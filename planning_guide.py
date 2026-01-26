@@ -611,16 +611,43 @@ if 'data_inputs' not in st.session_state:
 if 'selected_proxies' not in st.session_state:
     st.session_state.selected_proxies = {}
 
-# Add custom CSS for enhanced UI design
+# Add custom CSS for enhanced UI design with layered backgrounds
 st.markdown("""
     <style>
-    /* Column styling with grey backgrounds */
+    /* Main container background */
+    .stApp {
+        background: linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%);
+    }
+    
+    /* Outer layer - Very light grey background for column containers */
     div[data-testid="column"] {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        position: relative;
+        padding: 2rem 0.75rem;
+    }
+    
+    div[data-testid="column"]::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0.5rem;
+        right: 0.5rem;
+        bottom: 0;
+        background: linear-gradient(135deg, #f7f7f7 0%, #f0f0f0 100%);
+        border-radius: 24px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        z-index: 0;
+    }
+    
+    /* Inner layer - White background for actual content */
+    div[data-testid="column"] > div {
+        position: relative;
+        z-index: 1;
+        background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
         padding: 1.75rem 1.25rem;
-        border-radius: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        margin: 0 0.5rem;
+        border-radius: 18px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        margin: 0.5rem;
+        border: 1px solid rgba(203, 213, 225, 0.5);
     }
     
     /* Header styling */
@@ -630,6 +657,7 @@ st.markdown("""
         margin-bottom: 1.5rem !important;
         padding-bottom: 0.75rem;
         border-bottom: 3px solid #3b82f6;
+        font-weight: 700;
     }
     
     /* Subheader styling */
@@ -638,6 +666,7 @@ st.markdown("""
         font-size: 1.1rem !important;
         margin-top: 1.25rem !important;
         margin-bottom: 0.75rem !important;
+        font-weight: 600;
     }
     
     /* Expander styling */
@@ -646,7 +675,51 @@ st.markdown("""
         border-radius: 12px;
         border: 1px solid #e2e8f0;
         margin-bottom: 0.75rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        transition: all 0.3s ease;
+    }
+    
+    div[data-testid="stExpander"]:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    /* Select box styling with hover effect */
+    div[data-testid="stSelectbox"] > div {
+        background: white;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    div[data-testid="stSelectbox"]:hover > div {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    /* Multiselect styling with hover effect */
+    div[data-testid="stMultiSelect"] > div {
+        background: white;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    div[data-testid="stMultiSelect"]:hover > div {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    /* Checkbox container styling with hover effect */
+    div[data-testid="stCheckbox"] {
+        padding: 0.25rem 0;
+        transition: all 0.3s ease;
+        border-radius: 6px;
+        padding: 0.5rem;
+        margin: 0.25rem 0;
+    }
+    
+    div[data-testid="stCheckbox"]:hover {
+        background: rgba(59, 130, 246, 0.05);
+        transform: translateX(4px);
     }
     
     /* Button styling */
@@ -655,6 +728,13 @@ st.markdown("""
         border-radius: 10px;
         font-weight: 600;
         padding: 0.75rem 1.5rem;
+        box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    div[data-testid="column"] button[kind="primary"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
     }
     </style>
 """, unsafe_allow_html=True)
