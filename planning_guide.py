@@ -8,56 +8,592 @@ import random
 # Page configuration
 st.set_page_config(page_title="Project Planning Guide", layout="wide")
 
+# ==================== CONFIGURATION & RULES ENGINE ====================
+
+# Data requirements by analysis type
+ANALYSIS_REQUIREMENTS = {
+    "PED Planning": {
+        "critical_data": ["building_footprints", "energy_consumption", "climate_data"],
+        "important_data": ["construction_age", "building_materials", "occupancy_data"],
+        "base_confidence": 70,
+        "scale_preference": ["Neighborhood", "City"]
+    },
+    "ECOM Planning": {
+        "critical_data": ["building_footprints", "energy_consumption", "construction_age"],
+        "important_data": ["building_materials", "hvac_systems", "climate_data"],
+        "base_confidence": 65,
+        "scale_preference": ["Building", "Neighborhood"]
+    },
+    "Academic Research": {
+        "critical_data": ["building_footprints", "construction_age", "building_materials"],
+        "important_data": ["energy_consumption", "occupancy_data"],
+        "base_confidence": 75,
+        "scale_preference": ["Building", "Neighborhood", "City"]
+    },
+    "Investment Feasibility": {
+        "critical_data": ["building_footprints", "energy_consumption", "construction_age", "building_materials"],
+        "important_data": ["occupancy_data", "hvac_systems", "cost_data"],
+        "base_confidence": 60,
+        "scale_preference": ["Building", "Neighborhood"]
+    },
+    "Energy Audit": {
+        "critical_data": ["building_footprints", "energy_consumption", "hvac_systems"],
+        "important_data": ["construction_age", "building_materials", "occupancy_data"],
+        "base_confidence": 80,
+        "scale_preference": ["Building"]
+    },
+    "Carbon Assessment": {
+        "critical_data": ["building_footprints", "energy_consumption", "building_materials"],
+        "important_data": ["construction_age", "climate_data", "hvac_systems"],
+        "base_confidence": 70,
+        "scale_preference": ["Building", "Neighborhood", "City"]
+    },
+    "Retrofit Planning": {
+        "critical_data": ["building_footprints", "construction_age", "energy_consumption", "building_materials"],
+        "important_data": ["hvac_systems", "occupancy_data", "cost_data"],
+        "base_confidence": 65,
+        "scale_preference": ["Building", "Neighborhood"]
+    }
+}
+
+# Proxy tiers for missing data
+PROXY_TIERS = {
+    "construction_age": {
+        "tier1": {
+            "name": "National typology by age period",
+            "description": "Use national building archetypes categorized by construction period",
+            "uncertainty": "Medium",
+            "confidence_impact": -15,
+            "suitable_for": ["Scenario Planning", "Retrofit Ranking"],
+            "not_suitable_for": ["Detailed Analysis", "Individual Building Assessment"],
+            "outputs_affected": ["Annual Energy Demand", "Retrofit Prioritization"]
+        },
+        "tier2": {
+            "name": "Inferred age from remote sensing",
+            "description": "Estimate building age using satellite imagery and urban growth patterns",
+            "uncertainty": "High",
+            "confidence_impact": -30,
+            "suitable_for": ["Urban Screening", "Comparative Studies"],
+            "not_suitable_for": ["Investment Decisions", "Detailed Analysis"],
+            "outputs_affected": ["Annual Energy Demand", "Peak Power Load", "Cost Estimates"]
+        },
+        "tier3": {
+            "name": "Regional averages",
+            "description": "Apply average building age from regional statistics",
+            "uncertainty": "High",
+            "confidence_impact": -35,
+            "suitable_for": ["Scenario Planning", "High-level Screening"],
+            "not_suitable_for": ["Building-specific Analysis", "Investment Decisions"],
+            "outputs_affected": ["Annual Energy Demand", "Retrofit Prioritization", "Cost Estimates"]
+        }
+    },
+    "building_materials": {
+        "tier1": {
+            "name": "National construction standards by decade",
+            "description": "Use typical construction practices from national building codes",
+            "uncertainty": "Medium",
+            "confidence_impact": -20,
+            "suitable_for": ["Scenario Planning", "Comparative Analysis"],
+            "not_suitable_for": ["Precise Thermal Modeling"],
+            "outputs_affected": ["Annual Energy Demand", "Carbon Emissions"]
+        },
+        "tier2": {
+            "name": "Thermal imaging sample extrapolation",
+            "description": "Extrapolate from thermal imaging survey of representative buildings",
+            "uncertainty": "Medium-High",
+            "confidence_impact": -25,
+            "suitable_for": ["Neighborhood Assessment", "Prioritization"],
+            "not_suitable_for": ["Individual Building Analysis"],
+            "outputs_affected": ["Annual Energy Demand", "Retrofit Prioritization"]
+        },
+        "tier3": {
+            "name": "Climate zone defaults",
+            "description": "Apply typical envelope values for climate zone",
+            "uncertainty": "High",
+            "confidence_impact": -40,
+            "suitable_for": ["Rough Estimation Only"],
+            "not_suitable_for": ["Most Practical Applications"],
+            "outputs_affected": ["Annual Energy Demand", "Peak Power Load", "Carbon Emissions"]
+        }
+    },
+    "energy_consumption": {
+        "tier1": {
+            "name": "Utility billing data aggregated",
+            "description": "Use aggregated utility data for area or building type",
+            "uncertainty": "Medium",
+            "confidence_impact": -10,
+            "suitable_for": ["Neighborhood Analysis", "Baseline Assessment"],
+            "not_suitable_for": ["Peak Load Analysis", "Individual Buildings"],
+            "outputs_affected": ["Annual Energy Demand"]
+        },
+        "tier2": {
+            "name": "Benchmark data by building type",
+            "description": "Apply energy use intensity benchmarks from similar buildings",
+            "uncertainty": "High",
+            "confidence_impact": -35,
+            "suitable_for": ["Initial Screening", "Comparative Studies"],
+            "not_suitable_for": ["Accurate Energy Modeling"],
+            "outputs_affected": ["Annual Energy Demand", "Carbon Emissions", "Cost Estimates"]
+        },
+        "tier3": {
+            "name": "Simulated estimates",
+            "description": "Calculate from building physics and assumptions",
+            "uncertainty": "Very High",
+            "confidence_impact": -50,
+            "suitable_for": ["Scenario Comparison Only"],
+            "not_suitable_for": ["Baseline Reporting", "Investment Decisions"],
+            "outputs_affected": ["Annual Energy Demand", "Peak Power Load", "Carbon Emissions"]
+        }
+    },
+    "occupancy_data": {
+        "tier1": {
+            "name": "Census data by building type",
+            "description": "Use census occupancy statistics for building category",
+            "uncertainty": "Medium",
+            "confidence_impact": -12,
+            "suitable_for": ["Load Profiling", "Demand Estimation"],
+            "not_suitable_for": ["Hourly Load Curves"],
+            "outputs_affected": ["Peak Power Load", "Annual Energy Demand"]
+        },
+        "tier2": {
+            "name": "Standard occupancy schedules",
+            "description": "Apply typical occupancy patterns from standards",
+            "uncertainty": "High",
+            "confidence_impact": -25,
+            "suitable_for": ["Comparative Analysis", "Scenario Planning"],
+            "not_suitable_for": ["Demand Response Planning"],
+            "outputs_affected": ["Peak Power Load", "Annual Energy Demand"]
+        }
+    },
+    "hvac_systems": {
+        "tier1": {
+            "name": "Age-based system assumptions",
+            "description": "Infer HVAC type from building age and type",
+            "uncertainty": "Medium-High",
+            "confidence_impact": -20,
+            "suitable_for": ["System-level Planning", "Retrofit Screening"],
+            "not_suitable_for": ["Equipment Sizing"],
+            "outputs_affected": ["Peak Power Load", "Annual Energy Demand", "Retrofit Prioritization"]
+        },
+        "tier2": {
+            "name": "Regional typical systems",
+            "description": "Apply most common system types for region",
+            "uncertainty": "High",
+            "confidence_impact": -35,
+            "suitable_for": ["Initial Assessment Only"],
+            "not_suitable_for": ["Detailed Energy Modeling"],
+            "outputs_affected": ["Peak Power Load", "Annual Energy Demand", "Carbon Emissions"]
+        }
+    }
+}
+
+# Scale-specific requirements and considerations
+SCALE_CONSIDERATIONS = {
+    "Building": {
+        "required_detail": "High",
+        "aggregation_acceptable": False,
+        "typical_outputs": ["Annual Energy Demand", "Peak Power Load", "Retrofit Prioritization"],
+        "confidence_multiplier": 1.0,
+        "message": "Building-scale analysis requires detailed, building-specific data for reliable results."
+    },
+    "Neighborhood": {
+        "required_detail": "Medium",
+        "aggregation_acceptable": True,
+        "typical_outputs": ["Annual Energy Demand", "Peak Power Load", "Carbon Emissions", "Retrofit Prioritization"],
+        "confidence_multiplier": 1.1,
+        "message": "Neighborhood-scale analysis can tolerate some aggregated data and proxies."
+    },
+    "City": {
+        "required_detail": "Medium-Low",
+        "aggregation_acceptable": True,
+        "typical_outputs": ["Annual Energy Demand", "Carbon Emissions", "Cost Estimates"],
+        "confidence_multiplier": 1.2,
+        "message": "City-scale analysis focuses on aggregate trends; individual building accuracy less critical."
+    }
+}
+
+# Country-specific data quality adjustments
+COUNTRY_DATA_QUALITY = {
+    "Sweden": {"adjustment": 10, "note": "Excellent data infrastructure"},
+    "Denmark": {"adjustment": 10, "note": "Excellent data infrastructure"},
+    "Germany": {"adjustment": 5, "note": "Good data availability"},
+    "Finland": {"adjustment": 8, "note": "Very good data availability"},
+    "Norway": {"adjustment": 8, "note": "Very good data availability"},
+    "United Kingdom": {"adjustment": 5, "note": "Good data availability"},
+    "Belgium": {"adjustment": 3, "note": "Moderate data availability"},
+    "France": {"adjustment": 3, "note": "Moderate data availability"},
+    "Ireland": {"adjustment": 2, "note": "Moderate data availability"}
+}
+
+# Output-specific confidence calculation weights
+OUTPUT_WEIGHTS = {
+    "Annual Energy Demand": {
+        "critical_data": ["energy_consumption", "building_footprints", "climate_data"],
+        "important_data": ["construction_age", "building_materials"],
+        "base_confidence": 70
+    },
+    "Peak Power Load": {
+        "critical_data": ["energy_consumption", "occupancy_data", "hvac_systems"],
+        "important_data": ["construction_age", "climate_data"],
+        "base_confidence": 60
+    },
+    "Carbon Emissions": {
+        "critical_data": ["energy_consumption", "building_materials", "hvac_systems"],
+        "important_data": ["construction_age", "climate_data"],
+        "base_confidence": 65
+    },
+    "Cost Estimates": {
+        "critical_data": ["construction_age", "building_materials", "building_footprints"],
+        "important_data": ["energy_consumption", "hvac_systems"],
+        "base_confidence": 55
+    },
+    "Retrofit Prioritization": {
+        "critical_data": ["construction_age", "building_footprints", "energy_consumption"],
+        "important_data": ["building_materials", "hvac_systems"],
+        "base_confidence": 70
+    }
+}
+
+def calculate_confidence(analysis_type, data_inputs, project_scale, country, desired_outputs):
+    """
+    Calculate confidence levels based on available data, proxies, analysis type, and scale.
+    
+    Returns: dict with confidence for each output and overall confidence
+    """
+    results = {}
+    
+    # Get base confidence for analysis type
+    base_conf = ANALYSIS_REQUIREMENTS[analysis_type]["base_confidence"]
+    
+    # Apply scale multiplier
+    scale_mult = SCALE_CONSIDERATIONS[project_scale]["confidence_multiplier"]
+    
+    # Apply country adjustment
+    country_adj = COUNTRY_DATA_QUALITY[country]["adjustment"]
+    
+    # Calculate confidence for each desired output
+    output_confidences = {}
+    
+    for output in desired_outputs:
+        if output in OUTPUT_WEIGHTS:
+            output_conf = OUTPUT_WEIGHTS[output]["base_confidence"]
+            
+            # Check critical data availability
+            critical_data = OUTPUT_WEIGHTS[output]["critical_data"]
+            critical_missing = sum(1 for d in critical_data if not data_inputs.get(d, False))
+            critical_penalty = critical_missing * 20  # 20% penalty per missing critical item
+            
+            # Check important data availability
+            important_data = OUTPUT_WEIGHTS[output]["important_data"]
+            important_missing = sum(1 for d in important_data if not data_inputs.get(d, False))
+            important_penalty = important_missing * 10  # 10% penalty per missing important item
+            
+            # Calculate final confidence
+            final_conf = output_conf - critical_penalty - important_penalty
+            final_conf = final_conf * scale_mult + country_adj
+            final_conf = max(0, min(100, final_conf))  # Clamp between 0-100
+            
+            output_confidences[output] = round(final_conf)
+    
+    # Overall confidence is weighted average
+    if output_confidences:
+        overall_confidence = round(sum(output_confidences.values()) / len(output_confidences))
+    else:
+        overall_confidence = base_conf
+    
+    return {
+        "overall": overall_confidence,
+        "by_output": output_confidences,
+        "scale_message": SCALE_CONSIDERATIONS[project_scale]["message"],
+        "country_note": COUNTRY_DATA_QUALITY[country]["note"]
+    }
+
+def get_recommended_proxies(data_inputs, analysis_type, project_scale):
+    """
+    Determine which proxy tiers to recommend based on missing data and context.
+    
+    Returns: dict with recommended proxies for each missing data item
+    """
+    recommendations = {}
+    
+    # Get requirements for this analysis type
+    requirements = ANALYSIS_REQUIREMENTS[analysis_type]
+    critical_data = requirements["critical_data"]
+    
+    for data_item, is_available in data_inputs.items():
+        if not is_available and data_item in PROXY_TIERS:
+            # Determine best tier based on criticality and scale
+            is_critical = data_item in critical_data
+            
+            if project_scale == "Building":
+                # Building scale: prefer tier 1 or tier 2 for critical data
+                recommended_tier = "tier1" if is_critical else "tier2"
+            elif project_scale == "Neighborhood":
+                # Neighborhood scale: tier 1 usually sufficient
+                recommended_tier = "tier1"
+            else:  # City
+                # City scale: can tolerate tier 2 or even tier 3 for some items
+                recommended_tier = "tier2" if is_critical else "tier3"
+            
+            proxy_info = PROXY_TIERS[data_item][recommended_tier].copy()
+            proxy_info["is_critical"] = is_critical
+            proxy_info["tier"] = recommended_tier
+            recommendations[data_item] = proxy_info
+    
+    return recommendations
+
+def get_analysis_messages(analysis_type, data_inputs, project_scale, confidence_score):
+    """
+    Generate context-specific messages and warnings based on the configuration.
+    
+    Returns: dict with messages, warnings, and recommendations
+    """
+    messages = {
+        "warnings": [],
+        "recommendations": [],
+        "limitations": []
+    }
+    
+    requirements = ANALYSIS_REQUIREMENTS[analysis_type]
+    critical_data = requirements["critical_data"]
+    
+    # Check for missing critical data
+    missing_critical = [d for d in critical_data if not data_inputs.get(d, False)]
+    
+    if missing_critical:
+        for item in missing_critical:
+            messages["warnings"].append(
+                f"⚠ Critical data missing: {item.replace('_', ' ').title()}. "
+                f"This significantly impacts {analysis_type} reliability."
+            )
+            messages["recommendations"].append(
+                f"Priority: Obtain {item.replace('_', ' ')} data to improve confidence by 15-20%"
+            )
+    
+    # Scale-specific messages
+    if project_scale in requirements["scale_preference"]:
+        messages["recommendations"].append(
+            f"✓ {project_scale} scale is well-suited for {analysis_type}"
+        )
+    else:
+        messages["warnings"].append(
+            f"⚠ {analysis_type} typically performed at {' or '.join(requirements['scale_preference'])} scale"
+        )
+    
+    # Confidence-based messages
+    if confidence_score < 50:
+        messages["limitations"].append(
+            "⚠ Low confidence: Results should be used for screening purposes only"
+        )
+        messages["recommendations"].append(
+            "Critical: Significant data improvements needed before proceeding"
+        )
+    elif confidence_score < 70:
+        messages["limitations"].append(
+            "⚠ Medium confidence: Results suitable for planning but not detailed design"
+        )
+        messages["recommendations"].append(
+            "Recommended: Improve key data items to increase confidence above 70%"
+        )
+    else:
+        messages["recommendations"].append(
+            "✓ Good confidence level for proceeding with analysis"
+        )
+    
+    return messages
+
 # Custom CSS
 st.markdown("""
     <style>
+    /* Main container styling */
     .main {
-        padding: 0rem 1rem;
+        padding: 1rem 2rem;
+        background-color: #f8f9fa;
     }
+    
+    /* Typography improvements */
+    h1 {
+        color: #1e293b;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.5rem;
+    }
+    
+    h2 {
+        color: #334155;
+        font-weight: 600;
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    h3 {
+        color: #475569;
+        font-weight: 600;
+        margin-top: 1rem;
+    }
+    
+    /* Metric cards */
     .stMetric {
-        background-color: #f0f2f6;
-        padding: 10px;
-        border-radius: 5px;
+        background: linear-gradient(145deg, #ffffff, #f8f9fa);
+        padding: 1.25rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 1px solid #e2e8f0;
     }
+    
+    /* Badges styling */
     .available-badge {
-        background-color: #28a745;
+        background: linear-gradient(135deg, #10b981, #059669);
         color: white;
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: bold;
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
     }
+    
     .missing-badge {
-        background-color: #dc3545;
+        background: linear-gradient(135deg, #ef4444, #dc2626);
         color: white;
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: bold;
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
     }
+    
     .medium-badge {
-        background-color: #ffc107;
-        color: black;
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: bold;
-    }
-    .high-badge {
-        background-color: #dc3545;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
         color: white;
-        padding: 3px 10px;
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+    }
+    
+    .high-badge {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+    }
+    
+    /* Card containers */
+    .data-card {
+        background: white;
         border-radius: 12px;
-        font-size: 12px;
-        font-weight: bold;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
+    
+    .data-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    /* Selectbox styling */
+    .stSelectbox > div > div {
+        background-color: white;
+        border-radius: 8px;
+        border: 1.5px solid #e2e8f0;
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 0.625rem 1.25rem;
+        transition: all 0.2s ease;
+        border: none;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background-color: white;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        font-weight: 500;
+    }
+    
+    /* Progress bar */
+    .stProgress > div > div > div {
+        background: linear-gradient(90deg, #3b82f6, #2563eb);
+        border-radius: 4px;
+    }
+    
+    /* Tabs styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: transparent;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: white;
+        border-radius: 8px 8px 0 0;
+        padding: 12px 24px;
+        font-weight: 500;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(180deg, #3b82f6, #2563eb);
+        color: white;
+        border-color: #2563eb;
+    }
+    
+    /* Info box styling */
+    .stAlert {
+        background-color: white;
+        border-left: 4px solid #3b82f6;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    
+    /* DataFrame styling */
+    .dataframe {
+        border: none !important;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    /* Checkbox styling */
+    .stCheckbox {
+        padding: 0.25rem 0;
+    }
+    
+    /* Section dividers */
+    hr {
+        margin: 2rem 0;
+        border: none;
+        border-top: 2px solid #e2e8f0;
     }
     </style>
     """, unsafe_allow_html=True)
 
 # Title
 st.title("Project Planning Guide")
-st.markdown("### Data Fidelity Navigator - Handle Data Gaps & Review Impacts")
-st.markdown("---")
+st.markdown("<p style='font-size: 1.1rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 2rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
+st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
 
 # Initialize session state
 if 'data_inputs' not in st.session_state:
@@ -67,8 +603,61 @@ if 'data_inputs' not in st.session_state:
         'energy_consumption': True,
         'building_materials': False,
         'occupancy_data': True,
-        'climate_data': True
+        'climate_data': True,
+        'hvac_systems': False,
+        'cost_data': False
     }
+
+if 'selected_proxies' not in st.session_state:
+    st.session_state.selected_proxies = {}
+
+# Add custom CSS for enhanced UI design
+st.markdown("""
+    <style>
+    /* Column styling with grey backgrounds */
+    div[data-testid="column"] {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1.75rem 1.25rem;
+        border-radius: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin: 0 0.5rem;
+    }
+    
+    /* Header styling */
+    div[data-testid="column"] h1 {
+        color: #1e293b;
+        font-size: 1.5rem !important;
+        margin-bottom: 1.5rem !important;
+        padding-bottom: 0.75rem;
+        border-bottom: 3px solid #3b82f6;
+    }
+    
+    /* Subheader styling */
+    div[data-testid="column"] h2, div[data-testid="column"] h3 {
+        color: #475569;
+        font-size: 1.1rem !important;
+        margin-top: 1.25rem !important;
+        margin-bottom: 0.75rem !important;
+    }
+    
+    /* Expander styling */
+    div[data-testid="stExpander"] {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+    
+    /* Button styling */
+    div[data-testid="column"] button[kind="primary"] {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        border-radius: 10px;
+        font-weight: 600;
+        padding: 0.75rem 1.5rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Create three columns for main sections
 col1, col2, col3 = st.columns([1, 1.2, 1])
@@ -101,24 +690,6 @@ with col1:
         help="Select the geographic scope of your analysis"
     )
     
-    # Context
-    st.subheader("Context")
-    country = st.selectbox(
-        "Select country:",
-        options=[
-            "Sweden",
-            "Germany",
-            "United Kingdom",
-            "Ireland",
-            "Norway",
-            "Finland",
-            "Belgium",
-            "France",
-            "Denmark"
-        ],
-        help="Select the country for your analysis"
-    )
-
     # Building Uses (only for Neighborhood or City)
     if project_scale in ["Neighborhood", "City"]:
         st.subheader("Building Uses Included")
@@ -137,6 +708,24 @@ with col1:
 
         if selected_uses:
             st.info(f"{len(selected_uses)} building types selected")
+    
+    # Context
+    st.subheader("Context")
+    country = st.selectbox(
+        "Select country:",
+        options=[
+            "Sweden",
+            "Germany",
+            "United Kingdom",
+            "Ireland",
+            "Norway",
+            "Finland",
+            "Belgium",
+            "France",
+            "Denmark"
+        ],
+        help="Select the country for your analysis"
+    )
 
     # Desired Outputs
     st.subheader("Desired Outputs")
@@ -155,166 +744,245 @@ with col1:
     if st.button("Next", type="primary", use_container_width=True):
         st.success("Configuration saved")
 
+# ==================== RULES ENGINE: Calculate Everything Dynamically ====================
+
+# Calculate confidence levels based on configuration
+confidence_results = calculate_confidence(
+    analysis_type=analysis_type,
+    data_inputs=st.session_state.data_inputs,
+    project_scale=project_scale,
+    country=country,
+    desired_outputs=outputs
+)
+
+# Get recommended proxies for missing data
+recommended_proxies = get_recommended_proxies(
+    data_inputs=st.session_state.data_inputs,
+    analysis_type=analysis_type,
+    project_scale=project_scale
+)
+
+# Get contextual messages and recommendations
+analysis_messages = get_analysis_messages(
+    analysis_type=analysis_type,
+    data_inputs=st.session_state.data_inputs,
+    project_scale=project_scale,
+    confidence_score=confidence_results["overall"]
+)
+
 # ==================== COLUMN 2: Data Availability ====================
 with col2:
     st.header("Step 2: Review Data Inputs")
 
     st.subheader("Data Inputs")
 
-    # Available Data
-    with st.container():
-        st.markdown('<div style="border: 2px solid #28a745; border-radius: 5px; padding: 10px; margin-bottom: 10px;">', unsafe_allow_html=True)
-        col_check1, col_check2 = st.columns([3, 1])
-        with col_check1:
-            st.markdown("**Building Footprints**")
-            st.caption("• Detailed footprints map available")
-        with col_check2:
-            st.markdown('<span class="available-badge">Available</span>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Data categories structure
+    data_categories = {
+        "Building Geometry": [
+            {'label': 'Architectural drawings', 'key': 'architectural_drawings'},
+            {'label': 'Building dimensions', 'key': 'building_dimensions'},
+            {'label': 'Number of floors', 'key': 'number_of_floors'},
+            {'label': 'Roof shape and roof angle', 'key': 'roof_shape_angle'},
+            {'label': 'Window to wall ratio (all facades)', 'key': 'window_to_wall_ratio'},
+            {'label': 'Building orientation', 'key': 'building_orientation'}
+        ],
+        "Building Fabric and Construction": [
+            {'label': 'Construction materials', 'key': 'construction_materials'},
+            {'label': 'Year of construction/renovation', 'key': 'construction_age'},
+            {'label': 'Windows properties', 'key': 'window_properties'}
+        ],
+        "Building System": [
+            {'label': 'HVAC system type', 'key': 'hvac_systems'},
+            {'label': 'Infiltration rate', 'key': 'infiltration_rate'}
+        ],
+        "Location Context": [
+            {'label': 'Buildings location', 'key': 'building_location'},
+            {'label': 'Surroundings height and location', 'key': 'surroundings_data'}
+        ],
+        "Measured Energy Data": [
+            {'label': 'Hourly heating demand', 'key': 'hourly_heating_demand'},
+            {'label': 'Hourly electricity consumption', 'key': 'hourly_electricity_consumption'}
+        ],
+        "Building Use and Operation": [
+            {'label': 'Building use type', 'key': 'building_use_type'},
+            {'label': 'Occupancy patterns', 'key': 'occupancy_data'},
+            {'label': 'Internal gains', 'key': 'internal_gains'},
+            {'label': 'Domestic hot water demand', 'key': 'dhw_demand'}
+        ]
+    }
 
-    # Missing Data
-    with st.container():
-        st.markdown('<div style="border: 2px solid #dc3545; border-radius: 5px; padding: 10px; margin-bottom: 10px;">', unsafe_allow_html=True)
-        col_check1, col_check2 = st.columns([3, 1])
-        with col_check1:
-            st.markdown("**Construction Age**")
-            st.caption("• No building age data available")
-        with col_check2:
-            st.markdown('<span class="missing-badge">Missing</span>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Initialize session state for new data items if not present
+    for category, items in data_categories.items():
+        for item in items:
+            if item['key'] not in st.session_state.data_inputs:
+                st.session_state.data_inputs[item['key']] = False
 
-    # Proxy Recommendations
-    st.markdown("---")
-    tier_expanded = st.checkbox("Tier 1 Proxy (Recommended)", value=True)
+    # Display data items by category with expandable sections
+    for category, items in data_categories.items():
+        with st.expander(f"**{category}**", expanded=False):
+            for item in items:
+                checked = st.checkbox(
+                    item['label'],
+                    value=st.session_state.data_inputs.get(item['key'], False),
+                    key=f"checkbox_{item['key']}"
+                )
+                st.session_state.data_inputs[item['key']] = checked
 
-    if tier_expanded:
-        with st.container():
-            st.markdown('<div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; border-radius: 5px;">', unsafe_allow_html=True)
-            st.markdown("**National typology by age period**")
-            st.markdown('<span class="medium-badge">Medium</span>', unsafe_allow_html=True)
-
-            st.caption("• Annual heating demand, Retrofit ranking")
-
-            col_acc1, col_acc2, col_acc3 = st.columns(3)
-            with col_acc1:
-                st.markdown("**Scenario Planning**")
-            with col_acc2:
-                st.markdown("**Comparative Studies**")
-            with col_acc3:
-                st.markdown("**Detailed Analysis**")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    tier2_expanded = st.checkbox("Tier 2 Proxy")
-    if tier2_expanded:
-        with st.container():
-            st.markdown('<div style="background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 10px; border-radius: 5px;">', unsafe_allow_html=True)
-            st.markdown("**Inferred age from remote sensing**")
-            st.markdown('<span class="high-badge">High</span>', unsafe_allow_html=True)
-
-            st.caption("• Acceptable for: Urban Screening / Comparative Studies")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    tier3_expanded = st.checkbox("Tier 3 Proxy")
-    if tier3_expanded:
-        with st.container():
-            st.markdown('<div style="background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 10px; border-radius: 5px;">', unsafe_allow_html=True)
-            st.markdown("**Regional averages**")
-            st.markdown('<span class="high-badge">High</span>', unsafe_allow_html=True)
-
-            st.caption("• Acceptable for: Scenario Planning / Retrofit ranking")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    # Additional data items
-    st.markdown("---")
-    st.subheader("Other Data Items")
-
-    with st.expander("Energy Consumption Data - Available"):
-        st.caption("Metered data from local utility")
-        st.progress(0.9)
-
-    with st.expander("Building Materials - Missing"):
-        st.caption("Proxy: National construction standards by decade")
-        st.progress(0.4)
+    # Display Proxy Recommendations Dynamically
+    if recommended_proxies:
+        st.markdown("<hr style='margin: 1.5rem 0;'>", unsafe_allow_html=True)
+        st.subheader("Recommended Proxy Data")
+        
+        # Mapping for proxy data labels
+        data_items_display = {
+            'building_footprints': {'label': 'Building Footprints'},
+            'construction_age': {'label': 'Construction Age'},
+            'energy_consumption': {'label': 'Energy Consumption'},
+            'building_materials': {'label': 'Building Materials'},
+            'occupancy_data': {'label': 'Occupancy Data'},
+            'climate_data': {'label': 'Climate Data'},
+            'hvac_systems': {'label': 'HVAC Systems'},
+            'cost_data': {'label': 'Cost Data'}
+        }
+        
+        for data_item, proxy_info in recommended_proxies.items():
+            data_label = data_items_display[data_item]['label']
+            tier_num = proxy_info['tier'].replace('tier', '')
+            
+            # Determine badge color based on uncertainty
+            if proxy_info['uncertainty'] == "Medium":
+                badge_class = "medium-badge"
+                bg_gradient = "linear-gradient(135deg, #fef3c7, #fde68a)"
+                border_color = "#f59e0b"
+                text_color = "#92400e"
+            elif proxy_info['uncertainty'] == "High":
+                badge_class = "high-badge"
+                bg_gradient = "linear-gradient(135deg, #fecaca, #fca5a5)"
+                border_color = "#ef4444"
+                text_color = "#7f1d1d"
+            else:  # Very High
+                badge_class = "high-badge"
+                bg_gradient = "linear-gradient(135deg, #fca5a5, #f87171)"
+                border_color = "#dc2626"
+                text_color = "#7f1d1d"
+            
+            # Show as expandable section
+            is_recommended = proxy_info.get('is_critical', False) or tier_num == "1"
+            tier_label = f"Tier {tier_num} Proxy for {data_label}"
+            if is_recommended:
+                tier_label += " (Recommended)"
+            
+            with st.expander(tier_label, expanded=is_recommended):
+                with st.container():
+                    st.markdown(f'<div style="background: {bg_gradient}; border-left: 4px solid {border_color}; padding: 1.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">', unsafe_allow_html=True)
+                    st.markdown(f"<p style='font-weight: 600; color: {text_color}; margin: 0;'>{proxy_info['name']}</p>", unsafe_allow_html=True)
+                    st.markdown(f'<span class="{badge_class}">{proxy_info["uncertainty"]} Uncertainty</span>', unsafe_allow_html=True)
+                    
+                    st.caption(proxy_info['description'])
+                    st.caption(f"Confidence Impact: {proxy_info['confidence_impact']}%")
+                    
+                    if proxy_info['outputs_affected']:
+                        st.caption(f"Affects: {', '.join(proxy_info['outputs_affected'])}")
+                    
+                    # Show suitable/not suitable
+                    if len(proxy_info['suitable_for']) + len(proxy_info['not_suitable_for']) > 0:
+                        cols = st.columns(2)
+                        with cols[0]:
+                            if proxy_info['suitable_for']:
+                                st.markdown("<p style='font-size: 0.85rem; font-weight: 600; color: #059669; margin-top: 0.5rem;'>✓ Suitable for:</p>", unsafe_allow_html=True)
+                                for item in proxy_info['suitable_for']:
+                                    st.markdown(f"<p style='font-size: 0.8rem; color: #059669; margin: 0;'>• {item}</p>", unsafe_allow_html=True)
+                        with cols[1]:
+                            if proxy_info['not_suitable_for']:
+                                st.markdown("<p style='font-size: 0.85rem; font-weight: 600; color: #dc2626; margin-top: 0.5rem;'>✗ Not suitable for:</p>", unsafe_allow_html=True)
+                                for item in proxy_info['not_suitable_for']:
+                                    st.markdown(f"<p style='font-size: 0.8rem; color: #dc2626; margin: 0;'>• {item}</p>", unsafe_allow_html=True)
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Show scale-specific message
+    if confidence_results.get("scale_message"):
+        st.markdown("<hr style='margin: 1.5rem 0;'>", unsafe_allow_html=True)
+        st.info(f"**Scale Note:** {confidence_results['scale_message']}")
+    
+    # Show country-specific note
+    if confidence_results.get("country_note"):
+        st.info(f"**{country}:** {confidence_results['country_note']}")
 
 # ==================== COLUMN 3: Model Output Confidence ====================
 with col3:
     st.header("Model Output Confidence")
 
-    # Confidence Metrics
-    st.subheader("Output Confidence Levels")
-
-    # Annual Energy Demand
-    confidence_energy = 60
-    st.markdown("**Annual Heating Demand**")
-    st.progress(confidence_energy / 100)
-    col_conf1, col_conf2 = st.columns([3, 1])
-    with col_conf1:
-        st.caption("Reliable for scenario planning")
-    with col_conf2:
-        st.markdown(f"**{confidence_energy}%**")
-
+    # Overall Confidence
+    st.subheader("Overall Confidence")
+    overall_conf = confidence_results["overall"]
+    
+    # Determine color based on confidence level
+    if overall_conf >= 70:
+        conf_color = "#10b981"
+        conf_label = "Good"
+    elif overall_conf >= 50:
+        conf_color = "#f59e0b"
+        conf_label = "Medium"
+    else:
+        conf_color = "#ef4444"
+        conf_label = "Low"
+    
+    col_overall1, col_overall2 = st.columns([2, 1])
+    with col_overall1:
+        st.markdown(f'<div style="background: linear-gradient(135deg, {conf_color}15, {conf_color}25); padding: 1rem; border-radius: 8px; border-left: 4px solid {conf_color};">'
+                   f'<p style="font-size: 2rem; font-weight: 700; color: {conf_color}; margin: 0;">{overall_conf}%</p>'
+                   f'<p style="color: #64748b; margin: 0;">{conf_label} Confidence</p></div>', unsafe_allow_html=True)
+    
     st.markdown("---")
 
-    # Peak Power
-    confidence_peak = 35
-    st.markdown("**Peak Heating Power**")
-    st.progress(confidence_peak / 100)
-    col_conf1, col_conf2 = st.columns([3, 1])
-    with col_conf1:
-        st.markdown('<span style="color: #dc3545;">Low Confidence</span>', unsafe_allow_html=True)
-        st.caption("High uncertainty from missing data")
-    with col_conf2:
-        st.markdown(f"**{confidence_peak}%**")
-
-    st.markdown("---")
-
-    # Retrofit Prioritization
-    confidence_retrofit = 70
-    st.markdown("**Retrofit Prioritization**")
-    st.progress(confidence_retrofit / 100)
-    col_conf1, col_conf2 = st.columns([3, 1])
-    with col_conf1:
-        st.caption("Good for comparative ranking")
-    with col_conf2:
-        st.markdown(f"**{confidence_retrofit}%**")
-
-    # Main Limitations
-    st.markdown("---")
-    st.subheader("Main Limitations")
-    st.markdown("""
-    • Retrofit rankings biased due to age assumptions
-
-    • Peak power unreliable from remote sensing data
-
-    • Individual building accuracy limited
-    """)
-
-    # Recommended Upgrades
-    st.markdown("---")
-    st.subheader("Recommended Upgrades")
-    st.markdown("""
-    **Priority Actions:**
+    # Output-Specific Confidence Levels
+    st.subheader("By Output Type")
     
-    Gather metered heating data to improve accuracy
-    
-    Vote for local building registry to track construction
-    
-    Survey sample buildings for validation
-    """)
+    for output, conf_value in confidence_results["by_output"].items():
+        st.markdown(f"**{output}**")
+        
+        # Determine status and message
+        if conf_value >= 70:
+            status_color = "#10b981"
+            status_msg = "Reliable for most applications"
+        elif conf_value >= 50:
+            status_color = "#f59e0b"
+            status_msg = "Suitable for planning, limited precision"
+        else:
+            status_color = "#ef4444"
+            status_msg = "Low confidence - screening only"
+        
+        st.progress(conf_value / 100)
+        col_conf1, col_conf2 = st.columns([3, 1])
+        with col_conf1:
+            st.markdown(f'<span style="color: {status_color}; font-size: 0.85rem;">{status_msg}</span>', unsafe_allow_html=True)
+        with col_conf2:
+            st.markdown(f"**{conf_value}%**")
+        
+        st.markdown("---")
 
-    # Contacts
-    st.markdown("---")
-    st.subheader("More Contacts")
-    st.markdown("""
-    Campordats: resilperctee for summation
-    
-    Gather lowful data & suggeotions for future now
-    
-    Using alor-firm leading.388 for improvement, data
-    """)
+    # Display Warnings
+    if analysis_messages["warnings"]:
+        st.subheader("⚠ Warnings")
+        for warning in analysis_messages["warnings"]:
+            st.warning(warning)
+
+    # Display Limitations
+    if analysis_messages["limitations"]:
+        st.subheader("Main Limitations")
+        for limitation in analysis_messages["limitations"]:
+            st.markdown(f"• {limitation}")
+
+    # Display Recommendations
+    if analysis_messages["recommendations"]:
+        st.markdown("---")
+        st.subheader("Recommended Actions")
+        for idx, rec in enumerate(analysis_messages["recommendations"], 1):
+            st.markdown(f"{idx}. {rec}")
 
 # ==================== BOTTOM SECTION: Visualizations ====================
-st.markdown("---")
+st.markdown("<hr style='margin: 2.5rem 0;'>", unsafe_allow_html=True)
 st.header("Detailed Analysis")
 
 tab1, tab2, tab3 = st.tabs(["Data Coverage", "Confidence Breakdown", "Recommendations"])
@@ -496,7 +1164,7 @@ with tab3:
         st.metric("Cost per % Point", f"${investment * 1000 / max(confidence_improvement, 1):.0f}")
 
 # Footer
-st.markdown("---")
+st.markdown("<hr style='margin: 2rem 0;'>", unsafe_allow_html=True)
 col_foot1, col_foot2, col_foot3 = st.columns(3)
 
 with col_foot1:
@@ -513,4 +1181,4 @@ with col_foot3:
         st.info("Report generation coming soon")
 
 st.markdown("---")
-st.caption(f"Project Planning Guide v1.0 | Analysis: {analysis_type} | Scale: {project_scale}")
+st.markdown(f"<p style='text-align: center; color: #64748b; font-size: 0.9rem;'>Project Planning Guide v1.0 | Analysis: {analysis_type} | Scale: {project_scale} | Country: {country}</p>", unsafe_allow_html=True)
