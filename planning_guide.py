@@ -10,6 +10,92 @@ st.set_page_config(page_title="Project Planning Guide", layout="wide")
 
 # ==================== CONFIGURATION & RULES ENGINE ====================
 
+# Detailed data requirements by analysis type (maps to specific data item keys)
+ANALYSIS_DATA_REQUIREMENTS = {
+    "Energy & Carbon Performance": {
+        "required_items": [
+            # Building Geometry
+            "building_footprints",           # Footprint, height, number of floors
+            "number_of_floors",              # Height, number of floors
+            "roof_shape_angle",              # Roof shape and angle
+            "window_to_wall_ratio",          # Window-to-wall ratio (per façade)
+            # Location & Context
+            "building_location",             # Building coordinates / address
+            # Climate Data
+            "climate_data",                  # Weather file (EPW / TMY / future climate)
+            # Building Fabric & Construction (required)
+            "building_materials",            # Wall, roof, floor, window constructions
+            "construction_age",              # Year of construction (if materials unknown)
+            # Building Use & Operation
+            "building_use_type",             # Building use type
+            "occupancy_data",                # Occupancy profiles
+            "internal_gains",                # Internal gains (lighting, equipment)
+            "dhw_demand",                    # Domestic hot water demand
+            # Systems & Technologies (required)
+            "hvac_systems",                  # HVAC system type
+            "infiltration_rate",             # Infiltration rate
+            # Carbon Accounting (if emissions reported)
+            "emission_factors",              # Emission factors for electricity and heating supply
+            # Energy Data
+            "hourly_heating_demand",         # Hourly/monthly heating demand
+            "hourly_electricity_consumption" # Hourly/monthly electricity use
+        ],
+        "optional_items": [
+            "surroundings_data",             # Surrounding shading (if available)
+            "window_properties",             # Specific window properties
+            "architectural_drawings"         # More detailed geometry
+        ]
+    },
+    "Renewable Energy & Local Production": {
+        "required_items": [
+            # Building Geometry
+            "roof_shape_angle",              # Roof geometry (tilt, azimuth, usable area)
+            "roof_area",                     # Usable roof area
+            # Location & Context
+            "surroundings_data",             # Shading from surrounding buildings/trees
+            # Climate Data
+            "climate_data",                  # Solar radiation (from EPW)
+            # Systems & Technologies - PV system parameters
+            "pv_system_params",              # Panel efficiency, installed capacity, coverage ratio, inverter efficiency
+            # Building Use & Operation
+            "occupancy_data",                # Hourly demand profiles
+            # Energy Data
+            "hourly_electricity_consumption" # Measured load profiles (improves self-consumption analysis)
+        ],
+        "optional_items": [
+            "building_footprints",           # Building footprint for context
+            "building_location",             # Building coordinates
+            "battery_storage"                # Battery parameters (if storage included)
+        ]
+    },
+    "Climate Resilience": {
+        "required_items": [
+            # Climate Data
+            "climate_data",                  # Current weather file
+            "future_climate_data",           # Future climate files (SSP/RCP scenarios)
+            # Building Geometry
+            "building_orientation",          # Orientation
+            "window_to_wall_ratio",          # Window ratios
+            "surroundings_data",             # Shading geometry
+            # Building Fabric & Construction
+            "thermal_mass",                  # Thermal mass
+            "building_materials",            # Insulation levels
+            "window_properties",             # Window properties
+            # Building Use & Operation
+            "occupancy_data",                # Occupancy schedules
+            "comfort_thresholds",            # Comfort thresholds
+            # Systems & Technologies
+            "cooling_systems",               # Cooling systems (if present)
+            "ventilation_strategy"           # Ventilation strategy
+        ],
+        "optional_items": [
+            "building_footprints",           # Building footprint for context
+            "construction_age",              # Building age for vulnerability assessment
+            "hvac_systems"                   # Full HVAC details
+        ]
+    }
+}
+
 # Data requirements by analysis type
 ANALYSIS_REQUIREMENTS = {
     "Energy & Carbon Performance": {
@@ -210,6 +296,24 @@ DATA_ITEMS_WITH_PROXIES = {
                     'uncertainty': 'Medium'
                 }
             }
+        },
+        {
+            'label': 'Thermal mass',
+            'key': 'thermal_mass',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Construction type estimation',
+                    'description': 'Estimate thermal mass from building type and construction era',
+                    'confidence_impact': -20,
+                    'uncertainty': 'Medium-High'
+                },
+                'tier2': {
+                    'name': 'Generic thermal mass values',
+                    'description': 'Apply standard thermal mass values for building category',
+                    'confidence_impact': -35,
+                    'uncertainty': 'High'
+                }
+            }
         }
     ],
     "Building System": [
@@ -240,6 +344,36 @@ DATA_ITEMS_WITH_PROXIES = {
                     'description': 'Use typical infiltration rates based on construction period',
                     'confidence_impact': -15,
                     'uncertainty': 'Medium'
+                }
+            }
+        },
+        {
+            'label': 'Cooling systems',
+            'key': 'cooling_systems',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Climate zone typical systems',
+                    'description': 'Infer cooling system type based on climate and building age',
+                    'confidence_impact': -18,
+                    'uncertainty': 'Medium'
+                },
+                'tier2': {
+                    'name': 'Regional cooling standards',
+                    'description': 'Apply typical cooling solutions for region',
+                    'confidence_impact': -30,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Ventilation strategy',
+            'key': 'ventilation_strategy',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Building type defaults',
+                    'description': 'Assume typical ventilation for building type and age',
+                    'confidence_impact': -20,
+                    'uncertainty': 'Medium-High'
                 }
             }
         }
@@ -320,6 +454,120 @@ DATA_ITEMS_WITH_PROXIES = {
             }
         }
     ],
+    "Climate Data": [
+        {
+            'label': 'Weather file (EPW/TMY)',
+            'key': 'climate_data',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Nearby weather station data',
+                    'description': 'Use weather data from nearest meteorological station',
+                    'confidence_impact': -8,
+                    'uncertainty': 'Low-Medium'
+                },
+                'tier2': {
+                    'name': 'Climate zone typical year',
+                    'description': 'Use typical meteorological year for climate zone',
+                    'confidence_impact': -20,
+                    'uncertainty': 'Medium-High'
+                }
+            }
+        },
+        {
+            'label': 'Future climate scenarios (SSP/RCP)',
+            'key': 'future_climate_data',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Regional climate projections',
+                    'description': 'Use downscaled regional climate model projections',
+                    'confidence_impact': -15,
+                    'uncertainty': 'Medium'
+                },
+                'tier2': {
+                    'name': 'Morphed weather files',
+                    'description': 'Apply climate change factors to current weather data',
+                    'confidence_impact': -30,
+                    'uncertainty': 'High'
+                }
+            }
+        }
+    ],
+    "Carbon Accounting": [
+        {
+            'label': 'Emission factors for energy carriers',
+            'key': 'emission_factors',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'National grid emission factors',
+                    'description': 'Use national/regional emission factors from official sources',
+                    'confidence_impact': -10,
+                    'uncertainty': 'Low-Medium'
+                },
+                'tier2': {
+                    'name': 'Default IPCC factors',
+                    'description': 'Apply generic IPCC emission factors',
+                    'confidence_impact': -25,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Roof area / solar potential',
+            'key': 'roof_area',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Aerial imagery estimation',
+                    'description': 'Calculate roof area from satellite/aerial imagery',
+                    'confidence_impact': -10,
+                    'uncertainty': 'Medium'
+                }
+            }
+        },
+        {
+            'label': 'Solar potential assessment',
+            'key': 'solar_potential',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'GIS-based solar mapping',
+                    'description': 'Use available solar potential maps or calculations',
+                    'confidence_impact': -15,
+                    'uncertainty': 'Medium'
+                }
+            }
+        }
+    ],
+    "Renewable Energy Systems": [
+        {
+            'label': 'PV system parameters',
+            'key': 'pv_system_params',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Regional typical PV systems',
+                    'description': 'Use typical panel efficiency, inverter specs for region',
+                    'confidence_impact': -15,
+                    'uncertainty': 'Medium'
+                },
+                'tier2': {
+                    'name': 'Generic PV system defaults',
+                    'description': 'Apply standard industry defaults for PV systems',
+                    'confidence_impact': -30,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Battery storage parameters',
+            'key': 'battery_storage',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Standard battery system specs',
+                    'description': 'Use typical battery capacity and efficiency values',
+                    'confidence_impact': -20,
+                    'uncertainty': 'Medium-High'
+                }
+            }
+        }
+    ],
     "Building Use and Operation": [
         {
             'label': 'Building use type',
@@ -372,6 +620,24 @@ DATA_ITEMS_WITH_PROXIES = {
                     'description': 'Calculate DHW from occupancy and building standards',
                     'confidence_impact': -18,
                     'uncertainty': 'Medium'
+                }
+            }
+        },
+        {
+            'label': 'Comfort thresholds',
+            'key': 'comfort_thresholds',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Standard comfort ranges',
+                    'description': 'Apply ASHRAE/EN comfort standards for building type',
+                    'confidence_impact': -12,
+                    'uncertainty': 'Medium'
+                },
+                'tier2': {
+                    'name': 'Climate-based defaults',
+                    'description': 'Use typical comfort ranges for climate zone',
+                    'confidence_impact': -25,
+                    'uncertainty': 'High'
                 }
             }
         }
@@ -575,6 +841,44 @@ OUTPUT_WEIGHTS = {
         "base_confidence": 70
     }
 }
+
+def get_filtered_data_items(analysis_type):
+    """
+    Filter DATA_ITEMS_WITH_PROXIES based on the selected analysis type.
+    Returns only the data items relevant to the specified analysis.
+    
+    Args:
+        analysis_type: The selected analysis type (e.g., "Energy & Carbon Performance")
+    
+    Returns:
+        dict: Filtered dictionary of data items organized by category
+    """
+    # If analysis type not in detailed requirements, return all items
+    if analysis_type not in ANALYSIS_DATA_REQUIREMENTS:
+        return DATA_ITEMS_WITH_PROXIES
+    
+    requirements = ANALYSIS_DATA_REQUIREMENTS[analysis_type]
+    all_needed_keys = set(requirements["required_items"] + requirements.get("optional_items", []))
+    
+    # Filter data items by keeping only those in the requirements
+    filtered_items = {}
+    
+    for category, items in DATA_ITEMS_WITH_PROXIES.items():
+        filtered_category_items = []
+        
+        for item in items:
+            if item['key'] in all_needed_keys:
+                # Mark if it's required or optional
+                item_copy = item.copy()
+                item_copy['is_required'] = item['key'] in requirements["required_items"]
+                item_copy['is_optional'] = item['key'] in requirements.get("optional_items", [])
+                filtered_category_items.append(item_copy)
+        
+        # Only include category if it has items
+        if filtered_category_items:
+            filtered_items[category] = filtered_category_items
+    
+    return filtered_items
 
 def calculate_confidence(analysis_type, data_inputs, project_scale, country, desired_outputs):
     """
@@ -1146,9 +1450,7 @@ with col1:
             "Renewable Energy & Local Production",
             "Retrofit & Transformation",
             "Urban Design Support",
-            "Climate Resilience",
-            "Infrastructure Planning",
-            "Equity & Social Impact"
+            "Climate Resilience"
         ],
         help="Choose the type of analysis you're conducting"
     )
@@ -1246,14 +1548,17 @@ with col2:
     st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
 
     st.subheader("Do you have the following data inputs?")
-    st.caption("Expand each category and indicate data availability. Alternative proxy options will appear if data is unavailable.")
+    st.caption(f"Showing data requirements for **{analysis_type}**. Expand each category and indicate data availability.")
+    
+    # Get filtered data items based on analysis type
+    filtered_data_items = get_filtered_data_items(analysis_type)
 
-    # Calculate summary statistics
-    total_items = sum(len(items) for items in DATA_ITEMS_WITH_PROXIES.values())
-    available_items = sum(1 for items in DATA_ITEMS_WITH_PROXIES.values() 
+    # Calculate summary statistics using filtered items
+    total_items = sum(len(items) for items in filtered_data_items.values())
+    available_items = sum(1 for items in filtered_data_items.values() 
                          for item in items 
                          if st.session_state.data_inputs.get(item['key'], False))
-    proxy_items = sum(1 for items in DATA_ITEMS_WITH_PROXIES.values() 
+    proxy_items = sum(1 for items in filtered_data_items.values() 
                      for item in items 
                      if not st.session_state.data_inputs.get(item['key'], False) 
                      and st.session_state.get(f"proxy_{item['key']}", 'None (missing)') != 'None (missing)'
@@ -1271,19 +1576,26 @@ with col2:
     
     st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
-    # Initialize session state for new data items if not present
-    for category, items in DATA_ITEMS_WITH_PROXIES.items():
+    # Initialize session state for new data items if not present (use filtered items)
+    for category, items in filtered_data_items.items():
         for item in items:
             if item['key'] not in st.session_state.data_inputs:
                 st.session_state.data_inputs[item['key']] = False
             if f"proxy_{item['key']}" not in st.session_state:
                 st.session_state[f"proxy_{item['key']}"] = None
 
-    # Display data items by category with expandable sections
-    for category, items in DATA_ITEMS_WITH_PROXIES.items():
+    # Display data items by category with expandable sections (use filtered items)
+    for category, items in filtered_data_items.items():
         with st.expander(f"**{category}**", expanded=False):
             for item in items:
-                st.markdown(f"<p style='font-weight: 600; margin-bottom: 0.3rem; margin-top: 0.3rem; color: #334155; font-size: 0.9rem;'>{item['label']}</p>", unsafe_allow_html=True)
+                # Show required/optional badge
+                requirement_badge = ""
+                if item.get('is_required', False):
+                    requirement_badge = '<span style="background: #fef3c7; color: #92400e; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 0.3rem;">REQUIRED</span>'
+                elif item.get('is_optional', False):
+                    requirement_badge = '<span style="background: #e0e7ff; color: #4338ca; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 0.3rem;">OPTIONAL</span>'
+                
+                st.markdown(f"<p style='font-weight: 600; margin-bottom: 0.3rem; margin-top: 0.3rem; color: #334155; font-size: 0.9rem;'>{item['label']}{requirement_badge}</p>", unsafe_allow_html=True)
                 
                 # Create columns for Yes/No and Proxy dropdown
                 col_radio, col_proxy = st.columns([1, 2])
