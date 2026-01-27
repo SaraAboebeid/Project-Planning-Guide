@@ -56,7 +56,329 @@ ANALYSIS_REQUIREMENTS = {
     }
 }
 
-# Proxy tiers for missing data
+# Data items with integrated proxy options
+DATA_ITEMS_WITH_PROXIES = {
+    "Building Geometry": [
+        {
+            'label': 'Architectural drawings',
+            'key': 'architectural_drawings',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Google Earth + Street View measurements',
+                    'description': 'Extract dimensions from satellite imagery and street-level photos',
+                    'confidence_impact': -15,
+                    'uncertainty': 'Medium'
+                },
+                'tier2': {
+                    'name': 'Neighboring building averages',
+                    'description': 'Use average dimensions from similar nearby buildings',
+                    'confidence_impact': -30,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Building dimensions',
+            'key': 'building_footprints',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'GIS cadastral data',
+                    'description': 'Use building footprints from cadastral/property records',
+                    'confidence_impact': -10,
+                    'uncertainty': 'Medium'
+                },
+                'tier2': {
+                    'name': 'OpenStreetMap data',
+                    'description': 'Extract building outlines from OpenStreetMap',
+                    'confidence_impact': -25,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Number of floors',
+            'key': 'number_of_floors',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Visual estimation from imagery',
+                    'description': 'Count floors from Google Street View or site photos',
+                    'confidence_impact': -12,
+                    'uncertainty': 'Medium'
+                }
+            }
+        },
+        {
+            'label': 'Roof shape and roof angle',
+            'key': 'roof_shape_angle',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Aerial imagery analysis',
+                    'description': 'Determine roof characteristics from satellite/drone imagery',
+                    'confidence_impact': -15,
+                    'uncertainty': 'Medium'
+                }
+            }
+        },
+        {
+            'label': 'Window to wall ratio (all facades)',
+            'key': 'window_to_wall_ratio',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Photo analysis estimation',
+                    'description': 'Estimate WWR from building facade photos',
+                    'confidence_impact': -20,
+                    'uncertainty': 'Medium-High'
+                },
+                'tier2': {
+                    'name': 'Building type defaults',
+                    'description': 'Apply typical WWR values for building type and age',
+                    'confidence_impact': -35,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Building orientation',
+            'key': 'building_orientation',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'GIS/Map-based measurement',
+                    'description': 'Calculate orientation from map data or satellite imagery',
+                    'confidence_impact': -5,
+                    'uncertainty': 'Low'
+                }
+            }
+        }
+    ],
+    "Building Fabric and Construction": [
+        {
+            'label': 'Construction materials',
+            'key': 'building_materials',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'National construction standards by decade',
+                    'description': 'Use typical construction practices from national building codes',
+                    'confidence_impact': -20,
+                    'uncertainty': 'Medium'
+                },
+                'tier2': {
+                    'name': 'Thermal imaging sample extrapolation',
+                    'description': 'Extrapolate from thermal imaging survey of representative buildings',
+                    'confidence_impact': -25,
+                    'uncertainty': 'Medium-High'
+                },
+                'tier3': {
+                    'name': 'Climate zone defaults',
+                    'description': 'Apply typical envelope values for climate zone',
+                    'confidence_impact': -40,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Year of construction/renovation',
+            'key': 'construction_age',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Municipal building permits',
+                    'description': 'Obtain construction dates from building permit archives',
+                    'confidence_impact': -8,
+                    'uncertainty': 'Low-Medium'
+                },
+                'tier2': {
+                    'name': 'Architectural style dating',
+                    'description': 'Estimate age from architectural characteristics and local development patterns',
+                    'confidence_impact': -25,
+                    'uncertainty': 'High'
+                },
+                'tier3': {
+                    'name': 'Regional average by area',
+                    'description': 'Apply average building age from regional statistics',
+                    'confidence_impact': -35,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Windows properties',
+            'key': 'window_properties',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Age-based window standards',
+                    'description': 'Infer window properties from construction age and building codes',
+                    'confidence_impact': -18,
+                    'uncertainty': 'Medium'
+                }
+            }
+        }
+    ],
+    "Building System": [
+        {
+            'label': 'HVAC system type',
+            'key': 'hvac_systems',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Age-based system assumptions',
+                    'description': 'Infer HVAC type from building age and type',
+                    'confidence_impact': -20,
+                    'uncertainty': 'Medium-High'
+                },
+                'tier2': {
+                    'name': 'Regional typical systems',
+                    'description': 'Apply most common system types for region',
+                    'confidence_impact': -35,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Infiltration rate',
+            'key': 'infiltration_rate',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Building age defaults',
+                    'description': 'Use typical infiltration rates based on construction period',
+                    'confidence_impact': -15,
+                    'uncertainty': 'Medium'
+                }
+            }
+        }
+    ],
+    "Location Context": [
+        {
+            'label': 'Buildings location',
+            'key': 'building_location',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Address geocoding',
+                    'description': 'Convert addresses to coordinates using geocoding services',
+                    'confidence_impact': -5,
+                    'uncertainty': 'Low'
+                }
+            }
+        },
+        {
+            'label': 'Surroundings height and location',
+            'key': 'surroundings_data',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': '3D city model or LiDAR',
+                    'description': 'Use available 3D building data or aerial LiDAR scans',
+                    'confidence_impact': -12,
+                    'uncertainty': 'Medium'
+                },
+                'tier2': {
+                    'name': 'Simplified shading analysis',
+                    'description': 'Estimate shading using 2D maps and typical building heights',
+                    'confidence_impact': -25,
+                    'uncertainty': 'High'
+                }
+            }
+        }
+    ],
+    "Measured Energy Data": [
+        {
+            'label': 'Hourly heating demand',
+            'key': 'hourly_heating_demand',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Monthly/annual utility data',
+                    'description': 'Use monthly utility bills with load profile estimation',
+                    'confidence_impact': -20,
+                    'uncertainty': 'Medium-High'
+                },
+                'tier2': {
+                    'name': 'Benchmark data by building type',
+                    'description': 'Apply typical heating profiles from similar buildings',
+                    'confidence_impact': -35,
+                    'uncertainty': 'High'
+                },
+                'tier3': {
+                    'name': 'Physics-based simulation',
+                    'description': 'Calculate heating demand from building model and weather',
+                    'confidence_impact': -50,
+                    'uncertainty': 'Very High'
+                }
+            }
+        },
+        {
+            'label': 'Hourly electricity consumption',
+            'key': 'hourly_electricity_consumption',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Monthly/annual utility data',
+                    'description': 'Use monthly utility bills with load profile estimation',
+                    'confidence_impact': -18,
+                    'uncertainty': 'Medium-High'
+                },
+                'tier2': {
+                    'name': 'Benchmark load profiles',
+                    'description': 'Apply standard electricity profiles for building type',
+                    'confidence_impact': -40,
+                    'uncertainty': 'High'
+                }
+            }
+        }
+    ],
+    "Building Use and Operation": [
+        {
+            'label': 'Building use type',
+            'key': 'building_use_type',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Municipal zoning records',
+                    'description': 'Obtain building use classification from zoning database',
+                    'confidence_impact': -8,
+                    'uncertainty': 'Low'
+                }
+            }
+        },
+        {
+            'label': 'Occupancy patterns',
+            'key': 'occupancy_data',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Census data by building type',
+                    'description': 'Use census occupancy statistics for building category',
+                    'confidence_impact': -12,
+                    'uncertainty': 'Medium'
+                },
+                'tier2': {
+                    'name': 'Standard occupancy schedules',
+                    'description': 'Apply typical occupancy patterns from standards (ASHRAE, ISO)',
+                    'confidence_impact': -25,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Internal gains',
+            'key': 'internal_gains',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Building standard defaults',
+                    'description': 'Use standard internal gain values from energy codes',
+                    'confidence_impact': -15,
+                    'uncertainty': 'Medium'
+                }
+            }
+        },
+        {
+            'label': 'Domestic hot water demand',
+            'key': 'dhw_demand',
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Occupancy-based estimation',
+                    'description': 'Calculate DHW from occupancy and building standards',
+                    'confidence_impact': -18,
+                    'uncertainty': 'Medium'
+                }
+            }
+        }
+    ]
+}
+
+# Legacy PROXY_TIERS for backward compatibility with confidence calculations
 PROXY_TIERS = {
     "construction_age": {
         "tier1": {
@@ -854,65 +1176,178 @@ analysis_messages = get_analysis_messages(
 with col2:
     st.header("Step 2: Review Data Inputs")
 
-    st.subheader("Data Inputs")
+    st.subheader("Do you have the following data inputs?")
+    st.caption("Expand each category and indicate data availability. Alternative proxy options will appear if data is unavailable.")
 
-    # Data categories structure
-    data_categories = {
-        "Building Geometry": [
-            {'label': 'Architectural drawings', 'key': 'architectural_drawings'},
-            {'label': 'Building dimensions', 'key': 'building_dimensions'},
-            {'label': 'Number of floors', 'key': 'number_of_floors'},
-            {'label': 'Roof shape and roof angle', 'key': 'roof_shape_angle'},
-            {'label': 'Window to wall ratio (all facades)', 'key': 'window_to_wall_ratio'},
-            {'label': 'Building orientation', 'key': 'building_orientation'}
-        ],
-        "Building Fabric and Construction": [
-            {'label': 'Construction materials', 'key': 'construction_materials'},
-            {'label': 'Year of construction/renovation', 'key': 'construction_age'},
-            {'label': 'Windows properties', 'key': 'window_properties'}
-        ],
-        "Building System": [
-            {'label': 'HVAC system type', 'key': 'hvac_systems'},
-            {'label': 'Infiltration rate', 'key': 'infiltration_rate'}
-        ],
-        "Location Context": [
-            {'label': 'Buildings location', 'key': 'building_location'},
-            {'label': 'Surroundings height and location', 'key': 'surroundings_data'}
-        ],
-        "Measured Energy Data": [
-            {'label': 'Hourly heating demand', 'key': 'hourly_heating_demand'},
-            {'label': 'Hourly electricity consumption', 'key': 'hourly_electricity_consumption'}
-        ],
-        "Building Use and Operation": [
-            {'label': 'Building use type', 'key': 'building_use_type'},
-            {'label': 'Occupancy patterns', 'key': 'occupancy_data'},
-            {'label': 'Internal gains', 'key': 'internal_gains'},
-            {'label': 'Domestic hot water demand', 'key': 'dhw_demand'}
-        ]
-    }
+    # Calculate summary statistics
+    total_items = sum(len(items) for items in DATA_ITEMS_WITH_PROXIES.values())
+    available_items = sum(1 for items in DATA_ITEMS_WITH_PROXIES.values() 
+                         for item in items 
+                         if st.session_state.data_inputs.get(item['key'], False))
+    proxy_items = sum(1 for items in DATA_ITEMS_WITH_PROXIES.values() 
+                     for item in items 
+                     if not st.session_state.data_inputs.get(item['key'], False) 
+                     and st.session_state.get(f"proxy_{item['key']}", 'None (missing)') != 'None (missing)'
+                     and st.session_state.get(f"proxy_{item['key']}") is not None)
+    missing_items = total_items - available_items - proxy_items
+
+    # Display summary metrics
+    col_sum1, col_sum2, col_sum3 = st.columns(3)
+    with col_sum1:
+        st.metric("✓ Available", f"{available_items}/{total_items}", 
+                 delta="Direct data" if available_items > 0 else None)
+    with col_sum2:
+        st.metric("⚠️ Using Proxy", proxy_items,
+                 delta="Alternative data" if proxy_items > 0 else None)
+    with col_sum3:
+        st.metric("🔴 Missing", missing_items,
+                 delta="No data" if missing_items > 0 else None)
+    
+    st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
     # Initialize session state for new data items if not present
-    for category, items in data_categories.items():
+    for category, items in DATA_ITEMS_WITH_PROXIES.items():
         for item in items:
             if item['key'] not in st.session_state.data_inputs:
                 st.session_state.data_inputs[item['key']] = False
+            if f"proxy_{item['key']}" not in st.session_state:
+                st.session_state[f"proxy_{item['key']}"] = None
 
     # Display data items by category with expandable sections
-    for category, items in data_categories.items():
+    for category, items in DATA_ITEMS_WITH_PROXIES.items():
         with st.expander(f"**{category}**", expanded=False):
             for item in items:
-                checked = st.checkbox(
-                    item['label'],
-                    value=st.session_state.data_inputs.get(item['key'], False),
-                    key=f"checkbox_{item['key']}"
+                st.markdown(f"<p style='font-weight: 600; margin-bottom: 0.5rem; color: #334155;'>{item['label']}</p>", unsafe_allow_html=True)
+                
+                # Create columns for Yes/No checkboxes
+                col_yes, col_no = st.columns([1, 1])
+                
+                # Generate unique keys for radio buttons
+                radio_key = f"radio_{item['key']}"
+                
+                # Check current state
+                current_has_data = st.session_state.data_inputs.get(item['key'], False)
+                
+                # Create Yes/No radio button
+                data_available = st.radio(
+                    "Data available?",
+                    options=["Yes", "No"],
+                    index=0 if current_has_data else 1,
+                    key=radio_key,
+                    horizontal=True,
+                    label_visibility="collapsed"
                 )
-                st.session_state.data_inputs[item['key']] = checked
+                
+                # Update session state based on radio selection
+                has_data = (data_available == "Yes")
+                st.session_state.data_inputs[item['key']] = has_data
+                
+                # Show green checkmark if data is available
+                if has_data:
+                    st.markdown(
+                        '<div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); '
+                        'padding: 0.75rem; border-radius: 8px; border-left: 3px solid #10b981; '
+                        'margin-top: 0.5rem;">'
+                        '<p style="margin: 0; font-size: 0.85rem; color: #065f46; font-weight: 600;">'
+                        '✓ Data available</p>'
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+                
+                # Show proxy options if "No" is selected and proxies exist
+                elif not has_data and 'proxy_tiers' in item:
+                    st.markdown(
+                        '<p style="font-size: 0.9rem; font-weight: 600; color: #64748b; '
+                        'margin-top: 0.75rem; margin-bottom: 0.5rem;">↳ Use proxy data:</p>',
+                        unsafe_allow_html=True
+                    )
+                    
+                    # Build proxy options list
+                    proxy_options = ['None (missing)']
+                    for tier_key in sorted(item['proxy_tiers'].keys()):
+                        tier_num = tier_key.replace('tier', '')
+                        proxy_name = item['proxy_tiers'][tier_key]['name']
+                        confidence_impact = item['proxy_tiers'][tier_key]['confidence_impact']
+                        proxy_options.append(f"Tier {tier_num}: {proxy_name} ({confidence_impact}%)")
+                    
+                    # Select proxy with unique key
+                    selected_proxy = st.selectbox(
+                        "Select alternative:",
+                        options=proxy_options,
+                        key=f"proxy_select_{item['key']}",
+                        label_visibility="collapsed"
+                    )
+                    
+                    # Store selected proxy in session state
+                    st.session_state[f"proxy_{item['key']}"] = selected_proxy
+                    
+                    # Show proxy details based on selection
+                    if selected_proxy != 'None (missing)':
+                        # Extract tier number from selection
+                        tier_num = selected_proxy.split(':')[0].replace('Tier ', '').strip()
+                        tier_key = f'tier{tier_num}'
+                        proxy_info = item['proxy_tiers'][tier_key]
+                        
+                        # Determine color coding based on uncertainty
+                        uncertainty = proxy_info['uncertainty']
+                        if uncertainty in ['Low', 'Low-Medium']:
+                            bg_color = "linear-gradient(135deg, #dbeafe, #bfdbfe)"
+                            border_color = "#3b82f6"
+                            text_color = "#1e40af"
+                            icon = "ℹ️"
+                        elif uncertainty in ['Medium', 'Medium-High']:
+                            bg_color = "linear-gradient(135deg, #fef3c7, #fde68a)"
+                            border_color = "#f59e0b"
+                            text_color = "#92400e"
+                            icon = "⚠️"
+                        else:  # High, Very High
+                            bg_color = "linear-gradient(135deg, #fecaca, #fca5a5)"
+                            border_color = "#ef4444"
+                            text_color = "#7f1d1d"
+                            icon = "🔴"
+                        
+                        # Display styled proxy information box
+                        st.markdown(
+                            f'<div style="background: {bg_color}; '
+                            f'padding: 1rem; border-radius: 8px; '
+                            f'border-left: 4px solid {border_color}; '
+                            f'margin-top: 0.5rem; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">'
+                            f'<p style="margin: 0; font-size: 0.85rem; font-weight: 600; color: {text_color};">'
+                            f'{icon} {proxy_info["name"]}</p>'
+                            f'<p style="margin: 0.5rem 0 0 0; font-size: 0.8rem; color: #64748b;">'
+                            f'{proxy_info["description"]}</p>'
+                            f'<div style="display: flex; gap: 1rem; margin-top: 0.5rem;">'
+                            f'<p style="margin: 0; font-size: 0.75rem; font-weight: 600; color: {text_color};">'
+                            f'Impact: {proxy_info["confidence_impact"]}%</p>'
+                            f'<p style="margin: 0; font-size: 0.75rem; font-weight: 600; color: {text_color};">'
+                            f'Uncertainty: {uncertainty}</p>'
+                            f'</div>'
+                            f'</div>',
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        # Warning for missing data with no proxy selected
+                        st.markdown(
+                            '<div style="background: linear-gradient(135deg, #fee2e2, #fecaca); '
+                            'padding: 0.75rem; border-radius: 8px; border-left: 4px solid #dc2626; '
+                            'margin-top: 0.5rem;">'
+                            '<p style="margin: 0; font-size: 0.85rem; color: #991b1b; font-weight: 600;">'
+                            '🔴 Missing - will significantly impact results</p>'
+                            '</div>',
+                            unsafe_allow_html=True
+                        )
+                
+                # Add separator between items
+                st.markdown("<div style='margin: 1.25rem 0; border-bottom: 1px solid #e2e8f0;'></div>", unsafe_allow_html=True)
 
+# ==================== COLUMN 3: Proxy Recommendations & Confidence ====================
+with col3:
+    st.header("Step 3: Guidance & Results")
+    
     # Display Proxy Recommendations Dynamically
+    st.subheader("Recommended Proxy Data")
+    
     if recommended_proxies:
-        st.markdown("<hr style='margin: 1.5rem 0;'>", unsafe_allow_html=True)
-        st.subheader("Recommended Proxy Data")
-        
         # Mapping for proxy data labels
         data_items_display = {
             'building_footprints': {'label': 'Building Footprints'},
@@ -979,6 +1414,8 @@ with col2:
                                     st.markdown(f"<p style='font-size: 0.8rem; color: #dc2626; margin: 0;'>• {item}</p>", unsafe_allow_html=True)
                     
                     st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.info("✓ All critical data available! No proxies needed.")
     
     # Show scale-specific message
     if confidence_results.get("scale_message"):
@@ -988,13 +1425,12 @@ with col2:
     # Show country-specific note
     if confidence_results.get("country_note"):
         st.info(f"**{country}:** {confidence_results['country_note']}")
-
-# ==================== COLUMN 3: Model Output Confidence ====================
-with col3:
-    st.header("Model Output Confidence")
-
+    
+    # Model Output Confidence Section
+    st.markdown("<hr style='margin: 2rem 0;'>", unsafe_allow_html=True)
+    st.subheader("Model Output Confidence")
+    
     # Overall Confidence
-    st.subheader("Overall Confidence")
     overall_conf = confidence_results["overall"]
     
     # Determine color based on confidence level
@@ -1008,11 +1444,9 @@ with col3:
         conf_color = "#ef4444"
         conf_label = "Low"
     
-    col_overall1, col_overall2 = st.columns([2, 1])
-    with col_overall1:
-        st.markdown(f'<div style="background: linear-gradient(135deg, {conf_color}15, {conf_color}25); padding: 1rem; border-radius: 8px; border-left: 4px solid {conf_color};">'
-                   f'<p style="font-size: 2rem; font-weight: 700; color: {conf_color}; margin: 0;">{overall_conf}%</p>'
-                   f'<p style="color: #64748b; margin: 0;">{conf_label} Confidence</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="background: linear-gradient(135deg, {conf_color}15, {conf_color}25); padding: 1.5rem; border-radius: 12px; border-left: 4px solid {conf_color}; margin-bottom: 1rem;">'
+               f'<p style="font-size: 2.5rem; font-weight: 700; color: {conf_color}; margin: 0; text-align: center;">{overall_conf}%</p>'
+               f'<p style="color: #64748b; margin: 0; text-align: center; font-weight: 600;">{conf_label} Confidence</p></div>', unsafe_allow_html=True)
     
     st.markdown("---")
 
