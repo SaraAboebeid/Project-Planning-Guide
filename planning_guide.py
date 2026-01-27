@@ -12,47 +12,47 @@ st.set_page_config(page_title="Project Planning Guide", layout="wide")
 
 # Data requirements by analysis type
 ANALYSIS_REQUIREMENTS = {
-    "PED Planning": {
-        "critical_data": ["building_footprints", "energy_consumption", "climate_data"],
-        "important_data": ["construction_age", "building_materials", "occupancy_data"],
-        "base_confidence": 70,
-        "scale_preference": ["Neighborhood", "City"]
-    },
-    "ECOM Planning": {
-        "critical_data": ["building_footprints", "energy_consumption", "construction_age"],
-        "important_data": ["building_materials", "hvac_systems", "climate_data"],
-        "base_confidence": 65,
-        "scale_preference": ["Building", "Neighborhood"]
-    },
-    "Academic Research": {
-        "critical_data": ["building_footprints", "construction_age", "building_materials"],
-        "important_data": ["energy_consumption", "occupancy_data"],
-        "base_confidence": 75,
-        "scale_preference": ["Building", "Neighborhood", "City"]
-    },
-    "Investment Feasibility": {
-        "critical_data": ["building_footprints", "energy_consumption", "construction_age", "building_materials"],
-        "important_data": ["occupancy_data", "hvac_systems", "cost_data"],
-        "base_confidence": 60,
-        "scale_preference": ["Building", "Neighborhood"]
-    },
-    "Energy Audit": {
-        "critical_data": ["building_footprints", "energy_consumption", "hvac_systems"],
-        "important_data": ["construction_age", "building_materials", "occupancy_data"],
-        "base_confidence": 80,
-        "scale_preference": ["Building"]
-    },
-    "Carbon Assessment": {
+    "Energy & Carbon Performance": {
         "critical_data": ["building_footprints", "energy_consumption", "building_materials"],
         "important_data": ["construction_age", "climate_data", "hvac_systems"],
         "base_confidence": 70,
         "scale_preference": ["Building", "Neighborhood", "City"]
     },
-    "Retrofit Planning": {
+    "Renewable Energy & Local Production": {
+        "critical_data": ["building_footprints", "climate_data", "energy_consumption"],
+        "important_data": ["roof_area", "solar_potential", "occupancy_data"],
+        "base_confidence": 65,
+        "scale_preference": ["Building", "Neighborhood", "City"]
+    },
+    "Retrofit & Transformation": {
         "critical_data": ["building_footprints", "construction_age", "energy_consumption", "building_materials"],
         "important_data": ["hvac_systems", "occupancy_data", "cost_data"],
         "base_confidence": 65,
         "scale_preference": ["Building", "Neighborhood"]
+    },
+    "Urban Design Support": {
+        "critical_data": ["building_footprints", "urban_context", "land_use"],
+        "important_data": ["climate_data", "infrastructure_data", "demographic_data"],
+        "base_confidence": 70,
+        "scale_preference": ["Neighborhood", "City"]
+    },
+    "Climate Resilience": {
+        "critical_data": ["building_footprints", "climate_data", "vulnerability_data"],
+        "important_data": ["construction_age", "building_materials", "flood_risk"],
+        "base_confidence": 65,
+        "scale_preference": ["Building", "Neighborhood", "City"]
+    },
+    "Infrastructure Planning": {
+        "critical_data": ["building_footprints", "infrastructure_data", "energy_consumption"],
+        "important_data": ["occupancy_data", "climate_data", "cost_data"],
+        "base_confidence": 70,
+        "scale_preference": ["Neighborhood", "City"]
+    },
+    "Equity & Social Impact": {
+        "critical_data": ["building_footprints", "demographic_data", "accessibility_data"],
+        "important_data": ["energy_consumption", "cost_data", "health_data"],
+        "base_confidence": 65,
+        "scale_preference": ["Building", "Neighborhood", "City"]
     }
 }
 
@@ -914,7 +914,76 @@ st.markdown("""
 
 # Title
 st.title("Project Planning Guide")
-st.markdown("<p style='font-size: 1.1rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 2rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
+st.markdown("<p style='font-size: 1.1rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
+
+# Interactive Process Diagram using Streamlit columns
+st.markdown("<div style='background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); padding: 1.5rem; border-radius: 16px; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
+
+col_step1, col_arrow1, col_step2, col_arrow2, col_step3 = st.columns([3, 0.5, 3, 0.5, 3])
+
+with col_step1:
+    st.markdown("""
+        <div style='background: linear-gradient(135deg, #3b82f6, #2563eb); padding: 1.5rem; 
+                    border-radius: 12px; text-align: center; box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);'>
+            <div style='background: white; width: 48px; height: 48px; border-radius: 50%; 
+                        margin: 0 auto 0.8rem; display: flex; align-items: center; 
+                        justify-content: center; font-size: 1.5rem; font-weight: 700; 
+                        color: #3b82f6; box-shadow: 0 2px 8px rgba(0,0,0,0.15);'>
+                1
+            </div>
+            <h3 style='color: white; margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600;'>Analysis Setup</h3>
+            <p style='color: #dbeafe; margin: 0; font-size: 0.8rem;'>Define type, scale & context</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_arrow1:
+    st.markdown("<div style='text-align: center; font-size: 2rem; color: #94a3b8; padding-top: 2.5rem;'>→</div>", unsafe_allow_html=True)
+
+with col_step2:
+    st.markdown("""
+        <div style='background: linear-gradient(135deg, #10b981, #059669); padding: 1.5rem; 
+                    border-radius: 12px; text-align: center; box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);'>
+            <div style='background: white; width: 48px; height: 48px; border-radius: 50%; 
+                        margin: 0 auto 0.8rem; display: flex; align-items: center; 
+                        justify-content: center; font-size: 1.5rem; font-weight: 700; 
+                        color: #10b981; box-shadow: 0 2px 8px rgba(0,0,0,0.15);'>
+                2
+            </div>
+            <h3 style='color: white; margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600;'>Review Data Inputs</h3>
+            <p style='color: #d1fae5; margin: 0; font-size: 0.8rem;'>Select available data & proxies</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_arrow2:
+    st.markdown("<div style='text-align: center; font-size: 2rem; color: #94a3b8; padding-top: 2.5rem;'>→</div>", unsafe_allow_html=True)
+
+with col_step3:
+    st.markdown("""
+        <div style='background: linear-gradient(135deg, #f59e0b, #d97706); padding: 1.5rem; 
+                    border-radius: 12px; text-align: center; box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);'>
+            <div style='background: white; width: 48px; height: 48px; border-radius: 50%; 
+                        margin: 0 auto 0.8rem; display: flex; align-items: center; 
+                        justify-content: center; font-size: 1.5rem; font-weight: 700; 
+                        color: #f59e0b; box-shadow: 0 2px 8px rgba(0,0,0,0.15);'>
+                3
+            </div>
+            <h3 style='color: white; margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600;'>Guidance & Results</h3>
+            <p style='color: #fef3c7; margin: 0; font-size: 0.8rem;'>Confidence levels & recommendations</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+# Process description
+st.markdown("""
+    <div style='margin-top: 1rem; text-align: center; padding: 0.8rem; 
+                background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
+        <p style='margin: 0; color: #475569; font-size: 0.85rem;'>
+            <strong>How it works:</strong> Define your analysis parameters → Indicate data availability and select proxy alternatives → 
+            Review confidence scores and get actionable recommendations
+        </p>
+    </div>
+""", unsafe_allow_html=True)
+
+st.markdown("</div>", unsafe_allow_html=True)
 st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
 
 # Initialize session state
@@ -1066,20 +1135,20 @@ col1, col2, col3 = st.columns([1, 1.2, 1])
 
 # ==================== COLUMN 1: Analysis Setup ====================
 with col1:
-    st.header("Step 1: Analysis Setup")
+    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 1: Analysis Setup</h2>", unsafe_allow_html=True)
 
     # Analysis Type
     st.subheader("Analysis Type")
     analysis_type = st.selectbox(
         "Select your analysis:",
         options=[
-            "PED Planning",
-            "ECOM Planning",
-            "Academic Research",
-            "Investment Feasibility",
-            "Energy Audit",
-            "Carbon Assessment",
-            "Retrofit Planning"
+            "Energy & Carbon Performance",
+            "Renewable Energy & Local Production",
+            "Retrofit & Transformation",
+            "Urban Design Support",
+            "Climate Resilience",
+            "Infrastructure Planning",
+            "Equity & Social Impact"
         ],
         help="Choose the type of analysis you're conducting"
     )
@@ -1174,7 +1243,7 @@ analysis_messages = get_analysis_messages(
 
 # ==================== COLUMN 2: Data Availability ====================
 with col2:
-    st.header("Step 2: Review Data Inputs")
+    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
 
     st.subheader("Do you have the following data inputs?")
     st.caption("Expand each category and indicate data availability. Alternative proxy options will appear if data is unavailable.")
@@ -1194,14 +1263,11 @@ with col2:
     # Display summary metrics
     col_sum1, col_sum2, col_sum3 = st.columns(3)
     with col_sum1:
-        st.metric("✓ Available", f"{available_items}/{total_items}", 
-                 delta="Direct data" if available_items > 0 else None)
+        st.metric("✓ Available", f"{available_items}/{total_items}")
     with col_sum2:
-        st.metric("⚠️ Using Proxy", proxy_items,
-                 delta="Alternative data" if proxy_items > 0 else None)
+        st.metric("⚠️ Using Proxy", proxy_items)
     with col_sum3:
-        st.metric("🔴 Missing", missing_items,
-                 delta="No data" if missing_items > 0 else None)
+        st.metric("🔴 Missing", missing_items)
     
     st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
@@ -1340,7 +1406,7 @@ with col2:
 
 # ==================== COLUMN 3: Proxy Recommendations & Confidence ====================
 with col3:
-    st.header("Step 3: Guidance & Results")
+    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 3: Guidance & Results</h2>", unsafe_allow_html=True)
     
     # Display Proxy Recommendations Dynamically
     st.subheader("Recommended Proxy Data")
