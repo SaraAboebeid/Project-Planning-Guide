@@ -842,25 +842,56 @@ OUTPUT_WEIGHTS = {
     }
 }
 
-def get_filtered_data_items(analysis_type):
+def get_filtered_data_items(analysis_types):
     """
-    Filter DATA_ITEMS_WITH_PROXIES based on the selected analysis type.
-    Returns only the data items relevant to the specified analysis.
+    Filter DATA_ITEMS_WITH_PROXIES based on the selected analysis type(s).
+    Returns only the data items relevant to the specified analysis/analyses.
+    Merges requirements from multiple analyses without duplication.
     
     Args:
-        analysis_type: The selected analysis type (e.g., "Energy & Carbon Performance")
+        analysis_types: Single analysis type string or list of analysis types
     
     Returns:
         dict: Filtered dictionary of data items organized by category
     """
-    # If analysis type not in detailed requirements, return all items
-    if analysis_type not in ANALYSIS_DATA_REQUIREMENTS:
+    # Convert single string to list for uniform processing
+    if isinstance(analysis_types, str):
+        analysis_types = [analysis_types]
+    
+    # If no valid analysis types, return all items
+    valid_types = [at for at in analysis_types if at in ANALYSIS_DATA_REQUIREMENTS]
+    if not valid_types:
         return DATA_ITEMS_WITH_PROXIES
     
-    requirements = ANALYSIS_DATA_REQUIREMENTS[analysis_type]
-    all_needed_keys = set(requirements["required_items"] + requirements.get("optional_items", []))
+    # Merge requirements from all selected analysis types
+    all_required_keys = set()
+    all_optional_keys = set()
+    item_to_analyses = {}  # Track which analyses need each item
     
-    # Filter data items by keeping only those in the requirements
+    for analysis_type in valid_types:
+        requirements = ANALYSIS_DATA_REQUIREMENTS[analysis_type]
+        required = set(requirements["required_items"])
+        optional = set(requirements.get("optional_items", []))
+        
+        all_required_keys.update(required)
+        all_optional_keys.update(optional)
+        
+        # Track which analyses need each item
+        for key in required:
+            if key not in item_to_analyses:
+                item_to_analyses[key] = {'required_in': [], 'optional_in': []}
+            item_to_analyses[key]['required_in'].append(analysis_type)
+        
+        for key in optional:
+            if key not in item_to_analyses:
+                item_to_analyses[key] = {'required_in': [], 'optional_in': []}
+            item_to_analyses[key]['optional_in'].append(analysis_type)
+    
+    # If item is required in ANY analysis, treat as required (not optional)
+    all_optional_keys = all_optional_keys - all_required_keys
+    all_needed_keys = all_required_keys | all_optional_keys
+    
+    # Filter data items by keeping only those in the merged requirements
     filtered_items = {}
     
     for category, items in DATA_ITEMS_WITH_PROXIES.items():
@@ -868,10 +899,11 @@ def get_filtered_data_items(analysis_type):
         
         for item in items:
             if item['key'] in all_needed_keys:
-                # Mark if it's required or optional
+                # Mark if it's required or optional (across all selected analyses)
                 item_copy = item.copy()
-                item_copy['is_required'] = item['key'] in requirements["required_items"]
-                item_copy['is_optional'] = item['key'] in requirements.get("optional_items", [])
+                item_copy['is_required'] = item['key'] in all_required_keys
+                item_copy['is_optional'] = item['key'] in all_optional_keys
+                item_copy['analyses'] = item_to_analyses.get(item['key'], {'required_in': [], 'optional_in': []})
                 filtered_category_items.append(item_copy)
         
         # Only include category if it has items
@@ -1393,14 +1425,64 @@ st.markdown("""
     
     /* Multiselect styling with hover effect */
     div[data-testid="stMultiSelect"] > div {
-        background: white;
+        background-color: white !important;
         border-radius: 8px;
         transition: all 0.3s ease;
+    }
+    
+    div[data-testid="stMultiSelect"] > div > div {
+        background-color: white !important;
+    }
+    
+    div[data-testid="stMultiSelect"] input {
+        background-color: white !important;
+    }
+    
+    div[data-testid="stMultiSelect"] [data-baseweb="select"] {
+        background-color: white !important;
+    }
+    
+    div[data-testid="stMultiSelect"] [data-baseweb="select"] > div {
+        background-color: white !important;
+    }
+    
+    div[data-testid="stMultiSelect"] [role="combobox"] {
+        background-color: white !important;
+    }
+    
+    /* Placeholder text styling */
+    div[data-testid="stMultiSelect"] [data-baseweb="select"] [data-baseweb="input"] {
+        background-color: white !important;
+    }
+    
+    div[data-testid="stMultiSelect"] [class*="Input"] {
+        background-color: white !important;
     }
     
     div[data-testid="stMultiSelect"]:hover > div {
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         transform: translateY(-2px);
+    }
+    
+    /* Multiselect dropdown menu */
+    div[data-testid="stMultiSelect"] [data-baseweb="popover"] {
+        background-color: white !important;
+    }
+    
+    div[data-testid="stMultiSelect"] [data-baseweb="menu"] {
+        background-color: white !important;
+    }
+    
+    div[data-testid="stMultiSelect"] ul {
+        background-color: white !important;
+    }
+    
+    div[data-testid="stMultiSelect"] li {
+        background-color: white !important;
+    }
+    
+    div[data-testid="stMultiSelect"] li:hover {
+        background-color: #f0f9ff !important;
     }
     
     /* Checkbox container styling with hover effect */
@@ -1443,8 +1525,8 @@ with col1:
 
     # Analysis Type
     st.subheader("Analysis Type")
-    analysis_type = st.selectbox(
-        "Select your analysis:",
+    analysis_type = st.multiselect(
+        "Select your analysis (one or more):",
         options=[
             "Energy & Carbon Performance",
             "Renewable Energy & Local Production",
@@ -1452,8 +1534,12 @@ with col1:
             "Urban Design Support",
             "Climate Resilience"
         ],
-        help="Choose the type of analysis you're conducting"
+        help="Choose one or more analysis types. Requirements will be merged intelligently."
     )
+    
+    # Show selected analyses count
+    if analysis_type:
+        st.info(f"📊 {len(analysis_type)} analysis type(s) selected")
 
     # Define Scale
     st.subheader("Define Your Scale")
@@ -1500,19 +1586,8 @@ with col1:
         help="Select the country for your analysis"
     )
 
-    # Desired Outputs
-    st.subheader("Desired Outputs")
-    outputs = st.multiselect(
-        "Select outputs:",
-        options=[
-            "Annual Energy Demand",
-            "Peak Power Load",
-            "Carbon Emissions",
-            "Cost Estimates",
-            "Retrofit Prioritization"
-        ],
-        default=["Annual Energy Demand", "Peak Power Load"]
-    )
+    # Set default outputs for confidence calculation
+    outputs = ["Annual Energy Demand", "Peak Power Load", "Carbon Emissions"]
 
     if st.button("Next", type="primary", use_container_width=True):
         st.success("Configuration saved")
@@ -1520,8 +1595,10 @@ with col1:
 # ==================== RULES ENGINE: Calculate Everything Dynamically ====================
 
 # Calculate confidence levels based on configuration
+# For multiple analyses, use the first one for base confidence calculation
+first_analysis = analysis_type[0] if analysis_type else "Energy & Carbon Performance"
 confidence_results = calculate_confidence(
-    analysis_type=analysis_type,
+    analysis_type=first_analysis,
     data_inputs=st.session_state.data_inputs,
     project_scale=project_scale,
     country=country,
@@ -1529,15 +1606,17 @@ confidence_results = calculate_confidence(
 )
 
 # Get recommended proxies for missing data
+# For multiple analyses, use the first one for proxy recommendations
 recommended_proxies = get_recommended_proxies(
     data_inputs=st.session_state.data_inputs,
-    analysis_type=analysis_type,
+    analysis_type=first_analysis,
     project_scale=project_scale
 )
 
 # Get contextual messages and recommendations
+# For multiple analyses, use the first one for messages
 analysis_messages = get_analysis_messages(
-    analysis_type=analysis_type,
+    analysis_type=first_analysis,
     data_inputs=st.session_state.data_inputs,
     project_scale=project_scale,
     confidence_score=confidence_results["overall"]
@@ -1548,7 +1627,13 @@ with col2:
     st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
 
     st.subheader("Do you have the following data inputs?")
-    st.caption(f"Showing data requirements for **{analysis_type}**. Expand each category and indicate data availability.")
+    if analysis_type:
+        if len(analysis_type) == 1:
+            st.caption(f"Showing data requirements for **{analysis_type[0]}**. Expand each category and indicate data availability.")
+        else:
+            st.caption(f"Showing merged requirements for **{len(analysis_type)} analyses**: {', '.join(analysis_type)}. Common requirements appear once.")
+    else:
+        st.caption("Please select at least one analysis type in Step 1.")
     
     # Get filtered data items based on analysis type
     filtered_data_items = get_filtered_data_items(analysis_type)
@@ -1595,7 +1680,29 @@ with col2:
                 elif item.get('is_optional', False):
                     requirement_badge = '<span style="background: #e0e7ff; color: #4338ca; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 0.3rem;">OPTIONAL</span>'
                 
-                st.markdown(f"<p style='font-weight: 600; margin-bottom: 0.3rem; margin-top: 0.3rem; color: #334155; font-size: 0.9rem;'>{item['label']}{requirement_badge}</p>", unsafe_allow_html=True)
+                # Add analysis info if multiple analyses selected
+                analysis_info = ""
+                if analysis_type and len(analysis_type) > 1 and 'analyses' in item:
+                    analyses_data = item['analyses']
+                    # Create abbreviations for analysis types
+                    abbrev_map = {
+                        'Energy & Carbon Performance': 'E&C',
+                        'Renewable Energy & Local Production': 'RE&LP',
+                        'Climate Resilience': 'CR',
+                        'Retrofit & Transformation': 'R&T',
+                        'Urban Design Support': 'UDS'
+                    }
+                    info_parts = []
+                    if analyses_data['required_in']:
+                        abbrev_names = [abbrev_map.get(a, a) for a in analyses_data['required_in']]
+                        info_parts.append(f"<span style='font-size: 0.7rem; color: #059669; font-weight: 600;'>Required: {', '.join(abbrev_names)}</span>")
+                    if analyses_data['optional_in']:
+                        abbrev_names = [abbrev_map.get(a, a) for a in analyses_data['optional_in']]
+                        info_parts.append(f"<span style='font-size: 0.7rem; color: #2563eb; font-weight: 600;'>Optional: {', '.join(abbrev_names)}</span>")
+                    if info_parts:
+                        analysis_info = f"<br/><span style='font-size: 0.7rem; color: #64748b;'>({' | '.join(info_parts)})</span>"
+                
+                st.markdown(f"<p style='font-weight: 600; margin-bottom: 0.3rem; margin-top: 0.3rem; color: #334155; font-size: 0.9rem;'>{item['label']}{requirement_badge}{analysis_info}</p>", unsafe_allow_html=True)
                 
                 # Create columns for Yes/No and Proxy dropdown
                 col_radio, col_proxy = st.columns([1, 2])
