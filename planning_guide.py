@@ -1252,88 +1252,52 @@ st.markdown("""
 st.title("Project Planning Guide")
 st.markdown("<p style='font-size: 1.1rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
 
-# Interactive Process Diagram using Streamlit columns
-st.markdown("<div style='background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); padding: 1.5rem; border-radius: 16px; margin-bottom: 1.5rem;'>", unsafe_allow_html=True)
+# Interactive Process Diagram
+diagram_col1, diagram_col2, diagram_col3 = st.columns(3)
 
-col_step1, col_arrow1, col_step2, col_arrow2, col_step3 = st.columns([3, 0.5, 3, 0.5, 3])
-
-with col_step1:
+with diagram_col1:
     st.markdown("""
-        <div style='background: linear-gradient(135deg, #3b82f6, #2563eb); padding: 1.5rem; 
-                    border-radius: 12px; text-align: center; box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);'>
-            <div style='background: white; width: 48px; height: 48px; border-radius: 50%; 
-                        margin: 0 auto 0.8rem; display: flex; align-items: center; 
-                        justify-content: center; font-size: 1.5rem; font-weight: 700; 
-                        color: #3b82f6; box-shadow: 0 2px 8px rgba(0,0,0,0.15);'>
-                1
-            </div>
-            <h3 style='color: white; margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600;'>Analysis Setup</h3>
-            <p style='color: #dbeafe; margin: 0; font-size: 0.8rem;'>Define type, scale & context</p>
+    <div style='background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                padding: 1.5rem; border-radius: 16px; text-align: center; 
+                box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); margin-bottom: 1rem;'>
+        <div style='color: white; font-size: 3rem; font-weight: 700; margin-bottom: 0.5rem;'>1</div>
+        <div style='color: white; font-size: 1.1rem; font-weight: 600;'>Analysis Setup</div>
+        <div style='color: rgba(255,255,255,0.8); font-size: 0.85rem; margin-top: 0.5rem;'>
+            Define your analysis type, project scale, and context
         </div>
-    """, unsafe_allow_html=True)
-
-with col_arrow1:
-    st.markdown("<div style='text-align: center; font-size: 2rem; color: #94a3b8; padding-top: 2.5rem;'>→</div>", unsafe_allow_html=True)
-
-with col_step2:
-    st.markdown("""
-        <div style='background: linear-gradient(135deg, #10b981, #059669); padding: 1.5rem; 
-                    border-radius: 12px; text-align: center; box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);'>
-            <div style='background: white; width: 48px; height: 48px; border-radius: 50%; 
-                        margin: 0 auto 0.8rem; display: flex; align-items: center; 
-                        justify-content: center; font-size: 1.5rem; font-weight: 700; 
-                        color: #10b981; box-shadow: 0 2px 8px rgba(0,0,0,0.15);'>
-                2
-            </div>
-            <h3 style='color: white; margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600;'>Review Data Inputs</h3>
-            <p style='color: #d1fae5; margin: 0; font-size: 0.8rem;'>Select available data & proxies</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-with col_arrow2:
-    st.markdown("<div style='text-align: center; font-size: 2rem; color: #94a3b8; padding-top: 2.5rem;'>→</div>", unsafe_allow_html=True)
-
-with col_step3:
-    st.markdown("""
-        <div style='background: linear-gradient(135deg, #f59e0b, #d97706); padding: 1.5rem; 
-                    border-radius: 12px; text-align: center; box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);'>
-            <div style='background: white; width: 48px; height: 48px; border-radius: 50%; 
-                        margin: 0 auto 0.8rem; display: flex; align-items: center; 
-                        justify-content: center; font-size: 1.5rem; font-weight: 700; 
-                        color: #f59e0b; box-shadow: 0 2px 8px rgba(0,0,0,0.15);'>
-                3
-            </div>
-            <h3 style='color: white; margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600;'>Guidance & Results</h3>
-            <p style='color: #fef3c7; margin: 0; font-size: 0.8rem;'>Confidence levels & recommendations</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-# Process description
-st.markdown("""
-    <div style='margin-top: 1rem; text-align: center; padding: 0.8rem; 
-                background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
-        <p style='margin: 0; color: #475569; font-size: 0.85rem;'>
-            <strong>How it works:</strong> Define your analysis parameters → Indicate data availability and select proxy alternatives → 
-            Review confidence scores and get actionable recommendations
-        </p>
     </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-st.markdown("</div>", unsafe_allow_html=True)
+with diagram_col2:
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                padding: 1.5rem; border-radius: 16px; text-align: center; 
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); margin-bottom: 1rem;'>
+        <div style='color: white; font-size: 3rem; font-weight: 700; margin-bottom: 0.5rem;'>2</div>
+        <div style='color: white; font-size: 1.1rem; font-weight: 600;'>Review Data</div>
+        <div style='color: rgba(255,255,255,0.8); font-size: 0.85rem; margin-top: 0.5rem;'>
+            Indicate data availability and select proxy alternatives
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with diagram_col3:
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+                padding: 1.5rem; border-radius: 16px; text-align: center; 
+                box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); margin-bottom: 1rem;'>
+        <div style='color: white; font-size: 3rem; font-weight: 700; margin-bottom: 0.5rem;'>3</div>
+        <div style='color: white; font-size: 1.1rem; font-weight: 600;'>Guidance & Results</div>
+        <div style='color: rgba(255,255,255,0.8); font-size: 0.85rem; margin-top: 0.5rem;'>
+            Review confidence scores and recommendations
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
 
 # Initialize session state
 if 'data_inputs' not in st.session_state:
-    st.session_state.data_inputs = {
-        'building_footprints': True,
-        'construction_age': False,
-        'energy_consumption': True,
-        'building_materials': False,
-        'occupancy_data': True,
-        'climate_data': True,
-        'hvac_systems': False,
-        'cost_data': False
-    }
+    st.session_state.data_inputs = {}
 
 if 'selected_proxies' not in st.session_state:
     st.session_state.selected_proxies = {}
@@ -1625,6 +1589,28 @@ analysis_messages = get_analysis_messages(
 # ==================== COLUMN 2: Data Availability ====================
 with col2:
     st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
+    
+    # Progress Indicator - Data Completeness
+    if analysis_type:
+        filtered_items_preview = get_filtered_data_items(analysis_type)
+        total_preview = sum(len(items) for items in filtered_items_preview.values())
+        available_preview = sum(1 for items in filtered_items_preview.values() 
+                               for item in items 
+                               if st.session_state.data_inputs.get(item['key'], False))
+        required_preview = sum(1 for items in filtered_items_preview.values() 
+                             for item in items if item.get('is_required', False))
+        
+        completeness_pct = (available_preview / total_preview * 100) if total_preview > 0 else 0
+        
+        # Display progress
+        col_prog1, col_prog2 = st.columns([3, 1])
+        with col_prog1:
+            st.progress(completeness_pct / 100)
+        with col_prog2:
+            st.markdown(f"<div style='text-align: right; font-size: 1.2rem; font-weight: 700; color: #3b82f6;'>{completeness_pct:.0f}%</div>", unsafe_allow_html=True)
+        
+        st.markdown(f"<p style='color: #64748b; font-size: 0.9rem; margin-top: -0.5rem;'>📊 Data Completeness: {available_preview} of {total_preview} items • {required_preview} required</p>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
     st.subheader("Do you have the following data inputs?")
     if analysis_type:
@@ -1637,6 +1623,15 @@ with col2:
     
     # Get filtered data items based on analysis type
     filtered_data_items = get_filtered_data_items(analysis_type)
+
+    # Initialize session state for filtered items (default to False = "No")
+    # This ensures metrics calculate correctly
+    for category, items in filtered_data_items.items():
+        for item in items:
+            if item['key'] not in st.session_state.data_inputs:
+                st.session_state.data_inputs[item['key']] = False  # Default to "No"
+            if f"proxy_{item['key']}" not in st.session_state:
+                st.session_state[f"proxy_{item['key']}"] = None
 
     # Calculate summary statistics using filtered items
     total_items = sum(len(items) for items in filtered_data_items.values())
@@ -1660,14 +1655,6 @@ with col2:
         st.metric("🔴 Missing", missing_items)
     
     st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-
-    # Initialize session state for new data items if not present (use filtered items)
-    for category, items in filtered_data_items.items():
-        for item in items:
-            if item['key'] not in st.session_state.data_inputs:
-                st.session_state.data_inputs[item['key']] = False
-            if f"proxy_{item['key']}" not in st.session_state:
-                st.session_state[f"proxy_{item['key']}"] = None
 
     # Display data items by category with expandable sections (use filtered items)
     for category, items in filtered_data_items.items():
@@ -1708,25 +1695,28 @@ with col2:
                 col_radio, col_proxy = st.columns([1, 2])
                 
                 with col_radio:
-                    # Generate unique keys for radio buttons
-                    radio_key = f"radio_{item['key']}"
+                    # Get current state from session state (single source of truth)
+                    current_has_data = st.session_state.data_inputs[item['key']]
                     
-                    # Check current state
-                    current_has_data = st.session_state.data_inputs.get(item['key'], False)
-                    
-                    # Create Yes/No radio button
+                    # Create Yes/No radio button - directly use session state for index
+                    # The key links to a unique widget that persists its value
                     data_available = st.radio(
                         "Data available?",
                         options=["Yes", "No"],
                         index=0 if current_has_data else 1,
-                        key=radio_key,
+                        key=f"radio_{item['key']}",
                         horizontal=True,
                         label_visibility="collapsed"
                     )
                     
-                    # Update session state based on radio selection
-                    has_data = (data_available == "Yes")
-                    st.session_state.data_inputs[item['key']] = has_data
+                    # Immediately update session state to match radio selection
+                    # This keeps session state in sync with user interaction
+                    new_has_data = (data_available == "Yes")
+                    if st.session_state.data_inputs[item['key']] != new_has_data:
+                        st.session_state.data_inputs[item['key']] = new_has_data
+                
+                # Use session state as the single source of truth for displaying content
+                has_data = st.session_state.data_inputs[item['key']]
                 
                 with col_proxy:
                     # Show green checkmark if data is available
@@ -1826,6 +1816,17 @@ with col2:
 # ==================== COLUMN 3: Proxy Recommendations & Confidence ====================
 with col3:
     st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 3: Guidance & Results</h2>", unsafe_allow_html=True)
+    
+    # Export Report Buttons at the top
+    if analysis_type:
+        export_col1, export_col2 = st.columns(2)
+        with export_col1:
+            if st.button("📄 Export PDF", use_container_width=True, help="Download comprehensive report"):
+                st.info("📥 PDF export functionality - Coming soon!")
+        with export_col2:
+            if st.button("📊 Export Excel", use_container_width=True, help="Download data tables"):
+                st.info("📥 Excel export functionality - Coming soon!")
+        st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
     
     # Display Proxy Recommendations Dynamically
     st.subheader("Recommended Proxy Data")
@@ -1931,6 +1932,65 @@ with col3:
                f'<p style="font-size: 2.5rem; font-weight: 700; color: {conf_color}; margin: 0; text-align: center;">{overall_conf}%</p>'
                f'<p style="color: #64748b; margin: 0; text-align: center; font-weight: 600;">{conf_label} Confidence</p></div>', unsafe_allow_html=True)
     
+    # Confidence Prediction Calculator
+    with st.expander("🎯 Confidence Prediction - What If?", expanded=False):
+        st.markdown("**See how your confidence improves with additional data**")
+        
+        if analysis_type:
+            filtered_items_pred = get_filtered_data_items(analysis_type)
+            missing_critical = []
+            missing_important = []
+            
+            for category_items in filtered_items_pred.values():
+                for item in category_items:
+                    if not st.session_state.data_inputs.get(item['key'], False):
+                        if item.get('is_required', False):
+                            missing_critical.append(item)
+                        else:
+                            missing_important.append(item)
+            
+            if missing_critical or missing_important:
+                st.markdown("**Select data items you plan to obtain:**")
+                
+                predicted_additions = []
+                
+                if missing_critical:
+                    st.markdown("<p style='color: #ef4444; font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem;'>🔴 Critical Items (High Impact):</p>", unsafe_allow_html=True)
+                    for idx, item in enumerate(missing_critical[:5]):  # Show top 5
+                        if st.checkbox(f"{item['label']}", key=f"pred_crit_{idx}_{item['key']}", help="Critical for analysis"):
+                            predicted_additions.append(item['key'])
+                
+                if missing_important:
+                    st.markdown("<p style='color: #f59e0b; font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem;'>⚠️ Important Items (Medium Impact):</p>", unsafe_allow_html=True)
+                    for idx, item in enumerate(missing_important[:5]):  # Show top 5
+                        if st.checkbox(f"{item['label']}", key=f"pred_imp_{idx}_{item['key']}", help="Important for accuracy"):
+                            predicted_additions.append(item['key'])
+                
+                # Calculate predicted confidence
+                if predicted_additions:
+                    simulated_inputs = st.session_state.data_inputs.copy()
+                    for key in predicted_additions:
+                        simulated_inputs[key] = True
+                    
+                    predicted_results = calculate_confidence(
+                        analysis_type=first_analysis,
+                        data_inputs=simulated_inputs,
+                        project_scale=project_scale,
+                        country=country,
+                        desired_outputs=outputs
+                    )
+                    
+                    improvement = predicted_results['overall'] - confidence_results['overall']
+                    
+                    st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+                    st.markdown("<div style='background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 1rem; border-radius: 8px; border-left: 4px solid #3b82f6;'>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='margin: 0; font-size: 0.9rem; color: #1e40af;'><strong>Predicted Confidence:</strong> {predicted_results['overall']}%</p>", unsafe_allow_html=True)
+                    if improvement > 0:
+                        st.markdown(f"<p style='margin: 0.5rem 0 0 0; font-size: 1.1rem; color: #10b981; font-weight: 700;'>+{improvement:.0f}% improvement!</p>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                st.success("✓ All data items available! Excellent data coverage.")
+    
     st.markdown("---")
 
     # Output-Specific Confidence Levels
@@ -1977,6 +2037,77 @@ with col3:
         st.subheader("Recommended Actions")
         for idx, rec in enumerate(analysis_messages["recommendations"], 1):
             st.markdown(f"{idx}. {rec}")
+    
+    # Data Source Directory
+    st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
+    with st.expander("📚 Data Source Directory - Where to Find Data", expanded=False):
+        st.markdown("**Universal Data Sources:**")
+        
+        universal_sources = [
+            {"name": "OpenStreetMap", "url": "https://www.openstreetmap.org", "data": "Building footprints, locations"},
+            {"name": "Google Earth Engine", "url": "https://earthengine.google.com", "data": "Satellite imagery, land use"},
+            {"name": "EnergyPlus Weather Data", "url": "https://energyplus.net/weather", "data": "EPW climate files"},
+            {"name": "Climate.OneBuilding.Org", "url": "https://climate.onebuilding.org", "data": "Weather files worldwide"},
+            {"name": "IPCC Emission Factors", "url": "https://www.ipcc.ch", "data": "Carbon emission factors"},
+        ]
+        
+        for source in universal_sources:
+            st.markdown(f"- **[{source['name']}]({source['url']})** - {source['data']}")
+        
+        # Country-specific resources
+        data_sources = {
+            "Sweden": [
+                {"name": "Swedish Energy Agency", "url": "https://www.energimyndigheten.se", "data": "Energy statistics, building data"},
+                {"name": "Statistics Sweden (SCB)", "url": "https://www.scb.se", "data": "Building census, demographics"},
+                {"name": "Lantmäteriet", "url": "https://www.lantmateriet.se", "data": "Cadastral data, GIS data"},
+                {"name": "SMHI Climate Data", "url": "https://www.smhi.se", "data": "Weather files, climate data"},
+            ],
+            "Germany": [
+                {"name": "DENA (German Energy Agency)", "url": "https://www.dena.de", "data": "Building energy data"},
+                {"name": "Destatis", "url": "https://www.destatis.de", "data": "Building statistics"},
+                {"name": "DWD Weather Service", "url": "https://www.dwd.de", "data": "Climate data"},
+            ],
+            "United Kingdom": [
+                {"name": "EPC Register", "url": "https://www.gov.uk/find-energy-certificate", "data": "Energy Performance Certificates"},
+                {"name": "ONS", "url": "https://www.ons.gov.uk", "data": "Building and demographic data"},
+                {"name": "Met Office", "url": "https://www.metoffice.gov.uk", "data": "Weather data"},
+            ],
+            "Denmark": [
+                {"name": "Danish Energy Agency", "url": "https://ens.dk", "data": "Energy statistics"},
+                {"name": "Statistics Denmark", "url": "https://www.dst.dk", "data": "Building data"},
+                {"name": "DMI", "url": "https://www.dmi.dk", "data": "Climate data"},
+            ],
+            "Norway": [
+                {"name": "Norwegian Water Resources", "url": "https://www.nve.no", "data": "Energy statistics"},
+                {"name": "Statistics Norway", "url": "https://www.ssb.no", "data": "Building data"},
+            ],
+            "Finland": [
+                {"name": "Statistics Finland", "url": "https://www.stat.fi", "data": "Building statistics"},
+                {"name": "Finnish Meteorological Institute", "url": "https://en.ilmatieteenlaitos.fi", "data": "Climate data"},
+            ],
+        }
+        
+        st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+        
+        # Country-specific sources
+        if country in data_sources:
+            st.markdown(f"**{country}-Specific Resources:**")
+            for source in data_sources[country]:
+                st.markdown(f"- **[{source['name']}]({source['url']})** - {source['data']}")
+        
+        st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+        st.markdown("**Data Types & Where to Find Them:**")
+        st.markdown("""
+        - **Building Geometry**: GIS portals, cadastral offices, municipal planning departments
+        - **Energy Data**: Utility companies, building managers, smart meter data providers
+        - **Construction Materials**: Building permits, architectural archives, site surveys, thermal imaging
+        - **Climate Data**: National weather services, EnergyPlus.net, Climate.OneBuilding.Org
+        - **Occupancy**: Census data, building management systems, surveys, mobile network data
+        - **Emission Factors**: National energy agencies, IPCC databases, electricity grid operators
+        - **HVAC Systems**: Building technical documentation, facility management records
+        """)
+        
+        st.info("💡 Tip: Start with free open data sources (OpenStreetMap, government portals) before considering commercial data providers.")
 
 # ==================== BOTTOM SECTION: Visualizations ====================
 st.markdown("<hr style='margin: 2.5rem 0;'>", unsafe_allow_html=True)
