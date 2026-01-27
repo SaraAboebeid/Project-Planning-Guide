@@ -1217,72 +1217,70 @@ with col2:
     for category, items in DATA_ITEMS_WITH_PROXIES.items():
         with st.expander(f"**{category}**", expanded=False):
             for item in items:
-                st.markdown(f"<p style='font-weight: 600; margin-bottom: 0.5rem; color: #334155;'>{item['label']}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-weight: 600; margin-bottom: 0.3rem; margin-top: 0.3rem; color: #334155; font-size: 0.9rem;'>{item['label']}</p>", unsafe_allow_html=True)
                 
-                # Create columns for Yes/No checkboxes
-                col_yes, col_no = st.columns([1, 1])
+                # Create columns for Yes/No and Proxy dropdown
+                col_radio, col_proxy = st.columns([1, 2])
                 
-                # Generate unique keys for radio buttons
-                radio_key = f"radio_{item['key']}"
-                
-                # Check current state
-                current_has_data = st.session_state.data_inputs.get(item['key'], False)
-                
-                # Create Yes/No radio button
-                data_available = st.radio(
-                    "Data available?",
-                    options=["Yes", "No"],
-                    index=0 if current_has_data else 1,
-                    key=radio_key,
-                    horizontal=True,
-                    label_visibility="collapsed"
-                )
-                
-                # Update session state based on radio selection
-                has_data = (data_available == "Yes")
-                st.session_state.data_inputs[item['key']] = has_data
-                
-                # Show green checkmark if data is available
-                if has_data:
-                    st.markdown(
-                        '<div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); '
-                        'padding: 0.75rem; border-radius: 8px; border-left: 3px solid #10b981; '
-                        'margin-top: 0.5rem;">'
-                        '<p style="margin: 0; font-size: 0.85rem; color: #065f46; font-weight: 600;">'
-                        '✓ Data available</p>'
-                        '</div>',
-                        unsafe_allow_html=True
-                    )
-                
-                # Show proxy options if "No" is selected and proxies exist
-                elif not has_data and 'proxy_tiers' in item:
-                    st.markdown(
-                        '<p style="font-size: 0.9rem; font-weight: 600; color: #64748b; '
-                        'margin-top: 0.75rem; margin-bottom: 0.5rem;">↳ Use proxy data:</p>',
-                        unsafe_allow_html=True
-                    )
+                with col_radio:
+                    # Generate unique keys for radio buttons
+                    radio_key = f"radio_{item['key']}"
                     
-                    # Build proxy options list
-                    proxy_options = ['None (missing)']
-                    for tier_key in sorted(item['proxy_tiers'].keys()):
-                        tier_num = tier_key.replace('tier', '')
-                        proxy_name = item['proxy_tiers'][tier_key]['name']
-                        confidence_impact = item['proxy_tiers'][tier_key]['confidence_impact']
-                        proxy_options.append(f"Tier {tier_num}: {proxy_name} ({confidence_impact}%)")
+                    # Check current state
+                    current_has_data = st.session_state.data_inputs.get(item['key'], False)
                     
-                    # Select proxy with unique key
-                    selected_proxy = st.selectbox(
-                        "Select alternative:",
-                        options=proxy_options,
-                        key=f"proxy_select_{item['key']}",
+                    # Create Yes/No radio button
+                    data_available = st.radio(
+                        "Data available?",
+                        options=["Yes", "No"],
+                        index=0 if current_has_data else 1,
+                        key=radio_key,
+                        horizontal=True,
                         label_visibility="collapsed"
                     )
                     
-                    # Store selected proxy in session state
-                    st.session_state[f"proxy_{item['key']}"] = selected_proxy
+                    # Update session state based on radio selection
+                    has_data = (data_available == "Yes")
+                    st.session_state.data_inputs[item['key']] = has_data
+                
+                with col_proxy:
+                    # Show green checkmark if data is available
+                    if has_data:
+                        st.markdown(
+                            '<div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); '
+                            'padding: 0.35rem 0.6rem; border-radius: 6px; border-left: 3px solid #10b981;">'
+                            '<p style="margin: 0; font-size: 0.8rem; color: #065f46; font-weight: 600;">'
+                            '✓ Data available</p>'
+                            '</div>',
+                            unsafe_allow_html=True
+                        )
                     
-                    # Show proxy details based on selection
-                    if selected_proxy != 'None (missing)':
+                    # Show proxy dropdown if "No" is selected and proxies exist
+                    elif not has_data and 'proxy_tiers' in item:
+                        # Build proxy options list
+                        proxy_options = ['None (missing)']
+                        for tier_key in sorted(item['proxy_tiers'].keys()):
+                            tier_num = tier_key.replace('tier', '')
+                            proxy_name = item['proxy_tiers'][tier_key]['name']
+                            confidence_impact = item['proxy_tiers'][tier_key]['confidence_impact']
+                            proxy_options.append(f"Tier {tier_num}: {proxy_name} ({confidence_impact}%)")
+                        
+                        # Select proxy with unique key
+                        selected_proxy = st.selectbox(
+                            "↳ Use proxy:",
+                            options=proxy_options,
+                            key=f"proxy_select_{item['key']}",
+                            label_visibility="visible"
+                        )
+                        
+                        # Store selected proxy in session state
+                        st.session_state[f"proxy_{item['key']}"] = selected_proxy
+                
+                # Show proxy details below if a proxy is selected
+                if not has_data and 'proxy_tiers' in item:
+                    selected_proxy = st.session_state.get(f"proxy_{item['key']}", 'None (missing)')
+                    
+                    if selected_proxy and selected_proxy != 'None (missing)':
                         # Extract tier number from selection
                         tier_num = selected_proxy.split(':')[0].replace('Tier ', '').strip()
                         tier_key = f'tier{tier_num}'
@@ -1309,36 +1307,36 @@ with col2:
                         # Display styled proxy information box
                         st.markdown(
                             f'<div style="background: {bg_color}; '
-                            f'padding: 1rem; border-radius: 8px; '
-                            f'border-left: 4px solid {border_color}; '
-                            f'margin-top: 0.5rem; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">'
-                            f'<p style="margin: 0; font-size: 0.85rem; font-weight: 600; color: {text_color};">'
+                            f'padding: 0.5rem 0.7rem; border-radius: 6px; '
+                            f'border-left: 3px solid {border_color}; '
+                            f'margin-top: 0.3rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">'
+                            f'<p style="margin: 0; font-size: 0.8rem; font-weight: 600; color: {text_color};">'
                             f'{icon} {proxy_info["name"]}</p>'
-                            f'<p style="margin: 0.5rem 0 0 0; font-size: 0.8rem; color: #64748b;">'
+                            f'<p style="margin: 0.3rem 0 0 0; font-size: 0.75rem; color: #64748b;">'
                             f'{proxy_info["description"]}</p>'
-                            f'<div style="display: flex; gap: 1rem; margin-top: 0.5rem;">'
-                            f'<p style="margin: 0; font-size: 0.75rem; font-weight: 600; color: {text_color};">'
+                            f'<div style="display: flex; gap: 0.8rem; margin-top: 0.3rem;">'
+                            f'<p style="margin: 0; font-size: 0.7rem; font-weight: 600; color: {text_color};">'
                             f'Impact: {proxy_info["confidence_impact"]}%</p>'
-                            f'<p style="margin: 0; font-size: 0.75rem; font-weight: 600; color: {text_color};">'
+                            f'<p style="margin: 0; font-size: 0.7rem; font-weight: 600; color: {text_color};">'
                             f'Uncertainty: {uncertainty}</p>'
                             f'</div>'
                             f'</div>',
                             unsafe_allow_html=True
                         )
-                    else:
+                    elif selected_proxy == 'None (missing)':
                         # Warning for missing data with no proxy selected
                         st.markdown(
                             '<div style="background: linear-gradient(135deg, #fee2e2, #fecaca); '
-                            'padding: 0.75rem; border-radius: 8px; border-left: 4px solid #dc2626; '
-                            'margin-top: 0.5rem;">'
-                            '<p style="margin: 0; font-size: 0.85rem; color: #991b1b; font-weight: 600;">'
-                            '🔴 Missing - will significantly impact results</p>'
+                            'padding: 0.4rem 0.6rem; border-radius: 6px; border-left: 3px solid #dc2626; '
+                            'margin-top: 0.3rem;">'
+                            '<p style="margin: 0; font-size: 0.8rem; color: #991b1b; font-weight: 600;">'
+                            '🔴 Missing - will impact results</p>'
                             '</div>',
                             unsafe_allow_html=True
                         )
                 
                 # Add separator between items
-                st.markdown("<div style='margin: 1.25rem 0; border-bottom: 1px solid #e2e8f0;'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='margin: 0.6rem 0; border-bottom: 1px solid #e2e8f0;'></div>", unsafe_allow_html=True)
 
 # ==================== COLUMN 3: Proxy Recommendations & Confidence ====================
 with col3:
