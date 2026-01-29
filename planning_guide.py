@@ -1518,14 +1518,39 @@ with col1:
         st.subheader("Building Uses Included")
         st.caption("Select all building types in your analysis:")
 
+        # Controls for building uses
+        col_a, col_b = st.columns(2)
+        if col_a.button("Select all building uses", key="btn_select_uses"):
+            for _k in [
+                'use_residential', 'use_commercial', 'use_industrial',
+                'use_school', 'use_hospital', 'use_sports',
+                'use_office', 'use_mixed_use']:
+                st.session_state[_k] = True
+            if hasattr(st, "rerun"):
+                st.rerun()
+            else:
+                st.experimental_rerun()
+
+        if col_b.button("Unselect all building uses", key="btn_unselect_uses"):
+            for _k in [
+                'use_residential', 'use_commercial', 'use_industrial',
+                'use_school', 'use_hospital', 'use_sports',
+                'use_office', 'use_mixed_use']:
+                st.session_state[_k] = False
+            if hasattr(st, "rerun"):
+                st.rerun()
+            else:
+                st.experimental_rerun()
+
         building_uses = {}
-        building_uses['Residential'] = st.checkbox("Residential", value=True)
-        building_uses['Commercial'] = st.checkbox("Commercial", value=True)
-        building_uses['Industrial'] = st.checkbox("Industrial", value=False)
-        building_uses['Institutional'] = st.checkbox("Institutional (Schools, Hospitals)", value=True)
-        building_uses['Retail'] = st.checkbox("Retail", value=True)
-        building_uses['Office'] = st.checkbox("Office", value=False)
-        building_uses['Mixed-Use'] = st.checkbox("Mixed-Use", value=True)
+        building_uses['Residential'] = st.checkbox("Residential", value=False, key='use_residential')
+        building_uses['Commercial'] = st.checkbox("Commercial", value=False, key='use_commercial')
+        building_uses['Industrial'] = st.checkbox("Industrial", value=False, key='use_industrial')
+        building_uses['School'] = st.checkbox("School", value=False, key='use_school')
+        building_uses['Hospital'] = st.checkbox("Hospital", value=False, key='use_hospital')
+        building_uses['Sports Facilities'] = st.checkbox("Sports Facilities", value=False, key='use_sports')
+        building_uses['Office'] = st.checkbox("Office", value=False, key='use_office')
+        building_uses['Mixed-Use'] = st.checkbox("Mixed-Use", value=False, key='use_mixed_use')
 
         selected_uses = [k for k, v in building_uses.items() if v]
 
