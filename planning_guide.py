@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 
 # Page configuration
@@ -1060,102 +1060,257 @@ def get_analysis_messages(analysis_type, data_inputs, project_scale, confidence_
     
     return messages
 
+# ===== Backend Structure: Effort, Timeline, and Cost Estimation =====
+
+# Default consultant hourly rates by currency (adjust as needed)
+CONSULTANT_RATES = {
+    "USD": 150.0,
+    "EUR": 140.0,
+    "GBP": 130.0,
+    "SEK": 1400.0,
+    "NOK": 1500.0,
+    "DKK": 1050.0,
+}
+
+# Base analysis effort (hours) for Building scale
+EFFORT_BASE_HOURS = {
+    "Energy & Carbon Performance": 60,
+    "Renewable Energy & Local Production": 50,
+    "Climate Resilience": 70,
+    "Retrofit & Transformation": 65,
+    "Urban Design Support": 55,
+}
+
+SCALE_EFFORT_MULTIPLIERS = {
+    "Building": 1.0,
+    "Neighborhood": 1.8,
+    "City": 2.5,
+}
+
+PHASE_SPLIT = {
+    "Scoping": 0.10,
+    "Data Collection": 0.30,
+    "Modeling": 0.35,
+    "Validation": 0.15,
+    "Reporting": 0.10,
+}
+
+def get_selected_uses_count() -> int:
+    keys = [
+        'use_residential','use_commercial','use_industrial','use_school',
+        'use_hospital','use_sports','use_office','use_mixed_use'
+    ]
+    return sum(1 for k in keys if st.session_state.get(k, False))
+
+def get_data_completeness_stats(analysis_types, data_inputs):
+    filtered = get_filtered_data_items(analysis_types)
+    total = sum(len(items) for items in filtered.values())
+    available = sum(1 for items in filtered.values() for item in items if data_inputs.get(item['key'], False))
+    pct = (available / total * 100.0) if total > 0 else 0.0
+    return {"total": total, "available": available, "pct": pct}
+
+def estimate_effort_and_timeline(analysis_type, project_scale, selected_uses_count, data_completeness_pct, proxies_count):
+    base_hours = EFFORT_BASE_HOURS.get(analysis_type, 60)
+    scale_mult = SCALE_EFFORT_MULTIPLIERS.get(project_scale, 1.0)
+
+    # Complexity from building uses (Neighborhood/City only)
+    uses_mult = 1.0
+    if project_scale in ["Neighborhood", "City"]:
+        uses_mult = 1.0 + max(0, selected_uses_count - 1) * 0.08
+
+    # Data completeness impact (more missing → more effort)
+    completeness_mult = 1.0 + (1.0 - (data_completeness_pct / 100.0)) * 0.7
+
+    # Proxies add incremental effort
+    proxy_mult = 1.0 + proxies_count * 0.03
+
+    total_hours = base_hours * scale_mult * uses_mult * completeness_mult * proxy_mult
+
+    # Split into phases
+    breakdown = {phase: round(total_hours * frac) for phase, frac in PHASE_SPLIT.items()}
+
+    # Duration estimate assuming 30 focused hours/week
+    weekly_capacity = 30.0
+    duration_weeks = max(1, round(total_hours / weekly_capacity))
+
+    return {
+        "hours_total": round(total_hours),
+        "hours_breakdown": breakdown,
+        "duration_weeks": duration_weeks,
+    }
+
+def estimate_cost(hours_total, currency):
+    rate = st.session_state.get("consultant_rate", CONSULTANT_RATES.get(currency, 150.0))
+    # Overhead factor for management and QA
+    overhead_mult = 1.10
+    return {
+        "rate": rate,
+        "estimated_service_cost": round(hours_total * rate * overhead_mult, 2),
+        "overhead_mult": overhead_mult,
+    }
+
+# ===== UI Theming: Plotly and CSS Brand Palette =====
+
+BRAND_COLORWAY = [
+    "#2563eb",  # accent blue
+    "#115e59",  # teal
+    "#334155",  # slate
+    "#1e40af",  # primary indigo
+    "#6b7280",  # neutral gray
+    "#0f766e",  # success teal
+    "#4b5563",  # slate dark
+    "#1e3a8a",  # deep indigo
+]
+
+def apply_brand_plotly_theme(fig):
+    fig.update_layout(
+        paper_bgcolor="#f8fafc",
+        plot_bgcolor="#ffffff",
+        font=dict(
+            family="Inter, Segoe UI, system-ui, -apple-system, sans-serif",
+            color="#0f172a",
+            size=14,
+        ),
+        title_font=dict(size=18, color="#0f172a"),
+        legend_title_font=dict(color="#0f172a"),
+        legend_font=dict(color="#334155"),
+        xaxis=dict(
+            gridcolor="#e2e8f0",
+            zerolinecolor="#cbd5e1",
+            linecolor="#cbd5e1",
+            tickfont=dict(color="#334155"),
+            title_font=dict(color="#334155"),
+        ),
+        yaxis=dict(
+            gridcolor="#e2e8f0",
+            zerolinecolor="#cbd5e1",
+            linecolor="#cbd5e1",
+            tickfont=dict(color="#334155"),
+            title_font=dict(color="#334155"),
+        ),
+        colorway=BRAND_COLORWAY,
+        margin=dict(l=40, r=20, t=60, b=40),
+    )
+
 # Custom CSS
 st.markdown("""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+    :root {
+        --brand-primary: #1e40af;
+        --brand-accent: #2563eb;
+        --brand-navy: #0f172a;
+        --brand-teal: #115e59;
+        --brand-slate-700: #334155;
+        --brand-slate-500: #64748b;
+        --brand-slate-400: #94a3b8;
+        --brand-surface: #ffffff;
+        --brand-panel: #f8fafc;
+        --brand-border: #e2e8f0;
+        --brand-success: #0f766e;
+        --brand-warning: #b45309;
+        --brand-danger: #b91c1c;
+    }
+
+    html, body, .stApp {
+        font-family: Inter, Segoe UI, system-ui, -apple-system, sans-serif;
+        color: var(--brand-slate-700);
+        background-color: var(--brand-panel);
+    }
     /* Main container styling */
     .main {
         padding: 1rem 2rem;
-        background-color: #f8f9fa;
+        background-color: var(--brand-panel);
     }
     
     /* Typography improvements */
     h1 {
-        color: #1e293b;
+        color: var(--brand-navy);
         font-weight: 700;
         letter-spacing: -0.02em;
         margin-bottom: 0.5rem;
     }
     
     h2 {
-        color: #334155;
+        color: var(--brand-slate-700);
         font-weight: 600;
         margin-top: 1.5rem;
         margin-bottom: 1rem;
     }
     
     h3 {
-        color: #475569;
+        color: var(--brand-slate-500);
         font-weight: 600;
         margin-top: 1rem;
     }
     
     /* Metric cards */
     .stMetric {
-        background: linear-gradient(145deg, #ffffff, #f8f9fa);
+        background: linear-gradient(145deg, var(--brand-surface), var(--brand-panel));
         padding: 1.25rem;
         border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid var(--brand-border);
     }
     
     /* Badges styling */
     .available-badge {
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: white;
+        background: linear-gradient(135deg, var(--brand-success), #0b5f58);
+        color: #ffffff;
         padding: 4px 12px;
         border-radius: 16px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+        box-shadow: 0 2px 4px rgba(15, 118, 110, 0.25);
     }
     
     .missing-badge {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-        color: white;
+        background: linear-gradient(135deg, var(--brand-danger), #7f1d1d);
+        color: #ffffff;
         padding: 4px 12px;
         border-radius: 16px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+        box-shadow: 0 2px 4px rgba(185, 28, 28, 0.25);
     }
     
     .medium-badge {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        color: white;
+        background: linear-gradient(135deg, var(--brand-warning), #78350f);
+        color: #ffffff;
         padding: 4px 12px;
         border-radius: 16px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+        box-shadow: 0 2px 4px rgba(180, 83, 9, 0.25);
     }
     
     .high-badge {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-        color: white;
+        background: linear-gradient(135deg, var(--brand-danger), #7f1d1d);
+        color: #ffffff;
         padding: 4px 12px;
         border-radius: 16px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+        box-shadow: 0 2px 4px rgba(185, 28, 28, 0.25);
     }
     
     /* Card containers */
     .data-card {
-        background: white;
+        background: var(--brand-surface);
         border-radius: 12px;
         padding: 1.25rem;
         margin-bottom: 1rem;
         box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--brand-border);
         transition: all 0.3s ease;
     }
     
@@ -1166,9 +1321,9 @@ st.markdown("""
     
     /* Selectbox styling */
     .stSelectbox > div > div {
-        background-color: white;
+        background-color: var(--brand-surface);
         border-radius: 8px;
-        border: 1.5px solid #e2e8f0;
+        border: 1.5px solid var(--brand-border);
     }
     
     /* Button styling */
@@ -1177,7 +1332,9 @@ st.markdown("""
         font-weight: 600;
         padding: 0.625rem 1.25rem;
         transition: all 0.2s ease;
-        border: none;
+        border: 1px solid var(--brand-primary);
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-navy));
+        color: #ffffff;
     }
     
     .stButton > button:hover {
@@ -1187,15 +1344,15 @@ st.markdown("""
     
     /* Expander styling */
     .streamlit-expanderHeader {
-        background-color: white;
+        background-color: var(--brand-surface);
         border-radius: 8px;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--brand-border);
         font-weight: 500;
     }
     
     /* Progress bar */
     .stProgress > div > div > div {
-        background: linear-gradient(90deg, #3b82f6, #2563eb);
+        background: linear-gradient(90deg, var(--brand-accent), var(--brand-primary));
         border-radius: 4px;
     }
     
@@ -1206,23 +1363,23 @@ st.markdown("""
     }
     
     .stTabs [data-baseweb="tab"] {
-        background-color: white;
+        background-color: var(--brand-surface);
         border-radius: 8px 8px 0 0;
         padding: 12px 24px;
         font-weight: 500;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--brand-border);
     }
     
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(180deg, #3b82f6, #2563eb);
-        color: white;
-        border-color: #2563eb;
+        background: linear-gradient(180deg, var(--brand-accent), var(--brand-primary));
+        color: #ffffff;
+        border-color: var(--brand-primary);
     }
     
     /* Info box styling */
     .stAlert {
-        background-color: white;
-        border-left: 4px solid #3b82f6;
+        background-color: var(--brand-surface);
+        border-left: 4px solid var(--brand-accent);
         border-radius: 8px;
         padding: 1rem;
     }
@@ -1243,8 +1400,35 @@ st.markdown("""
     hr {
         margin: 2rem 0;
         border: none;
-        border-top: 2px solid #e2e8f0;
+        border-top: 2px solid var(--brand-border);
     }
+        /* Playful step cards */
+        .step-card {
+            background: linear-gradient(135deg, var(--grad-start) 0%, var(--grad-end) 100%);
+            padding: 1.25rem; border-radius: 16px; text-align: center;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12); margin-bottom: 1rem;
+            transform: translateY(0); transition: transform 0.2s ease, box-shadow 0.2s ease;
+            min-height: 150px; display: flex; flex-direction: column; justify-content: center;
+        }
+        .step-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+        }
+        .step-index {
+            display: inline-block;
+            color: white; font-size: 1.25rem; font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+        .step-title {
+            color: white; font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em;
+        }
+        .step-desc {
+            color: rgba(255,255,255,0.9); font-size: 0.85rem; margin-top: 0.35rem;
+        }
+        .step-arrow { 
+            display: flex; align-items: center; justify-content: center; 
+            height: 150px; color: #64748b; font-size: 1.6rem; 
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -1252,47 +1436,67 @@ st.markdown("""
 st.title("Project Planning Guide")
 st.markdown("<p style='font-size: 1.1rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
 
-# Interactive Process Diagram
-diagram_col1, diagram_col2, diagram_col3 = st.columns(3)
+# Interactive Process Diagram (Playful & Interactive)
+# Use narrow columns between steps for arrows
+diagram_cols = st.columns([1, 0.15, 1, 0.15, 1, 0.15, 1, 0.15, 1])
 
-with diagram_col1:
+with diagram_cols[0]:
     st.markdown("""
-    <div style='background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
-                padding: 1.5rem; border-radius: 16px; text-align: center; 
-                box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); margin-bottom: 1rem;'>
-        <div style='color: white; font-size: 3rem; font-weight: 700; margin-bottom: 0.5rem;'>1</div>
-        <div style='color: white; font-size: 1.1rem; font-weight: 600;'>Analysis Setup</div>
-        <div style='color: rgba(255,255,255,0.8); font-size: 0.85rem; margin-top: 0.5rem;'>
-            Define your analysis type, project scale, and context
-        </div>
+    <div class='step-card' style='--grad-start:#1e3a8a; --grad-end:#0f172a;'>
+        <div class='step-index'>1</div>
+        <div class='step-title'>Analysis Setup</div>
+        <div class='step-desc'>Choose analysis, scale, and context</div>
     </div>
     """, unsafe_allow_html=True)
 
-with diagram_col2:
+with diagram_cols[1]:
+    st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+
+with diagram_cols[2]:
     st.markdown("""
-    <div style='background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
-                padding: 1.5rem; border-radius: 16px; text-align: center; 
-                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); margin-bottom: 1rem;'>
-        <div style='color: white; font-size: 3rem; font-weight: 700; margin-bottom: 0.5rem;'>2</div>
-        <div style='color: white; font-size: 1.1rem; font-weight: 600;'>Review Data</div>
-        <div style='color: rgba(255,255,255,0.8); font-size: 0.85rem; margin-top: 0.5rem;'>
-            Indicate data availability and select proxy alternatives
-        </div>
+    <div class='step-card' style='--grad-start:#0f766e; --grad-end:#115e59;'>
+        <div class='step-index'>2</div>
+        <div class='step-title'>Review Data</div>
+        <div class='step-desc'>Mark availability and select proxies</div>
     </div>
     """, unsafe_allow_html=True)
 
-with diagram_col3:
+with diagram_cols[3]:
+    st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+
+with diagram_cols[4]:
     st.markdown("""
-    <div style='background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
-                padding: 1.5rem; border-radius: 16px; text-align: center; 
-                box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); margin-bottom: 1rem;'>
-        <div style='color: white; font-size: 3rem; font-weight: 700; margin-bottom: 0.5rem;'>3</div>
-        <div style='color: white; font-size: 1.1rem; font-weight: 600;'>Guidance & Results</div>
-        <div style='color: rgba(255,255,255,0.8); font-size: 0.85rem; margin-top: 0.5rem;'>
-            Review confidence scores and recommendations
-        </div>
+    <div class='step-card' style='--grad-start:#475569; --grad-end:#334155;'>
+        <div class='step-index'>3</div>
+        <div class='step-title'>Guidance & Results</div>
+        <div class='step-desc'>Confidence and recommendations</div>
     </div>
     """, unsafe_allow_html=True)
+
+with diagram_cols[5]:
+    st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+
+with diagram_cols[6]:
+    st.markdown("""
+    <div class='step-card' style='--grad-start:#2563eb; --grad-end:#1e40af;'>
+        <div class='step-index'>4</div>
+        <div class='step-title'>Project Timeline</div>
+        <div class='step-desc'>Milestones and Gantt view</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with diagram_cols[7]:
+    st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+
+with diagram_cols[8]:
+    st.markdown("""
+    <div class='step-card' style='--grad-start:#6b7280; --grad-end:#4b5563;'>
+        <div class='step-index'>5</div>
+        <div class='step-title'>Cost & Budget</div>
+        <div class='step-desc'>Service cost and CAPEX/OPEX</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
 st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
 
 # Initialize session state
@@ -1307,7 +1511,7 @@ st.markdown("""
     <style>
     /* Main container background */
     .stApp {
-        background: linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%);
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
     }
     
     /* Outer layer - Very light grey background for column containers */
@@ -1323,9 +1527,9 @@ st.markdown("""
         left: 0.5rem;
         right: 0.5rem;
         bottom: 0;
-        background: linear-gradient(135deg, #f7f7f7 0%, #f0f0f0 100%);
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
         border-radius: 24px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
         z-index: 0;
     }
     
@@ -1333,27 +1537,27 @@ st.markdown("""
     div[data-testid="column"] > div {
         position: relative;
         z-index: 1;
-        background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         padding: 1.75rem 1.25rem;
         border-radius: 18px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.06);
         margin: 0.5rem;
-        border: 1px solid rgba(203, 213, 225, 0.5);
+        border: 1px solid rgba(226, 232, 240, 0.8);
     }
     
     /* Header styling */
     div[data-testid="column"] h1 {
-        color: #1e293b;
+        color: var(--brand-navy);
         font-size: 1.5rem !important;
         margin-bottom: 1.5rem !important;
         padding-bottom: 0.75rem;
-        border-bottom: 3px solid #3b82f6;
+        border-bottom: 3px solid var(--brand-accent);
         font-weight: 700;
     }
     
     /* Subheader styling */
     div[data-testid="column"] h2, div[data-testid="column"] h3 {
-        color: #475569;
+        color: var(--brand-slate-500);
         font-size: 1.1rem !important;
         margin-top: 1.25rem !important;
         margin-bottom: 0.75rem !important;
@@ -1362,9 +1566,9 @@ st.markdown("""
     
     /* Expander styling */
     div[data-testid="stExpander"] {
-        background: white;
+        background: var(--brand-surface);
         border-radius: 12px;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--brand-border);
         margin-bottom: 0.75rem;
         box-shadow: 0 2px 6px rgba(0,0,0,0.06);
         transition: all 0.3s ease;
@@ -1377,7 +1581,7 @@ st.markdown("""
     
     /* Select box styling with hover effect */
     div[data-testid="stSelectbox"] > div {
-        background: white;
+        background: var(--brand-surface);
         border-radius: 8px;
         transition: all 0.3s ease;
     }
@@ -1389,38 +1593,38 @@ st.markdown("""
     
     /* Multiselect styling with hover effect */
     div[data-testid="stMultiSelect"] > div {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
         border-radius: 8px;
         transition: all 0.3s ease;
     }
     
     div[data-testid="stMultiSelect"] > div > div {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     div[data-testid="stMultiSelect"] input {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     div[data-testid="stMultiSelect"] [data-baseweb="select"] {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     div[data-testid="stMultiSelect"] [data-baseweb="select"] > div {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     div[data-testid="stMultiSelect"] [role="combobox"] {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     /* Placeholder text styling */
     div[data-testid="stMultiSelect"] [data-baseweb="select"] [data-baseweb="input"] {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     div[data-testid="stMultiSelect"] [class*="Input"] {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     div[data-testid="stMultiSelect"]:hover > div {
@@ -1430,23 +1634,23 @@ st.markdown("""
     
     /* Multiselect dropdown menu */
     div[data-testid="stMultiSelect"] [data-baseweb="popover"] {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     div[data-testid="stMultiSelect"] [data-baseweb="menu"] {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     div[data-testid="stMultiSelect"] ul {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     div[data-testid="stMultiSelect"] li {
-        background-color: white !important;
+        background-color: var(--brand-surface) !important;
     }
     
     div[data-testid="stMultiSelect"] li:hover {
-        background-color: #f0f9ff !important;
+        background-color: #eff6ff !important;
     }
     
     /* Checkbox container styling with hover effect */
@@ -1459,23 +1663,23 @@ st.markdown("""
     }
     
     div[data-testid="stCheckbox"]:hover {
-        background: rgba(59, 130, 246, 0.05);
+        background: rgba(37, 99, 235, 0.06);
         transform: translateX(4px);
     }
     
     /* Button styling */
     div[data-testid="column"] button[kind="primary"] {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        background: linear-gradient(135deg, var(--brand-accent) 0%, var(--brand-primary) 100%);
         border-radius: 10px;
         font-weight: 600;
         padding: 0.75rem 1.5rem;
-        box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+        box-shadow: 0 4px 8px rgba(37, 99, 235, 0.30);
         transition: all 0.3s ease;
     }
     
     div[data-testid="column"] button[kind="primary"]:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
+        box-shadow: 0 6px 12px rgba(37, 99, 235, 0.40);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -1578,8 +1782,7 @@ with col1:
     # Set default outputs for confidence calculation
     outputs = ["Annual Energy Demand", "Peak Power Load", "Carbon Emissions"]
 
-    if st.button("Next", type="primary", use_container_width=True):
-        st.success("Configuration saved")
+    # Removed Next button after context for streamlined flow
 
 # ==================== RULES ENGINE: Calculate Everything Dynamically ====================
 
@@ -1610,6 +1813,20 @@ analysis_messages = get_analysis_messages(
     project_scale=project_scale,
     confidence_score=confidence_results["overall"]
 )
+
+# Compute backend estimates for effort, duration, and cost
+completeness_stats = get_data_completeness_stats(analysis_type, st.session_state.data_inputs)
+selected_uses_count = get_selected_uses_count()
+proxies_count = len(recommended_proxies) if recommended_proxies else 0
+effort_results = estimate_effort_and_timeline(
+    analysis_type=first_analysis,
+    project_scale=project_scale,
+    selected_uses_count=selected_uses_count,
+    data_completeness_pct=completeness_stats["pct"],
+    proxies_count=proxies_count,
+)
+currency_for_cost = st.session_state.get("currency", "USD")
+cost_results = estimate_cost(effort_results["hours_total"], currency_for_cost)
 
 # ==================== COLUMN 2: Data Availability ====================
 with col2:
@@ -1789,8 +2006,8 @@ with col2:
                         # Determine color coding based on uncertainty
                         uncertainty = proxy_info['uncertainty']
                         if uncertainty in ['Low', 'Low-Medium']:
-                            bg_color = "linear-gradient(135deg, #dbeafe, #bfdbfe)"
-                            border_color = "#3b82f6"
+                            bg_color = "linear-gradient(135deg, #eff6ff, #dbeafe)"
+                            border_color = "#2563eb"
                             text_color = "#1e40af"
                             icon = "ℹ️"
                         elif uncertainty in ['Medium', 'Medium-High']:
@@ -1827,7 +2044,7 @@ with col2:
                         # Warning for missing data with no proxy selected
                         st.markdown(
                             '<div style="background: linear-gradient(135deg, #fee2e2, #fecaca); '
-                            'padding: 0.4rem 0.6rem; border-radius: 6px; border-left: 3px solid #dc2626; '
+                            'padding: 0.4rem 0.6rem; border-radius: 6px; border-left: 3px solid #b91c1c; '
                             'margin-top: 0.3rem;">'
                             '<p style="margin: 0; font-size: 0.8rem; color: #991b1b; font-weight: 600;">'
                             '🔴 Missing - will impact results</p>'
@@ -1838,9 +2055,159 @@ with col2:
                 # Add separator between items
                 st.markdown("<div style='margin: 0.6rem 0; border-bottom: 1px solid #e2e8f0;'></div>", unsafe_allow_html=True)
 
+# ==================== Step 4 & 5: Timeline and Cost (Full Width) ====================
+
+st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 4: Project Timeline</h2>", unsafe_allow_html=True)
+st.subheader("Project Timeline")
+
+if "project_start_date" not in st.session_state:
+    st.session_state.project_start_date = None
+if "project_end_date" not in st.session_state:
+    st.session_state.project_end_date = None
+if "timeline_rows" not in st.session_state:
+    st.session_state.timeline_rows = [
+        {"Task": "", "Start": None, "Finish": None, "Owner": "", "Phase": ""}
+    ]
+
+tcol1, tcol2 = st.columns(2)
+with tcol1:
+    st.session_state.project_start_date = st.date_input("Project start", value=st.session_state.project_start_date)
+with tcol2:
+    st.session_state.project_end_date = st.date_input("Project end", value=st.session_state.project_end_date)
+
+# Helper: populate timeline from estimated phases
+gen_cols = st.columns([1,1,2])
+if gen_cols[0].button("Populate timeline (estimated)"):
+    start_date = st.session_state.project_start_date or datetime.today().date()
+    current = pd.to_datetime(start_date)
+    weekly_capacity = 30.0
+    phase_rows = []
+    for phase, hrs in effort_results["hours_breakdown"].items():
+        weeks = max(1, round(hrs / weekly_capacity))
+        days = int(weeks * 7)
+        start = current
+        finish = current + pd.to_timedelta(days, unit='D')
+        phase_rows.append({
+            "Task": phase,
+            "Start": start.date(),
+            "Finish": finish.date(),
+            "Owner": "",
+            "Phase": phase
+        })
+        current = finish
+    st.session_state.timeline_rows = phase_rows
+
+timeline_df = pd.DataFrame(st.session_state.timeline_rows)
+edited_timeline = st.data_editor(
+    timeline_df,
+    num_rows="dynamic",
+    use_container_width=True,
+    column_config={
+        "Task": st.column_config.TextColumn("Task"),
+        "Start": st.column_config.DateColumn("Start"),
+        "Finish": st.column_config.DateColumn("Finish"),
+        "Owner": st.column_config.TextColumn("Owner"),
+        "Phase": st.column_config.TextColumn("Phase"),
+    },
+    key="data_editor_timeline"
+)
+st.session_state.timeline_rows = edited_timeline.to_dict(orient="records")
+
+valid_timeline = edited_timeline.dropna(subset=["Task", "Start", "Finish"])
+if not valid_timeline.empty:
+    valid_timeline["Start"] = pd.to_datetime(valid_timeline["Start"])  # type: ignore
+    valid_timeline["Finish"] = pd.to_datetime(valid_timeline["Finish"])  # type: ignore
+    fig_timeline = px.timeline(
+        valid_timeline,
+        x_start="Start",
+        x_end="Finish",
+        y="Task",
+        color="Phase" if "Phase" in valid_timeline.columns else None,
+        title="Project Timeline"
+    )
+    fig_timeline.update_yaxes(autorange="reversed")
+    apply_brand_plotly_theme(fig_timeline)
+    st.plotly_chart(fig_timeline, use_container_width=True)
+
+st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 5: Cost & Budget</h2>", unsafe_allow_html=True)
+st.subheader("Cost Inputs")
+
+# Show auto-estimated service cost reacting to inputs
+eco1, eco2, eco3 = st.columns(3)
+with eco1:
+    st.metric("Estimated Effort (hours)", effort_results["hours_total"])
+with eco2:
+    st.metric("Estimated Duration (weeks)", effort_results["duration_weeks"])
+with eco3:
+    st.metric("Estimated Service Cost", f"{cost_results['estimated_service_cost']:,.0f} {currency_for_cost}")
+
+if "currency" not in st.session_state:
+    st.session_state.currency = "USD"
+
+currency = st.selectbox("Currency", options=["USD", "EUR", "GBP", "SEK", "NOK", "DKK"], index=["USD", "EUR", "GBP", "SEK", "NOK", "DKK"].index(st.session_state.currency))
+st.session_state.currency = currency
+default_rate = CONSULTANT_RATES.get(currency, 150.0)
+st.session_state.consultant_rate = st.number_input("Consultant hourly rate", min_value=0.0, value=float(st.session_state.get("consultant_rate", default_rate)))
+
+capex_cols = st.columns(2)
+with capex_cols[0]:
+    capex_construction = st.number_input("Construction", min_value=0.0, value=float(st.session_state.get("capex_construction", 0.0)))
+    capex_design = st.number_input("Design & Engineering", min_value=0.0, value=float(st.session_state.get("capex_design", 0.0)))
+    capex_permits = st.number_input("Permits & Approvals", min_value=0.0, value=float(st.session_state.get("capex_permits", 0.0)))
+    capex_equipment = st.number_input("Equipment & Materials", min_value=0.0, value=float(st.session_state.get("capex_equipment", 0.0)))
+with capex_cols[1]:
+    contingency_pct = st.slider("Contingency (%)", min_value=0, max_value=30, value=int(st.session_state.get("contingency_pct", 10)))
+    st.session_state.contingency_pct = contingency_pct
+
+st.session_state.capex_construction = capex_construction
+st.session_state.capex_design = capex_design
+st.session_state.capex_permits = capex_permits
+st.session_state.capex_equipment = capex_equipment
+
+opex_cols = st.columns(2)
+with opex_cols[0]:
+    opex_energy = st.number_input("Energy & Utilities (annual)", min_value=0.0, value=float(st.session_state.get("opex_energy", 0.0)))
+    opex_maintenance = st.number_input("Maintenance (annual)", min_value=0.0, value=float(st.session_state.get("opex_maintenance", 0.0)))
+with opex_cols[1]:
+    opex_staffing = st.number_input("Staffing (annual)", min_value=0.0, value=float(st.session_state.get("opex_staffing", 0.0)))
+    opex_other = st.number_input("Other Opex (annual)", min_value=0.0, value=float(st.session_state.get("opex_other", 0.0)))
+
+st.session_state.opex_energy = opex_energy
+st.session_state.opex_maintenance = opex_maintenance
+st.session_state.opex_staffing = opex_staffing
+st.session_state.opex_other = opex_other
+
+capex_base = capex_construction + capex_design + capex_permits + capex_equipment
+capex_total = capex_base * (1 + contingency_pct / 100.0)
+opex_total = opex_energy + opex_maintenance + opex_staffing + opex_other
+
+mcol1, mcol2, mcol3 = st.columns(3)
+with mcol1:
+    st.metric("CAPEX (with contingency)", f"{capex_total:,.0f} {currency}")
+with mcol2:
+    st.metric("Annual OPEX", f"{opex_total:,.0f} {currency}")
+with mcol3:
+    st.metric("Contingency", f"{contingency_pct}%")
+
+breakdown_df = pd.DataFrame({
+    "Category": ["Construction", "Design", "Permits", "Equipment", "Contingency"],
+    "Amount": [capex_construction, capex_design, capex_permits, capex_equipment, capex_total - capex_base]
+})
+fig_cost = px.pie(breakdown_df, values="Amount", names="Category", title="CAPEX Breakdown")
+apply_brand_plotly_theme(fig_cost)
+st.plotly_chart(fig_cost, use_container_width=True)
+
 # ==================== COLUMN 3: Proxy Recommendations & Confidence ====================
 with col3:
     st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 3: Guidance & Results</h2>", unsafe_allow_html=True)
+    # Quick summary metrics reacting to user configuration
+    m3c1, m3c2, m3c3 = st.columns(3)
+    with m3c1:
+        st.metric("Estimated Effort (hours)", effort_results["hours_total"])
+    with m3c2:
+        st.metric("Estimated Duration (weeks)", effort_results["duration_weeks"])
+    with m3c3:
+        st.metric("Estimated Service Cost", f"{cost_results['estimated_service_cost']:,.0f} {currency_for_cost}")
     
     # Export Report Buttons at the top
     if analysis_type:
@@ -1896,9 +2263,9 @@ with col3:
             if is_recommended:
                 tier_label += " (Recommended)"
             
-            with st.expander(tier_label, expanded=is_recommended):
+            with st.expander(tier_label, expanded=False):
                 with st.container():
-                    st.markdown(f'<div style="background: {bg_gradient}; border-left: 4px solid {border_color}; padding: 1.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">', unsafe_allow_html=True)
+                    st.markdown(f'<div style="background: {bg_gradient}; border-left: 3px solid {border_color}; padding: 0.8rem; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">', unsafe_allow_html=True)
                     st.markdown(f"<p style='font-weight: 600; color: {text_color}; margin: 0;'>{proxy_info['name']}</p>", unsafe_allow_html=True)
                     st.markdown(f'<span class="{badge_class}">{proxy_info["uncertainty"]} Uncertainty</span>', unsafe_allow_html=True)
                     
@@ -1928,7 +2295,7 @@ with col3:
     
     # Show scale-specific message
     if confidence_results.get("scale_message"):
-        st.markdown("<hr style='margin: 1.5rem 0;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 0.5rem 0;'>", unsafe_allow_html=True)
         st.info(f"**Scale Note:** {confidence_results['scale_message']}")
     
     # Show country-specific note
@@ -1936,26 +2303,32 @@ with col3:
         st.info(f"**{country}:** {confidence_results['country_note']}")
     
     # Model Output Confidence Section
-    st.markdown("<hr style='margin: 2rem 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 1rem 0;'>", unsafe_allow_html=True)
     st.subheader("Model Output Confidence")
     
-    # Overall Confidence
+    # Overall Confidence (Branded Box)
     overall_conf = confidence_results["overall"]
-    
-    # Determine color based on confidence level
+
+    # Determine color and background based on confidence level
     if overall_conf >= 70:
-        conf_color = "#10b981"
+        conf_color = "#0f766e"  # brand success teal
         conf_label = "Good"
+        conf_bg = "linear-gradient(135deg, #d1fae5, #a7f3d0)"
     elif overall_conf >= 50:
-        conf_color = "#f59e0b"
+        conf_color = "#b45309"  # brand amber
         conf_label = "Medium"
+        conf_bg = "linear-gradient(135deg, #ffedd5, #fed7aa)"
     else:
-        conf_color = "#ef4444"
+        conf_color = "#b91c1c"  # brand deep red
         conf_label = "Low"
-    
-    st.markdown(f'<div style="background: linear-gradient(135deg, {conf_color}15, {conf_color}25); padding: 1.5rem; border-radius: 12px; border-left: 4px solid {conf_color}; margin-bottom: 1rem;">'
-               f'<p style="font-size: 2.5rem; font-weight: 700; color: {conf_color}; margin: 0; text-align: center;">{overall_conf}%</p>'
-               f'<p style="color: #64748b; margin: 0; text-align: center; font-weight: 600;">{conf_label} Confidence</p></div>', unsafe_allow_html=True)
+        conf_bg = "linear-gradient(135deg, #fee2e2, #fecaca)"
+
+    st.markdown(
+        f'<div style="background: {conf_bg}; padding: 0.9rem; border-radius: 10px; border-left: 4px solid {conf_color}; margin-bottom: 0.6rem;">'
+        f'<p style="font-size: 2.0rem; font-weight: 700; color: {conf_color}; margin: 0; text-align: center;">{overall_conf}%</p>'
+        f'<p style="color: #64748b; margin: 0; text-align: center; font-weight: 600;">{conf_label} Confidence</p></div>',
+        unsafe_allow_html=True
+    )
     
     # Confidence Prediction Calculator
     with st.expander("🎯 Confidence Prediction - What If?", expanded=False):
@@ -2007,61 +2380,29 @@ with col3:
                     
                     improvement = predicted_results['overall'] - confidence_results['overall']
                     
-                    st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-                    st.markdown("<div style='background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 1rem; border-radius: 8px; border-left: 4px solid #3b82f6;'>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin: 0.5rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+                    st.markdown("<div style='background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 0.7rem; border-radius: 8px; border-left: 3px solid #3b82f6;'>", unsafe_allow_html=True)
                     st.markdown(f"<p style='margin: 0; font-size: 0.9rem; color: #1e40af;'><strong>Predicted Confidence:</strong> {predicted_results['overall']}%</p>", unsafe_allow_html=True)
                     if improvement > 0:
-                        st.markdown(f"<p style='margin: 0.5rem 0 0 0; font-size: 1.1rem; color: #10b981; font-weight: 700;'>+{improvement:.0f}% improvement!</p>", unsafe_allow_html=True)
+                        st.markdown(f"<p style='margin: 0.3rem 0 0 0; font-size: 1rem; color: #10b981; font-weight: 700;'>+{improvement:.0f}% improvement!</p>", unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.success("✓ All data items available! Excellent data coverage.")
+
+        # Recommended Actions inside the same dropdown
+        if analysis_messages.get("recommendations"):
+            st.markdown("<hr style='margin: 0.5rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+            st.markdown("**Recommended Actions**")
+            for idx, rec in enumerate(analysis_messages["recommendations"], 1):
+                st.markdown(f"{idx}. {rec}")
     
-    st.markdown("---")
+    # Removed per-output confidence breakdown as requested
 
-    # Output-Specific Confidence Levels
-    st.subheader("By Output Type")
-    
-    for output, conf_value in confidence_results["by_output"].items():
-        st.markdown(f"**{output}**")
-        
-        # Determine status and message
-        if conf_value >= 70:
-            status_color = "#10b981"
-            status_msg = "Reliable for most applications"
-        elif conf_value >= 50:
-            status_color = "#f59e0b"
-            status_msg = "Suitable for planning, limited precision"
-        else:
-            status_color = "#ef4444"
-            status_msg = "Low confidence - screening only"
-        
-        st.progress(conf_value / 100)
-        col_conf1, col_conf2 = st.columns([3, 1])
-        with col_conf1:
-            st.markdown(f'<span style="color: {status_color}; font-size: 0.85rem;">{status_msg}</span>', unsafe_allow_html=True)
-        with col_conf2:
-            st.markdown(f"**{conf_value}%**")
-        
-        st.markdown("---")
+    # Warnings section removed as requested
 
-    # Display Warnings
-    if analysis_messages["warnings"]:
-        st.subheader("⚠ Warnings")
-        for warning in analysis_messages["warnings"]:
-            st.warning(warning)
+    # Limitations section removed as requested
 
-    # Display Limitations
-    if analysis_messages["limitations"]:
-        st.subheader("Main Limitations")
-        for limitation in analysis_messages["limitations"]:
-            st.markdown(f"• {limitation}")
-
-    # Display Recommendations
-    if analysis_messages["recommendations"]:
-        st.markdown("---")
-        st.subheader("Recommended Actions")
-        for idx, rec in enumerate(analysis_messages["recommendations"], 1):
-            st.markdown(f"{idx}. {rec}")
+    # Recommended Actions moved into Confidence Prediction dropdown
     
     # Data Source Directory
     st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
@@ -2134,43 +2475,69 @@ with col3:
         
         st.info("💡 Tip: Start with free open data sources (OpenStreetMap, government portals) before considering commercial data providers.")
 
+    # Step 4 & 5 moved above (full-width) for readability
+
 # ==================== BOTTOM SECTION: Visualizations ====================
 st.markdown("<hr style='margin: 2.5rem 0;'>", unsafe_allow_html=True)
 st.header("Detailed Analysis")
+
+# Summary metrics reacting to configuration (timeframe and cost)
+da_col1, da_col2, da_col3 = st.columns(3)
+with da_col1:
+    st.metric("Estimated Effort (hours)", effort_results["hours_total"])
+with da_col2:
+    st.metric("Estimated Duration (weeks)", effort_results["duration_weeks"])
+with da_col3:
+    st.metric("Estimated Service Cost", f"{cost_results['estimated_service_cost']:,.0f} {st.session_state.get('currency', currency_for_cost)}")
 
 tab1, tab2, tab3 = st.tabs(["Data Coverage", "Confidence Breakdown", "Recommendations"])
 
 with tab1:
     st.subheader("Data Availability Overview")
 
-    # Data coverage chart
-    data_items = [
-        {"Category": "Building Footprints", "Status": "Available", "Coverage": 100, "Quality": "High"},
-        {"Category": "Construction Age", "Status": "Missing", "Coverage": 0, "Quality": "N/A"},
-        {"Category": "Energy Consumption", "Status": "Available", "Coverage": 85, "Quality": "Medium"},
-        {"Category": "Building Materials", "Status": "Partial", "Coverage": 40, "Quality": "Low"},
-        {"Category": "Occupancy Data", "Status": "Available", "Coverage": 75, "Quality": "Medium"},
-        {"Category": "Climate Data", "Status": "Available", "Coverage": 100, "Quality": "High"},
-    ]
+    # Build dynamic coverage by category from current analysis requirements and inputs
+    filtered_items = get_filtered_data_items(analysis_type)
+    coverage_rows = []
+    for category, items in filtered_items.items():
+        total = len(items)
+        available = sum(1 for item in items if st.session_state.data_inputs.get(item['key'], False))
+        coverage = int(round((available / total * 100))) if total > 0 else 0
+        if coverage == 100:
+            status = "Available"
+            quality = "High"
+        elif coverage == 0:
+            status = "Missing"
+            quality = "N/A"
+        else:
+            status = "Partial"
+            quality = "Medium" if coverage >= 50 else "Low"
+        coverage_rows.append({
+            "Category": category,
+            "Status": status,
+            "Coverage": coverage,
+            "Quality": quality
+        })
 
-    df_data = pd.DataFrame(data_items)
+    df_data = pd.DataFrame(coverage_rows)
+    if not df_data.empty:
+        fig_coverage = px.bar(
+            df_data,
+            x="Coverage",
+            y="Category",
+            color="Status",
+            orientation='h',
+            title="Data Coverage by Category",
+            color_discrete_map={'Available': '#0f766e', 'Missing': '#b91c1c', 'Partial': '#b45309'},
+            labels={'Coverage': 'Coverage (%)'}
+        )
+        fig_coverage.update_layout(height=400)
+        apply_brand_plotly_theme(fig_coverage)
+        st.plotly_chart(fig_coverage, use_container_width=True)
 
-    fig_coverage = px.bar(
-        df_data,
-        x="Coverage",
-        y="Category",
-        color="Status",
-        orientation='h',
-        title="Data Coverage by Category",
-        color_discrete_map={'Available': '#28a745', 'Missing': '#dc3545', 'Partial': '#ffc107'},
-        labels={'Coverage': 'Coverage (%)'}
-    )
-    fig_coverage.update_layout(height=400)
-    st.plotly_chart(fig_coverage, use_container_width=True)
-
-    # Data quality table
-    st.markdown("**Data Quality Summary:**")
-    st.dataframe(df_data, use_container_width=True, hide_index=True)
+        st.markdown("**Data Quality Summary:**")
+        st.dataframe(df_data, use_container_width=True, hide_index=True)
+    else:
+        st.info("Select an analysis type to see data coverage.")
 
 with tab2:
     st.subheader("Model Confidence Analysis")
@@ -2178,53 +2545,77 @@ with tab2:
     col_chart1, col_chart2 = st.columns(2)
 
     with col_chart1:
-        # Confidence by output type
-        confidence_data = pd.DataFrame({
-            'Output': ['Annual Energy\nDemand', 'Peak Power\nLoad', 'Retrofit\nPriority', 'Carbon\nEmissions'],
-            'Confidence': [60, 35, 70, 55],
-            'Category': ['Medium', 'Low', 'High', 'Medium']
-        })
-
-        fig_conf = px.bar(
-            confidence_data,
-            x='Output',
-            y='Confidence',
-            color='Category',
-            title='Confidence by Output Type',
-            color_discrete_map={'Low': '#dc3545', 'Medium': '#ffc107', 'High': '#28a745'},
-            labels={'Confidence': 'Confidence (%)'}
-        )
-        fig_conf.update_layout(height=350)
-        st.plotly_chart(fig_conf, use_container_width=True)
+        # Confidence by output type (dynamic)
+        by_output = confidence_results.get("by_output", {})
+        if by_output:
+            rows = []
+            for output, val in by_output.items():
+                category = 'High' if val >= 70 else ('Medium' if val >= 50 else 'Low')
+                rows.append({'Output': output, 'Confidence': val, 'Category': category})
+            confidence_data = pd.DataFrame(rows)
+            fig_conf = px.bar(
+                confidence_data,
+                x='Output',
+                y='Confidence',
+                color='Category',
+                title='Confidence by Output Type',
+                color_discrete_map={'Low': '#b91c1c', 'Medium': '#b45309', 'High': '#0f766e'},
+                labels={'Confidence': 'Confidence (%)'}
+            )
+            fig_conf.update_layout(height=350)
+            apply_brand_plotly_theme(fig_conf)
+            st.plotly_chart(fig_conf, use_container_width=True)
+        else:
+            st.info("No output confidence available for the current selection.")
 
     with col_chart2:
-        # Impact of proxies
-        proxy_impact = pd.DataFrame({
-            'Proxy Tier': ['Tier 1\n(National)', 'Tier 2\n(Remote)', 'Tier 3\n(Regional)'],
-            'Accuracy Impact': [75, 50, 40],
-            'Usability': [85, 60, 70]
-        })
+        # Proxy performance (dynamic averages by tier)
+        if recommended_proxies:
+            tier_map = {"tier1": "Tier 1", "tier2": "Tier 2", "tier3": "Tier 3"}
+            # Map uncertainty to usability score
+            uncertainty_to_usability = {
+                'Very Low': 90, 'Low': 85, 'Low-Medium': 75,
+                'Medium': 60, 'Medium-High': 50, 'High': 40, 'Very High': 30
+            }
+            agg = {}
+            for info in recommended_proxies.values():
+                tier = tier_map.get(info.get('tier', ''), info.get('tier', 'Unknown'))
+                agg.setdefault(tier, {"impact_vals": [], "usability_vals": []})
+                impact = float(info.get('confidence_impact', 0))
+                usability = uncertainty_to_usability.get(info.get('uncertainty', 'Medium'), 60)
+                agg[tier]["impact_vals"].append(impact)
+                agg[tier]["usability_vals"].append(usability)
 
-        fig_proxy = go.Figure()
-        fig_proxy.add_trace(go.Bar(
-            name='Accuracy Impact',
-            x=proxy_impact['Proxy Tier'],
-            y=proxy_impact['Accuracy Impact'],
-            marker_color='#17a2b8'
-        ))
-        fig_proxy.add_trace(go.Bar(
-            name='Usability',
-            x=proxy_impact['Proxy Tier'],
-            y=proxy_impact['Usability'],
-            marker_color='#6c757d'
-        ))
-        fig_proxy.update_layout(
-            title='Proxy Data Performance',
-            barmode='group',
-            height=350,
-            yaxis_title='Score (%)'
-        )
-        st.plotly_chart(fig_proxy, use_container_width=True)
+            rows = []
+            for tier, vals in agg.items():
+                avg_impact = sum(vals["impact_vals"]) / max(len(vals["impact_vals"]), 1)
+                avg_usability = sum(vals["usability_vals"]) / max(len(vals["usability_vals"]), 1)
+                rows.append({"Proxy Tier": tier, "Accuracy Impact": round(avg_impact), "Usability": round(avg_usability)})
+            proxy_impact = pd.DataFrame(rows)
+
+            fig_proxy = go.Figure()
+            fig_proxy.add_trace(go.Bar(
+                name='Accuracy Impact',
+                x=proxy_impact['Proxy Tier'],
+                y=proxy_impact['Accuracy Impact'],
+                marker_color='#115e59'
+            ))
+            fig_proxy.add_trace(go.Bar(
+                name='Usability',
+                x=proxy_impact['Proxy Tier'],
+                y=proxy_impact['Usability'],
+                marker_color='#334155'
+            ))
+            fig_proxy.update_layout(
+                title='Proxy Data Performance',
+                barmode='group',
+                height=350,
+                yaxis_title='Score (%)'
+            )
+            apply_brand_plotly_theme(fig_proxy)
+            st.plotly_chart(fig_proxy, use_container_width=True)
+        else:
+            st.info("No proxies recommended — all critical data available.")
 
     # Sensitivity analysis
     st.markdown("**Sensitivity to Missing Data:**")
