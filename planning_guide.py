@@ -8,6 +8,10 @@ import random
 # Page configuration
 st.set_page_config(page_title="Project Planning Guide", layout="wide")
 
+# Wizard state for stepped navigation
+if "wizard_step" not in st.session_state:
+    st.session_state.wizard_step = 0  # 0 = intro, 1..5 = steps
+
 # ==================== CONFIGURATION & RULES ENGINE ====================
 
 # Detailed data requirements by analysis type (maps to specific data item keys)
@@ -1149,6 +1153,150 @@ def estimate_cost(hours_total, currency):
         "overhead_mult": overhead_mult,
     }
 
+# ===== Task Planner Helpers =====
+
+def generate_suggested_tasks(total_hours: int, proxies_count: int, completeness_pct: float, analysis_type: str, project_scale: str):
+    """Create a suggested task list with estimated hours and deliverables.
+    Returns a list of dicts: {Task, Hours, Owner, Phase, Deliverable}.
+    - If a specific analysis template exists, use absolute durations (scale-aware).
+    - Otherwise, fall back to weighted distribution of total_hours.
+    """
+    weekly_capacity = 30.0  # hours per week
+
+    # Specialized template for Renewable Energy & Local Production
+    if analysis_type == "Renewable Energy & Local Production":
+        # Scale factors (weeks) for core tasks
+        if project_scale == "Building":
+            weeks = {
+                "Digital Model Setup": 1.0,
+                "Roof & Usable Area Extraction": 0.5,
+                "Solar Irradiance (Incident Radiation) Simulation": 1.0,
+                "PV System Sizing & Layout": 0.5,
+                "Energy Balance & Self-Consumption": 0.5,
+                "Financial Analysis (CAPEX/OPEX)": 0.5,
+                "Validation & QA": 0.5,
+                "Reporting & Recommendations": 0.5,
+            }
+        elif project_scale == "Neighborhood":
+            weeks = {
+                "Digital Model Setup": 3.0,  # per user request
+                "Roof & Usable Area Extraction": 1.0,
+                "Solar Irradiance (Incident Radiation) Simulation": 2.0,
+                "PV System Sizing & Layout": 1.0,
+                "Energy Balance & Self-Consumption": 1.0,
+                "Financial Analysis (CAPEX/OPEX)": 1.0,
+                "Validation & QA": 0.5,
+                "Reporting & Recommendations": 0.5,
+            }
+        else:  # City (approximate)
+            weeks = {
+                "Digital Model Setup": 4.0,
+                "Roof & Usable Area Extraction": 2.0,
+                "Solar Irradiance (Incident Radiation) Simulation": 3.0,
+                "PV System Sizing & Layout": 1.5,
+                "Energy Balance & Self-Consumption": 1.5,
+                "Financial Analysis (CAPEX/OPEX)": 1.0,
+                "Validation & QA": 0.5,
+                "Reporting & Recommendations": 0.5,
+            }
+
+        # Data completeness/proxies can add a data wrangling task
+        missing_factor = max(0.0, 1.0 - (completeness_pct / 100.0))
+        wrangle_weeks = 0.0
+        if missing_factor > 0.0 or proxies_count > 0:
+            wrangle_weeks = 0.5 + 1.0 * missing_factor + 0.1 * min(proxies_count, 10)
+
+        deliverables = {
+            "Scoping & Kickoff": "Scope, success criteria, data checklist",
+            "Digital Model Setup": "Clean GIS/BIM model suitable for solar analysis",
+            "Data Wrangling & Gap Filling": "Curated dataset, proxy selections documented",
+            "Roof & Usable Area Extraction": "Usable roof polygons, obstructions mapped",
+            "Solar Irradiance (Incident Radiation) Simulation": "Annual/seasonal irradiance maps, kWh/m²",
+            "PV System Sizing & Layout": "Preliminary PV layout, DC/AC sizing, inverter config",
+            "Energy Balance & Self-Consumption": "Self-consumption ratio, grid import/export profile",
+            "Financial Analysis (CAPEX/OPEX)": "CAPEX/OPEX, LCOE, payback, NPV",
+            "Validation & QA": "Spot-checks vs known cases and sanity bounds",
+            "Reporting & Recommendations": "Executive summary, results, actions, risks",
+        }
+
+        tasks = []
+        # Scoping is small but useful
+        tasks.append({
+            "Task": "Scoping & Kickoff",
+            "Hours": int(round(0.3 * weekly_capacity)),
+            "Owner": "",
+            "Phase": "Scoping",
+            "Deliverable": deliverables["Scoping & Kickoff"],
+        })
+        # Optional data wrangling based on gaps
+        if wrangle_weeks > 0:
+            tasks.append({
+                "Task": "Data Wrangling & Gap Filling",
+                "Hours": int(round(wrangle_weeks * weekly_capacity)),
+                "Owner": "",
+                "Phase": "Data Collection",
+                "Deliverable": deliverables["Data Wrangling & Gap Filling"],
+            })
+        # Core tasks
+        core_phase_map = {
+            "Digital Model Setup": "Modeling",
+            "Roof & Usable Area Extraction": "Modeling",
+            "Solar Irradiance (Incident Radiation) Simulation": "Modeling",
+            "PV System Sizing & Layout": "Analysis",
+            "Energy Balance & Self-Consumption": "Analysis",
+            "Financial Analysis (CAPEX/OPEX)": "Analysis",
+            "Validation & QA": "Validation",
+            "Reporting & Recommendations": "Reporting",
+        }
+        for name, w in weeks.items():
+            tasks.append({
+                "Task": name,
+                "Hours": int(round(w * weekly_capacity)),
+                "Owner": "",
+                "Phase": core_phase_map.get(name, "Modeling"),
+                "Deliverable": deliverables.get(name, ""),
+            })
+        return tasks
+
+    # Fallback: weighted distribution when no specific template exists
+    weights = {
+        "Scoping": 0.10,
+        "Data Collection": 0.28,
+        "Proxy Preparation": 0.10 if proxies_count > 0 else 0.04,
+        "Model Setup & Simulation": 0.32,
+        "Validation & QA": 0.12,
+        "Reporting": 0.08,
+    }
+
+    if analysis_type in ["Climate Resilience", "Energy & Carbon Performance"]:
+        weights["Model Setup & Simulation"] += 0.03
+        weights["Data Collection"] -= 0.02
+        weights["Validation & QA"] -= 0.01
+
+    missing_factor = max(0.0, 1.0 - (completeness_pct / 100.0))
+    weights["Data Collection"] += 0.10 * missing_factor
+    weights["Proxy Preparation"] += (0.02 + 0.01 * min(proxies_count, 10)) * (0.5 + 0.5 * missing_factor)
+
+    total_w = sum(weights.values())
+    for k in list(weights.keys()):
+        weights[k] = weights[k] / total_w
+
+    tasks = []
+    for name, w in weights.items():
+        hours = max(1, round(total_hours * w))
+        if name in ["Scoping"]:
+            phase = "Scoping"
+        elif name in ["Data Collection", "Proxy Preparation"]:
+            phase = "Data Collection"
+        elif name == "Model Setup & Simulation":
+            phase = "Modeling"
+        elif name == "Validation & QA":
+            phase = "Validation"
+        else:
+            phase = "Reporting"
+        tasks.append({"Task": name, "Hours": hours, "Owner": "", "Phase": phase, "Deliverable": ""})
+    return tasks
+
 # ===== UI Theming: Plotly and CSS Brand Palette =====
 
 BRAND_COLORWAY = [
@@ -1211,6 +1359,25 @@ st.markdown("""
         --brand-success: #0f766e;
         --brand-warning: #b45309;
         --brand-danger: #b91c1c;
+
+        /* Material Design 3 (Light) palette — neutral grey variant */
+        --md3-primary: #475569; /* slate primary */
+        --md3-on-primary: #FFFFFF;
+        --md3-primary-container: #E2E8F0; /* slate container */
+        --md3-on-primary-container: #0F172A;
+        --md3-primary-hover: #556070; /* slightly lighter slate */
+        --md3-primary-pressed: #3B4757; /* slightly darker slate */
+        --md3-hover-surface: #F1F5F9; /* very light grey hover surface */
+        --md3-secondary: #475569; /* slate */
+        --md3-on-secondary: #FFFFFF;
+        --md3-secondary-container: #E2E8F0;
+        --md3-on-secondary-container: #0F172A;
+        --md3-surface: #F8FAFC; /* light grey surface */
+        --md3-on-surface: #1C1B1F;
+        --md3-surface-variant: #E2E8F0; /* neutral grey variant */
+        --md3-outline: #CBD5E1; /* neutral outline */
+        --md3-shadow-1: 0 1px 2px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.06);
+        --md3-shadow-2: 0 2px 6px rgba(0,0,0,0.10), 0 6px 12px rgba(0,0,0,0.08);
     }
 
     html, body, .stApp {
@@ -1247,76 +1414,83 @@ st.markdown("""
     
     /* Metric cards */
     .stMetric {
-        background: linear-gradient(145deg, var(--brand-surface), var(--brand-panel));
-        padding: 1.25rem;
+        background-color: var(--md3-surface);
+        color: var(--md3-on-surface);
+        padding: 1rem;
         border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        border: 1px solid var(--brand-border);
+        box-shadow: var(--md3-shadow-1);
+        border: 1px solid var(--md3-surface-variant);
+        text-align: center;
+        min-height: 88px;
     }
     
     /* Badges styling */
     .available-badge {
-        background: linear-gradient(135deg, var(--brand-success), #0b5f58);
-        color: #ffffff;
-        padding: 4px 12px;
-        border-radius: 16px;
+        background-color: var(--md3-primary-container);
+        color: var(--md3-on-primary-container);
+        padding: 4px 10px;
+        border-radius: 12px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        box-shadow: 0 2px 4px rgba(15, 118, 110, 0.25);
+        letter-spacing: 0.4px;
+        border: 1px solid var(--md3-surface-variant);
+        box-shadow: none;
     }
     
     .missing-badge {
-        background: linear-gradient(135deg, var(--brand-danger), #7f1d1d);
-        color: #ffffff;
-        padding: 4px 12px;
-        border-radius: 16px;
+        background-color: #FEE2E2; /* error container tone */
+        color: #7F1D1D; /* on error container */
+        padding: 4px 10px;
+        border-radius: 12px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        box-shadow: 0 2px 4px rgba(185, 28, 28, 0.25);
+        letter-spacing: 0.4px;
+        border: 1px solid #FCA5A5;
+        box-shadow: none;
     }
     
     .medium-badge {
-        background: linear-gradient(135deg, var(--brand-warning), #78350f);
-        color: #ffffff;
-        padding: 4px 12px;
-        border-radius: 16px;
+        background-color: #FFF4E5; /* warning container tone */
+        color: #7C2D12; /* on warning container */
+        padding: 4px 10px;
+        border-radius: 12px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        box-shadow: 0 2px 4px rgba(180, 83, 9, 0.25);
+        letter-spacing: 0.4px;
+        border: 1px solid #FED7AA;
+        box-shadow: none;
     }
     
     .high-badge {
-        background: linear-gradient(135deg, var(--brand-danger), #7f1d1d);
-        color: #ffffff;
-        padding: 4px 12px;
-        border-radius: 16px;
+        background-color: #FEE2E2;
+        color: #7F1D1D;
+        padding: 4px 10px;
+        border-radius: 12px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        box-shadow: 0 2px 4px rgba(185, 28, 28, 0.25);
+        letter-spacing: 0.4px;
+        border: 1px solid #FCA5A5;
+        box-shadow: none;
     }
     
     /* Card containers */
     .data-card {
-        background: var(--brand-surface);
+        background-color: var(--md3-surface);
+        color: var(--md3-on-surface);
         border-radius: 12px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        border: 1px solid var(--brand-border);
-        transition: all 0.3s ease;
+        padding: 1rem;
+        margin-bottom: 0.85rem;
+        box-shadow: var(--md3-shadow-1);
+        border: 1px solid var(--md3-surface-variant);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
     }
-    
     .data-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        transform: translateY(-2px);
+        box-shadow: var(--md3-shadow-2);
+        transform: translateY(-1px);
     }
     
     /* Selectbox styling */
@@ -1326,20 +1500,30 @@ st.markdown("""
         border: 1.5px solid var(--brand-border);
     }
     
-    /* Button styling */
+    /* Button styling (Material 3 - Light) */
     .stButton > button {
-        border-radius: 8px;
+        border-radius: 12px;
         font-weight: 600;
         padding: 0.625rem 1.25rem;
-        transition: all 0.2s ease;
-        border: 1px solid var(--brand-primary);
-        background: linear-gradient(135deg, var(--brand-primary), var(--brand-navy));
-        color: #ffffff;
+        transition: box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+        border: none;
+        background-color: var(--md3-primary);
+        color: var(--md3-on-primary);
+        box-shadow: var(--md3-shadow-1);
     }
-    
     .stButton > button:hover {
         transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        box-shadow: var(--md3-shadow-2);
+        background-color: var(--md3-hover-surface);
+        color: var(--md3-primary);
+        border: 1px solid var(--md3-outline);
+    }
+    .stButton > button:focus-visible {
+        outline: 3px solid var(--md3-primary-container);
+        outline-offset: 2px;
+    }
+    .stButton > button:active {
+        background-color: var(--md3-primary-pressed);
     }
     
     /* Expander styling */
@@ -1402,102 +1586,100 @@ st.markdown("""
         border: none;
         border-top: 2px solid var(--brand-border);
     }
-        /* Playful step cards */
+        /* Playful step cards - Material 3 light */
         .step-card {
-            background: linear-gradient(135deg, var(--grad-start) 0%, var(--grad-end) 100%);
-            padding: 1.25rem; border-radius: 16px; text-align: center;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.12); margin-bottom: 1rem;
+            background: none !important;
+            background-color: var(--md3-surface);
+            padding: 1rem; border-radius: 16px; text-align: center;
+            box-shadow: var(--md3-shadow-1); margin-bottom: 1rem;
             transform: translateY(0); transition: transform 0.2s ease, box-shadow 0.2s ease;
-            min-height: 150px; display: flex; flex-direction: column; justify-content: center;
+            min-height: 140px; display: flex; flex-direction: column; justify-content: center;
+            border: 1px solid var(--md3-surface-variant);
         }
         .step-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+            transform: translateY(-2px);
+            box-shadow: var(--md3-shadow-2);
         }
         .step-index {
             display: inline-block;
-            color: white; font-size: 1.25rem; font-weight: 700;
+            color: var(--md3-primary); font-size: 1.1rem; font-weight: 700;
             margin-bottom: 0.35rem;
         }
         .step-title {
-            color: white; font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em;
+            color: var(--md3-on-surface); font-size: 1rem; font-weight: 700; letter-spacing: 0.02em;
         }
         .step-desc {
-            color: rgba(255,255,255,0.9); font-size: 0.85rem; margin-top: 0.35rem;
+            color: rgba(28,27,31,0.7); font-size: 0.85rem; margin-top: 0.35rem;
         }
         .step-arrow { 
             display: flex; align-items: center; justify-content: center; 
-            height: 150px; color: #64748b; font-size: 1.6rem; 
+            height: 140px; color: #8E8DA1; font-size: 1.4rem; 
         }
     </style>
     """, unsafe_allow_html=True)
 
-# Title
-st.title("Project Planning Guide")
-st.markdown("<p style='font-size: 1.1rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
+if st.session_state.wizard_step == 0:
+    st.title("Project Planning Guide")
+    st.markdown("<p style='font-size: 1.1rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
+    # Overview diagram upload removed per request
 
-# Interactive Process Diagram (Playful & Interactive)
-# Use narrow columns between steps for arrows
-diagram_cols = st.columns([1, 0.15, 1, 0.15, 1, 0.15, 1, 0.15, 1])
+    # Interactive Process Diagram (Playful & Interactive)
+    diagram_cols = st.columns([1, 0.15, 1, 0.15, 1, 0.15, 1, 0.15, 1])
 
-with diagram_cols[0]:
-    st.markdown("""
-    <div class='step-card' style='--grad-start:#1e3a8a; --grad-end:#0f172a;'>
-        <div class='step-index'>1</div>
-        <div class='step-title'>Analysis Setup</div>
-        <div class='step-desc'>Choose analysis, scale, and context</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with diagram_cols[1]:
-    st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
-
-with diagram_cols[2]:
-    st.markdown("""
-    <div class='step-card' style='--grad-start:#0f766e; --grad-end:#115e59;'>
-        <div class='step-index'>2</div>
-        <div class='step-title'>Review Data</div>
-        <div class='step-desc'>Mark availability and select proxies</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with diagram_cols[3]:
-    st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
-
-with diagram_cols[4]:
-    st.markdown("""
-    <div class='step-card' style='--grad-start:#475569; --grad-end:#334155;'>
-        <div class='step-index'>3</div>
-        <div class='step-title'>Guidance & Results</div>
-        <div class='step-desc'>Confidence and recommendations</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with diagram_cols[5]:
-    st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
-
-with diagram_cols[6]:
-    st.markdown("""
-    <div class='step-card' style='--grad-start:#2563eb; --grad-end:#1e40af;'>
-        <div class='step-index'>4</div>
-        <div class='step-title'>Project Timeline</div>
-        <div class='step-desc'>Milestones and Gantt view</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with diagram_cols[7]:
-    st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
-
-with diagram_cols[8]:
-    st.markdown("""
-    <div class='step-card' style='--grad-start:#6b7280; --grad-end:#4b5563;'>
-        <div class='step-index'>5</div>
-        <div class='step-title'>Cost & Budget</div>
-        <div class='step-desc'>Service cost and CAPEX/OPEX</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
+    with diagram_cols[0]:
+        st.markdown("""
+        <div class='step-card' style='--grad-start:#1e3a8a; --grad-end:#0f172a;'>
+            <div class='step-index'>1</div>
+            <div class='step-title'>Define Scope & Context</div>
+            <div class='step-desc'>Choose analysis, scale, and context</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with diagram_cols[1]:
+        st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+    with diagram_cols[2]:
+        st.markdown("""
+        <div class='step-card' style='--grad-start:#0f766e; --grad-end:#115e59;'>
+            <div class='step-index'>2</div>
+            <div class='step-title'>Review Data</div>
+            <div class='step-desc'>Mark availability and select proxies</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with diagram_cols[3]:
+        st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+    with diagram_cols[4]:
+        st.markdown("""
+        <div class='step-card' style='--grad-start:#475569; --grad-end:#334155;'>
+            <div class='step-index'>3</div>
+            <div class='step-title'>Confidence & Recommendations</div>
+            <div class='step-desc'>Confidence and recommendations</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with diagram_cols[5]:
+        st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+    with diagram_cols[6]:
+        st.markdown("""
+        <div class='step-card' style='--grad-start:#2563eb; --grad-end:#1e40af;'>
+            <div class='step-index'>4</div>
+            <div class='step-title'>Project Timeline</div>
+            <div class='step-desc'>Milestones and Gantt view</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with diagram_cols[7]:
+        st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+    with diagram_cols[8]:
+        st.markdown("""
+        <div class='step-card' style='--grad-start:#6b7280; --grad-end:#4b5563;'>
+            <div class='step-index'>5</div>
+            <div class='step-title'>Cost & Budget</div>
+            <div class='step-desc'>Service cost and CAPEX/OPEX</div>
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
+    center_cols = st.columns([1,1,1])
+    with center_cols[1]:
+        if st.button("Start ➜", type="primary", use_container_width=True):
+            st.session_state.wizard_step = 1
+            st.rerun()
 
 # Initialize session state
 if 'data_inputs' not in st.session_state:
@@ -1511,7 +1693,7 @@ st.markdown("""
     <style>
     /* Main container background */
     .stApp {
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        background: var(--md3-surface);
     }
     
     /* Outer layer - Very light grey background for column containers */
@@ -1527,9 +1709,9 @@ st.markdown("""
         left: 0.5rem;
         right: 0.5rem;
         bottom: 0;
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        background: var(--md3-surface);
         border-radius: 24px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+        box-shadow: var(--md3-shadow-1);
         z-index: 0;
     }
     
@@ -1537,12 +1719,12 @@ st.markdown("""
     div[data-testid="column"] > div {
         position: relative;
         z-index: 1;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        padding: 1.75rem 1.25rem;
+        background: var(--md3-surface);
+        padding: 1.5rem 1.25rem;
         border-radius: 18px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+        box-shadow: var(--md3-shadow-1);
         margin: 0.5rem;
-        border: 1px solid rgba(226, 232, 240, 0.8);
+        border: 1px solid var(--md3-surface-variant);
     }
     
     /* Header styling */
@@ -1667,33 +1849,55 @@ st.markdown("""
         transform: translateX(4px);
     }
     
-    /* Button styling */
+    /* Button styling (Material 3 - Light) */
     div[data-testid="column"] button[kind="primary"] {
-        background: linear-gradient(135deg, var(--brand-accent) 0%, var(--brand-primary) 100%);
-        border-radius: 10px;
+        background-color: var(--md3-primary);
+        color: var(--md3-on-primary);
+        border: none;
+        border-radius: 12px;
         font-weight: 600;
         padding: 0.75rem 1.5rem;
-        box-shadow: 0 4px 8px rgba(37, 99, 235, 0.30);
-        transition: all 0.3s ease;
+        box-shadow: var(--md3-shadow-1);
+        transition: box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
     }
-    
     div[data-testid="column"] button[kind="primary"]:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(37, 99, 235, 0.40);
+        box-shadow: var(--md3-shadow-2);
+        background-color: var(--md3-hover-surface);
+        color: var(--md3-primary);
+        border: 1px solid var(--md3-outline);
+    }
+    div[data-testid="column"] button[kind="primary"]:active {
+        background-color: var(--md3-primary-pressed);
+    }
+    div[data-testid="column"] .stButton > button:not([kind="primary"]) {
+        background-color: transparent;
+        color: var(--md3-primary);
+        border: 1px solid var(--md3-outline);
+        border-radius: 12px;
+        box-shadow: none;
+        padding: 0.625rem 1.25rem;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    div[data-testid="column"] .stButton > button:not([kind="primary"]):hover {
+        transform: translateY(-1px);
+        border-color: color-mix(in oklab, var(--md3-outline) 70%, var(--md3-primary) 30%);
+        background-color: rgba(103, 80, 164, 0.06); /* subtle state layer */
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Create three columns for main sections
+# Create three columns for main sections (used in steps 1-3)
 col1, col2, col3 = st.columns([1, 1.2, 1])
 
 # ==================== COLUMN 1: Analysis Setup ====================
-with col1:
-    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 1: Analysis Setup</h2>", unsafe_allow_html=True)
+if st.session_state.wizard_step == 1:
+    with col1:
+        st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 1: Define Scope & Context</h2>", unsafe_allow_html=True)
 
-    # Analysis Type
-    st.subheader("Analysis Type")
-    analysis_type = st.multiselect(
+        # Analysis Type
+        st.subheader("Analysis Type")
+        analysis_type = st.multiselect(
         "Select your analysis (one or more):",
         options=[
             "Energy & Carbon Performance",
@@ -1702,23 +1906,27 @@ with col1:
             "Urban Design Support",
             "Climate Resilience"
         ],
-        help="Choose one or more analysis types. Requirements will be merged intelligently."
-    )
+        help="Choose one or more analysis types. Requirements will be merged intelligently.",
+        key="analysis_type"
+        )
     
     # Show selected analyses count
     if analysis_type:
         st.info(f"📊 {len(analysis_type)} analysis type(s) selected")
 
-    # Define Scale
-    st.subheader("Define Your Scale")
-    project_scale = st.selectbox(
+        # Define Scale
+        st.subheader("Define Your Scale")
+        project_scale = st.selectbox(
         "Project scale:",
         options=["Building", "Neighborhood", "City"],
-        help="Select the geographic scope of your analysis"
-    )
+        help="Select the geographic scope of your analysis",
+        key="project_scale"
+        )
     
     # Building Uses (only for Neighborhood or City)
-    if project_scale in ["Neighborhood", "City"]:
+    # Guard against NameError if scale not yet selected
+    _ps = st.session_state.get("project_scale", "Building")
+    if _ps in ["Neighborhood", "City"]:
         st.subheader("Building Uses Included")
         st.caption("Select all building types in your analysis:")
 
@@ -1761,9 +1969,9 @@ with col1:
         if selected_uses:
             st.info(f"{len(selected_uses)} building types selected")
     
-    # Context
-    st.subheader("Context")
-    country = st.selectbox(
+        # Context
+        st.subheader("Context")
+        country = st.selectbox(
         "Select country:",
         options=[
             "Sweden",
@@ -1776,18 +1984,37 @@ with col1:
             "France",
             "Denmark"
         ],
-        help="Select the country for your analysis"
-    )
+        help="Select the country for your analysis",
+        key="country"
+        )
 
-    # Set default outputs for confidence calculation
-    outputs = ["Annual Energy Demand", "Peak Power Load", "Carbon Emissions"]
+    # Default outputs are managed globally; no local assignment here
 
     # Removed Next button after context for streamlined flow
+
+# Navigation: Step 1
+    nav1 = st.columns([1,1])
+    with nav1[0]:
+        if st.button("◀ Back", use_container_width=True):
+            st.session_state.wizard_step = 0
+            st.rerun()
+    with nav1[1]:
+        if st.button("Next ▶", type="primary", use_container_width=True):
+            st.session_state.wizard_step = 2
+            st.rerun()
 
 # ==================== RULES ENGINE: Calculate Everything Dynamically ====================
 
 # Calculate confidence levels based on configuration
 # For multiple analyses, use the first one for base confidence calculation
+analysis_type = st.session_state.get("analysis_type", [])
+project_scale = st.session_state.get("project_scale", "Building")
+country = st.session_state.get("country", "Sweden")
+# Ensure desired outputs are defined globally to avoid NameError
+outputs = st.session_state.get(
+    "desired_outputs",
+    ["Annual Energy Demand", "Peak Power Load", "Carbon Emissions"]
+)
 first_analysis = analysis_type[0] if analysis_type else "Energy & Carbon Performance"
 confidence_results = calculate_confidence(
     analysis_type=first_analysis,
@@ -1804,6 +2031,7 @@ recommended_proxies = get_recommended_proxies(
     analysis_type=first_analysis,
     project_scale=project_scale
 )
+st.session_state.recommended_proxies = recommended_proxies or {}
 
 # Get contextual messages and recommendations
 # For multiple analyses, use the first one for messages
@@ -1825,12 +2053,14 @@ effort_results = estimate_effort_and_timeline(
     data_completeness_pct=completeness_stats["pct"],
     proxies_count=proxies_count,
 )
-currency_for_cost = st.session_state.get("currency", "USD")
+currency_for_cost = st.session_state.get("currency", "SEK")
 cost_results = estimate_cost(effort_results["hours_total"], currency_for_cost)
 
 # ==================== COLUMN 2: Data Availability ====================
-with col2:
-    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
+if st.session_state.wizard_step == 2:
+    with col2:
+        analysis_type = st.session_state.get("analysis_type", [])
+        st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
     
     # Progress Indicator - Data Completeness
     if analysis_type:
@@ -1887,7 +2117,7 @@ with col2:
                      and st.session_state.get(f"proxy_{item['key']}") is not None)
     missing_items = total_items - available_items - proxy_items
 
-    # Display summary metrics
+        # Display summary metrics (Step 2)
     col_sum1, col_sum2, col_sum3 = st.columns(3)
     with col_sum1:
         st.metric("✓ Available", f"{available_items}/{total_items}")
@@ -1895,20 +2125,13 @@ with col2:
         st.metric("⚠️ Using Proxy", proxy_items)
     with col_sum3:
         st.metric("🔴 Missing", missing_items)
-    
+
     st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
-    # Display data items by category with expandable sections (use filtered items)
+        # Display data items by category with expandable sections (use filtered items)
     for category, items in filtered_data_items.items():
         with st.expander(f"**{category}**", expanded=False):
             for item in items:
-                # Show required/optional badge
-                requirement_badge = ""
-                if item.get('is_required', False):
-                    requirement_badge = '<span style="background: #fef3c7; color: #92400e; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 0.3rem;">REQUIRED</span>'
-                elif item.get('is_optional', False):
-                    requirement_badge = '<span style="background: #e0e7ff; color: #4338ca; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 0.3rem;">OPTIONAL</span>'
-                
                 # Add analysis info if multiple analyses selected
                 analysis_info = ""
                 if analysis_type and len(analysis_type) > 1 and 'analyses' in item:
@@ -1931,7 +2154,7 @@ with col2:
                     if info_parts:
                         analysis_info = f"<br/><span style='font-size: 0.7rem; color: #64748b;'>({' | '.join(info_parts)})</span>"
                 
-                st.markdown(f"<p style='font-weight: 600; margin-bottom: 0.3rem; margin-top: 0.3rem; color: #334155; font-size: 0.9rem;'>{item['label']}{requirement_badge}{analysis_info}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-weight: 600; margin-bottom: 0.3rem; margin-top: 0.3rem; color: #334155; font-size: 0.9rem;'>{item['label']}{analysis_info}</p>", unsafe_allow_html=True)
                 
                 # Create columns for Yes/No and Proxy dropdown
                 col_radio, col_proxy = st.columns([1, 2])
@@ -2055,10 +2278,18 @@ with col2:
                 # Add separator between items
                 st.markdown("<div style='margin: 0.6rem 0; border-bottom: 1px solid #e2e8f0;'></div>", unsafe_allow_html=True)
 
-# ==================== Step 4 & 5: Timeline and Cost (Full Width) ====================
+        # Navigation: Step 2
+        nav2 = st.columns([1,1])
+        with nav2[0]:
+            if st.button("◀ Back", use_container_width=True):
+                st.session_state.wizard_step = 1
+                st.rerun()
+        with nav2[1]:
+            if st.button("Next ▶", type="primary", use_container_width=True):
+                st.session_state.wizard_step = 3
+                st.rerun()
 
-st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 4: Project Timeline</h2>", unsafe_allow_html=True)
-st.subheader("Project Timeline")
+# ==================== Step 4 & 5: Timeline and Cost (Full Width) ====================
 
 if "project_start_date" not in st.session_state:
     st.session_state.project_start_date = None
@@ -2068,146 +2299,283 @@ if "timeline_rows" not in st.session_state:
     st.session_state.timeline_rows = [
         {"Task": "", "Start": None, "Finish": None, "Owner": "", "Phase": ""}
     ]
+if "task_rows" not in st.session_state:
+    st.session_state.task_rows = []
+if "use_task_plan" not in st.session_state:
+    st.session_state.use_task_plan = False
 
-tcol1, tcol2 = st.columns(2)
-with tcol1:
-    st.session_state.project_start_date = st.date_input("Project start", value=st.session_state.project_start_date)
-with tcol2:
-    st.session_state.project_end_date = st.date_input("Project end", value=st.session_state.project_end_date)
+if st.session_state.wizard_step == 4:
+    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 4: Project Timeline</h2>", unsafe_allow_html=True)
+    st.subheader("Project Timeline")
 
-# Helper: populate timeline from estimated phases
-gen_cols = st.columns([1,1,2])
-if gen_cols[0].button("Populate timeline (estimated)"):
-    start_date = st.session_state.project_start_date or datetime.today().date()
-    current = pd.to_datetime(start_date)
-    weekly_capacity = 30.0
-    phase_rows = []
-    for phase, hrs in effort_results["hours_breakdown"].items():
-        weeks = max(1, round(hrs / weekly_capacity))
-        days = int(weeks * 7)
-        start = current
-        finish = current + pd.to_timedelta(days, unit='D')
-        phase_rows.append({
-            "Task": phase,
-            "Start": start.date(),
-            "Finish": finish.date(),
-            "Owner": "",
-            "Phase": phase
-        })
-        current = finish
-    st.session_state.timeline_rows = phase_rows
+    tcol1, tcol2 = st.columns(2)
+    with tcol1:
+        st.session_state.project_start_date = st.date_input("Project start", value=st.session_state.project_start_date)
+    with tcol2:
+        st.session_state.project_end_date = st.date_input("Project end", value=st.session_state.project_end_date)
 
-timeline_df = pd.DataFrame(st.session_state.timeline_rows)
-edited_timeline = st.data_editor(
-    timeline_df,
-    num_rows="dynamic",
-    use_container_width=True,
-    column_config={
-        "Task": st.column_config.TextColumn("Task"),
-        "Start": st.column_config.DateColumn("Start"),
-        "Finish": st.column_config.DateColumn("Finish"),
-        "Owner": st.column_config.TextColumn("Owner"),
-        "Phase": st.column_config.TextColumn("Phase"),
-    },
-    key="data_editor_timeline"
-)
-st.session_state.timeline_rows = edited_timeline.to_dict(orient="records")
+    # Navigation: Step 4
+    nav4 = st.columns([1,1])
+    with nav4[0]:
+        if st.button("◀ Back", use_container_width=True):
+            st.session_state.wizard_step = 3
+            st.rerun()
+    with nav4[1]:
+        if st.button("Next ▶", type="primary", use_container_width=True):
+            st.session_state.wizard_step = 5
+            st.rerun()
 
-valid_timeline = edited_timeline.dropna(subset=["Task", "Start", "Finish"])
-if not valid_timeline.empty:
-    valid_timeline["Start"] = pd.to_datetime(valid_timeline["Start"])  # type: ignore
-    valid_timeline["Finish"] = pd.to_datetime(valid_timeline["Finish"])  # type: ignore
-    fig_timeline = px.timeline(
-        valid_timeline,
-        x_start="Start",
-        x_end="Finish",
-        y="Task",
-        color="Phase" if "Phase" in valid_timeline.columns else None,
-        title="Project Timeline"
+    # Helper: populate timeline from estimated phases
+    gen_cols = st.columns([1,1,2])
+    if gen_cols[0].button("Populate timeline (estimated)"):
+        start_date = st.session_state.project_start_date or datetime.today().date()
+        current = pd.to_datetime(start_date)
+        weekly_capacity = 30.0
+        phase_rows = []
+        for phase, hrs in effort_results["hours_breakdown"].items():
+            weeks = max(1, round(hrs / weekly_capacity))
+            days = int(weeks * 7)
+            start = current
+            finish = current + pd.to_timedelta(days, unit='D')
+            phase_rows.append({
+                "Task": phase,
+                "Start": start.date(),
+                "Finish": finish.date(),
+                "Owner": "",
+                "Phase": phase
+            })
+            current = finish
+        st.session_state.timeline_rows = phase_rows
+
+    # Timeline editor and chart
+    timeline_df = pd.DataFrame(st.session_state.timeline_rows)
+    edited_timeline = st.data_editor(
+        timeline_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Task": st.column_config.TextColumn("Task"),
+            "Start": st.column_config.DateColumn("Start"),
+            "Finish": st.column_config.DateColumn("Finish"),
+            "Owner": st.column_config.TextColumn("Owner"),
+            "Phase": st.column_config.TextColumn("Phase"),
+        },
+        key="data_editor_timeline"
     )
-    fig_timeline.update_yaxes(autorange="reversed")
-    apply_brand_plotly_theme(fig_timeline)
-    st.plotly_chart(fig_timeline, use_container_width=True)
+    st.session_state.timeline_rows = edited_timeline.to_dict(orient="records")
 
-st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 5: Cost & Budget</h2>", unsafe_allow_html=True)
-st.subheader("Cost Inputs")
+    valid_timeline = edited_timeline.dropna(subset=["Task", "Start", "Finish"])
+    if not valid_timeline.empty:
+        valid_timeline["Start"] = pd.to_datetime(valid_timeline["Start"])  # type: ignore
+        valid_timeline["Finish"] = pd.to_datetime(valid_timeline["Finish"])  # type: ignore
+        fig_timeline = px.timeline(
+            valid_timeline,
+            x_start="Start",
+            x_end="Finish",
+            y="Task",
+            color="Phase" if "Phase" in valid_timeline.columns else None,
+            title="Project Timeline"
+        )
+        fig_timeline.update_yaxes(autorange="reversed")
+        apply_brand_plotly_theme(fig_timeline)
+        st.plotly_chart(fig_timeline, use_container_width=True)
 
-# Show auto-estimated service cost reacting to inputs
-eco1, eco2, eco3 = st.columns(3)
-with eco1:
-    st.metric("Estimated Effort (hours)", effort_results["hours_total"])
-with eco2:
-    st.metric("Estimated Duration (weeks)", effort_results["duration_weeks"])
-with eco3:
-    st.metric("Estimated Service Cost", f"{cost_results['estimated_service_cost']:,.0f} {currency_for_cost}")
+ 
 
-if "currency" not in st.session_state:
-    st.session_state.currency = "USD"
+if st.session_state.wizard_step == 5:
+    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 5: Tasks & Cost</h2>", unsafe_allow_html=True)
+    st.subheader("Task Planner (optional)")
 
-currency = st.selectbox("Currency", options=["USD", "EUR", "GBP", "SEK", "NOK", "DKK"], index=["USD", "EUR", "GBP", "SEK", "NOK", "DKK"].index(st.session_state.currency))
-st.session_state.currency = currency
-default_rate = CONSULTANT_RATES.get(currency, 150.0)
-st.session_state.consultant_rate = st.number_input("Consultant hourly rate", min_value=0.0, value=float(st.session_state.get("consultant_rate", default_rate)))
+    pcols = st.columns([1,1,1,2])
+    with pcols[0]:
+        if st.button("Suggest tasks from inputs"):
+            base_total = effort_results["hours_total"]
+            st.session_state.task_rows = generate_suggested_tasks(
+                total_hours=base_total,
+                proxies_count=proxies_count,
+                completeness_pct=completeness_stats["pct"],
+                analysis_type=first_analysis,
+                project_scale=project_scale,
+            )
+    with pcols[1]:
+        if st.button("Clear tasks"):
+            st.session_state.task_rows = []
+    with pcols[2]:
+        st.session_state.use_task_plan = st.toggle("Use task plan for duration/cost", value=st.session_state.use_task_plan)
 
-capex_cols = st.columns(2)
-with capex_cols[0]:
-    capex_construction = st.number_input("Construction", min_value=0.0, value=float(st.session_state.get("capex_construction", 0.0)))
-    capex_design = st.number_input("Design & Engineering", min_value=0.0, value=float(st.session_state.get("capex_design", 0.0)))
-    capex_permits = st.number_input("Permits & Approvals", min_value=0.0, value=float(st.session_state.get("capex_permits", 0.0)))
-    capex_equipment = st.number_input("Equipment & Materials", min_value=0.0, value=float(st.session_state.get("capex_equipment", 0.0)))
-with capex_cols[1]:
-    contingency_pct = st.slider("Contingency (%)", min_value=0, max_value=30, value=int(st.session_state.get("contingency_pct", 10)))
-    st.session_state.contingency_pct = contingency_pct
+    # Editable task table
+    task_df = pd.DataFrame(
+        st.session_state.task_rows if st.session_state.task_rows else [],
+        columns=["Task","Hours","Owner","Phase","Deliverable"]
+    )
+    task_df = st.data_editor(
+        task_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Task": st.column_config.TextColumn("Task", required=True),
+            "Hours": st.column_config.NumberColumn("Hours", min_value=0, step=1),
+            "Owner": st.column_config.TextColumn("Owner"),
+            "Phase": st.column_config.TextColumn("Phase"),
+            "Deliverable": st.column_config.TextColumn("Deliverable"),
+        },
+        key="data_editor_tasks"
+    )
+    st.session_state.task_rows = task_df.to_dict(orient="records")
 
-st.session_state.capex_construction = capex_construction
-st.session_state.capex_design = capex_design
-st.session_state.capex_permits = capex_permits
-st.session_state.capex_equipment = capex_equipment
+    # Compute task plan totals
+    task_total_hours = 0
+    tasks_duration_weeks = 0
+    if st.session_state.task_rows:
+        task_total_hours = int(sum(max(0, float(r.get("Hours", 0) or 0)) for r in st.session_state.task_rows))
+        weekly_capacity = 30.0
+        tasks_duration_weeks = max(1, round(task_total_hours / weekly_capacity)) if task_total_hours > 0 else 0
 
-opex_cols = st.columns(2)
-with opex_cols[0]:
-    opex_energy = st.number_input("Energy & Utilities (annual)", min_value=0.0, value=float(st.session_state.get("opex_energy", 0.0)))
-    opex_maintenance = st.number_input("Maintenance (annual)", min_value=0.0, value=float(st.session_state.get("opex_maintenance", 0.0)))
-with opex_cols[1]:
-    opex_staffing = st.number_input("Staffing (annual)", min_value=0.0, value=float(st.session_state.get("opex_staffing", 0.0)))
-    opex_other = st.number_input("Other Opex (annual)", min_value=0.0, value=float(st.session_state.get("opex_other", 0.0)))
+    if task_total_hours > 0:
+        st.caption(f"Task plan total: {task_total_hours} hours • ~{tasks_duration_weeks} weeks @ 30 hrs/week")
 
-st.session_state.opex_energy = opex_energy
-st.session_state.opex_maintenance = opex_maintenance
-st.session_state.opex_staffing = opex_staffing
-st.session_state.opex_other = opex_other
+    # Populate timeline from tasks
+    gen_cols2 = st.columns([1,3])
+    with gen_cols2[0]:
+        if st.button("Populate timeline from tasks") and st.session_state.task_rows:
+            start_date = st.session_state.project_start_date or datetime.today().date()
+            current = pd.to_datetime(start_date)
+            weekly_capacity = 30.0
+            rows = []
+            for r in st.session_state.task_rows:
+                hrs = max(0, float(r.get("Hours", 0) or 0))
+                weeks = max(1, round(hrs / weekly_capacity)) if hrs > 0 else 1
+                days = int(weeks * 7)
+                start = current
+                finish = current + pd.to_timedelta(days, unit='D')
+                rows.append({
+                    "Task": r.get("Task", "Task"),
+                    "Start": start.date(),
+                    "Finish": finish.date(),
+                    "Owner": r.get("Owner", ""),
+                    "Phase": r.get("Phase", "") or ("Modeling" if "Model" in r.get("Task","") else "")
+                })
+                current = finish
+            st.session_state.timeline_rows = rows
 
-capex_base = capex_construction + capex_design + capex_permits + capex_equipment
-capex_total = capex_base * (1 + contingency_pct / 100.0)
-opex_total = opex_energy + opex_maintenance + opex_staffing + opex_other
+    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Cost & Budget</h2>", unsafe_allow_html=True)
+    st.subheader("Cost Inputs")
 
-mcol1, mcol2, mcol3 = st.columns(3)
-with mcol1:
-    st.metric("CAPEX (with contingency)", f"{capex_total:,.0f} {currency}")
-with mcol2:
-    st.metric("Annual OPEX", f"{opex_total:,.0f} {currency}")
-with mcol3:
-    st.metric("Contingency", f"{contingency_pct}%")
+    # Show auto-estimated service cost reacting to inputs
+    eco1, eco2, eco3 = st.columns(3)
+    with eco1:
+        # Use task plan for effort if enabled
+        effective_hours_total = effort_results["hours_total"]
+        if st.session_state.get("use_task_plan") and st.session_state.get("task_rows"):
+            _task_hours = int(sum(max(0, float(r.get("Hours", 0) or 0)) for r in st.session_state.task_rows))
+            if _task_hours > 0:
+                effective_hours_total = _task_hours
+        st.metric("Estimated Effort (hours)", effective_hours_total)
+    with eco2:
+        weekly_capacity = 30.0
+        effective_duration_weeks = effort_results["duration_weeks"]
+        if st.session_state.get("use_task_plan") and st.session_state.get("task_rows") and effective_hours_total > 0:
+            effective_duration_weeks = max(1, round(effective_hours_total / weekly_capacity))
+        st.metric("Estimated Duration (weeks)", effective_duration_weeks)
+    with eco3:
+        # Recompute cost based on effective hours
+        cost_results = estimate_cost(effective_hours_total, currency_for_cost)
+        st.metric("Estimated Service Cost (CNL)", f"{cost_results['estimated_service_cost']:,.0f} {currency_for_cost}")
 
-breakdown_df = pd.DataFrame({
-    "Category": ["Construction", "Design", "Permits", "Equipment", "Contingency"],
-    "Amount": [capex_construction, capex_design, capex_permits, capex_equipment, capex_total - capex_base]
-})
-fig_cost = px.pie(breakdown_df, values="Amount", names="Category", title="CAPEX Breakdown")
-apply_brand_plotly_theme(fig_cost)
-st.plotly_chart(fig_cost, use_container_width=True)
+    if "currency" not in st.session_state:
+        st.session_state.currency = "SEK"
+
+    currency = st.selectbox("Currency", options=["USD", "EUR", "GBP", "SEK", "NOK", "DKK"], index=["USD", "EUR", "GBP", "SEK", "NOK", "DKK"].index(st.session_state.currency))
+    st.session_state.currency = currency
+    default_rate = CONSULTANT_RATES.get(currency, 150.0)
+    st.session_state.consultant_rate = st.number_input("Consultant hourly rate", min_value=0.0, value=float(st.session_state.get("consultant_rate", default_rate)))
+
+    capex_cols = st.columns(2)
+    with capex_cols[0]:
+        capex_construction = st.number_input("Construction", min_value=0.0, value=float(st.session_state.get("capex_construction", 0.0)))
+        capex_design = st.number_input("Design & Engineering", min_value=0.0, value=float(st.session_state.get("capex_design", 0.0)))
+        capex_permits = st.number_input("Permits & Approvals", min_value=0.0, value=float(st.session_state.get("capex_permits", 0.0)))
+        capex_equipment = st.number_input("Equipment & Materials", min_value=0.0, value=float(st.session_state.get("capex_equipment", 0.0)))
+    with capex_cols[1]:
+        contingency_pct = st.slider("Contingency (%)", min_value=0, max_value=30, value=int(st.session_state.get("contingency_pct", 10)))
+        st.session_state.contingency_pct = contingency_pct
+
+    st.session_state.capex_construction = capex_construction
+    st.session_state.capex_design = capex_design
+    st.session_state.capex_permits = capex_permits
+    st.session_state.capex_equipment = capex_equipment
+
+    opex_cols = st.columns(2)
+    with opex_cols[0]:
+        opex_energy = st.number_input("Energy & Utilities (annual)", min_value=0.0, value=float(st.session_state.get("opex_energy", 0.0)))
+        opex_maintenance = st.number_input("Maintenance (annual)", min_value=0.0, value=float(st.session_state.get("opex_maintenance", 0.0)))
+    with opex_cols[1]:
+        opex_staffing = st.number_input("Staffing (annual)", min_value=0.0, value=float(st.session_state.get("opex_staffing", 0.0)))
+        opex_other = st.number_input("Other Opex (annual)", min_value=0.0, value=float(st.session_state.get("opex_other", 0.0)))
+
+        # Navigation: Step 5
+        nav5 = st.columns([1,1])
+        with nav5[0]:
+            if st.button("◀ Back", use_container_width=True):
+                st.session_state.wizard_step = 4
+                st.rerun()
+        with nav5[1]:
+            if st.button("Restart ↺", use_container_width=True):
+                st.session_state.wizard_step = 0
+                st.rerun()
+
+    st.session_state.opex_energy = opex_energy
+    st.session_state.opex_maintenance = opex_maintenance
+    st.session_state.opex_staffing = opex_staffing
+    st.session_state.opex_other = opex_other
+
+    capex_base = capex_construction + capex_design + capex_permits + capex_equipment
+    capex_total = capex_base * (1 + contingency_pct / 100.0)
+    opex_total = opex_energy + opex_maintenance + opex_staffing + opex_other
+
+    mcol1, mcol2, mcol3 = st.columns(3)
+    with mcol1:
+        st.metric("CAPEX (with contingency)", f"{capex_total:,.0f} {currency}")
+    with mcol2:
+        st.metric("Annual OPEX", f"{opex_total:,.0f} {currency}")
+    with mcol3:
+        st.metric("Contingency", f"{contingency_pct}%")
+
+    breakdown_df = pd.DataFrame({
+        "Category": ["Construction", "Design", "Permits", "Equipment", "Contingency"],
+        "Amount": [capex_construction, capex_design, capex_permits, capex_equipment, capex_total - capex_base]
+    })
+    fig_cost = px.pie(breakdown_df, values="Amount", names="Category", title="CAPEX Breakdown")
+    apply_brand_plotly_theme(fig_cost)
+    st.plotly_chart(fig_cost, use_container_width=True)
 
 # ==================== COLUMN 3: Proxy Recommendations & Confidence ====================
-with col3:
-    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 3: Guidance & Results</h2>", unsafe_allow_html=True)
-    # Quick summary metrics reacting to user configuration
+# Guard: stop rendering this section unless on Step 3
+if st.session_state.wizard_step != 3:
+    st.stop()
+
+if st.session_state.wizard_step == 3:
+    with col3:
+        st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 3: Confidence & Recommendations</h2>", unsafe_allow_html=True)
+    # Quick summary metrics reacting to user configuration (Step 3)
     m3c1, m3c2, m3c3 = st.columns(3)
+    # Use task plan totals if enabled and available
+    effective_hours_total = effort_results["hours_total"]
+    effective_duration_weeks = effort_results["duration_weeks"]
+    if st.session_state.get("use_task_plan") and st.session_state.get("task_rows"):
+        _task_hours = int(sum(max(0, float(r.get("Hours", 0) or 0)) for r in st.session_state.task_rows))
+        if _task_hours > 0:
+            effective_hours_total = _task_hours
+            weekly_capacity = 30.0
+            effective_duration_weeks = max(1, round(effective_hours_total / weekly_capacity))
     with m3c1:
-        st.metric("Estimated Effort (hours)", effort_results["hours_total"])
+        st.metric("Estimated Effort (hours)", effective_hours_total)
     with m3c2:
-        st.metric("Estimated Duration (weeks)", effort_results["duration_weeks"])
+        st.metric("Estimated Duration (weeks)", effective_duration_weeks)
     with m3c3:
-        st.metric("Estimated Service Cost", f"{cost_results['estimated_service_cost']:,.0f} {currency_for_cost}")
+        # Recompute cost on the fly to reflect effective hours
+        _cost = estimate_cost(effective_hours_total, currency_for_cost)
+        st.metric("Estimated Service Cost (CNL)", f"{_cost['estimated_service_cost']:,.0f} {currency_for_cost}")
     
     # Export Report Buttons at the top
     if analysis_type:
@@ -2223,7 +2591,7 @@ with col3:
     # Display Proxy Recommendations Dynamically
     st.subheader("Recommended Proxy Data")
     
-    if recommended_proxies:
+    if st.session_state.get("recommended_proxies"):
         # Mapping for proxy data labels
         data_items_display = {
             'building_footprints': {'label': 'Building Footprints'},
@@ -2236,7 +2604,7 @@ with col3:
             'cost_data': {'label': 'Cost Data'}
         }
         
-        for data_item, proxy_info in recommended_proxies.items():
+        for data_item, proxy_info in st.session_state.recommended_proxies.items():
             data_label = data_items_display[data_item]['label']
             tier_num = proxy_info['tier'].replace('tier', '')
             
@@ -2475,254 +2843,17 @@ with col3:
         
         st.info("💡 Tip: Start with free open data sources (OpenStreetMap, government portals) before considering commercial data providers.")
 
+        # Navigation: Step 3
+        nav3 = st.columns([1,1])
+        with nav3[0]:
+            if st.button("◀ Back", use_container_width=True):
+                st.session_state.wizard_step = 2
+                st.rerun()
+        with nav3[1]:
+            if st.button("Next ▶", type="primary", use_container_width=True):
+                st.session_state.wizard_step = 4
+                st.rerun()
+
     # Step 4 & 5 moved above (full-width) for readability
 
-# ==================== BOTTOM SECTION: Visualizations ====================
-st.markdown("<hr style='margin: 2.5rem 0;'>", unsafe_allow_html=True)
-st.header("Detailed Analysis")
-
-# Summary metrics reacting to configuration (timeframe and cost)
-da_col1, da_col2, da_col3 = st.columns(3)
-with da_col1:
-    st.metric("Estimated Effort (hours)", effort_results["hours_total"])
-with da_col2:
-    st.metric("Estimated Duration (weeks)", effort_results["duration_weeks"])
-with da_col3:
-    st.metric("Estimated Service Cost", f"{cost_results['estimated_service_cost']:,.0f} {st.session_state.get('currency', currency_for_cost)}")
-
-tab1, tab2, tab3 = st.tabs(["Data Coverage", "Confidence Breakdown", "Recommendations"])
-
-with tab1:
-    st.subheader("Data Availability Overview")
-
-    # Build dynamic coverage by category from current analysis requirements and inputs
-    filtered_items = get_filtered_data_items(analysis_type)
-    coverage_rows = []
-    for category, items in filtered_items.items():
-        total = len(items)
-        available = sum(1 for item in items if st.session_state.data_inputs.get(item['key'], False))
-        coverage = int(round((available / total * 100))) if total > 0 else 0
-        if coverage == 100:
-            status = "Available"
-            quality = "High"
-        elif coverage == 0:
-            status = "Missing"
-            quality = "N/A"
-        else:
-            status = "Partial"
-            quality = "Medium" if coverage >= 50 else "Low"
-        coverage_rows.append({
-            "Category": category,
-            "Status": status,
-            "Coverage": coverage,
-            "Quality": quality
-        })
-
-    df_data = pd.DataFrame(coverage_rows)
-    if not df_data.empty:
-        fig_coverage = px.bar(
-            df_data,
-            x="Coverage",
-            y="Category",
-            color="Status",
-            orientation='h',
-            title="Data Coverage by Category",
-            color_discrete_map={'Available': '#0f766e', 'Missing': '#b91c1c', 'Partial': '#b45309'},
-            labels={'Coverage': 'Coverage (%)'}
-        )
-        fig_coverage.update_layout(height=400)
-        apply_brand_plotly_theme(fig_coverage)
-        st.plotly_chart(fig_coverage, use_container_width=True)
-
-        st.markdown("**Data Quality Summary:**")
-        st.dataframe(df_data, use_container_width=True, hide_index=True)
-    else:
-        st.info("Select an analysis type to see data coverage.")
-
-with tab2:
-    st.subheader("Model Confidence Analysis")
-
-    col_chart1, col_chart2 = st.columns(2)
-
-    with col_chart1:
-        # Confidence by output type (dynamic)
-        by_output = confidence_results.get("by_output", {})
-        if by_output:
-            rows = []
-            for output, val in by_output.items():
-                category = 'High' if val >= 70 else ('Medium' if val >= 50 else 'Low')
-                rows.append({'Output': output, 'Confidence': val, 'Category': category})
-            confidence_data = pd.DataFrame(rows)
-            fig_conf = px.bar(
-                confidence_data,
-                x='Output',
-                y='Confidence',
-                color='Category',
-                title='Confidence by Output Type',
-                color_discrete_map={'Low': '#b91c1c', 'Medium': '#b45309', 'High': '#0f766e'},
-                labels={'Confidence': 'Confidence (%)'}
-            )
-            fig_conf.update_layout(height=350)
-            apply_brand_plotly_theme(fig_conf)
-            st.plotly_chart(fig_conf, use_container_width=True)
-        else:
-            st.info("No output confidence available for the current selection.")
-
-    with col_chart2:
-        # Proxy performance (dynamic averages by tier)
-        if recommended_proxies:
-            tier_map = {"tier1": "Tier 1", "tier2": "Tier 2", "tier3": "Tier 3"}
-            # Map uncertainty to usability score
-            uncertainty_to_usability = {
-                'Very Low': 90, 'Low': 85, 'Low-Medium': 75,
-                'Medium': 60, 'Medium-High': 50, 'High': 40, 'Very High': 30
-            }
-            agg = {}
-            for info in recommended_proxies.values():
-                tier = tier_map.get(info.get('tier', ''), info.get('tier', 'Unknown'))
-                agg.setdefault(tier, {"impact_vals": [], "usability_vals": []})
-                impact = float(info.get('confidence_impact', 0))
-                usability = uncertainty_to_usability.get(info.get('uncertainty', 'Medium'), 60)
-                agg[tier]["impact_vals"].append(impact)
-                agg[tier]["usability_vals"].append(usability)
-
-            rows = []
-            for tier, vals in agg.items():
-                avg_impact = sum(vals["impact_vals"]) / max(len(vals["impact_vals"]), 1)
-                avg_usability = sum(vals["usability_vals"]) / max(len(vals["usability_vals"]), 1)
-                rows.append({"Proxy Tier": tier, "Accuracy Impact": round(avg_impact), "Usability": round(avg_usability)})
-            proxy_impact = pd.DataFrame(rows)
-
-            fig_proxy = go.Figure()
-            fig_proxy.add_trace(go.Bar(
-                name='Accuracy Impact',
-                x=proxy_impact['Proxy Tier'],
-                y=proxy_impact['Accuracy Impact'],
-                marker_color='#115e59'
-            ))
-            fig_proxy.add_trace(go.Bar(
-                name='Usability',
-                x=proxy_impact['Proxy Tier'],
-                y=proxy_impact['Usability'],
-                marker_color='#334155'
-            ))
-            fig_proxy.update_layout(
-                title='Proxy Data Performance',
-                barmode='group',
-                height=350,
-                yaxis_title='Score (%)'
-            )
-            apply_brand_plotly_theme(fig_proxy)
-            st.plotly_chart(fig_proxy, use_container_width=True)
-        else:
-            st.info("No proxies recommended — all critical data available.")
-
-    # Sensitivity analysis
-    st.markdown("**Sensitivity to Missing Data:**")
-
-    sensitivity_df = pd.DataFrame({
-        'Missing Data Item': ['Construction Age', 'Building Materials', 'Occupancy Patterns', 'HVAC Systems'],
-        'Impact on Energy': ['High', 'Medium', 'Low', 'High'],
-        'Impact on Peak': ['Very High', 'Medium', 'High', 'Very High'],
-        'Impact on Cost': ['Medium', 'High', 'Low', 'High']
-    })
-    st.dataframe(sensitivity_df, use_container_width=True, hide_index=True)
-
-with tab3:
-    st.subheader("Data Improvement Recommendations")
-
-    st.markdown("### Priority 1: Critical Data Gaps")
-
-    col_rec1, col_rec2 = st.columns([2, 1])
-    
-    with col_rec1:
-        st.markdown("""
-        **Construction Age Data**
-        - Current: Missing (using national typology proxy)
-        - Impact: Reduces confidence by 25%
-        - Recommendation: Survey historical building permits
-        - Timeline: 3-6 months
-        - Cost: Medium
-        """)
-
-    with col_rec2:
-        st.metric("Confidence Gain", "+25%", delta="High Impact")
-        st.metric("Effort", "Medium")
-
-    st.markdown("---")
-
-    st.markdown("### Priority 2: Quality Enhancement")
-
-    col_rec3, col_rec4 = st.columns([2, 1])
-    
-    with col_rec3:
-        st.markdown("""
-        **Building Materials Database**
-        - Current: 40% coverage with regional averages
-        - Impact: Moderate uncertainty in envelope performance
-        - Recommendation: Thermal imaging survey for sample buildings
-        - Timeline: 2-4 months
-        - Cost: Low-Medium
-        """)
-
-    with col_rec4:
-        st.metric("Confidence Gain", "+15%", delta="Medium Impact")
-        st.metric("Effort", "Low")
-
-    st.markdown("---")
-
-    st.markdown("### Action Plan")
-    
-    action_plan = pd.DataFrame({
-        'Phase': ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4'],
-        'Action': [
-            'Collect construction age from permits',
-            'Conduct thermal imaging survey',
-            'Deploy smart meter pilot program',
-            'Validate results against sample buildings'
-        ],
-        'Duration': ['3 months', '2 months', '6 months', '1 month'],
-        'Expected Confidence': ['60% → 75%', '75% → 82%', '82% → 90%', '90% → 95%']
-    })
-
-    st.dataframe(action_plan, use_container_width=True, hide_index=True)
-
-    # ROI Calculator
-    st.markdown("---")
-    st.markdown("### Investment vs. Confidence Gain")
-
-    investment = st.slider("Investment Budget ($1000s)", 0, 500, 100)
-
-    # Simple model: confidence increases with investment but with diminishing returns
-    base_confidence = 60
-    max_confidence = 95
-    confidence_improvement = (max_confidence - base_confidence) * (1 - 0.95 ** (investment / 50))
-    new_confidence = min(base_confidence + confidence_improvement, max_confidence)
-
-    col_roi1, col_roi2, col_roi3 = st.columns(3)
-    with col_roi1:
-        st.metric("Current Confidence", f"{base_confidence}%")
-    with col_roi2:
-        st.metric("Projected Confidence", f"{new_confidence:.1f}%", f"+{confidence_improvement:.1f}%")
-    with col_roi3:
-        st.metric("Cost per % Point", f"${investment * 1000 / max(confidence_improvement, 1):.0f}")
-
-# Footer
-st.markdown("<hr style='margin: 2rem 0;'>", unsafe_allow_html=True)
-col_foot1, col_foot2, col_foot3 = st.columns(3)
-
-with col_foot1:
-    if st.button("Back to Setup", use_container_width=True):
-        st.info("Navigate to Step 1")
-
-with col_foot2:
-    if st.button("Save Configuration", type="primary", use_container_width=True):
-        st.success("Configuration saved!")
-        st.balloons()
-
-with col_foot3:
-    if st.button("Export Report", use_container_width=True):
-        st.info("Report generation coming soon")
-
-st.markdown("---")
-st.markdown(f"<p style='text-align: center; color: #64748b; font-size: 0.9rem;'>Project Planning Guide v1.0 | Analysis: {analysis_type} | Scale: {project_scale} | Country: {country}</p>", unsafe_allow_html=True)
+# (Bottom visualizations removed for now to simplify step gating)
