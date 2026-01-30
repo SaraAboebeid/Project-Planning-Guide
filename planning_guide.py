@@ -1898,94 +1898,80 @@ if st.session_state.wizard_step == 1:
         # Analysis Type
         st.subheader("Analysis Type")
         analysis_type = st.multiselect(
-        "Select your analysis (one or more):",
-        options=[
-            "Energy & Carbon Performance",
-            "Renewable Energy & Local Production",
-            "Retrofit & Transformation",
-            "Urban Design Support",
-            "Climate Resilience"
-        ],
-        help="Choose one or more analysis types. Requirements will be merged intelligently.",
-        key="analysis_type"
+            "Select your analysis (one or more):",
+            options=[
+                "Energy & Carbon Performance",
+                "Renewable Energy & Local Production",
+                "Retrofit & Transformation",
+                "Urban Design Support",
+                "Climate Resilience"
+            ],
+            help="Choose one or more analysis types.",
+            key="analysis_type"
         )
-    
-    # Show selected analyses count
-    if analysis_type:
-        st.info(f"📊 {len(analysis_type)} analysis type(s) selected")
+        
+        if st.session_state.analysis_type:
+            st.info(f"📊 {len(st.session_state.analysis_type)} analysis type(s) selected")
 
         # Define Scale
         st.subheader("Define Your Scale")
         project_scale = st.selectbox(
-        "Project scale:",
-        options=["Building", "Neighborhood", "City"],
-        help="Select the geographic scope of your analysis",
-        key="project_scale"
+            "Project scale:",
+            options=["Building", "Neighborhood", "City"],
+            help="Select the geographic scope of your analysis",
+            key="project_scale"
         )
     
-    # Building Uses (only for Neighborhood or City)
-    # Guard against NameError if scale not yet selected
-    _ps = st.session_state.get("project_scale", "Building")
-    if _ps in ["Neighborhood", "City"]:
-        st.subheader("Building Uses Included")
-        st.caption("Select all building types in your analysis:")
+        # Building Uses (only for Neighborhood or City)
+        if st.session_state.get("project_scale") in ["Neighborhood", "City"]:
+            st.subheader("Building Uses Included")
+            st.caption("Select all building types in your analysis:")
 
-        # Controls for building uses
-        col_a, col_b = st.columns(2)
-        if col_a.button("Select all building uses", key="btn_select_uses"):
-            for _k in [
-                'use_residential', 'use_commercial', 'use_industrial',
-                'use_school', 'use_hospital', 'use_sports',
-                'use_office', 'use_mixed_use']:
-                st.session_state[_k] = True
-            if hasattr(st, "rerun"):
+            # Controls for building uses
+            col_a, col_b = st.columns(2)
+            if col_a.button("Select all building uses", key="btn_select_uses"):
+                for _k in [
+                    'use_residential', 'use_commercial', 'use_industrial',
+                    'use_school', 'use_hospital', 'use_sports',
+                    'use_office', 'use_mixed_use']:
+                    st.session_state[_k] = True
                 st.rerun()
-            else:
-                st.experimental_rerun()
 
-        if col_b.button("Unselect all building uses", key="btn_unselect_uses"):
-            for _k in [
-                'use_residential', 'use_commercial', 'use_industrial',
-                'use_school', 'use_hospital', 'use_sports',
-                'use_office', 'use_mixed_use']:
-                st.session_state[_k] = False
-            if hasattr(st, "rerun"):
+            if col_b.button("Unselect all building uses", key="btn_unselect_uses"):
+                for _k in [
+                    'use_residential', 'use_commercial', 'use_industrial',
+                    'use_school', 'use_hospital', 'use_sports',
+                    'use_office', 'use_mixed_use']:
+                    st.session_state[_k] = False
                 st.rerun()
-            else:
-                st.experimental_rerun()
 
-        building_uses = {}
-        building_uses['Residential'] = st.checkbox("Residential", value=False, key='use_residential')
-        building_uses['Commercial'] = st.checkbox("Commercial", value=False, key='use_commercial')
-        building_uses['Industrial'] = st.checkbox("Industrial", value=False, key='use_industrial')
-        building_uses['School'] = st.checkbox("School", value=False, key='use_school')
-        building_uses['Hospital'] = st.checkbox("Hospital", value=False, key='use_hospital')
-        building_uses['Sports Facilities'] = st.checkbox("Sports Facilities", value=False, key='use_sports')
-        building_uses['Office'] = st.checkbox("Office", value=False, key='use_office')
-        building_uses['Mixed-Use'] = st.checkbox("Mixed-Use", value=False, key='use_mixed_use')
+            building_uses = {}
+            building_uses['Residential'] = st.checkbox("Residential", value=st.session_state.get('use_residential', False), key='use_residential')
+            building_uses['Commercial'] = st.checkbox("Commercial", value=st.session_state.get('use_commercial', False), key='use_commercial')
+            building_uses['Industrial'] = st.checkbox("Industrial", value=st.session_state.get('use_industrial', False), key='use_industrial')
+            building_uses['School'] = st.checkbox("School", value=st.session_state.get('use_school', False), key='use_school')
+            building_uses['Hospital'] = st.checkbox("Hospital", value=st.session_state.get('use_hospital', False), key='use_hospital')
+            building_uses['Sports Facilities'] = st.checkbox("Sports Facilities", value=st.session_state.get('use_sports', False), key='use_sports')
+            building_uses['Office'] = st.checkbox("Office", value=st.session_state.get('use_office', False), key='use_office')
+            building_uses['Mixed-Use'] = st.checkbox("Mixed-Use", value=st.session_state.get('use_mixed_use', False), key='use_mixed_use')
 
-        selected_uses = [k for k, v in building_uses.items() if v]
+            selected_uses = [k for k, v in building_uses.items() if v]
 
-        if selected_uses:
-            st.info(f"{len(selected_uses)} building types selected")
+            if selected_uses:
+                st.info(f"{len(selected_uses)} building types selected")
     
         # Context
         st.subheader("Context")
         country = st.selectbox(
-        "Select country:",
-        options=[
-            "Sweden",
-            "Germany",
-            "United Kingdom",
-            "Ireland",
-            "Norway",
-            "Finland",
-            "Belgium",
-            "France",
-            "Denmark"
-        ],
-        help="Select the country for your analysis",
-        key="country"
+            "Select country:",
+            options=[
+                "Sweden",
+                "United Kingdom",
+                "Ireland",
+                "Belgium"
+            ],
+            help="Select the country for your analysis",
+            key="country"
         )
 
     # Default outputs are managed globally; no local assignment here
@@ -1993,15 +1979,17 @@ if st.session_state.wizard_step == 1:
     # Removed Next button after context for streamlined flow
 
 # Navigation: Step 1
-    nav1 = st.columns([1,1])
-    with nav1[0]:
-        if st.button("◀ Back", use_container_width=True):
+    nav1_col1, nav1_col2, nav1_col3, nav1_col4 = st.columns([1, 1, 2, 2])
+    with nav1_col1:
+        if st.button("◀ Back", use_container_width=True, key="nav_back_1"):
             st.session_state.wizard_step = 0
             st.rerun()
-    with nav1[1]:
-        if st.button("Next ▶", type="primary", use_container_width=True):
+    with nav1_col2:
+        if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_1"):
             st.session_state.wizard_step = 2
             st.rerun()
+    with nav1_col3:
+        st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 1/5</div>", unsafe_allow_html=True)
 
 # ==================== RULES ENGINE: Calculate Everything Dynamically ====================
 
@@ -2060,7 +2048,7 @@ cost_results = estimate_cost(effort_results["hours_total"], currency_for_cost)
 if st.session_state.wizard_step == 2:
     with col2:
         analysis_type = st.session_state.get("analysis_type", [])
-        st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem; text-align: left;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
     
     # Progress Indicator - Data Completeness
     if analysis_type:
@@ -2278,16 +2266,22 @@ if st.session_state.wizard_step == 2:
                 # Add separator between items
                 st.markdown("<div style='margin: 0.6rem 0; border-bottom: 1px solid #e2e8f0;'></div>", unsafe_allow_html=True)
 
+        # ==================== Step 2: Define Tasks (Full Width) ====================
+if st.session_state.wizard_step == 2:
+    with st.container():
+        # ... existing code for step 2 ...
         # Navigation: Step 2
-        nav2 = st.columns([1,1])
-        with nav2[0]:
-            if st.button("◀ Back", use_container_width=True):
+        nav2_col1, nav2_col2, nav2_col3, nav2_col4 = st.columns([1, 1, 2, 2])
+        with nav2_col1:
+            if st.button("◀ Back", use_container_width=True, key="nav_back_2"):
                 st.session_state.wizard_step = 1
                 st.rerun()
-        with nav2[1]:
-            if st.button("Next ▶", type="primary", use_container_width=True):
+        with nav2_col2:
+            if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_2"):
                 st.session_state.wizard_step = 3
                 st.rerun()
+        with nav2_col3:
+            st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 2/5</div>", unsafe_allow_html=True)
 
 # ==================== Step 4 & 5: Timeline and Cost (Full Width) ====================
 
@@ -2315,15 +2309,17 @@ if st.session_state.wizard_step == 4:
         st.session_state.project_end_date = st.date_input("Project end", value=st.session_state.project_end_date)
 
     # Navigation: Step 4
-    nav4 = st.columns([1,1])
-    with nav4[0]:
-        if st.button("◀ Back", use_container_width=True):
+    nav4_col1, nav4_col2, nav4_col3, nav4_col4 = st.columns([1, 1, 2, 2])
+    with nav4_col1:
+        if st.button("◀ Back", use_container_width=True, key="nav_back_4"):
             st.session_state.wizard_step = 3
             st.rerun()
-    with nav4[1]:
-        if st.button("Next ▶", type="primary", use_container_width=True):
+    with nav4_col2:
+        if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_4"):
             st.session_state.wizard_step = 5
             st.rerun()
+    with nav4_col3:
+        st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 4/5</div>", unsafe_allow_html=True)
 
     # Helper: populate timeline from estimated phases
     gen_cols = st.columns([1,1,2])
@@ -2513,13 +2509,15 @@ if st.session_state.wizard_step == 5:
         opex_staffing = st.number_input("Staffing (annual)", min_value=0.0, value=float(st.session_state.get("opex_staffing", 0.0)))
         opex_other = st.number_input("Other Opex (annual)", min_value=0.0, value=float(st.session_state.get("opex_other", 0.0)))
 
-        # Navigation: Step 5
-        nav5 = st.columns([1,1])
-        with nav5[0]:
+        st.markdown("<div style='text-align: center; color: #94a3b8; font-size: 0.9rem;'>Page 5/5</div>", unsafe_allow_html=True)
+        nav5_col1, nav5_col2, nav5_col3 = st.columns([2, 1, 1])
+        with nav5_col1:
+            st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 5/5</div>", unsafe_allow_html=True)
+        with nav5_col2:
             if st.button("◀ Back", use_container_width=True):
                 st.session_state.wizard_step = 4
                 st.rerun()
-        with nav5[1]:
+        with nav5_col3:
             if st.button("Restart ↺", use_container_width=True):
                 st.session_state.wizard_step = 0
                 st.rerun()
@@ -2844,15 +2842,17 @@ if st.session_state.wizard_step == 3:
         st.info("💡 Tip: Start with free open data sources (OpenStreetMap, government portals) before considering commercial data providers.")
 
         # Navigation: Step 3
-        nav3 = st.columns([1,1])
-        with nav3[0]:
-            if st.button("◀ Back", use_container_width=True):
+        nav3_col1, nav3_col2, nav3_col3, nav3_col4 = st.columns([1, 1, 2, 2])
+        with nav3_col1:
+            if st.button("◀ Back", use_container_width=True, key="nav_back_3"):
                 st.session_state.wizard_step = 2
                 st.rerun()
-        with nav3[1]:
-            if st.button("Next ▶", type="primary", use_container_width=True):
+        with nav3_col2:
+            if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_3"):
                 st.session_state.wizard_step = 4
                 st.rerun()
+        with nav3_col3:
+            st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 3/5</div>", unsafe_allow_html=True)
 
     # Step 4 & 5 moved above (full-width) for readability
 
