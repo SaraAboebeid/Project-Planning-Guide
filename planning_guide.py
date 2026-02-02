@@ -6,11 +6,11 @@ from datetime import datetime, timedelta
 import random
 
 # Page configuration
-st.set_page_config(page_title="Project Planning Guide", layout="wide")
+st.set_page_config(page_title="Project Planner", layout="wide")
 
 # Wizard state for stepped navigation
 if "wizard_step" not in st.session_state:
-    st.session_state.wizard_step = 0  # 0 = intro, 1..5 = steps
+    st.session_state.wizard_step = 0  # 0 = intro, 1..6 = steps
 
 # ==================== CONFIGURATION & RULES ENGINE ====================
 
@@ -1619,12 +1619,12 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 if st.session_state.wizard_step == 0:
-    st.title("Project Planning Guide")
+    st.title("Project Planner")
     st.markdown("<p style='font-size: 1.1rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
     # Overview diagram upload removed per request
 
     # Interactive Process Diagram (Playful & Interactive)
-    diagram_cols = st.columns([1, 0.15, 1, 0.15, 1, 0.15, 1, 0.15, 1])
+    diagram_cols = st.columns([1, 0.15, 1, 0.15, 1, 0.15, 1, 0.15, 1, 0.15, 1])
 
     with diagram_cols[0]:
         st.markdown("""
@@ -1660,8 +1660,8 @@ if st.session_state.wizard_step == 0:
         st.markdown("""
         <div class='step-card' style='--grad-start:#2563eb; --grad-end:#1e40af;'>
             <div class='step-index'>4</div>
-            <div class='step-title'>Project Timeline</div>
-            <div class='step-desc'>Milestones and Gantt view</div>
+            <div class='step-title'>Expected Results</div>
+            <div class='step-desc'>Review expected outcomes</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[7]:
@@ -1670,19 +1670,29 @@ if st.session_state.wizard_step == 0:
         st.markdown("""
         <div class='step-card' style='--grad-start:#6b7280; --grad-end:#4b5563;'>
             <div class='step-index'>5</div>
-            <div class='step-title'>Cost & Budget</div>
-            <div class='step-desc'>Service cost and CAPEX/OPEX</div>
+            <div class='step-title'>Project Timeline</div>
+            <div class='step-desc'>Plan phases and tasks</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with diagram_cols[9]:
+        st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+    with diagram_cols[10]:
+        st.markdown("""
+        <div class='step-card' style='--grad-start:#4b5563; --grad-end:#111827;'>
+            <div class='step-index'>6</div>
+            <div class='step-title'>Cost Estimation</div>
+            <div class='step-desc'>Budget, CAPEX, and OPEX</div>
         </div>
         """, unsafe_allow_html=True)
     st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
     center_cols = st.columns([1,1,1])
     with center_cols[1]:
-        if st.button("Start ➜", type="primary", use_container_width=True):
+        if st.button("Start", type="primary", use_container_width=True):
             st.session_state.wizard_step = 1
             st.rerun()
 
 # Initialize session state
-if 'data_inputs' not in st.session_state:
+if "data_inputs" not in st.session_state:
     st.session_state.data_inputs = {}
 
 if 'selected_proxies' not in st.session_state:
@@ -1922,8 +1932,8 @@ if st.session_state.wizard_step == 1:
             key="project_scale"
         )
     
-        # Building Uses (only for Neighborhood or City)
-        if st.session_state.get("project_scale") in ["Neighborhood", "City"]:
+        # Building Uses (only for Neighborhood)
+        if st.session_state.get("project_scale") == "Neighborhood":
             st.subheader("Building Uses Included")
             st.caption("Select all building types in your analysis:")
 
@@ -1989,7 +1999,7 @@ if st.session_state.wizard_step == 1:
             st.session_state.wizard_step = 2
             st.rerun()
     with nav1_col3:
-        st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 1/5</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 1/6</div>", unsafe_allow_html=True)
 
 # ==================== RULES ENGINE: Calculate Everything Dynamically ====================
 
@@ -2075,7 +2085,7 @@ if st.session_state.wizard_step == 2:
     st.subheader("Do you have the following data inputs?")
     if analysis_type:
         if len(analysis_type) == 1:
-            st.caption(f"Showing data requirements for **{analysis_type[0]}**. Expand each category and indicate data availability.")
+            st.caption(f"Showing data requirements for **{analysis_type[0]}**. Indicate data availability below.")
         else:
             st.caption(f"Showing merged requirements for **{len(analysis_type)} analyses**: {', '.join(analysis_type)}. Common requirements appear once.")
     else:
@@ -2105,7 +2115,7 @@ if st.session_state.wizard_step == 2:
                      and st.session_state.get(f"proxy_{item['key']}") is not None)
     missing_items = total_items - available_items - proxy_items
 
-        # Display summary metrics (Step 2)
+    # Display summary metrics (Step 2)
     col_sum1, col_sum2, col_sum3 = st.columns(3)
     with col_sum1:
         st.metric("✓ Available", f"{available_items}/{total_items}")
@@ -2118,8 +2128,8 @@ if st.session_state.wizard_step == 2:
 
         # Display data items by category with expandable sections (use filtered items)
     for category, items in filtered_data_items.items():
-        with st.expander(f"**{category}**", expanded=False):
-            for item in items:
+        st.markdown(f"### {category}")
+        for item in items:
                 # Add analysis info if multiple analyses selected
                 analysis_info = ""
                 if analysis_type and len(analysis_type) > 1 and 'analyses' in item:
@@ -2281,9 +2291,42 @@ if st.session_state.wizard_step == 2:
                 st.session_state.wizard_step = 3
                 st.rerun()
         with nav2_col3:
-            st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 2/5</div>", unsafe_allow_html=True)
+            st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 2/6</div>", unsafe_allow_html=True)
 
-# ==================== Step 4 & 5: Timeline and Cost (Full Width) ====================
+# ==================== Step 4: Expected Results ====================
+
+if st.session_state.wizard_step == 4:
+    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 4: Expected Results</h2>", unsafe_allow_html=True)
+    st.subheader("What you can expect")
+
+    exp_col1, exp_col2 = st.columns(2)
+    with exp_col1:
+        st.metric("Overall confidence", f"{confidence_results['overall']:.0f}%")
+        st.write("Top outputs")
+        outputs_preview = outputs[:3] if outputs else []
+        for o in outputs_preview:
+            st.markdown(f"- {o}")
+    with exp_col2:
+        st.write("Key warnings")
+        for w in analysis_messages.get("warnings", [])[:3]:
+            st.markdown(f"- {w}")
+        if not analysis_messages.get("warnings"):
+            st.markdown("- No critical warnings")
+
+    st.markdown("---")
+    nav4_col1, nav4_col2, nav4_col3, nav4_col4 = st.columns([1, 1, 2, 2])
+    with nav4_col1:
+        if st.button("◀ Back", use_container_width=True, key="nav_back_4_exp"):
+            st.session_state.wizard_step = 3
+            st.rerun()
+    with nav4_col2:
+        if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_4_exp"):
+            st.session_state.wizard_step = 5
+            st.rerun()
+    with nav4_col3:
+        st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 4/6</div>", unsafe_allow_html=True)
+
+# ==================== Step 5 & 6: Timeline and Cost (Full Width) ====================
 
 if "project_start_date" not in st.session_state:
     st.session_state.project_start_date = None
@@ -2298,8 +2341,8 @@ if "task_rows" not in st.session_state:
 if "use_task_plan" not in st.session_state:
     st.session_state.use_task_plan = False
 
-if st.session_state.wizard_step == 4:
-    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 4: Project Timeline</h2>", unsafe_allow_html=True)
+if st.session_state.wizard_step == 5:
+    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 5: Project Timeline</h2>", unsafe_allow_html=True)
     st.subheader("Project Timeline")
 
     tcol1, tcol2 = st.columns(2)
@@ -2308,18 +2351,18 @@ if st.session_state.wizard_step == 4:
     with tcol2:
         st.session_state.project_end_date = st.date_input("Project end", value=st.session_state.project_end_date)
 
-    # Navigation: Step 4
+    # Navigation: Step 5
     nav4_col1, nav4_col2, nav4_col3, nav4_col4 = st.columns([1, 1, 2, 2])
     with nav4_col1:
-        if st.button("◀ Back", use_container_width=True, key="nav_back_4"):
-            st.session_state.wizard_step = 3
+        if st.button("◀ Back", use_container_width=True, key="nav_back_5"):
+            st.session_state.wizard_step = 4
             st.rerun()
     with nav4_col2:
-        if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_4"):
-            st.session_state.wizard_step = 5
+        if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_5"):
+            st.session_state.wizard_step = 6
             st.rerun()
     with nav4_col3:
-        st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 4/5</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 5/6</div>", unsafe_allow_html=True)
 
     # Helper: populate timeline from estimated phases
     gen_cols = st.columns([1,1,2])
@@ -2378,8 +2421,8 @@ if st.session_state.wizard_step == 4:
 
  
 
-if st.session_state.wizard_step == 5:
-    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 5: Tasks & Cost</h2>", unsafe_allow_html=True)
+if st.session_state.wizard_step == 6:
+    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 6: Tasks & Cost</h2>", unsafe_allow_html=True)
     st.subheader("Task Planner (optional)")
 
     pcols = st.columns([1,1,1,2])
@@ -2509,13 +2552,13 @@ if st.session_state.wizard_step == 5:
         opex_staffing = st.number_input("Staffing (annual)", min_value=0.0, value=float(st.session_state.get("opex_staffing", 0.0)))
         opex_other = st.number_input("Other Opex (annual)", min_value=0.0, value=float(st.session_state.get("opex_other", 0.0)))
 
-        st.markdown("<div style='text-align: center; color: #94a3b8; font-size: 0.9rem;'>Page 5/5</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; color: #94a3b8; font-size: 0.9rem;'>Page 6/6</div>", unsafe_allow_html=True)
         nav5_col1, nav5_col2, nav5_col3 = st.columns([2, 1, 1])
         with nav5_col1:
-            st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 5/5</div>", unsafe_allow_html=True)
+            st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 6/6</div>", unsafe_allow_html=True)
         with nav5_col2:
             if st.button("◀ Back", use_container_width=True):
-                st.session_state.wizard_step = 4
+                st.session_state.wizard_step = 5
                 st.rerun()
         with nav5_col3:
             if st.button("Restart ↺", use_container_width=True):
@@ -2548,10 +2591,6 @@ if st.session_state.wizard_step == 5:
     st.plotly_chart(fig_cost, use_container_width=True)
 
 # ==================== COLUMN 3: Proxy Recommendations & Confidence ====================
-# Guard: stop rendering this section unless on Step 3
-if st.session_state.wizard_step != 3:
-    st.stop()
-
 if st.session_state.wizard_step == 3:
     with col3:
         st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 3: Confidence & Recommendations</h2>", unsafe_allow_html=True)
@@ -2732,13 +2771,13 @@ if st.session_state.wizard_step == 3:
                 
                 # Calculate predicted confidence
                 if predicted_additions:
-                    simulated_inputs = st.session_state.data_inputs.copy()
+                    simulated.inputs = st.session_state.data_inputs.copy()
                     for key in predicted_additions:
-                        simulated_inputs[key] = True
+                        simulated.inputs[key] = True
                     
                     predicted_results = calculate_confidence(
                         analysis_type=first_analysis,
-                        data_inputs=simulated_inputs,
+                        data_inputs=simulated.inputs,
                         project_scale=project_scale,
                         country=country,
                         desired_outputs=outputs
@@ -2852,7 +2891,7 @@ if st.session_state.wizard_step == 3:
                 st.session_state.wizard_step = 4
                 st.rerun()
         with nav3_col3:
-            st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 3/5</div>", unsafe_allow_html=True)
+            st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 3/6</div>", unsafe_allow_html=True)
 
     # Step 4 & 5 moved above (full-width) for readability
 
