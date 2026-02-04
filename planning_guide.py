@@ -5,6 +5,9 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import random
 
+# Import modular steps
+from steps.step2_review_data import render_step2, render_step2_navigation
+
 # Page configuration
 st.set_page_config(page_title="Project Planner", layout="wide")
 
@@ -19,35 +22,27 @@ ANALYSIS_DATA_REQUIREMENTS = {
     "Energy & Carbon Performance": {
         "required_items": [
             # Building Geometry
-            "building_footprints",           # Footprint, height, number of floors
-            "number_of_floors",              # Height, number of floors
-            "roof_shape_angle",              # Roof shape and angle
-            "window_to_wall_ratio",          # Window-to-wall ratio (per façade)
-            # Location & Context
-            "building_location",             # Building coordinates / address
-            # Climate Data
-            "climate_data",                  # Weather file (EPW / TMY / future climate)
-            # Building Fabric & Construction (required)
-            "building_materials",            # Wall, roof, floor, window constructions
-            "construction_age",              # Year of construction (if materials unknown)
+            "building_footprints",
+            "building_height",
+            "number_of_floors",
+            # Measured Energy Data
+            "annual_electricity_consumption",
+            # Renewable Energy Systems (presence)
+            "on_site_electricity",
             # Building Use & Operation
-            "building_use_type",             # Building use type
-            "occupancy_data",                # Occupancy profiles
-            "internal_gains",                # Internal gains (lighting, equipment)
-            "dhw_demand",                    # Domestic hot water demand
-            # Systems & Technologies (required)
-            "hvac_systems",                  # HVAC system type
-            "infiltration_rate",             # Infiltration rate
-            # Carbon Accounting (if emissions reported)
-            "emission_factors",              # Emission factors for electricity and heating supply
-            # Energy Data
-            "hourly_heating_demand",         # Hourly/monthly heating demand
-            "hourly_electricity_consumption" # Hourly/monthly electricity use
+            "building_use_type",
+            "operating_hours",
+            # Grid System
+            "grid_electricity_emission_factor"
         ],
         "optional_items": [
-            "surroundings_data",             # Surrounding shading (if available)
-            "window_properties",             # Specific window properties
-            "architectural_drawings"         # More detailed geometry
+            # If onsite production exists
+            "annual_electricity_production",
+            "electricity_production_time_series",
+            # Other optional items
+            "surroundings_data",
+            "window_properties",
+            "architectural_drawings"
         ]
     },
     "Renewable Energy & Local Production": {
@@ -170,6 +165,7 @@ DATA_ITEMS_WITH_PROXIES = {
         {
             'label': 'Building dimensions',
             'key': 'building_footprints',
+            'sources': ['Municipal cadastral/GIS', 'OpenStreetMap', 'Architectural/BIM files'],
             'proxy_tiers': {
                 'tier1': {
                     'name': 'GIS cadastral data',
@@ -180,6 +176,25 @@ DATA_ITEMS_WITH_PROXIES = {
                 'tier2': {
                     'name': 'OpenStreetMap data',
                     'description': 'Extract building outlines from OpenStreetMap',
+                    'confidence_impact': -25,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
+            'label': 'Building height',
+            'key': 'building_height',
+            'sources': ['Architectural plans', 'LiDAR/3D city model', 'Municipal building registry'],
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Remote sensing estimation',
+                    'description': 'Estimate height from LiDAR/DSM or photogrammetry',
+                    'confidence_impact': -12,
+                    'uncertainty': 'Medium'
+                },
+                'tier2': {
+                    'name': 'Type-based defaults',
+                    'description': 'Apply typical height per building type and floors',
                     'confidence_impact': -25,
                     'uncertainty': 'High'
                 }
@@ -416,6 +431,25 @@ DATA_ITEMS_WITH_PROXIES = {
     ],
     "Measured Energy Data": [
         {
+            'label': 'Annual electricity consumption',
+            'key': 'annual_electricity_consumption',
+            'sources': ['Utility bills', 'Smart meter portal', 'Facility energy management system'],
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Monthly utility aggregation',
+                    'description': 'Sum monthly bills; estimate gaps with typical seasonality',
+                    'confidence_impact': -12,
+                    'uncertainty': 'Medium-High'
+                },
+                'tier2': {
+                    'name': 'Benchmark EUI by type',
+                    'description': 'Use energy use intensity benchmarks for similar buildings',
+                    'confidence_impact': -35,
+                    'uncertainty': 'High'
+                }
+            }
+        },
+        {
             'label': 'Hourly heating demand',
             'key': 'hourly_heating_demand',
             'proxy_tiers': {
@@ -442,6 +476,7 @@ DATA_ITEMS_WITH_PROXIES = {
         {
             'label': 'Hourly electricity consumption',
             'key': 'hourly_electricity_consumption',
+            'sources': ['Smart meter portal', 'BMS/EMS time series export'],
             'proxy_tiers': {
                 'tier1': {
                     'name': 'Monthly/annual utility data',
@@ -542,6 +577,51 @@ DATA_ITEMS_WITH_PROXIES = {
     ],
     "Renewable Energy Systems": [
         {
+            'label': 'On-site electricity production (yes/no)',
+            'key': 'on_site_electricity',
+            'sources': ['Utility interconnection records', 'Local PV/wind registry', 'Facility documentation'],
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Local registry check',
+                    'description': 'Check municipal or utility databases for installations',
+                    'confidence_impact': -8,
+                    'uncertainty': 'Low-Medium'
+                },
+                'tier2': {
+                    'name': 'Assume none present',
+                    'description': 'Proceed assuming no onsite generation; validate later',
+                    'confidence_impact': -20,
+                    'uncertainty': 'Medium-High'
+                }
+            }
+        },
+        {
+            'label': 'Annual electricity production',
+            'key': 'annual_electricity_production',
+            'sources': ['Inverter portal (annual summary)', 'Utility net-metering statements'],
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Modeled annual yield',
+                    'description': 'Estimate using PVWatts or similar with system specs',
+                    'confidence_impact': -15,
+                    'uncertainty': 'Medium'
+                }
+            }
+        },
+        {
+            'label': 'Production time series',
+            'key': 'electricity_production_time_series',
+            'sources': ['Inverter/BMS portal export', 'SCADA logs'],
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Synthetic profile from model',
+                    'description': 'Create hourly series from modeled irradiance and system',
+                    'confidence_impact': -22,
+                    'uncertainty': 'Medium-High'
+                }
+            }
+        },
+        {
             'label': 'PV system parameters',
             'key': 'pv_system_params',
             'proxy_tiers': {
@@ -576,12 +656,26 @@ DATA_ITEMS_WITH_PROXIES = {
         {
             'label': 'Building use type',
             'key': 'building_use_type',
+            'sources': ['Zoning/permit records', 'Facility classification', 'EPC register'],
             'proxy_tiers': {
                 'tier1': {
                     'name': 'Municipal zoning records',
                     'description': 'Obtain building use classification from zoning database',
                     'confidence_impact': -8,
                     'uncertainty': 'Low'
+                }
+            }
+        },
+        {
+            'label': 'Operating hours',
+            'key': 'operating_hours',
+            'sources': ['Facility schedules', 'BMS trends', 'Operational manuals'],
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'Standard schedules by type',
+                    'description': 'Use typical operating hours for building category',
+                    'confidence_impact': -15,
+                    'uncertainty': 'Medium'
                 }
             }
         },
@@ -642,6 +736,27 @@ DATA_ITEMS_WITH_PROXIES = {
                     'description': 'Use typical comfort ranges for climate zone',
                     'confidence_impact': -25,
                     'uncertainty': 'High'
+                }
+            }
+        }
+    ],
+    "Grid System": [
+        {
+            'label': 'Grid electricity emission factor',
+            'key': 'grid_electricity_emission_factor',
+            'sources': ['National energy agency', 'IPCC databases', 'Grid operator reports'],
+            'proxy_tiers': {
+                'tier1': {
+                    'name': 'National/regional official factors',
+                    'description': 'Use latest official grid emission factor',
+                    'confidence_impact': -5,
+                    'uncertainty': 'Low'
+                },
+                'tier2': {
+                    'name': 'Default IPCC factors',
+                    'description': 'Apply generic IPCC emission factors when local data missing',
+                    'confidence_impact': -20,
+                    'uncertainty': 'Medium-High'
                 }
             }
         }
@@ -874,6 +989,26 @@ def get_filtered_data_items(analysis_types):
     
     for analysis_type in valid_types:
         requirements = ANALYSIS_DATA_REQUIREMENTS[analysis_type]
+
+        # Focus-specific override for Energy & Carbon Performance
+        if analysis_type == "Energy & Carbon Performance" and st.session_state.get("energy_system_focus") == "Electricity":
+            # Limit to electricity-focused inputs
+            requirements = {
+                "required_items": [
+                    "building_footprints",
+                    "building_height",
+                    "number_of_floors",
+                    "annual_electricity_consumption",
+                    "on_site_electricity",
+                    "building_use_type",
+                    "operating_hours",
+                    "grid_electricity_emission_factor",
+                ],
+                "optional_items": [
+                    "annual_electricity_production",
+                    "electricity_production_time_series"
+                ]
+            }
         required = set(requirements["required_items"])
         optional = set(requirements.get("optional_items", []))
         
@@ -1506,19 +1641,28 @@ st.markdown("""
         transform: translateY(-1px);
     }
     
-    /* Selectbox styling */
-    .stSelectbox > div > div {
-        background-color: var(--brand-surface);
-        border-radius: 8px;
-        border: 1.5px solid var(--brand-border);
+    /* Restore general checkbox styling (non-RE areas) */
+    .stCheckbox {
+        padding: 0.25rem 0;
+        margin: 0.25rem 0;
     }
     
-    /* Button styling (Material 3 - Light) */
-    .stButton > button {
-        border-radius: 12px;
-        font-weight: 600;
-        padding: 0.625rem 1.25rem;
-        transition: box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+    div[data-testid="stCheckbox"] {
+        transition: all 0.2s ease;
+        border-radius: 6px;
+    }
+    
+    div[data-testid="stCheckbox"]:hover {
+        background: rgba(37, 99, 235, 0.06);
+        transform: translateX(4px);
+    }
+    
+    /* Keep labels from wrapping (applies everywhere, harmless) */
+    div[data-baseweb="checkbox"] > label {
+        white-space: nowrap !important;
+        word-break: normal !important;
+        overflow: visible !important;
+    }
         border: none;
         background-color: var(--md3-primary);
         color: var(--md3-on-primary);
@@ -1959,20 +2103,24 @@ if st.session_state.wizard_step == 1:
 
         if "Renewable Energy & Local Production" in analysis_type:
             st.markdown("<span style='font-weight:600;'>Renewable energy types (select one or more)</span>", unsafe_allow_html=True)
-            st.multiselect(
-                "Renewable energy types:",
-                options=[
-                    "Battery Storage",
-                    "Biomass",
-                    "Geothermal",
-                    "Hydropower",
-                    "Offshore Wind",
-                    "Onshore Wind",
-                    "Solar PV",
-                    "Solar Thermal"
-                ],
-                key="renewable_types"
-            )
+            renewable_options = [
+                "Battery Storage",
+                "Biomass",
+                "Geothermal",
+                "Hydropower",
+                "Offshore Wind",
+                "Onshore Wind",
+                "Solar PV",
+                "Solar Thermal",
+            ]
+            cols = st.columns(2)
+            selected_re = []
+            for i, opt in enumerate(renewable_options):
+                opt_key = f"renewable_{opt.replace(' ', '_').lower()}"
+                with cols[i % 2]:
+                    if st.checkbox(opt, value=opt in st.session_state.get("renewable_types", []), key=opt_key):
+                        selected_re.append(opt)
+            st.session_state.renewable_types = selected_re
         else:
             st.session_state.renewable_types = []
 
@@ -2126,242 +2274,11 @@ cost_results = estimate_cost(effort_results["hours_total"], currency_for_cost)
 
 # ==================== COLUMN 2: Data Availability ====================
 if st.session_state.wizard_step == 2:
-    with col2:
-        analysis_type = st.session_state.get("analysis_type", [])
-        st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem; text-align: left;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
+    # Use the modular Step 2 renderer from steps/step2_review_data.py
+    render_step2(col2)
     
-    # Progress Indicator - Data Completeness
-    if analysis_type:
-        filtered_items_preview = get_filtered_data_items(analysis_type)
-        total_preview = sum(len(items) for items in filtered_items_preview.values())
-        available_preview = sum(1 for items in filtered_items_preview.values() 
-                               for item in items 
-                               if st.session_state.data_inputs.get(item['key'], False))
-        required_preview = sum(1 for items in filtered_items_preview.values() 
-                             for item in items if item.get('is_required', False))
-        
-        completeness_pct = (available_preview / total_preview * 100) if total_preview > 0 else 0
-        
-        # Display progress
-        col_prog1, col_prog2 = st.columns([3, 1])
-        with col_prog1:
-            st.progress(completeness_pct / 100)
-        with col_prog2:
-            st.markdown(f"<div style='text-align: right; font-size: 1.2rem; font-weight: 700; color: #3b82f6;'>{completeness_pct:.0f}%</div>", unsafe_allow_html=True)
-        
-        st.markdown(f"<p style='color: #64748b; font-size: 0.9rem; margin-top: -0.5rem;'>📊 Data Completeness: {available_preview} of {total_preview} items • {required_preview} required</p>", unsafe_allow_html=True)
-        st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-
-    st.subheader("Do you have the following data inputs?")
-    if analysis_type:
-        if len(analysis_type) == 1:
-            st.caption(f"Showing data requirements for **{analysis_type[0]}**. Indicate data availability below.")
-        else:
-            st.caption(f"Showing merged requirements for **{len(analysis_type)} analyses**: {', '.join(analysis_type)}. Common requirements appear once.")
-    else:
-        st.caption("Please select at least one analysis type in Step 1.")
-    
-    # Get filtered data items based on analysis type
-    filtered_data_items = get_filtered_data_items(analysis_type)
-
-    # Initialize session state for filtered items (default to False = "No")
-    # This ensures metrics calculate correctly
-    for category, items in filtered_data_items.items():
-        for item in items:
-            if item['key'] not in st.session_state.data_inputs:
-                st.session_state.data_inputs[item['key']] = False  # Default to "No"
-            if f"proxy_{item['key']}" not in st.session_state:
-                st.session_state[f"proxy_{item['key']}"] = None
-
-    # Calculate summary statistics using filtered items
-    total_items = sum(len(items) for items in filtered_data_items.values())
-    available_items = sum(1 for items in filtered_data_items.values() 
-                         for item in items 
-                         if st.session_state.data_inputs.get(item['key'], False))
-    proxy_items = sum(1 for items in filtered_data_items.values() 
-                     for item in items 
-                     if not st.session_state.data_inputs.get(item['key'], False) 
-                     and st.session_state.get(f"proxy_{item['key']}", 'None (missing)') != 'None (missing)'
-                     and st.session_state.get(f"proxy_{item['key']}") is not None)
-    missing_items = total_items - available_items - proxy_items
-
-    # Display summary metrics (Step 2)
-    col_sum1, col_sum2, col_sum3 = st.columns(3)
-    with col_sum1:
-        st.metric("✓ Available", f"{available_items}/{total_items}")
-    with col_sum2:
-        st.metric("⚠️ Using Proxy", proxy_items)
-    with col_sum3:
-        st.metric("🔴 Missing", missing_items)
-
-    st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-
-        # Display data items by category with expandable sections (use filtered items)
-    for category, items in filtered_data_items.items():
-        st.markdown(f"### {category}")
-        for item in items:
-                # Add analysis info if multiple analyses selected
-                analysis_info = ""
-                if analysis_type and len(analysis_type) > 1 and 'analyses' in item:
-                    analyses_data = item['analyses']
-                    # Create abbreviations for analysis types
-                    abbrev_map = {
-                        'Energy & Carbon Performance': 'E&C',
-                        'Renewable Energy & Local Production': 'RE&LP',
-                        'Climate Resilience': 'CR',
-                        'Retrofit & Transformation': 'R&T',
-                        'Urban Design Support': 'UDS'
-                    }
-                    info_parts = []
-                    if analyses_data['required_in']:
-                        abbrev_names = [abbrev_map.get(a, a) for a in analyses_data['required_in']]
-                        info_parts.append(f"<span style='font-size: 0.7rem; color: #059669; font-weight: 600;'>Required: {', '.join(abbrev_names)}</span>")
-                    if analyses_data['optional_in']:
-                        abbrev_names = [abbrev_map.get(a, a) for a in analyses_data['optional_in']]
-                        info_parts.append(f"<span style='font-size: 0.7rem; color: #2563eb; font-weight: 600;'>Optional: {', '.join(abbrev_names)}</span>")
-                    if info_parts:
-                        analysis_info = f"<br/><span style='font-size: 0.7rem; color: #64748b;'>({' | '.join(info_parts)})</span>"
-                
-                st.markdown(f"<p style='font-weight: 600; margin-bottom: 0.3rem; margin-top: 0.3rem; color: #334155; font-size: 0.9rem;'>{item['label']}{analysis_info}</p>", unsafe_allow_html=True)
-                
-                # Create columns for Yes/No and Proxy dropdown
-                col_radio, col_proxy = st.columns([1, 2])
-                
-                with col_radio:
-                    # Get current state from session state (single source of truth)
-                    current_has_data = st.session_state.data_inputs[item['key']]
-                    
-                    # Create Yes/No radio button - directly use session state for index
-                    # The key links to a unique widget that persists its value
-                    data_available = st.radio(
-                        "Data available?",
-                        options=["Yes", "No"],
-                        index=0 if current_has_data else 1,
-                        key=f"radio_{item['key']}",
-                        horizontal=True,
-                        label_visibility="collapsed"
-                    )
-                    
-                    # Immediately update session state to match radio selection
-                    # This keeps session state in sync with user interaction
-                    new_has_data = (data_available == "Yes")
-                    if st.session_state.data_inputs[item['key']] != new_has_data:
-                        st.session_state.data_inputs[item['key']] = new_has_data
-                
-                # Use session state as the single source of truth for displaying content
-                has_data = st.session_state.data_inputs[item['key']]
-                
-                with col_proxy:
-                    # Show green checkmark if data is available
-                    if has_data:
-                        st.markdown(
-                            '<div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); '
-                            'padding: 0.35rem 0.6rem; border-radius: 6px; border-left: 3px solid #10b981;">'
-                            '<p style="margin: 0; font-size: 0.8rem; color: #065f46; font-weight: 600;">'
-                            '✓ Data available</p>'
-                            '</div>',
-                            unsafe_allow_html=True
-                        )
-                    
-                    # Show proxy dropdown if "No" is selected and proxies exist
-                    elif not has_data and 'proxy_tiers' in item:
-                        # Build proxy options list
-                        proxy_options = ['None (missing)']
-                        for tier_key in sorted(item['proxy_tiers'].keys()):
-                            tier_num = tier_key.replace('tier', '')
-                            proxy_name = item['proxy_tiers'][tier_key]['name']
-                            confidence_impact = item['proxy_tiers'][tier_key]['confidence_impact']
-                            proxy_options.append(f"Tier {tier_num}: {proxy_name} ({confidence_impact}%)")
-                        
-                        # Select proxy with unique key
-                        selected_proxy = st.selectbox(
-                            "↳ Use proxy:",
-                            options=proxy_options,
-                            key=f"proxy_select_{item['key']}",
-                            label_visibility="visible"
-                        )
-                        
-                        # Store selected proxy in session state
-                        st.session_state[f"proxy_{item['key']}"] = selected_proxy
-                
-                # Show proxy details below if a proxy is selected
-                if not has_data and 'proxy_tiers' in item:
-                    selected_proxy = st.session_state.get(f"proxy_{item['key']}", 'None (missing)')
-                    
-                    if selected_proxy and selected_proxy != 'None (missing)':
-                        # Extract tier number from selection
-                        tier_num = selected_proxy.split(':')[0].replace('Tier ', '').strip()
-                        tier_key = f'tier{tier_num}'
-                        proxy_info = item['proxy_tiers'][tier_key]
-                        
-                        # Determine color coding based on uncertainty
-                        uncertainty = proxy_info['uncertainty']
-                        if uncertainty in ['Low', 'Low-Medium']:
-                            bg_color = "linear-gradient(135deg, #eff6ff, #dbeafe)"
-                            border_color = "#2563eb"
-                            text_color = "#1e40af"
-                            icon = "ℹ️"
-                        elif uncertainty in ['Medium', 'Medium-High']:
-                            bg_color = "linear-gradient(135deg, #fef3c7, #fde68a)"
-                            border_color = "#f59e0b"
-                            text_color = "#92400e"
-                            icon = "⚠️"
-                        else:  # High, Very High
-                            bg_color = "linear-gradient(135deg, #fecaca, #fca5a5)"
-                            border_color = "#ef4444"
-                            text_color = "#7f1d1d"
-                            icon = "🔴"
-                        
-                        # Display styled proxy information box
-                        st.markdown(
-                            f'<div style="background: {bg_color}; '
-                            f'padding: 0.5rem 0.7rem; border-radius: 6px; '
-                            f'border-left: 3px solid {border_color}; '
-                            f'margin-top: 0.3rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">'
-                            f'<p style="margin: 0; font-size: 0.8rem; font-weight: 600; color: {text_color};">'
-                            f'{icon} {proxy_info["name"]}</p>'
-                            f'<p style="margin: 0.3rem 0 0 0; font-size: 0.75rem; color: #64748b;">'
-                            f'{proxy_info["description"]}</p>'
-                            f'<div style="display: flex; gap: 0.8rem; margin-top: 0.3rem;">'
-                            f'<p style="margin: 0; font-size: 0.7rem; font-weight: 600; color: {text_color};">'
-                            f'Impact: {proxy_info["confidence_impact"]}%</p>'
-                            f'<p style="margin: 0; font-size: 0.7rem; font-weight: 600; color: {text_color};">'
-                            f'Uncertainty: {uncertainty}</p>'
-                            f'</div>'
-                            f'</div>',
-                            unsafe_allow_html=True
-                        )
-                    elif selected_proxy == 'None (missing)':
-                        # Warning for missing data with no proxy selected
-                        st.markdown(
-                            '<div style="background: linear-gradient(135deg, #fee2e2, #fecaca); '
-                            'padding: 0.4rem 0.6rem; border-radius: 6px; border-left: 3px solid #b91c1c; '
-                            'margin-top: 0.3rem;">'
-                            '<p style="margin: 0; font-size: 0.8rem; color: #991b1b; font-weight: 600;">'
-                            '🔴 Missing - will impact results</p>'
-                            '</div>',
-                            unsafe_allow_html=True
-                        )
-                
-                # Add separator between items
-                st.markdown("<div style='margin: 0.6rem 0; border-bottom: 1px solid #e2e8f0;'></div>", unsafe_allow_html=True)
-
-        # ==================== Step 2: Define Tasks (Full Width) ====================
-if st.session_state.wizard_step == 2:
-    with st.container():
-        # ... existing code for step 2 ...
-        # Navigation: Step 2
-        nav2_col1, nav2_col2, nav2_col3, nav2_col4 = st.columns([1, 1, 2, 2])
-        with nav2_col1:
-            if st.button("◀ Back", use_container_width=True, key="nav_back_2"):
-                st.session_state.wizard_step = 1
-                st.rerun()
-        with nav2_col2:
-            if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_2"):
-                st.session_state.wizard_step = 3
-                st.rerun()
-        with nav2_col3:
-            st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 2/6</div>", unsafe_allow_html=True)
+    # Navigation for Step 2
+    render_step2_navigation()
 
 # ==================== Step 4: Expected Results ====================
 
