@@ -1390,6 +1390,19 @@ st.markdown("""
         padding: 1rem 2rem;
         background-color: var(--brand-panel);
     }
+
+    /* Hide the default Streamlit sidebar/navigation */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+    }
+    div[data-testid="collapsedControl"] {
+        display: none !important;
+    }
+    /* Keep content full width when sidebar is hidden */
+    .block-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
     
     /* Typography improvements */
     h1 {
@@ -1907,6 +1920,7 @@ if st.session_state.wizard_step == 1:
 
         # Analysis Type
         st.subheader("Analysis Type")
+        st.markdown("<span style='font-weight:600;'>Select your analysis (one or more) <span style='color:#dc2626'>*</span></span>", unsafe_allow_html=True)
         analysis_type = st.multiselect(
             "Select your analysis (one or more):",
             options=[
@@ -1923,11 +1937,33 @@ if st.session_state.wizard_step == 1:
         if st.session_state.analysis_type:
             st.info(f"📊 {len(st.session_state.analysis_type)} analysis type(s) selected")
 
+        if "Renewable Energy & Local Production" in analysis_type:
+            st.markdown("<span style='font-weight:600;'>Renewable energy types (select one or more)</span>", unsafe_allow_html=True)
+            st.multiselect(
+                "Renewable energy types:",
+                options=[
+                    "Battery Storage",
+                    "Biomass",
+                    "Geothermal",
+                    "Hydropower",
+                    "Offshore Wind",
+                    "Onshore Wind",
+                    "Solar PV",
+                    "Solar Thermal"
+                ],
+                key="renewable_types"
+            )
+        else:
+            st.session_state.renewable_types = []
+
         # Define Scale
         st.subheader("Define Your Scale")
+        st.markdown("<span style='font-weight:600;'>Project scale <span style='color:#dc2626'>*</span></span>", unsafe_allow_html=True)
         project_scale = st.selectbox(
             "Project scale:",
             options=["Building", "Neighborhood", "City"],
+            index=None,
+            placeholder="Choose option",
             help="Select the geographic scope of your analysis",
             key="project_scale"
         )
@@ -1972,14 +2008,17 @@ if st.session_state.wizard_step == 1:
     
         # Context
         st.subheader("Context")
+        st.markdown("<span style='font-weight:600;'>Select country <span style='color:#dc2626'>*</span></span>", unsafe_allow_html=True)
         country = st.selectbox(
             "Select country:",
             options=[
-                "Sweden",
-                "United Kingdom",
+                "Belgium",
                 "Ireland",
-                "Belgium"
+                "Sweden",
+                "United Kingdom"
             ],
+            index=None,
+            placeholder="Choose option",
             help="Select the country for your analysis",
             key="country"
         )
@@ -1996,8 +2035,18 @@ if st.session_state.wizard_step == 1:
             st.rerun()
     with nav1_col2:
         if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_1"):
-            st.session_state.wizard_step = 2
-            st.rerun()
+            missing = []
+            if not analysis_type:
+                missing.append("analysis type")
+            if not project_scale:
+                missing.append("project scale")
+            if not country:
+                missing.append("country")
+            if missing:
+                st.warning("Please select: " + ", ".join(missing) + " before proceeding.")
+            else:
+                st.session_state.wizard_step = 2
+                st.rerun()
     with nav1_col3:
         st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 1/6</div>", unsafe_allow_html=True)
 
@@ -2006,8 +2055,9 @@ if st.session_state.wizard_step == 1:
 # Calculate confidence levels based on configuration
 # For multiple analyses, use the first one for base confidence calculation
 analysis_type = st.session_state.get("analysis_type", [])
-project_scale = st.session_state.get("project_scale", "Building")
-country = st.session_state.get("country", "Sweden")
+project_scale = st.session_state.get("project_scale") or "Building"
+# If no country selected yet, fall back to a safe default
+country = st.session_state.get("country") or "Belgium"
 # Ensure desired outputs are defined globally to avoid NameError
 outputs = st.session_state.get(
     "desired_outputs",
