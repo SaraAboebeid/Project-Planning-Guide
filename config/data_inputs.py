@@ -122,7 +122,138 @@ DATA_INPUTS = {
         # HEATING/COOLING FOCUS
         # ----------------------------------------------------------------------
         "Heating/Cooling": [
-            # TODO: Add heating/cooling-specific data inputs
+            {
+                "category": "Building Geometry",
+                "items": [
+                    {
+                        "key": "footprint",
+                        "label": "Footprint dimension",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "height",
+                        "label": "Height",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "num_floors",
+                        "label": "Number of floors",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "wwr",
+                        "label": "Window to wall ratio",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "has_basement",
+                        "label": "Does the building have basement?",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "orientation",
+                        "label": "Building Orientation",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Building Fabric & Construction",
+                "items": [
+                    {
+                        "key": "year_construction",
+                        "label": "Year of construction/renovation",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "construction_materials",
+                        "label": "Construction materials",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "window_properties",
+                        "label": "Window properties",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "infiltration_rate",
+                        "label": "Infiltration rate",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Building System",
+                "items": [
+                    {
+                        "key": "hvac_type",
+                        "label": "Type of HVAC system",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "setpoint",
+                        "label": "Heating/Cooling Setpoint",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "supply_temp",
+                        "label": "Supply temperature",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Location Context",
+                "items": [
+                    {
+                        "key": "location",
+                        "label": "Building location",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Measured Energy Data",
+                "items": [
+                    {
+                        "key": "annual_heating_cooling",
+                        "label": "Annual Heating/Cooling demand",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Building Use",
+                "items": [
+                    {
+                        "key": "use_type",
+                        "label": "Use type",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "occupancy_pattern",
+                        "label": "Occupancy pattern",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
         ],
         
         # ----------------------------------------------------------------------

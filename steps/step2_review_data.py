@@ -66,7 +66,7 @@ def render_step2(col2):
             category_name = category_data["category"]
             items = category_data["items"]
             
-            with st.expander(category_name, expanded=True):
+            with st.expander(category_name, expanded=False):
                 for item in items:
                     _render_data_item(item, page_key)
 
@@ -85,7 +85,7 @@ def _render_data_item(item: dict, page_key: str):
     st.markdown(f"**{item_label}**")
     
     # Show recommended source
-    st.markdown(f"📊 *Recommended:* {recommended_source}")
+    st.markdown(f"*Recommended:* {recommended_source}")
     
     # Simple Yes/No radio - default to Yes
     has_data_key = f"{page_key}_{item_key}_has_data"
