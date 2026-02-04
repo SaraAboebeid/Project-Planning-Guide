@@ -304,8 +304,211 @@ DATA_INPUTS = {
     # RENEWABLE ENERGY & LOCAL PRODUCTION
     # ==========================================================================
     "Renewable Energy & Local Production": {
+        
+        # ----------------------------------------------------------------------
+        # SOLAR PV FOCUS
+        # ----------------------------------------------------------------------
+        "Solar PV": [
+            {
+                "category": "Building Geometry",
+                "items": [
+                    {
+                        "key": "footprint",
+                        "label": "Footprint dimensions",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "height",
+                        "label": "Building height",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "roof_shape_angle",
+                        "label": "Roof shape and angle",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "roof_area",
+                        "label": "Roof area",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "orientation",
+                        "label": "Building orientation",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Location and Context",
+                "items": [
+                    {
+                        "key": "building_location",
+                        "label": "Building location",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "context_location_height",
+                        "label": "Context location and height",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Renewable Energy System",
+                "items": [
+                    {
+                        "key": "pv_module",
+                        "label": "PV module",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "installing_battery",
+                        "label": "Are you installing battery?",
+                        "type": "yes_no",
+                        "followup_label": "Battery module",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+        ],
+        
+        # ----------------------------------------------------------------------
+        # DEFAULT / OTHER RENEWABLE TYPES
+        # ----------------------------------------------------------------------
         "default": [
-            # TODO: Add Renewable Energy data inputs
+            # TODO: Add default Renewable Energy data inputs
+        ],
+    },
+    
+    # ==========================================================================
+    # RETROFIT & TRANSFORMATION
+    # ==========================================================================
+    "Retrofit & Transformation": {
+        "default": [
+            {
+                "category": "Building Geometry",
+                "items": [
+                    {
+                        "key": "footprint",
+                        "label": "Footprint dimensions",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "height",
+                        "label": "Height",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "roof_shape_angle",
+                        "label": "Roof shape and angle",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "wwr",
+                        "label": "Window to wall ratio",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "num_floors",
+                        "label": "Number of Floors",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Building Fabric & Construction",
+                "items": [
+                    {
+                        "key": "construction_materials",
+                        "label": "Construction materials",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "infiltration_rate",
+                        "label": "Infiltration rate",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "window_properties",
+                        "label": "Windows properties",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Building System",
+                "items": [
+                    {
+                        "key": "hvac_system",
+                        "label": "HVAC system",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "setpoint",
+                        "label": "Heating/cooling setpoint",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Location Context",
+                "items": [
+                    {
+                        "key": "building_location",
+                        "label": "Building location",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Measured Energy Data",
+                "items": [
+                    {
+                        "key": "annual_heating_demand",
+                        "label": "Annual heating demand",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
+            {
+                "category": "Building Use & Operation",
+                "items": [
+                    {
+                        "key": "building_use",
+                        "label": "Building use",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                    {
+                        "key": "occupancy_pattern",
+                        "label": "Occupancy pattern",
+                        "recommended_source": "",
+                        "proxy_options": [],
+                    },
+                ]
+            },
         ],
     },
     
@@ -323,6 +526,18 @@ DATA_INPUTS = {
 # ==============================================================================
 # HELPER FUNCTIONS
 # ==============================================================================
+
+# Countries that support Solar PV data inputs
+SOLAR_PV_COUNTRIES = ["Ireland", "Sweden", "United Kingdom", "Belgium"]
+
+# Scales that support Solar PV
+SOLAR_PV_SCALES = ["Building", "Neighborhood", "City"]
+
+# Countries that support Retrofit & Transformation data inputs
+RETROFIT_COUNTRIES = ["Ireland", "Sweden", "United Kingdom", "Belgium"]
+
+# Scales that support Retrofit & Transformation
+RETROFIT_SCALES = ["Building", "Neighborhood", "City"]
 
 # Countries that use the combined Electricity + Heating/Cooling approach
 WHOLE_SYSTEM_COUNTRIES = ["Ireland", "Sweden", "United Kingdom", "Belgium"]
@@ -402,7 +617,7 @@ def merge_data_inputs_without_duplicates(electricity_inputs: list, heating_cooli
     return merged
 
 
-def get_data_inputs(analysis_type: str, focus: str, scale: str = None, context: str = None) -> list:
+def get_data_inputs(analysis_type: str, focus: str, scale: str = None, context: str = None, renewable_types: list = None) -> list:
     """
     Get the FIXED data inputs list for a given analysis type and focus.
     
@@ -412,11 +627,18 @@ def get_data_inputs(analysis_type: str, focus: str, scale: str = None, context: 
     For "Whole system interaction" focus with specific scales and contexts,
     this function combines Electricity and Heating/Cooling inputs without duplicates.
     
+    For "Renewable Energy & Local Production" with Solar PV selected,
+    this function returns the Solar PV specific data inputs.
+    
+    For "Retrofit & Transformation" with specific scales and contexts,
+    this function returns the retrofit-specific data inputs.
+    
     Args:
         analysis_type: The selected analysis type (e.g., "Energy & Carbon Performance")
         focus: The selected focus (e.g., "Electricity", "Heating/Cooling", "Whole system interaction")
-        scale: The selected scale (e.g., "Building", "Neighbourhood", "City")
+        scale: The selected scale (e.g., "Building", "Neighborhood", "City")
         context: The selected context/country (e.g., "Ireland", "Sweden")
+        renewable_types: List of selected renewable energy types (e.g., ["Solar PV", "Battery Storage"])
     
     Returns:
         List of category dictionaries with items, or empty list if not configured
@@ -434,6 +656,28 @@ def get_data_inputs(analysis_type: str, focus: str, scale: str = None, context: 
         return []
     
     focus_data = DATA_INPUTS[analysis_type]
+    
+    # Special handling for "Retrofit & Transformation"
+    if analysis_type == "Retrofit & Transformation":
+        # Check if scale and context qualify
+        scale_qualifies = scale in RETROFIT_SCALES if scale else True
+        context_qualifies = context in RETROFIT_COUNTRIES if context else True
+        
+        if scale_qualifies and context_qualifies:
+            if "default" in focus_data and focus_data["default"]:
+                return focus_data["default"]
+    
+    # Special handling for "Renewable Energy & Local Production" with Solar PV
+    if analysis_type == "Renewable Energy & Local Production":
+        # Check if Solar PV is selected in renewable types
+        if renewable_types and "Solar PV" in renewable_types:
+            # Check if scale and context qualify
+            scale_qualifies = scale in SOLAR_PV_SCALES if scale else True
+            context_qualifies = context in SOLAR_PV_COUNTRIES if context else True
+            
+            if scale_qualifies and context_qualifies:
+                if "Solar PV" in focus_data:
+                    return focus_data["Solar PV"]
     
     # Special handling for "Whole system interaction" focus
     if focus == "Whole system interaction":

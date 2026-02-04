@@ -31,12 +31,15 @@ def render_step2(col2):
             st.session_state.step2_cached_scale = st.session_state.get("project_scale", "")
         if "step2_cached_context" not in st.session_state:
             st.session_state.step2_cached_context = st.session_state.get("country", "")
+        if "step2_cached_renewable_types" not in st.session_state:
+            st.session_state.step2_cached_renewable_types = st.session_state.get("renewable_types", [])
         
         # Use cached values
         analysis_type = st.session_state.step2_cached_analysis_type
         analysis_focus = st.session_state.step2_cached_focus
         analysis_scale = st.session_state.step2_cached_scale
         analysis_context = st.session_state.step2_cached_context
+        renewable_types = st.session_state.step2_cached_renewable_types
         
         st.markdown(
             "<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem; text-align: left;'>"
@@ -45,16 +48,17 @@ def render_step2(col2):
         )
         
         # Get the FIXED data list (does not change based on user clicks)
-        data_inputs = get_data_inputs(analysis_type, analysis_focus, analysis_scale, analysis_context)
+        data_inputs = get_data_inputs(analysis_type, analysis_focus, analysis_scale, analysis_context, renewable_types)
         
         if not data_inputs:
             st.warning(f"No data inputs configured yet for this analysis type and focus.")
             st.info("Please go back to Step 1 and select a valid combination, or check config/data_inputs.py")
             return
         
-        # Create unique session key for this analysis/focus/scale/context combo
+        # Create unique session key for this analysis/focus/scale/context/renewable combo
         analysis_name = analysis_type[0] if analysis_type else "none"
-        page_key = f"step2_{analysis_name}_{analysis_focus}_{analysis_scale}_{analysis_context}".replace(" ", "_").replace("&", "and")
+        renewable_str = "_".join(renewable_types) if renewable_types else "none"
+        page_key = f"step2_{analysis_name}_{analysis_focus}_{analysis_scale}_{analysis_context}_{renewable_str}".replace(" ", "_").replace("&", "and")
         
         # Initialize responses storage if needed
         if f"{page_key}_responses" not in st.session_state:
@@ -65,6 +69,8 @@ def render_step2(col2):
         if analysis_type:
             context_info = f" | **Scale:** {analysis_scale}" if analysis_scale else ""
             context_info += f" | **Context:** {analysis_context}" if analysis_context else ""
+            if renewable_types:
+                context_info += f" | **Renewable:** {', '.join(renewable_types)}"
             st.caption(f"Showing data requirements for **{analysis_type[0]}** → **{analysis_focus}**{context_info}")
         
         st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
@@ -130,6 +136,7 @@ def render_step2_navigation():
             st.session_state.pop("step2_cached_focus", None)
             st.session_state.pop("step2_cached_scale", None)
             st.session_state.pop("step2_cached_context", None)
+            st.session_state.pop("step2_cached_renewable_types", None)
             st.session_state.wizard_step = 1
             st.rerun()
     

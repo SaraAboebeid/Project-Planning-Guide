@@ -19,20 +19,24 @@ analysis_type = st.session_state.analysis_type[0] if isinstance(st.session_state
 analysis_focus = st.session_state.get("analysis_focus") or st.session_state.get("energy_system_focus", "")
 analysis_scale = st.session_state.get("analysis_scale") or st.session_state.get("project_scale", "")
 analysis_context = st.session_state.get("analysis_context") or st.session_state.get("country", "")
+renewable_types = st.session_state.get("renewable_types", [])
 
 context_info = f"**Analysis Type:** {analysis_type} | **Focus:** {analysis_focus}"
 if analysis_scale:
     context_info += f" | **Scale:** {analysis_scale}"
 if analysis_context:
     context_info += f" | **Context:** {analysis_context}"
+if renewable_types:
+    context_info += f" | **Renewable:** {', '.join(renewable_types)}"
 st.info(context_info)
 
 # ============================================================================
 # INITIALIZE SESSION STATE FOR THIS PAGE
 # ============================================================================
 
-# Create a unique key for this analysis type + focus + scale + context combination
-page_key = f"page2_{analysis_type}_{analysis_focus}_{analysis_scale}_{analysis_context}".replace(" ", "_").replace("&", "and")
+# Create a unique key for this analysis type + focus + scale + context + renewable combination
+renewable_str = "_".join(renewable_types) if renewable_types else "none"
+page_key = f"page2_{analysis_type}_{analysis_focus}_{analysis_scale}_{analysis_context}_{renewable_str}".replace(" ", "_").replace("&", "and")
 
 # Initialize session state for storing user responses if not exists
 if page_key not in st.session_state:
@@ -42,7 +46,7 @@ if page_key not in st.session_state:
 # GET THE DATA INPUTS (FIXED LIST - DOES NOT CHANGE)
 # ============================================================================
 
-data_inputs = get_data_inputs(analysis_type, analysis_focus, analysis_scale, analysis_context)
+data_inputs = get_data_inputs(analysis_type, analysis_focus, analysis_scale, analysis_context, renewable_types)
 
 if not data_inputs:
     st.warning(f"No data inputs configured yet for {analysis_type} → {analysis_focus}")
