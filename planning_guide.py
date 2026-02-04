@@ -1937,6 +1937,26 @@ if st.session_state.wizard_step == 1:
         if st.session_state.analysis_type:
             st.info(f"📊 {len(st.session_state.analysis_type)} analysis type(s) selected")
 
+        # When Energy & Carbon Performance is chosen, capture system focus
+        if "Energy & Carbon Performance" in analysis_type:
+            st.markdown("<span style='font-weight:600;'>Focus area (select one)</span>", unsafe_allow_html=True)
+            focus_options = [
+                "Electricity",
+                "Heating/Cooling",
+                "Whole system interaction",
+            ]
+            current_focus = st.session_state.get("energy_system_focus", "Electricity")
+            focus_index = focus_options.index(current_focus) if current_focus in focus_options else 0
+            st.session_state.energy_system_focus = st.radio(
+                "Focus area",
+                options=focus_options,
+                index=focus_index,
+                horizontal=True,
+                key="energy_system_focus_radio",
+            )
+        else:
+            st.session_state.energy_system_focus = None
+
         if "Renewable Energy & Local Production" in analysis_type:
             st.markdown("<span style='font-weight:600;'>Renewable energy types (select one or more)</span>", unsafe_allow_html=True)
             st.multiselect(
