@@ -119,23 +119,16 @@ DATA_INPUTS = {
         ],
         
         # ----------------------------------------------------------------------
-        # HEATING FOCUS
+        # HEATING/COOLING FOCUS
         # ----------------------------------------------------------------------
-        "Heating": [
-            # TODO: Add heating-specific data inputs
+        "Heating/Cooling": [
+            # TODO: Add heating/cooling-specific data inputs
         ],
         
         # ----------------------------------------------------------------------
-        # COOLING FOCUS
+        # WHOLE SYSTEM INTERACTION FOCUS
         # ----------------------------------------------------------------------
-        "Cooling": [
-            # TODO: Add cooling-specific data inputs
-        ],
-        
-        # ----------------------------------------------------------------------
-        # ALL (COMBINED) FOCUS
-        # ----------------------------------------------------------------------
-        "All": [
+        "Whole system interaction": [
             # TODO: Add combined data inputs
         ],
     },
