@@ -1,4 +1,5 @@
 import streamlit as st
+from config.data_inputs import get_data_inputs
 
 st.set_page_config(page_title="Review Data", page_icon="📊", layout="wide")
 
@@ -15,84 +16,23 @@ if "analysis_focus" not in st.session_state or not st.session_state.analysis_foc
 
 # Get selections from page 1
 analysis_type = st.session_state.analysis_type[0] if isinstance(st.session_state.analysis_type, list) else st.session_state.analysis_type
-analysis_focus = st.session_state.analysis_focus
+analysis_focus = st.session_state.get("analysis_focus") or st.session_state.get("energy_system_focus", "")
+analysis_scale = st.session_state.get("analysis_scale") or st.session_state.get("project_scale", "")
+analysis_context = st.session_state.get("analysis_context") or st.session_state.get("country", "")
 
-st.info(f"**Analysis Type:** {analysis_type} | **Focus:** {analysis_focus}")
-
-# ============================================================================
-# DATA INPUT CONFIGURATION
-# Structure: Each item has key, label, recommended_source, proxy_options
-# For yes_no items: type="yes_no", followup_label for the input shown when Yes
-# ============================================================================
-
-def get_data_inputs(analysis_type, focus):
-    """Return the list of data inputs for a given analysis type and focus."""
-    
-    if analysis_type == "Energy & Carbon Performance":
-        if focus == "Electricity":
-            return [
-                {
-                    "category": "Building Geometry",
-                    "items": [
-                        {"key": "footprint", "label": "Footprint dimension", "recommended_source": "", "proxy_options": []},
-                        {"key": "height", "label": "Height", "recommended_source": "", "proxy_options": []},
-                        {"key": "num_floors", "label": "Number of Floors", "recommended_source": "", "proxy_options": []},
-                    ]
-                },
-                {
-                    "category": "Measured Energy Data",
-                    "items": [
-                        {"key": "annual_electricity", "label": "Annual Electricity Consumption", "recommended_source": "", "proxy_options": []},
-                    ]
-                },
-                {
-                    "category": "Renewable Energy System",
-                    "items": [
-                        {"key": "onsite_production", "label": "Is there on-site electricity production?", "type": "yes_no", "followup_label": "Annual on-site electricity production", "recommended_source": "", "proxy_options": []},
-                    ]
-                },
-                {
-                    "category": "Building Use & Operation",
-                    "items": [
-                        {"key": "use_type", "label": "Use type", "recommended_source": "", "proxy_options": []},
-                        {"key": "operating_hours", "label": "Operating hours", "recommended_source": "", "proxy_options": []},
-                    ]
-                },
-                {
-                    "category": "Grid System",
-                    "items": [
-                        {"key": "grid_emission_factor", "label": "Grid emission factor", "recommended_source": "", "proxy_options": []},
-                    ]
-                },
-            ]
-        elif focus == "Heating":
-            return []
-        elif focus == "Cooling":
-            return []
-        elif focus == "All":
-            return []
-    
-    elif analysis_type == "Solar PV Potential":
-        return []
-    
-    elif analysis_type == "Thermal Comfort":
-        return []
-    
-    elif analysis_type == "Daylighting":
-        return []
-    
-    elif analysis_type == "Wind & Ventilation":
-        return []
-    
-    return []
-
+context_info = f"**Analysis Type:** {analysis_type} | **Focus:** {analysis_focus}"
+if analysis_scale:
+    context_info += f" | **Scale:** {analysis_scale}"
+if analysis_context:
+    context_info += f" | **Context:** {analysis_context}"
+st.info(context_info)
 
 # ============================================================================
 # INITIALIZE SESSION STATE FOR THIS PAGE
 # ============================================================================
 
-# Create a unique key for this analysis type + focus combination
-page_key = f"page2_{analysis_type}_{analysis_focus}".replace(" ", "_").replace("&", "and")
+# Create a unique key for this analysis type + focus + scale + context combination
+page_key = f"page2_{analysis_type}_{analysis_focus}_{analysis_scale}_{analysis_context}".replace(" ", "_").replace("&", "and")
 
 # Initialize session state for storing user responses if not exists
 if page_key not in st.session_state:
@@ -102,7 +42,7 @@ if page_key not in st.session_state:
 # GET THE DATA INPUTS (FIXED LIST - DOES NOT CHANGE)
 # ============================================================================
 
-data_inputs = get_data_inputs(analysis_type, analysis_focus)
+data_inputs = get_data_inputs(analysis_type, analysis_focus, analysis_scale, analysis_context)
 
 if not data_inputs:
     st.warning(f"No data inputs configured yet for {analysis_type} → {analysis_focus}")

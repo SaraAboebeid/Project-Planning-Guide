@@ -32,7 +32,7 @@ st.session_state["analysis_type"] = [selected_analysis]
 focus_label = "Focus"
 focus_options = []
 if selected_analysis == "Energy & Carbon Performance":
-    focus_options = ["Electricity", "Heating", "Cooling"]
+    focus_options = ["Electricity", "Heating/Cooling", "Whole system interaction"]
 elif selected_analysis == "Renewable Energy & Local Production":
     focus_options = ["Solar PV", "Battery Storage", "Other"]
 elif selected_analysis == "Climate Resilience":
@@ -45,9 +45,32 @@ selected_focus = st.selectbox(
 )
 
 st.session_state["analysis_focus"] = selected_focus
+st.session_state["energy_system_focus"] = selected_focus  # Also store for compatibility with main wizard
+
+# Scale selection
+st.markdown("### Scale")
+scale_options = ["Building", "Neighborhood", "City"]
+selected_scale = st.selectbox(
+    "Scale",
+    options=scale_options,
+    help="Select the scale of your analysis."
+)
+st.session_state["analysis_scale"] = selected_scale
+st.session_state["project_scale"] = selected_scale  # Also store for compatibility with main wizard
+
+# Context (Country) selection
+st.markdown("### Context")
+context_options = ["Ireland", "Sweden", "United Kingdom", "Belgium", "Other"]
+selected_context = st.selectbox(
+    "Country/Region",
+    options=context_options,
+    help="Select the country or region for your project."
+)
+st.session_state["analysis_context"] = selected_context
+st.session_state["country"] = selected_context  # Also store for compatibility with main wizard
 
 # Optional basic context
-st.markdown("### Project Context")
+st.markdown("### Project Details")
 col_a, col_b = st.columns(2)
 with col_a:
     st.session_state["project_name"] = st.text_input("Project Name", value=st.session_state.get("project_name", ""))
