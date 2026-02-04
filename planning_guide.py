@@ -1478,306 +1478,563 @@ def apply_brand_plotly_theme(fig):
 # Custom CSS
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
     :root {
-        --brand-primary: #1e40af;
-        --brand-accent: #2563eb;
-        --brand-navy: #0f172a;
-        --brand-teal: #115e59;
-        --brand-slate-700: #334155;
-        --brand-slate-500: #64748b;
-        --brand-slate-400: #94a3b8;
-        --brand-surface: #ffffff;
-        --brand-panel: #f8fafc;
-        --brand-border: #e2e8f0;
-        --brand-success: #0f766e;
-        --brand-warning: #b45309;
-        --brand-danger: #b91c1c;
-
-        /* Material Design 3 (Light) palette — neutral grey variant */
-        --md3-primary: #475569; /* slate primary */
-        --md3-on-primary: #FFFFFF;
-        --md3-primary-container: #E2E8F0; /* slate container */
-        --md3-on-primary-container: #0F172A;
-        --md3-primary-hover: #556070; /* slightly lighter slate */
-        --md3-primary-pressed: #3B4757; /* slightly darker slate */
-        --md3-hover-surface: #F1F5F9; /* very light grey hover surface */
-        --md3-secondary: #475569; /* slate */
-        --md3-on-secondary: #FFFFFF;
-        --md3-secondary-container: #E2E8F0;
-        --md3-on-secondary-container: #0F172A;
-        --md3-surface: #F8FAFC; /* light grey surface */
-        --md3-on-surface: #1C1B1F;
-        --md3-surface-variant: #E2E8F0; /* neutral grey variant */
-        --md3-outline: #CBD5E1; /* neutral outline */
-        --md3-shadow-1: 0 1px 2px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.06);
-        --md3-shadow-2: 0 2px 6px rgba(0,0,0,0.10), 0 6px 12px rgba(0,0,0,0.08);
+        /* ============================================
+           MATERIAL DESIGN 3 - Color System
+           Based on M3 Tonal Palette
+           ============================================ */
+        
+        /* Primary */
+        --md3-primary: #65558F;              /* P-40 */
+        --md3-on-primary: #FFFFFF;           /* P-100 */
+        --md3-primary-container: #E9DDFF;    /* P-90 */
+        --md3-on-primary-container: #21005E; /* P-10 */
+        
+        /* Secondary */
+        --md3-secondary: #625B71;            /* S-40 */
+        --md3-on-secondary: #FFFFFF;         /* S-100 */
+        --md3-secondary-container: #E8DEF8;  /* S-90 */
+        --md3-on-secondary-container: #1E192B; /* S-10 */
+        
+        /* Tertiary */
+        --md3-tertiary: #7E5260;             /* T-40 */
+        --md3-on-tertiary: #FFFFFF;          /* T-100 */
+        --md3-tertiary-container: #FFD9E3;   /* T-90 */
+        --md3-on-tertiary-container: #31101D; /* T-10 */
+        
+        /* Error */
+        --md3-error: #BA1A1A;                /* E-40 */
+        --md3-on-error: #FFFFFF;             /* E-100 */
+        --md3-error-container: #FFDAD6;      /* E-90 */
+        --md3-on-error-container: #410002;   /* E-10 */
+        
+        /* Surface - Light Grey Theme */
+        --md3-surface-dim: #E0E0E0;          /* Light grey dim */
+        --md3-surface: #F5F5F5;              /* Light grey background */
+        --md3-surface-bright: #FAFAFA;       /* Brighter grey */
+        --md3-surface-container-lowest: #FFFFFF;  /* White */
+        --md3-surface-container-low: #F8F8F8;     /* Very light grey */
+        --md3-surface-container: #F0F0F0;         /* Light grey */
+        --md3-surface-container-high: #E8E8E8;    /* Medium light grey */
+        --md3-surface-container-highest: #E0E0E0; /* Grey */
+        
+        /* On Surface */
+        --md3-on-surface: #1D1B20;           /* N-10 */
+        --md3-on-surface-variant: #49454E;   /* NV-30 */
+        --md3-outline: #7A757F;              /* NV-50 */
+        --md3-outline-variant: #CAC4CF;      /* NV-80 */
+        
+        /* Inverse */
+        --md3-inverse-surface: #322F35;      /* N-20 */
+        --md3-inverse-on-surface: #F5EFF7;   /* N-95 */
+        --md3-inverse-primary: #CFBCFF;      /* P-80 */
+        
+        /* Additional */
+        --md3-scrim: #000000;                /* N-0 */
+        --md3-shadow: #000000;               /* N-0 */
+        
+        /* State layers */
+        --md3-state-hover: 0.08;
+        --md3-state-focus: 0.12;
+        --md3-state-pressed: 0.12;
+        --md3-state-dragged: 0.16;
+        
+        /* Elevation (tonal) */
+        --md3-elevation-1: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
+        --md3-elevation-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+        --md3-elevation-3: 0 4px 8px 3px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.3);
+        --md3-elevation-4: 0 6px 10px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.3);
+        --md3-elevation-5: 0 8px 12px 6px rgba(0,0,0,0.15), 0 4px 4px rgba(0,0,0,0.3);
+        
+        /* Shape */
+        --md3-shape-none: 0px;
+        --md3-shape-extra-small: 4px;
+        --md3-shape-small: 8px;
+        --md3-shape-medium: 12px;
+        --md3-shape-large: 16px;
+        --md3-shape-extra-large: 28px;
+        --md3-shape-full: 9999px;
     }
 
+    /* Base Styles */
     html, body, .stApp {
-        font-family: Inter, Segoe UI, system-ui, -apple-system, sans-serif;
-        color: var(--brand-slate-700);
-        background-color: var(--brand-panel);
+        font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+        color: var(--md3-on-surface);
+        background-color: var(--md3-surface);
+        -webkit-font-smoothing: antialiased;
     }
-    /* Main container styling */
+    
     .main {
-        padding: 1rem 2rem;
-        background-color: var(--brand-panel);
+        padding: 1.5rem 2rem;
+        background-color: var(--md3-surface);
     }
 
-    /* Hide the default Streamlit sidebar/navigation */
-    section[data-testid="stSidebar"] {
-        display: none !important;
-    }
+    /* Hide sidebar */
+    section[data-testid="stSidebar"],
     div[data-testid="collapsedControl"] {
         display: none !important;
     }
-    /* Keep content full width when sidebar is hidden */
+    
     .block-container {
-        padding-left: 1rem;
-        padding-right: 1rem;
+        padding: 1rem 1.5rem;
+        max-width: 100%;
     }
     
-    /* Typography improvements */
+    /* Typography - M3 Type Scale */
     h1 {
-        color: var(--brand-navy);
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        margin-bottom: 0.5rem;
+        color: var(--md3-on-surface);
+        font-weight: 400;
+        font-size: 2.25rem;
+        line-height: 2.75rem;
+        letter-spacing: 0;
     }
     
     h2 {
-        color: var(--brand-slate-700);
-        font-weight: 600;
-        margin-top: 1.5rem;
-        margin-bottom: 1rem;
+        color: var(--md3-on-surface);
+        font-weight: 400;
+        font-size: 1.75rem;
+        line-height: 2.25rem;
+        letter-spacing: 0;
     }
     
     h3 {
-        color: var(--brand-slate-500);
-        font-weight: 600;
-        margin-top: 1rem;
-    }
-    
-    /* Metric cards */
-    .stMetric {
-        background-color: var(--md3-surface);
         color: var(--md3-on-surface);
-        padding: 1rem;
-        border-radius: 12px;
-        box-shadow: var(--md3-shadow-1);
-        border: 1px solid var(--md3-surface-variant);
-        text-align: center;
-        min-height: 88px;
+        font-weight: 500;
+        font-size: 1.5rem;
+        line-height: 2rem;
+        letter-spacing: 0;
     }
     
-    /* Badges styling */
-    .available-badge {
-        background-color: var(--md3-primary-container);
-        color: var(--md3-on-primary-container);
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        border: 1px solid var(--md3-surface-variant);
+    p, .stMarkdown {
+        color: var(--md3-on-surface);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        letter-spacing: 0.25px;
+    }
+    
+    /* M3 Filled Button */
+    .stButton > button {
+        font-family: 'Roboto', sans-serif;
+        font-weight: 500;
+        font-size: 0.875rem;
+        letter-spacing: 0.1px;
+        padding: 0 24px;
+        height: 40px;
+        min-width: 48px;
+        border-radius: var(--md3-shape-full);
+        border: none;
+        background-color: var(--md3-primary);
+        color: #FFFFFF !important;
         box-shadow: none;
+        transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+        cursor: pointer;
+    }
+    
+    .stButton > button:hover {
+        background-color: color-mix(in srgb, var(--md3-primary), var(--md3-on-primary) 8%);
+        box-shadow: var(--md3-elevation-1);
+    }
+    
+    .stButton > button:focus-visible {
+        outline: none;
+        background-color: color-mix(in srgb, var(--md3-primary), var(--md3-on-primary) 12%);
+    }
+    
+    .stButton > button:active {
+        background-color: color-mix(in srgb, var(--md3-primary), var(--md3-on-primary) 12%);
+        box-shadow: none;
+    }
+    
+    /* Primary type button same style */
+    .stButton > button[kind="primary"] {
+        background-color: var(--md3-primary);
+        color: var(--md3-on-primary);
+    }
+    
+    .stButton > button[kind="primary"]:hover {
+        background-color: color-mix(in srgb, var(--md3-primary), var(--md3-on-primary) 8%);
+    }
+    
+    /* M3 Cards */
+    .data-card, .stMetric {
+        background-color: var(--md3-surface-container-low);
+        color: var(--md3-on-surface);
+        border-radius: var(--md3-shape-medium);
+        padding: 1rem 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: none;
+        border: none;
+        transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+    }
+    
+    .data-card:hover, .stMetric:hover {
+        background-color: var(--md3-surface-container);
+    }
+    
+    /* M3 Chips/Badges */
+    .available-badge {
+        background-color: var(--md3-secondary-container);
+        color: var(--md3-on-secondary-container);
+        padding: 6px 16px;
+        border-radius: var(--md3-shape-small);
+        font-size: 0.875rem;
+        font-weight: 500;
+        letter-spacing: 0.1px;
+        border: none;
     }
     
     .missing-badge {
-        background-color: #FEE2E2; /* error container tone */
-        color: #7F1D1D; /* on error container */
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        border: 1px solid #FCA5A5;
-        box-shadow: none;
+        background-color: var(--md3-error-container);
+        color: var(--md3-on-error-container);
+        padding: 6px 16px;
+        border-radius: var(--md3-shape-small);
+        font-size: 0.875rem;
+        font-weight: 500;
+        letter-spacing: 0.1px;
+        border: none;
     }
     
     .medium-badge {
-        background-color: #FFF4E5; /* warning container tone */
-        color: #7C2D12; /* on warning container */
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        border: 1px solid #FED7AA;
-        box-shadow: none;
+        background-color: var(--md3-tertiary-container);
+        color: var(--md3-on-tertiary-container);
+        padding: 6px 16px;
+        border-radius: var(--md3-shape-small);
+        font-size: 0.875rem;
+        font-weight: 500;
+        letter-spacing: 0.1px;
+        border: none;
     }
     
     .high-badge {
-        background-color: #FEE2E2;
-        color: #7F1D1D;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        border: 1px solid #FCA5A5;
-        box-shadow: none;
+        background-color: var(--md3-error-container);
+        color: var(--md3-on-error-container);
+        padding: 6px 16px;
+        border-radius: var(--md3-shape-small);
+        font-size: 0.875rem;
+        font-weight: 500;
+        letter-spacing: 0.1px;
+        border: none;
     }
     
-    /* Card containers */
-    .data-card {
-        background-color: var(--md3-surface);
+    /* M3 Expander */
+    div[data-testid="stExpander"] {
+        background-color: var(--md3-surface-container-lowest);
+        border: 1px solid var(--md3-outline-variant);
+        border-radius: var(--md3-shape-medium);
+        overflow: hidden;
+        margin-bottom: 0.75rem;
+    }
+    
+    .streamlit-expanderHeader {
+        background-color: transparent;
+        font-weight: 500;
+        font-size: 0.875rem;
+        letter-spacing: 0.1px;
+        padding: 16px;
         color: var(--md3-on-surface);
-        border-radius: 12px;
-        padding: 1rem;
-        margin-bottom: 0.85rem;
-        box-shadow: var(--md3-shadow-1);
-        border: 1px solid var(--md3-surface-variant);
-        transition: box-shadow 0.2s ease, transform 0.2s ease;
-    }
-    .data-card:hover {
-        box-shadow: var(--md3-shadow-2);
-        transform: translateY(-1px);
     }
     
-    /* Restore general checkbox styling (non-RE areas) */
-    .stCheckbox {
-        padding: 0.25rem 0;
-        margin: 0.25rem 0;
+    .streamlit-expanderHeader:hover {
+        background-color: rgba(29, 27, 32, 0.08);
     }
     
+    /* M3 Checkbox */
     div[data-testid="stCheckbox"] {
-        transition: all 0.2s ease;
-        border-radius: 6px;
+        padding: 8px;
+        border-radius: var(--md3-shape-extra-small);
+        transition: background-color 0.2s ease;
     }
     
     div[data-testid="stCheckbox"]:hover {
-        background: rgba(37, 99, 235, 0.06);
-        transform: translateX(4px);
+        background-color: rgba(29, 27, 32, 0.08);
     }
     
-    /* Keep labels from wrapping (applies everywhere, harmless) */
-    div[data-baseweb="checkbox"] > label {
-        white-space: nowrap !important;
-        word-break: normal !important;
-        overflow: visible !important;
+    /* M3 Radio */
+    div[data-testid="stRadio"] label {
+        font-size: 0.875rem;
+        color: var(--md3-on-surface);
+        padding: 8px 16px;
+        border-radius: var(--md3-shape-extra-small);
     }
-        border: none;
-        background-color: var(--md3-primary);
-        color: var(--md3-on-primary);
-        box-shadow: var(--md3-shadow-1);
+    
+    div[data-testid="stRadio"] label:hover {
+        background-color: rgba(29, 27, 32, 0.08);
     }
-    .stButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: var(--md3-shadow-2);
-        background-color: var(--md3-hover-surface);
-        color: var(--md3-primary);
+    
+    /* M3 Select/Dropdown - Modern rounded style */
+    div[data-baseweb="select"] > div {
+        border-color: var(--md3-outline);
+        border-radius: var(--md3-shape-large) !important;
+        background-color: var(--md3-surface-container-lowest);
+    }
+    
+    div[data-baseweb="select"] > div:hover {
+        border-color: var(--md3-on-surface);
+    }
+    
+    div[data-baseweb="select"] > div:focus-within {
+        border-color: var(--md3-primary);
+        border-width: 2px;
+    }
+    
+    /* Dropdown menu/popover rounded corners */
+    div[data-baseweb="popover"] > div {
+        border-radius: var(--md3-shape-large) !important;
+        overflow: hidden;
+        box-shadow: var(--md3-elevation-2);
+    }
+    
+    div[data-baseweb="menu"] {
+        border-radius: var(--md3-shape-large) !important;
+    }
+    
+    div[data-baseweb="menu"] li {
+        border-radius: var(--md3-shape-small);
+        margin: 4px 8px;
+    }
+    
+    /* M3 Text Input */
+    .stTextInput > div > div > input {
+        border-radius: var(--md3-shape-extra-small);
         border: 1px solid var(--md3-outline);
-    }
-    .stButton > button:focus-visible {
-        outline: 3px solid var(--md3-primary-container);
-        outline-offset: 2px;
-    }
-    .stButton > button:active {
-        background-color: var(--md3-primary-pressed);
+        background-color: var(--md3-surface-container-highest);
+        padding: 16px;
+        font-size: 1rem;
+        color: var(--md3-on-surface);
     }
     
-    /* Expander styling */
-    .streamlit-expanderHeader {
-        background-color: var(--brand-surface);
-        border-radius: 8px;
-        border: 1px solid var(--brand-border);
-        font-weight: 500;
+    .stTextInput > div > div > input:hover {
+        border-color: var(--md3-on-surface);
     }
     
-    /* Progress bar */
-    .stProgress > div > div > div {
-        background: linear-gradient(90deg, var(--brand-accent), var(--brand-primary));
-        border-radius: 4px;
+    .stTextInput > div > div > input:focus {
+        border-color: var(--md3-primary);
+        border-width: 2px;
+        outline: none;
     }
     
-    /* Tabs styling */
+    /* M3 Tabs */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: transparent;
+        gap: 0;
+        background-color: var(--md3-surface);
+        border-bottom: none;
     }
     
     .stTabs [data-baseweb="tab"] {
-        background-color: var(--brand-surface);
-        border-radius: 8px 8px 0 0;
-        padding: 12px 24px;
+        background-color: transparent;
+        padding: 16px 24px;
         font-weight: 500;
-        border: 1px solid var(--brand-border);
+        font-size: 0.875rem;
+        letter-spacing: 0.1px;
+        color: var(--md3-on-surface-variant);
+        border: none;
+        border-bottom: 2px solid transparent;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: rgba(29, 27, 32, 0.08);
+        color: var(--md3-on-surface);
     }
     
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(180deg, var(--brand-accent), var(--brand-primary));
-        color: #ffffff;
-        border-color: var(--brand-primary);
+        color: var(--md3-primary);
+        border-bottom: 2px solid var(--md3-primary);
+        background-color: transparent;
     }
     
-    /* Info box styling */
-    .stAlert {
-        background-color: var(--brand-surface);
-        border-left: 4px solid var(--brand-accent);
-        border-radius: 8px;
+    /* M3 Multiselect Tags/Chips - Purple theme */
+    div[data-baseweb="tag"],
+    span[data-baseweb="tag"],
+    [data-baseweb="tag"] {
+        background-color: #65558F !important;
+        color: #FFFFFF !important;
+        border-radius: 8px !important;
+        border: none !important;
+    }
+    
+    div[data-baseweb="tag"] span,
+    span[data-baseweb="tag"] span,
+    [data-baseweb="tag"] span {
+        color: #FFFFFF !important;
+    }
+    
+    div[data-baseweb="tag"] svg,
+    span[data-baseweb="tag"] svg,
+    [data-baseweb="tag"] svg,
+    [data-baseweb="tag"] path {
+        fill: #FFFFFF !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* Override any inline styles on multiselect tags */
+    .stMultiSelect [data-baseweb="tag"] {
+        background-color: #65558F !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* M3 Alerts/Snackbar style - Light purple for info */
+    .stAlert, div[data-testid="stAlert"] {
+        background-color: #E9DDFF !important;
+        color: #21005E !important;
+        border-radius: 12px;
+        border: none;
         padding: 1rem;
     }
     
-    /* DataFrame styling */
-    .dataframe {
-        border: none !important;
-        border-radius: 8px;
-        overflow: hidden;
+    /* Success */
+    .element-container:has(.stSuccess) .stAlert {
+        background-color: #E8DEF8 !important;
+        color: #1E192B !important;
     }
     
-    /* Checkbox styling */
-    .stCheckbox {
-        padding: 0.25rem 0;
+    /* Warning */
+    .element-container:has(.stWarning) .stAlert {
+        background-color: #FFD9E3 !important;
+        color: #31101D !important;
     }
     
-    /* Section dividers */
+    /* Error */
+    .element-container:has(.stError) .stAlert {
+        background-color: #FFDAD6 !important;
+        color: #410002 !important;
+    }
+    
+    /* Info - Light purple container */
+    .element-container:has(.stInfo) .stAlert,
+    div[data-testid="stAlert"],
+    [data-baseweb="notification"] {
+        background-color: #E9DDFF !important;
+        color: #21005E !important;
+    }
+    
+    /* Divider */
     hr {
-        margin: 2rem 0;
+        margin: 1rem 0;
         border: none;
-        border-top: 2px solid var(--brand-border);
+        border-top: 1px solid var(--md3-outline-variant);
     }
-        /* Playful step cards - Material 3 light */
-        .step-card {
-            background: none !important;
-            background-color: var(--md3-surface);
-            padding: 1rem; border-radius: 16px; text-align: center;
-            box-shadow: var(--md3-shadow-1); margin-bottom: 1rem;
-            transform: translateY(0); transition: transform 0.2s ease, box-shadow 0.2s ease;
-            min-height: 140px; display: flex; flex-direction: column; justify-content: center;
-            border: 1px solid var(--md3-surface-variant);
-        }
-        .step-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--md3-shadow-2);
-        }
-        .step-index {
-            display: inline-block;
-            color: var(--md3-primary); font-size: 1.1rem; font-weight: 700;
-            margin-bottom: 0.35rem;
-        }
-        .step-title {
-            color: var(--md3-on-surface); font-size: 1rem; font-weight: 700; letter-spacing: 0.02em;
-        }
-        .step-desc {
-            color: rgba(28,27,31,0.7); font-size: 0.85rem; margin-top: 0.35rem;
-        }
-        .step-arrow { 
-            display: flex; align-items: center; justify-content: center; 
-            height: 140px; color: #8E8DA1; font-size: 1.4rem; 
-        }
+    
+    /* M3 Step Cards */
+    .step-card {
+        background-color: var(--md3-surface-container-low) !important;
+        padding: 1.5rem;
+        border-radius: var(--md3-shape-medium);
+        text-align: center;
+        margin-bottom: 1rem;
+        min-height: 140px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        border: none;
+        transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+    }
+    
+    .step-card:hover {
+        background-color: var(--md3-surface-container) !important;
+    }
+    
+    .step-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background-color: var(--md3-primary);
+        color: var(--md3-on-primary);
+        font-size: 1rem;
+        font-weight: 500;
+        border-radius: var(--md3-shape-full);
+        margin: 0 auto 0.75rem auto;
+    }
+    
+    .step-title {
+        color: var(--md3-on-surface);
+        font-size: 1rem;
+        font-weight: 500;
+        letter-spacing: 0.15px;
+    }
+    
+    .step-desc {
+        color: var(--md3-on-surface-variant);
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+        line-height: 1.25rem;
+    }
+    
+    .step-arrow { 
+        display: flex;
+        align-items: center;
+        justify-content: center; 
+        height: 140px;
+        color: var(--md3-outline);
+        font-size: 1.5rem;
+    }
+    
+    /* M3 Metric */
+    .stMetric {
+        background-color: var(--md3-surface-container-low);
+        padding: 1rem 1.25rem;
+        border-radius: var(--md3-shape-medium);
+        text-align: center;
+    }
+    
+    .stMetric label {
+        color: var(--md3-on-surface-variant);
+        font-size: 0.75rem;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+    }
+    
+    .stMetric [data-testid="stMetricValue"] {
+        color: var(--md3-primary);
+        font-size: 2.25rem;
+        font-weight: 400;
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: var(--md3-surface-container);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: var(--md3-outline);
+        border-radius: var(--md3-shape-full);
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--md3-on-surface-variant);
+    }
+    
+    /* M3 Progress */
+    .stProgress > div > div > div {
+        background-color: var(--md3-primary);
+        border-radius: var(--md3-shape-full);
+    }
+    
+    .stProgress > div > div {
+        background-color: var(--md3-primary-container);
+        border-radius: var(--md3-shape-full);
+    }
+    
+    /* Caption */
+    .stCaption, small {
+        color: var(--md3-on-surface-variant);
+        font-size: 0.75rem;
+        letter-spacing: 0.4px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 if st.session_state.wizard_step == 0:
     st.title("Project Planner")
-    st.markdown("<p style='font-size: 1.1rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 1rem; color: var(--md3-on-surface-variant, #49454E); margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
     # Overview diagram upload removed per request
 
     # Interactive Process Diagram (Playful & Interactive)
@@ -2079,7 +2336,7 @@ if st.session_state.wizard_step == 1:
         )
         
         if st.session_state.analysis_type:
-            st.info(f"📊 {len(st.session_state.analysis_type)} analysis type(s) selected")
+            st.info(f"{len(st.session_state.analysis_type)} analysis type(s) selected")
 
         # When Energy & Carbon Performance is chosen, capture system focus
         if "Energy & Carbon Performance" in analysis_type:
