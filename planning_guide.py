@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -14,6 +15,84 @@ st.set_page_config(page_title="Project Planner", layout="wide")
 # Wizard state for stepped navigation
 if "wizard_step" not in st.session_state:
     st.session_state.wizard_step = 0  # 0 = intro, 1..6 = steps
+
+# ==================== PAGE TRANSITION SCRIPT (Always loaded) ====================
+# This JavaScript handles smooth fade-out transitions when navigating between steps
+components.html("""
+<style>
+    /* Inject transition styles into parent document */
+    .page-transitioning .intro-container,
+    .page-transitioning .step-container {
+        animation: smoothFadeOut 0.5s ease-out forwards !important;
+    }
+    
+    @keyframes smoothFadeOut {
+        0% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-10px); }
+    }
+</style>
+<script>
+    (function() {
+        const doc = window.parent.document;
+        
+        // Inject styles into parent document
+        if (!doc.getElementById('page-transition-styles')) {
+            const style = doc.createElement('style');
+            style.id = 'page-transition-styles';
+            style.textContent = `
+                .page-transitioning .intro-container,
+                .page-transitioning .step-container {
+                    animation: smoothFadeOut 0.5s ease-out forwards !important;
+                }
+                @keyframes smoothFadeOut {
+                    0% { opacity: 1; transform: translateY(0); }
+                    100% { opacity: 0; transform: translateY(-10px); }
+                }
+            `;
+            doc.head.appendChild(style);
+        }
+        
+        function addTransitionEffect() {
+            const buttons = doc.querySelectorAll('button');
+            buttons.forEach(btn => {
+                if (btn.dataset.transitionHandled) return;
+                btn.dataset.transitionHandled = 'true';
+                
+                const btnText = (btn.innerText || '').toLowerCase().trim();
+                const isNavButton = ['start', 'next', 'back', 'restart'].some(nav => btnText.includes(nav));
+                
+                if (isNavButton) {
+                    btn.addEventListener('mousedown', function(e) {
+                        // Add transitioning class to body for immediate visual feedback
+                        doc.body.classList.add('page-transitioning');
+                        
+                        // Also directly animate the containers
+                        const containers = doc.querySelectorAll('.intro-container, .step-container');
+                        containers.forEach(c => {
+                            c.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
+                            c.style.opacity = '0';
+                            c.style.transform = 'translateY(-8px)';
+                        });
+                    });
+                }
+            });
+        }
+        
+        // Run multiple times to catch dynamically added buttons
+        addTransitionEffect();
+        setTimeout(addTransitionEffect, 100);
+        setTimeout(addTransitionEffect, 300);
+        setTimeout(addTransitionEffect, 600);
+        setTimeout(addTransitionEffect, 1000);
+        
+        // Observe for new buttons
+        const observer = new MutationObserver(() => setTimeout(addTransitionEffect, 50));
+        if (doc.body) {
+            observer.observe(doc.body, { childList: true, subtree: true });
+        }
+    })();
+</script>
+""", height=0)
 
 # ==================== CONFIGURATION & RULES ENGINE ====================
 
@@ -1566,10 +1645,128 @@ st.markdown("""
         -webkit-font-smoothing: antialiased;
     }
     
+    /* Hide Streamlit header/toolbar and fix white strip at top */
+    header[data-testid="stHeader"],
+    .stApp > header,
+    div[data-testid="stHeader"] {
+        background-color: var(--md3-surface) !important;
+        border-bottom: none !important;
+    }
+    
+    /* Remove any top margins/padding that could show white */
+    .stApp > div:first-child {
+        background-color: var(--md3-surface) !important;
+    }
+    
+    .stMainBlockContainer {
+        padding-top: 1rem !important;
+    }
+    
     .main {
         padding: 1.5rem 2rem;
         background-color: var(--md3-surface);
     }
+    
+    /* ========== Page Transition Animations ========== */
+    @keyframes fadeIn {
+        0% {
+            opacity: 0;
+            transform: translateY(18px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes fadeOut {
+        0% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        100% {
+            opacity: 0;
+            transform: translateY(-15px);
+        }
+    }
+    
+    @keyframes slideInFromRight {
+        from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    @keyframes scaleIn {
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+    
+    .page-transition-enter {
+        animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    
+    .page-transition-enter-delayed {
+        opacity: 0;
+        animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+    }
+    
+    .page-transition-exit {
+        animation: fadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    
+    .stagger-1 { animation-delay: 0.05s; }
+    .stagger-2 { animation-delay: 0.1s; }
+    .stagger-3 { animation-delay: 0.15s; }
+    .stagger-4 { animation-delay: 0.2s; }
+    .stagger-5 { animation-delay: 0.25s; }
+    .stagger-6 { animation-delay: 0.3s; }
+    
+    .intro-container {
+        animation: fadeIn 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+        animation-delay: 0.1s;
+        opacity: 0;
+    }
+    
+    .intro-container.exiting {
+        animation: fadeOut 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    }
+    
+    .step-container {
+        animation: fadeIn 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+        animation-delay: 0.15s;
+        opacity: 0;
+    }
+    
+    .step-container.exiting {
+        animation: fadeOut 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    }
+    
+    /* Ensure smooth transitions between pages */
+    .stApp > div > div > div > div {
+        transition: opacity 0.3s ease-out;
+    }
+    
+    .card-animate {
+        opacity: 0;
+        animation: scaleIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    
+    .slide-in-right {
+        opacity: 0;
+        animation: slideInFromRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    /* ========== End Page Transitions ========== */
 
     /* Hide sidebar */
     section[data-testid="stSidebar"],
@@ -2033,6 +2230,9 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 if st.session_state.wizard_step == 0:
+    # Animated intro container
+    st.markdown("<div class='intro-container'>", unsafe_allow_html=True)
+    
     st.title("Project Planner")
     st.markdown("<p style='font-size: 1rem; color: var(--md3-on-surface-variant, #49454E); margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
     # Overview diagram upload removed per request
@@ -2042,68 +2242,76 @@ if st.session_state.wizard_step == 0:
 
     with diagram_cols[0]:
         st.markdown("""
-        <div class='step-card' style='--grad-start:#1e3a8a; --grad-end:#0f172a;'>
+        <div class='step-card card-animate stagger-1' style='--grad-start:#1e3a8a; --grad-end:#0f172a;'>
             <div class='step-index'>1</div>
             <div class='step-title'>Define Scope & Context</div>
             <div class='step-desc'>Choose analysis, scale, and context</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[1]:
-        st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow card-animate stagger-1'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[2]:
         st.markdown("""
-        <div class='step-card' style='--grad-start:#0f766e; --grad-end:#115e59;'>
+        <div class='step-card card-animate stagger-2' style='--grad-start:#0f766e; --grad-end:#115e59;'>
             <div class='step-index'>2</div>
             <div class='step-title'>Review Data</div>
             <div class='step-desc'>Mark availability and select proxies</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[3]:
-        st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow card-animate stagger-2'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[4]:
         st.markdown("""
-        <div class='step-card' style='--grad-start:#475569; --grad-end:#334155;'>
+        <div class='step-card card-animate stagger-3' style='--grad-start:#475569; --grad-end:#334155;'>
             <div class='step-index'>3</div>
             <div class='step-title'>Confidence & Recommendations</div>
             <div class='step-desc'>Confidence and recommendations</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[5]:
-        st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow card-animate stagger-3'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[6]:
         st.markdown("""
-        <div class='step-card' style='--grad-start:#2563eb; --grad-end:#1e40af;'>
+        <div class='step-card card-animate stagger-4' style='--grad-start:#2563eb; --grad-end:#1e40af;'>
             <div class='step-index'>4</div>
             <div class='step-title'>Expected Results</div>
             <div class='step-desc'>Review expected outcomes</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[7]:
-        st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow card-animate stagger-4'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[8]:
         st.markdown("""
-        <div class='step-card' style='--grad-start:#6b7280; --grad-end:#4b5563;'>
+        <div class='step-card card-animate stagger-5' style='--grad-start:#6b7280; --grad-end:#4b5563;'>
             <div class='step-index'>5</div>
             <div class='step-title'>Project Timeline</div>
             <div class='step-desc'>Plan phases and tasks</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[9]:
-        st.markdown("<div class='step-arrow'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow card-animate stagger-5'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[10]:
         st.markdown("""
-        <div class='step-card' style='--grad-start:#4b5563; --grad-end:#111827;'>
+        <div class='step-card card-animate stagger-6' style='--grad-start:#4b5563; --grad-end:#111827;'>
             <div class='step-index'>6</div>
             <div class='step-title'>Cost Estimation</div>
             <div class='step-desc'>Budget, CAPEX, and OPEX</div>
         </div>
         """, unsafe_allow_html=True)
-    st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
+    
+    st.markdown("<hr class='card-animate stagger-6' style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
+    
     center_cols = st.columns([1,1,1])
     with center_cols[1]:
-        if st.button("Start", type="primary", use_container_width=True):
+        st.markdown("<div class='card-animate stagger-6'>", unsafe_allow_html=True)
+        if st.button("Start", type="primary", use_container_width=True, key="start_btn"):
+            st.session_state.page_transitioning = True
             st.session_state.wizard_step = 1
             st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Close intro container
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # Initialize session state
 if "data_inputs" not in st.session_state:
@@ -2317,7 +2525,9 @@ col1, col2, col3 = st.columns([1, 1.2, 1])
 # ==================== COLUMN 1: Analysis Setup ====================
 if st.session_state.wizard_step == 1:
     with col1:
-        st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 1: Define Scope & Context</h2>", unsafe_allow_html=True)
+        # Animated step container
+        st.markdown("<div class='step-container'>", unsafe_allow_html=True)
+        st.markdown("<h2 class='slide-in-right' style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 1: Define Scope & Context</h2>", unsafe_allow_html=True)
 
         # Analysis Type
         st.subheader("Analysis Type")
@@ -2381,15 +2591,82 @@ if st.session_state.wizard_step == 1:
         else:
             st.session_state.renewable_types = []
 
+        if "Urban Design Support" in analysis_type:
+            st.markdown("<span style='font-weight:600;'>Urban design focus (select one or more)</span>", unsafe_allow_html=True)
+            urban_design_options = [
+                "Accessibility",
+                "Amenities Demand",
+                "Ecosystem & Habitat",
+                "Noise",
+                "Parking Studies",
+                "Traffic & Congestion",
+                "Urban Heat Island",
+            ]
+            cols = st.columns(2)
+            selected_ud = []
+            for i, opt in enumerate(urban_design_options):
+                opt_key = f"urban_design_{opt.replace(' ', '_').replace('&', 'and').lower()}"
+                with cols[i % 2]:
+                    if st.checkbox(opt, value=opt in st.session_state.get("urban_design_types", []), key=opt_key):
+                        selected_ud.append(opt)
+            st.session_state.urban_design_types = selected_ud
+        else:
+            st.session_state.urban_design_types = []
+
+        if "Climate Resilience" in analysis_type:
+            st.markdown("<span style='font-weight:600;'>Climate resilience focus (select one or more)</span>", unsafe_allow_html=True)
+            climate_options = [
+                "Climate Projections",
+                "Cooling Demand Impact",
+                "Extreme Heat Analysis",
+                "Flood Risk Assessment",
+                "Wind & Ventilation Analysis",
+            ]
+            cols = st.columns(2)
+            selected_cr = []
+            for i, opt in enumerate(climate_options):
+                opt_key = f"climate_{opt.replace(' ', '_').replace('&', 'and').lower()}"
+                with cols[i % 2]:
+                    if st.checkbox(opt, value=opt in st.session_state.get("climate_resilience_types", []), key=opt_key):
+                        selected_cr.append(opt)
+            st.session_state.climate_resilience_types = selected_cr
+            
+            # Show note about Flood Risk Assessment scale restriction
+            if "Flood Risk Assessment" in selected_cr:
+                st.caption("ℹ️ Flood Risk Assessment is only available at Neighborhood or City scale")
+        else:
+            st.session_state.climate_resilience_types = []
+
         # Define Scale
         st.subheader("Define Your Scale")
         st.markdown("<span style='font-weight:600;'>Project scale <span style='color:#dc2626'>*</span></span>", unsafe_allow_html=True)
+        
+        # Determine available scale options based on analysis type selection
+        # Urban Design Support alone only allows Neighborhood or City
+        # Climate Resilience with only Flood Risk Assessment also restricts to Neighborhood/City
+        climate_types = st.session_state.get("climate_resilience_types", [])
+        urban_design_only = analysis_type == ["Urban Design Support"]
+        flood_risk_only = (analysis_type == ["Climate Resilience"] and climate_types == ["Flood Risk Assessment"])
+        
+        if urban_design_only or flood_risk_only:
+            scale_options = ["Neighborhood", "City"]
+            if urban_design_only:
+                scale_help = "Urban Design Support is only available at Neighborhood or City scale"
+            else:
+                scale_help = "Flood Risk Assessment is only available at Neighborhood or City scale"
+            # Reset scale if Building was previously selected
+            if st.session_state.get("project_scale") == "Building":
+                st.session_state.project_scale = None
+        else:
+            scale_options = ["Building", "Neighborhood", "City"]
+            scale_help = "Select the geographic scope of your analysis"
+        
         project_scale = st.selectbox(
             "Project scale:",
-            options=["Building", "Neighborhood", "City"],
+            options=scale_options,
             index=None,
             placeholder="Choose option",
-            help="Select the geographic scope of your analysis",
+            help=scale_help,
             key="project_scale"
         )
     
@@ -2474,6 +2751,9 @@ if st.session_state.wizard_step == 1:
                 st.rerun()
     with nav1_col3:
         st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 1/6</div>", unsafe_allow_html=True)
+    
+    # Close step container
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ==================== RULES ENGINE: Calculate Everything Dynamically ====================
 
@@ -2540,7 +2820,9 @@ if st.session_state.wizard_step == 2:
 # ==================== Step 4: Expected Results ====================
 
 if st.session_state.wizard_step == 4:
-    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 4: Expected Results</h2>", unsafe_allow_html=True)
+    # Animated step container
+    st.markdown("<div class='step-container'>", unsafe_allow_html=True)
+    st.markdown("<h2 class='slide-in-right' style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 4: Expected Results</h2>", unsafe_allow_html=True)
     st.subheader("What you can expect")
 
     exp_col1, exp_col2 = st.columns(2)
@@ -2569,6 +2851,8 @@ if st.session_state.wizard_step == 4:
             st.rerun()
     with nav4_col3:
         st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 4/6</div>", unsafe_allow_html=True)
+    # Close step container
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ==================== Step 5 & 6: Timeline and Cost (Full Width) ====================
 
@@ -2586,7 +2870,9 @@ if "use_task_plan" not in st.session_state:
     st.session_state.use_task_plan = False
 
 if st.session_state.wizard_step == 5:
-    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 5: Project Timeline</h2>", unsafe_allow_html=True)
+    # Animated step container
+    st.markdown("<div class='step-container'>", unsafe_allow_html=True)
+    st.markdown("<h2 class='slide-in-right' style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 5: Project Timeline</h2>", unsafe_allow_html=True)
     st.subheader("Project Timeline")
 
     tcol1, tcol2 = st.columns(2)
@@ -2662,11 +2948,16 @@ if st.session_state.wizard_step == 5:
         fig_timeline.update_yaxes(autorange="reversed")
         apply_brand_plotly_theme(fig_timeline)
         st.plotly_chart(fig_timeline, use_container_width=True)
+    
+    # Close step container
+    st.markdown("</div>", unsafe_allow_html=True)
 
  
 
 if st.session_state.wizard_step == 6:
-    st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 6: Tasks & Cost</h2>", unsafe_allow_html=True)
+    # Animated step container
+    st.markdown("<div class='step-container'>", unsafe_allow_html=True)
+    st.markdown("<h2 class='slide-in-right' style='font-size: 1.8rem; font-weight: 700; margin: 1.5rem 0 1rem;'>Step 6: Tasks & Cost</h2>", unsafe_allow_html=True)
     st.subheader("Task Planner (optional)")
 
     pcols = st.columns([1,1,1,2])
@@ -2833,11 +3124,16 @@ if st.session_state.wizard_step == 6:
     fig_cost = px.pie(breakdown_df, values="Amount", names="Category", title="CAPEX Breakdown")
     apply_brand_plotly_theme(fig_cost)
     st.plotly_chart(fig_cost, use_container_width=True)
+    
+    # Close step container
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ==================== COLUMN 3: Proxy Recommendations & Confidence ====================
 if st.session_state.wizard_step == 3:
     with col3:
-        st.markdown("<h2 style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 3: Confidence & Recommendations</h2>", unsafe_allow_html=True)
+        # Animated step container
+        st.markdown("<div class='step-container'>", unsafe_allow_html=True)
+        st.markdown("<h2 class='slide-in-right' style='font-size: 1.8rem; font-weight: 700; margin-bottom: 1rem;'>Step 3: Confidence & Recommendations</h2>", unsafe_allow_html=True)
     # Quick summary metrics reacting to user configuration (Step 3)
     m3c1, m3c2, m3c3 = st.columns(3)
     # Use task plan totals if enabled and available
@@ -3136,6 +3432,9 @@ if st.session_state.wizard_step == 3:
                 st.rerun()
         with nav3_col3:
             st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 3/6</div>", unsafe_allow_html=True)
+        
+        # Close step container
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # Step 4 & 5 moved above (full-width) for readability
 

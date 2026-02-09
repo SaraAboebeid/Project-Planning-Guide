@@ -516,8 +516,103 @@ DATA_INPUTS = {
     # CLIMATE RESILIENCE
     # ==========================================================================
     "Climate Resilience": {
+        
+        # ----------------------------------------------------------------------
+        # CLIMATE PROJECTIONS
+        # ----------------------------------------------------------------------
+        "Climate Projections": [
+            # TODO: Add Climate Projections data inputs
+        ],
+        
+        # ----------------------------------------------------------------------
+        # COOLING DEMAND IMPACT
+        # ----------------------------------------------------------------------
+        "Cooling Demand Impact": [
+            # TODO: Add Cooling Demand Impact data inputs
+        ],
+        
+        # ----------------------------------------------------------------------
+        # EXTREME HEAT ANALYSIS
+        # ----------------------------------------------------------------------
+        "Extreme Heat Analysis": [
+            # TODO: Add Extreme Heat Analysis data inputs
+        ],
+        
+        # ----------------------------------------------------------------------
+        # FLOOD RISK ASSESSMENT (Neighborhood/City only)
+        # ----------------------------------------------------------------------
+        "Flood Risk Assessment": [
+            # TODO: Add Flood Risk Assessment data inputs
+        ],
+        
+        # ----------------------------------------------------------------------
+        # WIND & VENTILATION ANALYSIS
+        # ----------------------------------------------------------------------
+        "Wind & Ventilation Analysis": [
+            # TODO: Add Wind & Ventilation Analysis data inputs
+        ],
+        
         "default": [
-            # TODO: Add Climate Resilience data inputs
+            # TODO: Add default Climate Resilience data inputs
+        ],
+    },
+    
+    # ==========================================================================
+    # URBAN DESIGN SUPPORT
+    # ==========================================================================
+    "Urban Design Support": {
+        
+        # ----------------------------------------------------------------------
+        # ACCESSIBILITY
+        # ----------------------------------------------------------------------
+        "Accessibility": [
+            # TODO: Add Accessibility data inputs
+        ],
+        
+        # ----------------------------------------------------------------------
+        # AMENITIES DEMAND
+        # ----------------------------------------------------------------------
+        "Amenities Demand": [
+            # TODO: Add Amenities Demand data inputs
+        ],
+        
+        # ----------------------------------------------------------------------
+        # ECOSYSTEM & HABITAT
+        # ----------------------------------------------------------------------
+        "Ecosystem & Habitat": [
+            # TODO: Add Ecosystem & Habitat data inputs
+        ],
+        
+        # ----------------------------------------------------------------------
+        # NOISE
+        # ----------------------------------------------------------------------
+        "Noise": [
+            # TODO: Add Noise data inputs
+        ],
+        
+        # ----------------------------------------------------------------------
+        # PARKING STUDIES
+        # ----------------------------------------------------------------------
+        "Parking Studies": [
+            # TODO: Add Parking Studies data inputs
+        ],
+        
+        # ----------------------------------------------------------------------
+        # TRAFFIC & CONGESTION
+        # ----------------------------------------------------------------------
+        "Traffic & Congestion": [
+            # TODO: Add Traffic & Congestion data inputs
+        ],
+        
+        # ----------------------------------------------------------------------
+        # URBAN HEAT ISLAND
+        # ----------------------------------------------------------------------
+        "Urban Heat Island": [
+            # TODO: Add Urban Heat Island data inputs
+        ],
+        
+        "default": [
+            # TODO: Add default Urban Design Support data inputs
         ],
     },
 }
@@ -545,51 +640,55 @@ WHOLE_SYSTEM_COUNTRIES = ["Ireland", "Sweden", "United Kingdom", "Belgium"]
 # Scales that support Whole system interaction
 WHOLE_SYSTEM_SCALES = ["Building", "Neighborhood", "City"]
 
+# Countries that support Urban Design Support data inputs
+URBAN_DESIGN_COUNTRIES = ["Belgium", "Ireland", "Sweden", "United Kingdom"]
 
-def merge_data_inputs_without_duplicates(electricity_inputs: list, heating_cooling_inputs: list) -> list:
+# Scales that support Urban Design Support (NOT Building - only Neighborhood and City)
+URBAN_DESIGN_SCALES = ["Neighborhood", "City"]
+
+# Countries that support Climate Resilience data inputs
+CLIMATE_RESILIENCE_COUNTRIES = ["Belgium", "Ireland", "Sweden", "United Kingdom"]
+
+# Scales that support Climate Resilience (all scales)
+CLIMATE_RESILIENCE_SCALES = ["Building", "Neighborhood", "City"]
+
+# Scales that support Flood Risk Assessment (NOT Building - only Neighborhood and City)
+FLOOD_RISK_SCALES = ["Neighborhood", "City"]
+
+
+def merge_data_inputs_without_duplicates(*input_lists) -> list:
     """
-    Merge Electricity and Heating/Cooling data inputs, removing duplicates.
+    Merge multiple data input lists, removing duplicates.
     
     Items are considered duplicates if they have the same 'key'.
-    When duplicates are found, the Heating/Cooling version is used (as it typically 
-    has more detail for building fabric properties).
+    When duplicates are found, the first occurrence is kept.
     
     Args:
-        electricity_inputs: List of category dicts from Electricity focus
-        heating_cooling_inputs: List of category dicts from Heating/Cooling focus
+        *input_lists: Variable number of lists of category dicts to merge
     
     Returns:
         Merged list of category dicts with no duplicate items
     """
-    # Track all seen keys and their source
-    seen_keys = {}
+    # Track all seen keys
+    seen_keys = set()
     
-    # First pass: collect all items from Heating/Cooling (they take priority for common items)
-    for category in heating_cooling_inputs:
-        for item in category.get("items", []):
-            seen_keys[item["key"]] = True
-    
-    # Build merged result
-    merged = []
+    # Build merged result using a category map
     category_map = {}  # category name -> category dict with items
     
-    # Add all Heating/Cooling categories and items first
-    for category in heating_cooling_inputs:
-        cat_name = category["category"]
-        if cat_name not in category_map:
-            category_map[cat_name] = {"category": cat_name, "items": []}
-        category_map[cat_name]["items"].extend(category.get("items", []))
-    
-    # Add Electricity items, skipping duplicates
-    for category in electricity_inputs:
-        cat_name = category["category"]
-        if cat_name not in category_map:
-            category_map[cat_name] = {"category": cat_name, "items": []}
-        
-        for item in category.get("items", []):
-            if item["key"] not in seen_keys:
-                category_map[cat_name]["items"].append(item)
-                seen_keys[item["key"]] = True
+    # Process each input list in order
+    for inputs in input_lists:
+        if not inputs:
+            continue
+        for category in inputs:
+            cat_name = category.get("category", "Other")
+            if cat_name not in category_map:
+                category_map[cat_name] = {"category": cat_name, "items": []}
+            
+            for item in category.get("items", []):
+                item_key = item.get("key", item.get("label", ""))
+                if item_key not in seen_keys:
+                    category_map[cat_name]["items"].append(item)
+                    seen_keys.add(item_key)
     
     # Convert to list, maintaining a logical order
     # Priority order for categories
@@ -602,9 +701,11 @@ def merge_data_inputs_without_duplicates(electricity_inputs: list, heating_cooli
         "Building Use & Operation",
         "Building Use",
         "Location Context",
+        "Location and Context",
         "Grid System",
     ]
     
+    merged = []
     for cat_name in category_order:
         if cat_name in category_map and category_map[cat_name]["items"]:
             merged.append(category_map[cat_name])
@@ -617,49 +718,19 @@ def merge_data_inputs_without_duplicates(electricity_inputs: list, heating_cooli
     return merged
 
 
-def get_data_inputs(analysis_type: str, focus: str, scale: str = None, context: str = None, renewable_types: list = None) -> list:
+def get_data_inputs_for_single_analysis(analysis_type: str, focus: str, scale: str = None, context: str = None, renewable_types: list = None, urban_design_types: list = None, climate_resilience_types: list = None) -> list:
     """
-    Get the FIXED data inputs list for a given analysis type and focus.
+    Get the data inputs for a SINGLE analysis type.
     
-    This function returns the same list every time for the same inputs.
-    The list does NOT change based on user interactions.
-    
-    For "Whole system interaction" focus with specific scales and contexts,
-    this function combines Electricity and Heating/Cooling inputs without duplicates.
-    
-    For "Renewable Energy & Local Production" with Solar PV selected,
-    this function returns the Solar PV specific data inputs.
-    
-    For "Retrofit & Transformation" with specific scales and contexts,
-    this function returns the retrofit-specific data inputs.
-    
-    Args:
-        analysis_type: The selected analysis type (e.g., "Energy & Carbon Performance")
-        focus: The selected focus (e.g., "Electricity", "Heating/Cooling", "Whole system interaction")
-        scale: The selected scale (e.g., "Building", "Neighborhood", "City")
-        context: The selected context/country (e.g., "Ireland", "Sweden")
-        renewable_types: List of selected renewable energy types (e.g., ["Solar PV", "Battery Storage"])
-    
-    Returns:
-        List of category dictionaries with items, or empty list if not configured
+    This is a helper function used by get_data_inputs to handle one analysis type at a time.
     """
-    if not analysis_type:
-        return []
-    
-    # Handle list input (from multiselect)
-    if isinstance(analysis_type, list):
-        if not analysis_type:
-            return []
-        analysis_type = analysis_type[0]
-    
-    if analysis_type not in DATA_INPUTS:
+    if not analysis_type or analysis_type not in DATA_INPUTS:
         return []
     
     focus_data = DATA_INPUTS[analysis_type]
     
     # Special handling for "Retrofit & Transformation"
     if analysis_type == "Retrofit & Transformation":
-        # Check if scale and context qualify
         scale_qualifies = scale in RETROFIT_SCALES if scale else True
         context_qualifies = context in RETROFIT_COUNTRIES if context else True
         
@@ -667,33 +738,107 @@ def get_data_inputs(analysis_type: str, focus: str, scale: str = None, context: 
             if "default" in focus_data and focus_data["default"]:
                 return focus_data["default"]
     
-    # Special handling for "Renewable Energy & Local Production" with Solar PV
-    if analysis_type == "Renewable Energy & Local Production":
-        # Check if Solar PV is selected in renewable types
-        if renewable_types and "Solar PV" in renewable_types:
-            # Check if scale and context qualify
-            scale_qualifies = scale in SOLAR_PV_SCALES if scale else True
-            context_qualifies = context in SOLAR_PV_COUNTRIES if context else True
-            
-            if scale_qualifies and context_qualifies:
-                if "Solar PV" in focus_data:
-                    return focus_data["Solar PV"]
+    # Special handling for "Urban Design Support"
+    if analysis_type == "Urban Design Support":
+        # Check if scale and context qualify for Urban Design Support
+        scale_qualifies = scale in URBAN_DESIGN_SCALES if scale else True
+        context_qualifies = context in URBAN_DESIGN_COUNTRIES if context else True
+        
+        if not scale_qualifies or not context_qualifies:
+            return []  # Urban Design Support only works at Neighborhood/City scale
+        
+        all_urban_inputs = []
+        
+        if urban_design_types:
+            for urban_type in urban_design_types:
+                # Check if we have specific data inputs for this urban design type
+                if urban_type in focus_data and focus_data[urban_type]:
+                    all_urban_inputs.append(focus_data[urban_type])
+        
+        # Merge all urban design inputs if we have multiple
+        if len(all_urban_inputs) > 1:
+            return merge_data_inputs_without_duplicates(*all_urban_inputs)
+        elif len(all_urban_inputs) == 1:
+            return all_urban_inputs[0]
+        
+        # Fall back to default if no specific urban design type matched
+        if "default" in focus_data and focus_data["default"]:
+            return focus_data["default"]
+        return []
     
-    # Special handling for "Whole system interaction" focus
-    if focus == "Whole system interaction":
-        # Check if scale and context qualify for combined inputs
+    # Special handling for "Climate Resilience"
+    if analysis_type == "Climate Resilience":
+        # Check if context qualifies
+        context_qualifies = context in CLIMATE_RESILIENCE_COUNTRIES if context else True
+        
+        if not context_qualifies:
+            return []
+        
+        all_climate_inputs = []
+        
+        if climate_resilience_types:
+            for climate_type in climate_resilience_types:
+                # Special handling for Flood Risk Assessment - only Neighborhood/City
+                if climate_type == "Flood Risk Assessment":
+                    if scale and scale not in FLOOD_RISK_SCALES:
+                        continue  # Skip Flood Risk Assessment for Building scale
+                
+                # Check if we have specific data inputs for this climate type
+                if climate_type in focus_data and focus_data[climate_type]:
+                    all_climate_inputs.append(focus_data[climate_type])
+        
+        # Merge all climate inputs if we have multiple
+        if len(all_climate_inputs) > 1:
+            return merge_data_inputs_without_duplicates(*all_climate_inputs)
+        elif len(all_climate_inputs) == 1:
+            return all_climate_inputs[0]
+        
+        # Fall back to default if no specific climate type matched
+        if "default" in focus_data and focus_data["default"]:
+            return focus_data["default"]
+        return []
+    
+    # Special handling for "Renewable Energy & Local Production"
+    if analysis_type == "Renewable Energy & Local Production":
+        all_renewable_inputs = []
+        
+        if renewable_types:
+            for renewable_type in renewable_types:
+                # Check if we have specific data inputs for this renewable type
+                if renewable_type == "Solar PV":
+                    scale_qualifies = scale in SOLAR_PV_SCALES if scale else True
+                    context_qualifies = context in SOLAR_PV_COUNTRIES if context else True
+                    
+                    if scale_qualifies and context_qualifies and "Solar PV" in focus_data:
+                        all_renewable_inputs.append(focus_data["Solar PV"])
+                
+                # Add more renewable types here as they are defined
+                # elif renewable_type == "Onshore Wind":
+                #     if "Onshore Wind" in focus_data:
+                #         all_renewable_inputs.append(focus_data["Onshore Wind"])
+        
+        # Merge all renewable inputs if we have multiple
+        if len(all_renewable_inputs) > 1:
+            return merge_data_inputs_without_duplicates(*all_renewable_inputs)
+        elif len(all_renewable_inputs) == 1:
+            return all_renewable_inputs[0]
+        
+        # Fall back to default if no specific renewable type matched
+        if "default" in focus_data and focus_data["default"]:
+            return focus_data["default"]
+        return []
+    
+    # Special handling for "Whole system interaction" focus (Energy & Carbon Performance)
+    if analysis_type == "Energy & Carbon Performance" and focus == "Whole system interaction":
         scale_qualifies = scale in WHOLE_SYSTEM_SCALES if scale else True
         context_qualifies = context in WHOLE_SYSTEM_COUNTRIES if context else True
         
         if scale_qualifies and context_qualifies:
-            # Get Electricity and Heating/Cooling inputs
             electricity_inputs = focus_data.get("Electricity", [])
             heating_cooling_inputs = focus_data.get("Heating/Cooling", [])
             
             if electricity_inputs and heating_cooling_inputs:
                 return merge_data_inputs_without_duplicates(electricity_inputs, heating_cooling_inputs)
-        
-        # If conditions not met or inputs not available, return empty or placeholder
         return []
     
     # Try exact focus match first
@@ -708,5 +853,84 @@ def get_data_inputs(analysis_type: str, focus: str, scale: str = None, context: 
     for key in focus_data:
         if focus_data[key]:
             return focus_data[key]
+    
+    return []
+
+
+def get_data_inputs(analysis_types, focus: str = None, scale: str = None, context: str = None, renewable_types: list = None, urban_design_types: list = None, climate_resilience_types: list = None) -> list:
+    """
+    Get the FIXED data inputs list for given analysis type(s) and focus.
+    
+    This function returns the same list every time for the same inputs.
+    The list does NOT change based on user interactions.
+    
+    HANDLES MULTIPLE ANALYSIS TYPES:
+    - If analysis_types is a list with multiple items, all their inputs are merged
+    - Duplicate items (same key) are removed, keeping the first occurrence
+    
+    For "Whole system interaction" focus with specific scales and contexts,
+    this function combines Electricity and Heating/Cooling inputs without duplicates.
+    
+    For "Renewable Energy & Local Production" with multiple renewable types,
+    this function merges all selected renewable type inputs without duplicates.
+    
+    For "Urban Design Support" with multiple urban design types,
+    this function merges all selected urban design type inputs without duplicates.
+    
+    For "Climate Resilience" with multiple climate types,
+    this function merges all selected climate type inputs without duplicates.
+    Note: Flood Risk Assessment is only available at Neighborhood/City scale.
+    
+    For "Retrofit & Transformation" with specific scales and contexts,
+    this function returns the retrofit-specific data inputs.
+    
+    Args:
+        analysis_types: Single analysis type string OR list of analysis types
+        focus: The selected focus (e.g., "Electricity", "Heating/Cooling", "Whole system interaction")
+        scale: The selected scale (e.g., "Building", "Neighborhood", "City")
+        context: The selected context/country (e.g., "Ireland", "Sweden")
+        renewable_types: List of selected renewable energy types (e.g., ["Solar PV", "Battery Storage"])
+        urban_design_types: List of selected urban design types (e.g., ["Accessibility", "Noise"])
+        climate_resilience_types: List of selected climate resilience types (e.g., ["Flood Risk Assessment", "Extreme Heat Analysis"])
+    
+    Returns:
+        List of category dictionaries with items, or empty list if not configured
+    """
+    if not analysis_types:
+        return []
+    
+    # Normalize to list
+    if isinstance(analysis_types, str):
+        analysis_types = [analysis_types]
+    
+    if not analysis_types:
+        return []
+    
+    # Get inputs for each analysis type
+    all_inputs = []
+    for analysis_type in analysis_types:
+        # Determine the focus for this analysis type
+        current_focus = None
+        if analysis_type == "Energy & Carbon Performance":
+            current_focus = focus
+        # Other analysis types use "default" or their own focus logic
+        
+        inputs = get_data_inputs_for_single_analysis(
+            analysis_type=analysis_type,
+            focus=current_focus,
+            scale=scale,
+            context=context,
+            renewable_types=renewable_types,
+            urban_design_types=urban_design_types,
+            climate_resilience_types=climate_resilience_types
+        )
+        if inputs:
+            all_inputs.append(inputs)
+    
+    # Merge all inputs if we have multiple analysis types
+    if len(all_inputs) > 1:
+        return merge_data_inputs_without_duplicates(*all_inputs)
+    elif len(all_inputs) == 1:
+        return all_inputs[0]
     
     return []
