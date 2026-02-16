@@ -47,20 +47,20 @@ DATA_INPUTS = {
                     {
                         "key": "footprint",
                         "label": "Footprint dimension",
-                        "recommended_source": "",  # TODO: Fill in
-                        "proxy_options": [],  # TODO: Fill in
+                        "recommended_source": "Architectural drawing",
+                        "proxy_options": [],
                     },
                     {
                         "key": "height",
                         "label": "Height",
-                        "recommended_source": "",  # TODO: Fill in
-                        "proxy_options": [],  # TODO: Fill in
+                        "recommended_source": "Architectural drawing",
+                        "proxy_options": [],
                     },
                     {
                         "key": "num_floors",
                         "label": "Number of Floors",
-                        "recommended_source": "",  # TODO: Fill in
-                        "proxy_options": [],  # TODO: Fill in
+                        "recommended_source": "Architectural drawing",
+                        "proxy_options": [],
                     },
                 ]
             },
@@ -128,37 +128,37 @@ DATA_INPUTS = {
                     {
                         "key": "footprint",
                         "label": "Footprint dimension",
-                        "recommended_source": "",
+                        "recommended_source": "Architectural drawing",
                         "proxy_options": [],
                     },
                     {
                         "key": "height",
                         "label": "Height",
-                        "recommended_source": "",
+                        "recommended_source": "Architectural drawing",
                         "proxy_options": [],
                     },
                     {
                         "key": "num_floors",
                         "label": "Number of floors",
-                        "recommended_source": "",
+                        "recommended_source": "Architectural drawing",
                         "proxy_options": [],
                     },
                     {
                         "key": "wwr",
                         "label": "Window to wall ratio",
-                        "recommended_source": "",
+                        "recommended_source": "Architectural drawing",
                         "proxy_options": [],
                     },
                     {
                         "key": "has_basement",
                         "label": "Does the building have basement?",
-                        "recommended_source": "",
+                        "recommended_source": "Architectural drawing",
                         "proxy_options": [],
                     },
                     {
                         "key": "orientation",
                         "label": "Building Orientation",
-                        "recommended_source": "",
+                        "recommended_source": "Architectural drawing",
                         "proxy_options": [],
                     },
                 ]
@@ -654,6 +654,94 @@ CLIMATE_RESILIENCE_SCALES = ["Building", "Neighborhood", "City"]
 
 # Scales that support Flood Risk Assessment (NOT Building - only Neighborhood and City)
 FLOOD_RISK_SCALES = ["Neighborhood", "City"]
+
+
+# ==============================================================================
+# CONTEXT-BASED PROXY OPTIONS
+# ==============================================================================
+# This dictionary maps (context/country, data_input_key) to a list of proxy alternatives.
+# When a user doesn't have the recommended data source, they can select from these proxies.
+# Structure:
+#   CONTEXT_PROXY_OPTIONS = {
+#       "Country Name": {
+#           "data_input_key": ["Proxy 1", "Proxy 2", ...],
+#       }
+#   }
+
+CONTEXT_PROXY_OPTIONS = {
+    "Sweden": {
+        # Building Geometry proxies for Sweden
+        "footprint": [
+            "Lantmäteriet database",
+            "EUBUCCO database",
+            "Energy Performance Certificate",
+            "OpenStreetMap",
+        ],
+        "height": [
+            "Laser data from Lantmäteriet",
+            "EUBUCCO database",
+        ],
+        "num_floors": [
+            "Google Street View",
+            "Image Recognition",
+            "Energy Performance Certificate",
+        ],
+        "roof_area": [
+            "Lantmäteriet database",
+            "Satellite Images",
+            "OpenStreetMap",
+        ],
+        "roof_shape": [
+            "Laser data from Lantmäteriet",
+            "Google Street View",
+        ],
+        "roof_angle": [
+            "Laser data from Lantmäteriet",
+            "Google Street View",
+        ],
+        "wwr": [
+            "Image Recognition",
+            "Google Street View",
+        ],
+        "orientation": [
+            "Google Street Maps",
+            "Lantmäteriet database",
+            "EUBUCCO database",
+        ],
+    },
+    # Add more countries here as needed
+    # "Ireland": {
+    #     "footprint": [...],
+    # },
+}
+
+
+def get_proxy_options_for_context(context: str, item_key: str, default_proxies: list = None) -> list:
+    """
+    Get proxy options for a specific data input based on the context (country).
+    
+    This function looks up context-specific proxies first, then falls back to
+    the default proxy_options defined in the data input item.
+    
+    Args:
+        context: The selected context/country (e.g., "Sweden", "Ireland")
+        item_key: The unique key of the data input item (e.g., "footprint", "height")
+        default_proxies: The default proxy_options list from the data input config
+    
+    Returns:
+        List of proxy options for this context and item, or empty list if none found
+    """
+    if default_proxies is None:
+        default_proxies = []
+    
+    # Check if we have context-specific proxies
+    if context and context in CONTEXT_PROXY_OPTIONS:
+        context_proxies = CONTEXT_PROXY_OPTIONS[context]
+        if item_key in context_proxies:
+            return context_proxies[item_key]
+    
+    # Fall back to default proxies from the data input config
+    return default_proxies
 
 
 def merge_data_inputs_without_duplicates(*input_lists) -> list:

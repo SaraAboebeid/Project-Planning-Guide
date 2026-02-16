@@ -7,7 +7,7 @@ and focus selected in Step 1.
 """
 
 import streamlit as st
-from config.data_inputs import get_data_inputs
+from config.data_inputs import get_data_inputs, get_proxy_options_for_context
 
 
 def render_step2(col2):
@@ -114,27 +114,35 @@ def render_step2(col2):
             
             with st.expander(category_name, expanded=False):
                 for item in items:
-                    _render_data_item(item, page_key)
+                    _render_data_item(item, page_key, analysis_context)
         
         # Close step container
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _render_data_item(item: dict, page_key: str):
+def _render_data_item(item: dict, page_key: str, context: str = None):
     """
     Render a single data item with Yes/No selection for data availability.
+    
+    Args:
+        item: The data item dictionary with key, label, recommended_source, proxy_options
+        page_key: Unique key prefix for session state
+        context: The selected context/country for context-aware proxy options
     """
     item_key = item["key"]
     item_label = item["label"]
     item_type = item.get("type", "standard")
     recommended_source = item.get("recommended_source", "") or "To be defined"
-    proxy_options = item.get("proxy_options", [])
+    default_proxy_options = item.get("proxy_options", [])
+    
+    # Get context-aware proxy options
+    proxy_options = get_proxy_options_for_context(context, item_key, default_proxy_options)
     
     # Data item label
     st.markdown(f"**{item_label}**")
     
-    # Show recommended source
-    st.markdown(f"*Recommended:* {recommended_source}")
+    # Show recommended data source (smaller font)
+    st.markdown(f"<span style='font-size: 0.85rem; color: #64748b;'>*Recommended data source:* {recommended_source}</span>", unsafe_allow_html=True)
     
     # Simple Yes/No radio - default to Yes
     has_data_key = f"{page_key}_{item_key}_has_data"
