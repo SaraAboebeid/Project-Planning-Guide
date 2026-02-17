@@ -716,6 +716,182 @@ CONTEXT_PROXY_OPTIONS = {
 }
 
 
+# ==============================================================================
+# PROXY CONFIDENCE ESTIMATES
+# ==============================================================================
+# Confidence values for each proxy option (percentage of confidence retained)
+# - "confidence": 0-100 scale (100 = same as recommended source)
+# - "source": "estimated" (expert judgment) or "validated" (literature-backed)
+# - "reference": Optional citation for validated values
+#
+# Confidence interpretation:
+#   95-100: Excellent - nearly equivalent to recommended source
+#   85-94:  Good - minor uncertainty introduced
+#   70-84:  Moderate - noticeable uncertainty, suitable for screening
+#   50-69:  Low - significant uncertainty, use with caution
+#   <50:    Poor - high uncertainty, preliminary estimates only
+
+PROXY_CONFIDENCE = {
+    "Sweden": {
+        "footprint": {
+            "Lantmäteriet database": {
+                "confidence": 95,
+                "source": "estimated",
+                "reference": "Based on official Swedish cadastral data accuracy"
+            },
+            "EUBUCCO database": {
+                "confidence": 85,
+                "source": "estimated",
+                "reference": "EUBUCCO v0.1 validation against OSM and official sources"
+            },
+            "Energy Performance Certificate": {
+                "confidence": 80,
+                "source": "estimated",
+                "reference": "EPC floor area typically within 5-15% of measured"
+            },
+            "OpenStreetMap": {
+                "confidence": 70,
+                "source": "estimated",
+                "reference": "Variable completeness and accuracy in urban areas"
+            },
+        },
+        "height": {
+            "Laser data from Lantmäteriet": {
+                "confidence": 95,
+                "source": "estimated",
+                "reference": "LiDAR typically ±0.5m vertical accuracy"
+            },
+            "EUBUCCO database": {
+                "confidence": 80,
+                "source": "estimated",
+                "reference": "Height estimates derived from mixed sources"
+            },
+        },
+        "num_floors": {
+            "Google Street View": {
+                "confidence": 80,
+                "source": "estimated",
+                "reference": "Visual counting reliable for visible floors"
+            },
+            "Image Recognition": {
+                "confidence": 70,
+                "source": "estimated",
+                "reference": "ML-based detection, accuracy varies by building type"
+            },
+            "Energy Performance Certificate": {
+                "confidence": 90,
+                "source": "estimated",
+                "reference": "EPC typically includes accurate floor count"
+            },
+        },
+        "roof_area": {
+            "Lantmäteriet database": {
+                "confidence": 90,
+                "source": "estimated",
+                "reference": "Derived from footprint, assumes flat roof"
+            },
+            "Satellite Images": {
+                "confidence": 75,
+                "source": "estimated",
+                "reference": "Manual or ML extraction, resolution dependent"
+            },
+            "OpenStreetMap": {
+                "confidence": 70,
+                "source": "estimated",
+                "reference": "Building outlines, roof geometry often missing"
+            },
+        },
+        "roof_shape": {
+            "Laser data from Lantmäteriet": {
+                "confidence": 90,
+                "source": "estimated",
+                "reference": "LiDAR point cloud allows shape classification"
+            },
+            "Google Street View": {
+                "confidence": 70,
+                "source": "estimated",
+                "reference": "Visual inspection, angle-dependent visibility"
+            },
+        },
+        "roof_angle": {
+            "Laser data from Lantmäteriet": {
+                "confidence": 85,
+                "source": "estimated",
+                "reference": "LiDAR derived, typically ±5° accuracy"
+            },
+            "Google Street View": {
+                "confidence": 60,
+                "source": "estimated",
+                "reference": "Visual estimation, significant uncertainty"
+            },
+        },
+        "wwr": {
+            "Image Recognition": {
+                "confidence": 65,
+                "source": "estimated",
+                "reference": "Facade analysis ML, occlusion issues common"
+            },
+            "Google Street View": {
+                "confidence": 60,
+                "source": "estimated",
+                "reference": "Manual estimation from street-level imagery"
+            },
+        },
+        "orientation": {
+            "Google Street Maps": {
+                "confidence": 95,
+                "source": "estimated",
+                "reference": "Map orientation highly accurate"
+            },
+            "Lantmäteriet database": {
+                "confidence": 95,
+                "source": "estimated",
+                "reference": "Official cadastral orientation data"
+            },
+            "EUBUCCO database": {
+                "confidence": 85,
+                "source": "estimated",
+                "reference": "Derived from building footprint geometry"
+            },
+        },
+    },
+    # Add more countries as needed
+}
+
+
+def get_proxy_confidence(context: str, item_key: str, proxy_name: str) -> dict:
+    """
+    Get confidence information for a specific proxy option.
+    
+    Args:
+        context: The selected context/country (e.g., "Sweden")
+        item_key: The data input key (e.g., "footprint")
+        proxy_name: The name of the proxy option
+    
+    Returns:
+        Dictionary with 'confidence', 'source', and 'reference' keys,
+        or default values if not found
+    """
+    default = {
+        "confidence": None,
+        "source": "unknown",
+        "reference": "Confidence not yet estimated"
+    }
+    
+    if not context or context not in PROXY_CONFIDENCE:
+        return default
+    
+    context_conf = PROXY_CONFIDENCE[context]
+    if item_key not in context_conf:
+        return default
+    
+    item_conf = context_conf[item_key]
+    if proxy_name not in item_conf:
+        return default
+    
+    return item_conf[proxy_name]
+
+
 def get_proxy_options_for_context(context: str, item_key: str, default_proxies: list = None) -> list:
     """
     Get proxy options for a specific data input based on the context (country).

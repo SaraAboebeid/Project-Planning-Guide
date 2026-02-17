@@ -7,7 +7,7 @@ and focus selected in Step 1.
 """
 
 import streamlit as st
-from config.data_inputs import get_data_inputs, get_proxy_options_for_context
+from config.data_inputs import get_data_inputs, get_proxy_options_for_context, get_proxy_confidence
 
 
 def render_step2(col2):
@@ -160,7 +160,38 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
         # Show proxy options
         if proxy_options:
             proxy_key = f"{page_key}_{item_key}_proxy"
-            st.selectbox("Select proxy:", options=proxy_options, key=proxy_key)
+            selected_proxy = st.selectbox("Select proxy:", options=proxy_options, key=proxy_key)
+            
+            # Get and display confidence for selected proxy
+            confidence_info = get_proxy_confidence(context, item_key, selected_proxy)
+            confidence_val = confidence_info.get("confidence")
+            confidence_source = confidence_info.get("source", "unknown")
+            confidence_ref = confidence_info.get("reference", "")
+            
+            if confidence_val is not None:
+                # Determine color based on confidence level
+                if confidence_val >= 85:
+                    color = "#22c55e"  # green
+                    level = "Good"
+                elif confidence_val >= 70:
+                    color = "#f59e0b"  # amber
+                    level = "Moderate"
+                else:
+                    color = "#ef4444"  # red
+                    level = "Low"
+                
+                # Show confidence with estimated badge and tooltip
+                source_badge = "ⓘ Estimated" if confidence_source == "estimated" else "✓ Validated"
+                st.markdown(
+                    f"<div style='display: flex; align-items: center; gap: 8px; margin-top: 4px;'>"
+                    f"<span style='font-size: 0.9rem;'>Confidence: </span>"
+                    f"<span style='background-color: {color}; color: white; padding: 2px 8px; border-radius: 4px; font-weight: 600;'>{confidence_val}% ({level})</span>"
+                    f"<span style='font-size: 0.75rem; color: #94a3b8; cursor: help;' title='{confidence_ref}'>{source_badge}</span>"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+            else:
+                st.caption("⚠️ Confidence not yet estimated for this proxy")
         else:
             st.caption("⚠️ No proxy options available yet")
     
