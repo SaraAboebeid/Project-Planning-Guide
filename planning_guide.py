@@ -12,6 +12,14 @@ from steps.step2_review_data import render_step2, render_step2_navigation
 # Page configuration
 st.set_page_config(page_title="Project Planner", layout="wide")
 
+# Hide the sidebar pages navigation
+st.markdown("""
+<style>
+    [data-testid="stSidebarNav"] {display: none;}
+    section[data-testid="stSidebar"] {display: none;}
+</style>
+""", unsafe_allow_html=True)
+
 # Wizard state for stepped navigation
 if "wizard_step" not in st.session_state:
     st.session_state.wizard_step = 0  # 0 = intro, 1..6 = steps
@@ -1565,11 +1573,11 @@ st.markdown("""
            Based on M3 Tonal Palette
            ============================================ */
         
-        /* Primary */
-        --md3-primary: #65558F;              /* P-40 */
+        /* Primary - Enhanced Purple */
+        --md3-primary: #7B4CC4;              /* Richer purple */
         --md3-on-primary: #FFFFFF;           /* P-100 */
-        --md3-primary-container: #E9DDFF;    /* P-90 */
-        --md3-on-primary-container: #21005E; /* P-10 */
+        --md3-primary-container: #DED0F7;    /* P-90 - more saturated */
+        --md3-on-primary-container: #2D0070; /* P-10 */
         
         /* Secondary */
         --md3-secondary: #625B71;            /* S-40 */
@@ -1725,12 +1733,43 @@ st.markdown("""
         animation: fadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
     }
     
-    .stagger-1 { animation-delay: 0.05s; }
-    .stagger-2 { animation-delay: 0.1s; }
-    .stagger-3 { animation-delay: 0.15s; }
-    .stagger-4 { animation-delay: 0.2s; }
-    .stagger-5 { animation-delay: 0.25s; }
-    .stagger-6 { animation-delay: 0.3s; }
+    /* Sequential card entrance animation */
+    @keyframes cardFadeIn {
+        0% {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Card entrance animation */
+    .card-animate {
+        animation: cardFadeIn 1s cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+    
+    /* Arrow entrance animation */
+    .arrow-animate {
+        animation: cardFadeIn 1s cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+    
+    /* Sequential stagger delays for cards - each card appears one at a time */
+    .stagger-1 { animation-delay: 0s; }
+    .stagger-2 { animation-delay: 1s; }
+    .stagger-3 { animation-delay: 2s; }
+    .stagger-4 { animation-delay: 3s; }
+    .stagger-5 { animation-delay: 4s; }
+    .stagger-6 { animation-delay: 5s; }
+    .stagger-7 { animation-delay: 6s; }
+    
+    /* Arrow stagger delays - appear between cards */
+    .arrow-stagger-1 { animation-delay: 0.5s; }
+    .arrow-stagger-2 { animation-delay: 1.5s; }
+    .arrow-stagger-3 { animation-delay: 2.5s; }
+    .arrow-stagger-4 { animation-delay: 3.5s; }
+    .arrow-stagger-5 { animation-delay: 4.5s; }
     
     .intro-container {
         animation: fadeIn 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
@@ -1755,11 +1794,6 @@ st.markdown("""
     /* Ensure smooth transitions between pages */
     .stApp > div > div > div > div {
         transition: opacity 0.3s ease-out;
-    }
-    
-    .card-animate {
-        opacity: 0;
-        animation: scaleIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
     }
     
     .slide-in-right {
@@ -2116,11 +2150,11 @@ st.markdown("""
     /* M3 Step Cards */
     .step-card {
         background-color: var(--md3-surface-container-low) !important;
-        padding: 1.5rem;
+        padding: 1.25rem;
         border-radius: var(--md3-shape-medium);
         text-align: center;
         margin-bottom: 1rem;
-        min-height: 140px;
+        height: 140px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -2136,28 +2170,29 @@ st.markdown("""
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 40px;
-        height: 40px;
+        width: 32px;
+        height: 32px;
         background-color: var(--md3-primary);
         color: var(--md3-on-primary);
-        font-size: 1rem;
+        font-size: 0.875rem;
         font-weight: 500;
         border-radius: var(--md3-shape-full);
-        margin: 0 auto 0.75rem auto;
+        margin: 0 auto 0.5rem auto;
     }
     
     .step-title {
         color: var(--md3-on-surface);
-        font-size: 1rem;
+        font-size: 0.8rem;
         font-weight: 500;
-        letter-spacing: 0.15px;
+        letter-spacing: 0.1px;
+        line-height: 1.2;
     }
     
     .step-desc {
         color: var(--md3-on-surface-variant);
-        font-size: 0.875rem;
-        margin-top: 0.5rem;
-        line-height: 1.25rem;
+        font-size: 0.7rem;
+        margin-top: 0.35rem;
+        line-height: 1.1rem;
     }
     
     .step-arrow { 
@@ -2166,7 +2201,7 @@ st.markdown("""
         justify-content: center; 
         height: 140px;
         color: var(--md3-outline);
-        font-size: 1.5rem;
+        font-size: 1.25rem;
     }
     
     /* M3 Metric */
@@ -2249,7 +2284,7 @@ if st.session_state.wizard_step == 0:
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[1]:
-        st.markdown("<div class='step-arrow card-animate stagger-1'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-1'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[2]:
         st.markdown("""
         <div class='step-card card-animate stagger-2' style='--grad-start:#0f766e; --grad-end:#115e59;'>
@@ -2259,17 +2294,17 @@ if st.session_state.wizard_step == 0:
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[3]:
-        st.markdown("<div class='step-arrow card-animate stagger-2'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-2'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[4]:
         st.markdown("""
         <div class='step-card card-animate stagger-3' style='--grad-start:#475569; --grad-end:#334155;'>
             <div class='step-index'>3</div>
-            <div class='step-title'>Confidence & Recommendations</div>
-            <div class='step-desc'>Confidence and recommendations</div>
+            <div class='step-title'>Confidence</div>
+            <div class='step-desc'>Review recommendations</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[5]:
-        st.markdown("<div class='step-arrow card-animate stagger-3'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-3'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[6]:
         st.markdown("""
         <div class='step-card card-animate stagger-4' style='--grad-start:#2563eb; --grad-end:#1e40af;'>
@@ -2279,7 +2314,7 @@ if st.session_state.wizard_step == 0:
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[7]:
-        st.markdown("<div class='step-arrow card-animate stagger-4'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-4'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[8]:
         st.markdown("""
         <div class='step-card card-animate stagger-5' style='--grad-start:#6b7280; --grad-end:#4b5563;'>
@@ -2289,7 +2324,7 @@ if st.session_state.wizard_step == 0:
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[9]:
-        st.markdown("<div class='step-arrow card-animate stagger-5'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-5'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[10]:
         st.markdown("""
         <div class='step-card card-animate stagger-6' style='--grad-start:#4b5563; --grad-end:#111827;'>
@@ -2299,15 +2334,14 @@ if st.session_state.wizard_step == 0:
         </div>
         """, unsafe_allow_html=True)
     
-    st.markdown("<hr class='card-animate stagger-6' style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
+    st.markdown("<hr class='card-animate stagger-7' style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
     
     center_cols = st.columns([1,1,1])
     with center_cols[1]:
-        st.markdown("<div class='card-animate stagger-6'>", unsafe_allow_html=True)
+        st.markdown("<div class='card-animate stagger-7'>", unsafe_allow_html=True)
         if st.button("Start", type="primary", use_container_width=True, key="start_btn"):
-            st.session_state.page_transitioning = True
-            st.session_state.wizard_step = 1
-            st.rerun()
+            # Navigate to multi-page wizard
+            st.switch_page("pages/1_Define_Scope_and_Context.py")
         st.markdown("</div>", unsafe_allow_html=True)
     
     # Close intro container
