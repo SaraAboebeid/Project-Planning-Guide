@@ -107,15 +107,97 @@ def render_step2(col2):
         
         st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
         
+        # SUMMARY CARD: Data availability & confidence
+        all_items = []
+        for category_data in data_inputs:
+            all_items.extend(category_data["items"])
+
+        available = 0
+        missing = 0
+        confidences = []
+        for item in all_items:
+            item_key = item["key"]
+            has_data_key = f"{page_key}_{item_key}_has_data"
+            has_data = st.session_state.get(has_data_key, "Yes")
+            if has_data == "Yes":
+                available += 1
+            else:
+                missing += 1
+                proxy_key = f"{page_key}_{item_key}_proxy"
+                selected_proxy = st.session_state.get(proxy_key)
+                if selected_proxy:
+                    conf_info = get_proxy_confidence(analysis_context, item_key, selected_proxy)
+                    conf_val = conf_info.get("confidence")
+                    if conf_val is not None:
+                        confidences.append(conf_val)
+
+        avg_conf = round(sum(confidences)/len(confidences), 1) if confidences else None
+        total_conf_display = f"{avg_conf}%" if avg_conf is not None else "N/A"
+
+        # Determine confidence color
+        if avg_conf is not None:
+            if avg_conf >= 85:
+                conf_color = "#22c55e"
+            elif avg_conf >= 70:
+                conf_color = "#f59e0b"
+            else:
+                conf_color = "#ef4444"
+        else:
+            conf_color = "#94a3b8"
+
+        st.markdown(f"""
+        <style>
+        .summary-card-row {{
+            display: flex;
+            gap: 1.2rem;
+            margin-bottom: 1.5rem;
+        }}
+        .summary-card {{
+            flex: 1 1 0;
+            border-radius: 16px;
+            padding: 1.2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 110px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }}
+        .summary-card .card-value {{
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }}
+        .summary-card .card-label {{
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #6b7280;
+        }}
+        </style>
+        <div class="summary-card-row">
+            <div class="summary-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
+                <div class="card-value" style="color: #16a34a;">{available}</div>
+                <div class="card-label">Available Datasets</div>
+            </div>
+            <div class="summary-card" style="background: rgba(239,68,68,0.10); border: 1px solid rgba(239,68,68,0.25);">
+                <div class="card-value" style="color: #ef4444;">{missing}</div>
+                <div class="card-label">Missing Datasets</div>
+            </div>
+            <div class="summary-card" style="background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.25);">
+                <div class="card-value" style="color: {conf_color};">{total_conf_display}</div>
+                <div class="card-label">Total Confidence</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
         # Render the FIXED list of categories and items
         for category_data in data_inputs:
             category_name = category_data["category"]
             items = category_data["items"]
-            
             with st.expander(category_name, expanded=False):
                 for item in items:
                     _render_data_item(item, page_key, analysis_context)
-        
+
         # Close step container
         st.markdown("</div>", unsafe_allow_html=True)
 

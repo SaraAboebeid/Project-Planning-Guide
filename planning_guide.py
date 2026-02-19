@@ -2277,7 +2277,7 @@ if st.session_state.wizard_step == 0:
 
     with diagram_cols[0]:
         st.markdown("""
-        <div class='step-card card-animate stagger-1' style='--grad-start:#1e3a8a; --grad-end:#0f172a;'>
+        <div class='step-card card-animate stagger-1' style='background: rgba(210,198,250,0.2);'>
             <div class='step-index'>1</div>
             <div class='step-title'>Define Scope & Context</div>
             <div class='step-desc'>Choose analysis, scale, and context</div>
@@ -2287,7 +2287,7 @@ if st.session_state.wizard_step == 0:
         st.markdown("<div class='step-arrow arrow-animate arrow-stagger-1'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[2]:
         st.markdown("""
-        <div class='step-card card-animate stagger-2' style='--grad-start:#0f766e; --grad-end:#115e59;'>
+        <div class='step-card card-animate stagger-2' style='background: rgba(210,198,250,0.2);'>
             <div class='step-index'>2</div>
             <div class='step-title'>Review Data</div>
             <div class='step-desc'>Mark availability and select proxies</div>
@@ -2297,7 +2297,7 @@ if st.session_state.wizard_step == 0:
         st.markdown("<div class='step-arrow arrow-animate arrow-stagger-2'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[4]:
         st.markdown("""
-        <div class='step-card card-animate stagger-3' style='--grad-start:#475569; --grad-end:#334155;'>
+        <div class='step-card card-animate stagger-3' style='background: rgba(210,198,250,0.2);'>
             <div class='step-index'>3</div>
             <div class='step-title'>Confidence</div>
             <div class='step-desc'>Review recommendations</div>
@@ -2307,7 +2307,7 @@ if st.session_state.wizard_step == 0:
         st.markdown("<div class='step-arrow arrow-animate arrow-stagger-3'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[6]:
         st.markdown("""
-        <div class='step-card card-animate stagger-4' style='--grad-start:#2563eb; --grad-end:#1e40af;'>
+        <div class='step-card card-animate stagger-4' style='background: rgba(210,198,250,0.2);'>
             <div class='step-index'>4</div>
             <div class='step-title'>Expected Results</div>
             <div class='step-desc'>Review expected outcomes</div>
@@ -2317,7 +2317,7 @@ if st.session_state.wizard_step == 0:
         st.markdown("<div class='step-arrow arrow-animate arrow-stagger-4'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[8]:
         st.markdown("""
-        <div class='step-card card-animate stagger-5' style='--grad-start:#6b7280; --grad-end:#4b5563;'>
+        <div class='step-card card-animate stagger-5' style='background: rgba(210,198,250,0.2);'>
             <div class='step-index'>5</div>
             <div class='step-title'>Project Timeline</div>
             <div class='step-desc'>Plan phases and tasks</div>
@@ -2327,7 +2327,7 @@ if st.session_state.wizard_step == 0:
         st.markdown("<div class='step-arrow arrow-animate arrow-stagger-5'>➜</div>", unsafe_allow_html=True)
     with diagram_cols[10]:
         st.markdown("""
-        <div class='step-card card-animate stagger-6' style='--grad-start:#4b5563; --grad-end:#111827;'>
+        <div class='step-card card-animate stagger-6' style='background: rgba(210,198,250,0.2);'>
             <div class='step-index'>6</div>
             <div class='step-title'>Cost Estimation</div>
             <div class='step-desc'>Budget, CAPEX, and OPEX</div>
@@ -2338,11 +2338,26 @@ if st.session_state.wizard_step == 0:
     
     center_cols = st.columns([1,1,1])
     with center_cols[1]:
-        st.markdown("<div class='card-animate stagger-7'>", unsafe_allow_html=True)
+        st.markdown("""
+        <div id='start-btn-container' class='card-animate stagger-7 hidden-until-animated'>
+        """, unsafe_allow_html=True)
         if st.button("Start", type="primary", use_container_width=True, key="start_btn"):
-            # Navigate to multi-page wizard
             st.switch_page("pages/1_Define_Scope_and_Context.py")
         st.markdown("</div>", unsafe_allow_html=True)
+
+    # Add CSS and JS to hide the button until animation is done
+    st.markdown("""
+    <style>
+    .hidden-until-animated { opacity: 0 !important; pointer-events: none; transition: opacity 0.3s; }
+    .show-after-anim { opacity: 1 !important; pointer-events: auto; }
+    </style>
+    <script>
+    setTimeout(function() {
+        var btn = window.parent.document.getElementById('start-btn-container');
+        if(btn) { btn.classList.remove('hidden-until-animated'); btn.classList.add('show-after-anim'); }
+    }, 7000); // 7s = last card delay + anim duration
+    </script>
+    """, unsafe_allow_html=True)
     
     # Close intro container
     st.markdown("</div>", unsafe_allow_html=True)
@@ -3345,10 +3360,12 @@ if st.session_state.wizard_step == 3:
                 
                 # Calculate predicted confidence
                 if predicted_additions:
+                    class Simulated:
+                        pass
+                    simulated = Simulated()
                     simulated.inputs = st.session_state.data_inputs.copy()
                     for key in predicted_additions:
                         simulated.inputs[key] = True
-                    
                     predicted_results = calculate_confidence(
                         analysis_type=first_analysis,
                         data_inputs=simulated.inputs,
@@ -3356,9 +3373,7 @@ if st.session_state.wizard_step == 3:
                         country=country,
                         desired_outputs=outputs
                     )
-                    
                     improvement = predicted_results['overall'] - confidence_results['overall']
-                    
                     st.markdown("<hr style='margin: 0.5rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
                     st.markdown("<div style='background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 0.7rem; border-radius: 8px; border-left: 3px solid #3b82f6;'>", unsafe_allow_html=True)
                     st.markdown(f"<p style='margin: 0; font-size: 0.9rem; color: #1e40af;'><strong>Predicted Confidence:</strong> {predicted_results['overall']}%</p>", unsafe_allow_html=True)
