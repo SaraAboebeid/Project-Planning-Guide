@@ -8,7 +8,7 @@ effort/duration estimates, and a data source directory.
 import streamlit as st
 from config.data_inputs import get_data_inputs, get_proxy_options_for_context, get_proxy_confidence
 
-st.set_page_config(page_title="Confidence & Recommendations", page_icon="🎯", layout="wide")
+st.set_page_config(page_title="Confidence & Recommendations", layout="wide")
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -23,7 +23,7 @@ st.markdown("""
 # ============================================================================
 
 if "analysis_type" not in st.session_state or not st.session_state.analysis_type:
-    st.warning("⚠️ Please complete Step 1 first: Define Scope and Context")
+    st.warning("Please complete Step 1 first.")
     if st.button("Go to Step 1"):
         st.switch_page("pages/1_Define_Scope_and_Context.py")
     st.stop()
@@ -56,7 +56,7 @@ data_inputs = get_data_inputs(
 
 if not data_inputs:
     st.warning("No data inputs found. Please complete Step 2 first.")
-    if st.button("← Back to Step 2"):
+    if st.button("Back to Step 2"):
         st.switch_page("pages/2_Review_Data.py")
     st.stop()
 
@@ -169,20 +169,20 @@ duration_weeks = max(1, round(total_hours / 30))
 # ============================================================================
 
 st.markdown(
-    "<h2 style='font-size:1.35rem; font-weight:700; margin-bottom:0.5rem;'>"
+    "<h2 style='font-size:1.5rem; font-weight:700; color:#0f172a; letter-spacing:-0.01em; margin-bottom:0.5rem;'>"
     "Step 3: Confidence & Recommendations</h2>",
     unsafe_allow_html=True
 )
 st.markdown(
-    "<p style='font-size:0.98rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>"
+    "<p style='font-size:0.92rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>"
     "Review your data confidence, estimated effort, and recommendations for improving results.</p>",
     unsafe_allow_html=True
 )
 
 # Context bar
-context_info = f"<span style='font-size:0.93rem; color:#334155;'><b>Analysis:</b> {analysis_type_str}"
+context_info = f"<span style='font-size:0.88rem; color:#475569;'><b>Analysis:</b> {analysis_type_str}"
 if analysis_focus:
-    context_info += f" → <b>{analysis_focus}</b>"
+    context_info += f" / <b>{analysis_focus}</b>"
 if analysis_scale:
     context_info += f" | <b>Scale:</b> {analysis_scale}"
 if analysis_context:
@@ -196,45 +196,47 @@ st.markdown(context_info, unsafe_allow_html=True)
 
 card_html = f"""
 <style>
-.s3-card-row {{
+.pg-card-row {{
     display: flex;
     gap: 1.2rem;
     margin: 1.2rem 0 1.5rem 0;
 }}
-.s3-card {{
+.pg-card {{
     flex: 1 1 0;
-    border-radius: 16px;
-    padding: 1.2rem 1.5rem;
+    border-radius: 14px;
+    padding: 1.1rem 1.4rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 110px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    min-height: 100px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    background: rgba(26,26,26,0.04);
+    border: 1px solid rgba(26,26,26,0.08);
 }}
-.s3-card .s3-value {{
+.pg-card .pg-val {{
     font-size: 2rem;
     font-weight: 700;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.2rem;
 }}
-.s3-card .s3-label {{
-    font-size: 0.95rem;
+.pg-card .pg-lbl {{
+    font-size: 0.88rem;
     font-weight: 500;
     color: #6b7280;
 }}
 </style>
-<div class="s3-card-row">
-    <div class="s3-card" style="background: {conf_bg}; border: 1px solid {conf_border};">
-        <div class="s3-value" style="color: {conf_color};">{overall_confidence}%</div>
-        <div class="s3-label">Overall Confidence ({conf_level})</div>
+<div class="pg-card-row">
+    <div class="pg-card" style="background: {conf_bg}; border: 1px solid {conf_border};">
+        <div class="pg-val" style="color: {conf_color};">{overall_confidence}%</div>
+        <div class="pg-lbl">Overall Confidence ({conf_level})</div>
     </div>
-    <div class="s3-card" style="background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.25);">
-        <div class="s3-value" style="color: #6366f1;">{total_hours} hrs</div>
-        <div class="s3-label">Estimated Effort</div>
+    <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
+        <div class="pg-val" style="color: #1A1A1A;">{total_hours} hrs</div>
+        <div class="pg-lbl">Estimated Effort</div>
     </div>
-    <div class="s3-card" style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.25);">
-        <div class="s3-value" style="color: #3b82f6;">{duration_weeks} wk</div>
-        <div class="s3-label">Estimated Duration</div>
+    <div class="pg-card" style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.25);">
+        <div class="pg-val" style="color: #3b82f6;">{duration_weeks} wk</div>
+        <div class="pg-lbl">Estimated Duration</div>
     </div>
 </div>
 """
@@ -271,8 +273,8 @@ st.markdown(
 
 if missing_items:
     st.markdown(
-        "<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.5rem;'>"
-        "📋 Missing Data & Proxy Recommendations</div>",
+        "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.5rem;'>"
+        "Missing Data and Proxy Recommendations</div>",
         unsafe_allow_html=True
     )
     st.markdown(
@@ -291,21 +293,21 @@ if missing_items:
             if conf_val is not None and conf_val >= 85:
                 badge_color = "#16a34a"
                 badge_bg = "#dcfce7"
-                badge_text = f"✓ {conf_val}% confidence"
+                badge_text = f"{conf_val}% confidence"
             elif conf_val is not None and conf_val >= 70:
                 badge_color = "#d97706"
                 badge_bg = "#fef3c7"
-                badge_text = f"⚠ {conf_val}% confidence"
+                badge_text = f"{conf_val}% confidence"
             elif conf_val is not None:
                 badge_color = "#ef4444"
                 badge_bg = "#fee2e2"
-                badge_text = f"✗ {conf_val}% confidence"
+                badge_text = f"{conf_val}% confidence"
             else:
                 badge_color = "#94a3b8"
                 badge_bg = "#f1f5f9"
                 badge_text = "Confidence N/A"
 
-            with st.expander(f"❌ {item['label']}  →  Proxy: {proxy}", expanded=False):
+            with st.expander(f"{item['label']}  —  Proxy: {proxy}", expanded=False):
                 st.markdown(
                     f"<div style='display:flex; align-items:center; gap:10px; margin-bottom:0.5rem;'>"
                     f"<span style='background:{badge_bg}; color:{badge_color}; padding:3px 10px; "
@@ -323,10 +325,10 @@ if missing_items:
                     )
         else:
             # No proxy selected — flag as gap
-            with st.expander(f"⚠️ {item['label']}  →  No proxy selected", expanded=False):
+            with st.expander(f"{item['label']}  —  No proxy selected", expanded=False):
                 st.markdown(
                     "<span style='background:#fee2e2; color:#ef4444; padding:3px 10px; "
-                    "border-radius:6px; font-weight:600; font-size:0.88rem;'>⚠ Data gap — no proxy</span>",
+                    "border-radius:6px; font-weight:600; font-size:0.88rem;'>Data gap — no proxy</span>",
                     unsafe_allow_html=True
                 )
                 rec_source = item.get("recommended_source", "To be defined")
@@ -338,7 +340,7 @@ if missing_items:
                 else:
                     st.caption("No proxy options available. This data must be obtained directly.")
 else:
-    st.success("✅ All required datasets are available! No proxies needed.")
+    st.success("All required datasets are available. No proxies needed.")
 
 # ============================================================================
 # CONFIDENCE IMPROVEMENT — WHAT IF?
@@ -350,7 +352,7 @@ st.markdown(
 )
 
 if missing_items:
-    with st.expander("🎯 What If? — Confidence Improvement Calculator", expanded=False):
+    with st.expander("What If? — Confidence Improvement Calculator", expanded=False):
         st.markdown(
             "**Select data items you plan to obtain to see how confidence improves:**"
         )
@@ -399,7 +401,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-with st.expander("📊 Effort & Duration Breakdown", expanded=False):
+with st.expander("Effort and Duration Breakdown", expanded=False):
     phases = {
         "Scoping": 0.10,
         "Data Collection": 0.30,
@@ -422,7 +424,7 @@ with st.expander("📊 Effort & Duration Breakdown", expanded=False):
             f"<div style='display:flex; align-items:center; gap:0.8rem; margin-bottom:0.5rem;'>"
             f"<div style='width:160px; font-size:0.9rem; font-weight:500;'>{phase}</div>"
             f"<div style='flex:1; background:#e5e7eb; border-radius:6px; height:10px; overflow:hidden;'>"
-            f"<div style='background:#6366f1; height:100%; width:{bar_width}%; border-radius:6px;'></div>"
+            f"<div style='background:#1A1A1A; height:100%; width:{bar_width}%; border-radius:6px;'></div>"
             f"</div>"
             f"<div style='width:55px; text-align:right; font-size:0.88rem; font-weight:600; color:#374151;'>"
             f"{phase_hours} hrs</div>"
@@ -445,16 +447,16 @@ st.markdown("---")
 col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
-    if st.button("← Back to Step 2", use_container_width=True):
+    if st.button("Back", use_container_width=True):
         st.switch_page("pages/2_Review_Data.py")
 
 with col2:
-    if st.button("Next: Step 4 →", type="primary", use_container_width=True):
+    if st.button("Continue", type="primary", use_container_width=True):
         st.switch_page("pages/4_Expected_Results.py")
 
 with col3:
     st.markdown(
-        "<div style='text-align: right; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>"
-        "Page 3 of 6</div>",
+        "<div style='text-align: right; color: #94a3b8; font-size: 0.85rem; padding-top: 0.5rem;'>"
+        "Step 3 of 6</div>",
         unsafe_allow_html=True
     )

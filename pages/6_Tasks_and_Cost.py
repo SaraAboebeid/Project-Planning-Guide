@@ -11,7 +11,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 from config.data_inputs import get_data_inputs, get_proxy_confidence
 
-st.set_page_config(page_title="Tasks & Cost", page_icon="💰", layout="wide")
+st.set_page_config(page_title="Tasks & Cost", layout="wide")
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -189,7 +189,7 @@ def _generate_suggested_tasks(total_hours, proxies_count, completeness_pct,
 # ============================================================================
 
 if "analysis_type" not in st.session_state or not st.session_state.analysis_type:
-    st.warning("⚠️ Please complete Step 1 first: Define Scope and Context")
+    st.warning("Please complete Step 1 first.")
     if st.button("Go to Step 1"):
         st.switch_page("pages/1_Define_Scope_and_Context.py")
     st.stop()
@@ -276,20 +276,20 @@ for key in ["p6_opex_energy", "p6_opex_maintenance", "p6_opex_staffing", "p6_ope
 # ============================================================================
 
 st.markdown(
-    "<h2 style='font-size:1.35rem; font-weight:700; margin-bottom:0.5rem;'>"
+    "<h2 style='font-size:1.5rem; font-weight:700; color:#0f172a; letter-spacing:-0.01em; margin-bottom:0.5rem;'>"
     "Step 6: Tasks & Cost</h2>",
     unsafe_allow_html=True
 )
 st.markdown(
-    "<p style='font-size:0.98rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>"
+    "<p style='font-size:0.92rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>"
     "Build a task plan, estimate consultant costs, and set your project budget.</p>",
     unsafe_allow_html=True
 )
 
 # Context bar
-context_info = f"<span style='font-size:0.93rem; color:#334155;'><b>Analysis:</b> {analysis_type_str}"
+context_info = f"<span style='font-size:0.88rem; color:#475569;'><b>Analysis:</b> {analysis_type_str}"
 if analysis_focus:
-    context_info += f" → <b>{analysis_focus}</b>"
+    context_info += f" / <b>{analysis_focus}</b>"
 if analysis_scale:
     context_info += f" | <b>Scale:</b> {analysis_scale}"
 if analysis_context:
@@ -328,45 +328,45 @@ currency = st.session_state.p6_currency
 
 card_html = f"""
 <style>
-.s6-card-row {{
+.pg-card-row {{
     display: flex;
     gap: 1.2rem;
     margin: 1.2rem 0 1.5rem 0;
 }}
-.s6-card {{
+.pg-card {{
     flex: 1 1 0;
-    border-radius: 16px;
-    padding: 1.2rem 1.5rem;
+    border-radius: 14px;
+    padding: 1.1rem 1.4rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 110px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    min-height: 100px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }}
-.s6-card .s6-value {{
-    font-size: 1.8rem;
+.pg-card .pg-val {{
+    font-size: 2rem;
     font-weight: 700;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.2rem;
 }}
-.s6-card .s6-label {{
-    font-size: 0.95rem;
+.pg-card .pg-lbl {{
+    font-size: 0.88rem;
     font-weight: 500;
     color: #6b7280;
 }}
 </style>
-<div class="s6-card-row">
-    <div class="s6-card" style="background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.25);">
-        <div class="s6-value" style="color: #6366f1;">{service_cost:,.0f} {currency}</div>
-        <div class="s6-label">Estimated Service Cost</div>
+<div class="pg-card-row">
+    <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
+        <div class="pg-val" style="color: #1A1A1A;">{service_cost:,.0f} {currency}</div>
+        <div class="pg-lbl">Estimated Service Cost</div>
     </div>
-    <div class="s6-card" style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.25);">
-        <div class="s6-value" style="color: #3b82f6;">{effective_hours} hrs</div>
-        <div class="s6-label">{"Task Plan" if st.session_state.p6_use_task_plan and task_total_hours > 0 else "Estimated"} Hours</div>
+    <div class="pg-card" style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.25);">
+        <div class="pg-val" style="color: #3b82f6;">{effective_hours} hrs</div>
+        <div class="pg-lbl">{"Task Plan" if st.session_state.p6_use_task_plan and task_total_hours > 0 else "Estimated"} Hours</div>
     </div>
-    <div class="s6-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
-        <div class="s6-value" style="color: #16a34a;">{effective_weeks} wk</div>
-        <div class="s6-label">Duration</div>
+    <div class="pg-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
+        <div class="pg-val" style="color: #16a34a;">{effective_weeks} wk</div>
+        <div class="pg-lbl">Duration</div>
     </div>
 </div>
 """
@@ -381,20 +381,20 @@ st.markdown(
     unsafe_allow_html=True
 )
 st.markdown(
-    "<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.5rem;'>"
-    "📋 Task Planner</div>",
+    "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.5rem;'>"
+    "Task Planner</div>",
     unsafe_allow_html=True
 )
 
 btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 2])
 with btn_col1:
     suggest_clicked = st.button(
-        "💡 Suggest Tasks",
+        "Suggest Tasks",
         use_container_width=True,
         help="Auto-generate tasks from analysis configuration"
     )
 with btn_col2:
-    clear_tasks = st.button("🗑️ Clear Tasks", use_container_width=True)
+    clear_tasks = st.button("Clear", use_container_width=True)
 with btn_col3:
     st.session_state.p6_use_task_plan = st.toggle(
         "Use task plan for duration & cost",
@@ -447,14 +447,14 @@ if not edited_tasks.empty and "Hours" in edited_tasks.columns:
     delta = plan_hours - total_hours
     delta_label = f"({'+' if delta > 0 else ''}{delta} vs estimate)" if delta != 0 else "(matches estimate)"
     st.caption(
-        f"📊 Task plan total: **{plan_hours} hours** · ~{plan_weeks} weeks @ 30 hrs/week {delta_label}"
+        f"Task plan total: **{plan_hours} hours** · ~{plan_weeks} weeks @ 30 hrs/week {delta_label}"
     )
 
 # Push to timeline button
 push_col1, push_col2 = st.columns([1, 3])
 with push_col1:
     push_clicked = st.button(
-        "📅 Push to Timeline (Step 5)",
+        "Push to Timeline",
         use_container_width=True,
         help="Copy task rows into Step 5's timeline"
     )
@@ -478,7 +478,7 @@ if push_clicked and st.session_state.p6_task_rows:
         })
         current = finish
     st.session_state.p5_timeline_rows = rows
-    st.success("✅ Timeline updated! Go to Step 5 to view the Gantt chart.")
+    st.success("Timeline updated. Go to Step 5 to view the Gantt chart.")
 
 # ============================================================================
 # COST & BUDGET
@@ -489,8 +489,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 st.markdown(
-    "<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.5rem;'>"
-    "💰 Cost & Budget</div>",
+    "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.5rem;'>"
+    "Cost and Budget</div>",
     unsafe_allow_html=True
 )
 
@@ -520,11 +520,11 @@ service_cost = round(effective_hours * rate * overhead_mult, 2)
 
 # ── Auto-estimated service cost ──
 st.markdown(
-    f"<div style='background:rgba(99,102,241,0.08); border-left:3px solid #6366f1; "
+    f"<div style='background:rgba(26,26,26,0.05); border-left:3px solid #C8E600; "
     f"padding:0.8rem 1rem; border-radius:8px; margin:0.5rem 0 1rem 0;'>"
     f"<div style='font-size:0.9rem; color:#64748b;'>Estimated Service Cost "
     f"({effective_hours} hrs × {rate:,.0f} {st.session_state.p6_currency}/hr × 1.10 overhead)</div>"
-    f"<div style='font-size:1.3rem; font-weight:700; color:#6366f1;'>"
+    f"<div style='font-size:1.3rem; font-weight:700; color:#1A1A1A;'>"
     f"{service_cost:,.0f} {st.session_state.p6_currency}</div>"
     f"</div>",
     unsafe_allow_html=True
@@ -623,18 +623,18 @@ st.markdown(
 cur = st.session_state.p6_currency
 
 summary_html = f"""
-<div class="s6-card-row">
-    <div class="s6-card" style="background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.25);">
-        <div class="s6-value" style="color: #6366f1; font-size:1.5rem;">{capex_total:,.0f} {cur}</div>
-        <div class="s6-label">CAPEX (with {st.session_state.p6_contingency_pct}% contingency)</div>
+<div class="pg-card-row">
+    <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
+        <div class="pg-val" style="color: #1A1A1A; font-size:1.5rem;">{capex_total:,.0f} {cur}</div>
+        <div class="pg-lbl">CAPEX (with {st.session_state.p6_contingency_pct}% contingency)</div>
     </div>
-    <div class="s6-card" style="background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.25);">
-        <div class="s6-value" style="color: #d97706; font-size:1.5rem;">{opex_total:,.0f} {cur}</div>
-        <div class="s6-label">Annual OPEX</div>
+    <div class="pg-card" style="background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.25);">
+        <div class="pg-val" style="color: #d97706; font-size:1.5rem;">{opex_total:,.0f} {cur}</div>
+        <div class="pg-lbl">Annual OPEX</div>
     </div>
-    <div class="s6-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
-        <div class="s6-value" style="color: #16a34a; font-size:1.5rem;">{st.session_state.p6_contingency_pct}%</div>
-        <div class="s6-label">Contingency</div>
+    <div class="pg-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
+        <div class="pg-val" style="color: #16a34a; font-size:1.5rem;">{st.session_state.p6_contingency_pct}%</div>
+        <div class="pg-lbl">Contingency</div>
     </div>
 </div>
 """
@@ -663,7 +663,7 @@ if capex_base > 0:
         fig = px.pie(
             breakdown_df, values="Amount", names="Category",
             title="CAPEX Breakdown",
-            color_discrete_sequence=["#6366f1", "#3b82f6", "#0f766e", "#d97706", "#94a3b8"],
+            color_discrete_sequence=["#1A1A1A", "#3b82f6", "#0f766e", "#d97706", "#94a3b8"],
         )
         fig.update_layout(
             paper_bgcolor="#f8fafc",
@@ -681,16 +681,16 @@ st.markdown("---")
 col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
-    if st.button("← Back to Step 5", use_container_width=True):
+    if st.button("Back", use_container_width=True):
         st.switch_page("pages/5_Project_Timeline.py")
 
 with col2:
-    if st.button("🔄 Restart", use_container_width=True):
+    if st.button("Restart", use_container_width=True):
         st.switch_page("pages/1_Define_Scope_and_Context.py")
 
 with col3:
     st.markdown(
-        "<div style='text-align: right; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>"
-        "Page 6 of 6</div>",
+        "<div style='text-align: right; color: #94a3b8; font-size: 0.85rem; padding-top: 0.5rem;'>"
+        "Step 6 of 6</div>",
         unsafe_allow_html=True
     )

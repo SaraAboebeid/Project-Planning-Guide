@@ -1247,7 +1247,7 @@ def get_analysis_messages(analysis_type, data_inputs, project_scale, confidence_
     if missing_critical:
         for item in missing_critical:
             messages["warnings"].append(
-                f"⚠ Critical data missing: {item.replace('_', ' ').title()}. "
+                f"Critical data missing: {item.replace('_', ' ').title()}. "
                 f"This significantly impacts {analysis_type} reliability."
             )
             messages["recommendations"].append(
@@ -1257,31 +1257,31 @@ def get_analysis_messages(analysis_type, data_inputs, project_scale, confidence_
     # Scale-specific messages
     if project_scale in requirements["scale_preference"]:
         messages["recommendations"].append(
-            f"✓ {project_scale} scale is well-suited for {analysis_type}"
+            f"{project_scale} scale is well-suited for {analysis_type}"
         )
     else:
         messages["warnings"].append(
-            f"⚠ {analysis_type} typically performed at {' or '.join(requirements['scale_preference'])} scale"
+            f"{analysis_type} typically performed at {' or '.join(requirements['scale_preference'])} scale"
         )
     
     # Confidence-based messages
     if confidence_score < 50:
         messages["limitations"].append(
-            "⚠ Low confidence: Results should be used for screening purposes only"
+            "Low confidence: Results should be used for screening purposes only"
         )
         messages["recommendations"].append(
             "Critical: Significant data improvements needed before proceeding"
         )
     elif confidence_score < 70:
         messages["limitations"].append(
-            "⚠ Medium confidence: Results suitable for planning but not detailed design"
+            "Medium confidence: Results suitable for planning but not detailed design"
         )
         messages["recommendations"].append(
             "Recommended: Improve key data items to increase confidence above 70%"
         )
     else:
         messages["recommendations"].append(
-            "✓ Good confidence level for proceeding with analysis"
+            "Good confidence level for proceeding with analysis"
         )
     
     return messages
@@ -1344,7 +1344,7 @@ def estimate_effort_and_timeline(analysis_type, project_scale, selected_uses_cou
     if project_scale in ["Neighborhood", "City"]:
         uses_mult = 1.0 + max(0, selected_uses_count - 1) * 0.08
 
-    # Data completeness impact (more missing → more effort)
+    # Data completeness impact (more missing -- more effort)
     completeness_mult = 1.0 + (1.0 - (data_completeness_pct / 100.0)) * 0.7
 
     # Proxies add incremental effort
@@ -1573,23 +1573,23 @@ st.markdown("""
            Based on M3 Tonal Palette
            ============================================ */
         
-        /* Primary - Enhanced Purple */
-        --md3-primary: #7B4CC4;              /* Richer purple */
-        --md3-on-primary: #FFFFFF;           /* P-100 */
-        --md3-primary-container: #DED0F7;    /* P-90 - more saturated */
-        --md3-on-primary-container: #2D0070; /* P-10 */
+        /* Primary - Chalmers Dark */
+        --md3-primary: #1A1A1A;              /* Near black */
+        --md3-on-primary: #FFFFFF;           /* White on dark */
+        --md3-primary-container: #E8E8E8;    /* Light grey container */
+        --md3-on-primary-container: #1A1A1A; /* Dark text */
         
-        /* Secondary */
-        --md3-secondary: #625B71;            /* S-40 */
-        --md3-on-secondary: #FFFFFF;         /* S-100 */
-        --md3-secondary-container: #E8DEF8;  /* S-90 */
-        --md3-on-secondary-container: #1E192B; /* S-10 */
+        /* Secondary - Charcoal */
+        --md3-secondary: #4A4A4A;            /* Charcoal */
+        --md3-on-secondary: #FFFFFF;         /* White */
+        --md3-secondary-container: #F0F0F0;  /* Light grey */
+        --md3-on-secondary-container: #1A1A1A; /* Dark */
         
-        /* Tertiary */
-        --md3-tertiary: #7E5260;             /* T-40 */
-        --md3-on-tertiary: #FFFFFF;          /* T-100 */
-        --md3-tertiary-container: #FFD9E3;   /* T-90 */
-        --md3-on-tertiary-container: #31101D; /* T-10 */
+        /* Tertiary - Accent Yellow */
+        --md3-tertiary: #C8E600;             /* Neon yellow-green */
+        --md3-on-tertiary: #1A1A1A;          /* Dark on yellow */
+        --md3-tertiary-container: #F5FACD;   /* Pale yellow */
+        --md3-on-tertiary-container: #2D3300; /* Dark olive */
         
         /* Error */
         --md3-error: #BA1A1A;                /* E-40 */
@@ -1608,15 +1608,15 @@ st.markdown("""
         --md3-surface-container-highest: #E0E0E0; /* Grey */
         
         /* On Surface */
-        --md3-on-surface: #1D1B20;           /* N-10 */
-        --md3-on-surface-variant: #49454E;   /* NV-30 */
-        --md3-outline: #7A757F;              /* NV-50 */
-        --md3-outline-variant: #CAC4CF;      /* NV-80 */
+        --md3-on-surface: #1A1A1A;           /* Near black */
+        --md3-on-surface-variant: #5A5A5A;   /* Medium grey */
+        --md3-outline: #8A8A8A;              /* Grey */
+        --md3-outline-variant: #D0D0D0;      /* Light grey */
         
         /* Inverse */
-        --md3-inverse-surface: #322F35;      /* N-20 */
-        --md3-inverse-on-surface: #F5EFF7;   /* N-95 */
-        --md3-inverse-primary: #CFBCFF;      /* P-80 */
+        --md3-inverse-surface: #2D2D2D;      /* Dark grey */
+        --md3-inverse-on-surface: #F5F5F5;   /* Light grey */
+        --md3-inverse-primary: #C8E600;      /* Yellow accent */
         
         /* Additional */
         --md3-scrim: #000000;                /* N-0 */
@@ -1878,14 +1878,16 @@ st.markdown("""
         box-shadow: none;
     }
     
-    /* Primary type button same style */
+    /* Primary type button — Chalmers yellow accent */
     .stButton > button[kind="primary"] {
-        background-color: var(--md3-primary);
-        color: var(--md3-on-primary);
+        background-color: #C8E600 !important;
+        color: #1A1A1A !important;
+        border: none !important;
     }
     
     .stButton > button[kind="primary"]:hover {
-        background-color: color-mix(in srgb, var(--md3-primary), var(--md3-on-primary) 8%);
+        background-color: #b5cf00 !important;
+        color: #1A1A1A !important;
     }
     
     /* M3 Cards */
@@ -2075,11 +2077,11 @@ st.markdown("""
         background-color: transparent;
     }
     
-    /* M3 Multiselect Tags/Chips - Purple theme */
+    /* M3 Multiselect Tags/Chips */
     div[data-baseweb="tag"],
     span[data-baseweb="tag"],
     [data-baseweb="tag"] {
-        background-color: #65558F !important;
+        background-color: #1A1A1A !important;
         color: #FFFFFF !important;
         border-radius: 8px !important;
         border: none !important;
@@ -2101,14 +2103,14 @@ st.markdown("""
     
     /* Override any inline styles on multiselect tags */
     .stMultiSelect [data-baseweb="tag"] {
-        background-color: #65558F !important;
+        background-color: #1A1A1A !important;
         color: #FFFFFF !important;
     }
     
-    /* M3 Alerts/Snackbar style - Light purple for info */
+    /* M3 Alerts/Snackbar style */
     .stAlert, div[data-testid="stAlert"] {
-        background-color: #E9DDFF !important;
-        color: #21005E !important;
+        background-color: #F0F0F0 !important;
+        color: #1A1A1A !important;
         border-radius: 12px;
         border: none;
         padding: 1rem;
@@ -2116,14 +2118,14 @@ st.markdown("""
     
     /* Success */
     .element-container:has(.stSuccess) .stAlert {
-        background-color: #E8DEF8 !important;
-        color: #1E192B !important;
+        background-color: #ECFDF5 !important;
+        color: #065F46 !important;
     }
     
     /* Warning */
     .element-container:has(.stWarning) .stAlert {
-        background-color: #FFD9E3 !important;
-        color: #31101D !important;
+        background-color: #FFFBEB !important;
+        color: #92400E !important;
     }
     
     /* Error */
@@ -2132,12 +2134,12 @@ st.markdown("""
         color: #410002 !important;
     }
     
-    /* Info - Light purple container */
+    /* Info */
     .element-container:has(.stInfo) .stAlert,
     div[data-testid="stAlert"],
     [data-baseweb="notification"] {
-        background-color: #E9DDFF !important;
-        color: #21005E !important;
+        background-color: #F5FACD !important;
+        color: #2D3300 !important;
     }
     
     /* Divider */
@@ -2149,21 +2151,23 @@ st.markdown("""
     
     /* M3 Step Cards */
     .step-card {
-        background-color: var(--md3-surface-container-low) !important;
+        background-color: #FFFFFF !important;
         padding: 1.25rem;
-        border-radius: var(--md3-shape-medium);
+        border-radius: 12px;
         text-align: center;
         margin-bottom: 1rem;
         height: 140px;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        border: none;
+        border: 1px solid #E5E5E5;
         transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
     }
     
     .step-card:hover {
-        background-color: var(--md3-surface-container) !important;
+        background-color: #FAFAFA !important;
+        border-color: #C8E600;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
     
     .step-index {
@@ -2172,11 +2176,15 @@ st.markdown("""
         justify-content: center;
         width: 32px;
         height: 32px;
-        background-color: var(--md3-primary);
-        color: var(--md3-on-primary);
+        min-width: 32px;
+        min-height: 32px;
+        aspect-ratio: 1;
+        flex-shrink: 0;
+        background-color: #C8E600;
+        color: #1A1A1A;
         font-size: 0.875rem;
-        font-weight: 500;
-        border-radius: var(--md3-shape-full);
+        font-weight: 700;
+        border-radius: 50%;
         margin: 0 auto 0.5rem auto;
     }
     
@@ -2200,8 +2208,17 @@ st.markdown("""
         align-items: center;
         justify-content: center; 
         height: 140px;
-        color: var(--md3-outline);
-        font-size: 1.25rem;
+        color: #8A8A8A;
+        font-size: 0;
+    }
+    .step-arrow::after {
+        content: '';
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border-top: 2px solid #C8E600;
+        border-right: 2px solid #C8E600;
+        transform: rotate(45deg);
     }
     
     /* M3 Metric */
@@ -2268,8 +2285,22 @@ if st.session_state.wizard_step == 0:
     # Animated intro container
     st.markdown("<div class='intro-container'>", unsafe_allow_html=True)
     
+    # Chalmers Next Labs logo
+    import base64, os
+    logo_path = os.path.join(os.path.dirname(__file__), "assets", "chalmers_next_labs_logo.svg")
+    if os.path.exists(logo_path):
+        with open(logo_path, "r") as f:
+            svg_data = f.read()
+        b64 = base64.b64encode(svg_data.encode()).decode()
+        st.markdown(
+            f"<div style='margin-bottom: 1.5rem;'>"
+            f"<img src='data:image/svg+xml;base64,{b64}' alt='Chalmers Next Labs' style='height: 50px;'>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
     st.title("Project Planner")
-    st.markdown("<p style='font-size: 1rem; color: var(--md3-on-surface-variant, #49454E); margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator - Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 1rem; color: var(--md3-on-surface-variant, #5A5A5A); margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator &mdash; Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
     # Overview diagram upload removed per request
 
     # Interactive Process Diagram (Playful & Interactive)
@@ -2277,57 +2308,57 @@ if st.session_state.wizard_step == 0:
 
     with diagram_cols[0]:
         st.markdown("""
-        <div class='step-card card-animate stagger-1' style='background: rgba(210,198,250,0.2);'>
+        <div class='step-card card-animate stagger-1'>
             <div class='step-index'>1</div>
             <div class='step-title'>Define Scope & Context</div>
             <div class='step-desc'>Choose analysis, scale, and context</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[1]:
-        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-1'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-1'></div>", unsafe_allow_html=True)
     with diagram_cols[2]:
         st.markdown("""
-        <div class='step-card card-animate stagger-2' style='background: rgba(210,198,250,0.2);'>
+        <div class='step-card card-animate stagger-2'>
             <div class='step-index'>2</div>
             <div class='step-title'>Review Data</div>
             <div class='step-desc'>Mark availability and select proxies</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[3]:
-        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-2'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-2'></div>", unsafe_allow_html=True)
     with diagram_cols[4]:
         st.markdown("""
-        <div class='step-card card-animate stagger-3' style='background: rgba(210,198,250,0.2);'>
+        <div class='step-card card-animate stagger-3'>
             <div class='step-index'>3</div>
             <div class='step-title'>Confidence</div>
             <div class='step-desc'>Review recommendations</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[5]:
-        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-3'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-3'></div>", unsafe_allow_html=True)
     with diagram_cols[6]:
         st.markdown("""
-        <div class='step-card card-animate stagger-4' style='background: rgba(210,198,250,0.2);'>
+        <div class='step-card card-animate stagger-4'>
             <div class='step-index'>4</div>
             <div class='step-title'>Expected Results</div>
             <div class='step-desc'>Review expected outcomes</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[7]:
-        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-4'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-4'></div>", unsafe_allow_html=True)
     with diagram_cols[8]:
         st.markdown("""
-        <div class='step-card card-animate stagger-5' style='background: rgba(210,198,250,0.2);'>
+        <div class='step-card card-animate stagger-5'>
             <div class='step-index'>5</div>
             <div class='step-title'>Project Timeline</div>
             <div class='step-desc'>Plan phases and tasks</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[9]:
-        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-5'>➜</div>", unsafe_allow_html=True)
+        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-5'></div>", unsafe_allow_html=True)
     with diagram_cols[10]:
         st.markdown("""
-        <div class='step-card card-animate stagger-6' style='background: rgba(210,198,250,0.2);'>
+        <div class='step-card card-animate stagger-6'>
             <div class='step-index'>6</div>
             <div class='step-title'>Cost Estimation</div>
             <div class='step-desc'>Budget, CAPEX, and OPEX</div>
@@ -2348,16 +2379,27 @@ if st.session_state.wizard_step == 0:
     # Add CSS and JS to hide the button until animation is done
     st.markdown("""
     <style>
-    .hidden-until-animated { opacity: 0 !important; pointer-events: none; transition: opacity 0.3s; }
-    .show-after-anim { opacity: 1 !important; pointer-events: auto; }
+    .hidden-until-animated { opacity: 0 !important; pointer-events: none; }
+    .show-after-anim { opacity: 1 !important; pointer-events: auto; transition: opacity 0.6s ease-in; }
     </style>
-    <script>
-    setTimeout(function() {
-        var btn = window.parent.document.getElementById('start-btn-container');
-        if(btn) { btn.classList.remove('hidden-until-animated'); btn.classList.add('show-after-anim'); }
-    }, 7000); // 7s = last card delay + anim duration
-    </script>
     """, unsafe_allow_html=True)
+    # Use components.html for reliable JS execution — show Start after Step 6 finishes
+    components.html("""
+    <script>
+    (function() {
+        var doc = window.parent.document;
+        function reveal() {
+            var btn = doc.getElementById('start-btn-container');
+            if (btn) {
+                btn.classList.remove('hidden-until-animated');
+                btn.classList.add('show-after-anim');
+            }
+        }
+        // Step 6 = stagger-6 = 5s delay + 1s animation = 6s. Show at 6.5s.
+        setTimeout(reveal, 6500);
+    })();
+    </script>
+    """, height=0)
     
     # Close intro container
     st.markdown("</div>", unsafe_allow_html=True)
@@ -2682,7 +2724,7 @@ if st.session_state.wizard_step == 1:
             
             # Show note about Flood Risk Assessment scale restriction
             if "Flood Risk Assessment" in selected_cr:
-                st.caption("ℹ️ Flood Risk Assessment is only available at Neighborhood or City scale")
+                st.caption("Flood Risk Assessment is only available at Neighborhood or City scale")
         else:
             st.session_state.climate_resilience_types = []
 
@@ -2781,11 +2823,11 @@ if st.session_state.wizard_step == 1:
 # Navigation: Step 1
     nav1_col1, nav1_col2, nav1_col3, nav1_col4 = st.columns([1, 1, 2, 2])
     with nav1_col1:
-        if st.button("◀ Back", use_container_width=True, key="nav_back_1"):
+        if st.button("Back", use_container_width=True, key="nav_back_1"):
             st.session_state.wizard_step = 0
             st.rerun()
     with nav1_col2:
-        if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_1"):
+        if st.button("Continue", type="primary", use_container_width=True, key="nav_next_1"):
             missing = []
             if not analysis_type:
                 missing.append("analysis type")
@@ -2891,11 +2933,11 @@ if st.session_state.wizard_step == 4:
     st.markdown("---")
     nav4_col1, nav4_col2, nav4_col3, nav4_col4 = st.columns([1, 1, 2, 2])
     with nav4_col1:
-        if st.button("◀ Back", use_container_width=True, key="nav_back_4_exp"):
+        if st.button("Back", use_container_width=True, key="nav_back_4_exp"):
             st.session_state.wizard_step = 3
             st.rerun()
     with nav4_col2:
-        if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_4_exp"):
+        if st.button("Continue", type="primary", use_container_width=True, key="nav_next_4_exp"):
             st.session_state.wizard_step = 5
             st.rerun()
     with nav4_col3:
@@ -2933,11 +2975,11 @@ if st.session_state.wizard_step == 5:
     # Navigation: Step 5
     nav4_col1, nav4_col2, nav4_col3, nav4_col4 = st.columns([1, 1, 2, 2])
     with nav4_col1:
-        if st.button("◀ Back", use_container_width=True, key="nav_back_5"):
+        if st.button("Back", use_container_width=True, key="nav_back_5"):
             st.session_state.wizard_step = 4
             st.rerun()
     with nav4_col2:
-        if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_5"):
+        if st.button("Continue", type="primary", use_container_width=True, key="nav_next_5"):
             st.session_state.wizard_step = 6
             st.rerun()
     with nav4_col3:
@@ -3141,11 +3183,11 @@ if st.session_state.wizard_step == 6:
         with nav5_col1:
             st.markdown("<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>Page 6/6</div>", unsafe_allow_html=True)
         with nav5_col2:
-            if st.button("◀ Back", use_container_width=True):
+            if st.button("Back", use_container_width=True):
                 st.session_state.wizard_step = 5
                 st.rerun()
         with nav5_col3:
-            if st.button("Restart ↺", use_container_width=True):
+            if st.button("Restart", use_container_width=True):
                 st.session_state.wizard_step = 0
                 st.rerun()
 
@@ -3207,11 +3249,11 @@ if st.session_state.wizard_step == 3:
     if analysis_type:
         export_col1, export_col2 = st.columns(2)
         with export_col1:
-            if st.button("📄 Export PDF", use_container_width=True, help="Download comprehensive report"):
-                st.info("📥 PDF export functionality - Coming soon!")
+            if st.button("Export PDF", use_container_width=True, help="Download comprehensive report"):
+                st.info("PDF export functionality - Coming soon!")
         with export_col2:
-            if st.button("📊 Export Excel", use_container_width=True, help="Download data tables"):
-                st.info("📥 Excel export functionality - Coming soon!")
+            if st.button("Export Excel", use_container_width=True, help="Download data tables"):
+                st.info("Excel export functionality - Coming soon!")
         st.markdown("<hr style='margin: 1rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
     
     # Display Proxy Recommendations Dynamically
@@ -3274,18 +3316,18 @@ if st.session_state.wizard_step == 3:
                         cols = st.columns(2)
                         with cols[0]:
                             if proxy_info['suitable_for']:
-                                st.markdown("<p style='font-size: 0.85rem; font-weight: 600; color: #059669; margin-top: 0.5rem;'>✓ Suitable for:</p>", unsafe_allow_html=True)
+                                st.markdown("<p style='font-size: 0.85rem; font-weight: 600; color: #059669; margin-top: 0.5rem;'>Suitable for:</p>", unsafe_allow_html=True)
                                 for item in proxy_info['suitable_for']:
                                     st.markdown(f"<p style='font-size: 0.8rem; color: #059669; margin: 0;'>• {item}</p>", unsafe_allow_html=True)
                         with cols[1]:
                             if proxy_info['not_suitable_for']:
-                                st.markdown("<p style='font-size: 0.85rem; font-weight: 600; color: #dc2626; margin-top: 0.5rem;'>✗ Not suitable for:</p>", unsafe_allow_html=True)
+                                st.markdown("<p style='font-size: 0.85rem; font-weight: 600; color: #dc2626; margin-top: 0.5rem;'>Not suitable for:</p>", unsafe_allow_html=True)
                                 for item in proxy_info['not_suitable_for']:
                                     st.markdown(f"<p style='font-size: 0.8rem; color: #dc2626; margin: 0;'>• {item}</p>", unsafe_allow_html=True)
                     
                     st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("✓ All critical data available! No proxies needed.")
+        st.info("All critical data available! No proxies needed.")
     
     # Show scale-specific message
     if confidence_results.get("scale_message"):
@@ -3325,7 +3367,7 @@ if st.session_state.wizard_step == 3:
     )
     
     # Confidence Prediction Calculator
-    with st.expander("🎯 Confidence Prediction - What If?", expanded=False):
+    with st.expander("Confidence Prediction - What If?", expanded=False):
         st.markdown("**See how your confidence improves with additional data**")
         
         if analysis_type:
@@ -3347,13 +3389,13 @@ if st.session_state.wizard_step == 3:
                 predicted_additions = []
                 
                 if missing_critical:
-                    st.markdown("<p style='color: #ef4444; font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem;'>🔴 Critical Items (High Impact):</p>", unsafe_allow_html=True)
+                    st.markdown("<p style='color: #ef4444; font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem;'>Critical Items (High Impact):</p>", unsafe_allow_html=True)
                     for idx, item in enumerate(missing_critical[:5]):  # Show top 5
                         if st.checkbox(f"{item['label']}", key=f"pred_crit_{idx}_{item['key']}", help="Critical for analysis"):
                             predicted_additions.append(item['key'])
                 
                 if missing_important:
-                    st.markdown("<p style='color: #f59e0b; font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem;'>⚠️ Important Items (Medium Impact):</p>", unsafe_allow_html=True)
+                    st.markdown("<p style='color: #f59e0b; font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem;'>Important Items (Medium Impact):</p>", unsafe_allow_html=True)
                     for idx, item in enumerate(missing_important[:5]):  # Show top 5
                         if st.checkbox(f"{item['label']}", key=f"pred_imp_{idx}_{item['key']}", help="Important for accuracy"):
                             predicted_additions.append(item['key'])
@@ -3381,7 +3423,7 @@ if st.session_state.wizard_step == 3:
                         st.markdown(f"<p style='margin: 0.3rem 0 0 0; font-size: 1rem; color: #10b981; font-weight: 700;'>+{improvement:.0f}% improvement!</p>", unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
             else:
-                st.success("✓ All data items available! Excellent data coverage.")
+                st.success("All data items available! Excellent data coverage.")
 
         # Recommended Actions inside the same dropdown
         if analysis_messages.get("recommendations"):
@@ -3400,7 +3442,7 @@ if st.session_state.wizard_step == 3:
     
     # Data Source Directory
     st.markdown("<hr style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
-    with st.expander("📚 Data Source Directory - Where to Find Data", expanded=False):
+    with st.expander("Data Source Directory - Where to Find Data", expanded=False):
         st.markdown("**Universal Data Sources:**")
         
         universal_sources = [
@@ -3467,16 +3509,16 @@ if st.session_state.wizard_step == 3:
         - **HVAC Systems**: Building technical documentation, facility management records
         """)
         
-        st.info("💡 Tip: Start with free open data sources (OpenStreetMap, government portals) before considering commercial data providers.")
+        st.info("Tip: Start with free open data sources (OpenStreetMap, government portals) before considering commercial data providers.")
 
         # Navigation: Step 3
         nav3_col1, nav3_col2, nav3_col3, nav3_col4 = st.columns([1, 1, 2, 2])
         with nav3_col1:
-            if st.button("◀ Back", use_container_width=True, key="nav_back_3"):
+            if st.button("Back", use_container_width=True, key="nav_back_3"):
                 st.session_state.wizard_step = 2
                 st.rerun()
         with nav3_col2:
-            if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_3"):
+            if st.button("Continue", type="primary", use_container_width=True, key="nav_next_3"):
                 st.session_state.wizard_step = 4
                 st.rerun()
         with nav3_col3:

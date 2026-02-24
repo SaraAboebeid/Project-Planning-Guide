@@ -7,7 +7,7 @@ building uses, and country context - matching the original wizard functionality.
 
 import streamlit as st
 
-st.set_page_config(page_title="Define Scope", page_icon="📋", layout="wide")
+st.set_page_config(page_title="Define Scope", layout="wide")
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -19,9 +19,9 @@ st.markdown("""
 
 
 # --- SMALLER HEADER & CONTEXT ---
-st.markdown("<h2 style='font-size:1.35rem; font-weight:700; margin-bottom:0.5rem;'>Step 1: Define Scope & Context</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='font-size:1.5rem; font-weight:700; color:#0f172a; letter-spacing:-0.01em; margin-bottom:0.5rem;'>Step 1: Define Scope & Context</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='font-size:0.98rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>Select the analysis type, focus, and basic context for your project.</p>",
+    "<p style='font-size:0.92rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>Select the analysis type, focus, and basic context for your project.</p>",
     unsafe_allow_html=True
 )
 
@@ -30,7 +30,7 @@ st.markdown(
 # ============================================================================
 
 
-st.markdown("<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.2rem;'>Analysis Type <span style='color:#dc2626'>*</span></div>", unsafe_allow_html=True)
+st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Analysis Type <span style='color:#dc2626'>*</span></div>", unsafe_allow_html=True)
 
 analysis_type = st.multiselect(
     "Select your analysis (one or more):",
@@ -61,7 +61,7 @@ if analysis_type:
 # Energy & Carbon Performance - Focus area
 if "Energy & Carbon Performance" in analysis_type:
 
-    st.markdown("<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.2rem;'>Focus area (select one)</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Focus area (select one)</div>", unsafe_allow_html=True)
     focus_options = [
         "Electricity",
         "Heating/Cooling",
@@ -87,7 +87,7 @@ else:
 # Renewable Energy & Local Production - Renewable types
 if "Renewable Energy & Local Production" in analysis_type:
 
-    st.markdown("<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.2rem;'>Renewable energy types (select one or more)</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Renewable energy types (select one or more)</div>", unsafe_allow_html=True)
     renewable_options = [
         "Battery Storage",
         "Biomass",
@@ -112,7 +112,7 @@ else:
 # Urban Design Support - Urban design focus
 if "Urban Design Support" in analysis_type:
 
-    st.markdown("<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.2rem;'>Urban design focus (select one or more)</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Urban design focus (select one or more)</div>", unsafe_allow_html=True)
     urban_design_options = [
         "Accessibility",
         "Amenities Demand",
@@ -136,7 +136,7 @@ else:
 # Climate Resilience - Climate resilience focus
 if "Climate Resilience" in analysis_type:
 
-    st.markdown("<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.2rem;'>Climate resilience focus (select one or more)</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Climate resilience focus (select one or more)</div>", unsafe_allow_html=True)
     climate_options = [
         "Climate Projections",
         "Cooling Demand Impact",
@@ -155,7 +155,7 @@ if "Climate Resilience" in analysis_type:
     
     # Show note about Flood Risk Assessment scale restriction
     if "Flood Risk Assessment" in selected_cr:
-        st.caption("ℹ️ Flood Risk Assessment is only available at Neighborhood or City scale")
+        st.caption("Flood Risk Assessment is only available at Neighborhood or City scale")
 else:
     st.session_state.climate_resilience_types = []
 
@@ -164,7 +164,7 @@ else:
 # ============================================================================
 
 
-st.markdown("<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.2rem;'>Define Your Scale <span style='color:#dc2626'>*</span></div>", unsafe_allow_html=True)
+st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Define Your Scale <span style='color:#dc2626'>*</span></div>", unsafe_allow_html=True)
 
 # Determine available scale options based on analysis type selection
 climate_types = st.session_state.get("climate_resilience_types", [])
@@ -207,7 +207,7 @@ st.session_state["analysis_scale"] = project_scale
 
 if project_scale == "Neighborhood":
 
-    st.markdown("<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.2rem;'>Building Uses Included</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Building Uses Included</div>", unsafe_allow_html=True)
     st.caption("<span style='font-size:0.93rem;'>Select all building types in your analysis:</span>", unsafe_allow_html=True)
 
     # Controls for building uses
@@ -252,7 +252,7 @@ if project_scale == "Neighborhood":
 # ============================================================================
 
 
-st.markdown("<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.2rem;'>Context <span style='color:#dc2626'>*</span></div>", unsafe_allow_html=True)
+st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Context <span style='color:#dc2626'>*</span></div>", unsafe_allow_html=True)
 
 # Get current country value for index
 current_country = st.session_state.get("country")
@@ -277,7 +277,7 @@ st.session_state["analysis_context"] = country
 # ============================================================================
 
 
-st.markdown("<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.2rem;'>Project Details</div>", unsafe_allow_html=True)
+st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Project Details</div>", unsafe_allow_html=True)
 col_a, col_b = st.columns(2)
 with col_a:
     st.session_state["project_name"] = st.text_input(
@@ -297,14 +297,14 @@ with col_b:
 # ============================================================================
 
 st.markdown("---")
-nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([1, 1, 2, 2])
+col1, col2, col3 = st.columns([1, 1, 2])
 
-with nav_col1:
-    if st.button("◀ Back", use_container_width=True, key="nav_back_1"):
+with col1:
+    if st.button("Back", use_container_width=True, key="nav_back_1"):
         st.switch_page("planning_guide.py")
 
-with nav_col2:
-    if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_1"):
+with col2:
+    if st.button("Continue", type="primary", use_container_width=True, key="nav_next_1"):
         # Validation
         missing = []
         if not analysis_type:
@@ -319,9 +319,9 @@ with nav_col2:
         else:
             st.switch_page("pages/2_Review_Data.py")
 
-with nav_col3:
+with col3:
     st.markdown(
-        "<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>"
-        "Page 1 of 6</div>",
+        "<div style='text-align: right; color: #94a3b8; font-size: 0.85rem; padding-top: 0.5rem;'>"
+        "Step 1 of 6</div>",
         unsafe_allow_html=True
     )

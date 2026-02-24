@@ -101,7 +101,7 @@ def render_step2(col2):
             # Show focus only for Energy & Carbon Performance
             focus_str = ""
             if analysis_focus and "Energy & Carbon Performance" in (analysis_type if isinstance(analysis_type, list) else [analysis_type]):
-                focus_str = f" → **{analysis_focus}**"
+                focus_str = f" / **{analysis_focus}**"
             
             st.caption(f"Showing data requirements for **{analysis_str}**{focus_str}{context_info}")
         
@@ -147,45 +147,45 @@ def render_step2(col2):
 
         st.markdown(f"""
         <style>
-        .summary-card-row {{
+        .pg-card-row {{
             display: flex;
             gap: 1.2rem;
-            margin-bottom: 1.5rem;
+            margin: 1.2rem 0 1.5rem 0;
         }}
-        .summary-card {{
+        .pg-card {{
             flex: 1 1 0;
-            border-radius: 16px;
-            padding: 1.2rem 1.5rem;
+            border-radius: 14px;
+            padding: 1.1rem 1.4rem;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 110px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            min-height: 100px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
         }}
-        .summary-card .card-value {{
+        .pg-card .pg-val {{
             font-size: 2rem;
             font-weight: 700;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.2rem;
         }}
-        .summary-card .card-label {{
-            font-size: 0.95rem;
+        .pg-card .pg-lbl {{
+            font-size: 0.88rem;
             font-weight: 500;
             color: #6b7280;
         }}
         </style>
-        <div class="summary-card-row">
-            <div class="summary-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
-                <div class="card-value" style="color: #16a34a;">{available}</div>
-                <div class="card-label">Available Datasets</div>
+        <div class="pg-card-row">
+            <div class="pg-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
+                <div class="pg-val" style="color: #16a34a;">{available}</div>
+                <div class="pg-lbl">Available Datasets</div>
             </div>
-            <div class="summary-card" style="background: rgba(239,68,68,0.10); border: 1px solid rgba(239,68,68,0.25);">
-                <div class="card-value" style="color: #ef4444;">{missing}</div>
-                <div class="card-label">Missing Datasets</div>
+            <div class="pg-card" style="background: rgba(239,68,68,0.10); border: 1px solid rgba(239,68,68,0.25);">
+                <div class="pg-val" style="color: #ef4444;">{missing}</div>
+                <div class="pg-lbl">Missing Datasets</div>
             </div>
-            <div class="summary-card" style="background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.25);">
-                <div class="card-value" style="color: {conf_color};">{total_conf_display}</div>
-                <div class="card-label">Total Confidence</div>
+            <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
+                <div class="pg-val" style="color: {conf_color};">{total_conf_display}</div>
+                <div class="pg-lbl">Total Confidence</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -237,7 +237,7 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
     )
     
     if has_data == "Yes":
-        st.success("✓ Using recommended source")
+        st.success("Using recommended source")
     else:
         # Show proxy options
         if proxy_options:
@@ -263,7 +263,7 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
                     level = "Low"
                 
                 # Show confidence with estimated badge and tooltip
-                source_badge = "ⓘ Estimated" if confidence_source == "estimated" else "✓ Validated"
+                source_badge = "Estimated" if confidence_source == "estimated" else "Validated"
                 st.markdown(
                     f"<div style='display: flex; align-items: center; gap: 8px; margin-top: 4px;'>"
                     f"<span style='font-size: 0.9rem;'>Confidence: </span>"
@@ -273,9 +273,9 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
                     unsafe_allow_html=True
                 )
             else:
-                st.caption("⚠️ Confidence not yet estimated for this proxy")
+                st.caption("Confidence not yet estimated for this proxy")
         else:
-            st.caption("⚠️ No proxy options available yet")
+            st.caption("No proxy options available yet")
     
     # Separator
     st.markdown("---")
@@ -283,10 +283,10 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
 
 def render_step2_navigation():
     """Render navigation buttons for Step 2."""
-    nav_col1, nav_col2, nav_col3, nav_col4 = st.columns([1, 1, 2, 2])
+    col1, col2_nav, col3 = st.columns([1, 1, 2])
     
-    with nav_col1:
-        if st.button("◀ Back", use_container_width=True, key="nav_back_2"):
+    with col1:
+        if st.button("Back", use_container_width=True, key="nav_back_2"):
             # Clear cached values so they refresh from Step 1
             st.session_state.pop("step2_cached_analysis_type", None)
             st.session_state.pop("step2_cached_focus", None)
@@ -298,14 +298,14 @@ def render_step2_navigation():
             st.session_state.wizard_step = 1
             st.rerun()
     
-    with nav_col2:
-        if st.button("Next ▶", type="primary", use_container_width=True, key="nav_next_2"):
+    with col2_nav:
+        if st.button("Continue", type="primary", use_container_width=True, key="nav_next_2"):
             st.session_state.wizard_step = 3
             st.rerun()
     
-    with nav_col3:
+    with col3:
         st.markdown(
-            "<div style='text-align: left; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>"
-            "Page 2/6</div>",
+            "<div style='text-align: right; color: #94a3b8; font-size: 0.85rem; padding-top: 0.5rem;'>"
+            "Step 2 of 6</div>",
             unsafe_allow_html=True
         )

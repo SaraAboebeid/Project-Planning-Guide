@@ -8,7 +8,7 @@ with proxy alternatives and confidence estimates.
 import streamlit as st
 from config.data_inputs import get_data_inputs, get_proxy_options_for_context, get_proxy_confidence
 
-st.set_page_config(page_title="Review Data", page_icon="�", layout="wide")
+st.set_page_config(page_title="Review Data", layout="wide")
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -148,7 +148,7 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
     )
     
     if has_data == "Yes":
-        st.success("✓ Using recommended source")
+        st.success("Using recommended source")
     else:
         # Show proxy options with confidence
         if proxy_options:
@@ -179,7 +179,7 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
                     level = "Low"
                 
                 # Show confidence with estimated badge and tooltip
-                source_badge = "ⓘ Estimated" if confidence_source == "estimated" else "✓ Validated"
+                source_badge = "Estimated" if confidence_source == "estimated" else "Validated"
                 st.markdown(
                     f"<div style='display: flex; align-items: center; gap: 8px; margin-top: 4px;'>"
                     f"<span style='font-size: 0.9rem;'>Confidence: </span>"
@@ -191,20 +191,20 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
                     unsafe_allow_html=True
                 )
             else:
-                st.caption("⚠️ Confidence not yet estimated for this proxy")
+                st.caption("Confidence not yet estimated for this proxy")
         else:
-            st.caption("⚠️ No proxy options available yet")
+            st.caption("No proxy options available yet")
 
         # Show contextual "Where to find this data" links
         source_links = _get_source_links(item_key, context)
         if source_links:
             links_html = " · ".join(
-                f"<a href='{url}' target='_blank' style='color:#6366f1; text-decoration:none; font-weight:500;'>{name}</a>"
+                f"<a href='{url}' target='_blank' style='color:#1A1A1A; text-decoration:none; font-weight:500;'>{name}</a>"
                 for name, url in source_links
             )
             st.markdown(
                 f"<div style='margin-top:6px; font-size:0.85rem; color:#64748b;'>"
-                f"📎 Find this data: {links_html}"
+                f"Sources: {links_html}"
                 f"</div>",
                 unsafe_allow_html=True
             )
@@ -233,7 +233,7 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
 # ============================================================================
 
 if "analysis_type" not in st.session_state or not st.session_state.analysis_type:
-    st.warning("⚠️ Please complete Step 1 first: Define Scope and Context")
+    st.warning("Please complete Step 1 first.")
     if st.button("Go to Step 1"):
         st.switch_page("pages/1_Define_Scope_and_Context.py")
     st.stop()
@@ -261,14 +261,14 @@ climate_resilience_types = st.session_state.get("climate_resilience_types", [])
 
 
 # --- SMALLER HEADER & CONTEXT ---
-st.markdown("<h2 style='font-size:1.35rem; font-weight:700; margin-bottom:0.5rem;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='font-size:1.5rem; font-weight:700; color:#0f172a; letter-spacing:-0.01em; margin-bottom:0.5rem;'>Step 2: Review Data Inputs</h2>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='font-size:0.98rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>Review the required data inputs and select proxy alternatives if needed.</p>",
+    "<p style='font-size:0.92rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>Review the required data inputs and select proxy alternatives if needed.</p>",
     unsafe_allow_html=True
 )
-context_info = f"<span style='font-size:0.93rem; color:#334155;'><b>Analysis Type:</b> {analysis_type_str}"
+context_info = f"<span style='font-size:0.88rem; color:#475569;'><b>Analysis Type:</b> {analysis_type_str}"
 if analysis_focus:
-    context_info += f" → <b>{analysis_focus}</b>"
+    context_info += f" / <b>{analysis_focus}</b>"
 if analysis_scale:
     context_info += f" | <b>Scale:</b> {analysis_scale}"
 if analysis_context:
@@ -295,7 +295,7 @@ data_inputs = get_data_inputs(
 if not data_inputs:
     st.warning(f"No data inputs configured yet for this analysis type and focus.")
     st.info("Please go back to Step 1 and select a valid combination, or check config/data_inputs.py")
-    if st.button("← Back to Step 1"):
+    if st.button("Back to Step 1"):
         st.switch_page("pages/1_Define_Scope_and_Context.py")
     st.stop()
 
@@ -335,49 +335,47 @@ avg_conf_display = f"{avg_conf}%" if avg_conf is not None else "N/A"
 
 card_html = f"""
 <style>
-.card-row {{
-  display: flex;
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
+.pg-card-row {{
+    display: flex;
+    gap: 1.2rem;
+    margin: 1.2rem 0 1.5rem 0;
 }}
-.card-m3 {{
-  background: rgba(210,198,250,0.2);
-  border-radius: 18px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-  padding: 1.2rem 2rem 1.2rem 2rem;
-  flex: 1 1 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 160px;
-  min-height: 110px;
+.pg-card {{
+    flex: 1 1 0;
+    border-radius: 14px;
+    padding: 1.1rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    background: rgba(26,26,26,0.04);
+    border: 1px solid rgba(26,26,26,0.08);
 }}
-.card-m3 .card-metric {{
-  font-size: 2.1rem;
-  font-weight: 700;
-  color: #4b2996;
-  margin-bottom: 0.2rem;
+.pg-card .pg-val {{
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
 }}
-.card-m3 .card-label {{
-  font-size: 1.05rem;
-  color: #6b7280;
-  font-weight: 500;
-  letter-spacing: 0.2px;
+.pg-card .pg-lbl {{
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: #6b7280;
 }}
 </style>
-<div class='card-row'>
-  <div class='card-m3'>
-    <div class='card-metric'>{available}</div>
-    <div class='card-label'>Available Data</div>
+<div class='pg-card-row'>
+  <div class='pg-card'>
+    <div class='pg-val'>{available}</div>
+    <div class='pg-lbl'>Available Data</div>
   </div>
-  <div class='card-m3'>
-    <div class='card-metric'>{missing}</div>
-    <div class='card-label'>Missing Data</div>
+  <div class='pg-card'>
+    <div class='pg-val'>{missing}</div>
+    <div class='pg-lbl'>Missing Data</div>
   </div>
-  <div class='card-m3'>
-    <div class='card-metric'>{avg_conf_display}</div>
-    <div class='card-label'>Avg. Proxy Confidence</div>
+  <div class='pg-card'>
+    <div class='pg-val'>{avg_conf_display}</div>
+    <div class='pg-lbl'>Avg. Proxy Confidence</div>
   </div>
 </div>
 """
@@ -392,7 +390,7 @@ st.markdown(card_html, unsafe_allow_html=True)
 
 
 st.markdown("<hr style='margin: 0.7rem 0 0.7rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-st.markdown("<div style='font-size:1.08rem; font-weight:600; margin-bottom:0.2rem;'>Do you have the following data inputs?</div>", unsafe_allow_html=True)
+st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Do you have the following data inputs?</div>", unsafe_allow_html=True)
 
 for category_data in data_inputs:
     category_name = category_data["category"]
@@ -413,16 +411,16 @@ st.markdown("---")
 col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
-    if st.button("← Back to Step 1", use_container_width=True):
+    if st.button("Back", use_container_width=True):
         st.switch_page("pages/1_Define_Scope_and_Context.py")
 
 with col2:
-    if st.button("Next: Step 3 →", type="primary", use_container_width=True):
+    if st.button("Continue", type="primary", use_container_width=True):
         st.switch_page("pages/3_Analysis_Method.py")
 
 with col3:
     st.markdown(
-        "<div style='text-align: right; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>"
-        "Page 2 of 6</div>",
+        "<div style='text-align: right; color: #94a3b8; font-size: 0.85rem; padding-top: 0.5rem;'>"
+        "Step 2 of 6</div>",
         unsafe_allow_html=True
     )

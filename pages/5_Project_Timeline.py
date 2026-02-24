@@ -11,7 +11,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 from config.data_inputs import get_data_inputs, get_proxy_confidence
 
-st.set_page_config(page_title="Project Timeline", page_icon="📅", layout="wide")
+st.set_page_config(page_title="Project Timeline", layout="wide")
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -26,7 +26,7 @@ st.markdown("""
 # ============================================================================
 
 if "analysis_type" not in st.session_state or not st.session_state.analysis_type:
-    st.warning("⚠️ Please complete Step 1 first: Define Scope and Context")
+    st.warning("Please complete Step 1 first.")
     if st.button("Go to Step 1"):
         st.switch_page("pages/1_Define_Scope_and_Context.py")
     st.stop()
@@ -120,20 +120,20 @@ if "p5_timeline_rows" not in st.session_state:
 # ============================================================================
 
 st.markdown(
-    "<h2 style='font-size:1.35rem; font-weight:700; margin-bottom:0.5rem;'>"
+    "<h2 style='font-size:1.5rem; font-weight:700; color:#0f172a; letter-spacing:-0.01em; margin-bottom:0.5rem;'>"
     "Step 5: Project Timeline</h2>",
     unsafe_allow_html=True
 )
 st.markdown(
-    "<p style='font-size:0.98rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>"
+    "<p style='font-size:0.92rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>"
     "Plan your project schedule. Auto-generate phases from effort estimates or build your own.</p>",
     unsafe_allow_html=True
 )
 
 # Context bar
-context_info = f"<span style='font-size:0.93rem; color:#334155;'><b>Analysis:</b> {analysis_type_str}"
+context_info = f"<span style='font-size:0.88rem; color:#475569;'><b>Analysis:</b> {analysis_type_str}"
 if analysis_focus:
-    context_info += f" → <b>{analysis_focus}</b>"
+    context_info += f" / <b>{analysis_focus}</b>"
 if analysis_scale:
     context_info += f" | <b>Scale:</b> {analysis_scale}"
 if analysis_context:
@@ -149,45 +149,45 @@ num_phases = len(PHASE_SPLIT)
 
 card_html = f"""
 <style>
-.s5-card-row {{
+.pg-card-row {{
     display: flex;
     gap: 1.2rem;
     margin: 1.2rem 0 1.5rem 0;
 }}
-.s5-card {{
+.pg-card {{
     flex: 1 1 0;
-    border-radius: 16px;
-    padding: 1.2rem 1.5rem;
+    border-radius: 14px;
+    padding: 1.1rem 1.4rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 110px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    min-height: 100px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }}
-.s5-card .s5-value {{
+.pg-card .pg-val {{
     font-size: 2rem;
     font-weight: 700;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.2rem;
 }}
-.s5-card .s5-label {{
-    font-size: 0.95rem;
+.pg-card .pg-lbl {{
+    font-size: 0.88rem;
     font-weight: 500;
     color: #6b7280;
 }}
 </style>
-<div class="s5-card-row">
-    <div class="s5-card" style="background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.25);">
-        <div class="s5-value" style="color: #6366f1;">{total_hours} hrs</div>
-        <div class="s5-label">Estimated Effort</div>
+<div class="pg-card-row">
+    <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
+        <div class="pg-val" style="color: #1A1A1A;">{total_hours} hrs</div>
+        <div class="pg-lbl">Estimated Effort</div>
     </div>
-    <div class="s5-card" style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.25);">
-        <div class="s5-value" style="color: #3b82f6;">{duration_weeks} wk</div>
-        <div class="s5-label">Estimated Duration</div>
+    <div class="pg-card" style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.25);">
+        <div class="pg-val" style="color: #3b82f6;">{duration_weeks} wk</div>
+        <div class="pg-lbl">Estimated Duration</div>
     </div>
-    <div class="s5-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
-        <div class="s5-value" style="color: #16a34a;">{num_phases}</div>
-        <div class="s5-label">Project Phases</div>
+    <div class="pg-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
+        <div class="pg-val" style="color: #16a34a;">{num_phases}</div>
+        <div class="pg-lbl">Project Phases</div>
     </div>
 </div>
 """
@@ -205,13 +205,13 @@ st.markdown(
 dcol1, dcol2 = st.columns(2)
 with dcol1:
     st.session_state.p5_project_start = st.date_input(
-        "📅 Project Start Date",
+        "Project Start Date",
         value=st.session_state.p5_project_start,
         key="p5_start_input"
     )
 with dcol2:
     st.session_state.p5_project_end = st.date_input(
-        "📅 Project End Date",
+        "Project End Date",
         value=st.session_state.p5_project_end,
         key="p5_end_input"
     )
@@ -228,12 +228,12 @@ st.markdown(
 gen_col1, gen_col2, gen_col3 = st.columns([1, 1, 2])
 with gen_col1:
     generate_clicked = st.button(
-        "📋 Generate Timeline from Estimates",
+        "Generate Timeline",
         use_container_width=True,
         help="Auto-populate phases based on effort breakdown"
     )
 with gen_col2:
-    clear_clicked = st.button("🗑️ Clear Timeline", use_container_width=True)
+    clear_clicked = st.button("Clear", use_container_width=True)
 
 if generate_clicked:
     start_date = pd.to_datetime(st.session_state.p5_project_start)
@@ -266,8 +266,8 @@ if clear_clicked:
 # ============================================================================
 
 st.markdown(
-    "<div style='font-size:1.05rem; font-weight:600; margin-bottom:0.5rem;'>"
-    "📝 Timeline Editor</div>",
+    "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.5rem;'>"
+    "Timeline Editor</div>",
     unsafe_allow_html=True
 )
 
@@ -303,7 +303,7 @@ st.session_state.p5_timeline_rows = edited_timeline.to_dict(orient="records")
 if not edited_timeline.empty and "Hours" in edited_timeline.columns:
     total_planned = int(edited_timeline["Hours"].fillna(0).sum())
     st.caption(
-        f"📊 Timeline total: **{total_planned} hours** across "
+        f"Timeline total: **{total_planned} hours** across "
         f"**{len(edited_timeline)}** tasks "
         f"(estimated baseline: {total_hours} hours)"
     )
@@ -332,7 +332,7 @@ if not valid_timeline.empty:
             color="Phase" if "Phase" in valid_timeline.columns else None,
             title="Project Timeline (Gantt)",
             color_discrete_sequence=[
-                "#6366f1", "#3b82f6", "#0f766e", "#d97706", "#94a3b8", "#ef4444"
+                "#1A1A1A", "#3b82f6", "#0f766e", "#d97706", "#94a3b8", "#ef4444"
             ],
         )
         fig.update_yaxes(autorange="reversed")
@@ -350,7 +350,7 @@ if not valid_timeline.empty:
         st.warning(f"Could not render Gantt chart: {e}")
 else:
     st.info(
-        "📅 No timeline data yet. Use **Generate Timeline from Estimates** above "
+        "No timeline data yet. Use **Generate Timeline from Estimates** above "
         "or add rows manually in the editor."
     )
 
@@ -362,16 +362,16 @@ st.markdown("---")
 col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
-    if st.button("← Back to Step 4", use_container_width=True):
+    if st.button("Back", use_container_width=True):
         st.switch_page("pages/4_Expected_Results.py")
 
 with col2:
-    if st.button("Next: Step 6 →", type="primary", use_container_width=True):
+    if st.button("Continue", type="primary", use_container_width=True):
         st.switch_page("pages/6_Tasks_and_Cost.py")
 
 with col3:
     st.markdown(
-        "<div style='text-align: right; color: #94a3b8; font-size: 0.9rem; padding-top: 0.5rem;'>"
-        "Page 5 of 6</div>",
+        "<div style='text-align: right; color: #94a3b8; font-size: 0.85rem; padding-top: 0.5rem;'>"
+        "Step 5 of 6</div>",
         unsafe_allow_html=True
     )
