@@ -2285,10 +2285,10 @@ if st.session_state.wizard_step == 0:
     # Animated intro container
     st.markdown("<div class='intro-container'>", unsafe_allow_html=True)
     
-    # Chalmers Next Labs logo + Chalmers University logo
+    # Branded gradient ribbon with logos
     import base64, os
-    logo_path = os.path.join(os.path.dirname(__file__), "assets", "chalmers_next_labs_logo.svg")
-    uni_logo_path = os.path.join(os.path.dirname(__file__), "assets", "chalmers_university_logo.svg")
+    logo_path = os.path.join(os.path.dirname(__file__), "assets", "chalmers_next_labs_logo_white.svg")
+    uni_logo_path = os.path.join(os.path.dirname(__file__), "assets", "chalmers_university_logo_white.svg")
     logo_html_parts = []
     if os.path.exists(logo_path):
         with open(logo_path, "r") as f:
@@ -2302,18 +2302,37 @@ if st.session_state.wizard_step == 0:
             uni_svg = f.read()
         uni_b64 = base64.b64encode(uni_svg.encode()).decode()
         logo_html_parts.append(
-            f"<img src='data:image/svg+xml;base64,{uni_b64}' alt='Chalmers University of Technology' style='height: 45px;'>"
+            f"<img src='data:image/svg+xml;base64,{uni_b64}' alt='Chalmers University of Technology' style='height: 38px;'>"
         )
+    ribbon_logos = ""
     if logo_html_parts:
-        st.markdown(
-            f"<div style='display:flex; align-items:center; justify-content:flex-end; gap:2rem; margin-bottom:1.5rem;'>"
-            f"{''.join(logo_html_parts)}"
-            f"</div>",
-            unsafe_allow_html=True
-        )
-
-    st.title("Project Planner")
-    st.markdown("<p style='font-size: 1rem; color: var(--md3-on-surface-variant, #5A5A5A); margin-top: -0.5rem; margin-bottom: 1.5rem;'>Data Fidelity Navigator &mdash; Handle Data Gaps & Review Impacts</p>", unsafe_allow_html=True)
+        divider = "<div style='width:1px; height:32px; background:rgba(255,255,255,0.35);'></div>"
+        ribbon_logos = divider.join(logo_html_parts)
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(135deg, #33A9A0 0%, #33528A 100%);
+        border-radius: 14px;
+        padding: 1rem 2rem;
+        margin: -1rem -1rem 1.8rem -1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.5rem;
+        box-shadow: 0 4px 20px rgba(51, 82, 138, 0.18);
+    ">
+        <div>
+            <div style="font-size: 1.6rem; font-weight: 800; color: #fff; letter-spacing: 0.5px; line-height: 1.2;">
+                Project Planner
+            </div>
+            <div style="font-size: 0.85rem; color: rgba(255,255,255,0.8); margin-top: 0.2rem; letter-spacing: 0.3px;">
+                Data Fidelity Navigator &mdash; Handle Data Gaps &amp; Review Impacts
+            </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.8rem; flex-shrink:0;">
+            {ribbon_logos}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     # Overview diagram upload removed per request
 
     # Interactive Process Diagram (Playful & Interactive)
