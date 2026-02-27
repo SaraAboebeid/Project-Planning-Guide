@@ -10,8 +10,12 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 from config.data_inputs import get_data_inputs, get_proxy_confidence
+from utils.shared_css import inject_shared_css, render_step_indicator, render_sidebar_cards
 
 st.set_page_config(page_title="Tasks & Cost", layout="wide")
+
+# Inject shared MD3 button / theme CSS
+inject_shared_css()
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -20,6 +24,9 @@ st.markdown("""
     section[data-testid="stSidebar"] {display: none;}
 </style>
 """, unsafe_allow_html=True)
+
+# Persistent step progress indicator
+render_step_indicator(6)
 
 # ============================================================================
 # CONSTANTS
@@ -323,54 +330,17 @@ service_cost = round(effective_hours * rate * overhead_mult, 2)
 currency = st.session_state.p6_currency
 
 # ============================================================================
-# SUMMARY CARDS
+# SIDEBAR SUMMARY CARDS
 # ============================================================================
 
-card_html = f"""
-<style>
-.pg-card-row {{
-    display: flex;
-    gap: 1.2rem;
-    margin: 1.2rem 0 1.5rem 0;
-}}
-.pg-card {{
-    flex: 1 1 0;
-    border-radius: 14px;
-    padding: 1.1rem 1.4rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}}
-.pg-card .pg-val {{
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 0.2rem;
-}}
-.pg-card .pg-lbl {{
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: #6b7280;
-}}
-</style>
-<div class="pg-card-row">
-    <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
-        <div class="pg-val" style="color: #1A1A1A;">{service_cost:,.0f} {currency}</div>
-        <div class="pg-lbl">Estimated Service Cost</div>
-    </div>
-    <div class="pg-card" style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.25);">
-        <div class="pg-val" style="color: #3b82f6;">{effective_hours} hrs</div>
-        <div class="pg-lbl">{"Task Plan" if st.session_state.p6_use_task_plan and task_total_hours > 0 else "Estimated"} Hours</div>
-    </div>
-    <div class="pg-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
-        <div class="pg-val" style="color: #16a34a;">{effective_weeks} wk</div>
-        <div class="pg-lbl">Duration</div>
-    </div>
-</div>
-"""
-st.markdown(card_html, unsafe_allow_html=True)
+render_sidebar_cards([
+    {"value": f"{service_cost:,.0f} {currency}", "label": "Estimated Service Cost",
+     "color": "#33528A", "bg": "rgba(51,82,138,0.10)", "border": "rgba(51,82,138,0.25)"},
+    {"value": f"{effective_hours} hrs", "label": f"{'Task Plan' if st.session_state.p6_use_task_plan and task_total_hours > 0 else 'Estimated'} Hours",
+     "color": "#33A9A0", "bg": "rgba(51,169,160,0.10)", "border": "rgba(51,169,160,0.25)"},
+    {"value": f"{effective_weeks} wk", "label": "Duration",
+     "color": "#8AB62E", "bg": "rgba(138,182,46,0.10)", "border": "rgba(138,182,46,0.25)"},
+])
 
 # ============================================================================
 # TASK PLANNER
@@ -520,11 +490,11 @@ service_cost = round(effective_hours * rate * overhead_mult, 2)
 
 # ── Auto-estimated service cost ──
 st.markdown(
-    f"<div style='background:rgba(26,26,26,0.05); border-left:3px solid #C8E600; "
+    f"<div style='background:rgba(51,169,160,0.05); border-left:3px solid #33A9A0; "
     f"padding:0.8rem 1rem; border-radius:8px; margin:0.5rem 0 1rem 0;'>"
     f"<div style='font-size:0.9rem; color:#64748b;'>Estimated Service Cost "
     f"({effective_hours} hrs × {rate:,.0f} {st.session_state.p6_currency}/hr × 1.10 overhead)</div>"
-    f"<div style='font-size:1.3rem; font-weight:700; color:#1A1A1A;'>"
+    f"<div style='font-size:1.3rem; font-weight:700; color:#33528A;'>"
     f"{service_cost:,.0f} {st.session_state.p6_currency}</div>"
     f"</div>",
     unsafe_allow_html=True
@@ -623,18 +593,18 @@ st.markdown(
 cur = st.session_state.p6_currency
 
 summary_html = f"""
-<div class="pg-card-row">
-    <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
-        <div class="pg-val" style="color: #1A1A1A; font-size:1.5rem;">{capex_total:,.0f} {cur}</div>
-        <div class="pg-lbl">CAPEX (with {st.session_state.p6_contingency_pct}% contingency)</div>
+<div style="display:flex; gap:1.2rem; margin:1.2rem 0 1.5rem 0;">
+    <div style="flex:1 1 0; border-radius:14px; padding:1.1rem 1.4rem; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100px; box-shadow:0 1px 4px rgba(0,0,0,0.06); background:rgba(51,82,138,0.10); border:1px solid rgba(51,82,138,0.25);">
+        <div style="font-size:1.5rem; font-weight:700; color:#33528A; margin-bottom:0.2rem;">{capex_total:,.0f} {cur}</div>
+        <div style="font-size:0.88rem; font-weight:500; color:#6b7280;">CAPEX (with {st.session_state.p6_contingency_pct}% contingency)</div>
     </div>
-    <div class="pg-card" style="background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.25);">
-        <div class="pg-val" style="color: #d97706; font-size:1.5rem;">{opex_total:,.0f} {cur}</div>
-        <div class="pg-lbl">Annual OPEX</div>
+    <div style="flex:1 1 0; border-radius:14px; padding:1.1rem 1.4rem; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100px; box-shadow:0 1px 4px rgba(0,0,0,0.06); background:rgba(51,169,160,0.10); border:1px solid rgba(51,169,160,0.25);">
+        <div style="font-size:1.5rem; font-weight:700; color:#33A9A0; margin-bottom:0.2rem;">{opex_total:,.0f} {cur}</div>
+        <div style="font-size:0.88rem; font-weight:500; color:#6b7280;">Annual OPEX</div>
     </div>
-    <div class="pg-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
-        <div class="pg-val" style="color: #16a34a; font-size:1.5rem;">{st.session_state.p6_contingency_pct}%</div>
-        <div class="pg-lbl">Contingency</div>
+    <div style="flex:1 1 0; border-radius:14px; padding:1.1rem 1.4rem; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100px; box-shadow:0 1px 4px rgba(0,0,0,0.06); background:rgba(138,182,46,0.10); border:1px solid rgba(138,182,46,0.25);">
+        <div style="font-size:1.5rem; font-weight:700; color:#8AB62E; margin-bottom:0.2rem;">{st.session_state.p6_contingency_pct}%</div>
+        <div style="font-size:0.88rem; font-weight:500; color:#6b7280;">Contingency</div>
     </div>
 </div>
 """
@@ -663,7 +633,7 @@ if capex_base > 0:
         fig = px.pie(
             breakdown_df, values="Amount", names="Category",
             title="CAPEX Breakdown",
-            color_discrete_sequence=["#1A1A1A", "#3b82f6", "#0f766e", "#d97706", "#94a3b8"],
+            color_discrete_sequence=["#33528A", "#33A9A0", "#8AB62E", "#C4E81D", "#597001"],
         )
         fig.update_layout(
             paper_bgcolor="#f8fafc",

@@ -10,8 +10,12 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 from config.data_inputs import get_data_inputs, get_proxy_confidence
+from utils.shared_css import inject_shared_css, render_step_indicator, render_sidebar_cards
 
 st.set_page_config(page_title="Project Timeline", layout="wide")
+
+# Inject shared MD3 button / theme CSS
+inject_shared_css()
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -20,6 +24,9 @@ st.markdown("""
     section[data-testid="stSidebar"] {display: none;}
 </style>
 """, unsafe_allow_html=True)
+
+# Persistent step progress indicator
+render_step_indicator(5)
 
 # ============================================================================
 # CHECK PREREQUISITES
@@ -142,56 +149,19 @@ context_info += "</span>"
 st.markdown(context_info, unsafe_allow_html=True)
 
 # ============================================================================
-# SUMMARY CARDS
+# SIDEBAR SUMMARY CARDS
 # ============================================================================
 
 num_phases = len(PHASE_SPLIT)
 
-card_html = f"""
-<style>
-.pg-card-row {{
-    display: flex;
-    gap: 1.2rem;
-    margin: 1.2rem 0 1.5rem 0;
-}}
-.pg-card {{
-    flex: 1 1 0;
-    border-radius: 14px;
-    padding: 1.1rem 1.4rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}}
-.pg-card .pg-val {{
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 0.2rem;
-}}
-.pg-card .pg-lbl {{
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: #6b7280;
-}}
-</style>
-<div class="pg-card-row">
-    <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
-        <div class="pg-val" style="color: #1A1A1A;">{total_hours} hrs</div>
-        <div class="pg-lbl">Estimated Effort</div>
-    </div>
-    <div class="pg-card" style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.25);">
-        <div class="pg-val" style="color: #3b82f6;">{duration_weeks} wk</div>
-        <div class="pg-lbl">Estimated Duration</div>
-    </div>
-    <div class="pg-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
-        <div class="pg-val" style="color: #16a34a;">{num_phases}</div>
-        <div class="pg-lbl">Project Phases</div>
-    </div>
-</div>
-"""
-st.markdown(card_html, unsafe_allow_html=True)
+render_sidebar_cards([
+    {"value": f"{total_hours} hrs", "label": "Estimated Effort",
+     "color": "#33528A", "bg": "rgba(51,82,138,0.10)", "border": "rgba(51,82,138,0.25)"},
+    {"value": f"{duration_weeks} wk", "label": "Estimated Duration",
+     "color": "#33A9A0", "bg": "rgba(51,169,160,0.10)", "border": "rgba(51,169,160,0.25)"},
+    {"value": str(num_phases), "label": "Project Phases",
+     "color": "#8AB62E", "bg": "rgba(138,182,46,0.10)", "border": "rgba(138,182,46,0.25)"},
+])
 
 # ============================================================================
 # DATE INPUTS
@@ -332,7 +302,7 @@ if not valid_timeline.empty:
             color="Phase" if "Phase" in valid_timeline.columns else None,
             title="Project Timeline (Gantt)",
             color_discrete_sequence=[
-                "#1A1A1A", "#3b82f6", "#0f766e", "#d97706", "#94a3b8", "#ef4444"
+                "#33528A", "#33A9A0", "#8AB62E", "#C4E81D", "#597001", "#ef4444"
             ],
         )
         fig.update_yaxes(autorange="reversed")

@@ -6,8 +6,12 @@ building uses, and country context - matching the original wizard functionality.
 """
 
 import streamlit as st
+from utils.shared_css import inject_shared_css, render_step_indicator
 
 st.set_page_config(page_title="Define Scope", layout="wide")
+
+# Inject shared MD3 button / theme CSS
+inject_shared_css()
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -17,8 +21,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
-# --- SMALLER HEADER & CONTEXT ---
+# Persistent step progress indicator
+render_step_indicator(1)
 st.markdown("<h2 style='font-size:1.5rem; font-weight:700; color:#0f172a; letter-spacing:-0.01em; margin-bottom:0.5rem;'>Step 1: Define Scope & Context</h2>", unsafe_allow_html=True)
 st.markdown(
     "<p style='font-size:0.92rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>Select the analysis type, focus, and basic context for your project.</p>",

@@ -1573,23 +1573,23 @@ st.markdown("""
            Based on M3 Tonal Palette
            ============================================ */
         
-        /* Primary - Chalmers Dark */
-        --md3-primary: #1A1A1A;              /* Near black */
+        /* Primary - Navy Blue */
+        --md3-primary: #33528A;              /* Navy blue */
         --md3-on-primary: #FFFFFF;           /* White on dark */
-        --md3-primary-container: #E8E8E8;    /* Light grey container */
-        --md3-on-primary-container: #1A1A1A; /* Dark text */
+        --md3-primary-container: #dce4f0;    /* Light navy container */
+        --md3-on-primary-container: #33528A; /* Navy text */
         
-        /* Secondary - Charcoal */
-        --md3-secondary: #4A4A4A;            /* Charcoal */
+        /* Secondary - Teal */
+        --md3-secondary: #33A9A0;            /* Teal */
         --md3-on-secondary: #FFFFFF;         /* White */
-        --md3-secondary-container: #F0F0F0;  /* Light grey */
-        --md3-on-secondary-container: #1A1A1A; /* Dark */
+        --md3-secondary-container: #d4f0ee;  /* Light teal */
+        --md3-on-secondary-container: #1a5752; /* Dark teal */
         
-        /* Tertiary - Accent Yellow */
-        --md3-tertiary: #C8E600;             /* Neon yellow-green */
-        --md3-on-tertiary: #1A1A1A;          /* Dark on yellow */
-        --md3-tertiary-container: #F5FACD;   /* Pale yellow */
-        --md3-on-tertiary-container: #2D3300; /* Dark olive */
+        /* Tertiary - Lime Green Accent */
+        --md3-tertiary: #C4E81D;             /* Lime green */
+        --md3-on-tertiary: #597001;          /* Dark olive on lime */
+        --md3-tertiary-container: #eef5c4;   /* Pale lime */
+        --md3-on-tertiary-container: #597001; /* Dark olive */
         
         /* Error */
         --md3-error: #BA1A1A;                /* E-40 */
@@ -1616,7 +1616,7 @@ st.markdown("""
         /* Inverse */
         --md3-inverse-surface: #2D2D2D;      /* Dark grey */
         --md3-inverse-on-surface: #F5F5F5;   /* Light grey */
-        --md3-inverse-primary: #C8E600;      /* Yellow accent */
+        --md3-inverse-primary: #C4E81D;      /* Lime accent */
         
         /* Additional */
         --md3-scrim: #000000;                /* N-0 */
@@ -1878,16 +1878,16 @@ st.markdown("""
         box-shadow: none;
     }
     
-    /* Primary type button — Chalmers yellow accent */
+    /* Primary type button — Lime green accent */
     .stButton > button[kind="primary"] {
-        background-color: #C8E600 !important;
-        color: #1A1A1A !important;
+        background-color: #C4E81D !important;
+        color: #597001 !important;
         border: none !important;
     }
     
     .stButton > button[kind="primary"]:hover {
-        background-color: #b5cf00 !important;
-        color: #1A1A1A !important;
+        background-color: #8AB62E !important;
+        color: #FFFFFF !important;
     }
     
     /* M3 Cards */
@@ -2166,7 +2166,7 @@ st.markdown("""
     
     .step-card:hover {
         background-color: #FAFAFA !important;
-        border-color: #C8E600;
+        border-color: #C4E81D;
         box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
     
@@ -2180,7 +2180,7 @@ st.markdown("""
         min-height: 32px;
         aspect-ratio: 1;
         flex-shrink: 0;
-        background-color: #C8E600;
+        background-color: #C4E81D;
         color: #1A1A1A;
         font-size: 0.875rem;
         font-weight: 700;
@@ -2216,8 +2216,8 @@ st.markdown("""
         display: inline-block;
         width: 18px;
         height: 18px;
-        border-top: 2px solid #C8E600;
-        border-right: 2px solid #C8E600;
+        border-top: 2px solid #C4E81D;
+        border-right: 2px solid #C4E81D;
         transform: rotate(45deg);
     }
     

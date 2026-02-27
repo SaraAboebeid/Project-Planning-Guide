@@ -7,8 +7,20 @@ with proxy alternatives and confidence estimates.
 
 import streamlit as st
 from config.data_inputs import get_data_inputs, get_proxy_options_for_context, get_proxy_confidence
+from config.sensitivity_config import get_importance_rank, get_sensitivity_weight
+from utils.sensitivity_plots import (
+    create_tornado_chart, create_parameter_sweeps,
+    create_oat_waterfall, create_oat_radar,
+    create_global_sa_importance, create_global_sa_beeswarm,
+    create_global_parallel_coords, create_global_correlation_heatmap,
+    create_combined_importance,
+)
+from utils.shared_css import inject_shared_css, render_step_indicator, recommended_source_badge, render_sidebar_cards
 
 st.set_page_config(page_title="Review Data", layout="wide")
+
+# Inject shared MD3 button / theme CSS
+inject_shared_css()
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -17,6 +29,9 @@ st.markdown("""
     section[data-testid="stSidebar"] {display: none;}
 </style>
 """, unsafe_allow_html=True)
+
+# Persistent step progress indicator
+render_step_indicator(2)
 
 
 # Contextual data source links by data item key
@@ -113,7 +128,8 @@ def _get_source_links(item_key: str, context: str = None):
     return links
 
 
-def _render_data_item(item: dict, page_key: str, context: str = None):
+def _render_data_item(item: dict, page_key: str, context: str = None,
+                      analysis_type_str: str = None):
     """
     Render a single data item with Yes/No selection and proxy options with confidence.
     """
@@ -126,8 +142,22 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
     # Get context-aware proxy options
     proxy_options = get_proxy_options_for_context(context, item_key, default_proxy_options)
     
-    # Data item label
-    st.markdown(f"**{item_label}**")
+    # Sensitivity importance ranking badge (analysis-type aware)
+    imp = get_importance_rank(item_key, analysis_type_str)
+    badge_html = (
+        f"<span style='display:inline-flex; align-items:center; gap:4px; "
+        f"background:{imp['color']}18; border:1px solid {imp['color']}40; "
+        f"color:{imp['color']}; font-size:0.72rem; font-weight:600; "
+        f"padding:1px 8px; border-radius:10px; margin-left:8px; "
+        f"vertical-align:middle;'>"
+        f"{imp['icon']} {imp['label']}</span>"
+    )
+    
+    # Data item label with importance badge
+    st.markdown(
+        f"<span style='font-weight:700;'>{item_label}</span>{badge_html}",
+        unsafe_allow_html=True,
+    )
     
     # Show recommended data source (smaller font)
     st.markdown(
@@ -148,7 +178,7 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
     )
     
     if has_data == "Yes":
-        st.success("Using recommended source")
+        recommended_source_badge()
     else:
         # Show proxy options with confidence
         if proxy_options:
@@ -199,7 +229,7 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
         source_links = _get_source_links(item_key, context)
         if source_links:
             links_html = " · ".join(
-                f"<a href='{url}' target='_blank' style='color:#1A1A1A; text-decoration:none; font-weight:500;'>{name}</a>"
+                f"<a href='{url}' target='_blank' style='color:#33528A; text-decoration:none; font-weight:500;'>{name}</a>"
                 for name, url in source_links
             )
             st.markdown(
@@ -333,75 +363,157 @@ for item in all_items:
 avg_conf = round(sum(confidences)/len(confidences), 1) if confidences else None
 avg_conf_display = f"{avg_conf}%" if avg_conf is not None else "N/A"
 
-card_html = f"""
-<style>
-.pg-card-row {{
-    display: flex;
-    gap: 1.2rem;
-    margin: 1.2rem 0 1.5rem 0;
-}}
-.pg-card {{
-    flex: 1 1 0;
-    border-radius: 14px;
-    padding: 1.1rem 1.4rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    background: rgba(26,26,26,0.04);
-    border: 1px solid rgba(26,26,26,0.08);
-}}
-.pg-card .pg-val {{
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 0.2rem;
-}}
-.pg-card .pg-lbl {{
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: #6b7280;
-}}
-</style>
-<div class='pg-card-row'>
-  <div class='pg-card'>
-    <div class='pg-val'>{available}</div>
-    <div class='pg-lbl'>Available Data</div>
-  </div>
-  <div class='pg-card'>
-    <div class='pg-val'>{missing}</div>
-    <div class='pg-lbl'>Missing Data</div>
-  </div>
-  <div class='pg-card'>
-    <div class='pg-val'>{avg_conf_display}</div>
-    <div class='pg-lbl'>Avg. Proxy Confidence</div>
-  </div>
-</div>
-"""
-st.markdown(card_html, unsafe_allow_html=True)
 
+# ============================================================================
+# SENSITIVITY ANALYSIS DIALOG
+# ============================================================================
 
+@st.dialog("Sensitivity Analysis Results", width="large")
+def show_sensitivity_analysis():
+    """Interactive sensitivity analysis visualization with OAT and Global SA."""
+    st.markdown(
+        "<p style='color: #64748b; font-size: 0.92rem; margin-bottom: 0.5rem;'>"
+        "Results from sensitivity analysis on a reference building energy model. "
+        "These results show how each input parameter impacts annual heating demand "
+        "and are used to weight confidence scores.</p>",
+        unsafe_allow_html=True,
+    )
+
+    tab_oat, tab_global, tab_compare = st.tabs([
+        "One-at-a-Time (OAT)",
+        "Global SA (200 runs)",
+        "OAT vs Global Comparison",
+    ])
+
+    with tab_oat:
+        st.markdown(
+            "Each parameter was varied **independently** while all others "
+            "were held at their baseline value."
+        )
+        oat_view = st.radio(
+            "Visualisation",
+            ["Tornado Chart", "Parameter Sweeps", "Waterfall", "Radar"],
+            horizontal=True, key="sa_oat_view",
+        )
+        if oat_view == "Tornado Chart":
+            fig = create_tornado_chart()
+            st.plotly_chart(fig, key="sa_tornado", width="stretch")
+            st.caption("Bars show the total output range (MWh/year) caused by varying each parameter across its full range.")
+        elif oat_view == "Parameter Sweeps":
+            fig = create_parameter_sweeps()
+            st.plotly_chart(fig, key="sa_sweeps", width="stretch")
+            st.caption("Line charts show how annual heating changes as each parameter varies. Diamond marks baseline.")
+        elif oat_view == "Waterfall":
+            fig = create_oat_waterfall()
+            st.plotly_chart(fig, key="sa_waterfall", width="stretch")
+            st.caption("Waterfall shows how each parameter\u2019s uncertainty accumulates into total output uncertainty.")
+        elif oat_view == "Radar":
+            fig = create_oat_radar()
+            st.plotly_chart(fig, key="sa_radar", width="stretch")
+            st.caption("Radar chart shows the relative importance of each OAT parameter.")
+
+    with tab_global:
+        st.markdown(
+            "All parameters were varied **simultaneously** across 200 "
+            "simulations, capturing interaction effects."
+        )
+        gsa_view = st.radio(
+            "Visualisation",
+            ["SHAP Beeswarm", "Feature Importance", "Parallel Coordinates",
+             "Correlation Heatmap"],
+            horizontal=True, key="sa_gsa_view",
+        )
+        if gsa_view == "SHAP Beeswarm":
+            fig = create_global_sa_beeswarm()
+            st.plotly_chart(fig, key="sa_beeswarm", width="stretch")
+            st.caption("Each dot is one simulation. Colour shows the parameter\u2019s value. Spread shows impact.")
+        elif gsa_view == "Feature Importance":
+            fig = create_global_sa_importance()
+            st.plotly_chart(fig, key="sa_global_imp", width="stretch")
+            st.caption("|Spearman \u03c1| measures monotonic correlation between each parameter and the output.")
+        elif gsa_view == "Parallel Coordinates":
+            fig = create_global_parallel_coords()
+            st.plotly_chart(fig, key="sa_parcoords", width="stretch")
+            st.caption("Each line is one simulation run through its parameter values. Colour: blue=low, red=high.")
+        elif gsa_view == "Correlation Heatmap":
+            fig = create_global_correlation_heatmap()
+            st.plotly_chart(fig, key="sa_heatmap", width="stretch")
+            st.caption("Pairwise Spearman correlations between all parameters and the output.")
+
+    with tab_compare:
+        st.markdown(
+            "Side-by-side comparison of parameter importance from the OAT "
+            "analysis and Global SA."
+        )
+        fig = create_combined_importance()
+        st.plotly_chart(fig, key="sa_combined", width="stretch")
+        st.caption("Parameters that rank high in both methods are the most critical.")
 
 
 # ============================================================================
-# RENDER DATA INPUTS
+# TWO-COLUMN LAYOUT: data inputs (left) + sticky summary cards (right)
 # ============================================================================
 
+left_col, right_col = st.columns([0.65, 0.35])
 
-st.markdown("<hr style='margin: 0.7rem 0 0.7rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Do you have the following data inputs?</div>", unsafe_allow_html=True)
+# ── RIGHT COLUMN: sticky summary cards ─────────────────────────────
+with right_col:
+    sidebar_html = f"""
+    <div class='sticky-sidebar'>
+      <div class='pg-card-stack'>
+        <div class='pg-card' style='background:rgba(51,169,160,0.10); border:1px solid rgba(51,169,160,0.25);'>
+          <div class='pg-val' style='color:#33A9A0;'>{available}</div>
+          <div class='pg-lbl'>Available Data</div>
+        </div>
+        <div class='pg-card' style='background:rgba(51,82,138,0.10); border:1px solid rgba(51,82,138,0.25);'>
+          <div class='pg-val' style='color:#33528A;'>{missing}</div>
+          <div class='pg-lbl'>Missing Data</div>
+        </div>
+        <div class='pg-card' style='background:rgba(138,182,46,0.10); border:1px solid rgba(138,182,46,0.25);'>
+          <div class='pg-val' style='color:#8AB62E;'>{avg_conf_display}</div>
+          <div class='pg-lbl'>Avg. Proxy Confidence</div>
+        </div>
+      </div>
+      <div style='font-size:0.78rem; color:#597001; margin-bottom:0.5rem;'>
+        Rankings weighted by sensitivity analysis impact.
+      </div>
+    </div>
+    """
+    st.markdown(sidebar_html, unsafe_allow_html=True)
 
-for category_data in data_inputs:
-    category_name = category_data["category"]
-    items = category_data["items"]
-    
-    with st.expander(category_name, expanded=False):
-        for item in items:
-            _render_data_item(item, page_key, analysis_context)
+    if st.button("ℹ️ Sensitivity Analysis", key="sa_dialog_btn",
+                  help="View how each parameter impacts results"):
+        show_sensitivity_analysis()
 
+    # Sensitivity importance legend (3 tiers)
+    st.markdown(
+        "<div style='display:flex; flex-direction:column; gap:4px; margin-top:0.8rem; font-size:0.78rem;'>"
+        "<span style='font-weight:600; color:#597001;'>Sensitivity ranking</span>"
+        "<span style='color:#33A9A0; font-weight:600;'>🔴 High impact</span>"
+        "<span style='color:#8AB62E; font-weight:600;'>🟡 Medium impact</span>"
+        "<span style='color:#33528A; font-weight:600;'>🔵 Low impact</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
-available = 0
+# ── LEFT COLUMN: data inputs ───────────────────────────────────────
+with left_col:
+    st.markdown("<hr style='margin: 0.3rem 0 0.7rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Do you have the following data inputs?</div>", unsafe_allow_html=True)
+
+    for category_data in data_inputs:
+        category_name = category_data["category"]
+        items = category_data["items"]
+        # Sort items: most important first (highest weight → lowest)
+        sorted_items = sorted(
+            items,
+            key=lambda it: get_sensitivity_weight(it["key"], analysis_type_str),
+            reverse=True,
+        )
+        with st.expander(category_name, expanded=False):
+            for item in sorted_items:
+                _render_data_item(item, page_key, analysis_context, analysis_type_str)
+
 
 # ============================================================================
 # NAVIGATION

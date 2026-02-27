@@ -7,8 +7,12 @@ specific to the selected analysis type(s) and focus/sub-types.
 
 import streamlit as st
 from config.data_inputs import get_data_inputs, get_proxy_confidence
+from utils.shared_css import inject_shared_css, render_step_indicator, render_sidebar_cards
 
 st.set_page_config(page_title="Expected Results", layout="wide")
+
+# Inject shared MD3 button / theme CSS
+inject_shared_css()
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -17,6 +21,9 @@ st.markdown("""
     section[data-testid="stSidebar"] {display: none;}
 </style>
 """, unsafe_allow_html=True)
+
+# Persistent step progress indicator
+render_step_indicator(4)
 
 # ============================================================================
 # EXPECTED DELIVERABLES CATALOG
@@ -365,54 +372,17 @@ context_info += "</span>"
 st.markdown(context_info, unsafe_allow_html=True)
 
 # ============================================================================
-# SUMMARY CARDS
+# SIDEBAR SUMMARY CARDS
 # ============================================================================
 
-card_html = f"""
-<style>
-.pg-card-row {{
-    display: flex;
-    gap: 1.2rem;
-    margin: 1.2rem 0 1.5rem 0;
-}}
-.pg-card {{
-    flex: 1 1 0;
-    border-radius: 14px;
-    padding: 1.1rem 1.4rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}}
-.pg-card .pg-val {{
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 0.2rem;
-}}
-.pg-card .pg-lbl {{
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: #6b7280;
-}}
-</style>
-<div class="pg-card-row">
-    <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
-        <div class="pg-val" style="color: #1A1A1A;">{total_deliverables}</div>
-        <div class="pg-lbl">Report Deliverables</div>
-    </div>
-    <div class="pg-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
-        <div class="pg-val" style="color: #16a34a;">{len(sections)}</div>
-        <div class="pg-lbl">Analysis Sections</div>
-    </div>
-    <div class="pg-card" style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.25);">
-        <div class="pg-val" style="color: #3b82f6;">{data_coverage_pct:.0f}%</div>
-        <div class="pg-lbl">Data Coverage</div>
-    </div>
-</div>
-"""
-st.markdown(card_html, unsafe_allow_html=True)
+render_sidebar_cards([
+    {"value": str(total_deliverables), "label": "Report Deliverables",
+     "color": "#33528A", "bg": "rgba(51,82,138,0.10)", "border": "rgba(51,82,138,0.25)"},
+    {"value": str(len(sections)), "label": "Analysis Sections",
+     "color": "#33A9A0", "bg": "rgba(51,169,160,0.10)", "border": "rgba(51,169,160,0.25)"},
+    {"value": f"{data_coverage_pct:.0f}%", "label": "Data Coverage",
+     "color": "#8AB62E", "bg": "rgba(138,182,46,0.10)", "border": "rgba(138,182,46,0.25)"},
+])
 
 # ============================================================================
 # DELIVERABLES BY SECTION
@@ -430,7 +400,7 @@ else:
                 st.markdown(
                     f"<div style='display:flex; align-items:flex-start; gap:10px; "
                     f"padding:8px 12px; margin-bottom:4px; "
-                    f"background:#f8fafc; border-radius:8px; border-left:3px solid #C8E600;'>"
+                    f"background:#f8fafc; border-radius:8px; border-left:3px solid #33A9A0;'>"
                     f"<div>"
                     f"<div style='font-weight:600; font-size:0.95rem; color:#1e293b;'>{name}</div>"
                     f"<div style='font-size:0.85rem; color:#64748b;'>{description}</div>"

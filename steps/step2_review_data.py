@@ -8,6 +8,8 @@ and focus selected in Step 1.
 
 import streamlit as st
 from config.data_inputs import get_data_inputs, get_proxy_options_for_context, get_proxy_confidence
+from config.sensitivity_config import get_importance_rank, get_sensitivity_weight
+from utils.shared_css import recommended_source_badge
 
 
 def render_step2(col2):
@@ -175,27 +177,44 @@ def render_step2(col2):
         }}
         </style>
         <div class="pg-card-row">
-            <div class="pg-card" style="background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.25);">
-                <div class="pg-val" style="color: #16a34a;">{available}</div>
+            <div class="pg-card" style="background: rgba(51,169,160,0.10); border: 1px solid rgba(51,169,160,0.25);">
+                <div class="pg-val" style="color: #33A9A0;">{available}</div>
                 <div class="pg-lbl">Available Datasets</div>
             </div>
-            <div class="pg-card" style="background: rgba(239,68,68,0.10); border: 1px solid rgba(239,68,68,0.25);">
-                <div class="pg-val" style="color: #ef4444;">{missing}</div>
+            <div class="pg-card" style="background: rgba(51,82,138,0.10); border: 1px solid rgba(51,82,138,0.25);">
+                <div class="pg-val" style="color: #33528A;">{missing}</div>
                 <div class="pg-lbl">Missing Datasets</div>
             </div>
-            <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
+            <div class="pg-card" style="background: rgba(138,182,46,0.10); border: 1px solid rgba(138,182,46,0.25);">
                 <div class="pg-val" style="color: {conf_color};">{total_conf_display}</div>
                 <div class="pg-lbl">Total Confidence</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Render the FIXED list of categories and items
+        # Sensitivity importance legend (3 tiers)
+        st.markdown(
+            "<div style='display:flex; gap:14px; flex-wrap:wrap; margin-bottom:0.8rem; font-size:0.82rem;'>"
+            "<span style='font-weight:600; color:#597001;'>Sensitivity ranking:</span>"
+            "<span style='color:#33A9A0; font-weight:600;'>🔴 High</span>"
+            "<span style='color:#8AB62E; font-weight:600;'>🟡 Medium</span>"
+            "<span style='color:#33528A; font-weight:600;'>🔵 Low</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Render categories with items sorted by sensitivity importance
         for category_data in data_inputs:
             category_name = category_data["category"]
             items = category_data["items"]
+            # Sort items: most important first (highest weight → lowest)
+            sorted_items = sorted(
+                items,
+                key=lambda it: get_sensitivity_weight(it["key"]),
+                reverse=True,
+            )
             with st.expander(category_name, expanded=False):
-                for item in items:
+                for item in sorted_items:
                     _render_data_item(item, page_key, analysis_context)
 
         # Close step container
@@ -220,8 +239,22 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
     # Get context-aware proxy options
     proxy_options = get_proxy_options_for_context(context, item_key, default_proxy_options)
     
-    # Data item label
-    st.markdown(f"**{item_label}**")
+    # Sensitivity importance ranking
+    imp = get_importance_rank(item_key)
+    badge_html = (
+        f"<span style='display:inline-flex; align-items:center; gap:4px; "
+        f"background:{imp['color']}18; border:1px solid {imp['color']}40; "
+        f"color:{imp['color']}; font-size:0.72rem; font-weight:600; "
+        f"padding:1px 8px; border-radius:10px; margin-left:8px; "
+        f"vertical-align:middle;'>"
+        f"{imp['icon']} {imp['label']}</span>"
+    )
+    
+    # Data item label with importance badge
+    st.markdown(
+        f"<span style='font-weight:700;'>{item_label}</span>{badge_html}",
+        unsafe_allow_html=True,
+    )
     
     # Show recommended data source (smaller font)
     st.markdown(f"<span style='font-size: 0.85rem; color: #64748b;'>*Recommended data source:* {recommended_source}</span>", unsafe_allow_html=True)
@@ -237,7 +270,7 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
     )
     
     if has_data == "Yes":
-        st.success("Using recommended source")
+        recommended_source_badge()
     else:
         # Show proxy options
         if proxy_options:

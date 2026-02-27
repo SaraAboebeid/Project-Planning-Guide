@@ -7,8 +7,13 @@ effort/duration estimates, and a data source directory.
 
 import streamlit as st
 from config.data_inputs import get_data_inputs, get_proxy_options_for_context, get_proxy_confidence
+from config.sensitivity_config import get_sensitivity_weight
+from utils.shared_css import inject_shared_css, render_step_indicator, render_sidebar_cards
 
 st.set_page_config(page_title="Confidence & Recommendations", layout="wide")
+
+# Inject shared MD3 button / theme CSS
+inject_shared_css()
 
 # Hide the sidebar pages navigation
 st.markdown("""
@@ -17,6 +22,9 @@ st.markdown("""
     section[data-testid="stSidebar"] {display: none;}
 </style>
 """, unsafe_allow_html=True)
+
+# Persistent step progress indicator
+render_step_indicator(3)
 
 # ============================================================================
 # CHECK PREREQUISITES
@@ -75,6 +83,7 @@ available_items = []
 missing_items = []
 confidences = []
 missing_with_proxy = []
+item_status = {}  # For sensitivity analysis
 
 for item in all_items:
     item_key = item["key"]
@@ -83,6 +92,11 @@ for item in all_items:
 
     if has_data == "Yes":
         available_items.append(item)
+        item_status[item_key] = {
+            "available": True,
+            "proxy_name": None,
+            "proxy_confidence": None,
+        }
     else:
         missing_items.append(item)
         proxy_key = f"{page_key}_{item_key}_proxy"
@@ -98,6 +112,11 @@ for item in all_items:
                 "confidence": conf_val,
                 "conf_info": conf_info,
             })
+            item_status[item_key] = {
+                "available": False,
+                "proxy_name": selected_proxy,
+                "proxy_confidence": conf_val,
+            }
         else:
             missing_with_proxy.append({
                 "item": item,
@@ -105,45 +124,65 @@ for item in all_items:
                 "confidence": None,
                 "conf_info": {},
             })
+            item_status[item_key] = {
+                "available": False,
+                "proxy_name": None,
+                "proxy_confidence": None,
+            }
 
 available_count = len(available_items)
 missing_count = len(missing_items)
 total_count = len(all_items)
 
-# Overall confidence calculation
+# Data coverage percentage (simple count-based)
+data_coverage_pct = (available_count / total_count * 100) if total_count > 0 else 0
+
+# Avg proxy confidence (for display purposes)
 if confidences:
     avg_proxy_conf = round(sum(confidences) / len(confidences), 1)
 else:
     avg_proxy_conf = None
 
-# Compute overall confidence: base from available data %, adjusted by proxy confidence
-data_coverage_pct = (available_count / total_count * 100) if total_count > 0 else 0
-if missing_count == 0:
-    overall_confidence = 95  # Near-perfect when all data available
-elif avg_proxy_conf is not None:
-    # Blend: coverage weight + proxy confidence weight
-    overall_confidence = round(data_coverage_pct * 0.6 + avg_proxy_conf * 0.4)
+# ── SENSITIVITY-BASED CONFIDENCE CALCULATION ──
+# Each parameter's contribution to confidence is proportional to its impact
+# on results (derived from sensitivity analysis).
+#   Available data   → contributes full sensitivity weight
+#   Proxy data       → contributes weight × (proxy_confidence / 100)
+#   Missing (no proxy) → contributes nothing
+total_weight = sum(get_sensitivity_weight(item["key"]) for item in all_items)
+
+if total_weight > 0:
+    earned_weight = 0.0
+    for item in available_items:
+        earned_weight += get_sensitivity_weight(item["key"])
+    for entry in missing_with_proxy:
+        if entry["confidence"] is not None:
+            w = get_sensitivity_weight(entry["item"]["key"])
+            earned_weight += w * entry["confidence"] / 100.0
+    # Scale to 0–95 range (95 = maximum achievable confidence)
+    overall_confidence = round(earned_weight / total_weight * 95)
 else:
+    earned_weight = 0.0
     overall_confidence = round(data_coverage_pct * 0.7)
 
 overall_confidence = max(0, min(100, overall_confidence))
 
-# Determine confidence color/level
+# Determine confidence level and colour
 if overall_confidence >= 70:
+    conf_level = "Good"
     conf_color = "#16a34a"
     conf_bg = "rgba(34,197,94,0.10)"
     conf_border = "rgba(34,197,94,0.30)"
-    conf_level = "Good"
 elif overall_confidence >= 50:
+    conf_level = "Moderate"
     conf_color = "#d97706"
     conf_bg = "rgba(245,158,11,0.10)"
     conf_border = "rgba(245,158,11,0.30)"
-    conf_level = "Moderate"
 else:
+    conf_level = "Low"
     conf_color = "#ef4444"
     conf_bg = "rgba(239,68,68,0.10)"
     conf_border = "rgba(239,68,68,0.30)"
-    conf_level = "Low"
 
 # Effort estimation
 EFFORT_BASE = {
@@ -191,56 +230,17 @@ context_info += "</span>"
 st.markdown(context_info, unsafe_allow_html=True)
 
 # ============================================================================
-# TOP SUMMARY CARDS
+# SIDEBAR SUMMARY CARDS
 # ============================================================================
 
-card_html = f"""
-<style>
-.pg-card-row {{
-    display: flex;
-    gap: 1.2rem;
-    margin: 1.2rem 0 1.5rem 0;
-}}
-.pg-card {{
-    flex: 1 1 0;
-    border-radius: 14px;
-    padding: 1.1rem 1.4rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    background: rgba(26,26,26,0.04);
-    border: 1px solid rgba(26,26,26,0.08);
-}}
-.pg-card .pg-val {{
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 0.2rem;
-}}
-.pg-card .pg-lbl {{
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: #6b7280;
-}}
-</style>
-<div class="pg-card-row">
-    <div class="pg-card" style="background: {conf_bg}; border: 1px solid {conf_border};">
-        <div class="pg-val" style="color: {conf_color};">{overall_confidence}%</div>
-        <div class="pg-lbl">Overall Confidence ({conf_level})</div>
-    </div>
-    <div class="pg-card" style="background: rgba(26,26,26,0.06); border: 1px solid rgba(26,26,26,0.12);">
-        <div class="pg-val" style="color: #1A1A1A;">{total_hours} hrs</div>
-        <div class="pg-lbl">Estimated Effort</div>
-    </div>
-    <div class="pg-card" style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.25);">
-        <div class="pg-val" style="color: #3b82f6;">{duration_weeks} wk</div>
-        <div class="pg-lbl">Estimated Duration</div>
-    </div>
-</div>
-"""
-st.markdown(card_html, unsafe_allow_html=True)
+render_sidebar_cards([
+    {"value": f"{overall_confidence}%", "label": f"Overall Confidence ({conf_level})",
+     "color": conf_color, "bg": conf_bg, "border": conf_border},
+    {"value": f"{total_hours} hrs", "label": "Estimated Effort",
+     "color": "#33528A", "bg": "rgba(51,82,138,0.08)", "border": "rgba(51,82,138,0.20)"},
+    {"value": f"{duration_weeks} wk", "label": "Estimated Duration",
+     "color": "#33A9A0", "bg": "rgba(51,169,160,0.08)", "border": "rgba(51,169,160,0.20)"},
+])
 
 # ============================================================================
 # DATA AVAILABILITY SUMMARY
@@ -343,7 +343,7 @@ else:
     st.success("All required datasets are available. No proxies needed.")
 
 # ============================================================================
-# CONFIDENCE IMPROVEMENT — WHAT IF?
+# SENSITIVITY ANALYSIS — PARAMETER IMPACT ON CONFIDENCE
 # ============================================================================
 
 st.markdown(
@@ -351,27 +351,128 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+with st.expander("Parameter Impact on Confidence (Sensitivity Weights)", expanded=False):
+    st.markdown(
+        "<p style='font-size:0.9rem; color:#64748b; margin-bottom:0.8rem;'>"
+        "Each parameter is weighted by its importance from the sensitivity analysis. "
+        "The bars show how much each parameter contributes to your confidence score.</p>",
+        unsafe_allow_html=True
+    )
+
+    # Header row
+    st.markdown(
+        "<div style='display:flex; gap:0.5rem; padding:0.4rem 0; border-bottom:2px solid #e2e8f0; "
+        "font-weight:600; font-size:0.85rem; color:#475569;'>"
+        "<div style='width:200px;'>Parameter</div>"
+        "<div style='width:70px; text-align:center;'>Weight</div>"
+        "<div style='width:80px; text-align:center;'>Status</div>"
+        "<div style='flex:1;'>Contribution</div>"
+        "</div>",
+        unsafe_allow_html=True
+    )
+
+    available_keys = {item["key"] for item in available_items}
+    proxy_map = {
+        entry["item"]["key"]: entry["confidence"]
+        for entry in missing_with_proxy if entry["proxy"]
+    }
+    max_weight = max((get_sensitivity_weight(item["key"]) for item in all_items), default=1)
+
+    # Sort items by weight (highest first)
+    sorted_items = sorted(all_items, key=lambda it: get_sensitivity_weight(it["key"]), reverse=True)
+
+    for item in sorted_items:
+        w = get_sensitivity_weight(item["key"])
+
+        if item["key"] in available_keys:
+            status_badge = (
+                "<span style='background:#dcfce7; color:#16a34a; padding:2px 8px; "
+                "border-radius:4px; font-size:0.78rem; font-weight:600;'>Available</span>"
+            )
+            fill_pct = 100.0
+            bar_color = "#16a34a"
+        elif item["key"] in proxy_map:
+            pc = proxy_map[item["key"]]
+            pct_label = f"{pc}%" if pc is not None else "N/A"
+            status_badge = (
+                f"<span style='background:#fef3c7; color:#d97706; padding:2px 8px; "
+                f"border-radius:4px; font-size:0.78rem; font-weight:600;'>"
+                f"Proxy ({pct_label})</span>"
+            )
+            fill_pct = (pc if pc is not None else 50)
+            bar_color = "#d97706"
+        else:
+            status_badge = (
+                "<span style='background:#fee2e2; color:#ef4444; padding:2px 8px; "
+                "border-radius:4px; font-size:0.78rem; font-weight:600;'>Missing</span>"
+            )
+            fill_pct = 0
+            bar_color = "#ef4444"
+
+        bar_width = (w / max_weight) * fill_pct
+
+        st.markdown(
+            f"<div style='display:flex; gap:0.5rem; padding:0.45rem 0; border-bottom:1px solid #f1f5f9; "
+            f"align-items:center; font-size:0.88rem;'>"
+            f"<div style='width:200px; font-weight:500; color:#1e293b;'>{item['label']}</div>"
+            f"<div style='width:70px; text-align:center; color:#64748b;'>{w:.1f}</div>"
+            f"<div style='width:80px; text-align:center;'>{status_badge}</div>"
+            f"<div style='flex:1;'>"
+            f"  <div style='background:#e5e7eb; border-radius:4px; height:8px; overflow:hidden;'>"
+            f"    <div style='background:{bar_color}; height:100%; width:{bar_width:.0f}%; border-radius:4px;'></div>"
+            f"  </div>"
+            f"</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+    # Summary footer
+    st.markdown(
+        f"<div style='margin-top:0.7rem; padding:0.6rem 0.8rem; background:rgba(59,130,246,0.06); "
+        f"border-radius:8px; font-size:0.88rem; color:#334155;'>"
+        f"<b>Total weight:</b> {total_weight:.1f} &nbsp;|&nbsp; "
+        f"<b>Achieved:</b> {earned_weight:.1f} &nbsp;|&nbsp; "
+        f"<b>Confidence:</b> <span style='font-weight:700; color:{conf_color};'>{overall_confidence}%</span>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
+
+# ── What-If Calculator (sensitivity-aware) ──
 if missing_items:
     with st.expander("What If? — Confidence Improvement Calculator", expanded=False):
         st.markdown(
-            "**Select data items you plan to obtain to see how confidence improves:**"
+            "**Select data items you plan to obtain to see how confidence improves "
+            "(weighted by parameter importance):**"
         )
 
-        planned_items = []
+        whatif_planned = []
         for idx, item in enumerate(missing_items):
-            if st.checkbox(item["label"], key=f"whatif_{idx}_{item['key']}"):
-                planned_items.append(item)
+            w = get_sensitivity_weight(item["key"])
+            dots = "●" * max(1, round(w / 4))  # visual weight indicator
+            if st.checkbox(
+                f"{item['label']}  ({dots} weight {w:.0f})",
+                key=f"whatif_{idx}_{item['key']}"
+            ):
+                whatif_planned.append(item)
 
-        if planned_items:
-            new_available = available_count + len(planned_items)
-            new_coverage = (new_available / total_count * 100) if total_count > 0 else 0
-            if missing_count - len(planned_items) == 0:
-                new_confidence = 95
-            elif avg_proxy_conf is not None:
-                new_confidence = round(new_coverage * 0.6 + avg_proxy_conf * 0.4)
-            else:
-                new_confidence = round(new_coverage * 0.7)
-            new_confidence = max(0, min(100, new_confidence))
+        if whatif_planned:
+            # Recalculate with planned items counted as fully available
+            avail_keys = {it["key"] for it in available_items}
+            planned_keys_set = {it["key"] for it in whatif_planned}
+            proxy_conf_map = {
+                e["item"]["key"]: e["confidence"]
+                for e in missing_with_proxy if e["confidence"] is not None
+            }
+
+            new_earned = 0.0
+            for it in all_items:
+                wt = get_sensitivity_weight(it["key"])
+                if it["key"] in avail_keys or it["key"] in planned_keys_set:
+                    new_earned += wt
+                elif it["key"] in proxy_conf_map:
+                    new_earned += wt * proxy_conf_map[it["key"]] / 100.0
+
+            new_confidence = max(0, min(100, round(new_earned / total_weight * 95))) if total_weight > 0 else 95
             improvement = new_confidence - overall_confidence
 
             if new_confidence >= 70:
@@ -388,6 +489,9 @@ if missing_items:
                 f"Predicted Confidence: {new_confidence}%</div>"
                 f"<div style='font-size:0.95rem; color:#10b981; font-weight:600; margin-top:0.2rem;'>"
                 f"+{improvement}% improvement</div>"
+                f"<div style='font-size:0.85rem; color:#64748b; margin-top:0.3rem;'>"
+                f"Weighted score: {new_earned:.1f} / {total_weight:.1f}"
+                f"</div>"
                 f"</div>",
                 unsafe_allow_html=True
             )
@@ -424,7 +528,7 @@ with st.expander("Effort and Duration Breakdown", expanded=False):
             f"<div style='display:flex; align-items:center; gap:0.8rem; margin-bottom:0.5rem;'>"
             f"<div style='width:160px; font-size:0.9rem; font-weight:500;'>{phase}</div>"
             f"<div style='flex:1; background:#e5e7eb; border-radius:6px; height:10px; overflow:hidden;'>"
-            f"<div style='background:#1A1A1A; height:100%; width:{bar_width}%; border-radius:6px;'></div>"
+            f"<div style='background:#33A9A0; height:100%; width:{bar_width}%; border-radius:6px;'></div>"
             f"</div>"
             f"<div style='width:55px; text-align:right; font-size:0.88rem; font-weight:600; color:#374151;'>"
             f"{phase_hours} hrs</div>"
