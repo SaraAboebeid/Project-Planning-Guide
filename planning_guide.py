@@ -1522,14 +1522,14 @@ def generate_suggested_tasks(total_hours: int, proxies_count: int, completeness_
 # ===== UI Theming: Plotly and CSS Brand Palette =====
 
 BRAND_COLORWAY = [
-    "#2563eb",  # accent blue
-    "#115e59",  # teal
-    "#334155",  # slate
-    "#1e40af",  # primary indigo
+    "#33A9A0",  # teal (primary)
+    "#33528A",  # navy (secondary)
+    "#8AB62E",  # green
+    "#597001",  # dark olive
+    "#C4E81D",  # lime
+    "#1A1A1A",  # black
     "#6b7280",  # neutral gray
-    "#0f766e",  # success teal
-    "#4b5563",  # slate dark
-    "#1e3a8a",  # deep indigo
+    "#475569",  # slate
 ]
 
 def apply_brand_plotly_theme(fig):
@@ -2285,16 +2285,29 @@ if st.session_state.wizard_step == 0:
     # Animated intro container
     st.markdown("<div class='intro-container'>", unsafe_allow_html=True)
     
-    # Chalmers Next Labs logo
+    # Chalmers Next Labs logo + Chalmers University logo
     import base64, os
     logo_path = os.path.join(os.path.dirname(__file__), "assets", "chalmers_next_labs_logo.svg")
+    uni_logo_path = os.path.join(os.path.dirname(__file__), "assets", "chalmers_university_logo.svg")
+    logo_html_parts = []
     if os.path.exists(logo_path):
         with open(logo_path, "r") as f:
             svg_data = f.read()
         b64 = base64.b64encode(svg_data.encode()).decode()
-        st.markdown(
-            f"<div style='margin-bottom: 1.5rem;'>"
+        logo_html_parts.append(
             f"<img src='data:image/svg+xml;base64,{b64}' alt='Chalmers Next Labs' style='height: 50px;'>"
+        )
+    if os.path.exists(uni_logo_path):
+        with open(uni_logo_path, "r") as f:
+            uni_svg = f.read()
+        uni_b64 = base64.b64encode(uni_svg.encode()).decode()
+        logo_html_parts.append(
+            f"<img src='data:image/svg+xml;base64,{uni_b64}' alt='Chalmers University of Technology' style='height: 45px;'>"
+        )
+    if logo_html_parts:
+        st.markdown(
+            f"<div style='display:flex; align-items:center; justify-content:flex-end; gap:2rem; margin-bottom:1.5rem;'>"
+            f"{''.join(logo_html_parts)}"
             f"</div>",
             unsafe_allow_html=True
         )
@@ -2366,40 +2379,26 @@ if st.session_state.wizard_step == 0:
         """, unsafe_allow_html=True)
     
     st.markdown("<hr class='card-animate stagger-7' style='margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;'>", unsafe_allow_html=True)
-    
-    center_cols = st.columns([1,1,1])
-    with center_cols[1]:
-        st.markdown("""
-        <div id='start-btn-container' class='card-animate stagger-7 hidden-until-animated'>
-        """, unsafe_allow_html=True)
-        if st.button("Start", type="primary", use_container_width=True, key="start_btn"):
-            st.switch_page("pages/1_Define_Scope_and_Context.py")
-        st.markdown("</div>", unsafe_allow_html=True)
 
-    # Add CSS and JS to hide the button until animation is done
+    # CSS animation hides the Start button from the very first frame (fill-mode:both)
+    # and then fades it in after the step-card animations finish (~7s).
     st.markdown("""
     <style>
-    .hidden-until-animated { opacity: 0 !important; pointer-events: none; }
-    .show-after-anim { opacity: 1 !important; pointer-events: auto; transition: opacity 0.6s ease-in; }
+    @keyframes startBtnFadeIn {
+        0%   { opacity: 0; transform: translateY(14px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+    /* Target primary buttons in the main content area */
+    [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"] {
+        animation: startBtnFadeIn 0.8s ease-out 7s both;
+    }
     </style>
     """, unsafe_allow_html=True)
-    # Use components.html for reliable JS execution — show Start after Step 6 finishes
-    components.html("""
-    <script>
-    (function() {
-        var doc = window.parent.document;
-        function reveal() {
-            var btn = doc.getElementById('start-btn-container');
-            if (btn) {
-                btn.classList.remove('hidden-until-animated');
-                btn.classList.add('show-after-anim');
-            }
-        }
-        // Step 6 = stagger-6 = 5s delay + 1s animation = 6s. Show at 6.5s.
-        setTimeout(reveal, 6500);
-    })();
-    </script>
-    """, height=0)
+
+    center_cols = st.columns([1,1,1])
+    with center_cols[1]:
+        if st.button("Start", type="primary", use_container_width=True, key="start_btn"):
+            st.switch_page("pages/1_Define_Scope_and_Context.py")
     
     # Close intro container
     st.markdown("</div>", unsafe_allow_html=True)
@@ -3279,19 +3278,19 @@ if st.session_state.wizard_step == 3:
             # Determine badge color based on uncertainty
             if proxy_info['uncertainty'] == "Medium":
                 badge_class = "medium-badge"
-                bg_gradient = "linear-gradient(135deg, #fef3c7, #fde68a)"
-                border_color = "#f59e0b"
-                text_color = "#92400e"
+                bg_gradient = "linear-gradient(135deg, rgba(51,82,138,0.12), rgba(51,82,138,0.22))"
+                border_color = "#33528A"
+                text_color = "#33528A"
             elif proxy_info['uncertainty'] == "High":
                 badge_class = "high-badge"
-                bg_gradient = "linear-gradient(135deg, #fecaca, #fca5a5)"
-                border_color = "#ef4444"
-                text_color = "#7f1d1d"
+                bg_gradient = "linear-gradient(135deg, rgba(89,112,1,0.12), rgba(89,112,1,0.22))"
+                border_color = "#597001"
+                text_color = "#597001"
             else:  # Very High
                 badge_class = "high-badge"
-                bg_gradient = "linear-gradient(135deg, #fca5a5, #f87171)"
-                border_color = "#dc2626"
-                text_color = "#7f1d1d"
+                bg_gradient = "linear-gradient(135deg, rgba(89,112,1,0.18), rgba(89,112,1,0.28))"
+                border_color = "#597001"
+                text_color = "#1A1A1A"
             
             # Show as expandable section
             is_recommended = proxy_info.get('is_critical', False) or tier_num == "1"
@@ -3316,14 +3315,14 @@ if st.session_state.wizard_step == 3:
                         cols = st.columns(2)
                         with cols[0]:
                             if proxy_info['suitable_for']:
-                                st.markdown("<p style='font-size: 0.85rem; font-weight: 600; color: #059669; margin-top: 0.5rem;'>Suitable for:</p>", unsafe_allow_html=True)
+                                st.markdown("<p style='font-size: 0.85rem; font-weight: 600; color: #33A9A0; margin-top: 0.5rem;'>Suitable for:</p>", unsafe_allow_html=True)
                                 for item in proxy_info['suitable_for']:
-                                    st.markdown(f"<p style='font-size: 0.8rem; color: #059669; margin: 0;'>• {item}</p>", unsafe_allow_html=True)
+                                    st.markdown(f"<p style='font-size: 0.8rem; color: #33A9A0; margin: 0;'>• {item}</p>", unsafe_allow_html=True)
                         with cols[1]:
                             if proxy_info['not_suitable_for']:
-                                st.markdown("<p style='font-size: 0.85rem; font-weight: 600; color: #dc2626; margin-top: 0.5rem;'>Not suitable for:</p>", unsafe_allow_html=True)
+                                st.markdown("<p style='font-size: 0.85rem; font-weight: 600; color: #597001; margin-top: 0.5rem;'>Not suitable for:</p>", unsafe_allow_html=True)
                                 for item in proxy_info['not_suitable_for']:
-                                    st.markdown(f"<p style='font-size: 0.8rem; color: #dc2626; margin: 0;'>• {item}</p>", unsafe_allow_html=True)
+                                    st.markdown(f"<p style='font-size: 0.8rem; color: #597001; margin: 0;'>• {item}</p>", unsafe_allow_html=True)
                     
                     st.markdown('</div>', unsafe_allow_html=True)
     else:
@@ -3347,17 +3346,17 @@ if st.session_state.wizard_step == 3:
 
     # Determine color and background based on confidence level
     if overall_conf >= 70:
-        conf_color = "#0f766e"  # brand success teal
+        conf_color = "#33A9A0"  # teal
         conf_label = "Good"
-        conf_bg = "linear-gradient(135deg, #d1fae5, #a7f3d0)"
+        conf_bg = "linear-gradient(135deg, rgba(51,169,160,0.15), rgba(51,169,160,0.25))"
     elif overall_conf >= 50:
-        conf_color = "#b45309"  # brand amber
+        conf_color = "#33528A"  # navy
         conf_label = "Medium"
-        conf_bg = "linear-gradient(135deg, #ffedd5, #fed7aa)"
+        conf_bg = "linear-gradient(135deg, rgba(51,82,138,0.15), rgba(51,82,138,0.25))"
     else:
-        conf_color = "#b91c1c"  # brand deep red
+        conf_color = "#597001"  # dark olive
         conf_label = "Low"
-        conf_bg = "linear-gradient(135deg, #fee2e2, #fecaca)"
+        conf_bg = "linear-gradient(135deg, rgba(89,112,1,0.15), rgba(89,112,1,0.25))"
 
     st.markdown(
         f'<div style="background: {conf_bg}; padding: 0.9rem; border-radius: 10px; border-left: 4px solid {conf_color}; margin-bottom: 0.6rem;">'
@@ -3389,13 +3388,13 @@ if st.session_state.wizard_step == 3:
                 predicted_additions = []
                 
                 if missing_critical:
-                    st.markdown("<p style='color: #ef4444; font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem;'>Critical Items (High Impact):</p>", unsafe_allow_html=True)
+                    st.markdown("<p style='color: #597001; font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem;'>Critical Items (High Impact):</p>", unsafe_allow_html=True)
                     for idx, item in enumerate(missing_critical[:5]):  # Show top 5
                         if st.checkbox(f"{item['label']}", key=f"pred_crit_{idx}_{item['key']}", help="Critical for analysis"):
                             predicted_additions.append(item['key'])
                 
                 if missing_important:
-                    st.markdown("<p style='color: #f59e0b; font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem;'>Important Items (Medium Impact):</p>", unsafe_allow_html=True)
+                    st.markdown("<p style='color: #33528A; font-weight: 600; font-size: 0.9rem; margin-top: 0.5rem;'>Important Items (Medium Impact):</p>", unsafe_allow_html=True)
                     for idx, item in enumerate(missing_important[:5]):  # Show top 5
                         if st.checkbox(f"{item['label']}", key=f"pred_imp_{idx}_{item['key']}", help="Important for accuracy"):
                             predicted_additions.append(item['key'])
@@ -3417,10 +3416,10 @@ if st.session_state.wizard_step == 3:
                     )
                     improvement = predicted_results['overall'] - confidence_results['overall']
                     st.markdown("<hr style='margin: 0.5rem 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-                    st.markdown("<div style='background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 0.7rem; border-radius: 8px; border-left: 3px solid #3b82f6;'>", unsafe_allow_html=True)
-                    st.markdown(f"<p style='margin: 0; font-size: 0.9rem; color: #1e40af;'><strong>Predicted Confidence:</strong> {predicted_results['overall']}%</p>", unsafe_allow_html=True)
+                    st.markdown("<div style='background: linear-gradient(135deg, rgba(51,82,138,0.08), rgba(51,82,138,0.14)); padding: 0.7rem; border-radius: 8px; border-left: 3px solid #33528A;'>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='margin: 0; font-size: 0.9rem; color: #33528A;'><strong>Predicted Confidence:</strong> {predicted_results['overall']}%</p>", unsafe_allow_html=True)
                     if improvement > 0:
-                        st.markdown(f"<p style='margin: 0.3rem 0 0 0; font-size: 1rem; color: #10b981; font-weight: 700;'>+{improvement:.0f}% improvement!</p>", unsafe_allow_html=True)
+                        st.markdown(f"<p style='margin: 0.3rem 0 0 0; font-size: 1rem; color: #8AB62E; font-weight: 700;'>+{improvement:.0f}% improvement!</p>", unsafe_allow_html=True)
                     st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.success("All data items available! Excellent data coverage.")

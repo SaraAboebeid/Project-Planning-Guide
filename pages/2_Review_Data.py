@@ -199,13 +199,13 @@ def _render_data_item(item: dict, page_key: str, context: str = None,
             if confidence_val is not None:
                 # Determine color based on confidence level
                 if confidence_val >= 85:
-                    color = "#22c55e"  # green
+                    color = "#33A9A0"  # teal
                     level = "Good"
                 elif confidence_val >= 70:
-                    color = "#f59e0b"  # amber
+                    color = "#33528A"  # navy
                     level = "Moderate"
                 else:
-                    color = "#ef4444"  # red
+                    color = "#597001"  # dark olive
                     level = "Low"
                 
                 # Show confidence with estimated badge and tooltip
@@ -481,7 +481,15 @@ with right_col:
     """
     st.markdown(sidebar_html, unsafe_allow_html=True)
 
-    if st.button("ℹ️ Sensitivity Analysis", key="sa_dialog_btn",
+    st.markdown(
+        "<style>"
+        "div[data-testid='stVerticalBlock']:has(#sa-small-btn) button "
+        "{font-size:0.78rem!important; height:32px!important; padding:0 14px!important; min-height:0!important;}"
+        "</style>"
+        "<span id='sa-small-btn'></span>",
+        unsafe_allow_html=True,
+    )
+    if st.button("Sensitivity Analysis", key="sa_dialog_btn",
                   help="View how each parameter impacts results"):
         show_sensitivity_analysis()
 

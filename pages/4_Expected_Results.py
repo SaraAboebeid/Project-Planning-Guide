@@ -7,7 +7,7 @@ specific to the selected analysis type(s) and focus/sub-types.
 
 import streamlit as st
 from config.data_inputs import get_data_inputs, get_proxy_confidence
-from utils.shared_css import inject_shared_css, render_step_indicator, render_sidebar_cards
+from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards
 
 st.set_page_config(page_title="Expected Results", layout="wide")
 
@@ -372,10 +372,10 @@ context_info += "</span>"
 st.markdown(context_info, unsafe_allow_html=True)
 
 # ============================================================================
-# SIDEBAR SUMMARY CARDS
+# SUMMARY CARDS
 # ============================================================================
 
-render_sidebar_cards([
+render_top_cards([
     {"value": str(total_deliverables), "label": "Report Deliverables",
      "color": "#33528A", "bg": "rgba(51,82,138,0.10)", "border": "rgba(51,82,138,0.25)"},
     {"value": str(len(sections)), "label": "Analysis Sections",

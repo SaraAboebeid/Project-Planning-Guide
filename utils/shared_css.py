@@ -285,3 +285,29 @@ def render_sidebar_cards(cards: list):
         for c in cards
     )
     st.markdown(f"<div class='fixed-sidebar'>{inner}</div>", unsafe_allow_html=True)
+
+
+def render_top_cards(cards: list):
+    """
+    Render summary cards as a horizontal row at the top of the page.
+
+    Parameters
+    ----------
+    cards : list of dict
+        Each dict: {"value": str, "label": str, "color": str,
+                    "bg": str, "border": str}
+    """
+    inner = "".join(
+        f"<div style='flex:1 1 0; border-radius:14px; padding:1.1rem 1.4rem; "
+        f"display:flex; flex-direction:column; align-items:center; justify-content:center; "
+        f"min-height:100px; box-shadow:0 1px 4px rgba(0,0,0,0.06); "
+        f"background:{c['bg']}; border:1px solid {c['border']};'>"
+        f"<div style='font-size:2rem; font-weight:700; margin-bottom:0.2rem; color:{c['color']};'>{c['value']}</div>"
+        f"<div style='font-size:0.88rem; font-weight:500; color:#6b7280;'>{c['label']}</div>"
+        f"</div>"
+        for c in cards
+    )
+    st.markdown(
+        f"<div style='display:flex; gap:1.2rem; margin:1.2rem 0 1.5rem 0;'>{inner}</div>",
+        unsafe_allow_html=True,
+    )

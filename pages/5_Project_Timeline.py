@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 from config.data_inputs import get_data_inputs, get_proxy_confidence
-from utils.shared_css import inject_shared_css, render_step_indicator, render_sidebar_cards
+from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards
 
 st.set_page_config(page_title="Project Timeline", layout="wide")
 
@@ -149,12 +149,12 @@ context_info += "</span>"
 st.markdown(context_info, unsafe_allow_html=True)
 
 # ============================================================================
-# SIDEBAR SUMMARY CARDS
+# SUMMARY CARDS
 # ============================================================================
 
 num_phases = len(PHASE_SPLIT)
 
-render_sidebar_cards([
+render_top_cards([
     {"value": f"{total_hours} hrs", "label": "Estimated Effort",
      "color": "#33528A", "bg": "rgba(51,82,138,0.10)", "border": "rgba(51,82,138,0.25)"},
     {"value": f"{duration_weeks} wk", "label": "Estimated Duration",
@@ -302,7 +302,7 @@ if not valid_timeline.empty:
             color="Phase" if "Phase" in valid_timeline.columns else None,
             title="Project Timeline (Gantt)",
             color_discrete_sequence=[
-                "#33528A", "#33A9A0", "#8AB62E", "#C4E81D", "#597001", "#ef4444"
+                "#33528A", "#33A9A0", "#8AB62E", "#C4E81D", "#597001", "#1A1A1A"
             ],
         )
         fig.update_yaxes(autorange="reversed")

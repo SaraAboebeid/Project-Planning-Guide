@@ -139,11 +139,11 @@ def render_step2(col2):
         # Determine confidence color
         if avg_conf is not None:
             if avg_conf >= 85:
-                conf_color = "#22c55e"
+                conf_color = "#33A9A0"
             elif avg_conf >= 70:
-                conf_color = "#f59e0b"
+                conf_color = "#33528A"
             else:
-                conf_color = "#ef4444"
+                conf_color = "#597001"
         else:
             conf_color = "#94a3b8"
 
@@ -286,13 +286,13 @@ def _render_data_item(item: dict, page_key: str, context: str = None):
             if confidence_val is not None:
                 # Determine color based on confidence level
                 if confidence_val >= 85:
-                    color = "#22c55e"  # green
+                    color = "#33A9A0"  # teal
                     level = "Good"
                 elif confidence_val >= 70:
-                    color = "#f59e0b"  # amber
+                    color = "#33528A"  # navy
                     level = "Moderate"
                 else:
-                    color = "#ef4444"  # red
+                    color = "#597001"  # dark olive
                     level = "Low"
                 
                 # Show confidence with estimated badge and tooltip

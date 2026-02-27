@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 from config.data_inputs import get_data_inputs, get_proxy_confidence
-from utils.shared_css import inject_shared_css, render_step_indicator, render_sidebar_cards
+from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards
 
 st.set_page_config(page_title="Tasks & Cost", layout="wide")
 
@@ -330,10 +330,10 @@ service_cost = round(effective_hours * rate * overhead_mult, 2)
 currency = st.session_state.p6_currency
 
 # ============================================================================
-# SIDEBAR SUMMARY CARDS
+# SUMMARY CARDS
 # ============================================================================
 
-render_sidebar_cards([
+render_top_cards([
     {"value": f"{service_cost:,.0f} {currency}", "label": "Estimated Service Cost",
      "color": "#33528A", "bg": "rgba(51,82,138,0.10)", "border": "rgba(51,82,138,0.25)"},
     {"value": f"{effective_hours} hrs", "label": f"{'Task Plan' if st.session_state.p6_use_task_plan and task_total_hours > 0 else 'Estimated'} Hours",

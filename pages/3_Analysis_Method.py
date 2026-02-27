@@ -8,7 +8,7 @@ effort/duration estimates, and a data source directory.
 import streamlit as st
 from config.data_inputs import get_data_inputs, get_proxy_options_for_context, get_proxy_confidence
 from config.sensitivity_config import get_sensitivity_weight
-from utils.shared_css import inject_shared_css, render_step_indicator, render_sidebar_cards
+from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards
 
 st.set_page_config(page_title="Confidence & Recommendations", layout="wide")
 
@@ -170,19 +170,19 @@ overall_confidence = max(0, min(100, overall_confidence))
 # Determine confidence level and colour
 if overall_confidence >= 70:
     conf_level = "Good"
-    conf_color = "#16a34a"
-    conf_bg = "rgba(34,197,94,0.10)"
-    conf_border = "rgba(34,197,94,0.30)"
+    conf_color = "#33A9A0"
+    conf_bg = "rgba(51,169,160,0.10)"
+    conf_border = "rgba(51,169,160,0.30)"
 elif overall_confidence >= 50:
     conf_level = "Moderate"
-    conf_color = "#d97706"
-    conf_bg = "rgba(245,158,11,0.10)"
-    conf_border = "rgba(245,158,11,0.30)"
+    conf_color = "#33528A"
+    conf_bg = "rgba(51,82,138,0.10)"
+    conf_border = "rgba(51,82,138,0.30)"
 else:
     conf_level = "Low"
-    conf_color = "#ef4444"
-    conf_bg = "rgba(239,68,68,0.10)"
-    conf_border = "rgba(239,68,68,0.30)"
+    conf_color = "#597001"
+    conf_bg = "rgba(89,112,1,0.10)"
+    conf_border = "rgba(89,112,1,0.30)"
 
 # Effort estimation
 EFFORT_BASE = {
@@ -230,10 +230,10 @@ context_info += "</span>"
 st.markdown(context_info, unsafe_allow_html=True)
 
 # ============================================================================
-# SIDEBAR SUMMARY CARDS
+# SUMMARY CARDS
 # ============================================================================
 
-render_sidebar_cards([
+render_top_cards([
     {"value": f"{overall_confidence}%", "label": f"Overall Confidence ({conf_level})",
      "color": conf_color, "bg": conf_bg, "border": conf_border},
     {"value": f"{total_hours} hrs", "label": "Estimated Effort",
@@ -291,16 +291,16 @@ if missing_items:
         if proxy:
             # Has a proxy selected
             if conf_val is not None and conf_val >= 85:
-                badge_color = "#16a34a"
-                badge_bg = "#dcfce7"
+                badge_color = "#33A9A0"
+                badge_bg = "rgba(51,169,160,0.15)"
                 badge_text = f"{conf_val}% confidence"
             elif conf_val is not None and conf_val >= 70:
-                badge_color = "#d97706"
-                badge_bg = "#fef3c7"
+                badge_color = "#33528A"
+                badge_bg = "rgba(51,82,138,0.15)"
                 badge_text = f"{conf_val}% confidence"
             elif conf_val is not None:
-                badge_color = "#ef4444"
-                badge_bg = "#fee2e2"
+                badge_color = "#597001"
+                badge_bg = "rgba(89,112,1,0.15)"
                 badge_text = f"{conf_val}% confidence"
             else:
                 badge_color = "#94a3b8"
@@ -327,7 +327,7 @@ if missing_items:
             # No proxy selected — flag as gap
             with st.expander(f"{item['label']}  —  No proxy selected", expanded=False):
                 st.markdown(
-                    "<span style='background:#fee2e2; color:#ef4444; padding:3px 10px; "
+                    "<span style='background:rgba(89,112,1,0.15); color:#597001; padding:3px 10px; "
                     "border-radius:6px; font-weight:600; font-size:0.88rem;'>Data gap — no proxy</span>",
                     unsafe_allow_html=True
                 )
@@ -386,28 +386,28 @@ with st.expander("Parameter Impact on Confidence (Sensitivity Weights)", expande
 
         if item["key"] in available_keys:
             status_badge = (
-                "<span style='background:#dcfce7; color:#16a34a; padding:2px 8px; "
+                "<span style='background:rgba(51,169,160,0.15); color:#33A9A0; padding:2px 8px; "
                 "border-radius:4px; font-size:0.78rem; font-weight:600;'>Available</span>"
             )
             fill_pct = 100.0
-            bar_color = "#16a34a"
+            bar_color = "#33A9A0"
         elif item["key"] in proxy_map:
             pc = proxy_map[item["key"]]
             pct_label = f"{pc}%" if pc is not None else "N/A"
             status_badge = (
-                f"<span style='background:#fef3c7; color:#d97706; padding:2px 8px; "
+                f"<span style='background:rgba(51,82,138,0.15); color:#33528A; padding:2px 8px; "
                 f"border-radius:4px; font-size:0.78rem; font-weight:600;'>"
                 f"Proxy ({pct_label})</span>"
             )
             fill_pct = (pc if pc is not None else 50)
-            bar_color = "#d97706"
+            bar_color = "#33528A"
         else:
             status_badge = (
-                "<span style='background:#fee2e2; color:#ef4444; padding:2px 8px; "
+                "<span style='background:rgba(89,112,1,0.15); color:#597001; padding:2px 8px; "
                 "border-radius:4px; font-size:0.78rem; font-weight:600;'>Missing</span>"
             )
             fill_pct = 0
-            bar_color = "#ef4444"
+            bar_color = "#597001"
 
         bar_width = (w / max_weight) * fill_pct
 
@@ -428,7 +428,7 @@ with st.expander("Parameter Impact on Confidence (Sensitivity Weights)", expande
 
     # Summary footer
     st.markdown(
-        f"<div style='margin-top:0.7rem; padding:0.6rem 0.8rem; background:rgba(59,130,246,0.06); "
+        f"<div style='margin-top:0.7rem; padding:0.6rem 0.8rem; background:rgba(51,82,138,0.06); "
         f"border-radius:8px; font-size:0.88rem; color:#334155;'>"
         f"<b>Total weight:</b> {total_weight:.1f} &nbsp;|&nbsp; "
         f"<b>Achieved:</b> {earned_weight:.1f} &nbsp;|&nbsp; "
@@ -476,18 +476,18 @@ if missing_items:
             improvement = new_confidence - overall_confidence
 
             if new_confidence >= 70:
-                new_color = "#16a34a"
+                new_color = "#33A9A0"
             elif new_confidence >= 50:
-                new_color = "#d97706"
+                new_color = "#33528A"
             else:
-                new_color = "#ef4444"
+                new_color = "#597001"
 
             st.markdown(
-                f"<div style='background: rgba(59,130,246,0.08); border-left: 3px solid #3b82f6; "
+                f"<div style='background: rgba(51,82,138,0.08); border-left: 3px solid #33528A; "
                 f"padding: 0.8rem 1rem; border-radius: 8px; margin-top: 0.5rem;'>"
                 f"<div style='font-size:1.1rem; font-weight:700; color:{new_color};'>"
                 f"Predicted Confidence: {new_confidence}%</div>"
-                f"<div style='font-size:0.95rem; color:#10b981; font-weight:600; margin-top:0.2rem;'>"
+                f"<div style='font-size:0.95rem; color:#8AB62E; font-weight:600; margin-top:0.2rem;'>"
                 f"+{improvement}% improvement</div>"
                 f"<div style='font-size:0.85rem; color:#64748b; margin-top:0.3rem;'>"
                 f"Weighted score: {new_earned:.1f} / {total_weight:.1f}"
