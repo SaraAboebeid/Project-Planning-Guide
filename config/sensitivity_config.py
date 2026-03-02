@@ -95,6 +95,82 @@ OAT_PARAMETERS = {
         "range_kwh": 866.10,
         "baseline_value": 0.24,
     },
+
+    # ------------------------------------------------------------------
+    # NEW OAT PARAMETERS (added from latest simulation results)
+    # ------------------------------------------------------------------
+
+    "roof_pitch_gable": {
+        "label": "Roof Pitch (Gable)",
+        "unit": "degrees",
+        "data_keys": ["roof_shape_angle"],
+        "values": [0, 10, 15, 25, 35, 45],
+        "outputs_kwh": [
+            225100.96, 244381.48, 261399.58,
+            304791.38, 361038.53, 436418.24,
+        ],
+        "range_kwh": 211317.28,
+        "baseline_value": 0,
+    },
+    "heating_setpoint": {
+        "label": "Heating Setpoint",
+        "unit": "°C",
+        "data_keys": ["setpoint"],
+        "values": [19, 20, 21, 22, 23],
+        "outputs_kwh": [
+            171222.30, 197468.59, 226335.41, 257907.95, 291787.77,
+        ],
+        "range_kwh": 120565.47,
+        "baseline_value": 21,
+    },
+    "floors_total": {
+        "label": "Number of Floors",
+        "unit": "count",
+        "data_keys": ["num_floors"],
+        "values": [3, 4, 5],
+        "outputs_kwh": [190255.20, 226335.41, 262413.31],
+        "range_kwh": 72158.11,
+        "baseline_value": 4,
+    },
+    "footprint_length": {
+        "label": "Building Length",
+        "unit": "factor",
+        "data_keys": ["footprint"],
+        "values": [0.9, 1.0, 1.1, 1.2],
+        "outputs_kwh": [205108.69, 226335.41, 247628.30, 268861.77],
+        "range_kwh": 63753.08,
+        "baseline_value": 1.0,
+    },
+    "footprint_width": {
+        "label": "Building Width",
+        "unit": "factor",
+        "data_keys": ["footprint"],
+        "values": [0.8, 0.9, 1.0, 1.1, 1.2],
+        "outputs_kwh": [200067.92, 213174.52, 226335.41, 239692.54, 252891.61],
+        "range_kwh": 52823.69,
+        "baseline_value": 1.0,
+    },
+    "glazing_package": {
+        "label": "Glazing Quality",
+        "unit": "category",
+        "data_keys": ["window_properties"],
+        "values": ["P0 Poor", "P1 Baseline", "P2 Good"],
+        "outputs_kwh": [225390.84, 213962.33, 202041.01],
+        "range_kwh": 23349.83,
+        "baseline_value": "P1 Baseline",
+    },
+    "roof_pitch_shed": {
+        "label": "Roof Pitch (Shed)",
+        "unit": "degrees",
+        "data_keys": ["roof_shape_angle"],
+        "values": [0, 10, 15, 25, 35, 45],
+        "outputs_kwh": [
+            224629.69, 225877.35, 227057.18,
+            230904.45, 237255.22, 247602.52,
+        ],
+        "range_kwh": 22972.83,
+        "baseline_value": 0,
+    },
 }
 
 # Computed relative importance (% of total output range)
@@ -115,21 +191,24 @@ OAT_IMPORTANCE = {
 
 # Default weights (Heating / Cooling focus — from OAT + Global SA)
 SENSITIVITY_WEIGHTS = {
-    # --- High impact (from OAT analysis) ---
+    # --- Very high impact (from OAT analysis) ---
+    "roof_shape_angle": 20.0,
     "infiltration_rate": 20.0,
     "construction_materials": 15.0,
+
+    # --- High impact ---
+    "setpoint": 12.0,
     "wwr": 10.0,
+    "num_floors": 9.0,
     "window_properties": 8.0,
 
     # --- Moderate impact (from global SA + physics) ---
-    "footprint": 7.0,
-    "num_floors": 6.0,
-    "height": 5.0,
+    "footprint": 8.0,
+    "height": 6.0,
     "hvac_type": 5.0,
 
     # --- Lower impact ---
     "year_construction": 4.0,
-    "setpoint": 4.0,
     "orientation": 3.0,
     "supply_temp": 3.0,
     "annual_heating_cooling": 3.0,

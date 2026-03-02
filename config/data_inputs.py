@@ -680,6 +680,7 @@ CONTEXT_PROXY_OPTIONS = {
         "height": [
             "Laser data from Lantmäteriet",
             "EUBUCCO database",
+            "OpenStreetMap",
         ],
         "num_floors": [
             "Google Street View",
@@ -765,6 +766,11 @@ PROXY_CONFIDENCE = {
                 "confidence": 80,
                 "source": "estimated",
                 "reference": "Height estimates derived from mixed sources"
+            },
+            "OpenStreetMap": {
+                "confidence": 65,
+                "source": "estimated",
+                "reference": "Height data sparse, coverage varies significantly by region"
             },
         },
         "num_floors": {

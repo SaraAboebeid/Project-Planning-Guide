@@ -151,7 +151,7 @@ def create_tornado_chart() -> go.Figure:
         xaxis=dict(title="Output Range (MWh/year)", gridcolor=GRID,
                    zeroline=True, zerolinecolor="#ddd"),
         yaxis=dict(title=""),
-        height=320,
+        height=max(320, 55 * len(labels)),
         margin=dict(l=10, r=140, t=50, b=40),
     ))
     return fig
@@ -163,22 +163,29 @@ def create_tornado_chart() -> go.Figure:
 
 def create_parameter_sweeps() -> go.Figure:
     """Grid of line/bar subplots for each OAT parameter sweep."""
+    CATEGORICAL_UNITS = {"category"}
     continuous = {
-        k: v for k, v in OAT_PARAMETERS.items() if k != "construction_package"
+        k: v for k, v in OAT_PARAMETERS.items()
+        if v.get("unit") not in CATEGORICAL_UNITS
     }
-    n = len(continuous) + 1
+    categorical = {
+        k: v for k, v in OAT_PARAMETERS.items()
+        if v.get("unit") in CATEGORICAL_UNITS
+    }
+    n = len(continuous) + len(categorical)
     ncols = 3
     nrows = (n + ncols - 1) // ncols
 
     titles = [d["label"] for d in continuous.values()]
-    titles.append(OAT_PARAMETERS["construction_package"]["label"])
+    titles += [d["label"] for d in categorical.values()]
 
     fig = make_subplots(
         rows=nrows, cols=ncols, subplot_titles=titles,
-        vertical_spacing=0.18, horizontal_spacing=0.10,
+        vertical_spacing=max(0.06, 0.22 / nrows), horizontal_spacing=0.10,
     )
     bl = BASELINE_HEATING_KWH / 1000
 
+    # --- Continuous parameters (line + markers) ---
     for idx, (name, data) in enumerate(continuous.items()):
         r, c = idx // ncols + 1, idx % ncols + 1
         col = PALETTE[idx % len(PALETTE)]
@@ -214,23 +221,28 @@ def create_parameter_sweeps() -> go.Figure:
             line=dict(color="#aaa", width=1, dash="dash"),
         )
 
-    # Construction package (bar chart)
-    cp = OAT_PARAMETERS["construction_package"]
-    idx_cp = len(continuous)
-    r, c = idx_cp // ncols + 1, idx_cp % ncols + 1
-    fig.add_trace(go.Bar(
-        x=cp["values"],
-        y=[v / 1000 for v in cp["outputs_kwh"]],
-        marker=dict(
-            color=["#ef4444", "#f59e0b", "#22c55e"],
-            line=dict(width=0),
-        ),
-        showlegend=False,
-        hovertemplate="Package: %{x}<br>Heating: %{y:.1f} MWh<extra></extra>",
-    ), row=r, col=c)
+    # --- Categorical parameters (bar charts) ---
+    cat_colors = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7"]
+    for ci, (name, data) in enumerate(categorical.items()):
+        idx_cat = len(continuous) + ci
+        r, c = idx_cat // ncols + 1, idx_cat % ncols + 1
+        nvals = len(data["values"])
+        bar_colors = cat_colors[:nvals] if nvals <= len(cat_colors) else (
+            [PALETTE[i % len(PALETTE)] for i in range(nvals)]
+        )
+        fig.add_trace(go.Bar(
+            x=data["values"],
+            y=[v / 1000 for v in data["outputs_kwh"]],
+            marker=dict(color=bar_colors, line=dict(width=0)),
+            showlegend=False,
+            hovertemplate=(
+                f"{data['label']}: %{{x}}<br>"
+                f"Heating: %{{y:.1f}} MWh<extra></extra>"
+            ),
+        ), row=r, col=c)
 
     fig.update_layout(**_base(
-        height=280 * nrows,
+        height=260 * nrows,
         margin=dict(l=10, r=10, t=30, b=10),
     ))
     fig.update_yaxes(title_text="MWh/year", gridcolor=GRID,
@@ -271,8 +283,8 @@ def create_oat_waterfall() -> go.Figure:
         ),
         yaxis=dict(title="Cumulative Uncertainty (MWh)", gridcolor=GRID),
         xaxis=dict(title=""),
-        height=380,
-        margin=dict(l=10, r=10, t=50, b=80),
+        height=max(380, 30 * len(labels) + 80),
+        margin=dict(l=10, r=10, t=50, b=100),
     ))
     fig.update_xaxes(tickangle=-30)
     return fig
@@ -624,20 +636,37 @@ def create_combined_importance() -> go.Figure:
         "wwr_south": "wwr_s",
         "wwr_east": "wwr_e",
         "wwr_west": "wwr_w",
+        "floors_total": "floors_total",
+        "footprint_length": "length_factor",
+        "footprint_width": "width_factor",
+        "glazing_package": "glazing_pkg",
+        "roof_pitch_gable": "roof_pitch_deg",
+        # No direct Global SA match: heating_setpoint, roof_pitch_shed
     }
+    # Reverse map: global col -> OAT name
+    align_rev = {v: k for k, v in align.items()}
 
     labels, oat_vals, gsa_vals = [], [], []
+    # 1) Add OAT parameters that also appear in Global SA
     for oat_name, (label, oat_pct) in sorted(
         oat_map.items(), key=lambda x: x[1][1], reverse=True
     ):
         gsa_col = align.get(oat_name)
-        if gsa_col and gsa_col in global_map:
-            labels.append(label)
-            oat_vals.append(oat_pct)
-            gsa_vals.append(global_map[gsa_col] * 100)
+        gsa_score = global_map.get(gsa_col, 0) * 100 if gsa_col else 0
+        labels.append(label)
+        oat_vals.append(oat_pct)
+        gsa_vals.append(gsa_score)
+
+    # 2) Add Global-SA-only parameters (not tested in OAT)
+    covered_gsa_cols = set(align.values())
+    for gsa_col, rho in sorted(global_map.items(), key=lambda x: x[1], reverse=True):
+        if gsa_col not in covered_gsa_cols:
+            labels.append(GLOBAL_SA_LABELS.get(gsa_col, gsa_col))
+            oat_vals.append(0)  # not tested in OAT
+            gsa_vals.append(rho * 100)
 
     if not labels:
-        return _placeholder("No overlapping parameters between OAT and Global SA.")
+        return _placeholder("No parameter importance data available.")
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -665,7 +694,7 @@ def create_combined_importance() -> go.Figure:
         ),
         xaxis=dict(title="Importance Score", gridcolor=GRID),
         yaxis=dict(title=""),
-        height=360,
+        height=max(360, 36 * len(labels)),
         margin=dict(l=10, r=100, t=50, b=60),
     ))
     return fig

@@ -34,97 +34,42 @@ st.markdown("""
 render_step_indicator(2)
 
 
-# Contextual data source links by data item key
-# Maps item keys (or key patterns) to relevant source URLs
-DATA_SOURCE_LINKS = {
-    # Building Geometry
-    "footprint":      [("OpenStreetMap", "https://www.openstreetmap.org"), ("Google Earth", "https://earth.google.com")],
-    "height":         [("OpenStreetMap", "https://www.openstreetmap.org"), ("Google Earth", "https://earth.google.com")],
-    "num_floors":     [("OpenStreetMap", "https://www.openstreetmap.org"), ("Google Earth", "https://earth.google.com")],
-    "wwr":            [("Google Street View", "https://www.google.com/streetview/")],
-    "orientation":    [("OpenStreetMap", "https://www.openstreetmap.org"), ("Google Maps", "https://maps.google.com")],
-    "has_basement":   [],
-    "roof_shape_angle": [("Google Earth", "https://earth.google.com")],
-    "roof_area":      [("Google Earth", "https://earth.google.com")],
-    # Building Fabric & Construction
-    "year_construction":     [("OpenStreetMap", "https://www.openstreetmap.org")],
-    "construction_materials": [],
-    "window_properties":     [],
-    "infiltration_rate":     [],
-    # Building Systems
-    "hvac_type":    [],
-    "hvac_system":  [],
-    "setpoint":     [],
-    "supply_temp":  [],
-    # Energy Data
-    "annual_electricity":     [],
-    "annual_heating_cooling": [],
-    "annual_heating_demand":  [],
-    "onsite_production":      [],
-    "grid_emission_factor":   [("IPCC", "https://www.ipcc.ch"), ("IEA", "https://www.iea.org/data-and-statistics")],
-    # Building Use & Operation
-    "use_type":           [("OpenStreetMap", "https://www.openstreetmap.org")],
-    "building_use":       [("OpenStreetMap", "https://www.openstreetmap.org")],
-    "operating_hours":    [],
-    "occupancy_pattern":  [],
-    # Location & Climate
-    "location":               [("Google Maps", "https://maps.google.com")],
-    "building_location":      [("Google Maps", "https://maps.google.com"), ("OpenStreetMap", "https://www.openstreetmap.org")],
-    "context_location_height": [("Google Earth", "https://earth.google.com")],
-    # Renewable / PV
-    "pv_module":           [],
-    "installing_battery":  [],
+# ── Proxy-option → URL mapping ──────────────────────────────────────
+# Maps the *exact* proxy-option names that appear in the dropdowns to
+# their website URLs.  Only options listed here get a clickable link in
+# the "Sources" row below the proxy selector.
+PROXY_SOURCE_URLS = {
+    # Swedish national sources
+    "Lantmäteriet database":          "https://www.lantmateriet.se",
+    "Laser data from Lantmäteriet":   "https://www.lantmateriet.se",
+    # European / international open-data
+    "EUBUCCO database":               "https://eubucco.com/",
+    "OpenStreetMap":                   "https://www.openstreetmap.org",
+    # Google services
+    "Google Street View":             "https://www.google.com/streetview/",
+    "Google Street Maps":             "https://maps.google.com",
+    "Google Earth":                   "https://earth.google.com",
+    # Official registries
+    "Energy Performance Certificate": "https://www.boverket.se/en/start/building-in-sweden/energy-performance-certificates/",
+    "SCB":                            "https://www.scb.se",
+    "Energimyndigheten":              "https://www.energimyndigheten.se",
+    # Other sources (no URL → omitted from links)
+    # "Image Recognition":  None,
+    # "Satellite Images":   None,
 }
+def _get_source_links_for_proxies(proxy_options: list) -> list:
+    """Build source links from the proxy options in the dropdown.
 
-# Country-specific sources to append
-COUNTRY_SOURCE_LINKS = {
-    "Sweden": {
-        "footprint":    [("Lantmäteriet", "https://www.lantmateriet.se")],
-        "height":       [("Lantmäteriet", "https://www.lantmateriet.se")],
-        "num_floors":   [("SCB", "https://www.scb.se")],
-        "year_construction": [("SCB", "https://www.scb.se")],
-        "annual_electricity": [("Energimyndigheten", "https://www.energimyndigheten.se")],
-        "annual_heating_cooling": [("Energimyndigheten", "https://www.energimyndigheten.se")],
-        "annual_heating_demand":  [("Energimyndigheten", "https://www.energimyndigheten.se")],
-        "grid_emission_factor":   [("Energimyndigheten", "https://www.energimyndigheten.se")],
-        "location":     [("Lantmäteriet", "https://www.lantmateriet.se")],
-        "building_location": [("Lantmäteriet", "https://www.lantmateriet.se")],
-    },
-    "Germany": {
-        "footprint":    [("ALKIS", "https://www.adv-online.de")],
-        "annual_electricity": [("DENA", "https://www.dena.de")],
-        "grid_emission_factor": [("UBA", "https://www.umweltbundesamt.de")],
-    },
-    "United Kingdom": {
-        "annual_electricity": [("EPC Register", "https://www.gov.uk/find-energy-certificate")],
-        "year_construction":  [("EPC Register", "https://www.gov.uk/find-energy-certificate")],
-        "grid_emission_factor": [("BEIS", "https://www.gov.uk/government/organisations/department-for-energy-security-and-net-zero")],
-    },
-    "Denmark": {
-        "annual_electricity": [("Danish Energy Agency", "https://ens.dk")],
-        "footprint":    [("SDFI", "https://sdfi.dk")],
-    },
-    "Norway": {
-        "annual_electricity": [("NVE", "https://www.nve.no")],
-        "footprint":    [("Kartverket", "https://www.kartverket.no")],
-    },
-    "Finland": {
-        "annual_electricity": [("Statistics Finland", "https://www.stat.fi")],
-        "footprint":    [("NLS Finland", "https://www.maanmittauslaitos.fi")],
-    },
-}
-
-
-def _get_source_links(item_key: str, context: str = None):
-    """Get combined universal + country-specific source links for a data item."""
-    links = list(DATA_SOURCE_LINKS.get(item_key, []))
-    if context and context in COUNTRY_SOURCE_LINKS:
-        country_links = COUNTRY_SOURCE_LINKS[context].get(item_key, [])
-        # Add country links, avoiding duplicates by name
-        existing_names = {name for name, _ in links}
-        for name, url in country_links:
-            if name not in existing_names:
-                links.append((name, url))
+    Only proxy names that have an entry in PROXY_SOURCE_URLS are returned.
+    This ensures the "Sources" section always matches the dropdown list.
+    """
+    links = []
+    seen = set()
+    for proxy_name in proxy_options:
+        url = PROXY_SOURCE_URLS.get(proxy_name)
+        if url and proxy_name not in seen:
+            links.append((proxy_name, url))
+            seen.add(proxy_name)
     return links
 
 
@@ -225,8 +170,8 @@ def _render_data_item(item: dict, page_key: str, context: str = None,
         else:
             st.caption("No proxy options available yet")
 
-        # Show contextual "Where to find this data" links
-        source_links = _get_source_links(item_key, context)
+        # Show source links that match the proxy dropdown options
+        source_links = _get_source_links_for_proxies(proxy_options)
         if source_links:
             links_html = " · ".join(
                 f"<a href='{url}' target='_blank' style='color:#33528A; text-decoration:none; font-weight:500;'>{name}</a>"
@@ -371,6 +316,15 @@ avg_conf_display = f"{avg_conf}%" if avg_conf is not None else "N/A"
 @st.dialog("Sensitivity Analysis Results", width="large")
 def show_sensitivity_analysis():
     """Interactive sensitivity analysis visualization with OAT and Global SA."""
+    # Ensure the dialog body scrolls so tall charts (waterfall, parallel-coords)
+    # are always reachable.
+    st.markdown(
+        "<style>"
+        "div[data-testid='stDialog'] section[data-testid='stVerticalBlockBorderWrapper'] "
+        "{overflow-y:auto !important; max-height:80vh !important;}"
+        "</style>",
+        unsafe_allow_html=True,
+    )
     st.markdown(
         "<p style='color: #64748b; font-size: 0.92rem; margin-bottom: 0.5rem;'>"
         "Results from sensitivity analysis on a reference building energy model. "
@@ -390,10 +344,17 @@ def show_sensitivity_analysis():
             "Each parameter was varied **independently** while all others "
             "were held at their baseline value."
         )
-        oat_view = st.radio(
+        st.info(
+            "OAT tested **13 parameters**: Infiltration Rate, Construction Quality, "
+            "WWR (N/S/E/W), Roof Pitch (Gable & Shed), Heating Setpoint, "
+            "Number of Floors, Building Length & Width, and Glazing Quality. "
+            "The **Global SA** tab shows all 12 simultaneously-varied parameters.",
+            icon="ℹ️",
+        )
+        oat_view = st.selectbox(
             "Visualisation",
             ["Tornado Chart", "Parameter Sweeps", "Waterfall", "Radar"],
-            horizontal=True, key="sa_oat_view",
+            key="sa_oat_view",
         )
         if oat_view == "Tornado Chart":
             fig = create_tornado_chart()
@@ -417,11 +378,11 @@ def show_sensitivity_analysis():
             "All parameters were varied **simultaneously** across 200 "
             "simulations, capturing interaction effects."
         )
-        gsa_view = st.radio(
+        gsa_view = st.selectbox(
             "Visualisation",
             ["SHAP Beeswarm", "Feature Importance", "Parallel Coordinates",
              "Correlation Heatmap"],
-            horizontal=True, key="sa_gsa_view",
+            key="sa_gsa_view",
         )
         if gsa_view == "SHAP Beeswarm":
             fig = create_global_sa_beeswarm()
