@@ -68,6 +68,13 @@ if not data_inputs:
         st.switch_page("pages/2_Review_Data.py")
     st.stop()
 
+# Check whether Step 2 was actually visited
+if "step2_data_choices" not in st.session_state:
+    st.warning("Please complete Step 2 first so your data availability is captured.")
+    if st.button("Go to Step 2"):
+        st.switch_page("pages/2_Review_Data.py")
+    st.stop()
+
 # Reconstruct page_key (same logic as Page 2)
 renewable_str = "_".join(renewable_types) if renewable_types else "none"
 urban_str = "_".join(urban_design_types) if urban_design_types else "none"
@@ -79,6 +86,11 @@ all_items = []
 for category_data in data_inputs:
     all_items.extend(category_data["items"])
 
+# ── Read persisted choices from Step 2 ──────────────────────────────
+# Page 2 saves a plain dict (not widget keys) to session state so that
+# the data-availability selections survive page navigation.
+step2_choices = st.session_state.get("step2_data_choices", {})
+
 available_items = []
 missing_items = []
 confidences = []
@@ -87,8 +99,9 @@ item_status = {}  # For sensitivity analysis
 
 for item in all_items:
     item_key = item["key"]
-    has_data_key = f"{page_key}_{item_key}_has_data"
-    has_data = st.session_state.get(has_data_key, "Yes")
+    choice = step2_choices.get(item_key, {})
+    has_data = choice.get("has_data", "Yes")
+    persisted_proxy = choice.get("proxy")
 
     if has_data == "Yes":
         available_items.append(item)
@@ -99,8 +112,7 @@ for item in all_items:
         }
     else:
         missing_items.append(item)
-        proxy_key = f"{page_key}_{item_key}_proxy"
-        selected_proxy = st.session_state.get(proxy_key)
+        selected_proxy = persisted_proxy
         if selected_proxy:
             conf_info = get_proxy_confidence(analysis_context, item_key, selected_proxy)
             conf_val = conf_info.get("confidence")
@@ -495,53 +507,6 @@ if missing_items:
                 f"</div>",
                 unsafe_allow_html=True
             )
-
-# ============================================================================
-# EFFORT BREAKDOWN
-# ============================================================================
-
-st.markdown(
-    "<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>",
-    unsafe_allow_html=True
-)
-
-with st.expander("Effort and Duration Breakdown", expanded=False):
-    phases = {
-        "Scoping": 0.10,
-        "Data Collection": 0.30,
-        "Modeling & Simulation": 0.35,
-        "Validation & QA": 0.15,
-        "Reporting": 0.10,
-    }
-
-    st.markdown(
-        f"<div style='font-size:0.95rem; color:#64748b; margin-bottom:0.7rem;'>"
-        f"Based on <b>{analysis_type_str}</b> at <b>{analysis_scale}</b> scale "
-        f"with <b>{data_coverage_pct:.0f}%</b> data coverage.</div>",
-        unsafe_allow_html=True
-    )
-
-    for phase, fraction in phases.items():
-        phase_hours = round(total_hours * fraction)
-        bar_width = fraction * 100
-        st.markdown(
-            f"<div style='display:flex; align-items:center; gap:0.8rem; margin-bottom:0.5rem;'>"
-            f"<div style='width:160px; font-size:0.9rem; font-weight:500;'>{phase}</div>"
-            f"<div style='flex:1; background:#e5e7eb; border-radius:6px; height:10px; overflow:hidden;'>"
-            f"<div style='background:#33A9A0; height:100%; width:{bar_width}%; border-radius:6px;'></div>"
-            f"</div>"
-            f"<div style='width:55px; text-align:right; font-size:0.88rem; font-weight:600; color:#374151;'>"
-            f"{phase_hours} hrs</div>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
-
-    st.markdown(
-        f"<div style='margin-top:0.5rem; font-size:0.9rem; color:#64748b;'>"
-        f"<b>Total:</b> {total_hours} hours | <b>Duration:</b> ~{duration_weeks} weeks "
-        f"(at 30 hrs/week)</div>",
-        unsafe_allow_html=True
-    )
 
 # ============================================================================
 # NAVIGATION

@@ -485,6 +485,23 @@ with left_col:
 
 
 # ============================================================================
+# PERSIST DATA CHOICES (survives page navigation)
+# ============================================================================
+# Streamlit widget keys are cleaned up when navigating away from a page.
+# Save every user choice into a plain session-state dict so downstream
+# pages (Step 3+) can reliably read the data-availability selections.
+
+_persisted = {}
+for _item in all_items:
+    _ik = _item["key"]
+    _persisted[_ik] = {
+        "has_data": st.session_state.get(f"{page_key}_{_ik}_has_data", "Yes"),
+        "proxy":    st.session_state.get(f"{page_key}_{_ik}_proxy"),
+    }
+st.session_state["step2_data_choices"] = _persisted
+st.session_state["step2_page_key"]     = page_key
+
+# ============================================================================
 # NAVIGATION
 # ============================================================================
 

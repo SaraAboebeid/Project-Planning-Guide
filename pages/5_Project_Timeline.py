@@ -63,27 +63,29 @@ data_inputs = get_data_inputs(
     renewable_types, urban_design_types, climate_resilience_types
 )
 
-renewable_str = "_".join(renewable_types) if renewable_types else "none"
-urban_str = "_".join(urban_design_types) if urban_design_types else "none"
-climate_str = "_".join(climate_resilience_types) if climate_resilience_types else "none"
-page_key = f"page2_{analysis_type_str}_{analysis_focus}_{analysis_scale}_{analysis_context}_{renewable_str}_{urban_str}_{climate_str}".replace(" ", "_").replace("&", "and")
+# ── Read persisted choices from Step 2 ──────────────────────────────
+# Page 2 saves a plain dict (not widget keys) to session state so that
+# the data-availability selections survive page navigation.
+step2_choices = st.session_state.get("step2_data_choices", {})
 
 all_items = []
 for cat in (data_inputs or []):
     all_items.extend(cat["items"])
 total_count = len(all_items)
-available_count = sum(
-    1 for item in all_items
-    if st.session_state.get(f"{page_key}_{item['key']}_has_data", "Yes") == "Yes"
-)
-data_coverage_pct = (available_count / total_count * 100) if total_count > 0 else 0
 
-# Count proxies
-proxies_with_selection = sum(
-    1 for item in all_items
-    if st.session_state.get(f"{page_key}_{item['key']}_has_data", "Yes") == "No"
-    and st.session_state.get(f"{page_key}_{item['key']}_proxy")
-)
+available_count = 0
+proxies_with_selection = 0
+for item in all_items:
+    choice = step2_choices.get(item["key"], {})
+    has_data = choice.get("has_data", "Yes")
+    if has_data == "Yes":
+        available_count += 1
+    else:
+        proxy = choice.get("proxy")
+        if proxy:
+            proxies_with_selection += 1
+
+data_coverage_pct = (available_count / total_count * 100) if total_count > 0 else 0
 
 EFFORT_BASE = {
     "Energy & Carbon Performance": 60,
@@ -164,6 +166,94 @@ render_top_cards([
 ])
 
 # ============================================================================
+# EDITABLE EFFORT & DURATION BREAKDOWN
+# ============================================================================
+
+st.markdown(
+    "<hr style='margin: 0.5rem 0 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>",
+    unsafe_allow_html=True
+)
+
+with st.expander("Effort and Duration Breakdown", expanded=True):
+    st.markdown(
+        f"<div style='font-size:0.95rem; color:#64748b; margin-bottom:0.7rem;'>"
+        f"Based on <b>{analysis_type_str}</b> at <b>{analysis_scale}</b> scale "
+        f"with <b>{data_coverage_pct:.0f}%</b> data coverage. "
+        f"Adjust hours per phase as needed.</div>",
+        unsafe_allow_html=True
+    )
+
+    # Initialise editable phase hours in session state on first visit
+    if "p5_phase_hours" not in st.session_state:
+        st.session_state.p5_phase_hours = {
+            phase: round(total_hours * frac) for phase, frac in PHASE_SPLIT.items()
+        }
+
+    # Offer a button to reset to auto-calculated values
+    if st.button("Reset to estimated values", key="p5_reset_effort"):
+        st.session_state.p5_phase_hours = {
+            phase: round(total_hours * frac) for phase, frac in PHASE_SPLIT.items()
+        }
+        st.rerun()
+
+    # Render editable number inputs for each phase
+    # First pass: collect current values via number_input widgets
+    updated_phase_hours = {}
+    phase_cols = {}  # store bar column refs for second pass
+    for phase, frac in PHASE_SPLIT.items():
+        default_hrs = st.session_state.p5_phase_hours.get(phase, round(total_hours * frac))
+        col_label, col_input, col_bar = st.columns([2, 1, 4])
+        with col_label:
+            st.markdown(
+                f"<div style='font-size:0.9rem; font-weight:500; padding-top:0.45rem;'>{phase}</div>",
+                unsafe_allow_html=True,
+            )
+        with col_input:
+            new_val = st.number_input(
+                phase,
+                min_value=0,
+                value=default_hrs,
+                step=1,
+                key=f"p5_phase_{phase}",
+                label_visibility="collapsed",
+            )
+            updated_phase_hours[phase] = new_val
+        phase_cols[phase] = col_bar
+
+    # Second pass: draw bars now that we know the true max across all phases
+    max_hrs = max(updated_phase_hours.values()) if updated_phase_hours else 1
+    for phase, col_bar in phase_cols.items():
+        hrs = updated_phase_hours[phase]
+        bar_pct = (hrs / max_hrs * 100) if max_hrs > 0 else 0
+        with col_bar:
+            st.markdown(
+                f"<div style='padding-top:0.45rem;'>"
+                f"<div style='background:#e5e7eb; border-radius:6px; height:10px; overflow:hidden;'>"
+                f"<div style='background:#33A9A0; height:100%; width:{bar_pct:.0f}%; border-radius:6px;'></div>"
+                f"</div></div>",
+                unsafe_allow_html=True,
+            )
+
+    # Persist edited values
+    st.session_state.p5_phase_hours = updated_phase_hours
+
+    # Totals
+    user_total_hours = sum(updated_phase_hours.values())
+    user_duration_weeks = max(1, round(user_total_hours / 30))
+
+    st.markdown(
+        f"<div style='margin-top:0.5rem; font-size:0.9rem; color:#64748b;'>"
+        f"<b>Total:</b> {user_total_hours} hours &nbsp;|&nbsp; "
+        f"<b>Duration:</b> ~{user_duration_weeks} weeks (at 30 hrs/week)"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+# Use user-edited totals for downstream timeline generation
+total_hours = sum(st.session_state.get("p5_phase_hours", {phase: round(total_hours * frac) for phase, frac in PHASE_SPLIT.items()}).values()) or total_hours
+duration_weeks = max(1, round(total_hours / 30))
+
+# ============================================================================
 # DATE INPUTS
 # ============================================================================
 
@@ -210,9 +300,11 @@ if generate_clicked:
     weekly_capacity = 30.0
     rows = []
     current = start_date
-    for phase, fraction in PHASE_SPLIT.items():
-        phase_hours = round(total_hours * fraction)
-        weeks = max(1, round(phase_hours / weekly_capacity))
+    edited_phases = st.session_state.get("p5_phase_hours", {
+        phase: round(total_hours * frac) for phase, frac in PHASE_SPLIT.items()
+    })
+    for phase, phase_hours in edited_phases.items():
+        weeks = max(1, round(phase_hours / weekly_capacity)) if phase_hours > 0 else 1
         days = int(weeks * 7)
         finish = current + pd.to_timedelta(days, unit="D")
         rows.append({

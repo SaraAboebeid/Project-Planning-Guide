@@ -1,18 +1,16 @@
 """
-Page 6: Tasks & Cost
+Page 6: Cost
 
-Task planner with auto-generation from analysis configuration,
-plus CAPEX/OPEX budget estimation and cost summary.
+CAPEX/OPEX budget estimation and cost summary.
 """
 
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime, timedelta
-from config.data_inputs import get_data_inputs, get_proxy_confidence
+from config.data_inputs import get_data_inputs
 from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards
 
-st.set_page_config(page_title="Tasks & Cost", layout="wide")
+st.set_page_config(page_title="Cost", layout="wide")
 
 # Inject shared MD3 button / theme CSS
 inject_shared_css()
@@ -61,136 +59,6 @@ PHASE_SPLIT = {
 }
 
 
-def _generate_suggested_tasks(total_hours, proxies_count, completeness_pct,
-                              analysis_type, project_scale):
-    """Generate a suggested task list based on analysis configuration."""
-    weekly_capacity = 30.0
-
-    # ── Specialized template: Renewable Energy & Local Production ──
-    if analysis_type == "Renewable Energy & Local Production":
-        if project_scale == "Building":
-            weeks = {
-                "Digital Model Setup": 1.0,
-                "Roof & Usable Area Extraction": 0.5,
-                "Solar Irradiance Simulation": 1.0,
-                "PV System Sizing & Layout": 0.5,
-                "Energy Balance & Self-Consumption": 0.5,
-                "Financial Analysis (CAPEX/OPEX)": 0.5,
-                "Validation & QA": 0.5,
-                "Reporting & Recommendations": 0.5,
-            }
-        elif project_scale == "Neighborhood":
-            weeks = {
-                "Digital Model Setup": 3.0,
-                "Roof & Usable Area Extraction": 1.0,
-                "Solar Irradiance Simulation": 2.0,
-                "PV System Sizing & Layout": 1.0,
-                "Energy Balance & Self-Consumption": 1.0,
-                "Financial Analysis (CAPEX/OPEX)": 1.0,
-                "Validation & QA": 0.5,
-                "Reporting & Recommendations": 0.5,
-            }
-        else:  # City
-            weeks = {
-                "Digital Model Setup": 4.0,
-                "Roof & Usable Area Extraction": 2.0,
-                "Solar Irradiance Simulation": 3.0,
-                "PV System Sizing & Layout": 1.5,
-                "Energy Balance & Self-Consumption": 1.5,
-                "Financial Analysis (CAPEX/OPEX)": 1.0,
-                "Validation & QA": 0.5,
-                "Reporting & Recommendations": 0.5,
-            }
-
-        missing_factor = max(0.0, 1.0 - (completeness_pct / 100.0))
-        wrangle_weeks = 0.0
-        if missing_factor > 0.0 or proxies_count > 0:
-            wrangle_weeks = 0.5 + 1.0 * missing_factor + 0.1 * min(proxies_count, 10)
-
-        deliverables = {
-            "Scoping & Kickoff": "Scope, success criteria, data checklist",
-            "Digital Model Setup": "Clean GIS/BIM model suitable for solar analysis",
-            "Data Wrangling & Gap Filling": "Curated dataset, proxy selections documented",
-            "Roof & Usable Area Extraction": "Usable roof polygons, obstructions mapped",
-            "Solar Irradiance Simulation": "Annual/seasonal irradiance maps, kWh/m²",
-            "PV System Sizing & Layout": "Preliminary PV layout, DC/AC sizing",
-            "Energy Balance & Self-Consumption": "Self-consumption ratio, grid export profile",
-            "Financial Analysis (CAPEX/OPEX)": "CAPEX/OPEX, LCOE, payback, NPV",
-            "Validation & QA": "Spot-checks vs known cases and sanity bounds",
-            "Reporting & Recommendations": "Executive summary, results, actions, risks",
-        }
-        phase_map = {
-            "Scoping & Kickoff": "Scoping",
-            "Digital Model Setup": "Modeling",
-            "Data Wrangling & Gap Filling": "Data Collection",
-            "Roof & Usable Area Extraction": "Modeling",
-            "Solar Irradiance Simulation": "Modeling",
-            "PV System Sizing & Layout": "Analysis",
-            "Energy Balance & Self-Consumption": "Analysis",
-            "Financial Analysis (CAPEX/OPEX)": "Analysis",
-            "Validation & QA": "Validation",
-            "Reporting & Recommendations": "Reporting",
-        }
-
-        tasks = [
-            {"Task": "Scoping & Kickoff", "Hours": int(round(0.3 * weekly_capacity)),
-             "Owner": "", "Phase": "Scoping",
-             "Deliverable": deliverables["Scoping & Kickoff"]},
-        ]
-        if wrangle_weeks > 0:
-            tasks.append({
-                "Task": "Data Wrangling & Gap Filling",
-                "Hours": int(round(wrangle_weeks * weekly_capacity)),
-                "Owner": "", "Phase": "Data Collection",
-                "Deliverable": deliverables["Data Wrangling & Gap Filling"],
-            })
-        for name, w in weeks.items():
-            tasks.append({
-                "Task": name,
-                "Hours": int(round(w * weekly_capacity)),
-                "Owner": "",
-                "Phase": phase_map.get(name, "Modeling"),
-                "Deliverable": deliverables.get(name, ""),
-            })
-        return tasks
-
-    # ── Generic fallback ──
-    weights = {
-        "Scoping": 0.10,
-        "Data Collection": 0.28,
-        "Proxy Preparation": 0.10 if proxies_count > 0 else 0.04,
-        "Model Setup & Simulation": 0.32,
-        "Validation & QA": 0.12,
-        "Reporting": 0.08,
-    }
-
-    missing_factor = max(0.0, 1.0 - (completeness_pct / 100.0))
-    weights["Data Collection"] += 0.10 * missing_factor
-    weights["Proxy Preparation"] += (0.02 + 0.01 * min(proxies_count, 10)) * (0.5 + 0.5 * missing_factor)
-
-    total_w = sum(weights.values())
-    for k in list(weights.keys()):
-        weights[k] /= total_w
-
-    phase_map = {
-        "Scoping": "Scoping",
-        "Data Collection": "Data Collection",
-        "Proxy Preparation": "Data Collection",
-        "Model Setup & Simulation": "Modeling",
-        "Validation & QA": "Validation",
-        "Reporting": "Reporting",
-    }
-
-    tasks = []
-    for name, w in weights.items():
-        hours = max(1, round(total_hours * w))
-        tasks.append({
-            "Task": name, "Hours": hours, "Owner": "",
-            "Phase": phase_map.get(name, "Other"), "Deliverable": "",
-        })
-    return tasks
-
-
 # ============================================================================
 # CHECK PREREQUISITES
 # ============================================================================
@@ -226,26 +94,27 @@ data_inputs = get_data_inputs(
     renewable_types, urban_design_types, climate_resilience_types
 )
 
-renewable_str = "_".join(renewable_types) if renewable_types else "none"
-urban_str = "_".join(urban_design_types) if urban_design_types else "none"
-climate_str = "_".join(climate_resilience_types) if climate_resilience_types else "none"
-page_key = f"page2_{analysis_type_str}_{analysis_focus}_{analysis_scale}_{analysis_context}_{renewable_str}_{urban_str}_{climate_str}".replace(" ", "_").replace("&", "and")
+# ── Read persisted choices from Step 2 ──────────────────────────────
+step2_choices = st.session_state.get("step2_data_choices", {})
 
 all_items = []
 for cat in (data_inputs or []):
     all_items.extend(cat["items"])
 total_count = len(all_items)
-available_count = sum(
-    1 for item in all_items
-    if st.session_state.get(f"{page_key}_{item['key']}_has_data", "Yes") == "Yes"
-)
-data_coverage_pct = (available_count / total_count * 100) if total_count > 0 else 0
 
-proxies_count = sum(
-    1 for item in all_items
-    if st.session_state.get(f"{page_key}_{item['key']}_has_data", "Yes") == "No"
-    and st.session_state.get(f"{page_key}_{item['key']}_proxy")
-)
+available_count = 0
+proxies_count = 0
+for item in all_items:
+    choice = step2_choices.get(item["key"], {})
+    has_data = choice.get("has_data", "Yes")
+    if has_data == "Yes":
+        available_count += 1
+    else:
+        proxy = choice.get("proxy")
+        if proxy:
+            proxies_count += 1
+
+data_coverage_pct = (available_count / total_count * 100) if total_count > 0 else 0
 
 base_hours = EFFORT_BASE.get(analysis_type_str, 55)
 scale_mult = SCALE_MULT.get(analysis_scale, 1.0)
@@ -258,10 +127,6 @@ duration_weeks = max(1, round(total_hours / 30))
 # INITIALIZE SESSION STATE
 # ============================================================================
 
-if "p6_task_rows" not in st.session_state:
-    st.session_state.p6_task_rows = []
-if "p6_use_task_plan" not in st.session_state:
-    st.session_state.p6_use_task_plan = False
 if "p6_currency" not in st.session_state:
     st.session_state.p6_currency = "SEK"
 if "p6_consultant_rate" not in st.session_state:
@@ -289,7 +154,7 @@ st.markdown(
 )
 st.markdown(
     "<p style='font-size:0.92rem; color:#64748b; margin-top:-0.5rem; margin-bottom:0.7rem;'>"
-    "Build a task plan, estimate consultant costs, and set your project budget.</p>",
+    "Estimate consultant costs and set your project budget.</p>",
     unsafe_allow_html=True
 )
 
@@ -308,19 +173,7 @@ st.markdown(context_info, unsafe_allow_html=True)
 # COMPUTE EFFECTIVE VALUES
 # ============================================================================
 
-# Determine effective hours (task plan vs estimated)
-task_total_hours = 0
-if st.session_state.p6_task_rows:
-    task_total_hours = int(sum(
-        max(0, float(r.get("Hours", 0) or 0))
-        for r in st.session_state.p6_task_rows
-    ))
-
-if st.session_state.p6_use_task_plan and task_total_hours > 0:
-    effective_hours = task_total_hours
-else:
-    effective_hours = total_hours
-
+effective_hours = total_hours
 effective_weeks = max(1, round(effective_hours / 30))
 
 # Service cost
@@ -336,119 +189,11 @@ currency = st.session_state.p6_currency
 render_top_cards([
     {"value": f"{service_cost:,.0f} {currency}", "label": "Estimated Service Cost",
      "color": "#33528A", "bg": "rgba(51,82,138,0.10)", "border": "rgba(51,82,138,0.25)"},
-    {"value": f"{effective_hours} hrs", "label": f"{'Task Plan' if st.session_state.p6_use_task_plan and task_total_hours > 0 else 'Estimated'} Hours",
+    {"value": f"{effective_hours} hrs", "label": "Estimated Hours",
      "color": "#33A9A0", "bg": "rgba(51,169,160,0.10)", "border": "rgba(51,169,160,0.25)"},
     {"value": f"{effective_weeks} wk", "label": "Duration",
      "color": "#8AB62E", "bg": "rgba(138,182,46,0.10)", "border": "rgba(138,182,46,0.25)"},
 ])
-
-# ============================================================================
-# TASK PLANNER
-# ============================================================================
-
-st.markdown(
-    "<hr style='margin: 0.5rem 0 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>",
-    unsafe_allow_html=True
-)
-st.markdown(
-    "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.5rem;'>"
-    "Task Planner</div>",
-    unsafe_allow_html=True
-)
-
-btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 2])
-with btn_col1:
-    suggest_clicked = st.button(
-        "Suggest Tasks",
-        use_container_width=True,
-        help="Auto-generate tasks from analysis configuration"
-    )
-with btn_col2:
-    clear_tasks = st.button("Clear", use_container_width=True)
-with btn_col3:
-    st.session_state.p6_use_task_plan = st.toggle(
-        "Use task plan for duration & cost",
-        value=st.session_state.p6_use_task_plan,
-        key="p6_use_toggle"
-    )
-
-if suggest_clicked:
-    st.session_state.p6_task_rows = _generate_suggested_tasks(
-        total_hours=total_hours,
-        proxies_count=proxies_count,
-        completeness_pct=data_coverage_pct,
-        analysis_type=analysis_type_str,
-        project_scale=analysis_scale,
-    )
-    st.rerun()
-
-if clear_tasks:
-    st.session_state.p6_task_rows = []
-    st.rerun()
-
-# Editable task table
-task_df = pd.DataFrame(
-    st.session_state.p6_task_rows if st.session_state.p6_task_rows else [],
-    columns=["Task", "Hours", "Owner", "Phase", "Deliverable"]
-)
-edited_tasks = st.data_editor(
-    task_df,
-    num_rows="dynamic",
-    use_container_width=True,
-    column_config={
-        "Task": st.column_config.TextColumn("Task", required=True),
-        "Hours": st.column_config.NumberColumn("Hours", min_value=0, step=1),
-        "Owner": st.column_config.TextColumn("Owner"),
-        "Phase": st.column_config.SelectboxColumn(
-            "Phase",
-            options=["Scoping", "Data Collection", "Modeling", "Analysis",
-                     "Validation", "Reporting", "Other"],
-        ),
-        "Deliverable": st.column_config.TextColumn("Deliverable"),
-    },
-    key="p6_task_editor"
-)
-st.session_state.p6_task_rows = edited_tasks.to_dict(orient="records")
-
-# Task plan summary
-if not edited_tasks.empty and "Hours" in edited_tasks.columns:
-    plan_hours = int(edited_tasks["Hours"].fillna(0).sum())
-    plan_weeks = max(1, round(plan_hours / 30)) if plan_hours > 0 else 0
-    delta = plan_hours - total_hours
-    delta_label = f"({'+' if delta > 0 else ''}{delta} vs estimate)" if delta != 0 else "(matches estimate)"
-    st.caption(
-        f"Task plan total: **{plan_hours} hours** · ~{plan_weeks} weeks @ 30 hrs/week {delta_label}"
-    )
-
-# Push to timeline button
-push_col1, push_col2 = st.columns([1, 3])
-with push_col1:
-    push_clicked = st.button(
-        "Push to Timeline",
-        use_container_width=True,
-        help="Copy task rows into Step 5's timeline"
-    )
-if push_clicked and st.session_state.p6_task_rows:
-    start_date = st.session_state.get("p5_project_start", datetime.today().date())
-    current = pd.to_datetime(start_date)
-    weekly_capacity = 30.0
-    rows = []
-    for r in st.session_state.p6_task_rows:
-        hrs = max(0, float(r.get("Hours", 0) or 0))
-        weeks = max(1, round(hrs / weekly_capacity)) if hrs > 0 else 1
-        days = int(weeks * 7)
-        finish = current + pd.to_timedelta(days, unit="D")
-        rows.append({
-            "Task": r.get("Task", "Task"),
-            "Start": current.date(),
-            "Finish": finish.date(),
-            "Hours": int(hrs),
-            "Owner": r.get("Owner", ""),
-            "Phase": r.get("Phase", ""),
-        })
-        current = finish
-    st.session_state.p5_timeline_rows = rows
-    st.success("Timeline updated. Go to Step 5 to view the Gantt chart.")
 
 # ============================================================================
 # COST & BUDGET

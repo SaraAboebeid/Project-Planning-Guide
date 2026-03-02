@@ -315,22 +315,27 @@ data_inputs = get_data_inputs(
     renewable_types, urban_design_types, climate_resilience_types
 )
 
-# Page key (same as Page 2/3)
-renewable_str = "_".join(renewable_types) if renewable_types else "none"
-urban_str = "_".join(urban_design_types) if urban_design_types else "none"
-climate_str = "_".join(climate_resilience_types) if climate_resilience_types else "none"
-page_key = f"page2_{analysis_type_str}_{analysis_focus}_{analysis_scale}_{analysis_context}_{renewable_str}_{urban_str}_{climate_str}".replace(" ", "_").replace("&", "and")
+# ── Read persisted choices from Step 2 ──────────────────────────────
+# Page 2 saves a plain dict (not widget keys) to session state so that
+# the data-availability selections survive page navigation.
+step2_choices = st.session_state.get("step2_data_choices", {})
 
 # Count available / missing
 all_items = []
 for cat in (data_inputs or []):
     all_items.extend(cat["items"])
 total_count = len(all_items)
-available_count = sum(
-    1 for item in all_items
-    if st.session_state.get(f"{page_key}_{item['key']}_has_data", "Yes") == "Yes"
-)
-missing_count = total_count - available_count
+
+available_count = 0
+missing_count = 0
+for item in all_items:
+    choice = step2_choices.get(item["key"], {})
+    has_data = choice.get("has_data", "Yes")
+    if has_data == "Yes":
+        available_count += 1
+    else:
+        missing_count += 1
+
 data_coverage_pct = (available_count / total_count * 100) if total_count > 0 else 0
 
 # ============================================================================
