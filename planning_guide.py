@@ -2408,16 +2408,20 @@ if st.session_state.wizard_step == 0:
         100% { opacity: 1; transform: translateY(0); }
     }
     /* Target primary buttons in the main content area */
-    [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"] {
+    [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"],
+    [data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"] {
         animation: startBtnFadeIn 0.8s ease-out 7s both;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    center_cols = st.columns([1,1,1])
+    center_cols = st.columns([1, 1, 1, 1, 1])
     with center_cols[1]:
         if st.button("Start", type="primary", use_container_width=True, key="start_btn"):
             st.switch_page("pages/1_Define_Scope_and_Context.py")
+    with center_cols[3]:
+        if st.button("Start (Step 1+)", use_container_width=True, key="start_plus_btn"):
+            st.switch_page("pages/0_Define_Project.py")
     
     # Close intro container
     st.markdown("</div>", unsafe_allow_html=True)
