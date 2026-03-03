@@ -13,9 +13,7 @@ session-state keys that Steps 2-6 already expect.
 PROJECT_TYPES = [
     "Energy Community Planning",
     "Renovation Planning",
-    "System Optimization",
-    "Net Zero Carbon Strategy",
-    "Renewable Energy Feasibility",
+    "Renewable Energy Planning",
 ]
 
 # Short descriptions shown in the UI beneath each project type
@@ -28,15 +26,7 @@ PROJECT_TYPE_DESCRIPTIONS = {
         "Assess and prioritise retrofit measures for existing buildings — "
         "envelope, systems, comfort, and EPC improvement."
     ),
-    "System Optimization": (
-        "Optimise individual building systems — "
-        "heating, cooling, ventilation, controls, and lighting."
-    ),
-    "Net Zero Carbon Strategy": (
-        "Develop a roadmap to net-zero carbon — "
-        "operational and embodied carbon reduction pathways."
-    ),
-    "Renewable Energy Feasibility": (
+    "Renewable Energy Planning": (
         "Evaluate renewable energy potential — "
         "solar, wind, geothermal, biomass, and storage."
     ),
@@ -48,45 +38,42 @@ PROJECT_TYPE_DESCRIPTIONS = {
 
 SYSTEMS_BY_PROJECT_TYPE = {
     "Energy Community Planning": [
-        "Solar PV",
-        "Battery Storage",
-        "V2G (Vehicle to Grid)",
-        "Heating System",
-        "Cooling System",
-        "DHW (Domestic Hot Water)",
-        "Grid Connection",
+        "Buildings",
+        "Rooftop PV",
+        "Community PV",
+        "Facade PV (BIPV)",
+        "Battery System",
+        "EV Charging",
+        "Vehicle to Grid (V2G)",
+        "Grid",
     ],
     "Renovation Planning": [
-        "Building Envelope (Wall, Roof, Window, Floor)",
+        "Building Envelope (Windows, Roof, Walls, Floors)",
+        "Domestic Hot Water System (DHW)",
         "Heating System",
         "Cooling System",
-        "DHW (Domestic Hot Water)",
     ],
-    "System Optimization": [
-        "Heating System",
-        "Cooling System",
-        "Ventilation",
-        "DHW (Domestic Hot Water)",
-        "Solar PV System",
-    ],
-    "Net Zero Carbon Strategy": [
-        "Envelope (Walls, Roof, Windows)",
-        "Heating",
-        "Cooling",
-        "Ventilation",
-        "Solar PV",
-        "Lighting",
-        "DHW (Domestic Hot Water)",
-        "Embodied Carbon",
-        "Operational Carbon",
-    ],
-    "Renewable Energy Feasibility": [
-        "Solar PV",
-        "Solar Thermal",
-        "Onshore Wind",
+    "Renewable Energy Planning": [
+        "Rooftop PV",
+        "Community PV",
+        "Facade PV (BIPV)",
+        "Battery System",
         "Offshore Wind",
+        "Onshore Wind",
+        "Solar Thermal",
         "Geothermal",
-        "Battery Storage",
+        "Biomass",
+        "Hydropower",
+    ],
+}
+
+# Systems that are shown but disabled (greyed-out) in the UI
+DISABLED_SYSTEMS = {
+    "Renewable Energy Planning": [
+        "Offshore Wind",
+        "Onshore Wind",
+        "Solar Thermal",
+        "Geothermal",
         "Biomass",
         "Hydropower",
     ],
@@ -99,42 +86,126 @@ SYSTEMS_BY_PROJECT_TYPE = {
 KPIS_BY_PROJECT_TYPE = {
     "Energy Community Planning": [
         "Self-sufficiency",
-        "Peak load reduction",
-        "Operating cost reduction",
-        "Energy balance (self-consumption)",
-        "GWP reduction",
+        "Peak Load",
+        "Global Warming Potential",
+        "Cost",
+        "Return on Investment",
     ],
     "Renovation Planning": [
-        "Reduce energy demand",
-        "Reduce energy cost",
-        "Improve thermal comfort",
-        "Reduce GWP",
-        "Reduce peak loads",
+        "Cost",
+        "Thermal Comfort",
+        "Global Warming Potential",
+        "Energy Demand",
+        "Return on Investment",
     ],
-    "System Optimization": [
-        "Reduce energy demand",
-        "Reduce energy cost",
-        "Reduce GWP",
-        "Improve system efficiency (COP)",
-        "Reduce peak loads",
-        "Improve indoor comfort",
+    "Renewable Energy Planning": [
+        "Self-Sufficiency",
+        "Global Warming Potential",
+        "Energy Import",
+        "Peak Load",
+        "Thermal Comfort",
+        "Cost",
+        "Return on Investment",
     ],
-    "Net Zero Carbon Strategy": [
-        "Operational carbon zero",
-        "Whole-life carbon reduction",
-        "Embodied carbon reduction",
-        "Timeline to net zero",
-        "Carbon offset budget",
-        "Achieve EPC A rating",
-    ],
-    "Renewable Energy Feasibility": [
-        "Energy yield (kWh/yr)",
-        "Self-consumption rate",
-        "ROI / Payback period",
-        "LCOE (Levelized Cost of Energy)",
-        "GWP avoided",
-        "Grid independence",
-    ],
+}
+
+# Conditional KPIs added dynamically based on selected systems in scope
+CONDITIONAL_KPIS = {
+    "Energy Community Planning": {
+        "Grid": ["Energy Import"],
+        "Battery System": ["Energy Export", "State of Charge"],
+    },
+    "Renewable Energy Planning": {
+        "Battery System": ["Energy Export"],
+    },
+}
+
+
+# ============================================================================
+# EXPLORATION APPROACHES  –  options, descriptions & KPI constraints
+# ============================================================================
+
+EXPLORATION_OPTIONS = [
+    "Baseline Assessment",
+    "Scenario Comparison",
+    "What-if Simulation",
+    "Multi-objective Optimization",
+    "Resource Allocation Planning",
+    "Roadmap Planning",
+    "Risk & Uncertainty Analysis",
+]
+
+EXPLORATION_CONSTRAINTS = {
+    "Baseline Assessment": {
+        "min_kpis": 1,
+        "max_kpis": None,
+        "icon": "📏",
+        "description": (
+            "Evaluate current performance against selected KPIs "
+            "to establish a reference point."
+        ),
+        "hint": "Select one or more KPIs",
+    },
+    "Scenario Comparison": {
+        "min_kpis": 1,
+        "max_kpis": None,
+        "icon": "🔀",
+        "description": (
+            "Compare multiple design or operational scenarios "
+            "side-by-side across KPIs."
+        ),
+        "hint": "Select one or more KPIs",
+    },
+    "What-if Simulation": {
+        "min_kpis": 1,
+        "max_kpis": 1,
+        "icon": "🧪",
+        "description": (
+            "Test the impact of changing a single variable on one KPI."
+        ),
+        "hint": "Select exactly 1 KPI",
+    },
+    "Multi-objective Optimization": {
+        "min_kpis": 2,
+        "max_kpis": 5,
+        "weighting": True,
+        "icon": "⚖️",
+        "description": (
+            "Find optimal trade-offs between 2–5 competing objectives "
+            "with customisable weights."
+        ),
+        "hint": "Select 2–5 KPIs and assign weights",
+    },
+    "Resource Allocation Planning": {
+        "min_kpis": 1,
+        "max_kpis": 1,
+        "icon": "📦",
+        "description": (
+            "Determine how to allocate limited resources "
+            "to maximise one KPI."
+        ),
+        "hint": "Select exactly 1 KPI",
+    },
+    "Roadmap Planning": {
+        "min_kpis": 1,
+        "max_kpis": None,
+        "primary": True,
+        "icon": "🗺️",
+        "description": (
+            "Define a phased plan with a primary target KPI "
+            "and optional supporting secondary KPIs."
+        ),
+        "hint": "Select a primary KPI + optional secondary KPIs",
+    },
+    "Risk & Uncertainty Analysis": {
+        "min_kpis": 1,
+        "max_kpis": 1,
+        "icon": "🎲",
+        "description": (
+            "Assess how uncertainty in inputs affects one KPI."
+        ),
+        "hint": "Select exactly 1 KPI",
+    },
 }
 
 
@@ -166,13 +237,14 @@ def translate_to_legacy_keys(project_type, systems, kpis):
 
     # ── renewable helpers ────────────────────────────────────────────
     _RE_MAP = {
-        "Solar PV": "Solar PV",
-        "Solar PV System": "Solar PV",
+        "Rooftop PV": "Solar PV",
+        "Community PV": "Solar PV",
+        "Facade PV (BIPV)": "Solar PV",
         "Solar Thermal": "Solar Thermal",
         "Onshore Wind": "Onshore Wind",
         "Offshore Wind": "Offshore Wind",
         "Geothermal": "Geothermal",
-        "Battery Storage": "Battery Storage",
+        "Battery System": "Battery Storage",
         "Biomass": "Biomass",
         "Hydropower": "Hydropower",
     }
@@ -183,11 +255,8 @@ def translate_to_legacy_keys(project_type, systems, kpis):
     # ── focus helper ─────────────────────────────────────────────────
     def _infer_focus():
         thermal = {"Heating System", "Cooling System"} & systems_set
-        electrical = {"Lighting"} & systems_set
-        if thermal and not electrical:
+        if thermal:
             return "Heating/Cooling"
-        if electrical and not thermal:
-            return "Electricity"
         return "Whole system interaction"
 
     # ── project-type → analysis_type mapping ─────────────────────────
@@ -195,37 +264,22 @@ def translate_to_legacy_keys(project_type, systems, kpis):
         result["analysis_type"] = ["Energy & Carbon Performance"]
         result["analysis_focus"] = "Whole system interaction"
         result["energy_system_focus"] = "Whole system interaction"
-        if {"Solar PV", "Solar PV System", "Solar Thermal", "Battery Storage"} & systems_set:
+        pv_systems = {"Rooftop PV", "Community PV", "Facade PV (BIPV)",
+                      "Battery System"}
+        if pv_systems & systems_set:
             result["analysis_type"].append("Renewable Energy & Local Production")
 
     elif project_type == "Renovation Planning":
         result["analysis_type"] = ["Retrofit & Transformation"]
         energy_sys = {"Heating System", "Cooling System",
-                      "DHW (Domestic Hot Water)"}
+                      "Domestic Hot Water System (DHW)"}
         if energy_sys & systems_set:
             result["analysis_type"].insert(0, "Energy & Carbon Performance")
             focus = _infer_focus()
             result["analysis_focus"] = focus
             result["energy_system_focus"] = focus
 
-    elif project_type == "System Optimization":
-        result["analysis_type"] = ["Energy & Carbon Performance"]
-        if "Solar PV System" in systems_set:
-            result["analysis_type"].append("Renewable Energy & Local Production")
-        focus = _infer_focus()
-        result["analysis_focus"] = focus
-        result["energy_system_focus"] = focus
-
-    elif project_type == "Net Zero Carbon Strategy":
-        result["analysis_type"] = ["Energy & Carbon Performance"]
-        if "Envelope (Walls, Roof, Windows)" in systems_set:
-            result["analysis_type"].append("Retrofit & Transformation")
-        if "Solar PV" in systems_set:
-            result["analysis_type"].append("Renewable Energy & Local Production")
-        result["analysis_focus"] = "Whole system interaction"
-        result["energy_system_focus"] = "Whole system interaction"
-
-    elif project_type == "Renewable Energy Feasibility":
+    elif project_type == "Renewable Energy Planning":
         result["analysis_type"] = ["Renewable Energy & Local Production"]
         result["analysis_focus"] = None
         result["energy_system_focus"] = None

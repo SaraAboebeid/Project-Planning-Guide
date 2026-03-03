@@ -11,7 +11,11 @@ from config.project_types import (
     PROJECT_TYPES,
     PROJECT_TYPE_DESCRIPTIONS,
     SYSTEMS_BY_PROJECT_TYPE,
+    DISABLED_SYSTEMS,
     KPIS_BY_PROJECT_TYPE,
+    CONDITIONAL_KPIS,
+    EXPLORATION_OPTIONS,
+    EXPLORATION_CONSTRAINTS,
     translate_to_legacy_keys,
 )
 from utils.shared_css import inject_shared_css, render_step_indicator
@@ -77,9 +81,14 @@ if project_type:
 prev_pt = st.session_state.get("_prev_project_type")
 if project_type is not None and project_type != prev_pt:
     if prev_pt is not None:
+        # Clear all Step 1+ widget keys
         for key in list(st.session_state.keys()):
-            if key.startswith("sys1p_") or key.startswith("kpi1p_"):
+            if key.startswith(("p1p_", "kpi_approach_", "kpi_weight_",
+                               "roadmap_primary_", "roadmap_secondary_")):
                 del st.session_state[key]
+        for key in ["systems_in_scope", "exploration_approaches",
+                    "selected_kpis", "kpis_by_approach", "kpi_weights"]:
+            st.session_state.pop(key, None)
     st.session_state["_prev_project_type"] = project_type
     if prev_pt is not None:
         st.rerun()
@@ -99,31 +108,30 @@ if project_type:
         "Systems in Scope <span style='color:#dc2626'>*</span></div>",
         unsafe_allow_html=True,
     )
-    st.caption("Select the systems relevant to your project:")
 
-    available_systems = SYSTEMS_BY_PROJECT_TYPE.get(project_type, [])
-    cols = st.columns(2)
-    selected_systems = []
-    for i, sys_name in enumerate(available_systems):
-        sys_key = (
-            "sys1p_"
-            + sys_name.replace(" ", "_")
-            .replace("(", "")
-            .replace(")", "")
-            .replace(",", "")
-            .lower()
-        )
-        with cols[i % 2]:
-            if st.checkbox(sys_name, key=sys_key):
-                selected_systems.append(sys_name)
+    all_systems = SYSTEMS_BY_PROJECT_TYPE.get(project_type, [])
+    disabled_list = DISABLED_SYSTEMS.get(project_type, [])
+    selectable_systems = [s for s in all_systems if s not in disabled_list]
 
+    selected_systems = st.multiselect(
+        "Systems in Scope",
+        options=selectable_systems,
+        default=st.session_state.get("systems_in_scope", []),
+        placeholder="Choose systems...",
+        key="p1p_systems_select",
+        label_visibility="collapsed",
+    )
     st.session_state["systems_in_scope"] = selected_systems
 
-    if selected_systems:
-        st.caption(f"{len(selected_systems)} system(s) selected")
+    # Show greyed-out unavailable systems as a note
+    if disabled_list:
+        disabled_str = ", ".join(disabled_list)
+        st.caption(
+            f"🔒 Coming soon: {disabled_str}"
+        )
 
 # ============================================================================
-# KEY PERFORMANCE INDICATORS
+# EXPLORATION APPROACH
 # ============================================================================
 
 if project_type:
@@ -134,31 +142,185 @@ if project_type:
     )
     st.markdown(
         "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>"
+        "How would you like to explore this? "
+        "<span style='color:#dc2626'>*</span></div>",
+        unsafe_allow_html=True,
+    )
+
+    selected_explorations = st.multiselect(
+        "Exploration approaches",
+        options=EXPLORATION_OPTIONS,
+        default=st.session_state.get("exploration_approaches", []),
+        placeholder="Choose approaches...",
+        key="p1p_exploration_select",
+        label_visibility="collapsed",
+    )
+    st.session_state["exploration_approaches"] = selected_explorations
+
+    # Show brief descriptions for selected approaches
+    if selected_explorations:
+        for appr in selected_explorations:
+            cfg = EXPLORATION_CONSTRAINTS.get(appr, {})
+            st.caption(
+                f"{cfg.get('icon', '📊')} **{appr}** — {cfg.get('description', '')}"
+            )
+
+# ============================================================================
+# KEY PERFORMANCE INDICATORS  (per exploration approach)
+# ============================================================================
+
+_approaches = st.session_state.get("exploration_approaches", [])
+
+if project_type and _approaches:
+    st.markdown(
+        "<hr style='margin: 0.8rem 0 1rem 0; border: none; "
+        "border-top: 1px solid #e2e8f0;'>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>"
         "Key Performance Indicators <span style='color:#dc2626'>*</span></div>",
         unsafe_allow_html=True,
     )
-    st.caption("Select the KPIs you want to evaluate:")
 
-    available_kpis = KPIS_BY_PROJECT_TYPE.get(project_type, [])
-    cols = st.columns(2)
-    selected_kpis = []
-    for i, kpi in enumerate(available_kpis):
-        kpi_key = (
-            "kpi1p_"
-            + kpi.replace(" ", "_")
-            .replace("/", "_")
-            .replace("(", "")
-            .replace(")", "")
-            .lower()
+    # Build available KPI list: base + conditional
+    _base_kpis = list(KPIS_BY_PROJECT_TYPE.get(project_type, []))
+    _conditional = CONDITIONAL_KPIS.get(project_type, {})
+    _systems_set = set(st.session_state.get("systems_in_scope", []))
+    for _trigger, _extras in _conditional.items():
+        if _trigger in _systems_set:
+            for _k in _extras:
+                if _k not in _base_kpis:
+                    _base_kpis.append(_k)
+
+    _all_approach_kpis = {}
+    _all_weights = {}
+
+    for _appr in _approaches:
+        _cfg = EXPLORATION_CONSTRAINTS.get(_appr, {})
+        _icon = _cfg.get("icon", "📊")
+        _hint = _cfg.get("hint", "")
+        _max_k = _cfg.get("max_kpis")
+        _safe = (
+            _appr.replace(" ", "_").replace("-", "_")
+            .replace("&", "and").lower()
         )
-        with cols[i % 2]:
-            if st.checkbox(kpi, key=kpi_key):
-                selected_kpis.append(kpi)
 
-    st.session_state["selected_kpis"] = selected_kpis
+        with st.expander(f"{_icon}  {_appr}", expanded=True):
+            st.caption(_hint)
 
-    if selected_kpis:
-        st.caption(f"{len(selected_kpis)} KPI(s) selected")
+            # ── Roadmap Planning: primary + secondary ────────────
+            if _cfg.get("primary"):
+                st.markdown(
+                    "<span style='font-size:0.88rem; font-weight:600;'>"
+                    "Primary KPI</span>",
+                    unsafe_allow_html=True,
+                )
+                _primary = st.selectbox(
+                    "Primary KPI",
+                    options=_base_kpis,
+                    index=None,
+                    placeholder="Choose primary KPI...",
+                    key=f"roadmap_primary_{_safe}",
+                    label_visibility="collapsed",
+                )
+                _appr_kpis = [_primary] if _primary else []
+                if _primary:
+                    _remaining = [k for k in _base_kpis if k != _primary]
+                    st.markdown(
+                        "<span style='font-size:0.88rem; font-weight:600;'>"
+                        "Secondary KPIs</span>"
+                        "<span style='font-size:0.82rem; color:#94a3b8;'>"
+                        " — optional</span>",
+                        unsafe_allow_html=True,
+                    )
+                    _secondary = st.multiselect(
+                        "Secondary KPIs",
+                        options=_remaining,
+                        placeholder="Choose secondary KPIs...",
+                        key=f"roadmap_secondary_{_safe}",
+                        label_visibility="collapsed",
+                    )
+                    _appr_kpis += _secondary
+                _all_approach_kpis[_appr] = _appr_kpis
+
+            # ── Multi-objective Optimization: 2-5 + weights ──────
+            elif _cfg.get("weighting"):
+                _kpis = st.multiselect(
+                    "KPIs",
+                    options=_base_kpis,
+                    max_selections=_max_k,
+                    placeholder="Choose 2–5 KPIs...",
+                    key=f"kpi_approach_{_safe}",
+                    label_visibility="collapsed",
+                )
+                _all_approach_kpis[_appr] = _kpis
+
+                if len(_kpis) >= 2:
+                    st.markdown(
+                        "<span style='font-size:0.88rem; font-weight:600;'>"
+                        "Assign relative importance</span>"
+                        "<span style='font-size:0.82rem; color:#94a3b8;'>"
+                        " (1 = low, 10 = high)</span>",
+                        unsafe_allow_html=True,
+                    )
+                    _weights = {}
+                    _wcols = st.columns(min(len(_kpis), 3))
+                    for _j, _kpi in enumerate(_kpis):
+                        _kpi_safe = (
+                            _kpi.replace(" ", "_").replace("-", "_")
+                            .lower()
+                        )
+                        with _wcols[_j % min(len(_kpis), 3)]:
+                            _w = st.slider(
+                                _kpi, 1, 10, 5,
+                                key=f"kpi_weight_{_safe}_{_kpi_safe}",
+                            )
+                            _weights[_kpi] = _w
+                    _all_weights[_appr] = _weights
+
+                    # Show normalised percentages
+                    _total = sum(_weights.values())
+                    _norm = [
+                        f"{k}: {round(v / _total * 100)}%"
+                        for k, v in _weights.items()
+                    ]
+                    st.caption("Normalised weights — " + " · ".join(_norm))
+                elif _kpis:
+                    st.info("Select at least 2 KPIs to enable weighting.")
+
+            # ── Single-KPI approaches ────────────────────────────
+            elif _max_k == 1:
+                _kpi = st.selectbox(
+                    "KPI",
+                    options=_base_kpis,
+                    index=None,
+                    placeholder="Choose a KPI...",
+                    key=f"kpi_approach_{_safe}",
+                    label_visibility="collapsed",
+                )
+                _all_approach_kpis[_appr] = [_kpi] if _kpi else []
+
+            # ── Unlimited-KPI approaches ─────────────────────────
+            else:
+                _kpis = st.multiselect(
+                    "KPIs",
+                    options=_base_kpis,
+                    placeholder="Choose KPIs...",
+                    key=f"kpi_approach_{_safe}",
+                    label_visibility="collapsed",
+                )
+                _all_approach_kpis[_appr] = _kpis
+
+    # Flatten all selected KPIs (de-duplicated, preserving order)
+    _flat_kpis = list(
+        dict.fromkeys(
+            k for v in _all_approach_kpis.values() for k in v if k
+        )
+    )
+    st.session_state["selected_kpis"] = _flat_kpis
+    st.session_state["kpis_by_approach"] = _all_approach_kpis
+    st.session_state["kpi_weights"] = _all_weights
 
 # ============================================================================
 # SCALE SELECTION
@@ -342,6 +504,20 @@ with col2:
             missing.append("project type")
         if not st.session_state.get("systems_in_scope"):
             missing.append("at least one system in scope")
+        if not st.session_state.get("exploration_approaches"):
+            missing.append("at least one exploration approach")
+
+        # Per-approach KPI validation
+        _kba = st.session_state.get("kpis_by_approach", {})
+        for _ea in st.session_state.get("exploration_approaches", []):
+            _ec = EXPLORATION_CONSTRAINTS.get(_ea, {})
+            _min = _ec.get("min_kpis", 1)
+            _count = len(_kba.get(_ea, []))
+            if _count < _min:
+                missing.append(
+                    f"{_min} KPI(s) for {_ea} (currently {_count})"
+                )
+
         if not st.session_state.get("selected_kpis"):
             missing.append("at least one KPI")
         if not project_scale:
