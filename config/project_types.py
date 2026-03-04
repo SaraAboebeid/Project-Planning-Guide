@@ -57,7 +57,6 @@ SYSTEMS_BY_PROJECT_TYPE = {
         "Rooftop PV",
         "Community PV",
         "Facade PV (BIPV)",
-        "Battery System",
         "Offshore Wind",
         "Onshore Wind",
         "Solar Thermal",
@@ -67,7 +66,23 @@ SYSTEMS_BY_PROJECT_TYPE = {
     ],
 }
 
+# Follow-up systems — shown as a conditional question when trigger systems
+# are selected.  Keeps the main systems list clean while guiding the user.
+FOLLOW_UP_SYSTEMS = {
+    "Renewable Energy Planning": {
+        "Battery System": {
+            "triggers": ["Rooftop PV", "Community PV", "Facade PV (BIPV)"],
+            "question": "Are you planning to include a battery storage system?",
+            "help": (
+                "Battery storage can improve self-sufficiency, enable "
+                "energy export, and smooth peak loads."
+            ),
+        },
+    },
+}
+
 # Systems that are shown but disabled (greyed-out) in the UI
+# See also FOLLOW_UP_SYSTEMS (conditional follow-up questions)
 DISABLED_SYSTEMS = {
     "Renewable Energy Planning": [
         "Offshore Wind",

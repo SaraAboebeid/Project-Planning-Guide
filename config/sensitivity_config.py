@@ -266,6 +266,48 @@ ANALYSIS_TYPE_WEIGHTS = {
         "building_location": 2.0,
         "context_location_height": 1.0,
     },
+
+    # ------------------------------------------------------------------
+    # RENEWABLE ENERGY & LOCAL PRODUCTION  — Solar PV / RE Planning
+    # ------------------------------------------------------------------
+    # For renewable energy analysis the building geometry & orientation
+    # parameters that determine solar access dominate, while HVAC and
+    # envelope thermal parameters drop in importance.
+    # Derived from the Solar Analysis OAT study (same reference model,
+    # interpreted through the solar-gain lens).
+    "Renewable Energy & Local Production": {
+        # ── Very High (solar access drivers) ─────────────────────────
+        "roof_shape_angle": 20.0,       # tilt → PV yield
+        "roof_area": 20.0,              # available PV area
+        "orientation": 18.0,            # azimuth → irradiance
+        "pv_module": 16.0,              # panel type / efficiency
+        # ── High (context & shading) ─────────────────────────────────
+        "building_location": 14.0,      # urban shading context
+        "context_location_height": 12.0, # horizon shading
+        "wwr": 10.0,                    # south WWR ↔ passive solar
+        # ── Medium (geometry affecting available roof / facade) ──────
+        "footprint": 8.0,
+        "height": 8.0,
+        "num_floors": 6.0,
+        "installing_battery": 6.0,      # storage sizing
+        # ── Lower (less relevant for PV yield) ───────────────────────
+        "infiltration_rate": 3.0,
+        "construction_materials": 3.0,
+        "window_properties": 3.0,
+        "hvac_type": 2.0,
+        "setpoint": 2.0,
+        "supply_temp": 2.0,
+        "annual_heating_cooling": 2.0,
+        "annual_electricity": 3.0,
+        "onsite_production": 4.0,
+        "grid_emission_factor": 5.0,
+        "use_type": 2.0,
+        "occupancy_pattern": 2.0,
+        "operating_hours": 2.0,
+        "year_construction": 2.0,
+        "location": 3.0,
+        "has_basement": 1.0,
+    },
 }
 
 DEFAULT_SENSITIVITY_WEIGHT = 2.0
@@ -303,6 +345,96 @@ def get_importance_rank(item_key: str, analysis_type: str = None) -> dict:
     if w >= 8:
         return {"label": "Medium", "color": "#8AB62E", "icon": "🟡", "weight": w, "rank": 2}
     return {"label": "Low",    "color": "#33528A", "icon": "🔵", "weight": w, "rank": 3}
+
+
+# ==============================================================================
+# SOLAR / RE OAT PARAMETERS
+# ==============================================================================
+# Same reference model, but the OAT parameters are interpreted through
+# the solar-gain lens: WWR South is now "beneficial" (more glass = more
+# solar gain = less heating) while WWR North drives losses.
+# The CSV lives at data/sensitivity/solar_oat_results.csv.
+
+SOLAR_OAT_PARAMETERS = {
+    "wwr_south": {
+        "label": "WWR South (Solar Gain)",
+        "unit": "ratio",
+        "data_keys": ["wwr"],
+        "values": [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
+        "outputs_kwh": [
+            232793.26, 230955.88, 229269.27, 227746.60, 226335.41,
+            225070.15, 223991.71, 223019.81, 222163.65, 221334.63,
+        ],
+        "range_kwh": 11458.63,
+        "baseline_value": 0.24,
+    },
+    "wwr_north": {
+        "label": "WWR North (Heat Loss)",
+        "unit": "ratio",
+        "data_keys": ["wwr"],
+        "values": [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
+        "outputs_kwh": [
+            220166.13, 223635.98, 227028.12, 230419.99, 233855.33,
+            237277.13, 240684.87, 244000.08, 247388.97, 250767.13,
+        ],
+        "range_kwh": 30601.0,
+        "baseline_value": 0.24,
+    },
+    "wwr_east": {
+        "label": "WWR East",
+        "unit": "ratio",
+        "data_keys": ["wwr"],
+        "values": [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
+        "outputs_kwh": [
+            226335.41, 226847.50, 227353.04, 227855.17, 228295.53,
+            228811.72, 229375.06, 229895.35, 230449.54, 231005.21,
+        ],
+        "range_kwh": 4669.80,
+        "baseline_value": 0.24,
+    },
+    "wwr_west": {
+        "label": "WWR West",
+        "unit": "ratio",
+        "data_keys": ["wwr"],
+        "values": [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
+        "outputs_kwh": [
+            226335.41, 226395.50, 226452.13, 226512.16, 226581.38,
+            226591.01, 226708.05, 226785.22, 227033.05, 227201.51,
+        ],
+        "range_kwh": 866.10,
+        "baseline_value": 0.24,
+    },
+    "infiltration": {
+        "label": "Infiltration Rate",
+        "unit": "m³/s·m²",
+        "data_keys": ["infiltration_rate"],
+        "values": [
+            0.0001, 0.00015, 0.0002, 0.00025, 0.0003,
+            0.00035, 0.0004, 0.00045, 0.0005, 0.00055, 0.0006,
+        ],
+        "outputs_kwh": [
+            129919.15, 143239.16, 156715.22, 170366.23, 184183.35,
+            198158.18, 212251.26, 226335.41, 240635.27, 255020.16, 269353.10,
+        ],
+        "range_kwh": 139434.0,
+        "baseline_value": 0.00045,
+    },
+    "construction_package": {
+        "label": "Construction Quality",
+        "unit": "category",
+        "data_keys": ["construction_materials"],
+        "values": ["P0 Poor", "P1 Baseline", "P2 Well-insulated"],
+        "outputs_kwh": [279892.67, 226335.41, 201608.30],
+        "range_kwh": 78284.37,
+        "baseline_value": "P1 Baseline",
+    },
+}
+
+TOTAL_SOLAR_OAT_RANGE = sum(p["range_kwh"] for p in SOLAR_OAT_PARAMETERS.values())
+SOLAR_OAT_IMPORTANCE = {
+    name: round(data["range_kwh"] / TOTAL_SOLAR_OAT_RANGE * 100, 1)
+    for name, data in SOLAR_OAT_PARAMETERS.items()
+}
 
 
 # ==============================================================================
