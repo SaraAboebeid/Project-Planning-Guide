@@ -81,6 +81,37 @@ FOLLOW_UP_SYSTEMS = {
     },
 }
 
+# Follow-up questions for Energy Community Planning
+# These ask whether PV / battery are *already installed* on site,
+# which changes the data input list (measured vs. planned data).
+EC_FOLLOW_UP_QUESTIONS = {
+    "existing_pv": {
+        "triggers": ["Rooftop PV", "Community PV", "Facade PV (BIPV)"],
+        "question": "Is there PV already installed on site?",
+        "help": (
+            "If PV is already installed, we will ask for measured "
+            "production data. Otherwise we will ask for planned "
+            "system specifications."
+        ),
+    },
+    "existing_battery": {
+        "triggers": ["Battery System"],
+        "question": "Is there a battery system already installed on site?",
+        "help": (
+            "If a battery is already installed, we will ask for "
+            "measured performance data. Otherwise we will ask for "
+            "planned specifications."
+        ),
+    },
+}
+
+# Energy focus options for Energy Community Planning
+EC_FOCUS_OPTIONS = [
+    "Electricity",
+    "Heating",
+    "Cooling",
+]
+
 # Systems that are shown but disabled (greyed-out) in the UI
 # See also FOLLOW_UP_SYSTEMS (conditional follow-up questions)
 DISABLED_SYSTEMS = {
@@ -186,10 +217,9 @@ EXPLORATION_CONSTRAINTS = {
         "weighting": True,
         "icon": "⚖️",
         "description": (
-            "Find optimal trade-offs between 2–5 competing objectives "
-            "with customisable weights."
+            "Find optimal trade-offs between 2–5 competing objectives."
         ),
-        "hint": "Select 2–5 KPIs and assign weights",
+        "hint": "Select 2–5 KPIs",
     },
     "Resource Allocation Planning": {
         "min_kpis": 1,

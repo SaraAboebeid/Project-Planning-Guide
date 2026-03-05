@@ -13,6 +13,8 @@ from config.project_types import (
     SYSTEMS_BY_PROJECT_TYPE,
     DISABLED_SYSTEMS,
     FOLLOW_UP_SYSTEMS,
+    EC_FOLLOW_UP_QUESTIONS,
+    EC_FOCUS_OPTIONS,
     KPIS_BY_PROJECT_TYPE,
     CONDITIONAL_KPIS,
     EXPLORATION_OPTIONS,
@@ -20,10 +22,7 @@ from config.project_types import (
     translate_to_legacy_keys,
 )
 
-_APPROACH_NAMES = [a for a in EXPLORATION_OPTIONS]
-_APPROACH_LABELS = {
-    a: f"{EXPLORATION_CONSTRAINTS[a]['icon']}  {a}" for a in EXPLORATION_OPTIONS
-}
+_APPROACH_NAMES = list(EXPLORATION_OPTIONS)
 from utils.shared_css import inject_shared_css, render_step_indicator
 
 st.set_page_config(page_title="Define Project", layout="wide")
@@ -88,10 +87,10 @@ prev_pt = st.session_state.get("_prev_project_type")
 if project_type is not None and project_type != prev_pt:
     if prev_pt is not None:
         for key in list(st.session_state.keys()):
-            if key.startswith(("p1p_", "kpi_w_")):
+            if key.startswith("p1p_"):
                 del st.session_state[key]
         for key in ["systems_in_scope", "exploration_approaches",
-                    "selected_kpis", "kpi_weights"]:
+                    "selected_kpis"]:
             st.session_state.pop(key, None)
     st.session_state["_prev_project_type"] = project_type
     if prev_pt is not None:
@@ -158,6 +157,161 @@ if project_type:
             selected_systems.append(_fu)
     st.session_state["systems_in_scope"] = selected_systems
 
+    # ── Renovation Planning follow-up questions ────────────────────
+    if project_type == "Renovation Planning" and selected_systems:
+
+        # --- Building Envelope sub-components ---
+        if "Building Envelope (Windows, Roof, Walls, Floors)" in selected_systems:
+            st.markdown(
+                "<hr style='margin: 0.5rem 0 0.8rem 0; border: none; "
+                "border-top: 1px solid #e2e8f0;'>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='font-size:0.95rem; font-weight:600; "
+                "margin-bottom:0.2rem;'>"
+                "Which envelope components would you like to renovate? "
+                "<span style='color:#dc2626'>*</span></div>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Select one or more components:")
+            envelope_options = ["Windows", "Walls", "Roof", "Floor"]
+            env_cols = st.columns(2)
+            selected_envelope = []
+            for i, env in enumerate(envelope_options):
+                env_key = f"p1p_renv_{env.lower()}"
+                with env_cols[i % 2]:
+                    if st.checkbox(env, key=env_key):
+                        selected_envelope.append(env)
+            st.session_state["renovation_envelope_components"] = selected_envelope
+        else:
+            st.session_state["renovation_envelope_components"] = []
+
+        # --- Heating System: existing system question ---
+        if "Heating System" in selected_systems:
+            st.markdown(
+                "<hr style='margin: 0.5rem 0 0.8rem 0; border: none; "
+                "border-top: 1px solid #e2e8f0;'>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='font-size:0.95rem; font-weight:600; "
+                "margin-bottom:0.2rem;'>"
+                "Is there an existing heating system installed?</div>",
+                unsafe_allow_html=True,
+            )
+            _heat_idx = 0 if st.session_state.get("p1p_existing_heating", "Yes") == "Yes" else 1
+            existing_heating = st.radio(
+                "Existing heating system?",
+                options=["Yes", "No"],
+                horizontal=True,
+                index=_heat_idx,
+                key="p1p_existing_heating",
+                label_visibility="collapsed",
+            )
+            st.session_state["renovation_existing_heating"] = existing_heating
+
+        # --- Cooling System: existing system question ---
+        if "Cooling System" in selected_systems:
+            st.markdown(
+                "<hr style='margin: 0.5rem 0 0.8rem 0; border: none; "
+                "border-top: 1px solid #e2e8f0;'>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='font-size:0.95rem; font-weight:600; "
+                "margin-bottom:0.2rem;'>"
+                "Is there an existing cooling system installed?</div>",
+                unsafe_allow_html=True,
+            )
+            _cool_idx = 0 if st.session_state.get("p1p_existing_cooling", "Yes") == "Yes" else 1
+            existing_cooling = st.radio(
+                "Existing cooling system?",
+                options=["Yes", "No"],
+                horizontal=True,
+                index=_cool_idx,
+                key="p1p_existing_cooling",
+                label_visibility="collapsed",
+            )
+            st.session_state["renovation_existing_cooling"] = existing_cooling
+
+        # --- DHW: existing system question ---
+        if "Domestic Hot Water System (DHW)" in selected_systems:
+            st.markdown(
+                "<hr style='margin: 0.5rem 0 0.8rem 0; border: none; "
+                "border-top: 1px solid #e2e8f0;'>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='font-size:0.95rem; font-weight:600; "
+                "margin-bottom:0.2rem;'>"
+                "Is there an existing domestic hot water system?</div>",
+                unsafe_allow_html=True,
+            )
+            _dhw_idx = 0 if st.session_state.get("p1p_existing_dhw", "Yes") == "Yes" else 1
+            existing_dhw = st.radio(
+                "Existing DHW system?",
+                options=["Yes", "No"],
+                horizontal=True,
+                index=_dhw_idx,
+                key="p1p_existing_dhw",
+                label_visibility="collapsed",
+            )
+            st.session_state["renovation_existing_dhw"] = existing_dhw
+
+    # ── EC-specific follow-ups (existing PV / battery on site) ─────
+    if project_type == "Energy Community Planning" and selected_systems:
+        _ec_pv_systems = {"Rooftop PV", "Community PV", "Facade PV (BIPV)"}
+        _ec_has_pv = _ec_pv_systems & set(selected_systems)
+        if _ec_has_pv:
+            _ans_pv = st.radio(
+                EC_FOLLOW_UP_QUESTIONS["existing_pv"]["question"],
+                options=["Yes", "No"],
+                index=0 if st.session_state.get("p1p_ec_existing_pv", "No") == "Yes" else 1,
+                horizontal=True,
+                key="p1p_ec_existing_pv",
+                help=EC_FOLLOW_UP_QUESTIONS["existing_pv"]["help"],
+            )
+            st.session_state["ec_existing_pv"] = (_ans_pv == "Yes")
+        else:
+            st.session_state["ec_existing_pv"] = False
+
+        if "Battery System" in selected_systems:
+            _ans_bat = st.radio(
+                EC_FOLLOW_UP_QUESTIONS["existing_battery"]["question"],
+                options=["Yes", "No"],
+                index=0 if st.session_state.get("p1p_ec_existing_battery", "No") == "Yes" else 1,
+                horizontal=True,
+                key="p1p_ec_existing_battery",
+                help=EC_FOLLOW_UP_QUESTIONS["existing_battery"]["help"],
+            )
+            st.session_state["ec_existing_battery"] = (_ans_bat == "Yes")
+        else:
+            st.session_state["ec_existing_battery"] = False
+
+    # ── EC energy focus (Electricity / Heating / Cooling / All) ────
+    if project_type == "Energy Community Planning":
+        st.markdown(
+            "<hr style='margin: 0.8rem 0 1rem 0; border: none; "
+            "border-top: 1px solid #e2e8f0;'>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>"
+            "Energy Focus <span style='color:#dc2626'>*</span></div>",
+            unsafe_allow_html=True,
+        )
+        _cur_focus = st.session_state.get("ec_energy_focus", [])
+        _ec_focus = st.multiselect(
+            "Energy focus",
+            options=EC_FOCUS_OPTIONS,
+            default=[f for f in _cur_focus if f in EC_FOCUS_OPTIONS],
+            placeholder="Choose focus...",
+            key="p1p_ec_focus_select",
+            label_visibility="collapsed",
+        )
+        st.session_state["ec_energy_focus"] = _ec_focus
+
 # ============================================================================
 # EXPLORATION APPROACH
 # ============================================================================
@@ -175,19 +329,14 @@ if project_type:
         unsafe_allow_html=True,
     )
 
-    _labels = [_APPROACH_LABELS[a] for a in _APPROACH_NAMES]
-    selected_labels = st.multiselect(
+    selected_explorations = st.multiselect(
         "Exploration approaches",
-        options=_labels,
-        default=st.session_state.get("_p1p_exploration_labels", []),
+        options=_APPROACH_NAMES,
+        default=st.session_state.get("exploration_approaches", []),
         placeholder="Choose approaches...",
         key="p1p_exploration_select",
         label_visibility="collapsed",
     )
-    st.session_state["_p1p_exploration_labels"] = selected_labels
-    selected_explorations = [
-        _APPROACH_NAMES[_labels.index(lbl)] for lbl in selected_labels
-    ]
     st.session_state["exploration_approaches"] = selected_explorations
 
     # Show brief descriptions for selected approaches
@@ -195,7 +344,7 @@ if project_type:
         for appr in selected_explorations:
             cfg = EXPLORATION_CONSTRAINTS.get(appr, {})
             st.caption(
-                f"{cfg.get('icon', '📊')} **{appr}** — {cfg.get('description', '')}"
+                f"**{appr}** — {cfg.get('description', '')}"
             )
 
 # ============================================================================
@@ -239,46 +388,6 @@ if project_type:
         label_visibility="collapsed",
     )
     st.session_state["selected_kpis"] = selected_kpis
-
-    # ── Multi-objective Optimization: subtle hint + weights ──────────
-    _approaches = st.session_state.get("exploration_approaches", [])
-    if "Multi-objective Optimization" in _approaches:
-        if len(selected_kpis) <= 1:
-            st.info(
-                "💡 With 1 KPI this becomes single-objective optimization "
-                "— add more KPIs to compare trade-offs."
-            )
-        else:
-            st.markdown(
-                "<div style='font-size:0.95rem; font-weight:600; "
-                "margin-top:0.6rem; margin-bottom:0.2rem;'>"
-                "⚖️ KPI Importance Weights"
-                "<span style='font-size:0.82rem; color:#94a3b8; "
-                "font-weight:400;'>"
-                " — assign relative importance (1 = low, 10 = high)"
-                "</span></div>",
-                unsafe_allow_html=True,
-            )
-            _weights = {}
-            _wcols = st.columns(min(len(selected_kpis), 3))
-            for _j, _kpi in enumerate(selected_kpis):
-                _kpi_safe = (
-                    _kpi.replace(" ", "_").replace("-", "_").lower()
-                )
-                with _wcols[_j % min(len(selected_kpis), 3)]:
-                    _w = st.slider(
-                        _kpi, 1, 10, 5,
-                        key=f"kpi_w_{_kpi_safe}",
-                    )
-                    _weights[_kpi] = _w
-
-            _total = sum(_weights.values())
-            _norm = [
-                f"**{k}** {round(v / _total * 100)}%"
-                for k, v in _weights.items()
-            ]
-            st.caption("Normalised weights — " + " · ".join(_norm))
-            st.session_state["kpi_weights"] = _weights
 
 # ============================================================================
 # SCALE SELECTION
@@ -470,6 +579,8 @@ with col2:
             missing.append("project scale")
         if not country:
             missing.append("country")
+        if project_type == "Energy Community Planning" and not st.session_state.get("ec_energy_focus", []):
+            missing.append("energy focus")
 
         if missing:
             st.warning("Please select: " + ", ".join(missing) + " before proceeding.")
@@ -490,7 +601,7 @@ with col2:
             # Mark pipeline mode
             st.session_state["pipeline_mode"] = "step1plus"
 
-            st.switch_page("pages/2_Review_Data.py")
+            st.switch_page("pages/2plus_Review_Data.py")
 
 with col3:
     st.markdown(
