@@ -116,10 +116,15 @@ if project_type:
     disabled_list = DISABLED_SYSTEMS.get(project_type, [])
     selectable_systems = [s for s in all_systems if s not in disabled_list]
 
+    # Filter saved defaults to only include currently selectable options
+    # (follow-up systems like "Battery System" are added separately)
+    _saved = st.session_state.get("systems_in_scope", [])
+    _safe_defaults = [s for s in _saved if s in selectable_systems]
+
     selected_systems = st.multiselect(
         "Systems in Scope",
         options=selectable_systems,
-        default=st.session_state.get("systems_in_scope", []),
+        default=_safe_defaults,
         placeholder="Choose systems...",
         key="p1p_systems_select",
         label_visibility="collapsed",
