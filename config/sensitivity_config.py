@@ -461,3 +461,176 @@ CATEGORICAL_ENCODING = {
     "glazing_pkg": {"P0_poor": 0, "P1_baseline": 1, "P2_good": 2},
     "roof_type": {"gable": 0, "shed": 1},
 }
+
+
+# ==============================================================================
+# SOLAR PV SENSITIVITY ANALYSIS  (Renewable Energy Planning)
+# ==============================================================================
+# Results from OAT and Morris screening analyses on a reference solar PV system
+# with rooftop + façade-integrated panels (Swedish climate, PVWatts-based model).
+# Output metrics: annual PV production (kWh), winter production (Oct–Mar kWh),
+# and specific yield (kWh/kWdc).
+
+SOLAR_PV_BASELINE = {
+    "annual_kwh": 88385.07,
+    "winter_kwh": 17174.19,
+    "specific_yield": 722.13,   # kWh per kWdc installed
+}
+
+SOLAR_PV_LABELS = {
+    "roof_coverage":      "Roof PV Coverage",
+    "facade_cov_S":       "South Façade Coverage",
+    "facade_cov_N":       "North Façade Coverage",
+    "facade_cov_E":       "East Façade Coverage",
+    "facade_cov_W":       "West Façade Coverage",
+    "module_efficiency":  "Module Efficiency",
+    "roof_tilt":          "Roof Tilt Angle",
+    "roof_type":          "Roof Type",
+    "losses_percent":     "System Losses",
+    "facade_shading":     "Façade Shading",
+    "winter_snow_derate": "Winter Snow Derating",
+    "building_azimuth":   "Building Orientation",
+    "availability":       "System Availability",
+    "array_type":         "Array Type",
+    "snowloss_enabled":   "Snow Loss Model",
+    "dc_ac_ratio":        "DC/AC Ratio",
+    "albedo":             "Ground Albedo",
+}
+
+# OAT results: (delta_low_pct, delta_high_pct, max_abs_swing_pct)
+# Negative delta = production decreases; positive = production increases.
+SOLAR_PV_OAT_ANNUAL = {
+    "roof_coverage":      (-59.04,  23.62, 59.04),
+    "facade_cov_S":       (-19.56,  50.85, 50.85),
+    "module_efficiency":  (-25.00,  15.00, 25.00),
+    "facade_cov_N":       ( -3.80,  18.98, 18.98),
+    "roof_tilt":          ( -1.52,  14.63, 14.63),
+    "roof_type":          ( 13.45,   0.00, 13.45),
+    "losses_percent":     ( 10.69, -13.07, 13.07),
+    "facade_shading":     (  3.24, -12.96, 12.96),
+    "facade_cov_W":       ( -2.92,  10.23, 10.23),
+    "facade_cov_E":       ( -2.87,  10.06, 10.06),
+    "winter_snow_derate": (  2.16,  -6.48,  6.48),
+    "building_azimuth":   ( -4.39,  -4.40,  4.40),
+    "availability":       ( -4.04,   1.01,  4.04),
+    "array_type":         ( -1.23,   0.00,  1.23),
+    "snowloss_enabled":   (  0.82,   0.00,  0.82),
+    "dc_ac_ratio":        ( -0.43,  -0.03,  0.43),
+}
+
+SOLAR_PV_OAT_WINTER = {
+    "facade_cov_S":       (-34.47,  89.63, 89.63),
+    "roof_coverage":      (-47.51,  19.01, 47.51),
+    "roof_tilt":          ( -4.38,  42.45, 42.45),
+    "winter_snow_derate": ( 11.11, -33.33, 33.33),
+    "roof_type":          ( 27.56,   0.00, 27.56),
+    "module_efficiency":  (-25.00,  15.00, 25.00),
+    "facade_shading":     (  4.78, -19.10, 19.10),
+    "facade_cov_N":       ( -3.15,  15.73, 15.73),
+    "losses_percent":     ( 10.82, -13.23, 13.23),
+    "facade_cov_W":       ( -2.80,   9.81,  9.81),
+    "building_azimuth":   ( -9.36,  -9.35,  9.36),
+    "facade_cov_E":       ( -2.56,   8.96,  8.96),
+    "snowloss_enabled":   (  4.24,   0.00,  4.24),
+    "availability":       ( -4.04,   1.01,  4.04),
+    "array_type":         ( -3.38,   0.00,  3.38),
+    "dc_ac_ratio":        ( -0.69,   0.36,  0.69),
+}
+
+SOLAR_PV_OAT_SPECIFIC_YIELD = {
+    "facade_cov_N":       (  9.02, -25.07, 25.07),
+    "roof_type":          ( 13.45,   0.00, 13.45),
+    "losses_percent":     ( 10.69, -13.07, 13.07),
+    "roof_coverage":      (-12.47,   1.92, 12.47),
+    "roof_tilt":          (  0.43,  -7.08,  7.08),
+    "winter_snow_derate": (  2.16,  -6.48,  6.48),
+    "building_azimuth":   ( -4.39,  -4.40,  4.40),
+    "facade_cov_S":       ( -2.94,   4.39,  4.39),
+    "availability":       ( -4.04,   1.01,  4.04),
+    "facade_shading":     ( -0.75,   3.71,  3.71),
+    "facade_cov_E":       (  0.79,  -2.37,  2.37),
+    "facade_cov_W":       (  0.74,  -2.21,  2.21),
+    "array_type":         ( -1.23,   0.00,  1.23),
+    "snowloss_enabled":   (  0.82,   0.00,  0.82),
+    "dc_ac_ratio":        ( -0.43,  -0.03,  0.43),
+    "module_efficiency":  (  0.00,   0.00,  0.00),
+}
+
+# Morris screening: (mu_star, sigma)  — μ* = mean |elementary effect|, σ = std
+SOLAR_PV_MORRIS = {
+    "annual_kwh": {
+        "roof_coverage":      (63604.73, 15185.88),
+        "facade_cov_N":       (40808.54, 17313.44),
+        "module_efficiency":  (30960.43, 11413.80),
+        "facade_cov_S":       (25825.38, 12823.53),
+        "building_azimuth":   (25397.33, 37904.66),
+        "facade_shading":     (24124.61, 11388.31),
+        "losses_percent":     (20929.71,  5767.81),
+        "roof_type":          (16858.43, 20943.84),
+        "roof_tilt":          (10018.64, 12892.87),
+        "facade_cov_E":       ( 8808.58,  4061.50),
+        "winter_snow_derate": ( 8001.83,  2594.27),
+        "facade_cov_W":       ( 6786.82,  3401.22),
+        "array_type":         ( 4106.81,  2516.15),
+        "availability":       ( 3835.15,  1521.50),
+        "dc_ac_ratio":        (  954.35,  1044.05),
+        "snowloss_enabled":   (  652.85,   350.37),
+    },
+    "winter_kwh": {
+        "facade_cov_N":       ( 9996.31,  6340.33),
+        "roof_coverage":      ( 9104.10,  3840.49),
+        "building_azimuth":   ( 8789.60, 12898.78),
+        "winter_snow_derate": ( 8001.83,  2594.27),
+        "facade_cov_S":       ( 5762.24,  4461.39),
+        "module_efficiency":  ( 5761.22,  2386.26),
+        "roof_type":          ( 5411.27,  6549.46),
+        "facade_shading":     ( 5184.31,  3049.11),
+        "losses_percent":     ( 3856.35,  1560.97),
+        "roof_tilt":          ( 2489.17,  2871.13),
+        "facade_cov_E":       ( 1755.33,  1146.54),
+        "array_type":         ( 1437.29,   961.37),
+        "facade_cov_W":       ( 1225.98,  1181.76),
+        "availability":       (  658.60,   348.27),
+        "snowloss_enabled":   (  652.85,   350.37),
+        "dc_ac_ratio":        (  254.01,   251.40),
+    },
+    "specific_yield": {
+        "building_azimuth":   (178.91, 261.76),
+        "losses_percent":     (126.79,  15.21),
+        "roof_type":          (101.37, 123.74),
+        "roof_coverage":      ( 92.24,  80.17),
+        "facade_cov_N":       ( 79.93, 100.84),
+        "facade_cov_S":       ( 77.62,  80.67),
+        "roof_tilt":          ( 63.81,  76.51),
+        "winter_snow_derate": ( 51.25,  13.88),
+        "facade_shading":     ( 33.33,  28.56),
+        "availability":       ( 26.66,   3.86),
+        "array_type":         ( 25.81,  11.16),
+        "facade_cov_W":       ( 18.50,  20.90),
+        "facade_cov_E":       ( 16.10,  20.67),
+        "dc_ac_ratio":        (  5.83,   6.12),
+        "snowloss_enabled":   (  4.61,   1.83),
+        "module_efficiency":  (  0.33,   0.33),
+    },
+}
+
+# Stakeholder-friendly descriptions of each solar PV parameter
+SOLAR_PV_DESCRIPTIONS = {
+    "roof_coverage":      "Share of roof area covered by PV panels. The single biggest driver of total production — more panels = more electricity.",
+    "facade_cov_S":       "Share of south-facing façade with PV. South façades get the most sun and dramatically boost winter production.",
+    "facade_cov_N":       "Share of north-facing façade with PV. North panels produce less but add to total capacity; removing them improves specific yield.",
+    "facade_cov_E":       "Share of east-facing façade with PV. East panels capture morning sun — moderate benefit.",
+    "facade_cov_W":       "Share of west-facing façade with PV. West panels capture afternoon sun — similar to east in impact.",
+    "module_efficiency":  "Conversion efficiency of PV modules (%). Higher efficiency panels produce more per m², but cost more.",
+    "roof_tilt":          "Tilt angle of roof-mounted panels. Optimal tilt depends on latitude; wrong tilt especially hurts winter production.",
+    "roof_type":          "Gable vs shed (mono-pitch) roof. Roof shape affects how much roof area faces the optimal direction.",
+    "losses_percent":     "System losses from wiring, soiling, mismatch, etc. Keeping losses low is a reliable way to boost output.",
+    "facade_shading":     "Shading on façade panels from nearby buildings or trees. Shading reduces production and is hard to predict without a site survey.",
+    "winter_snow_derate": "Production loss from snow covering panels in winter. Very important in Nordic climates — can cut winter output by a third.",
+    "building_azimuth":   "Compass orientation of the building. Affects how much sun reaches roof and façade surfaces throughout the day.",
+    "availability":       "Fraction of time the system is operational. Accounts for maintenance downtime and grid outages.",
+    "array_type":         "Fixed-tilt vs tracking mount. Tracking systems follow the sun but add cost and complexity.",
+    "snowloss_enabled":   "Whether the energy model accounts for snow-related losses. A modelling choice, not a physical parameter.",
+    "dc_ac_ratio":        "Ratio of DC panel capacity to AC inverter capacity. Oversizing DC slightly boosts output but beyond a point causes clipping.",
+    "albedo":             "Ground reflectance. Has negligible impact in this study.",
+}
