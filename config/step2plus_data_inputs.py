@@ -413,22 +413,10 @@ RE_ROOFTOP_PV_INPUTS = {
         "category": "Rooftop PV — Electricity Demand",
         "items": [
             {
-                "key": "re_rpv_annual_demand",
-                "label": "Annual electricity consumption (kWh/year)",
+                "key": "re_rpv_electricity_demand",
+                "label": "Existing electricity demand",
                 "recommended_source": "Electricity bills / utility records",
                 "proxy_options": ["SCB / Energimyndigheten benchmarks"],
-            },
-            {
-                "key": "re_rpv_demand_target",
-                "label": "Target share of demand to cover with PV (%)",
-                "recommended_source": "Stakeholder goal / feasibility study",
-                "proxy_options": [],
-            },
-            {
-                "key": "re_rpv_tariff",
-                "label": "Current electricity price (SEK/kWh or €/kWh)",
-                "recommended_source": "Electricity bill / utility contract",
-                "proxy_options": ["Elpriskollen", "Nordpool spot price"],
             },
         ],
     },
@@ -459,61 +447,19 @@ RE_ROOFTOP_PV_INPUTS = {
                 "recommended_source": "Site plan",
                 "proxy_options": ["Google Earth", "OpenStreetMap"],
             },
-            {
-                "key": "re_rpv_shading",
-                "label": "Shading context (nearby trees, buildings, chimneys)",
-                "recommended_source": "Site visit / photos",
-                "proxy_options": ["Google Street View"],
-            },
-            {
-                "key": "re_rpv_roof_condition",
-                "label": "Roof material and condition",
-                "recommended_source": "Building inspection report",
-                "proxy_options": ["Owner knowledge / photos"],
-            },
-        ],
-    },
-    "grid": {
-        "category": "Rooftop PV — Grid Connection",
-        "items": [
-            {
-                "key": "re_rpv_grid_export",
-                "label": "Is grid export (selling surplus) allowed?",
-                "type": "yes_no",
-                "recommended_source": "Grid operator / utility contract",
-                "proxy_options": [],
-            },
-            {
-                "key": "re_rpv_feed_in_tariff",
-                "label": "Feed-in tariff or compensation for exported electricity",
-                "recommended_source": "Utility contract / grid operator",
-                "proxy_options": ["Energimarknadsinspektionen"],
-            },
         ],
     },
 }
 
 RE_FACADE_PV_INPUTS = {
     "demand": {
-        "category": "Facade PV (BIPV) — Energy Demand",
+        "category": "Facade PV (BIPV) — Electricity Demand",
         "items": [
             {
-                "key": "re_fpv_annual_demand",
-                "label": "Annual electricity consumption (kWh/year)",
+                "key": "re_fpv_electricity_demand",
+                "label": "Existing electricity demand",
                 "recommended_source": "Electricity bills / utility records",
                 "proxy_options": ["SCB / Energimyndigheten benchmarks"],
-            },
-            {
-                "key": "re_fpv_demand_target",
-                "label": "Target share of demand to cover with façade PV (%)",
-                "recommended_source": "Stakeholder goal / feasibility study",
-                "proxy_options": [],
-            },
-            {
-                "key": "re_fpv_tariff",
-                "label": "Current electricity price (SEK/kWh or €/kWh)",
-                "recommended_source": "Electricity bill / utility contract",
-                "proxy_options": ["Elpriskollen", "Nordpool spot price"],
             },
         ],
     },
@@ -544,36 +490,6 @@ RE_FACADE_PV_INPUTS = {
                 "recommended_source": "Site plan / architectural drawing",
                 "proxy_options": ["Google Earth", "OpenStreetMap"],
             },
-            {
-                "key": "re_fpv_shading",
-                "label": "Shading context (nearby buildings, vegetation)",
-                "recommended_source": "Site visit / photos",
-                "proxy_options": ["Google Street View"],
-            },
-            {
-                "key": "re_fpv_facade_condition",
-                "label": "Façade material and condition",
-                "recommended_source": "Building inspection report",
-                "proxy_options": ["Owner knowledge / photos"],
-            },
-        ],
-    },
-    "grid": {
-        "category": "Facade PV (BIPV) — Grid Connection",
-        "items": [
-            {
-                "key": "re_fpv_grid_export",
-                "label": "Is grid export (selling surplus) allowed?",
-                "type": "yes_no",
-                "recommended_source": "Grid operator / utility contract",
-                "proxy_options": [],
-            },
-            {
-                "key": "re_fpv_feed_in_tariff",
-                "label": "Feed-in tariff or compensation for exported electricity",
-                "recommended_source": "Utility contract / grid operator",
-                "proxy_options": ["Energimarknadsinspektionen"],
-            },
         ],
     },
 }
@@ -589,7 +505,7 @@ RE_COMMUNITY_PV_INPUTS = {
                 "proxy_options": ["Google Maps", "Lantmäteriet database"],
             },
             {
-                "key": "re_cpv_land_area",
+                "key": "re_cpv_site_area",
                 "label": "Available site area (m²)",
                 "recommended_source": "Site plan / cadastral data",
                 "proxy_options": ["Lantmäteriet database", "Google Earth"],
@@ -600,22 +516,10 @@ RE_COMMUNITY_PV_INPUTS = {
                 "recommended_source": "Topographic survey",
                 "proxy_options": ["Laser data from Lantmäteriet"],
             },
-            {
-                "key": "re_cpv_orientation",
-                "label": "Site orientation (compass direction of main slope)",
-                "recommended_source": "Site plan",
-                "proxy_options": ["Google Earth", "OpenStreetMap"],
-            },
-            {
-                "key": "re_cpv_land_ownership",
-                "label": "Land ownership type (owned / leased / municipal)",
-                "recommended_source": "Land registry / property records",
-                "proxy_options": ["Lantmäteriet database"],
-            },
         ],
     },
     "infrastructure": {
-        "category": "Community PV — Existing Infrastructure",
+        "category": "Community PV — Infrastructure",
         "items": [
             {
                 "key": "re_cpv_existing_infra",
@@ -630,41 +534,28 @@ RE_COMMUNITY_PV_INPUTS = {
                 "recommended_source": "Grid operator / utility",
                 "proxy_options": [],
             },
-            {
-                "key": "re_cpv_grid_distance",
-                "label": "Distance to nearest grid connection point",
-                "recommended_source": "Grid operator",
-                "proxy_options": [],
-            },
-            {
-                "key": "re_cpv_grid_capacity",
-                "label": "Available grid capacity for feed-in",
-                "recommended_source": "Grid operator",
-                "proxy_options": [],
-            },
-        ],
-    },
-    "demand": {
-        "category": "Community PV — Demand & Offtake",
-        "items": [
-            {
-                "key": "re_cpv_num_participants",
-                "label": "Number of participating households / buildings",
-                "recommended_source": "Community agreement / feasibility study",
-                "proxy_options": [],
-            },
-            {
-                "key": "re_cpv_total_demand",
-                "label": "Total annual electricity demand of participants (kWh/year)",
-                "recommended_source": "Electricity bills / utility records",
-                "proxy_options": ["SCB / Energimyndigheten benchmarks"],
-            },
         ],
     },
 }
 
 RE_BATTERY_INPUTS = {
-    "location": {
+    "purpose": {
+        "category": "Battery Storage — Purpose",
+        "items": [
+            {
+                "key": "re_bat_priority",
+                "label": "Primary purpose of battery",
+                "type": "select",
+                "options": [
+                    "Self-consumption",
+                    "Peak shaving",
+                ],
+                "recommended_source": "Stakeholder goal",
+                "proxy_options": [],
+            },
+        ],
+    },
+    "installation": {
         "category": "Battery Storage — Installation",
         "items": [
             {
@@ -674,51 +565,10 @@ RE_BATTERY_INPUTS = {
                 "proxy_options": ["Owner knowledge"],
             },
             {
-                "key": "re_bat_space",
-                "label": "Available space for battery installation (m²)",
+                "key": "re_bat_area",
+                "label": "Available area for battery installation (m²)",
                 "recommended_source": "Architectural drawing / site visit",
                 "proxy_options": ["Owner measurement"],
-            },
-        ],
-    },
-    "purpose": {
-        "category": "Battery Storage — Purpose & Usage",
-        "items": [
-            {
-                "key": "re_bat_priority",
-                "label": "Primary purpose of battery",
-                "type": "select",
-                "options": [
-                    "Maximise self-consumption",
-                    "Peak shaving",
-                    "Backup power",
-                ],
-                "recommended_source": "Stakeholder goal",
-                "proxy_options": [],
-            },
-            {
-                "key": "re_bat_grid_export",
-                "label": "Will the battery be used for grid export?",
-                "type": "yes_no",
-                "recommended_source": "Grid operator / utility contract",
-                "proxy_options": [],
-            },
-        ],
-    },
-    "demand": {
-        "category": "Battery Storage — Demand Context",
-        "items": [
-            {
-                "key": "re_bat_daily_consumption",
-                "label": "Average daily electricity consumption (kWh/day)",
-                "recommended_source": "Electricity bills / smart meter data",
-                "proxy_options": ["SCB / Energimyndigheten benchmarks"],
-            },
-            {
-                "key": "re_bat_peak_load",
-                "label": "Peak electricity load (kW)",
-                "recommended_source": "Smart meter data / utility records",
-                "proxy_options": [],
             },
         ],
     },

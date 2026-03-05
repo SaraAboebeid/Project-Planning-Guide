@@ -162,6 +162,27 @@ if project_type:
             selected_systems.append(_fu)
     st.session_state["systems_in_scope"] = selected_systems
 
+    # ── RE: electricity threshold follow-up ────────────────────────
+    if project_type == "Renewable Energy Planning":
+        _pv_systems = {"Rooftop PV", "Community PV", "Facade PV (BIPV)"}
+        if _pv_systems & set(selected_systems):
+            _threshold_key = "p1p_re_electricity_threshold"
+            _saved_threshold = st.session_state.get(_threshold_key, "Partial coverage")
+            _threshold_options = ["Net zero", "Surplus", "Partial coverage"]
+            _threshold = st.selectbox(
+                "What is your electricity target?",
+                options=_threshold_options,
+                index=_threshold_options.index(_saved_threshold)
+                    if _saved_threshold in _threshold_options else 2,
+                key=_threshold_key,
+                help=(
+                    "Net zero — PV covers 100 % of annual demand. "
+                    "Surplus — PV exceeds demand (export to grid). "
+                    "Partial coverage — PV covers a share of demand."
+                ),
+            )
+            st.session_state["re_electricity_threshold"] = _threshold
+
     # ── Renovation Planning follow-up questions ────────────────────
     if project_type == "Renovation Planning" and selected_systems:
 

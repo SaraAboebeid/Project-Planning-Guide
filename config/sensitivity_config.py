@@ -270,43 +270,47 @@ ANALYSIS_TYPE_WEIGHTS = {
     # ------------------------------------------------------------------
     # RENEWABLE ENERGY & LOCAL PRODUCTION  — Solar PV / RE Planning
     # ------------------------------------------------------------------
-    # For renewable energy analysis the building geometry & orientation
-    # parameters that determine solar access dominate, while HVAC and
-    # envelope thermal parameters drop in importance.
-    # Derived from the Solar Analysis OAT study (same reference model,
-    # interpreted through the solar-gain lens).
+    # Weights for the RE-specific data-input keys (re_rpv_*, re_fpv_*,
+    # re_cpv_*, re_bat_*) used in step2plus_data_inputs.py.
+    #
+    # Mapping methodology:
+    #   • SA-backed params  → weight derived from OAT annual % swing
+    #       swing ≥ 20%  → 20  (High)
+    #       swing 10–19% → 15  (High)
+    #       swing  4–9%  → 10  (Medium)
+    #       swing  1–3%  → 5   (Low)
+    #       swing < 1%   → 3   (Low)
+    #   • Non-SA params     → classified by domain knowledge / literature
+    #       High     = 18   (physical / regulatory constraint)
+    #       Medium   = 10   (economic / planning parameter)
+    #       Low      = 5    (logistics / organisational)
     "Renewable Energy & Local Production": {
-        # ── Very High (solar access drivers) ─────────────────────────
-        "roof_shape_angle": 20.0,       # tilt → PV yield
-        "roof_area": 20.0,              # available PV area
-        "orientation": 18.0,            # azimuth → irradiance
-        "pv_module": 16.0,              # panel type / efficiency
-        # ── High (context & shading) ─────────────────────────────────
-        "building_location": 14.0,      # urban shading context
-        "context_location_height": 12.0, # horizon shading
-        "wwr": 10.0,                    # south WWR ↔ passive solar
-        # ── Medium (geometry affecting available roof / facade) ──────
-        "footprint": 8.0,
-        "height": 8.0,
-        "num_floors": 6.0,
-        "installing_battery": 6.0,      # storage sizing
-        # ── Lower (less relevant for PV yield) ───────────────────────
-        "infiltration_rate": 3.0,
-        "construction_materials": 3.0,
-        "window_properties": 3.0,
-        "hvac_type": 2.0,
-        "setpoint": 2.0,
-        "supply_temp": 2.0,
-        "annual_heating_cooling": 2.0,
-        "annual_electricity": 3.0,
-        "onsite_production": 4.0,
-        "grid_emission_factor": 5.0,
-        "use_type": 2.0,
-        "occupancy_pattern": 2.0,
-        "operating_hours": 2.0,
-        "year_construction": 2.0,
-        "location": 3.0,
-        "has_basement": 1.0,
+
+        # ────────────────── ROOFTOP PV ───────────────────────────────
+        "re_rpv_electricity_demand": 18.0,  # energy demand → High
+        "re_rpv_location":           18.0,  # determines GHI → High
+        "re_rpv_roof_area":          20.0,  # SA: roof_coverage 59% swing → High
+        "re_rpv_tilt":               15.0,  # SA: roof_tilt 14.6% swing → High
+        "re_rpv_azimuth":            10.0,  # SA: building_azimuth 4.4% → Medium
+
+        # ────────────────── FACADE PV (BIPV) ────────────────────────
+        "re_fpv_electricity_demand": 18.0,  # energy demand → High
+        "re_fpv_location":           18.0,  # determines GHI → High
+        "re_fpv_facade_area":        20.0,  # SA: facade_cov_S 51% swing → High
+        "re_fpv_wwr":                18.0,  # determines usable façade → High
+        "re_fpv_orientation":        18.0,  # S vs N matters hugely → High
+
+        # ────────────────── COMMUNITY PV ────────────────────────────
+        "re_cpv_location":           18.0,  # determines GHI → High
+        "re_cpv_site_area":          20.0,  # SA: roof_coverage concept → High
+        "re_cpv_slope":              15.0,  # SA: roof_tilt concept → High
+        "re_cpv_existing_infra":      5.0,  # logistics → Low
+        "re_cpv_grid_connection":    18.0,  # infrastructure constraint → High
+
+        # ────────────────── BATTERY STORAGE ─────────────────────────
+        "re_bat_priority":            8.0,  # operational strategy → Low–Medium
+        "re_bat_location":            5.0,  # logistics → Low
+        "re_bat_area":                5.0,  # logistics → Low
     },
 }
 
