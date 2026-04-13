@@ -27,7 +27,7 @@ from config.project_types import (
 )
 
 _APPROACH_NAMES = list(EXPLORATION_OPTIONS)
-from utils.shared_css import inject_shared_css, render_step_indicator
+from utils.shared_css import inject_shared_css, render_step_indicator, render_branded_top_bar
 from utils.location_data import (
     geocode_address,
     get_nearby_epc_snapshot,
@@ -50,18 +50,9 @@ st.markdown("""
 
 # Persistent step progress indicator
 render_step_indicator(1)
-
-st.markdown(
-    "<h2 style='font-size:1.5rem; font-weight:700; color:#0f172a; "
-    "letter-spacing:-0.01em; margin-bottom:0.5rem;'>"
-    "Step 1+: Define Project</h2>",
-    unsafe_allow_html=True,
-)
-st.markdown(
-    "<p style='font-size:0.92rem; color:#64748b; margin-top:-0.5rem; "
-    "margin-bottom:0.7rem;'>"
-    "Select your project type, systems in scope, KPIs, and context.</p>",
-    unsafe_allow_html=True,
+render_branded_top_bar(
+    "Step 1+: Define Project",
+    "Select your project type, systems in scope, KPIs, and project context using the Chalmers decision-support workflow.",
 )
 
 # ============================================================================

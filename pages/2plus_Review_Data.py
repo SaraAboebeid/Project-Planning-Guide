@@ -19,16 +19,35 @@ from config.sensitivity_config import (
     SOLAR_PV_MORRIS, SOLAR_PV_DESCRIPTIONS,
 )
 from config.data_inputs import get_proxy_confidence
-from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards
+from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards, render_branded_top_bar
 from utils.location_data import (
     has_location_database,
     get_nearby_epc_snapshot,
     get_epc_snapshot_for_bbox,
     geocode_address,
+    get_epc_building_passport,
 )
 
 st.set_page_config(page_title="Review Data (Step 2+)", layout="wide")
 inject_shared_css()
+
+
+def _is_missing(value):
+    text = str(value).strip().lower()
+    return value is None or text in {"", "<na>", "nan", "none"}
+
+
+def _display_value(value, suffix: str = ""):
+    if _is_missing(value):
+        return "—"
+    return f"{value}{suffix}"
+
+
+def _safe_id_text(value):
+    try:
+        return str(int(value))
+    except (TypeError, ValueError):
+        return "N/A"
 
 # Hide sidebar + tighter spacing for data items
 st.markdown("""
@@ -77,18 +96,9 @@ reno_cost_kpi = "Cost" in st.session_state.get("selected_kpis", [])
 # PAGE HEADER
 # ============================================================================
 
-st.markdown(
-    "<h2 style='font-size:1.5rem; font-weight:700; color:#0f172a; "
-    "letter-spacing:-0.01em; margin-bottom:0.5rem;'>"
-    "Step 2+: Review Data Inputs</h2>",
-    unsafe_allow_html=True,
-)
-st.markdown(
-    "<p style='font-size:0.92rem; color:#64748b; margin-top:-0.5rem; "
-    "margin-bottom:0.7rem;'>"
-    "Review the required data inputs for each system in scope and "
-    "select proxy alternatives if needed.</p>",
-    unsafe_allow_html=True,
+render_branded_top_bar(
+    "Step 2+: Review Data Inputs",
+    "Review required data inputs, inspect linked EPC buildings, and assess local data coverage with a building-level passport.",
 )
 
 # Context bar
@@ -942,6 +952,18 @@ with right_col:
             summary = snapshot["summary"]
             classes_df = snapshot["classes"]
             sample_df = snapshot["sample"]
+            linked_points_df = points_df[
+                ~points_df["FormularId"].isna()
+                & (
+                    points_df["address"].notna()
+                    | points_df["energy_class"].notna()
+                    | points_df["energy_performance"].notna()
+                    | points_df["build_year"].notna()
+                    | points_df["atemp"].notna()
+                )
+            ].copy() if not points_df.empty else points_df
+            if not linked_points_df.empty:
+                linked_points_df = linked_points_df.drop_duplicates(subset=["FormularId"], keep="first")
 
             st.markdown(
                 "<div style='font-size:0.9rem; font-weight:600; margin-top:0.8rem; margin-bottom:0.2rem;'>"
@@ -952,9 +974,10 @@ with right_col:
             if project_scale == "Building":
                 st.caption("Teal point is the nearest footprint centroid for the selected building address.")
             else:
-                st.caption("Teal points are footprint centroids within your selected radius or bounding box.")
+                st.caption("Teal points are buildings with linked EPC data inside your selected radius or bounding box.")
 
-            if not points_df.empty:
+            selected_row = None
+            if not linked_points_df.empty:
                 fmap = folium.Map(
                     location=[map_center_lat, map_center_lon],
                     zoom_start=13,
@@ -962,34 +985,43 @@ with right_col:
                     control_scale=False,
                     prefer_canvas=True,
                 )
-                for _, r in points_df.head(1200).iterrows():
-                    rid_raw = r.get("FormularId")
-                    try:
-                        rid_text = str(int(rid_raw))
-                    except (TypeError, ValueError):
-                        rid_text = "N/A"
-
-                    ep_raw = r.get("energy_performance")
-                    ep_text = "-" if ep_raw is None or str(ep_raw).lower() == "<na>" else str(ep_raw)
-
+                for _, r in linked_points_df.head(1200).iterrows():
+                    rid_text = _safe_id_text(r.get("FormularId"))
+                    ep_text = _display_value(r.get("energy_performance"))
+                    tooltip = (
+                        f"{r.get('address') if not _is_missing(r.get('address')) else 'Linked EPC building'}"
+                        f" · EPC {_display_value(r.get('energy_class'))}"
+                    )
                     popup = (
+                        f"<b>{r.get('address') if not _is_missing(r.get('address')) else 'Address unavailable'}</b><br>"
                         f"FormularId: {rid_text}<br>"
-                        f"Address: {r.get('address') or '-'}<br>"
-                        f"Municipality: {r.get('municipality') or '-'}<br>"
-                        f"Energy class: {r.get('energy_class') or '-'}<br>"
+                        f"Municipality: {_display_value(r.get('municipality'))}<br>"
+                        f"Energy class: {_display_value(r.get('energy_class'))}<br>"
                         f"Energy performance: {ep_text}"
                     )
                     folium.CircleMarker(
                         location=[float(r["lat"]), float(r["lon"])],
-                        radius=2,
+                        radius=3,
                         weight=1,
                         color="#33A9A0",
                         fill=True,
                         fill_color="#33A9A0",
-                        fill_opacity=0.65,
+                        fill_opacity=0.8,
+                        tooltip=folium.Tooltip(tooltip, sticky=True),
                         popup=folium.Popup(popup, max_width=320),
                     ).add_to(fmap)
-                st_folium(fmap, width=None, height=300, key="s2p_location_points_map")
+                map_state = st_folium(fmap, width=None, height=300, key="s2p_location_points_map")
+
+                clicked = (map_state or {}).get("last_object_clicked")
+                if clicked:
+                    click_lat = clicked.get("lat")
+                    click_lng = clicked.get("lng")
+                    if click_lat is not None and click_lng is not None:
+                        selected_row = linked_points_df.assign(
+                            _distance=(linked_points_df["lat"] - click_lat).abs() + (linked_points_df["lon"] - click_lng).abs()
+                        ).sort_values("_distance").iloc[0]
+            elif not points_df.empty:
+                st.caption("Footprints were found here, but none of the mapped points in this selection currently have linked EPC details to display.")
 
             mc1, mc2 = st.columns(2)
             mc1.metric("Buildings", f"{summary.get('footprint_buildings', 0):,}")
@@ -1000,15 +1032,9 @@ with right_col:
             st.session_state["location_sample"] = sample_df.to_dict("records")
 
             # Building-level details (select from points currently plotted)
-            if not points_df.empty:
-                points_with_id = points_df.dropna(subset=["FormularId"]).copy()
+            if not linked_points_df.empty:
+                points_with_id = linked_points_df.copy()
                 if not points_with_id.empty:
-                    def _safe_id_text(v):
-                        try:
-                            return str(int(v))
-                        except (TypeError, ValueError):
-                            return "N/A"
-
                     points_with_id["_label"] = points_with_id.apply(
                         lambda r: (
                             f"{_safe_id_text(r.get('FormularId'))}"
@@ -1016,16 +1042,80 @@ with right_col:
                         ),
                         axis=1,
                     )
+                    default_index = 0
+                    if selected_row is not None:
+                        selected_id = _safe_id_text(selected_row.get("FormularId"))
+                        labels = points_with_id["_label"].tolist()[:600]
+                        for idx, label in enumerate(labels):
+                            if label.startswith(selected_id):
+                                default_index = idx
+                                break
                     chosen = st.selectbox(
                         "Select a mapped building",
                         options=points_with_id["_label"].tolist()[:600],
+                        index=default_index,
                         key="s2p_selected_building",
                     )
                     selected_row = points_with_id[points_with_id["_label"] == chosen].iloc[0]
-                    st.caption(
-                        f"Data available: energy class={selected_row.get('energy_class')}, "
-                        f"energy performance={selected_row.get('energy_performance')}, "
-                        f"build year={selected_row.get('build_year')}, atemp={selected_row.get('atemp')}"
+                    passport = get_epc_building_passport(selected_row.get("FormularId")) or {}
+                    completeness = sum(
+                        1
+                        for val in [
+                            passport.get("IdAdr", selected_row.get("address")),
+                            passport.get("IdKommun", selected_row.get("municipality")),
+                            passport.get("EgiEnergiklass", selected_row.get("energy_class")),
+                            passport.get("EgiEnergiPrestanda", selected_row.get("energy_performance")),
+                            passport.get("EgenNybyggAr", selected_row.get("build_year")),
+                            passport.get("EgenAtemp", selected_row.get("atemp")),
+                        ]
+                        if not _is_missing(val)
+                    )
+                    energy_systems = passport.get("energy_systems", [])
+                    ventilation_modes = passport.get("ventilation_modes", [])
+                    systems_text = ", ".join(energy_systems) if energy_systems else "—"
+                    ventilation_text = ", ".join(ventilation_modes) if ventilation_modes else "—"
+
+                    st.markdown(
+                        f"""
+                        <div style='border:1px solid #d5e3ea; border-radius:16px; padding:1rem; margin-top:0.45rem; background:linear-gradient(180deg, #fbfdff 0%, #f4fafc 100%); box-shadow:0 8px 24px rgba(51,82,138,0.08);'>
+                            <div style='display:flex; justify-content:space-between; align-items:flex-start; gap:0.6rem;'>
+                                <div>
+                                    <div style='font-size:0.74rem; color:#33528A; text-transform:uppercase; letter-spacing:0.08em; font-weight:700;'>Building Passport</div>
+                                    <div style='font-size:1.05rem; font-weight:800; color:#0f172a; margin-top:0.18rem;'>{_display_value(passport.get('IdAdr', selected_row.get('address')))}</div>
+                                    <div style='font-size:0.84rem; color:#475569; margin-top:0.14rem;'>{_display_value(passport.get('IdPostort'))} · {_display_value(passport.get('IdKommun', selected_row.get('municipality')))}</div>
+                                </div>
+                                <div style='background:rgba(51,169,160,0.10); color:#0f766e; border:1px solid rgba(51,169,160,0.25); border-radius:999px; padding:0.2rem 0.6rem; font-size:0.74rem; font-weight:600;'>
+                                    {completeness}/6 key fields available
+                                </div>
+                            </div>
+                            <div style='display:grid; grid-template-columns:1fr 1fr; gap:0.55rem; margin-top:0.85rem;'>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>FormularId</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_safe_id_text(passport.get('FormularId', selected_row.get('FormularId')))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Energy Class</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgiEnergiklass', selected_row.get('energy_class')))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Energy Performance</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgiEnergiPrestanda', selected_row.get('energy_performance')))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Specific Energy Use</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgiSpecifikEnergianvandning'))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Primary Energy</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgiPrimarenergianvandning'))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Atemp</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgenAtemp', selected_row.get('atemp')), ' m²')}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Build Year</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgenNybyggAr', selected_row.get('build_year')))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Number of Floors</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgenAntalPlan'))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Apartments</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgenAntalBolgh'))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Building Type</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgenByggnadsTyp'))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Building Category</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgenByggnadsKat'))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Typcode</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgenTypkod_typ'))}</div></div>
+                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Complexity</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgenKomplexitet'))}</div></div>
+                            </div>
+                            <div style='display:grid; grid-template-columns:1fr 1fr; gap:0.55rem; margin-top:0.55rem;'>
+                                <div style='background:rgba(51,82,138,0.06); border:1px solid rgba(51,82,138,0.14); border-radius:12px; padding:0.75rem;'>
+                                    <div style='font-size:0.72rem; color:#33528A; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;'>Energy Systems</div>
+                                    <div style='font-size:0.88rem; color:#0f172a; margin-top:0.35rem; line-height:1.45;'>{systems_text}</div>
+                                </div>
+                                <div style='background:rgba(196,232,29,0.10); border:1px solid rgba(196,232,29,0.22); border-radius:12px; padding:0.75rem;'>
+                                    <div style='font-size:0.72rem; color:#597001; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;'>Ventilation & Status</div>
+                                    <div style='font-size:0.88rem; color:#0f172a; margin-top:0.35rem; line-height:1.45;'>Ventilation: {ventilation_text}<br>Approved: {_display_value(passport.get('Godkand'))}<br>Ventilation check: {_display_value(passport.get('VentGruppGodkand'))}</div>
+                                </div>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
                     )
 
             with st.expander("Preview local data found near this location"):

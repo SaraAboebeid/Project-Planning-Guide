@@ -329,3 +329,125 @@ def get_epc_snapshot_for_bbox(
 def has_location_database() -> bool:
     """Whether the EPC DuckDB file is available locally."""
     return DB_PATH.exists()
+
+
+@st.cache_data(ttl=60 * 60)
+def get_epc_building_passport(formular_id: int | str) -> dict[str, Any] | None:
+    """Return a richer EPC record for a single building."""
+    try:
+        formular_id_int = int(formular_id)
+    except (TypeError, ValueError):
+        return None
+
+    con = _connect_duckdb()
+    try:
+        row = con.execute(
+            """
+            SELECT
+                FormularId,
+                IdAdr,
+                IdPostort,
+                IdKommun,
+                IdPostnr,
+                EgenByggnadsTyp,
+                EgenByggnadsKat,
+                EgenTypkod_typ,
+                EgenKomplexitet,
+                EgenNybyggAr,
+                EgenAtemp,
+                EgenAntalPlan,
+                EgenAntalBolgh,
+                EgiEnergiklass,
+                EgiEnergiPrestanda,
+                EgiSpecifikEnergianvandning,
+                EgiPrimarenergianvandning,
+                EgiFjarrvarme,
+                EgiElDirekt,
+                EgiElLuft,
+                EgiPumpFranluft,
+                EgiPumpLuftVatten,
+                EgiPumpLuftLuft,
+                EgiSolcell,
+                VentGruppGodkand,
+                VentTypFTX,
+                VentTypF,
+                VentTypFT,
+                VentTypSjalvdrag,
+                Godkand
+            FROM epc
+            WHERE FormularId = ?
+            LIMIT 1
+            """,
+            [formular_id_int],
+        ).fetchone()
+        if row is None:
+            return None
+
+        columns = [
+            "FormularId",
+            "IdAdr",
+            "IdPostort",
+            "IdKommun",
+            "IdPostnr",
+            "EgenByggnadsTyp",
+            "EgenByggnadsKat",
+            "EgenTypkod_typ",
+            "EgenKomplexitet",
+            "EgenNybyggAr",
+            "EgenAtemp",
+            "EgenAntalPlan",
+            "EgenAntalBolgh",
+            "EgiEnergiklass",
+            "EgiEnergiPrestanda",
+            "EgiSpecifikEnergianvandning",
+            "EgiPrimarenergianvandning",
+            "EgiFjarrvarme",
+            "EgiElDirekt",
+            "EgiElLuft",
+            "EgiPumpFranluft",
+            "EgiPumpLuftVatten",
+            "EgiPumpLuftLuft",
+            "EgiSolcell",
+            "VentGruppGodkand",
+            "VentTypFTX",
+            "VentTypF",
+            "VentTypFT",
+            "VentTypSjalvdrag",
+            "Godkand",
+        ]
+        passport = dict(zip(columns, row))
+
+        energy_systems: list[str] = []
+        system_map = {
+            "District heating": passport.get("EgiFjarrvarme"),
+            "Direct electric": passport.get("EgiElDirekt"),
+            "Electric air heating": passport.get("EgiElLuft"),
+            "Exhaust air heat pump": passport.get("EgiPumpFranluft"),
+            "Air-to-water heat pump": passport.get("EgiPumpLuftVatten"),
+            "Air-to-air heat pump": passport.get("EgiPumpLuftLuft"),
+            "Solar PV": passport.get("EgiSolcell"),
+        }
+        for label, value in system_map.items():
+            try:
+                if value is not None and float(value) > 0:
+                    energy_systems.append(label)
+            except (TypeError, ValueError):
+                continue
+        passport["energy_systems"] = energy_systems
+
+        ventilation_modes: list[str] = []
+        ventilation_map = {
+            "FTX": passport.get("VentTypFTX"),
+            "F": passport.get("VentTypF"),
+            "FT": passport.get("VentTypFT"),
+            "Natural ventilation": passport.get("VentTypSjalvdrag"),
+        }
+        for label, value in ventilation_map.items():
+            value_text = str(value).strip().lower()
+            if value is not None and value_text not in {"", "<na>", "none", "nan", "nej", "no", "0"}:
+                ventilation_modes.append(label)
+        passport["ventilation_modes"] = ventilation_modes
+
+        return passport
+    finally:
+        con.close()

@@ -11,6 +11,9 @@ Palette:
   #33528A  navy blue   – secondary accents
 """
 
+import base64
+from pathlib import Path
+
 import streamlit as st
 
 # ── Step metadata used by the persistent stepper ──
@@ -311,3 +314,59 @@ def render_top_cards(cards: list):
         f"<div style='display:flex; gap:1.2rem; margin:1.2rem 0 1.5rem 0;'>{inner}</div>",
         unsafe_allow_html=True,
     )
+
+
+def _load_svg_data_uri(asset_name: str) -> str | None:
+    asset_path = Path(__file__).resolve().parents[1] / "assets" / asset_name
+    if not asset_path.exists():
+        return None
+    svg_text = asset_path.read_text(encoding="utf-8")
+    encoded = base64.b64encode(svg_text.encode("utf-8")).decode("utf-8")
+    return f"data:image/svg+xml;base64,{encoded}"
+
+
+def render_branded_top_bar(page_title: str, subtitle: str = "", home_target: str = "planning_guide.py"):
+    """Render a professional branded page header with logos and a home-page link."""
+    next_labs_logo = _load_svg_data_uri("chalmers_next_labs_logo_white.svg")
+    university_logo = _load_svg_data_uri("chalmers_university_logo_white.svg")
+
+    logo_html = ""
+    if next_labs_logo:
+        logo_html += f"<img src='{next_labs_logo}' alt='Chalmers Next Labs' style='height:44px; object-fit:contain;'>"
+    if university_logo:
+        if logo_html:
+            logo_html += "<div style='width:1px; height:32px; background:rgba(255,255,255,0.28);'></div>"
+        logo_html += f"<img src='{university_logo}' alt='Chalmers University of Technology' style='height:34px; object-fit:contain;'>"
+
+    st.markdown(
+        f"""
+        <div style="
+            background: linear-gradient(135deg, #33528A 0%, #33A9A0 62%, #6A87C4 100%);
+            border-radius: 18px;
+            padding: 1.15rem 1.35rem;
+            margin: 0.15rem 0 1rem 0;
+            box-shadow: 0 10px 28px rgba(34, 64, 118, 0.18);
+            border: 1px solid rgba(255,255,255,0.18);
+            overflow: hidden;
+            position: relative;
+        ">
+            <div style="position:absolute; inset:0; background:linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0)); pointer-events:none;"></div>
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1.25rem; position:relative; z-index:1;">
+                <div>
+                    <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.14em; font-weight:700; color:rgba(255,255,255,0.78); margin-bottom:0.28rem;">Project Planning Guide</div>
+                    <div style="font-size:1.45rem; line-height:1.15; font-weight:800; color:#ffffff;">{page_title}</div>
+                    <div style="font-size:0.88rem; color:rgba(255,255,255,0.88); margin-top:0.35rem; max-width:62ch;">{subtitle}</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:0.75rem; flex-shrink:0;">{logo_html}</div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-top:0.95rem; position:relative; z-index:1;">
+                <div style="display:inline-flex; align-items:center; gap:0.45rem; background:rgba(196,232,29,0.18); border:1px solid rgba(196,232,29,0.38); color:#F6FFD1; padding:0.32rem 0.78rem; border-radius:999px; font-size:0.76rem; font-weight:600;">
+                    Workflow Navigation
+                </div>
+                <div style="font-size:0.76rem; color:rgba(255,255,255,0.72);">Chalmers University of Technology × Chalmers Next Labs</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.page_link(home_target, label="Home Page", icon="🏠")
