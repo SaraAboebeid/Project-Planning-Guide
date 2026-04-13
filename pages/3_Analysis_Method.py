@@ -26,6 +26,10 @@ st.markdown("""
 # Persistent step progress indicator
 render_step_indicator(3)
 
+is_plus_mode = st.session_state.get("pipeline_mode") == "step1plus"
+step1_page = "pages/0_Define_Project.py" if is_plus_mode else "pages/1_Define_Scope_and_Context.py"
+step2_page = "pages/2plus_Review_Data.py" if is_plus_mode else "pages/2_Review_Data.py"
+
 # ============================================================================
 # CHECK PREREQUISITES
 # ============================================================================
@@ -33,7 +37,7 @@ render_step_indicator(3)
 if "analysis_type" not in st.session_state or not st.session_state.analysis_type:
     st.warning("Please complete Step 1 first.")
     if st.button("Go to Step 1"):
-        st.switch_page("pages/1_Define_Scope_and_Context.py")
+        st.switch_page(step1_page)
     st.stop()
 
 # ============================================================================
@@ -65,14 +69,14 @@ data_inputs = get_data_inputs(
 if not data_inputs:
     st.warning("No data inputs found. Please complete Step 2 first.")
     if st.button("Back to Step 2"):
-        st.switch_page("pages/2_Review_Data.py")
+        st.switch_page(step2_page)
     st.stop()
 
 # Check whether Step 2 was actually visited
 if "step2_data_choices" not in st.session_state:
     st.warning("Please complete Step 2 first so your data availability is captured.")
     if st.button("Go to Step 2"):
-        st.switch_page("pages/2_Review_Data.py")
+        st.switch_page(step2_page)
     st.stop()
 
 # Reconstruct page_key (same logic as Page 2)
@@ -513,17 +517,21 @@ if missing_items:
 # ============================================================================
 
 st.markdown("---")
-col1, col2, col3 = st.columns([1, 1, 2])
+col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
 
 with col1:
-    if st.button("Back", use_container_width=True):
-        st.switch_page("pages/2_Review_Data.py")
+    if st.button("Home", use_container_width=True, key="s3_home"):
+        st.switch_page("planning_guide.py")
 
 with col2:
+    if st.button("Back", use_container_width=True):
+        st.switch_page(step2_page)
+
+with col3:
     if st.button("Continue", type="primary", use_container_width=True):
         st.switch_page("pages/4_Expected_Results.py")
 
-with col3:
+with col4:
     st.markdown(
         "<div style='text-align: right; color: #94a3b8; font-size: 0.85rem; padding-top: 0.5rem;'>"
         "Step 3 of 6</div>",

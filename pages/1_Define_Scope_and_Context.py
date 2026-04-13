@@ -6,7 +6,9 @@ building uses, and country context - matching the original wizard functionality.
 """
 
 import streamlit as st
+import pydeck as pdk
 from utils.shared_css import inject_shared_css, render_step_indicator
+from utils.location_data import geocode_address, get_nearby_epc_snapshot, has_location_database
 
 st.set_page_config(page_title="Define Scope", layout="wide")
 
@@ -295,6 +297,136 @@ with col_b:
         value=st.session_state.get("location", ""),
         placeholder="Enter location..."
     )
+
+# ============================================================================
+# LOCATION MAP & AVAILABLE DATA SNAPSHOT (DuckDB)
+# ============================================================================
+
+st.markdown("<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>Project Location Map</div>", unsafe_allow_html=True)
+
+if not has_location_database():
+    st.info("Location dataset not found: data/sensitivity/epc_sweden.duckdb")
+else:
+    st.caption("Search an address, place it on the map, and preview available nearby EPC data.")
+
+    col_map_a, col_map_b, col_map_c = st.columns([2, 1, 1])
+    with col_map_a:
+        location_query = st.text_input(
+            "Project address",
+            value=st.session_state.get("location", ""),
+            placeholder="Example: Johanneberg, Gothenburg",
+            key="project_location_query",
+        )
+    with col_map_b:
+        radius_m = st.slider(
+            "Search radius (m)",
+            min_value=300,
+            max_value=3000,
+            step=100,
+            value=int(st.session_state.get("location_radius_m", 800)),
+            key="location_radius_m",
+        )
+    with col_map_c:
+        st.markdown("<div style='height:1.65rem;'></div>", unsafe_allow_html=True)
+        locate_clicked = st.button("Locate & Load Data", use_container_width=True, key="locate_project_btn")
+
+    if locate_clicked:
+        if not location_query.strip():
+            st.warning("Please enter an address before locating on map.")
+        else:
+            try:
+                geocoded = geocode_address(location_query, st.session_state.get("country", "Sweden"))
+                if not geocoded:
+                    st.warning("No map location found for that address. Try a city + street format.")
+                else:
+                    st.session_state["location"] = location_query
+                    st.session_state["project_lat"] = geocoded["lat"]
+                    st.session_state["project_lon"] = geocoded["lon"]
+                    st.session_state["project_location_label"] = geocoded["display_name"]
+            except Exception as exc:
+                st.error(f"Could not geocode this address: {exc}")
+
+    if "project_lat" in st.session_state and "project_lon" in st.session_state:
+        lat = float(st.session_state["project_lat"])
+        lon = float(st.session_state["project_lon"])
+        label = st.session_state.get("project_location_label", "Selected location")
+
+        snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=radius_m)
+        summary = snapshot["summary"]
+        points_df = snapshot["points"]
+        classes_df = snapshot["classes"]
+        sample_df = snapshot["sample"]
+
+        st.session_state["location_data_summary"] = summary
+        st.session_state["location_classes"] = classes_df.to_dict("records")
+        st.session_state["location_sample"] = sample_df.to_dict("records")
+
+        st.markdown(
+            f"<div style='font-size:0.9rem; color:#475569; margin-top:0.4rem;'><b>Selected location:</b> {label}</div>",
+            unsafe_allow_html=True,
+        )
+
+        if not points_df.empty:
+            map_data = points_df[["lat", "lon"]].copy()
+            map_data["kind"] = "Nearby footprint"
+        else:
+            map_data = points_df
+
+        project_point = [{"lat": lat, "lon": lon, "kind": "Project location"}]
+
+        st.pydeck_chart(
+            pdk.Deck(
+                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                initial_view_state=pdk.ViewState(
+                    latitude=lat,
+                    longitude=lon,
+                    zoom=14,
+                    pitch=42,
+                ),
+                layers=[
+                    pdk.Layer(
+                        "ScatterplotLayer",
+                        data=map_data,
+                        get_position="[lon, lat]",
+                        get_radius=22,
+                        get_fill_color=[51, 169, 160, 135],
+                        pickable=True,
+                    ),
+                    pdk.Layer(
+                        "ScatterplotLayer",
+                        data=project_point,
+                        get_position="[lon, lat]",
+                        get_radius=70,
+                        get_fill_color=[196, 232, 29, 230],
+                        pickable=True,
+                    ),
+                ],
+                tooltip={"text": "{kind}"},
+            ),
+            use_container_width=True,
+        )
+        st.caption("If the basemap does not render on your network, the points and metrics below are still valid.")
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Nearby buildings", f"{summary['footprint_buildings']:,}")
+        m2.metric("EPC records", f"{summary['epc_records']:,}")
+        m3.metric("Has energy class", f"{summary['has_energy_class']:,}")
+        m4.metric("Has energy performance", f"{summary['has_energy_performance']:,}")
+
+        with st.expander("Preview local data found near this location"):
+            col_c1, col_c2 = st.columns([1, 1.4])
+            with col_c1:
+                st.markdown("**Energy class distribution (top values)**")
+                if classes_df.empty:
+                    st.caption("No EPC class records found in selected radius.")
+                else:
+                    st.dataframe(classes_df, use_container_width=True, hide_index=True)
+            with col_c2:
+                st.markdown("**Sample EPC records**")
+                if sample_df.empty:
+                    st.caption("No address-level EPC records found in selected radius.")
+                else:
+                    st.dataframe(sample_df, use_container_width=True, hide_index=True)
 
 # ============================================================================
 # NAVIGATION

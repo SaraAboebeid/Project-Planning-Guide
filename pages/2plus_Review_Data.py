@@ -9,6 +9,8 @@ and the appropriate sensitivity analysis.
 """
 
 import streamlit as st
+import folium
+from streamlit_folium import st_folium
 from config.step2plus_data_inputs import get_ec_data_inputs, get_re_data_inputs, get_renovation_data_inputs
 from config.sensitivity_config import (
     get_importance_rank, get_sensitivity_weight,
@@ -17,7 +19,13 @@ from config.sensitivity_config import (
     SOLAR_PV_MORRIS, SOLAR_PV_DESCRIPTIONS,
 )
 from config.data_inputs import get_proxy_confidence
-from utils.shared_css import inject_shared_css, render_step_indicator
+from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards
+from utils.location_data import (
+    has_location_database,
+    get_nearby_epc_snapshot,
+    get_epc_snapshot_for_bbox,
+    geocode_address,
+)
 
 st.set_page_config(page_title="Review Data (Step 2+)", layout="wide")
 inject_shared_css()
@@ -751,31 +759,291 @@ for it in all_items:
 avg_conf = round(sum(confs) / len(confs), 1) if confs else None
 avg_display = f"{avg_conf}%" if avg_conf else "N/A"
 
+render_top_cards([
+        {
+                "value": str(avail),
+                "label": "Available Data",
+                "color": "#33A9A0",
+                "bg": "rgba(51,169,160,0.10)",
+                "border": "rgba(51,169,160,0.25)",
+        },
+        {
+                "value": str(miss),
+                "label": "Missing Data",
+                "color": "#33528A",
+                "bg": "rgba(51,82,138,0.10)",
+                "border": "rgba(51,82,138,0.25)",
+        },
+        {
+                "value": avg_display,
+                "label": "Avg. Proxy Confidence",
+                "color": "#8AB62E",
+                "bg": "rgba(138,182,46,0.10)",
+                "border": "rgba(138,182,46,0.25)",
+        },
+])
+
 left_col, right_col = st.columns([0.65, 0.35])
 
 # ── Right: summary cards + SA button ────────────────────────────────
 with right_col:
-    st.markdown(
-        f"""
-        <div class='sticky-sidebar'>
-          <div class='pg-card-stack'>
-            <div class='pg-card' style='background:rgba(51,169,160,0.10); border:1px solid rgba(51,169,160,0.25);'>
-              <div class='pg-val' style='color:#33A9A0;'>{avail}</div>
-              <div class='pg-lbl'>Available Data</div>
-            </div>
-            <div class='pg-card' style='background:rgba(51,82,138,0.10); border:1px solid rgba(51,82,138,0.25);'>
-              <div class='pg-val' style='color:#33528A;'>{miss}</div>
-              <div class='pg-lbl'>Missing Data</div>
-            </div>
-            <div class='pg-card' style='background:rgba(138,182,46,0.10); border:1px solid rgba(138,182,46,0.25);'>
-              <div class='pg-val' style='color:#8AB62E;'>{avg_display}</div>
-              <div class='pg-lbl'>Avg. Proxy Confidence</div>
-            </div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown("<div style='height:0.25rem;'></div>", unsafe_allow_html=True)
+
+    # Location map + existing local data coverage (moved from Step 1+)
+    if has_location_database():
+        project_scale = st.session_state.get("project_scale", "")
+        sel = st.session_state.get("location_selection", {})
+        selection_mode = "Address + Radius"
+        if isinstance(sel, dict) and sel.get("mode") == "bbox":
+            selection_mode = "Draw Bounding Box"
+        elif isinstance(sel, dict) and sel.get("mode") == "address":
+            selection_mode = "Address + Radius"
+        else:
+            selection_mode = st.session_state.get("p1p_location_mode", "Address + Radius")
+        if project_scale == "Building":
+            selection_mode = "Address + Radius"
+        snapshot = None
+        location_label = st.session_state.get("project_location_label", st.session_state.get("location", "Selected location"))
+
+        if selection_mode == "Draw Bounding Box" and isinstance(sel, dict) and sel.get("bbox"):
+            b = sel["bbox"]
+            snapshot = get_epc_snapshot_for_bbox(
+                b["min_lat"], b["max_lat"], b["min_lon"], b["max_lon"], point_limit=1200
+            )
+            map_center_lat = (b["min_lat"] + b["max_lat"]) / 2
+            map_center_lon = (b["min_lon"] + b["max_lon"]) / 2
+            location_note = (
+                f"Bounding box · lat [{b['min_lat']:.5f}, {b['max_lat']:.5f}] · "
+                f"lon [{b['min_lon']:.5f}, {b['max_lon']:.5f}]"
+            )
+        elif selection_mode == "Draw Bounding Box" and st.session_state.get("project_bbox"):
+            b = st.session_state["project_bbox"]
+            snapshot = get_epc_snapshot_for_bbox(
+                b["min_lat"], b["max_lat"], b["min_lon"], b["max_lon"], point_limit=1200
+            )
+            map_center_lat = (b["min_lat"] + b["max_lat"]) / 2
+            map_center_lon = (b["min_lon"] + b["max_lon"]) / 2
+            location_note = (
+                f"Bounding box · lat [{b['min_lat']:.5f}, {b['max_lat']:.5f}] · "
+                f"lon [{b['min_lon']:.5f}, {b['max_lon']:.5f}]"
+            )
+        elif selection_mode == "Address + Radius" and isinstance(sel, dict) and sel.get("lat") is not None and sel.get("lon") is not None:
+            lat = float(sel["lat"])
+            lon = float(sel["lon"])
+            if project_scale == "Building":
+                snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=250, point_limit=300)
+                if not snapshot["points"].empty:
+                    nearest_df = snapshot["points"].sort_values("distance_m", ascending=True).head(1).copy()
+                    snapshot["points"] = nearest_df
+                    snapshot["sample"] = nearest_df[
+                        ["address", "post_town", "municipality", "energy_class", "energy_performance"]
+                    ].rename(
+                        columns={
+                            "address": "address",
+                            "post_town": "post_town",
+                            "municipality": "municipality",
+                            "energy_class": "energy_class",
+                            "energy_performance": "energy_performance",
+                        }
+                    )
+                    snapshot["classes"] = nearest_df[["energy_class"]].copy()
+                    snapshot["classes"]["energy_class"] = snapshot["classes"]["energy_class"].fillna("Unknown")
+                    snapshot["classes"]["records"] = 1
+                    has_epc = 1 if nearest_df["energy_performance"].notna().any() else 0
+                    has_class = 1 if nearest_df["energy_class"].notna().any() else 0
+                    snapshot["summary"] = {
+                        "footprint_points": 1,
+                        "footprint_buildings": 1,
+                        "epc_records": 1 if nearest_df["FormularId"].notna().any() else 0,
+                        "has_energy_class": has_class,
+                        "has_energy_performance": has_epc,
+                        "has_build_year": 1 if nearest_df["build_year"].notna().any() else 0,
+                        "has_atemp": 1 if nearest_df["atemp"].notna().any() else 0,
+                        "radius_m": 0,
+                    }
+                location_note = f"{location_label} · nearest building"
+            else:
+                radius = int(sel.get("radius_m", st.session_state.get("location_radius_m", 800)))
+                snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=radius, point_limit=1000)
+                location_note = f"{location_label} · radius {radius} m"
+            map_center_lat = lat
+            map_center_lon = lon
+        elif "project_lat" in st.session_state and "project_lon" in st.session_state:
+            lat = float(st.session_state["project_lat"])
+            lon = float(st.session_state["project_lon"])
+            if project_scale == "Building":
+                snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=250, point_limit=300)
+                if not snapshot["points"].empty:
+                    nearest_df = snapshot["points"].sort_values("distance_m", ascending=True).head(1).copy()
+                    snapshot["points"] = nearest_df
+                location_note = f"{location_label} · nearest building"
+            else:
+                radius = int(st.session_state.get("location_radius_m", 800))
+                snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=radius, point_limit=1000)
+                location_note = f"{location_label} · radius {radius} m"
+            map_center_lat = lat
+            map_center_lon = lon
+        else:
+            # Fallback: if user has an address but no saved coordinates, geocode now.
+            addr = (st.session_state.get("location") or "").strip()
+            if addr:
+                try:
+                    geocoded = geocode_address(addr, st.session_state.get("country", "Sweden"))
+                    if geocoded:
+                        lat = float(geocoded["lat"])
+                        lon = float(geocoded["lon"])
+                        st.session_state["project_lat"] = lat
+                        st.session_state["project_lon"] = lon
+                        st.session_state["project_location_label"] = geocoded.get("display_name", addr)
+
+                        if project_scale == "Building":
+                            snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=250, point_limit=300)
+                            if not snapshot["points"].empty:
+                                nearest_df = snapshot["points"].sort_values("distance_m", ascending=True).head(1).copy()
+                                snapshot["points"] = nearest_df
+                                snapshot["sample"] = nearest_df[
+                                    ["address", "post_town", "municipality", "energy_class", "energy_performance"]
+                                ]
+                                snapshot["classes"] = nearest_df[["energy_class"]].copy()
+                                snapshot["classes"]["energy_class"] = snapshot["classes"]["energy_class"].fillna("Unknown")
+                                snapshot["classes"]["records"] = 1
+                                has_epc = 1 if nearest_df["energy_performance"].notna().any() else 0
+                                has_class = 1 if nearest_df["energy_class"].notna().any() else 0
+                                snapshot["summary"] = {
+                                    "footprint_points": 1,
+                                    "footprint_buildings": 1,
+                                    "epc_records": 1 if nearest_df["FormularId"].notna().any() else 0,
+                                    "has_energy_class": has_class,
+                                    "has_energy_performance": has_epc,
+                                    "has_build_year": 1 if nearest_df["build_year"].notna().any() else 0,
+                                    "has_atemp": 1 if nearest_df["atemp"].notna().any() else 0,
+                                    "radius_m": 0,
+                                }
+                            location_note = f"{st.session_state.get('project_location_label', addr)} · nearest building"
+                        else:
+                            radius = int(st.session_state.get("location_radius_m", 800))
+                            snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=radius, point_limit=1000)
+                            location_note = f"{st.session_state.get('project_location_label', addr)} · radius {radius} m"
+
+                        map_center_lat = lat
+                        map_center_lon = lon
+                    else:
+                        map_center_lat = map_center_lon = None
+                        location_note = None
+                except Exception:
+                    map_center_lat = map_center_lon = None
+                    location_note = None
+            else:
+                map_center_lat = map_center_lon = None
+                location_note = None
+
+        if snapshot is not None and map_center_lat is not None and map_center_lon is not None:
+            points_df = snapshot["points"]
+            summary = snapshot["summary"]
+            classes_df = snapshot["classes"]
+            sample_df = snapshot["sample"]
+
+            st.markdown(
+                "<div style='font-size:0.9rem; font-weight:600; margin-top:0.8rem; margin-bottom:0.2rem;'>"
+                "Local Footprints & Existing Data</div>",
+                unsafe_allow_html=True,
+            )
+            st.caption(location_note)
+            if project_scale == "Building":
+                st.caption("Teal point is the nearest footprint centroid for the selected building address.")
+            else:
+                st.caption("Teal points are footprint centroids within your selected radius or bounding box.")
+
+            if not points_df.empty:
+                fmap = folium.Map(
+                    location=[map_center_lat, map_center_lon],
+                    zoom_start=13,
+                    tiles="CartoDB positron",
+                    control_scale=False,
+                    prefer_canvas=True,
+                )
+                for _, r in points_df.head(1200).iterrows():
+                    rid_raw = r.get("FormularId")
+                    try:
+                        rid_text = str(int(rid_raw))
+                    except (TypeError, ValueError):
+                        rid_text = "N/A"
+
+                    ep_raw = r.get("energy_performance")
+                    ep_text = "-" if ep_raw is None or str(ep_raw).lower() == "<na>" else str(ep_raw)
+
+                    popup = (
+                        f"FormularId: {rid_text}<br>"
+                        f"Address: {r.get('address') or '-'}<br>"
+                        f"Municipality: {r.get('municipality') or '-'}<br>"
+                        f"Energy class: {r.get('energy_class') or '-'}<br>"
+                        f"Energy performance: {ep_text}"
+                    )
+                    folium.CircleMarker(
+                        location=[float(r["lat"]), float(r["lon"])],
+                        radius=2,
+                        weight=1,
+                        color="#33A9A0",
+                        fill=True,
+                        fill_color="#33A9A0",
+                        fill_opacity=0.65,
+                        popup=folium.Popup(popup, max_width=320),
+                    ).add_to(fmap)
+                st_folium(fmap, width=None, height=300, key="s2p_location_points_map")
+
+            mc1, mc2 = st.columns(2)
+            mc1.metric("Buildings", f"{summary.get('footprint_buildings', 0):,}")
+            mc2.metric("EPC", f"{summary.get('epc_records', 0):,}")
+
+            st.session_state["location_data_summary"] = summary
+            st.session_state["location_classes"] = classes_df.to_dict("records")
+            st.session_state["location_sample"] = sample_df.to_dict("records")
+
+            # Building-level details (select from points currently plotted)
+            if not points_df.empty:
+                points_with_id = points_df.dropna(subset=["FormularId"]).copy()
+                if not points_with_id.empty:
+                    def _safe_id_text(v):
+                        try:
+                            return str(int(v))
+                        except (TypeError, ValueError):
+                            return "N/A"
+
+                    points_with_id["_label"] = points_with_id.apply(
+                        lambda r: (
+                            f"{_safe_id_text(r.get('FormularId'))}"
+                            + (f" · {r['address']}" if isinstance(r.get("address"), str) and r.get("address") else "")
+                        ),
+                        axis=1,
+                    )
+                    chosen = st.selectbox(
+                        "Select a mapped building",
+                        options=points_with_id["_label"].tolist()[:600],
+                        key="s2p_selected_building",
+                    )
+                    selected_row = points_with_id[points_with_id["_label"] == chosen].iloc[0]
+                    st.caption(
+                        f"Data available: energy class={selected_row.get('energy_class')}, "
+                        f"energy performance={selected_row.get('energy_performance')}, "
+                        f"build year={selected_row.get('build_year')}, atemp={selected_row.get('atemp')}"
+                    )
+
+            with st.expander("Preview local data found near this location"):
+                p1, p2 = st.columns([1, 1.4])
+                with p1:
+                    st.markdown("**Energy class distribution**")
+                    if classes_df.empty:
+                        st.caption("No EPC class records in selected area.")
+                    else:
+                        st.dataframe(classes_df, use_container_width=True, hide_index=True)
+                with p2:
+                    st.markdown("**Sample EPC records**")
+                    if sample_df.empty:
+                        st.caption("No sample EPC records in selected area.")
+                    else:
+                        st.dataframe(sample_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No mapped area found yet. In Step 1+, set an address (and click Locate) or draw a bounding box.")
 
     # SA button — only for RE Planning (we have data)
     if project_type == "Renewable Energy Planning":
@@ -791,8 +1059,6 @@ with right_col:
         if st.button("Sensitivity Analysis", key="sa2p_dialog_btn",
                       help="View solar OAT sensitivity results"):
             show_re_sensitivity()
-    elif project_type == "Energy Community Planning":
-        st.caption("Sensitivity analysis for Energy Community will be available soon.")
 
     # Legend
     st.markdown(
@@ -859,17 +1125,21 @@ st.session_state["step2_page_key"] = page_key
 # ============================================================================
 
 st.markdown("---")
-col1, col2, col3 = st.columns([1, 1, 2])
+col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
 
 with col1:
+    if st.button("Home", key="s2p_home"):
+        st.switch_page("planning_guide.py")
+
+with col2:
     if st.button("Back", key="s2p_back"):
         st.switch_page("pages/0_Define_Project.py")
 
-with col2:
+with col3:
     if st.button("Continue", type="primary", key="s2p_next"):
         st.switch_page("pages/3_Analysis_Method.py")
 
-with col3:
+with col4:
     st.markdown(
         "<div style='text-align:right; color:#94a3b8; font-size:0.85rem; "
         "padding-top:0.5rem;'>Step 2+ of 6</div>",

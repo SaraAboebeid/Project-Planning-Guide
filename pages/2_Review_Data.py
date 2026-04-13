@@ -253,6 +253,35 @@ if renewable_types:
 context_info += "</span>"
 st.markdown(context_info, unsafe_allow_html=True)
 
+location_summary = st.session_state.get("location_data_summary")
+if location_summary:
+    location_label = st.session_state.get("project_location_label", st.session_state.get("location", "Selected location"))
+    st.info(
+        f"Location snapshot for {location_label}: "
+        f"{location_summary.get('epc_records', 0):,} EPC records, "
+        f"{location_summary.get('has_energy_class', 0):,} with energy class, "
+        f"{location_summary.get('has_energy_performance', 0):,} with energy performance "
+        f"within {location_summary.get('radius_m', 0)} m."
+    )
+
+    with st.expander("View location-based data coverage details"):
+        classes_rows = st.session_state.get("location_classes", [])
+        sample_rows = st.session_state.get("location_sample", [])
+
+        col_l1, col_l2 = st.columns([1, 1.5])
+        with col_l1:
+            st.markdown("**Energy class distribution**")
+            if classes_rows:
+                st.dataframe(classes_rows, use_container_width=True, hide_index=True)
+            else:
+                st.caption("No energy class data available for the selected area.")
+        with col_l2:
+            st.markdown("**Sample nearby EPC records**")
+            if sample_rows:
+                st.dataframe(sample_rows, use_container_width=True, hide_index=True)
+            else:
+                st.caption("No nearby EPC sample rows available.")
+
 # ============================================================================
 # GET DATA INPUTS (must be before card row)
 # ============================================================================

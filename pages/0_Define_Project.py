@@ -7,6 +7,10 @@ then translates into the session-state keys Steps 2-6 expect.
 """
 
 import streamlit as st
+import pydeck as pdk
+import folium
+from folium.plugins import Draw
+from streamlit_folium import st_folium
 from config.project_types import (
     PROJECT_TYPES,
     PROJECT_TYPE_DESCRIPTIONS,
@@ -24,6 +28,12 @@ from config.project_types import (
 
 _APPROACH_NAMES = list(EXPLORATION_OPTIONS)
 from utils.shared_css import inject_shared_css, render_step_indicator
+from utils.location_data import (
+    geocode_address,
+    get_nearby_epc_snapshot,
+    get_epc_snapshot_for_bbox,
+    has_location_database,
+)
 
 st.set_page_config(page_title="Define Project", layout="wide")
 
@@ -430,7 +440,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-scale_options = ["Building", "Neighborhood", "City"]
+if project_type == "Energy Community Planning":
+    scale_options = ["Neighborhood", "City"]
+    if st.session_state.get("project_scale") == "Building":
+        st.session_state["project_scale"] = None
+else:
+    scale_options = ["Building", "Neighborhood", "City"]
 current_scale = st.session_state.get("project_scale")
 scale_index = (
     scale_options.index(current_scale) if current_scale in scale_options else None
@@ -441,7 +456,11 @@ project_scale = st.selectbox(
     options=scale_options,
     index=scale_index,
     placeholder="Choose option",
-    help="Select the geographic scope of your project",
+    help=(
+        "Energy Community Planning is available at Neighborhood or City scale"
+        if project_type == "Energy Community Planning"
+        else "Select the geographic scope of your project"
+    ),
     key="p1p_scale_select",
     label_visibility="collapsed",
 )
@@ -577,6 +596,187 @@ with col_b:
         placeholder="Enter location...",
         key="p1p_location",
     )
+
+# ============================================================================
+# PROJECT LOCATION MAP + DATA SNAPSHOT
+# ============================================================================
+
+st.markdown(
+    "<hr style='margin: 0.8rem 0 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>"
+    "Project Location Map</div>",
+    unsafe_allow_html=True,
+)
+
+if not has_location_database():
+    st.info("Location dataset not found: data/sensitivity/epc_sweden.duckdb")
+else:
+    st.caption("Select data area by address + radius, or draw a bounding box directly on the map.")
+
+    is_building_scale = (project_scale == "Building")
+    if is_building_scale:
+        selection_mode = "Address + Radius"
+        st.session_state["p1p_location_mode"] = selection_mode
+        st.caption("Building scale uses a single address (nearest building). Radius and bounding box are disabled.")
+    else:
+        selection_mode = st.radio(
+            "Selection mode",
+            options=["Address + Radius", "Draw Bounding Box"],
+            horizontal=True,
+            key="p1p_location_mode",
+        )
+
+    if selection_mode == "Address + Radius":
+        col_map_a, col_map_b, col_map_c = st.columns([2, 1, 1])
+        with col_map_a:
+            location_query = st.text_input(
+                "Project address",
+                value=st.session_state.get("location", ""),
+                placeholder="Example: Johanneberg, Gothenburg",
+                key="p1p_project_location_query",
+            )
+        with col_map_b:
+            if is_building_scale:
+                st.markdown("<div style='height:1.2rem;'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:0.85rem;color:#64748b;'>Single building mode</div>", unsafe_allow_html=True)
+                st.session_state["location_radius_m"] = 80
+            else:
+                radius_m = st.slider(
+                    "Search radius (m)",
+                    min_value=300,
+                    max_value=3000,
+                    step=100,
+                    value=int(st.session_state.get("location_radius_m", 800)),
+                    key="p1p_location_radius_m",
+                )
+                st.session_state["location_radius_m"] = radius_m
+        with col_map_c:
+            st.markdown("<div style='height:1.65rem;'></div>", unsafe_allow_html=True)
+            locate_clicked = st.button("Locate & Load Data", use_container_width=True, key="p1p_locate_project_btn")
+
+        if locate_clicked:
+            if not location_query.strip():
+                st.warning("Please enter an address before locating on map.")
+            else:
+                try:
+                    geocoded = geocode_address(location_query, st.session_state.get("country", "Sweden"))
+                    if not geocoded:
+                        st.warning("No map location found for that address. Try a city + street format.")
+                    else:
+                        st.session_state["location"] = location_query
+                        st.session_state["project_lat"] = geocoded["lat"]
+                        st.session_state["project_lon"] = geocoded["lon"]
+                        st.session_state["project_location_label"] = geocoded["display_name"]
+                        st.session_state["location_selection"] = {
+                            "mode": "address",
+                            "query": location_query,
+                            "label": geocoded["display_name"],
+                            "lat": float(geocoded["lat"]),
+                            "lon": float(geocoded["lon"]),
+                            "radius_m": 80 if is_building_scale else int(st.session_state.get("location_radius_m", 800)),
+                        }
+                except Exception as exc:
+                    st.error(f"Could not geocode this address: {exc}")
+
+        if "project_lat" in st.session_state and "project_lon" in st.session_state:
+            lat = float(st.session_state["project_lat"])
+            lon = float(st.session_state["project_lon"])
+            if st.session_state.get("location_selection", {}).get("mode") != "address":
+                st.session_state["location_selection"] = {
+                    "mode": "address",
+                    "query": st.session_state.get("location", ""),
+                    "label": st.session_state.get("project_location_label", "Selected location"),
+                    "lat": lat,
+                    "lon": lon,
+                    "radius_m": 80 if is_building_scale else int(st.session_state.get("location_radius_m", 800)),
+                }
+            st.markdown(
+                f"<div style='font-size:0.9rem; color:#475569; margin-top:0.4rem;'><b>Selected location:</b> "
+                f"{st.session_state.get('project_location_label', 'Selected location')}</div>",
+                unsafe_allow_html=True,
+            )
+            project_point = [{"lat": lat, "lon": lon, "kind": "Project location"}]
+
+            st.pydeck_chart(
+                pdk.Deck(
+                    map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                    initial_view_state=pdk.ViewState(latitude=lat, longitude=lon, zoom=14, pitch=42),
+                    layers=[
+                        pdk.Layer(
+                            "ScatterplotLayer",
+                            data=project_point,
+                            get_position="[lon, lat]",
+                            get_radius=70,
+                            get_fill_color=[196, 232, 29, 230],
+                            pickable=True,
+                        ),
+                    ],
+                    tooltip={"text": "{kind}"},
+                ),
+                use_container_width=True,
+            )
+            if is_building_scale:
+                st.caption("Single building address selected. The nearest building footprint and data are shown in Step 2+.")
+            else:
+                st.caption("Project marker shown here. Footprints and local EPC preview are shown in Step 2+.")
+
+    else:
+        st.caption("Draw a rectangle and use its extent as the project area.")
+        default_lat = float(st.session_state.get("project_lat", 57.7089))
+        default_lon = float(st.session_state.get("project_lon", 11.9746))
+
+        draw_map = folium.Map(location=[default_lat, default_lon], zoom_start=12, tiles="CartoDB positron")
+        Draw(
+            export=False,
+            draw_options={
+                "polyline": False,
+                "polygon": False,
+                "circle": False,
+                "marker": False,
+                "circlemarker": False,
+                "rectangle": True,
+            },
+            edit_options={"edit": False, "remove": True},
+        ).add_to(draw_map)
+
+        draw_result = st_folium(draw_map, width=None, height=420, key="p1p_bbox_draw_map")
+
+        last_geom = (draw_result or {}).get("last_active_drawing")
+        if not last_geom:
+            all_drawings = (draw_result or {}).get("all_drawings") or []
+            if all_drawings:
+                last_geom = all_drawings[-1]
+        if last_geom and last_geom.get("geometry", {}).get("type") == "Polygon":
+            coords = last_geom["geometry"]["coordinates"][0]
+            lons = [c[0] for c in coords]
+            lats = [c[1] for c in coords]
+            if lats and lons:
+                bbox = {
+                    "min_lat": min(lats),
+                    "max_lat": max(lats),
+                    "min_lon": min(lons),
+                    "max_lon": max(lons),
+                }
+                st.session_state["project_bbox"] = bbox
+                st.session_state["location_selection"] = {
+                    "mode": "bbox",
+                    "bbox": {
+                        "min_lat": float(bbox["min_lat"]),
+                        "max_lat": float(bbox["max_lat"]),
+                        "min_lon": float(bbox["min_lon"]),
+                        "max_lon": float(bbox["max_lon"]),
+                    },
+                }
+
+        if st.session_state.get("project_bbox"):
+            b = st.session_state["project_bbox"]
+            st.caption(
+                f"Using bounding box: lat [{b['min_lat']:.5f}, {b['max_lat']:.5f}] · "
+                f"lon [{b['min_lon']:.5f}, {b['max_lon']:.5f}]"
+            )
 
 # ============================================================================
 # NAVIGATION

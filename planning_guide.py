@@ -1776,6 +1776,7 @@ st.markdown("""
         animation-delay: 0.1s;
         opacity: 0;
     }
+
     
     .intro-container.exiting {
         animation: fadeOut 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;

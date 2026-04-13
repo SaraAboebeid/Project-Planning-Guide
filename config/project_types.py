@@ -133,20 +133,20 @@ KPIS_BY_PROJECT_TYPE = {
     "Energy Community Planning": [
         "Self-sufficiency",
         "Peak Load",
-        "Global Warming Potential",
+        "Climate Impacts",
         "Cost",
         "Return on Investment",
     ],
     "Renovation Planning": [
         "Cost",
         "Thermal Comfort",
-        "Global Warming Potential",
+        "Climate Impacts",
         "Energy Demand",
         "Return on Investment",
     ],
     "Renewable Energy Planning": [
         "Self-Sufficiency",
-        "Global Warming Potential",
+        "Climate Impacts",
         "Energy Import",
         "Peak Load",
         "Thermal Comfort",
