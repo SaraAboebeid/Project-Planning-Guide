@@ -55,13 +55,33 @@ st.markdown("""
 <style>
     [data-testid="stSidebarNav"] {display: none;}
     section[data-testid="stSidebar"] {display: none;}
+
+    /* Page background */
+    .stApp { background: #f8fafc !important; }
+
     /* Compact spacing inside expanders */
     .s2p-item { margin-bottom: 0.15rem; padding-bottom: 0.15rem;
                 border-bottom: 1px solid #f1f5f9; }
     .s2p-item:last-child { border-bottom: none; }
-    .s2p-subhdr { font-size: 0.82rem; font-weight: 600; color: #475569;
-                   margin: 0.5rem 0 0.2rem 0; text-transform: uppercase;
-                   letter-spacing: 0.04em; }
+    .s2p-subhdr { font-family: 'Inter', sans-serif; font-size: 0.78rem;
+                   font-weight: 700; color: #334155;
+                   margin: 0.6rem 0 0.25rem 0; text-transform: uppercase;
+                   letter-spacing: 0.06em; }
+
+    /* SA banner card style */
+    .sa-banner {
+        border-radius: 16px;
+        padding: 1.1rem 1.4rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 0.8rem 0;
+        border: 1px solid;
+        transition: box-shadow 0.2s ease;
+    }
+    .sa-banner:hover {
+        box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -101,14 +121,45 @@ render_branded_top_bar(
 )
 render_step_indicator(2)
 
-# Context bar
-_ctx = f"<span style='font-size:0.88rem; color:#475569;'><b>Project Type:</b> {project_type}"
-if project_type == "Energy Community Planning":
-    _ctx += f" | <b>Focus:</b> {ec_focus}"
-_ctx += f" | <b>Systems:</b> {', '.join(systems)}"
+# Context bar — styled card with pill chips
+_chips = []
+_chips.append(
+    f"<span style='display:inline-flex; align-items:center; gap:0.3rem; "
+    f"background:rgba(51,82,138,0.08); border:1px solid rgba(51,82,138,0.15); "
+    f"color:#33528A; padding:0.25rem 0.75rem; border-radius:999px; "
+    f"font-size:0.78rem; font-weight:600; font-family:Inter,sans-serif;'>"
+    f"📋 {project_type}</span>"
+)
+if project_type == "Energy Community Planning" and ec_focus:
+    _chips.append(
+        f"<span style='display:inline-flex; align-items:center; gap:0.3rem; "
+        f"background:rgba(51,169,160,0.08); border:1px solid rgba(51,169,160,0.15); "
+        f"color:#115e59; padding:0.25rem 0.75rem; border-radius:999px; "
+        f"font-size:0.78rem; font-weight:600; font-family:Inter,sans-serif;'>"
+        f"🎯 {', '.join(ec_focus) if isinstance(ec_focus, list) else ec_focus}</span>"
+    )
+if systems:
+    _chips.append(
+        f"<span style='display:inline-flex; align-items:center; gap:0.3rem; "
+        f"background:rgba(196,232,29,0.10); border:1px solid rgba(196,232,29,0.22); "
+        f"color:#597001; padding:0.25rem 0.75rem; border-radius:999px; "
+        f"font-size:0.78rem; font-weight:600; font-family:Inter,sans-serif;'>"
+        f"⚙️ {len(systems)} system{'s' if len(systems) != 1 else ''}</span>"
+    )
 if country:
-    _ctx += f" | <b>Context:</b> {country}"
-_ctx += "</span>"
+    _chips.append(
+        f"<span style='display:inline-flex; align-items:center; gap:0.3rem; "
+        f"background:#f1f5f9; border:1px solid #e2e8f0; "
+        f"color:#334155; padding:0.25rem 0.75rem; border-radius:999px; "
+        f"font-size:0.78rem; font-weight:600; font-family:Inter,sans-serif;'>"
+        f"📍 {country}</span>"
+    )
+_ctx = (
+    f"<div style='display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; "
+    f"padding:0.7rem 1rem; background:#ffffff; border:1px solid #e2e8f0; "
+    f"border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.03); margin-bottom:0.5rem;'>"
+    f"{''.join(_chips)}</div>"
+)
 st.markdown(_ctx, unsafe_allow_html=True)
 
 # ============================================================================
@@ -796,20 +847,16 @@ def show_renovation_sensitivity():
         "<div style='font-size:0.7rem; color:#64748b; margin-top:2px;'>{l}</div>"
         "</div>"
     )
-    rc1, rc2, rc3, rc4 = st.columns(4)
+    rc1, rc2, rc3 = st.columns(3)
     rc1.markdown(_rcard.format(
-        bg="rgba(51,169,160,0.08)", bd="rgba(51,169,160,0.2)",
-        c=TEAL, v=f"{baseline/1000:.0f} MWh", l="Baseline Annual Heating",
-    ), unsafe_allow_html=True)
-    rc2.markdown(_rcard.format(
         bg="rgba(51,82,138,0.08)", bd="rgba(51,82,138,0.2)",
         c=NAVY, v=f"±{reno_swings[0][4]:.0f}%", l=f"Top: {reno_swings[0][1]}",
     ), unsafe_allow_html=True)
-    rc3.markdown(_rcard.format(
+    rc2.markdown(_rcard.format(
         bg="rgba(255,107,107,0.08)", bd="rgba(255,107,107,0.2)",
         c=CORAL, v=f"{len(reno_swings)}", l="Parameters Tested",
     ), unsafe_allow_html=True)
-    rc4.markdown(_rcard.format(
+    rc3.markdown(_rcard.format(
         bg="rgba(138,182,46,0.08)", bd="rgba(138,182,46,0.2)",
         c=LIME, v=rtop3[0], l="Most Critical Parameter",
     ), unsafe_allow_html=True)

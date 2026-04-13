@@ -45,6 +45,47 @@ st.markdown("""
 <style>
     [data-testid="stSidebarNav"] {display: none;}
     section[data-testid="stSidebar"] {display: none;}
+
+    /* Page-level polish for Step 1+ */
+    .stApp {
+        background: #f8fafc !important;
+    }
+    .block-container {
+        max-width: 900px;
+        padding: 1rem 2rem 3rem 2rem;
+    }
+
+    /* Section labels */
+    .section-label {
+        font-family: 'Inter', -apple-system, sans-serif;
+        font-size: 0.98rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 0.25rem;
+        letter-spacing: -0.005em;
+    }
+    .section-label span { color: #dc2626; }
+
+    /* Refined dividers */
+    .section-divider {
+        margin: 1rem 0 1.2rem 0;
+        border: none;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    /* Subtle card wrapper for form groups */
+    .form-section {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 1.4rem 1.5rem;
+        margin-bottom: 1.2rem;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+        transition: border-color 0.2s ease;
+    }
+    .form-section:hover {
+        border-color: rgba(51,169,160,0.2);
+    }
 </style>
 """, unsafe_allow_html=True)
 
