@@ -369,4 +369,4 @@ def render_branded_top_bar(page_title: str, subtitle: str = "", home_target: str
         """,
         unsafe_allow_html=True,
     )
-    st.page_link(home_target, label="Home Page", icon="🏠")
+    st.page_link(home_target, label="Home Page")

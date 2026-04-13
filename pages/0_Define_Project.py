@@ -48,12 +48,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Persistent step progress indicator
-render_step_indicator(1)
+# Branded top bar + persistent step progress indicator
 render_branded_top_bar(
     "Step 1+: Define Project",
     "Select your project type, systems in scope, KPIs, and project context using the Chalmers decision-support workflow.",
 )
+render_step_indicator(1)
 
 # ============================================================================
 # PROJECT TYPE
@@ -629,6 +629,9 @@ else:
                 placeholder="Example: Johanneberg, Gothenburg",
                 key="p1p_project_location_query",
             )
+            # Keep the canonical location field in sync with what the user types,
+            # so Step 2+ can transition smoothly even before pressing Locate.
+            st.session_state["location"] = location_query
         with col_map_b:
             if is_building_scale:
                 st.markdown("<div style='height:1.2rem;'></div>", unsafe_allow_html=True)

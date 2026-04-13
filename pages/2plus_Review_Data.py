@@ -17,6 +17,7 @@ from config.sensitivity_config import (
     SOLAR_PV_BASELINE, SOLAR_PV_LABELS, SOLAR_PV_OAT_ANNUAL,
     SOLAR_PV_OAT_WINTER, SOLAR_PV_OAT_SPECIFIC_YIELD,
     SOLAR_PV_MORRIS, SOLAR_PV_DESCRIPTIONS,
+    OAT_PARAMETERS, BASELINE_HEATING_KWH,
 )
 from config.data_inputs import get_proxy_confidence
 from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards, render_branded_top_bar
@@ -64,8 +65,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-render_step_indicator(2)
-
 # ============================================================================
 # PREREQUISITES
 # ============================================================================
@@ -100,6 +99,7 @@ render_branded_top_bar(
     "Step 2+: Review Data Inputs",
     "Review required data inputs, inspect linked EPC buildings, and assess local data coverage with a building-level passport.",
 )
+render_step_indicator(2)
 
 # Context bar
 _ctx = f"<span style='font-size:0.88rem; color:#475569;'><b>Project Type:</b> {project_type}"
@@ -205,8 +205,7 @@ def _render_item(item, analysis_type_str=None):
     st.markdown(
         f"<div style='margin-bottom:2px;'>"
         f"<span style='font-weight:600; font-size:0.92rem;'>{item_label}</span>{badge}"
-        f"<span style='font-size:0.78rem; color:#94a3b8; margin-left:8px;'>"
-        f"{recommended_source}</span></div>",
+        f"</div>",
         unsafe_allow_html=True,
     )
 
@@ -437,7 +436,7 @@ def show_re_sensitivity():
             legend=dict(orientation="h", y=-0.12, x=0.5, xanchor="center",
                         font=dict(size=10)),
         )
-        st.plotly_chart(fig, key="re_butterfly", width="stretch")
+        st.plotly_chart(fig, key="re_butterfly", use_container_width=True)
 
         # Insight callout
         st.info(
@@ -540,7 +539,7 @@ def show_re_sensitivity():
             plot_bgcolor=BG, paper_bgcolor=BG,
             showlegend=False,
         )
-        st.plotly_chart(fig, key="re_morris", width="stretch")
+        st.plotly_chart(fig, key="re_morris", use_container_width=True)
 
         st.caption(
             "**How to read:** Large bubbles in the upper-right need the most care — "
@@ -605,7 +604,7 @@ def show_re_sensitivity():
             legend=dict(orientation="h", y=-0.12, x=0.5, xanchor="center",
                         font=dict(size=10)),
         )
-        st.plotly_chart(fig, key="re_seasonal", width="stretch")
+        st.plotly_chart(fig, key="re_seasonal", use_container_width=True)
 
         # Highlight biggest seasonal difference
         biggest_diff = max(combined, key=lambda x: abs(x[2] - x[1]))
@@ -655,7 +654,7 @@ def show_re_sensitivity():
             plot_bgcolor=BG, paper_bgcolor=BG,
         )
         fig.update_xaxes(tickangle=-35)
-        st.plotly_chart(fig, key="re_waterfall_pv", width="stretch")
+        st.plotly_chart(fig, key="re_waterfall_pv", use_container_width=True)
 
         top3_total = sum(v[2] for _, v in sorted_annual[:3])
         all_total  = sum(v[2] for _, v in sorted_annual)
@@ -744,6 +743,407 @@ def show_re_sensitivity():
 # ============================================================================
 # TWO-COLUMN LAYOUT
 # ============================================================================
+@st.dialog("Sensitivity Analysis — Heating & Renovation", width="large")
+def show_renovation_sensitivity():
+    """OAT sensitivity analysis for Renovation Planning (heating/cooling focus)."""
+    import plotly.graph_objects as go
+
+    st.markdown(
+        "<style>"
+        "div[data-testid='stDialog'] section[data-testid='stVerticalBlockBorderWrapper'] "
+        "{overflow-y:auto !important; max-height:82vh !important;}"
+        "</style>",
+        unsafe_allow_html=True,
+    )
+
+    TEAL  = "#33A9A0"
+    NAVY  = "#33528A"
+    LIME  = "#8AB62E"
+    CORAL = "#FF6B6B"
+    GREEN = "#22C55E"
+    BG    = "rgba(0,0,0,0)"
+    GRID  = "rgba(0,0,0,0.06)"
+
+    baseline = BASELINE_HEATING_KWH
+
+    reno_swings = []
+    for p_key, p_data in OAT_PARAMETERS.items():
+        outputs = p_data["outputs_kwh"]
+        if not outputs:
+            continue
+        min_out = min(outputs)
+        max_out = max(outputs)
+        delta_low  = round((min_out - baseline) / baseline * 100, 2)
+        delta_high = round((max_out - baseline) / baseline * 100, 2)
+        max_swing  = max(abs(delta_low), abs(delta_high))
+        if max_swing > 0.1:
+            reno_swings.append((p_key, p_data["label"], delta_low, delta_high, max_swing))
+    reno_swings.sort(key=lambda x: x[4], reverse=True)
+    rtop3 = [s[1] for s in reno_swings[:3]]
+
+    st.markdown(
+        "<p style='color:#64748b; font-size:0.86rem; margin-bottom:0.2rem;'>"
+        "Results from One-At-a-Time (OAT) analysis on a reference building energy model "
+        "(Swedish climate, heating focus). Shows which building parameters most affect "
+        "annual heating demand and therefore renovation priorities.</p>",
+        unsafe_allow_html=True,
+    )
+
+    _rcard = (
+        "<div style='background:{bg}; border-radius:10px; padding:10px 12px; "
+        "text-align:center; border:1px solid {bd};'>"
+        "<div style='font-size:1.25rem; font-weight:700; color:{c};'>{v}</div>"
+        "<div style='font-size:0.7rem; color:#64748b; margin-top:2px;'>{l}</div>"
+        "</div>"
+    )
+    rc1, rc2, rc3, rc4 = st.columns(4)
+    rc1.markdown(_rcard.format(
+        bg="rgba(51,169,160,0.08)", bd="rgba(51,169,160,0.2)",
+        c=TEAL, v=f"{baseline/1000:.0f} MWh", l="Baseline Annual Heating",
+    ), unsafe_allow_html=True)
+    rc2.markdown(_rcard.format(
+        bg="rgba(51,82,138,0.08)", bd="rgba(51,82,138,0.2)",
+        c=NAVY, v=f"±{reno_swings[0][4]:.0f}%", l=f"Top: {reno_swings[0][1]}",
+    ), unsafe_allow_html=True)
+    rc3.markdown(_rcard.format(
+        bg="rgba(255,107,107,0.08)", bd="rgba(255,107,107,0.2)",
+        c=CORAL, v=f"{len(reno_swings)}", l="Parameters Tested",
+    ), unsafe_allow_html=True)
+    rc4.markdown(_rcard.format(
+        bg="rgba(138,182,46,0.08)", bd="rgba(138,182,46,0.2)",
+        c=LIME, v=rtop3[0], l="Most Critical Parameter",
+    ), unsafe_allow_html=True)
+
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+    rtab1, rtab2, rtab3 = st.tabs(["Impact Butterfly", "Parameter Ranking", "Stakeholder Guide"])
+
+    with rtab1:
+        st.info(
+            "**Impact Butterfly (OAT):** Each parameter varied one-at-a-time from its low to high bound "
+            "while all others stay at baseline. Bars to the *left* show heating demand *decrease* "
+            "(beneficial for renovation). Bars to the *right* show heating demand *increase*. "
+            "Long bars = high impact on energy performance.",
+            icon="ℹ️",
+        )
+        ry_labels  = [s[1] for s in reversed(reno_swings)]
+        rlow_vals  = [s[2] for s in reversed(reno_swings)]
+        rhigh_vals = [s[3] for s in reversed(reno_swings)]
+
+        rfig = go.Figure()
+        rfig.add_trace(go.Bar(
+            y=ry_labels, x=rlow_vals, orientation="h",
+            name="Low → Baseline",
+            marker=dict(color=[GREEN if v < 0 else CORAL for v in rlow_vals], line=dict(width=0)),
+            hovertemplate="<b>%{y}</b><br>Low scenario: %{x:+.1f}%<extra></extra>",
+            text=[f"{v:+.1f}%" for v in rlow_vals],
+            textposition="outside", textfont=dict(size=9),
+        ))
+        rfig.add_trace(go.Bar(
+            y=ry_labels, x=rhigh_vals, orientation="h",
+            name="Baseline → High",
+            marker=dict(color=[CORAL if v > 0 else GREEN for v in rhigh_vals], line=dict(width=0)),
+            hovertemplate="<b>%{y}</b><br>High scenario: %{x:+.1f}%<extra></extra>",
+            text=[f"{v:+.1f}%" for v in rhigh_vals],
+            textposition="outside", textfont=dict(size=9),
+        ))
+        rfig.add_vline(x=0, line=dict(color="#475569", width=1.5))
+        rfig.update_layout(
+            title=dict(text="OAT Butterfly — Annual Heating Demand (% change from baseline)",
+                       font=dict(size=13, color="#1a1a2e")),
+            xaxis=dict(title="Change in Annual Heating Demand (%)", gridcolor=GRID, zeroline=False),
+            yaxis=dict(title=""),
+            barmode="overlay",
+            height=max(400, 38 * len(reno_swings)),
+            margin=dict(l=10, r=80, t=50, b=40),
+            plot_bgcolor=BG, paper_bgcolor=BG,
+            showlegend=True,
+            legend=dict(orientation="h", y=-0.12, x=0.5, xanchor="center", font=dict(size=10)),
+        )
+        st.plotly_chart(rfig, key="reno_butterfly", use_container_width=True)
+        st.info(
+            f"🦋 **Key insight:** *{rtop3[0]}* has the largest impact on heating demand. "
+            f"Improving this parameter alone can reduce heating by up to "
+            f"**{abs(reno_swings[0][2]):.0f}%**. Prioritise accurate data for the top-ranked "
+            f"parameters before finalising the renovation plan."
+        )
+
+    with rtab2:
+        st.info(
+            "**Parameter Ranking:** Sorted by maximum absolute swing in annual heating demand. "
+            "High-ranking parameters should be prioritised for data collection and renovation investment.",
+            icon="ℹ️",
+        )
+        r_rank = 0
+        for p_key, lbl, d_low, d_high, swing in reno_swings:
+            r_rank += 1
+            if swing >= 30:
+                tbg = "rgba(255,107,107,0.07)"; tbd = "rgba(255,107,107,0.25)"
+                tc = "#FF6B6B"; r_icon = "🔴"; tier = "High"
+            elif swing >= 10:
+                tbg = "rgba(51,82,138,0.07)"; tbd = "rgba(51,82,138,0.25)"
+                tc = "#33528A"; r_icon = "🔵"; tier = "Moderate"
+            else:
+                tbg = "rgba(148,163,184,0.07)"; tbd = "rgba(148,163,184,0.25)"
+                tc = "#94a3b8"; r_icon = "⚪"; tier = "Low"
+            dir_note = f"↓{abs(d_low):.1f}% / ↑{d_high:.1f}%" if d_low < 0 and d_high > 0 else f"range: {d_low:+.1f}% to {d_high:+.1f}%"
+            st.markdown(
+                f"<div style='background:{tbg}; border:1px solid {tbd}; "
+                f"border-radius:10px; padding:11px 15px; margin-bottom:7px;'>"
+                f"<div style='display:flex; justify-content:space-between; align-items:center;'>"
+                f"<span style='font-weight:600; font-size:0.93rem; color:#1e293b;'>#{r_rank}  {lbl}</span>"
+                f"<span style='background:{tbg}; border:1px solid {tbd}; border-radius:16px; "
+                f"padding:2px 10px; font-size:0.72rem; color:{tc}; font-weight:600;'>"
+                f"{r_icon} {tier}  ·  {dir_note}</span>"
+                f"</div></div>",
+                unsafe_allow_html=True,
+            )
+
+    with rtab3:
+        st.markdown("**🏗️ Which parameters matter most for your renovation?**")
+        _reno_guide = [
+            ("Infiltration Rate", "🔴 High", "#FF6B6B",
+             "Air leakage through the building envelope is often the largest driver of heating loss. "
+             "Prioritise airtightness testing (blower door) before and after renovation."),
+            ("Construction Quality", "🔴 High", "#FF6B6B",
+             "Wall, roof and floor insulation package determines baseline heat loss. "
+             "Upgrading poorly insulated envelopes delivers the largest heating reductions."),
+            ("Heating Setpoint", "🔴 High", "#FF6B6B",
+             "Every degree of setpoint reduction cuts heating by roughly 10–15%. "
+             "Smart controls and occupant behaviour can be as impactful as physical renovation."),
+            ("Roof Shape & Pitch", "🔴 High", "#FF6B6B",
+             "Roof geometry affects heat loss area and solar gain / PV potential. "
+             "Document accurately from surveys or laser scan."),
+            ("Number of Floors", "🟡 Moderate", "#8AB62E",
+             "Building volume and surface-to-volume ratio scale with floor count. "
+             "Correct floor count from EPC or site survey improves model accuracy significantly."),
+            ("Building Footprint", "🟡 Moderate", "#8AB62E",
+             "Length and width affect total external wall area. Use GIS or architectural drawings."),
+            ("Window-to-Wall Ratio", "🟡 Moderate", "#8AB62E",
+             "Glazing area is a key heat loss pathway and solar gain source. "
+             "Minimise north-facing glazing; south-facing can be beneficial."),
+            ("Glazing Quality", "🔵 Low–Medium", "#33528A",
+             "Window U-value and g-value. Triple glazing has diminishing returns beyond a point. "
+             "Prioritise frame air-sealing before expensive glazing upgrades."),
+        ]
+        for rg_name, rg_tier, rg_color, rg_desc in _reno_guide:
+            st.markdown(
+                f"<div style='background:rgba(0,0,0,0.02); border-left:3px solid {rg_color}; "
+                f"padding:10px 14px; margin-bottom:8px; border-radius:0 8px 8px 0;'>"
+                f"<b>{rg_name}</b> <span style='color:{rg_color}; font-size:0.78rem; font-weight:600;'>{rg_tier}</span>"
+                f"<div style='font-size:0.82rem; color:#475569; margin-top:4px;'>{rg_desc}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+        st.markdown(
+            "<hr style='margin:14px 0; border:none; border-top:1px solid #e2e8f0;'>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "**🔑 Key take-away:** "
+            f"The top 3 parameters — **{rtop3[0]}**, **{rtop3[1]}**, "
+            f"and **{rtop3[2]}** — dominate heating demand uncertainty. "
+            "Get accurate data for these first. Parameters ranked *Low* "
+            "can safely use proxy estimates without significantly affecting the result."
+        )
+
+
+@st.dialog("Sensitivity Analysis — Energy Community", width="large")
+def show_ec_sensitivity():
+    """OAT sensitivity for Energy Community Planning — building energy baseline."""
+    import plotly.graph_objects as go
+
+    st.markdown(
+        "<style>"
+        "div[data-testid='stDialog'] section[data-testid='stVerticalBlockBorderWrapper'] "
+        "{overflow-y:auto !important; max-height:82vh !important;}"
+        "</style>",
+        unsafe_allow_html=True,
+    )
+
+    TEAL  = "#33A9A0"
+    NAVY  = "#33528A"
+    LIME  = "#8AB62E"
+    CORAL = "#FF6B6B"
+    GREEN = "#22C55E"
+    BG    = "rgba(0,0,0,0)"
+    GRID  = "rgba(0,0,0,0.06)"
+
+    baseline = BASELINE_HEATING_KWH
+
+    ec_swings = []
+    for p_key, p_data in OAT_PARAMETERS.items():
+        outputs = p_data["outputs_kwh"]
+        if not outputs:
+            continue
+        min_out = min(outputs)
+        max_out = max(outputs)
+        delta_low  = round((min_out - baseline) / baseline * 100, 2)
+        delta_high = round((max_out - baseline) / baseline * 100, 2)
+        max_swing  = max(abs(delta_low), abs(delta_high))
+        if max_swing > 0.1:
+            ec_swings.append((p_key, p_data["label"], delta_low, delta_high, max_swing))
+    ec_swings.sort(key=lambda x: x[4], reverse=True)
+    etop3 = [s[1] for s in ec_swings[:3]]
+
+    st.markdown(
+        "<p style='color:#64748b; font-size:0.86rem; margin-bottom:0.2rem;'>"
+        "Results from OAT analysis on a reference community building (Swedish climate). "
+        "In an energy community, individual building parameters drive collective demand, "
+        "self-consumption and sharing potential. Understanding which parameters matter most "
+        "helps prioritise data collection across all community members.</p>",
+        unsafe_allow_html=True,
+    )
+
+    _ecard = (
+        "<div style='background:{bg}; border-radius:10px; padding:10px 12px; "
+        "text-align:center; border:1px solid {bd};'>"
+        "<div style='font-size:1.25rem; font-weight:700; color:{c};'>{v}</div>"
+        "<div style='font-size:0.7rem; color:#64748b; margin-top:2px;'>{l}</div>"
+        "</div>"
+    )
+    ec2, ec3, ec4 = st.columns(3)
+    ec2.markdown(_ecard.format(
+        bg="rgba(51,82,138,0.08)", bd="rgba(51,82,138,0.2)",
+        c=NAVY, v=f"±{ec_swings[0][4]:.0f}%", l=f"Top: {ec_swings[0][1]}",
+    ), unsafe_allow_html=True)
+    ec3.markdown(_ecard.format(
+        bg="rgba(255,107,107,0.08)", bd="rgba(255,107,107,0.2)",
+        c=CORAL, v=f"{len(ec_swings)}", l="Parameters Tested",
+    ), unsafe_allow_html=True)
+    ec4.markdown(_ecard.format(
+        bg="rgba(138,182,46,0.08)", bd="rgba(138,182,46,0.2)",
+        c=LIME, v=etop3[0], l="Most Critical Parameter",
+    ), unsafe_allow_html=True)
+
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+    etab1, etab2, etab3 = st.tabs(["Impact Butterfly", "Parameter Ranking", "Community Guide"])
+
+    with etab1:
+        st.info(
+            "**Impact Butterfly (OAT):** Each building parameter is varied independently. "
+            "In a community context these effects multiply across all member buildings — "
+            "a ±20% swing per building translates directly to community-level demand uncertainty "
+            "and affects self-sufficiency and sharing calculations.",
+            icon="ℹ️",
+        )
+        ey_labels  = [s[1] for s in reversed(ec_swings)]
+        elow_vals  = [s[2] for s in reversed(ec_swings)]
+        ehigh_vals = [s[3] for s in reversed(ec_swings)]
+
+        efig = go.Figure()
+        efig.add_trace(go.Bar(
+            y=ey_labels, x=elow_vals, orientation="h",
+            name="Low → Baseline",
+            marker=dict(color=[GREEN if v < 0 else CORAL for v in elow_vals], line=dict(width=0)),
+            hovertemplate="<b>%{y}</b><br>Low scenario: %{x:+.1f}%<extra></extra>",
+            text=[f"{v:+.1f}%" for v in elow_vals],
+            textposition="outside", textfont=dict(size=9),
+        ))
+        efig.add_trace(go.Bar(
+            y=ey_labels, x=ehigh_vals, orientation="h",
+            name="Baseline → High",
+            marker=dict(color=[CORAL if v > 0 else GREEN for v in ehigh_vals], line=dict(width=0)),
+            hovertemplate="<b>%{y}</b><br>High scenario: %{x:+.1f}%<extra></extra>",
+            text=[f"{v:+.1f}%" for v in ehigh_vals],
+            textposition="outside", textfont=dict(size=9),
+        ))
+        efig.add_vline(x=0, line=dict(color="#475569", width=1.5))
+        efig.update_layout(
+            title=dict(text="OAT Butterfly — Annual Heating Demand per Building (% change from baseline)",
+                       font=dict(size=13, color="#1a1a2e")),
+            xaxis=dict(title="Change in Annual Heating Demand (%)", gridcolor=GRID, zeroline=False),
+            yaxis=dict(title=""),
+            barmode="overlay",
+            height=max(400, 38 * len(ec_swings)),
+            margin=dict(l=10, r=80, t=50, b=40),
+            plot_bgcolor=BG, paper_bgcolor=BG,
+            showlegend=True,
+            legend=dict(orientation="h", y=-0.12, x=0.5, xanchor="center", font=dict(size=10)),
+        )
+        st.plotly_chart(efig, key="ec_butterfly", use_container_width=True)
+        st.info(
+            f"🦋 **Community insight:** *{etop3[0]}* has the largest per-building impact. "
+            f"Across a 10-building community, this alone can create a ±{abs(ec_swings[0][2]):.0f}% "
+            f"variance in total heating demand — directly affecting sizing and financial viability."
+        )
+
+    with etab2:
+        st.info(
+            "**Parameter Ranking:** Sorted by maximum absolute swing in annual heating demand. "
+            "Collect data for high-ranked parameters across all community member buildings.",
+            icon="ℹ️",
+        )
+        e_rank = 0
+        for p_key, lbl, d_low, d_high, swing in ec_swings:
+            e_rank += 1
+            if swing >= 30:
+                tbg = "rgba(255,107,107,0.07)"; tbd = "rgba(255,107,107,0.25)"
+                tc = "#FF6B6B"; e_icon = "🔴"; tier = "High"
+            elif swing >= 10:
+                tbg = "rgba(51,82,138,0.07)"; tbd = "rgba(51,82,138,0.25)"
+                tc = "#33528A"; e_icon = "🔵"; tier = "Moderate"
+            else:
+                tbg = "rgba(148,163,184,0.07)"; tbd = "rgba(148,163,184,0.25)"
+                tc = "#94a3b8"; e_icon = "⚪"; tier = "Low"
+            dir_note = f"↓{abs(d_low):.1f}% / ↑{d_high:.1f}%" if d_low < 0 and d_high > 0 else f"range: {d_low:+.1f}% to {d_high:+.1f}%"
+            st.markdown(
+                f"<div style='background:{tbg}; border:1px solid {tbd}; "
+                f"border-radius:10px; padding:11px 15px; margin-bottom:7px;'>"
+                f"<div style='display:flex; justify-content:space-between; align-items:center;'>"
+                f"<span style='font-weight:600; font-size:0.93rem; color:#1e293b;'>#{e_rank}  {lbl}</span>"
+                f"<span style='background:{tbg}; border:1px solid {tbd}; border-radius:16px; "
+                f"padding:2px 10px; font-size:0.72rem; color:{tc}; font-weight:600;'>"
+                f"{e_icon} {tier}  ·  {dir_note}</span>"
+                f"</div></div>",
+                unsafe_allow_html=True,
+            )
+
+    with etab3:
+        st.markdown("**🏘️ How building parameters affect community energy planning**")
+        _ec_guide = [
+            ("Infiltration Rate", "🔴 High community impact", "#FF6B6B",
+             "Air leakage varies widely across a community — older buildings often have 3–5× higher rates. "
+             "Poor envelope airtightness inflates community demand baseline and undermines self-sufficiency."),
+            ("Construction Quality", "🔴 High community impact", "#FF6B6B",
+             "Mixed construction vintages (e.g. 1960s vs 2000s) create demand heterogeneity. "
+             "Knowing each building's insulation profile enables targeted flexible demand strategies."),
+            ("Heating Setpoint", "🔴 High community impact", "#FF6B6B",
+             "Setpoint diversity enables demand-response: shifting setpoints ±1°C across buildings "
+             "can provide significant flexibility without comfort impact."),
+            ("Roof Shape & Pitch", "🔴 High — affects PV potential", "#FF6B6B",
+             "In communities with shared PV, roof geometry determines available panel area. "
+             "Document from EPC, LiDAR, or aerial imagery for accurate production sizing."),
+            ("Number of Floors", "🟡 Moderate community impact", "#8AB62E",
+             "Affects individual building demand which sums to community total. EPC or cadastre provides this."),
+            ("Building Footprint", "🟡 Moderate", "#8AB62E",
+             "Sets envelope area and volume. Available from GIS/cadastre for community-scale modelling."),
+            ("Window-to-Wall Ratio", "🟡 Moderate", "#8AB62E",
+             "Affects solar gain diversity across community buildings. South-facing glazing helps in winter."),
+        ]
+        for eg_name, eg_tier, eg_color, eg_desc in _ec_guide:
+            st.markdown(
+                f"<div style='background:rgba(0,0,0,0.02); border-left:3px solid {eg_color}; "
+                f"padding:10px 14px; margin-bottom:8px; border-radius:0 8px 8px 0;'>"
+                f"<b>{eg_name}</b> <span style='color:{eg_color}; font-size:0.78rem; font-weight:600;'>{eg_tier}</span>"
+                f"<div style='font-size:0.82rem; color:#475569; margin-top:4px;'>{eg_desc}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+        st.markdown(
+            "<hr style='margin:14px 0; border:none; border-top:1px solid #e2e8f0;'>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "**🔑 Key take-away for Energy Communities:** "
+            f"Collect accurate data for **{etop3[0]}**, **{etop3[1]}**, and **{etop3[2]}** "
+            "across all buildings in the community. These parameters dominate collective "
+            "demand uncertainty, directly affecting sharing potential, self-sufficiency, "
+            "and grid interaction calculations."
+        )
+
+
 
 all_items = []
 for sys_group in data_inputs:
@@ -793,9 +1193,68 @@ render_top_cards([
         },
 ])
 
+# ── Sensitivity Analysis banner — above both columns, always visible ──────────
+# ── Sensitivity Analysis banner — visible for all three project types ─────────
+_SA_INFO = {
+    "Renewable Energy Planning": (
+        "⚡ Sensitivity Analysis Available",
+        "Inspect Solar PV parameter impact, OAT butterfly, Morris screening, seasonal comparison and uncertainty waterfall.",
+        "rgba(196,232,29,0.55)",
+        "linear-gradient(120deg, rgba(196,232,29,0.18) 0%, rgba(51,169,160,0.13) 100%)",
+        "#597001", "rgba(89,112,1,0.13)",
+    ),
+    "Renovation Planning": (
+        "🏗️ Sensitivity Analysis Available",
+        "Inspect building envelope parameter impact on heating demand, OAT butterfly, parameter ranking and renovation priorities.",
+        "rgba(51,82,138,0.40)",
+        "linear-gradient(120deg, rgba(51,82,138,0.12) 0%, rgba(51,169,160,0.10) 100%)",
+        "#33528A", "rgba(51,82,138,0.12)",
+    ),
+    "Energy Community Planning": (
+        "🏘️ Sensitivity Analysis Available",
+        "Inspect community building parameter impact on heating demand, sensitivity ranking and community-level energy planning guide.",
+        "rgba(51,169,160,0.40)",
+        "linear-gradient(120deg, rgba(51,169,160,0.15) 0%, rgba(138,182,46,0.12) 100%)",
+        "#0f766e", "rgba(51,169,160,0.12)",
+    ),
+}
+_sa = _SA_INFO.get(project_type)
+if _sa:
+    _sa_title, _sa_desc, _sa_border, _sa_bg, _sa_tc, _sa_shadow = _sa
+    sa_col, sa_btn_col = st.columns([0.78, 0.22])
+    with sa_col:
+        st.markdown(
+            f"""
+            <div style='border:1px solid {_sa_border}; border-radius:14px; padding:0.78rem 1rem;
+                        background:{_sa_bg};
+                        box-shadow:0 4px 18px {_sa_shadow}; margin-bottom:0.1rem;'>
+                <div style='font-size:0.75rem; font-weight:800; color:{_sa_tc}; text-transform:uppercase; letter-spacing:0.09em;'>{_sa_title}</div>
+                <div style='font-size:0.9rem; color:#33528A; margin-top:0.22rem; font-weight:500;'>
+                    {_sa_desc}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with sa_btn_col:
+        st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
+        if st.button(
+            "Open Analysis",
+            key="sa2p_dialog_btn",
+            type="primary",
+            use_container_width=True,
+            help="View sensitivity analysis results",
+        ):
+            if project_type == "Renewable Energy Planning":
+                show_re_sensitivity()
+            elif project_type == "Renovation Planning":
+                show_renovation_sensitivity()
+            elif project_type == "Energy Community Planning":
+                show_ec_sensitivity()
+
 left_col, right_col = st.columns([0.65, 0.35])
 
-# ── Right: summary cards + SA button ────────────────────────────────
+# ── Right: map + legend ────────────────────────────────
 with right_col:
     st.markdown("<div style='height:0.25rem;'></div>", unsafe_allow_html=True)
 
@@ -803,6 +1262,33 @@ with right_col:
     if has_location_database():
         project_scale = st.session_state.get("project_scale", "")
         sel = st.session_state.get("location_selection", {})
+
+        # Smooth address transition from Step 1+ to Step 2+:
+        # if user typed a new address but did not click Locate, refresh coordinates here.
+        if isinstance(sel, dict) and sel.get("mode") == "address":
+            typed_addr = (st.session_state.get("location") or "").strip()
+            selected_query = str(sel.get("query") or "").strip()
+            if typed_addr and typed_addr != selected_query:
+                try:
+                    geocoded = geocode_address(typed_addr, st.session_state.get("country", "Sweden"))
+                    if geocoded:
+                        lat = float(geocoded["lat"])
+                        lon = float(geocoded["lon"])
+                        st.session_state["project_lat"] = lat
+                        st.session_state["project_lon"] = lon
+                        st.session_state["project_location_label"] = geocoded.get("display_name", typed_addr)
+                        st.session_state["location_selection"] = {
+                            "mode": "address",
+                            "query": typed_addr,
+                            "label": st.session_state["project_location_label"],
+                            "lat": lat,
+                            "lon": lon,
+                            "radius_m": 80 if project_scale == "Building" else int(st.session_state.get("location_radius_m", 800)),
+                        }
+                        sel = st.session_state.get("location_selection", {})
+                except Exception:
+                    pass
+
         selection_mode = "Address + Radius"
         if isinstance(sel, dict) and sel.get("mode") == "bbox":
             selection_mode = "Draw Bounding Box"
@@ -1134,21 +1620,6 @@ with right_col:
                         st.dataframe(sample_df, use_container_width=True, hide_index=True)
         else:
             st.info("No mapped area found yet. In Step 1+, set an address (and click Locate) or draw a bounding box.")
-
-    # SA button — only for RE Planning (we have data)
-    if project_type == "Renewable Energy Planning":
-        st.markdown(
-            "<style>"
-            "div[data-testid='stVerticalBlock']:has(#sa2p-btn) button "
-            "{font-size:0.78rem!important; height:32px!important; "
-            "padding:0 14px!important; min-height:0!important;}"
-            "</style>"
-            "<span id='sa2p-btn'></span>",
-            unsafe_allow_html=True,
-        )
-        if st.button("Sensitivity Analysis", key="sa2p_dialog_btn",
-                      help="View solar OAT sensitivity results"):
-            show_re_sensitivity()
 
     # Legend
     st.markdown(
