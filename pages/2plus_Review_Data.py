@@ -21,6 +21,12 @@ from config.sensitivity_config import (
 )
 from config.data_inputs import get_proxy_confidence
 from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards, render_branded_top_bar
+from utils.boverket_api import (
+    get_latest_version as boverket_latest_version,
+    get_categories as boverket_categories,
+    get_resources_by_category as boverket_resources_by_category,
+    resource_summary as boverket_resource_summary,
+)
 from utils.location_data import (
     has_location_database,
     get_nearby_epc_snapshot,
@@ -49,6 +55,65 @@ def _safe_id_text(value):
         return str(int(value))
     except (TypeError, ValueError):
         return "N/A"
+
+
+def _normalize_address_text(text: str) -> str:
+    return " ".join(str(text or "").strip().lower().replace(",", " ").split())
+
+
+def _prepare_single_building_snapshot(snapshot: dict, address_query: str = ""):
+    """Reduce a nearby snapshot to one EPC-linked building, preferring address match when possible."""
+    points_df = snapshot.get("points")
+    if points_df is None or points_df.empty:
+        return snapshot, None, False
+
+    working = points_df.copy()
+    selected_df = None
+    matched_by_query = False
+
+    query_norm = _normalize_address_text(address_query)
+    if query_norm and "address" in working.columns:
+        addr_norm = working["address"].fillna("").astype(str).map(_normalize_address_text)
+        candidates = working[addr_norm.str.contains(query_norm, regex=False)]
+
+        if candidates.empty:
+            # fallback: try "street + number" token match from query prefix
+            query_head = " ".join(query_norm.split()[:2]).strip()
+            if query_head:
+                candidates = working[addr_norm.str.contains(query_head, regex=False)]
+
+        if not candidates.empty:
+            selected_df = candidates.sort_values("distance_m", ascending=True).head(1).copy()
+            matched_by_query = True
+
+    if selected_df is None:
+        selected_df = working.sort_values("distance_m", ascending=True).head(1).copy()
+
+    snapshot["points"] = selected_df
+    snapshot["sample"] = selected_df[
+        ["address", "post_town", "municipality", "energy_class", "energy_performance"]
+    ]
+    snapshot["classes"] = selected_df[["energy_class"]].copy()
+    snapshot["classes"]["energy_class"] = snapshot["classes"]["energy_class"].fillna("Unknown")
+    snapshot["classes"]["records"] = 1
+
+    has_epc = 1 if selected_df["energy_performance"].notna().any() else 0
+    has_class = 1 if selected_df["energy_class"].notna().any() else 0
+    has_link = 1 if selected_df["FormularId"].notna().any() else 0
+    snapshot["summary"] = {
+        "footprint_points": 1,
+        "footprint_buildings": 1,
+        "epc_linked_buildings": has_link,
+        "epc_records": has_link,
+        "has_energy_class": has_class,
+        "has_energy_performance": has_epc,
+        "has_build_year": 1 if selected_df["build_year"].notna().any() else 0,
+        "has_atemp": 1 if selected_df["atemp"].notna().any() else 0,
+        "radius_m": 0,
+    }
+
+    chosen_addr = selected_df.iloc[0].get("address") if not selected_df.empty else None
+    return snapshot, chosen_addr, matched_by_query
 
 # Hide sidebar + tighter spacing for data items
 st.markdown("""
@@ -81,6 +146,37 @@ st.markdown("""
     }
     .sa-banner:hover {
         box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+
+    /* Fix expander header icon/text overlap.
+       Streamlit 1.53 renders a <span> with ligature text
+       "keyboard_arrow_down" as the icon. We hide it by
+       zeroing font-size on the heading row, then restoring
+       it only on the label wrapper <div> inside. */
+    div[data-testid="stExpander"] summary {
+        list-style: none !important;
+    }
+    div[data-testid="stExpander"] summary::marker,
+    div[data-testid="stExpander"] summary::-webkit-details-marker {
+        display: none !important;
+        content: "" !important;
+    }
+    /* The heading <span> wraps icon-span + label-div.
+       Zero out ALL text so the ligature text vanishes. */
+    div[data-testid="stExpander"] summary > span {
+        font-size: 0 !important;
+        line-height: 0 !important;
+    }
+    /* Restore font-size ONLY on the label wrapper <div> */
+    div[data-testid="stExpander"] summary > span > div {
+        font-size: 0.875rem !important;
+        line-height: 1.4 !important;
+    }
+    div[data-testid="stExpander"] summary p {
+        margin: 0 !important;
+        font-size: 0.875rem !important;
+        line-height: 1.35 !important;
+        white-space: normal !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1299,6 +1395,126 @@ if _sa:
             elif project_type == "Energy Community Planning":
                 show_ec_sensitivity()
 
+# ============================================================================
+# BOVERKET KLIMATDATABAS — Building material climate data
+# ============================================================================
+
+st.markdown(
+    "<div style='font-size:1.05rem; font-weight:700; color:#334155; "
+    "margin:1.4rem 0 0.3rem 0; display:flex; align-items:center; gap:8px;'>"
+    "<span style='font-size:1.15rem;'>🌱</span> "
+    "Boverket Climate Database — Building Material GWP</div>",
+    unsafe_allow_html=True,
+)
+st.caption(
+    "Generic building resources from [Boverket Klimatdatabas]"
+    "(https://www.boverket.se/sv/klimatdeklaration/klimatdatabas/). "
+    "Values show **Global Warming Potential** (kg CO₂ eq.) per declared unit."
+)
+
+_bov_version = boverket_latest_version()
+_bov_cats = boverket_categories(version=_bov_version, culture="en") if _bov_version else []
+
+if not _bov_cats:
+    st.warning("Could not load Boverket climate data. The API may be temporarily unavailable.")
+else:
+    _cat_options = {c["Title"]: c["Id"] for c in _bov_cats}
+    # Pre-select relevant categories based on project type
+    _default_cats = []
+    if project_type == "Renovation Planning":
+        _default_cats = [t for t in ["Concrete", "Insulation", "Steel and other metals",
+                                      "Windows, doors and glass", "Solid woods"] if t in _cat_options]
+    elif project_type in ("Energy Community Planning", "Renewable Energy Planning"):
+        _default_cats = [t for t in ["Steel and other metals", "Concrete",
+                                      "Energy and fuel"] if t in _cat_options]
+
+    bov_c1, bov_c2 = st.columns([0.6, 0.4])
+    with bov_c1:
+        _sel_cats = st.multiselect(
+            "Material categories",
+            options=sorted(_cat_options.keys()),
+            default=_default_cats or [sorted(_cat_options.keys())[0]],
+            key="s2p_bov_categories",
+            help="Select one or more building-material categories to browse",
+        )
+    with bov_c2:
+        st.markdown(
+            f"<div style='font-size:0.78rem; color:#64748b; margin-top:1.8rem;'>"
+            f"Database version <b>{_bov_version}</b> · "
+            f"<a href='https://api-portal.boverket.se/reference#api=klimatdatabas' "
+            f"target='_blank' style='color:#8AB62E;'>API docs ↗</a></div>",
+            unsafe_allow_html=True,
+        )
+
+    if _sel_cats:
+        import pandas as pd
+
+        _all_rows = []
+        for cat_name in _sel_cats:
+            cat_id = _cat_options[cat_name]
+            resources = boverket_resources_by_category(cat_id, version=_bov_version, culture="en")
+            for res in resources:
+                row = boverket_resource_summary(res)
+                row["Material Category"] = cat_name
+                _all_rows.append(row)
+
+        if _all_rows:
+            bov_df = pd.DataFrame(_all_rows)
+
+            # Reorder columns
+            col_order = [
+                "Material Category", "Name", "Unit",
+                "GWP A1-A3 (Conservative)", "GWP A1-A3 (Typical)",
+                "GWP A4 (Transport)", "GWP A5.1 (Installation)",
+                "Density / Conversion", "Waste Factor",
+            ]
+            col_order = [c for c in col_order if c in bov_df.columns]
+            bov_df = bov_df[col_order]
+
+            # Search / filter
+            _bov_search = st.text_input(
+                "🔍 Filter resources by name",
+                key="s2p_bov_search",
+                placeholder="e.g. concrete, insulation, steel…",
+            )
+            if _bov_search:
+                mask = bov_df["Name"].str.contains(_bov_search, case=False, na=False)
+                bov_df = bov_df[mask]
+
+            st.markdown(
+                f"<div style='font-size:0.82rem; color:#64748b; margin-bottom:0.3rem;'>"
+                f"Showing <b>{len(bov_df)}</b> resources across "
+                f"<b>{len(_sel_cats)}</b> categories</div>",
+                unsafe_allow_html=True,
+            )
+
+            st.dataframe(
+                bov_df,
+                use_container_width=True,
+                hide_index=True,
+                height=min(420, 38 + len(bov_df) * 35),
+                column_config={
+                    "GWP A1-A3 (Conservative)": st.column_config.NumberColumn(
+                        "GWP A1-A3 (Cons.)", format="%.4f",
+                        help="Conservative value including safety margin",
+                    ),
+                    "GWP A1-A3 (Typical)": st.column_config.NumberColumn(
+                        "GWP A1-A3 (Typ.)", format="%.4f",
+                        help="Typical / average production value",
+                    ),
+                    "GWP A4 (Transport)": st.column_config.NumberColumn(
+                        "GWP A4", format="%.5f",
+                        help="Transport to site",
+                    ),
+                    "GWP A5.1 (Installation)": st.column_config.NumberColumn(
+                        "GWP A5.1", format="%.5f",
+                        help="Installation waste on site",
+                    ),
+                },
+            )
+        else:
+            st.info("No resources found for the selected categories.")
+
 left_col, right_col = st.columns([0.65, 0.35])
 
 # ── Right: map + legend ────────────────────────────────
@@ -1375,36 +1591,13 @@ with right_col:
             lon = float(sel["lon"])
             if project_scale == "Building":
                 snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=250, point_limit=300)
-                if not snapshot["points"].empty:
-                    nearest_df = snapshot["points"].sort_values("distance_m", ascending=True).head(1).copy()
-                    snapshot["points"] = nearest_df
-                    snapshot["sample"] = nearest_df[
-                        ["address", "post_town", "municipality", "energy_class", "energy_performance"]
-                    ].rename(
-                        columns={
-                            "address": "address",
-                            "post_town": "post_town",
-                            "municipality": "municipality",
-                            "energy_class": "energy_class",
-                            "energy_performance": "energy_performance",
-                        }
-                    )
-                    snapshot["classes"] = nearest_df[["energy_class"]].copy()
-                    snapshot["classes"]["energy_class"] = snapshot["classes"]["energy_class"].fillna("Unknown")
-                    snapshot["classes"]["records"] = 1
-                    has_epc = 1 if nearest_df["energy_performance"].notna().any() else 0
-                    has_class = 1 if nearest_df["energy_class"].notna().any() else 0
-                    snapshot["summary"] = {
-                        "footprint_points": 1,
-                        "footprint_buildings": 1,
-                        "epc_records": 1 if nearest_df["FormularId"].notna().any() else 0,
-                        "has_energy_class": has_class,
-                        "has_energy_performance": has_epc,
-                        "has_build_year": 1 if nearest_df["build_year"].notna().any() else 0,
-                        "has_atemp": 1 if nearest_df["atemp"].notna().any() else 0,
-                        "radius_m": 0,
-                    }
-                location_note = f"{location_label} · nearest building"
+                addr_query = (sel.get("query") or st.session_state.get("location") or location_label)
+                snapshot, chosen_addr, matched_by_query = _prepare_single_building_snapshot(snapshot, addr_query)
+                if chosen_addr:
+                    tag = "matched EPC building" if matched_by_query else "nearest EPC building"
+                    location_note = f"{location_label} · {tag}: {chosen_addr}"
+                else:
+                    location_note = f"{location_label} · nearest EPC building"
             else:
                 radius = int(sel.get("radius_m", st.session_state.get("location_radius_m", 800)))
                 snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=radius, point_limit=1000)
@@ -1416,10 +1609,13 @@ with right_col:
             lon = float(st.session_state["project_lon"])
             if project_scale == "Building":
                 snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=250, point_limit=300)
-                if not snapshot["points"].empty:
-                    nearest_df = snapshot["points"].sort_values("distance_m", ascending=True).head(1).copy()
-                    snapshot["points"] = nearest_df
-                location_note = f"{location_label} · nearest building"
+                addr_query = st.session_state.get("location") or location_label
+                snapshot, chosen_addr, matched_by_query = _prepare_single_building_snapshot(snapshot, addr_query)
+                if chosen_addr:
+                    tag = "matched EPC building" if matched_by_query else "nearest EPC building"
+                    location_note = f"{location_label} · {tag}: {chosen_addr}"
+                else:
+                    location_note = f"{location_label} · nearest EPC building"
             else:
                 radius = int(st.session_state.get("location_radius_m", 800))
                 snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=radius, point_limit=1000)
@@ -1441,28 +1637,12 @@ with right_col:
 
                         if project_scale == "Building":
                             snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=250, point_limit=300)
-                            if not snapshot["points"].empty:
-                                nearest_df = snapshot["points"].sort_values("distance_m", ascending=True).head(1).copy()
-                                snapshot["points"] = nearest_df
-                                snapshot["sample"] = nearest_df[
-                                    ["address", "post_town", "municipality", "energy_class", "energy_performance"]
-                                ]
-                                snapshot["classes"] = nearest_df[["energy_class"]].copy()
-                                snapshot["classes"]["energy_class"] = snapshot["classes"]["energy_class"].fillna("Unknown")
-                                snapshot["classes"]["records"] = 1
-                                has_epc = 1 if nearest_df["energy_performance"].notna().any() else 0
-                                has_class = 1 if nearest_df["energy_class"].notna().any() else 0
-                                snapshot["summary"] = {
-                                    "footprint_points": 1,
-                                    "footprint_buildings": 1,
-                                    "epc_records": 1 if nearest_df["FormularId"].notna().any() else 0,
-                                    "has_energy_class": has_class,
-                                    "has_energy_performance": has_epc,
-                                    "has_build_year": 1 if nearest_df["build_year"].notna().any() else 0,
-                                    "has_atemp": 1 if nearest_df["atemp"].notna().any() else 0,
-                                    "radius_m": 0,
-                                }
-                            location_note = f"{st.session_state.get('project_location_label', addr)} · nearest building"
+                            snapshot, chosen_addr, matched_by_query = _prepare_single_building_snapshot(snapshot, addr)
+                            if chosen_addr:
+                                tag = "matched EPC building" if matched_by_query else "nearest EPC building"
+                                location_note = f"{st.session_state.get('project_location_label', addr)} · {tag}: {chosen_addr}"
+                            else:
+                                location_note = f"{st.session_state.get('project_location_label', addr)} · nearest EPC building"
                         else:
                             radius = int(st.session_state.get("location_radius_m", 800))
                             snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=radius, point_limit=1000)
@@ -1553,12 +1733,18 @@ with right_col:
                         selected_row = linked_points_df.assign(
                             _distance=(linked_points_df["lat"] - click_lat).abs() + (linked_points_df["lon"] - click_lng).abs()
                         ).sort_values("_distance").iloc[0]
+                        st.session_state["s2p_selected_formular_id"] = _safe_id_text(selected_row.get("FormularId"))
             elif not points_df.empty:
                 st.caption("Footprints were found here, but none of the mapped points in this selection currently have linked EPC details to display.")
 
             mc1, mc2 = st.columns(2)
             mc1.metric("Buildings", f"{summary.get('footprint_buildings', 0):,}")
-            mc2.metric("EPC", f"{summary.get('epc_records', 0):,}")
+            mc2.metric("EPC-linked buildings", f"{summary.get('epc_linked_buildings', 0):,}")
+            st.caption(
+                f"EPC rows in database for this area: {summary.get('epc_records', 0):,}. "
+                "A single building can have multiple EPC rows (e.g., updated declarations/versions), "
+                "so EPC rows can be higher than building count."
+            )
 
             st.session_state["location_data_summary"] = summary
             st.session_state["location_classes"] = classes_df.to_dict("records")
@@ -1570,26 +1756,38 @@ with right_col:
                 if not points_with_id.empty:
                     points_with_id["_label"] = points_with_id.apply(
                         lambda r: (
-                            f"{_safe_id_text(r.get('FormularId'))}"
-                            + (f" · {r['address']}" if isinstance(r.get("address"), str) and r.get("address") else "")
+                            (r["address"] if isinstance(r.get("address"), str) and r.get("address") else "Address unavailable")
+                            + (f" · {r['municipality']}" if isinstance(r.get("municipality"), str) and r.get("municipality") else "")
+                            + (f" · EPC {_display_value(r.get('energy_class'))}" if not _is_missing(r.get("energy_class")) else "")
                         ),
                         axis=1,
                     )
-                    default_index = 0
+                    options = points_with_id["_label"].tolist()[:600]
+
                     if selected_row is not None:
-                        selected_id = _safe_id_text(selected_row.get("FormularId"))
-                        labels = points_with_id["_label"].tolist()[:600]
-                        for idx, label in enumerate(labels):
-                            if label.startswith(selected_id):
-                                default_index = idx
+                        st.session_state["s2p_selected_formular_id"] = _safe_id_text(selected_row.get("FormularId"))
+
+                    preferred_id = st.session_state.get("s2p_selected_formular_id")
+                    preferred_label = None
+                    if preferred_id:
+                        for label in options:
+                            if label.startswith(str(preferred_id)):
+                                preferred_label = label
                                 break
+                    if preferred_label is None and options:
+                        preferred_label = options[0]
+
+                    if preferred_label is not None and st.session_state.get("s2p_selected_building") != preferred_label:
+                        st.session_state["s2p_selected_building"] = preferred_label
+
                     chosen = st.selectbox(
                         "Select a mapped building",
-                        options=points_with_id["_label"].tolist()[:600],
-                        index=default_index,
+                        options=options,
                         key="s2p_selected_building",
                     )
                     selected_row = points_with_id[points_with_id["_label"] == chosen].iloc[0]
+                    st.session_state["s2p_selected_formular_id"] = _safe_id_text(selected_row.get("FormularId"))
+
                     passport = get_epc_building_passport(selected_row.get("FormularId")) or {}
                     completeness = sum(
                         1
@@ -1607,6 +1805,56 @@ with right_col:
                     ventilation_modes = passport.get("ventilation_modes", [])
                     systems_text = ", ".join(energy_systems) if energy_systems else "—"
                     ventilation_text = ", ".join(ventilation_modes) if ventilation_modes else "—"
+                    total_fields = int(passport.get("total_field_count", 0) or 0)
+                    available_fields = int(passport.get("available_field_count", 0) or 0)
+
+                    suggested_labels = {
+                        "AtgForslagStyrTeknisk": "Technical control optimization",
+                        "AtgForslagInstTeknisk": "Installation technical upgrade",
+                        "AtgForslagByggTeknisk": "Building envelope technical upgrade",
+                        "AtgForslagNyVentil": "New ventilation system",
+                        "AtgForslagJustVarme": "Adjust heating system",
+                        "AtgForslagStyrVarme": "Heating control optimization",
+                        "AtgForslagRengVarme": "Heating system cleaning",
+                        "AtgForslagBegrTemp": "Limit indoor temperature",
+                        "AtgForslagNyGivare": "New sensors",
+                        "AtgForslagBytePumpar": "Replace pumps",
+                        "AtgForslagAnnanVarme": "Other heating measure",
+                        "AtgForslagJustVent": "Adjust ventilation",
+                        "AtgForslagTidstyrVent": "Time-controlled ventilation",
+                        "AtgForslagBehovstyrVent": "Demand-controlled ventilation",
+                        "AtgForslagByteFlaktar": "Replace fans",
+                        "AtgForslagAnnanVent": "Other ventilation measure",
+                        "AtgForslagStyrBelys": "Lighting control optimization",
+                        "AtgForslagStyrKyla": "Cooling control optimization",
+                        "AtgForslagAnnanBelysKyla": "Other lighting/cooling measure",
+                        "AtgForslagSparaVatten": "Water-saving measure",
+                        "AtgForslagEffektivBelys": "Efficient lighting",
+                        "AtgForslagIsolKanal": "Duct insulation",
+                        "AtgForslagByteVarmepump": "Replace heat pump",
+                        "AtgForslagByteAnnanVarme": "Replace other heating",
+                        "AtgForslagByteVent": "Replace ventilation",
+                        "AtgForslagAterVent": "Ventilation heat recovery",
+                        "AtgForslagAnnanInst": "Other installation measure",
+                        "AtgForslagIsolTak": "Roof insulation",
+                        "AtgForslagIsolVagg": "Wall insulation",
+                        "AtgForslagIsolMark": "Ground/floor insulation",
+                        "AtgForslagInstSolceller": "Install solar PV",
+                        "AtgForslagInstSolvarme": "Install solar thermal",
+                        "AtgForslagByteFonster": "Replace windows",
+                        "AtgForslagKompFonster": "Window complement",
+                        "AtgForslagTatFonster": "Seal/tighten windows",
+                        "AtgForslagAnnanBygg": "Other building envelope measure",
+                    }
+                    suggested_measures = []
+                    for key, label in suggested_labels.items():
+                        val = passport.get(key)
+                        vtxt = str(val).strip().lower()
+                        if val is not None and vtxt not in {"", "<na>", "none", "nan", "nej", "no", "0", "false"}:
+                            suggested_measures.append(label)
+                    savings_text = _display_value(passport.get("AtgForslagEgiMinskad"))
+                    cost_text = _display_value(passport.get("AtgForslagKostnad"))
+                    co2_text = _display_value(passport.get("AtgForslagCO2"))
 
                     st.markdown(
                         f"""
@@ -1618,11 +1866,10 @@ with right_col:
                                     <div style='font-size:0.84rem; color:#475569; margin-top:0.14rem;'>{_display_value(passport.get('IdPostort'))} · {_display_value(passport.get('IdKommun', selected_row.get('municipality')))}</div>
                                 </div>
                                 <div style='background:rgba(51,169,160,0.10); color:#0f766e; border:1px solid rgba(51,169,160,0.25); border-radius:999px; padding:0.2rem 0.6rem; font-size:0.74rem; font-weight:600;'>
-                                    {completeness}/6 key fields available
+                                    {completeness}/6 key fields · {available_fields}/{total_fields if total_fields else '—'} EPC fields
                                 </div>
                             </div>
                             <div style='display:grid; grid-template-columns:1fr 1fr; gap:0.55rem; margin-top:0.85rem;'>
-                                <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>FormularId</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_safe_id_text(passport.get('FormularId', selected_row.get('FormularId')))}</div></div>
                                 <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Energy Class</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgiEnergiklass', selected_row.get('energy_class')))}</div></div>
                                 <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Energy Performance</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgiEnergiPrestanda', selected_row.get('energy_performance')))}</div></div>
                                 <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Specific Energy Use</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgiSpecifikEnergianvandning'))}</div></div>
@@ -1636,6 +1883,10 @@ with right_col:
                                 <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Typcode</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgenTypkod_typ'))}</div></div>
                                 <div style='background:#ffffff; border-radius:10px; padding:0.68rem; border:1px solid #e2e8f0;'><div style='font-size:0.72rem; color:#64748b;'>Complexity</div><div style='font-size:0.92rem; font-weight:700; color:#0f172a;'>{_display_value(passport.get('EgenKomplexitet'))}</div></div>
                             </div>
+                            <div style='margin-top:0.55rem; background:#fff; border:1px dashed #cbd5e1; border-radius:12px; padding:0.7rem 0.8rem;'>
+                                <div style='font-size:0.74rem; color:#475569; line-height:1.45;'><b>Specific Energy Use</b>: energy use per m² Atemp (commonly kWh/m²·year), useful for comparing buildings of different sizes.</div>
+                                <div style='font-size:0.74rem; color:#475569; line-height:1.45; margin-top:0.35rem;'><b>Primary Energy</b>: delivered energy adjusted by national primary-energy factors (source and conversion impact), used for regulatory performance assessment.</div>
+                            </div>
                             <div style='display:grid; grid-template-columns:1fr 1fr; gap:0.55rem; margin-top:0.55rem;'>
                                 <div style='background:rgba(51,82,138,0.06); border:1px solid rgba(51,82,138,0.14); border-radius:12px; padding:0.75rem;'>
                                     <div style='font-size:0.72rem; color:#33528A; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;'>Energy Systems</div>
@@ -1646,25 +1897,78 @@ with right_col:
                                     <div style='font-size:0.88rem; color:#0f172a; margin-top:0.35rem; line-height:1.45;'>Ventilation: {ventilation_text}<br>Approved: {_display_value(passport.get('Godkand'))}<br>Ventilation check: {_display_value(passport.get('VentGruppGodkand'))}</div>
                                 </div>
                             </div>
+                            <div style='margin-top:0.55rem; background:rgba(255,255,255,0.96); border:1px solid #e2e8f0; border-radius:12px; padding:0.75rem;'>
+                                <div style='font-size:0.72rem; color:#334155; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;'>Suggested measures (AtgForslag*)</div>
+                                <div style='font-size:0.86rem; color:#0f172a; margin-top:0.35rem; line-height:1.45;'>
+                                    {'<br>'.join(['• ' + m for m in suggested_measures]) if suggested_measures else 'No suggested measures recorded for this EPC row.'}
+                                </div>
+                                <div style='display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-top:0.55rem;'>
+                                    <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.55rem;'><div style='font-size:0.7rem; color:#64748b;'>Expected energy saving</div><div style='font-size:0.9rem; font-weight:700; color:#0f172a;'>{savings_text}</div></div>
+                                    <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.55rem;'><div style='font-size:0.7rem; color:#64748b;'>Estimated cost</div><div style='font-size:0.9rem; font-weight:700; color:#0f172a;'>{cost_text}</div></div>
+                                    <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.55rem;'><div style='font-size:0.7rem; color:#64748b;'>Estimated CO₂ impact</div><div style='font-size:0.9rem; font-weight:700; color:#0f172a;'>{co2_text}</div></div>
+                                </div>
+                            </div>
                         </div>
                         """,
                         unsafe_allow_html=True,
                     )
 
-            with st.expander("Preview local data found near this location"):
-                p1, p2 = st.columns([1, 1.4])
-                with p1:
-                    st.markdown("**Energy class distribution**")
-                    if classes_df.empty:
-                        st.caption("No EPC class records in selected area.")
-                    else:
-                        st.dataframe(classes_df, use_container_width=True, hide_index=True)
-                with p2:
-                    st.markdown("**Sample EPC records**")
-                    if sample_df.empty:
-                        st.caption("No sample EPC records in selected area.")
-                    else:
-                        st.dataframe(sample_df, use_container_width=True, hide_index=True)
+                    show_full_epc = st.toggle("Show full EPC fields for selected building", value=False, key="s2p_show_full_epc")
+                    if show_full_epc:
+                        show_empty_fields = st.checkbox(
+                            "Show empty/missing fields",
+                            value=False,
+                            key="s2p_passport_show_empty",
+                        )
+                        derived_keys = {
+                            "FormularId",
+                            "energy_systems",
+                            "ventilation_modes",
+                            "available_field_count",
+                            "total_field_count",
+                        }
+                        raw_rows = []
+                        for field_name, value in sorted(passport.items(), key=lambda kv: kv[0].lower()):
+                            if field_name in derived_keys:
+                                continue
+                            if (not show_empty_fields) and _is_missing(value):
+                                continue
+                            raw_rows.append(
+                                {
+                                    "Field": field_name,
+                                    "Value": "—" if _is_missing(value) else value,
+                                }
+                            )
+
+                        st.caption(
+                            f"Showing {len(raw_rows):,} fields"
+                            + (f" (of {total_fields:,} total EPC fields)." if total_fields else ".")
+                        )
+                        if raw_rows:
+                            st.dataframe(raw_rows, use_container_width=True, hide_index=True, height=380)
+                        else:
+                            st.caption("No fields to display for this selection.")
+
+            st.markdown(
+                "<div style='font-size:0.92rem; font-weight:600; color:#334155; "
+                "margin:1.2rem 0 0.5rem 0; padding:10px 14px; "
+                "background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;'>"
+                "Local EPC data found near this location</div>",
+                unsafe_allow_html=True,
+            )
+            p1, p2 = st.columns([1, 1.4])
+            with p1:
+                st.markdown("**Energy class distribution**")
+                if classes_df.empty:
+                    st.caption("No EPC class records in selected area.")
+                else:
+                    st.dataframe(classes_df, use_container_width=True, hide_index=True)
+            with p2:
+                st.markdown("**Sample EPC records**")
+                if sample_df.empty:
+                    st.caption("No sample EPC records in selected area.")
+                else:
+                    st.dataframe(sample_df, use_container_width=True, hide_index=True)
         else:
             st.info("No mapped area found yet. In Step 1+, set an address (and click Locate) or draw a bounding box.")
 
@@ -1696,7 +2000,9 @@ with left_col:
     for sys_group in data_inputs:
         sys_name = sys_group["system"]
         sys_items_count = sum(len(c["items"]) for c in sys_group["categories"])
-        with st.expander(f"{sys_name}  ({sys_items_count} inputs)", expanded=False):
+        _expander_key = f"s2p_expand_{sys_name.replace(' ','_')}"
+        _show_sys = st.toggle(f"{sys_name}  ({sys_items_count} inputs)", value=False, key=_expander_key)
+        if _show_sys:
             for cat in sys_group["categories"]:
                 # Lightweight sub-header for each category
                 st.markdown(

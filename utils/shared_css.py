@@ -273,6 +273,31 @@ div[data-testid="stExpander"]:hover {
     border-color: rgba(51,169,160,0.3);
     box-shadow: 0 2px 12px rgba(51,169,160,0.06);
 }
+/* Hide expander toggle icon ligature text globally.
+   Streamlit 1.53 renders icon as a <span> with raw text
+   "keyboard_arrow_down". We zero font-size on the heading
+   <span> and restore it on the label <div> child. */
+div[data-testid="stExpander"] summary {
+    list-style: none !important;
+}
+div[data-testid="stExpander"] summary::marker,
+div[data-testid="stExpander"] summary::-webkit-details-marker {
+    display: none !important;
+    content: "" !important;
+}
+div[data-testid="stExpander"] summary > span {
+    font-size: 0 !important;
+    line-height: 0 !important;
+}
+div[data-testid="stExpander"] summary > span > div {
+    font-size: 0.875rem !important;
+    line-height: 1.4 !important;
+}
+div[data-testid="stExpander"] summary p {
+    margin: 0 !important;
+    font-size: 0.875rem !important;
+    line-height: 1.35 !important;
+}
 
 /* ── Enhanced selectbox / dropdowns ── */
 div[data-baseweb="select"] > div {

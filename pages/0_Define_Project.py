@@ -622,12 +622,7 @@ with col_a:
         key="p1p_project_name",
     )
 with col_b:
-    st.session_state["location"] = st.text_input(
-        "Location / Address",
-        value=st.session_state.get("location", ""),
-        placeholder="Enter location...",
-        key="p1p_location",
-    )
+    st.markdown("<div style='height:1px;'></div>", unsafe_allow_html=True)
 
 # ============================================================================
 # PROJECT LOCATION MAP + DATA SNAPSHOT
@@ -744,8 +739,8 @@ else:
                             "ScatterplotLayer",
                             data=project_point,
                             get_position="[lon, lat]",
-                            get_radius=70,
-                            get_fill_color=[196, 232, 29, 230],
+                            get_radius=40,
+                            get_fill_color=[196, 232, 29, 200],
                             pickable=True,
                         ),
                     ],

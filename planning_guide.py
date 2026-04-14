@@ -1985,10 +1985,28 @@ st.markdown("""
         background-color: transparent;
         font-family: 'Inter', sans-serif;
         font-weight: 600;
-        font-size: 0.86rem;
         letter-spacing: 0.005em;
         padding: 14px 16px;
         color: #0f172a;
+        list-style: none !important;
+    }
+    div[data-testid="stExpander"] summary::marker,
+    div[data-testid="stExpander"] summary::-webkit-details-marker {
+        display: none !important;
+        content: "" !important;
+    }
+    div[data-testid="stExpander"] summary > span {
+        font-size: 0 !important;
+        line-height: 0 !important;
+    }
+    div[data-testid="stExpander"] summary > span > div {
+        font-size: 0.86rem !important;
+        line-height: 1.4 !important;
+    }
+    div[data-testid="stExpander"] summary p {
+        margin: 0 !important;
+        font-size: 0.86rem !important;
+        line-height: 1.35 !important;
     }
     
     div[data-testid="stExpander"] summary:hover {

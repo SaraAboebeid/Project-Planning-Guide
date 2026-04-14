@@ -134,6 +134,7 @@ def get_nearby_epc_snapshot(
             SELECT
                 count(*) FILTER (WHERE n.distance_m <= ?) AS footprint_points,
                 count(DISTINCT n.FormularId) FILTER (WHERE n.distance_m <= ?) AS footprint_buildings,
+                count(DISTINCT n.FormularId) FILTER (WHERE n.distance_m <= ? AND e.FormularId IS NOT NULL) AS epc_linked_buildings,
                 count(e.FormularId) FILTER (WHERE n.distance_m <= ?) AS epc_records,
                 count(e.EgiEnergiklass) FILTER (WHERE n.distance_m <= ?) AS has_energy_class,
                 count(e.EgiEnergiPrestanda) FILTER (WHERE n.distance_m <= ?) AS has_energy_performance,
@@ -142,7 +143,7 @@ def get_nearby_epc_snapshot(
             FROM nearby n
             LEFT JOIN epc e USING (FormularId)
             """,
-            [*params_base, radius_m, radius_m, radius_m, radius_m, radius_m, radius_m, radius_m],
+            [*params_base, radius_m, radius_m, radius_m, radius_m, radius_m, radius_m, radius_m, radius_m],
         ).fetchone()
 
         classes_df = con.execute(
@@ -186,11 +187,12 @@ def get_nearby_epc_snapshot(
     summary_dict = {
         "footprint_points": int(summary[0] or 0),
         "footprint_buildings": int(summary[1] or 0),
-        "epc_records": int(summary[2] or 0),
-        "has_energy_class": int(summary[3] or 0),
-        "has_energy_performance": int(summary[4] or 0),
-        "has_build_year": int(summary[5] or 0),
-        "has_atemp": int(summary[6] or 0),
+        "epc_linked_buildings": int(summary[2] or 0),
+        "epc_records": int(summary[3] or 0),
+        "has_energy_class": int(summary[4] or 0),
+        "has_energy_performance": int(summary[5] or 0),
+        "has_build_year": int(summary[6] or 0),
+        "has_atemp": int(summary[7] or 0),
         "radius_m": int(radius_m),
     }
 
@@ -257,6 +259,7 @@ def get_epc_snapshot_for_bbox(
             SELECT
                 count(*) AS footprint_points,
                 count(DISTINCT b.FormularId) AS footprint_buildings,
+                count(DISTINCT b.FormularId) FILTER (WHERE e.FormularId IS NOT NULL) AS epc_linked_buildings,
                 count(e.FormularId) AS epc_records,
                 count(e.EgiEnergiklass) AS has_energy_class,
                 count(e.EgiEnergiPrestanda) AS has_energy_performance,
@@ -305,11 +308,12 @@ def get_epc_snapshot_for_bbox(
     summary_dict = {
         "footprint_points": int(summary[0] or 0),
         "footprint_buildings": int(summary[1] or 0),
-        "epc_records": int(summary[2] or 0),
-        "has_energy_class": int(summary[3] or 0),
-        "has_energy_performance": int(summary[4] or 0),
-        "has_build_year": int(summary[5] or 0),
-        "has_atemp": int(summary[6] or 0),
+        "epc_linked_buildings": int(summary[2] or 0),
+        "epc_records": int(summary[3] or 0),
+        "has_energy_class": int(summary[4] or 0),
+        "has_energy_performance": int(summary[5] or 0),
+        "has_build_year": int(summary[6] or 0),
+        "has_atemp": int(summary[7] or 0),
         "bbox": {
             "min_lat": float(lo_lat),
             "max_lat": float(hi_lat),
@@ -333,7 +337,7 @@ def has_location_database() -> bool:
 
 @st.cache_data(ttl=60 * 60)
 def get_epc_building_passport(formular_id: int | str) -> dict[str, Any] | None:
-    """Return a richer EPC record for a single building."""
+    """Return a full EPC record for a single building plus derived helper fields."""
     try:
         formular_id_int = int(formular_id)
     except (TypeError, ValueError):
@@ -341,98 +345,58 @@ def get_epc_building_passport(formular_id: int | str) -> dict[str, Any] | None:
 
     con = _connect_duckdb()
     try:
-        row = con.execute(
+        cur = con.execute(
             """
-            SELECT
-                FormularId,
-                IdAdr,
-                IdPostort,
-                IdKommun,
-                IdPostnr,
-                EgenByggnadsTyp,
-                EgenByggnadsKat,
-                EgenTypkod_typ,
-                EgenKomplexitet,
-                EgenNybyggAr,
-                EgenAtemp,
-                EgenAntalPlan,
-                EgenAntalBolgh,
-                EgiEnergiklass,
-                EgiEnergiPrestanda,
-                EgiSpecifikEnergianvandning,
-                EgiPrimarenergianvandning,
-                EgiFjarrvarme,
-                EgiElDirekt,
-                EgiElLuft,
-                EgiPumpFranluft,
-                EgiPumpLuftVatten,
-                EgiPumpLuftLuft,
-                EgiSolcell,
-                VentGruppGodkand,
-                VentTypFTX,
-                VentTypF,
-                VentTypFT,
-                VentTypSjalvdrag,
-                Godkand
+            SELECT *
             FROM epc
             WHERE FormularId = ?
             LIMIT 1
             """,
             [formular_id_int],
-        ).fetchone()
+        )
+        row = cur.fetchone()
         if row is None:
             return None
-
-        columns = [
-            "FormularId",
-            "IdAdr",
-            "IdPostort",
-            "IdKommun",
-            "IdPostnr",
-            "EgenByggnadsTyp",
-            "EgenByggnadsKat",
-            "EgenTypkod_typ",
-            "EgenKomplexitet",
-            "EgenNybyggAr",
-            "EgenAtemp",
-            "EgenAntalPlan",
-            "EgenAntalBolgh",
-            "EgiEnergiklass",
-            "EgiEnergiPrestanda",
-            "EgiSpecifikEnergianvandning",
-            "EgiPrimarenergianvandning",
-            "EgiFjarrvarme",
-            "EgiElDirekt",
-            "EgiElLuft",
-            "EgiPumpFranluft",
-            "EgiPumpLuftVatten",
-            "EgiPumpLuftLuft",
-            "EgiSolcell",
-            "VentGruppGodkand",
-            "VentTypFTX",
-            "VentTypF",
-            "VentTypFT",
-            "VentTypSjalvdrag",
-            "Godkand",
-        ]
+        columns = [d[0] for d in cur.description]
         passport = dict(zip(columns, row))
+
+        def _is_missing_local(value: Any) -> bool:
+            text = str(value).strip().lower()
+            return value is None or text in {"", "<na>", "nan", "none"}
+
+        def _is_active(value: Any) -> bool:
+            if _is_missing_local(value):
+                return False
+            text = str(value).strip().lower()
+            if text in {"nej", "no", "false", "0"}:
+                return False
+            try:
+                return float(value) > 0
+            except (TypeError, ValueError):
+                return True
 
         energy_systems: list[str] = []
         system_map = {
             "District heating": passport.get("EgiFjarrvarme"),
+            "District cooling": passport.get("EgiFjarrkyla"),
+            "Oil": passport.get("EgiOlja"),
+            "Gas": passport.get("EgiGas"),
+            "Wood": passport.get("EgiVed"),
+            "Wood chips": passport.get("EgiFlis"),
+            "Other biofuel": passport.get("EgiOvrBiobransle"),
+            "Electric water heating": passport.get("EgiElVatten"),
             "Direct electric": passport.get("EgiElDirekt"),
             "Electric air heating": passport.get("EgiElLuft"),
+            "Ground-source heat pump": passport.get("EgiPumpMark"),
             "Exhaust air heat pump": passport.get("EgiPumpFranluft"),
             "Air-to-water heat pump": passport.get("EgiPumpLuftVatten"),
             "Air-to-air heat pump": passport.get("EgiPumpLuftLuft"),
+            "Solar thermal": passport.get("EgiSolvarme"),
             "Solar PV": passport.get("EgiSolcell"),
         }
         for label, value in system_map.items():
-            try:
-                if value is not None and float(value) > 0:
-                    energy_systems.append(label)
-            except (TypeError, ValueError):
-                continue
+            if _is_active(value):
+                energy_systems.append(label)
         passport["energy_systems"] = energy_systems
 
         ventilation_modes: list[str] = []
@@ -440,13 +404,17 @@ def get_epc_building_passport(formular_id: int | str) -> dict[str, Any] | None:
             "FTX": passport.get("VentTypFTX"),
             "F": passport.get("VentTypF"),
             "FT": passport.get("VentTypFT"),
+            "F with heat recovery": passport.get("VentTypFmed"),
             "Natural ventilation": passport.get("VentTypSjalvdrag"),
         }
         for label, value in ventilation_map.items():
-            value_text = str(value).strip().lower()
-            if value is not None and value_text not in {"", "<na>", "none", "nan", "nej", "no", "0"}:
+            if _is_active(value):
                 ventilation_modes.append(label)
         passport["ventilation_modes"] = ventilation_modes
+
+        available_fields = sum(1 for _, value in passport.items() if not _is_missing_local(value))
+        passport["available_field_count"] = available_fields
+        passport["total_field_count"] = len(columns)
 
         return passport
     finally:
