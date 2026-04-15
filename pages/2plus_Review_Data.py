@@ -28,6 +28,18 @@ from utils.location_data import (
     geocode_address,
     get_epc_building_passport,
 )
+from utils.tabula_matching import (
+    match_archetype,
+    match_confidence,
+    epc_to_building_type,
+    year_to_tabula_period,
+    compute_epc_tabula_delta,
+    get_tabula_energy_for_zone,
+    climate_zone_from_county,
+    climate_zone_from_lat,
+    get_all_archetypes_summary,
+    BUILDING_TYPE_LABELS,
+)
 
 st.set_page_config(page_title="Review Data (Step 2+)", layout="wide")
 inject_shared_css()
@@ -1823,6 +1835,211 @@ with right_col:
                         else:
                             st.caption("No fields to display for this selection.")
 
+                    # ============================================================
+                    # TABULA / EPISCOPE — ARCHETYPE MATCH + OVERLAP PANEL
+                    # ============================================================
+                    _epc_build_year = passport.get("EgenNybyggAr", selected_row.get("build_year"))
+                    _epc_btype_raw = passport.get("EgenByggnadsTyp") or passport.get("EgenByggnadsKat") or ""
+                    _epc_energy_perf = passport.get("EgiEnergiPrestanda", selected_row.get("energy_performance"))
+                    _epc_kommun = passport.get("IdKommun", selected_row.get("municipality")) or ""
+
+                    # Try to get numeric build year
+                    _build_year_num = None
+                    if _epc_build_year is not None:
+                        try:
+                            _build_year_num = int(float(str(_epc_build_year)))
+                        except (ValueError, TypeError):
+                            pass
+
+                    # Try to get numeric energy performance
+                    _epc_energy_num = None
+                    if _epc_energy_perf is not None:
+                        try:
+                            _epc_energy_num = float(str(_epc_energy_perf))
+                        except (ValueError, TypeError):
+                            pass
+
+                    # Determine climate zone
+                    _climate_zone = climate_zone_from_county(_epc_kommun)
+                    if _climate_zone is None:
+                        _lat = float(selected_row.get("lat", 0)) if selected_row.get("lat") else None
+                        _climate_zone = climate_zone_from_lat(_lat) if _lat else 3  # default south
+
+                    _tabula_match = None
+                    _tabula_conf = None
+                    if _build_year_num and _epc_btype_raw:
+                        _tabula_match = match_archetype(_epc_btype_raw, _build_year_num)
+                        _tabula_conf = match_confidence(_epc_btype_raw, _build_year_num)
+                    elif _build_year_num:
+                        # Fallback: try typkod or category
+                        for _try_field in ["EgenTypkod_typ", "EgenByggnadsKat"]:
+                            _try_val = passport.get(_try_field, "")
+                            if _try_val:
+                                _tabula_match = match_archetype(str(_try_val), _build_year_num)
+                                _tabula_conf = match_confidence(str(_try_val), _build_year_num)
+                                if _tabula_match:
+                                    break
+
+                    # Store for downstream steps
+                    st.session_state["tabula_archetype"] = _tabula_match
+                    st.session_state["tabula_confidence"] = _tabula_conf
+                    st.session_state["tabula_climate_zone"] = _climate_zone
+
+                    st.markdown(
+                        "<div style='font-size:0.74rem; color:#33528A; text-transform:uppercase; "
+                        "letter-spacing:0.08em; font-weight:700; margin-top:1.2rem;'>"
+                        "🏛️ TABULA Archetype Match</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    if _tabula_match:
+                        _conf = _tabula_conf or {"level": "Medium", "score": 60, "reason": ""}
+                        _conf_color = {
+                            "High": "#33A9A0", "Medium": "#33528A", "Low": "#F59E0B", "None": "#94a3b8"
+                        }.get(_conf["level"], "#94a3b8")
+                        _conf_bg = {
+                            "High": "rgba(51,169,160,0.12)", "Medium": "rgba(51,82,138,0.10)",
+                            "Low": "rgba(245,158,11,0.12)", "None": "rgba(148,163,184,0.10)"
+                        }.get(_conf["level"], "rgba(148,163,184,0.10)")
+
+                        _tabula_net = get_tabula_energy_for_zone(_tabula_match, _climate_zone)
+
+                        st.markdown(
+                            f"<div style='border:1px solid {_conf_color}40; border-radius:14px; "
+                            f"padding:0.9rem 1rem; margin-top:0.4rem; "
+                            f"background:linear-gradient(180deg, #fbfdff 0%, #f4fafc 100%); "
+                            f"box-shadow:0 4px 16px rgba(51,82,138,0.06);'>"
+                            f"<div style='display:flex; justify-content:space-between; align-items:center; "
+                            f"margin-bottom:0.6rem;'>"
+                            f"<span style='font-weight:700; font-size:0.92rem; color:#0f172a;'>"
+                            f"{_tabula_match['type_label']}</span>"
+                            f"<span style='background:{_conf_bg}; color:{_conf_color}; "
+                            f"padding:0.15rem 0.6rem; border-radius:999px; font-size:0.72rem; "
+                            f"font-weight:700; border:1px solid {_conf_color}30;'>"
+                            f"{_conf['level']} confidence</span>"
+                            f"</div>"
+                            f"<div style='display:grid; grid-template-columns:1fr 1fr; gap:0.45rem;'>"
+                            f"<div style='background:#fff; border:1px solid #e2e8f0; border-radius:10px; "
+                            f"padding:0.55rem;'>"
+                            f"<div style='font-size:0.7rem; color:#64748b;'>Archetype Code</div>"
+                            f"<div style='font-size:0.88rem; font-weight:700; color:#0f172a;'>"
+                            f"{_tabula_match['code']}</div></div>"
+                            f"<div style='background:#fff; border:1px solid #e2e8f0; border-radius:10px; "
+                            f"padding:0.55rem;'>"
+                            f"<div style='font-size:0.7rem; color:#64748b;'>Period</div>"
+                            f"<div style='font-size:0.88rem; font-weight:700; color:#0f172a;'>"
+                            f"{_tabula_match['period']}</div></div>"
+                            f"<div style='background:#fff; border:1px solid #e2e8f0; border-radius:10px; "
+                            f"padding:0.55rem;'>"
+                            f"<div style='font-size:0.7rem; color:#64748b;'>Climate Zone</div>"
+                            f"<div style='font-size:0.88rem; font-weight:700; color:#0f172a;'>"
+                            f"Zone {_climate_zone}</div></div>"
+                            f"<div style='background:#fff; border:1px solid #e2e8f0; border-radius:10px; "
+                            f"padding:0.55rem;'>"
+                            f"<div style='font-size:0.7rem; color:#64748b;'>TABULA Net Heating</div>"
+                            f"<div style='font-size:0.88rem; font-weight:700; color:#0f172a;'>"
+                            f"{_tabula_net:.1f} kWh/m²" if _tabula_net else "—"
+                            f"</div></div>"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+
+                        # ── U-value comparison ──
+                        _u = _tabula_match.get("u_values", {})
+                        _u_items = [
+                            ("Wall", _u.get("wall")),
+                            ("Roof", _u.get("roof")),
+                            ("Floor", _u.get("floor")),
+                            ("Window", _u.get("window")),
+                            ("Door", _u.get("door")),
+                        ]
+                        _u_html = "".join(
+                            f"<div style='text-align:center;'>"
+                            f"<div style='font-size:1rem; font-weight:700; color:#33528A;'>"
+                            f"{v:.2f}</div>"
+                            f"<div style='font-size:0.68rem; color:#64748b;'>{n}</div></div>"
+                            for n, v in _u_items if v is not None and v > 0
+                        )
+                        st.markdown(
+                            f"<div style='margin-top:0.5rem; padding:0.6rem 0.8rem; "
+                            f"background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;'>"
+                            f"<div style='font-size:0.72rem; color:#475569; font-weight:600; "
+                            f"margin-bottom:0.35rem;'>TABULA U-values (W/m²K)</div>"
+                            f"<div style='display:flex; justify-content:space-around; gap:0.4rem;'>"
+                            f"{_u_html}</div></div>",
+                            unsafe_allow_html=True,
+                        )
+
+                        # ── EPC ↔ TABULA Energy Overlap Panel ──
+                        if _epc_energy_num and _tabula_net:
+                            _delta_info = compute_epc_tabula_delta(
+                                _epc_energy_num, _tabula_match, _climate_zone
+                            )
+                            if _delta_info:
+                                _d_pct = _delta_info["delta_pct"]
+                                if abs(_d_pct) < 5:
+                                    _d_color = "#33A9A0"
+                                    _d_icon = "✅"
+                                elif _d_pct < -5:
+                                    _d_color = "#8AB62E"
+                                    _d_icon = "💚"
+                                else:
+                                    _d_color = "#FF6B6B"
+                                    _d_icon = "⚠️"
+
+                                st.markdown(
+                                    f"<div style='margin-top:0.6rem; border:2px solid {_d_color}40; "
+                                    f"border-radius:14px; padding:0.85rem 1rem; "
+                                    f"background:linear-gradient(135deg, {_d_color}08 0%, #ffffff 100%);'>"
+                                    f"<div style='font-size:0.74rem; color:#33528A; font-weight:700; "
+                                    f"text-transform:uppercase; letter-spacing:0.08em; "
+                                    f"margin-bottom:0.5rem;'>"
+                                    f"📊 EPC ↔ TABULA Energy Overlap</div>"
+                                    f"<div style='display:grid; grid-template-columns:1fr 1fr 1fr; "
+                                    f"gap:0.5rem;'>"
+                                    f"<div style='background:#fff; border-radius:10px; padding:0.6rem; "
+                                    f"border:1px solid #e2e8f0; text-align:center;'>"
+                                    f"<div style='font-size:0.68rem; color:#64748b;'>EPC Actual</div>"
+                                    f"<div style='font-size:1.1rem; font-weight:800; color:#33528A;'>"
+                                    f"{_delta_info['epc']}</div>"
+                                    f"<div style='font-size:0.65rem; color:#94a3b8;'>kWh/m²</div></div>"
+                                    f"<div style='background:#fff; border-radius:10px; padding:0.6rem; "
+                                    f"border:1px solid #e2e8f0; text-align:center;'>"
+                                    f"<div style='font-size:0.68rem; color:#64748b;'>TABULA Expected</div>"
+                                    f"<div style='font-size:1.1rem; font-weight:800; color:#8AB62E;'>"
+                                    f"{_delta_info['tabula']}</div>"
+                                    f"<div style='font-size:0.65rem; color:#94a3b8;'>kWh/m² (Z{_climate_zone})</div></div>"
+                                    f"<div style='background:#fff; border-radius:10px; padding:0.6rem; "
+                                    f"border:1px solid {_d_color}30; text-align:center;'>"
+                                    f"<div style='font-size:0.68rem; color:#64748b;'>Delta</div>"
+                                    f"<div style='font-size:1.1rem; font-weight:800; color:{_d_color};'>"
+                                    f"{_d_icon} {_delta_info['delta_pct']:+.1f}%</div>"
+                                    f"<div style='font-size:0.65rem; color:#94a3b8;'>"
+                                    f"{_delta_info['delta']:+.1f} kWh/m²</div></div>"
+                                    f"</div>"
+                                    f"<div style='margin-top:0.5rem; font-size:0.82rem; color:#475569; "
+                                    f"background:#f8fafc; border-radius:8px; padding:0.5rem 0.7rem; "
+                                    f"border-left:3px solid {_d_color};'>"
+                                    f"{_delta_info['interpretation']}</div>"
+                                    f"</div>",
+                                    unsafe_allow_html=True,
+                                )
+
+                                # Store overlap for downstream
+                                st.session_state["epc_tabula_delta"] = _delta_info
+                    else:
+                        _reason = (_tabula_conf or {}).get("reason", "No match found")
+                        st.markdown(
+                            f"<div style='border:1px dashed #cbd5e1; border-radius:12px; "
+                            f"padding:0.75rem 1rem; margin-top:0.4rem; background:#f8fafc;'>"
+                            f"<div style='font-size:0.85rem; color:#64748b;'>"
+                            f"No TABULA archetype match available</div>"
+                            f"<div style='font-size:0.78rem; color:#94a3b8; margin-top:0.2rem;'>"
+                            f"{_reason}</div>"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+
             st.markdown(
                 "<div style='font-size:0.92rem; font-weight:600; color:#334155; "
                 "margin:1.2rem 0 0.5rem 0; padding:10px 14px; "
@@ -1925,11 +2142,14 @@ with col2:
 
 with col3:
     if st.button("Continue", type="primary", key="s2p_next"):
-        st.switch_page("pages/3_Analysis_Method.py")
+        if project_type == "Renovation Planning":
+            st.switch_page("pages/3plus_Data_Inputs.py")
+        else:
+            st.switch_page("pages/3_Analysis_Method.py")
 
 with col4:
     st.markdown(
         "<div style='text-align:right; color:#94a3b8; font-size:0.85rem; "
-        "padding-top:0.5rem;'>Step 2+ of 6</div>",
+        "padding-top:0.5rem;'>Step 2+ of 7</div>",
         unsafe_allow_html=True,
     )

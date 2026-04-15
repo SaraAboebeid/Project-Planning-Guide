@@ -26,6 +26,17 @@ _STEPS = [
     ("6", "Cost Estimation",    "pages/6_Tasks_and_Cost.py"),
 ]
 
+# ── Extended steps for the Renovation Planning + pipeline ──
+_STEPS_PLUS = [
+    ("1", "Define Project",     "pages/0_Define_Project.py"),
+    ("2", "Building Baseline",  "pages/2plus_Review_Data.py"),
+    ("3", "Data & Assumptions", "pages/3plus_Data_Inputs.py"),
+    ("4", "Recommendations",    "pages/4plus_Recommendations.py"),
+    ("5", "Expected Results",   "pages/4_Expected_Results.py"),
+    ("6", "Timeline",           "pages/5_Project_Timeline.py"),
+    ("7", "Budget / Cost",      "pages/6_Tasks_and_Cost.py"),
+]
+
 _NAV_BUTTON_CSS = """
 <style>
 /* ── Google Fonts import ── */
@@ -375,10 +386,15 @@ def render_step_indicator(current_step: int):
     Parameters
     ----------
     current_step : int
-        1-based index of the active step (1–6).
+        1-based index of the active step (1–6 for standard, 1–7 for + mode).
     """
+    # Auto-detect + pipeline mode
+    is_plus = st.session_state.get("pipeline_mode") == "step1plus"
+    is_reno = st.session_state.get("project_type") == "Renovation Planning"
+    steps = _STEPS_PLUS if (is_plus and is_reno) else _STEPS
+
     parts: list[str] = []
-    for idx, (num, label, _page) in enumerate(_STEPS):
+    for idx, (num, label, _page) in enumerate(steps):
         step_num = idx + 1
         if step_num < current_step:
             cls = "done"

@@ -24,9 +24,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Persistent step progress indicator
-render_step_indicator(6)
-
 is_plus_mode = st.session_state.get("pipeline_mode") == "step1plus"
+_is_plus_reno = (
+    is_plus_mode
+    and st.session_state.get("project_type") == "Renovation Planning"
+)
+render_step_indicator(7 if _is_plus_reno else 6)
+
 step1_page = "pages/0_Define_Project.py" if is_plus_mode else "pages/1_Define_Scope_and_Context.py"
 
 # ============================================================================
@@ -411,8 +415,13 @@ with col3:
         st.switch_page(step1_page)
 
 with col4:
+    _is_plus_reno = (
+        is_plus_mode
+        and st.session_state.get("project_type") == "Renovation Planning"
+    )
+    _step_lbl = "Step 7+ of 7" if _is_plus_reno else "Step 6 of 6"
     st.markdown(
-        "<div style='text-align: right; color: #94a3b8; font-size: 0.85rem; padding-top: 0.5rem;'>"
-        "Step 6 of 6</div>",
+        f"<div style='text-align: right; color: #94a3b8; font-size: 0.85rem; padding-top: 0.5rem;'>"
+        f"{_step_lbl}</div>",
         unsafe_allow_html=True
     )
