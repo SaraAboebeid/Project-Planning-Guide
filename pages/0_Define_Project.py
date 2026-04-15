@@ -238,16 +238,20 @@ if project_type:
             st.markdown(
                 "<div style='font-size:0.95rem; font-weight:600; "
                 "margin-bottom:0.2rem;'>"
-                "Which envelope components would you like to renovate? "
+                "Which components are included in the renovation? "
                 "<span style='color:#dc2626'>*</span></div>",
                 unsafe_allow_html=True,
             )
             st.caption("Select one or more components:")
-            envelope_options = ["Windows", "Walls", "Roof", "Floor"]
+            envelope_options = [
+                "Walls", "Windows", "Doors",
+                "Structure (Columns & Beams)",
+                "Floor", "Roof", "Balcony", "Insulation",
+            ]
             env_cols = st.columns(2)
             selected_envelope = []
             for i, env in enumerate(envelope_options):
-                env_key = f"p1p_renv_{env.lower()}"
+                env_key = f"p1p_renv_{env.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('&', 'and')}"
                 with env_cols[i % 2]:
                     if st.checkbox(env, key=env_key):
                         selected_envelope.append(env)

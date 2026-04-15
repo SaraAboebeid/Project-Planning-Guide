@@ -21,12 +21,6 @@ from config.sensitivity_config import (
 )
 from config.data_inputs import get_proxy_confidence
 from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards, render_branded_top_bar
-from utils.boverket_api import (
-    get_latest_version as boverket_latest_version,
-    get_categories as boverket_categories,
-    get_resources_by_category as boverket_resources_by_category,
-    resource_summary as boverket_resource_summary,
-)
 from utils.location_data import (
     has_location_database,
     get_nearby_epc_snapshot,
@@ -1394,126 +1388,6 @@ if _sa:
                 show_renovation_sensitivity()
             elif project_type == "Energy Community Planning":
                 show_ec_sensitivity()
-
-# ============================================================================
-# BOVERKET KLIMATDATABAS — Building material climate data
-# ============================================================================
-
-st.markdown(
-    "<div style='font-size:1.05rem; font-weight:700; color:#334155; "
-    "margin:1.4rem 0 0.3rem 0; display:flex; align-items:center; gap:8px;'>"
-    "<span style='font-size:1.15rem;'>🌱</span> "
-    "Boverket Climate Database — Building Material GWP</div>",
-    unsafe_allow_html=True,
-)
-st.caption(
-    "Generic building resources from [Boverket Klimatdatabas]"
-    "(https://www.boverket.se/sv/klimatdeklaration/klimatdatabas/). "
-    "Values show **Global Warming Potential** (kg CO₂ eq.) per declared unit."
-)
-
-_bov_version = boverket_latest_version()
-_bov_cats = boverket_categories(version=_bov_version, culture="en") if _bov_version else []
-
-if not _bov_cats:
-    st.warning("Could not load Boverket climate data. The API may be temporarily unavailable.")
-else:
-    _cat_options = {c["Title"]: c["Id"] for c in _bov_cats}
-    # Pre-select relevant categories based on project type
-    _default_cats = []
-    if project_type == "Renovation Planning":
-        _default_cats = [t for t in ["Concrete", "Insulation", "Steel and other metals",
-                                      "Windows, doors and glass", "Solid woods"] if t in _cat_options]
-    elif project_type in ("Energy Community Planning", "Renewable Energy Planning"):
-        _default_cats = [t for t in ["Steel and other metals", "Concrete",
-                                      "Energy and fuel"] if t in _cat_options]
-
-    bov_c1, bov_c2 = st.columns([0.6, 0.4])
-    with bov_c1:
-        _sel_cats = st.multiselect(
-            "Material categories",
-            options=sorted(_cat_options.keys()),
-            default=_default_cats or [sorted(_cat_options.keys())[0]],
-            key="s2p_bov_categories",
-            help="Select one or more building-material categories to browse",
-        )
-    with bov_c2:
-        st.markdown(
-            f"<div style='font-size:0.78rem; color:#64748b; margin-top:1.8rem;'>"
-            f"Database version <b>{_bov_version}</b> · "
-            f"<a href='https://api-portal.boverket.se/reference#api=klimatdatabas' "
-            f"target='_blank' style='color:#8AB62E;'>API docs ↗</a></div>",
-            unsafe_allow_html=True,
-        )
-
-    if _sel_cats:
-        import pandas as pd
-
-        _all_rows = []
-        for cat_name in _sel_cats:
-            cat_id = _cat_options[cat_name]
-            resources = boverket_resources_by_category(cat_id, version=_bov_version, culture="en")
-            for res in resources:
-                row = boverket_resource_summary(res)
-                row["Material Category"] = cat_name
-                _all_rows.append(row)
-
-        if _all_rows:
-            bov_df = pd.DataFrame(_all_rows)
-
-            # Reorder columns
-            col_order = [
-                "Material Category", "Name", "Unit",
-                "GWP A1-A3 (Conservative)", "GWP A1-A3 (Typical)",
-                "GWP A4 (Transport)", "GWP A5.1 (Installation)",
-                "Density / Conversion", "Waste Factor",
-            ]
-            col_order = [c for c in col_order if c in bov_df.columns]
-            bov_df = bov_df[col_order]
-
-            # Search / filter
-            _bov_search = st.text_input(
-                "🔍 Filter resources by name",
-                key="s2p_bov_search",
-                placeholder="e.g. concrete, insulation, steel…",
-            )
-            if _bov_search:
-                mask = bov_df["Name"].str.contains(_bov_search, case=False, na=False)
-                bov_df = bov_df[mask]
-
-            st.markdown(
-                f"<div style='font-size:0.82rem; color:#64748b; margin-bottom:0.3rem;'>"
-                f"Showing <b>{len(bov_df)}</b> resources across "
-                f"<b>{len(_sel_cats)}</b> categories</div>",
-                unsafe_allow_html=True,
-            )
-
-            st.dataframe(
-                bov_df,
-                use_container_width=True,
-                hide_index=True,
-                height=min(420, 38 + len(bov_df) * 35),
-                column_config={
-                    "GWP A1-A3 (Conservative)": st.column_config.NumberColumn(
-                        "GWP A1-A3 (Cons.)", format="%.4f",
-                        help="Conservative value including safety margin",
-                    ),
-                    "GWP A1-A3 (Typical)": st.column_config.NumberColumn(
-                        "GWP A1-A3 (Typ.)", format="%.4f",
-                        help="Typical / average production value",
-                    ),
-                    "GWP A4 (Transport)": st.column_config.NumberColumn(
-                        "GWP A4", format="%.5f",
-                        help="Transport to site",
-                    ),
-                    "GWP A5.1 (Installation)": st.column_config.NumberColumn(
-                        "GWP A5.1", format="%.5f",
-                        help="Installation waste on site",
-                    ),
-                },
-            )
-        else:
-            st.info("No resources found for the selected categories.")
 
 left_col, right_col = st.columns([0.65, 0.35])
 

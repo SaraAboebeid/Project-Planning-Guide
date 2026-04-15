@@ -6,9 +6,18 @@ effort/duration estimates, and a data source directory.
 """
 
 import streamlit as st
+import pandas as pd
 from config.data_inputs import get_data_inputs, get_proxy_options_for_context, get_proxy_confidence
 from config.sensitivity_config import get_sensitivity_weight
 from utils.shared_css import inject_shared_css, render_step_indicator, render_top_cards
+from utils.boverket_api import (
+    get_latest_version as boverket_latest_version,
+    get_categories as boverket_categories,
+    get_resources_by_category as boverket_resources_by_category,
+    get_resources_for_component as boverket_resources_for_component,
+    resource_summary as boverket_resource_summary,
+    RENOVATION_COMPONENTS,
+)
 
 st.set_page_config(page_title="Confidence & Recommendations", layout="wide")
 
@@ -511,6 +520,253 @@ if missing_items:
                 f"</div>",
                 unsafe_allow_html=True
             )
+
+# ============================================================================
+# BOVERKET KLIMATDATABAS — Building material climate data
+# ============================================================================
+
+st.markdown(
+    "<hr style='margin: 1rem 0; border: none; border-top: 1px solid #e2e8f0;'>",
+    unsafe_allow_html=True,
+)
+
+_project_type = st.session_state.get("project_type", "")
+_is_renovation = _project_type == "Renovation Planning" and is_plus_mode
+_reno_components = st.session_state.get("renovation_envelope_components", [])
+
+st.markdown(
+    "<div style='font-size:1.05rem; font-weight:700; color:#334155; "
+    "margin:0.5rem 0 0.3rem 0; display:flex; align-items:center; gap:8px;'>"
+    "<span style='font-size:1.15rem;'>🌱</span> "
+    "Boverket Climate Database — Building Material GWP</div>",
+    unsafe_allow_html=True,
+)
+st.caption(
+    "Generic building resources from [Boverket Klimatdatabas]"
+    "(https://www.boverket.se/sv/klimatdeklaration/klimatdatabas/). "
+    "Values show **Global Warming Potential** (kg CO₂ eq.) per declared unit."
+)
+
+_bov_version = boverket_latest_version()
+
+if not _bov_version:
+    st.warning("Could not load Boverket climate data. The API may be temporarily unavailable.")
+else:
+    # ── Renovation Planning: component-based view ──
+    if _is_renovation and _reno_components:
+        st.markdown(
+            f"<div style='font-size:0.78rem; color:#64748b; margin-bottom:0.6rem;'>"
+            f"Database version <b>{_bov_version}</b> · "
+            f"Showing materials for <b>{len(_reno_components)}</b> renovation component(s) "
+            f"selected in Step 0 · "
+            f"<a href='https://api-portal.boverket.se/reference#api=klimatdatabas' "
+            f"target='_blank' style='color:#8AB62E;'>API docs ↗</a></div>",
+            unsafe_allow_html=True,
+        )
+
+        # Let user pick which components to view (default = all selected in Step 0)
+        _valid = [c for c in _reno_components if c in RENOVATION_COMPONENTS]
+        _show_components = st.multiselect(
+            "Components to show",
+            options=RENOVATION_COMPONENTS,
+            default=_valid or RENOVATION_COMPONENTS[:1],
+            key="s3_bov_components",
+            help="Select renovation components to browse available materials",
+        )
+
+        # Add toggle for view mode
+        bov_view_mode = st.radio(
+            "View as:",
+            options=["Total GWP Range", "A1-A3 Typical Module"],
+            horizontal=True,
+            key="s3_bov_view_mode",
+            help="Total GWP Range: Shows min/max lifecycle impact. A1-A3 Typical Module: Shows only production phase.",
+        )
+
+        if _show_components:
+            # Build tabs for each component
+            _comp_tabs = st.tabs([f"📦 {c}" for c in _show_components])
+            for _tab, _comp in zip(_comp_tabs, _show_components):
+                with _tab:
+                    _resources = boverket_resources_for_component(
+                        _comp, version=_bov_version, culture="en"
+                    )
+                    if not _resources:
+                        st.info(f"No materials found for {_comp}.")
+                        continue
+
+                    _rows = [boverket_resource_summary(r) for r in _resources]
+                    _df = pd.DataFrame(_rows)
+
+                    # Choose columns based on view mode
+                    if bov_view_mode == "Total GWP Range":
+                        col_order = [
+                            "Name", "Unit",
+                            "GWP Max (Cons+A4+A5)", "GWP Min (Typ+A4+A5)",
+                            "Density / Conversion", "Waste Factor",
+                        ]
+                    else:  # A1-A3 Typical Module
+                        col_order = [
+                            "Name", "Unit",
+                            "GWP A1-A3 (Typical)",
+                            "Density / Conversion", "Waste Factor",
+                        ]
+                    col_order = [c for c in col_order if c in _df.columns]
+                    _df = _df[col_order]
+
+                    _search = st.text_input(
+                        "🔍 Filter", key=f"s3_bov_search_{_comp}",
+                        placeholder=f"Filter {_comp.lower()} materials…",
+                    )
+                    if _search:
+                        _df = _df[_df["Name"].str.contains(_search, case=False, na=False)]
+
+                    st.markdown(
+                        f"<div style='font-size:0.82rem; color:#64748b; margin-bottom:0.3rem;'>"
+                        f"<b>{len(_df)}</b> materials for <b>{_comp}</b></div>",
+                        unsafe_allow_html=True,
+                    )
+                    
+                    # Configure columns based on view mode
+                    if bov_view_mode == "Total GWP Range":
+                        col_config = {
+                            "GWP Max (Cons+A4+A5)": st.column_config.NumberColumn(
+                                "GWP Max (kg CO₂ eq.)", format="%.4f",
+                                help="Conservative production + Transport + Installation",
+                            ),
+                            "GWP Min (Typ+A4+A5)": st.column_config.NumberColumn(
+                                "GWP Min (kg CO₂ eq.)", format="%.4f",
+                                help="Typical production + Transport + Installation",
+                            ),
+                        }
+                    else:  # A1-A3 Typical Module
+                        col_config = {
+                            "GWP A1-A3 (Typical)": st.column_config.NumberColumn(
+                                "GWP A1-A3 Typical (kg CO₂ eq.)", format="%.4f",
+                                help="Average production phase impact",
+                            ),
+                        }
+                    
+                    st.dataframe(
+                        _df,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=min(380, 38 + len(_df) * 35),
+                        column_config=col_config,
+                    )
+
+    # ── General view (non-renovation or no components selected) ──
+    else:
+        _bov_cats = boverket_categories(version=_bov_version, culture="en")
+        if not _bov_cats:
+            st.warning("Could not load categories.")
+        else:
+            _cat_options = {c["Title"]: c["Id"] for c in _bov_cats}
+
+            bov_c1, bov_c2 = st.columns([0.6, 0.4])
+            with bov_c1:
+                _sel_cats = st.multiselect(
+                    "Material categories",
+                    options=sorted(_cat_options.keys()),
+                    default=[sorted(_cat_options.keys())[0]],
+                    key="s3_bov_categories",
+                    help="Select one or more categories to browse",
+                )
+            with bov_c2:
+                st.markdown(
+                    f"<div style='font-size:0.78rem; color:#64748b; margin-top:1.8rem;'>"
+                    f"Database version <b>{_bov_version}</b> · "
+                    f"<a href='https://api-portal.boverket.se/reference#api=klimatdatabas' "
+                    f"target='_blank' style='color:#8AB62E;'>API docs ↗</a></div>",
+                    unsafe_allow_html=True,
+                )
+
+            if _sel_cats:
+                # Add toggle for view mode
+                bov_view_mode = st.radio(
+                    "View as:",
+                    options=["Total GWP Range", "A1-A3 Typical Module"],
+                    horizontal=True,
+                    key="s3_bov_view_mode_general",
+                    help="Total GWP Range: Shows min/max lifecycle impact. A1-A3 Typical Module: Shows only production phase.",
+                )
+
+                _all_rows = []
+                for cat_name in _sel_cats:
+                    cat_id = _cat_options[cat_name]
+                    resources = boverket_resources_by_category(
+                        cat_id, version=_bov_version, culture="en"
+                    )
+                    for res in resources:
+                        row = boverket_resource_summary(res)
+                        row["Material Category"] = cat_name
+                        _all_rows.append(row)
+
+                if _all_rows:
+                    bov_df = pd.DataFrame(_all_rows)
+                    
+                    # Choose columns based on view mode
+                    if bov_view_mode == "Total GWP Range":
+                        col_order = [
+                            "Material Category", "Name", "Unit",
+                            "GWP Max (Cons+A4+A5)", "GWP Min (Typ+A4+A5)",
+                            "Density / Conversion", "Waste Factor",
+                        ]
+                    else:  # A1-A3 Typical Module
+                        col_order = [
+                            "Material Category", "Name", "Unit",
+                            "GWP A1-A3 (Typical)",
+                            "Density / Conversion", "Waste Factor",
+                        ]
+                    col_order = [c for c in col_order if c in bov_df.columns]
+                    bov_df = bov_df[col_order]
+
+                    _bov_search = st.text_input(
+                        "🔍 Filter resources by name",
+                        key="s3_bov_search",
+                        placeholder="e.g. concrete, insulation, steel…",
+                    )
+                    if _bov_search:
+                        bov_df = bov_df[
+                            bov_df["Name"].str.contains(_bov_search, case=False, na=False)
+                        ]
+
+                    st.markdown(
+                        f"<div style='font-size:0.82rem; color:#64748b; margin-bottom:0.3rem;'>"
+                        f"Showing <b>{len(bov_df)}</b> resources across "
+                        f"<b>{len(_sel_cats)}</b> categories</div>",
+                        unsafe_allow_html=True,
+                    )
+                    
+                    # Configure columns based on view mode
+                    if bov_view_mode == "Total GWP Range":
+                        col_config = {
+                            "GWP Max (Cons+A4+A5)": st.column_config.NumberColumn(
+                                "GWP Max (kg CO₂ eq.)", format="%.4f",
+                                help="Conservative production + Transport + Installation",
+                            ),
+                            "GWP Min (Typ+A4+A5)": st.column_config.NumberColumn(
+                                "GWP Min (kg CO₂ eq.)", format="%.4f",
+                                help="Typical production + Transport + Installation",
+                            ),
+                        }
+                    else:  # A1-A3 Typical Module
+                        col_config = {
+                            "GWP A1-A3 (Typical)": st.column_config.NumberColumn(
+                                "GWP A1-A3 Typical (kg CO₂ eq.)", format="%.4f",
+                                help="Average production phase impact",
+                            ),
+                        }
+                    
+                    st.dataframe(
+                        bov_df,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=min(420, 38 + len(bov_df) * 35),
+                        column_config=col_config,
+                    )
+                else:
+                    st.info("No resources found for the selected categories.")
 
 # ============================================================================
 # NAVIGATION
