@@ -40,6 +40,11 @@ from utils.tabula_matching import (
     get_all_archetypes_summary,
     BUILDING_TYPE_LABELS,
 )
+from utils.data_requirements import (
+    assess_coverage,
+    compute_confidence_score,
+    group_by_category,
+)
 
 st.set_page_config(page_title="Review Data (Step 2+)", layout="wide")
 inject_shared_css()
@@ -218,8 +223,8 @@ reno_cost_kpi = "Cost" in st.session_state.get("selected_kpis", [])
 # ============================================================================
 
 render_branded_top_bar(
-    "Step 2+: Review Data Inputs",
-    "Review required data inputs, inspect linked EPC buildings, and assess local data coverage with a building-level passport.",
+    "Step 2+: Data Coverage & Configuration",
+    "Understand what we already know about your asset, identify data gaps, and configure the workflow for missing inputs.",
 )
 render_step_indicator(2)
 
@@ -1294,53 +1299,68 @@ def show_ec_sensitivity():
 
 
 
-all_items = []
-for sys_group in data_inputs:
-    for cat in sys_group["categories"]:
-        all_items.extend(cat["items"])
+_is_reno_planning = (project_type == "Renovation Planning")
 
-# Stats
-avail = miss = 0
-confs = []
-for it in all_items:
-    hk = f"{page_key}_{it['key']}_has"
-    if st.session_state.get(hk, "Yes") == "Yes":
-        avail += 1
-    else:
-        miss += 1
-        pk = f"{page_key}_{it['key']}_proxy"
-        sp = st.session_state.get(pk)
-        if sp:
-            ci = get_proxy_confidence(country, it["key"], sp)
-            cv = ci.get("confidence")
-            if cv is not None:
-                confs.append(cv)
-avg_conf = round(sum(confs) / len(confs), 1) if confs else None
-avg_display = f"{avg_conf}%" if avg_conf else "N/A"
+if not _is_reno_planning:
+    all_items = []
+    for sys_group in data_inputs:
+        for cat in sys_group["categories"]:
+            all_items.extend(cat["items"])
 
-render_top_cards([
-        {
-                "value": str(avail),
-                "label": "Available Data",
-                "color": "#33A9A0",
-                "bg": "rgba(51,169,160,0.10)",
-                "border": "rgba(51,169,160,0.25)",
-        },
-        {
-                "value": str(miss),
-                "label": "Missing Data",
-                "color": "#33528A",
-                "bg": "rgba(51,82,138,0.10)",
-                "border": "rgba(51,82,138,0.25)",
-        },
-        {
-                "value": avg_display,
-                "label": "Avg. Proxy Confidence",
-                "color": "#8AB62E",
-                "bg": "rgba(138,182,46,0.10)",
-                "border": "rgba(138,182,46,0.25)",
-        },
-])
+    # Stats
+    avail = miss = 0
+    confs = []
+    for it in all_items:
+        hk = f"{page_key}_{it['key']}_has"
+        if st.session_state.get(hk, "Yes") == "Yes":
+            avail += 1
+        else:
+            miss += 1
+            pk = f"{page_key}_{it['key']}_proxy"
+            sp = st.session_state.get(pk)
+            if sp:
+                ci = get_proxy_confidence(country, it["key"], sp)
+                cv = ci.get("confidence")
+                if cv is not None:
+                    confs.append(cv)
+    avg_conf = round(sum(confs) / len(confs), 1) if confs else None
+    avg_display = f"{avg_conf}%" if avg_conf else "N/A"
+    _total_items = avail + miss
+
+    # Coverage summary header
+    st.markdown(
+        "<div style='font-size:1.05rem; font-weight:700; color:#0f172a; "
+        "margin:0.5rem 0 0.3rem 0;'>📋 Data Input Coverage</div>",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        f"Your project requires **{_total_items} data inputs**. "
+        f"Tell us what you already have — we'll configure the workflow for what's missing."
+    )
+
+    render_top_cards([
+            {
+                    "value": str(avail),
+                    "label": "Available Data",
+                    "color": "#33A9A0",
+                    "bg": "rgba(51,169,160,0.10)",
+                    "border": "rgba(51,169,160,0.25)",
+            },
+            {
+                    "value": str(miss),
+                    "label": "Missing Data",
+                    "color": "#33528A",
+                    "bg": "rgba(51,82,138,0.10)",
+                    "border": "rgba(51,82,138,0.25)",
+            },
+            {
+                    "value": avg_display,
+                    "label": "Avg. Proxy Confidence",
+                    "color": "#8AB62E",
+                    "bg": "rgba(138,182,46,0.10)",
+                    "border": "rgba(138,182,46,0.25)",
+            },
+    ])
 
 # ── Sensitivity Analysis banner — above both columns, always visible ──────────
 # ── Sensitivity Analysis banner — visible for all three project types ─────────
@@ -1401,10 +1421,487 @@ if _sa:
             elif project_type == "Energy Community Planning":
                 show_ec_sensitivity()
 
-left_col, right_col = st.columns([0.65, 0.35])
+if project_type == "Renovation Planning":
+    # ================================================================
+    # RENOVATION PLANNING — PROJECT CONFIGURATION VIEW
+    # ================================================================
+    # 1. Compact building selector
+    # 2. Assess coverage from EPC + TABULA
+    # 3. Summary cards (covered / synthetic / missing / confidence)
+    # 4. Grouped coverage list
+    # 5. Workflow assessment (what we do about gaps)
+    # 6. Expander: map + passport + TABULA details (behind button)
+
+    _reno_passport = {}
+    _reno_tabula_match = None
+    _reno_tabula_conf = None
+    _reno_climate_zone = 3
+    _reno_selected_row = None
+    _reno_map_center = None
+    _reno_linked_points = None
+
+    if has_location_database():
+        project_scale = st.session_state.get("project_scale", "")
+        sel = st.session_state.get("location_selection", {})
+
+        # Re-geocode if needed
+        if isinstance(sel, dict) and sel.get("mode") == "address":
+            typed_addr = (st.session_state.get("location") or "").strip()
+            selected_query = str(sel.get("query") or "").strip()
+            if typed_addr and typed_addr != selected_query:
+                try:
+                    geocoded = geocode_address(typed_addr, st.session_state.get("country", "Sweden"))
+                    if geocoded:
+                        lat = float(geocoded["lat"])
+                        lon = float(geocoded["lon"])
+                        st.session_state["project_lat"] = lat
+                        st.session_state["project_lon"] = lon
+                        st.session_state["project_location_label"] = geocoded.get("display_name", typed_addr)
+                        st.session_state["location_selection"] = {
+                            "mode": "address", "query": typed_addr,
+                            "label": st.session_state["project_location_label"],
+                            "lat": lat, "lon": lon,
+                            "radius_m": 80 if project_scale == "Building" else int(st.session_state.get("location_radius_m", 800)),
+                        }
+                        sel = st.session_state.get("location_selection", {})
+                except Exception:
+                    pass
+
+        selection_mode = "Address + Radius"
+        if isinstance(sel, dict) and sel.get("mode") == "bbox":
+            selection_mode = "Draw Bounding Box"
+        elif isinstance(sel, dict) and sel.get("mode") == "address":
+            selection_mode = "Address + Radius"
+        else:
+            selection_mode = st.session_state.get("p1p_location_mode", "Address + Radius")
+        if project_scale == "Building":
+            selection_mode = "Address + Radius"
+
+        snapshot = None
+        location_label = st.session_state.get("project_location_label", st.session_state.get("location", "Selected location"))
+        map_center_lat = map_center_lon = None
+        location_note = ""
+
+        # Resolve snapshot (same logic as right_col)
+        if selection_mode == "Draw Bounding Box" and isinstance(sel, dict) and sel.get("bbox"):
+            b = sel["bbox"]
+            snapshot = get_epc_snapshot_for_bbox(b["min_lat"], b["max_lat"], b["min_lon"], b["max_lon"], point_limit=1200)
+            map_center_lat = (b["min_lat"] + b["max_lat"]) / 2
+            map_center_lon = (b["min_lon"] + b["max_lon"]) / 2
+            location_note = f"Bounding box"
+        elif selection_mode == "Address + Radius" and isinstance(sel, dict) and sel.get("lat") is not None:
+            lat = float(sel["lat"])
+            lon = float(sel["lon"])
+            if project_scale == "Building":
+                snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=250, point_limit=300)
+                addr_query = sel.get("query") or st.session_state.get("location") or location_label
+                snapshot, chosen_addr, matched_by_query = _prepare_single_building_snapshot(snapshot, addr_query)
+                location_note = f"{location_label}"
+            else:
+                radius = int(sel.get("radius_m", st.session_state.get("location_radius_m", 800)))
+                snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=radius, point_limit=1000)
+                location_note = f"{location_label} · radius {radius} m"
+            map_center_lat = lat
+            map_center_lon = lon
+        elif "project_lat" in st.session_state and "project_lon" in st.session_state:
+            lat = float(st.session_state["project_lat"])
+            lon = float(st.session_state["project_lon"])
+            if project_scale == "Building":
+                snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=250, point_limit=300)
+                addr_query = st.session_state.get("location") or location_label
+                snapshot, chosen_addr, matched_by_query = _prepare_single_building_snapshot(snapshot, addr_query)
+                location_note = f"{location_label}"
+            else:
+                radius = int(st.session_state.get("location_radius_m", 800))
+                snapshot = get_nearby_epc_snapshot(lat, lon, radius_m=radius, point_limit=1000)
+                location_note = f"{location_label} · radius {radius} m"
+            map_center_lat = lat
+            map_center_lon = lon
+
+        # Map + building selector
+        if snapshot is not None and map_center_lat is not None:
+            points_df = snapshot["points"]
+            linked_points_df = points_df[
+                ~points_df["FormularId"].isna()
+                & (points_df["address"].notna() | points_df["energy_class"].notna()
+                   | points_df["energy_performance"].notna() | points_df["build_year"].notna()
+                   | points_df["atemp"].notna())
+            ].copy() if not points_df.empty else points_df
+            if not linked_points_df.empty:
+                linked_points_df = linked_points_df.drop_duplicates(subset=["FormularId"], keep="first")
+
+            # Store map data for rendering in the details expander later
+            _reno_map_center = (map_center_lat, map_center_lon)
+            _reno_linked_points = linked_points_df
+
+            if not linked_points_df.empty:
+                st.markdown(
+                    f"<div style='font-size:0.82rem; color:#64748b; margin-bottom:0.2rem;'>"
+                    f"📍 {location_note} · {len(linked_points_df)} EPC-linked building{'s' if len(linked_points_df) != 1 else ''}</div>",
+                    unsafe_allow_html=True,
+                )
+                points_with_id = linked_points_df.copy()
+                points_with_id["_label"] = points_with_id.apply(
+                    lambda r: (
+                        (r["address"] if isinstance(r.get("address"), str) and r.get("address") else "Address unavailable")
+                        + (f" · EPC {_display_value(r.get('energy_class'))}" if not _is_missing(r.get("energy_class")) else "")
+                    ),
+                    axis=1,
+                )
+                options = points_with_id["_label"].tolist()[:300]
+                chosen = st.selectbox("Select building", options=options, key="s2p_reno_building")
+                _reno_selected_row = points_with_id[points_with_id["_label"] == chosen].iloc[0]
+                st.session_state["s2p_selected_formular_id"] = _safe_id_text(_reno_selected_row.get("FormularId"))
+
+                _reno_passport = get_epc_building_passport(_reno_selected_row.get("FormularId")) or {}
+
+                # TABULA matching
+                _epc_build_year = _reno_passport.get("EgenNybyggAr", _reno_selected_row.get("build_year"))
+                _epc_btype_raw = _reno_passport.get("EgenByggnadsTyp") or _reno_passport.get("EgenByggnadsKat") or ""
+                _epc_kommun = _reno_passport.get("IdKommun", _reno_selected_row.get("municipality")) or ""
+
+                _build_year_num = None
+                if _epc_build_year is not None:
+                    try:
+                        _build_year_num = int(float(str(_epc_build_year)))
+                    except (ValueError, TypeError):
+                        pass
+
+                _reno_climate_zone = climate_zone_from_county(_epc_kommun)
+                if _reno_climate_zone is None:
+                    _lat = float(_reno_selected_row.get("lat", 0)) if _reno_selected_row.get("lat") else None
+                    _reno_climate_zone = climate_zone_from_lat(_lat) if _lat else 3
+
+                if _build_year_num and _epc_btype_raw:
+                    _reno_tabula_match = match_archetype(_epc_btype_raw, _build_year_num)
+                    _reno_tabula_conf = match_confidence(_epc_btype_raw, _build_year_num)
+                elif _build_year_num:
+                    for _try_field in ["EgenTypkod_typ", "EgenByggnadsKat"]:
+                        _try_val = _reno_passport.get(_try_field, "")
+                        if _try_val:
+                            _reno_tabula_match = match_archetype(str(_try_val), _build_year_num)
+                            _reno_tabula_conf = match_confidence(str(_try_val), _build_year_num)
+                            if _reno_tabula_match:
+                                break
+
+                st.session_state["tabula_archetype"] = _reno_tabula_match
+                st.session_state["tabula_confidence"] = _reno_tabula_conf
+                st.session_state["tabula_climate_zone"] = _reno_climate_zone
+                st.session_state["epc_passport"] = _reno_passport
+            else:
+                st.info("No EPC-linked buildings found near this location.")
+
+    # ── Assess data coverage ──────────────────────────────────────
+    _coverage = assess_coverage(
+        passport=_reno_passport,
+        tabula_match=_reno_tabula_match,
+        boverket_available=True,
+        wikells_available=False,
+        envelope_components=reno_envelope,
+    )
+    _conf_score = compute_confidence_score(_coverage)
+    _grouped = group_by_category(_coverage)
+
+    _n_covered = sum(1 for r in _coverage if r["status"] == "covered")
+    _n_synthetic = sum(1 for r in _coverage if r["status"] == "available_synthetic")
+    _n_missing = sum(1 for r in _coverage if r["status"] == "missing")
+
+    # ── Summary cards ──────────────────────────────────────────────
+    st.markdown("<div style='height:0.6rem;'></div>", unsafe_allow_html=True)
+
+    _STATUS_STYLE = {
+        "covered": ("#33A9A0", "rgba(51,169,160,0.10)", "rgba(51,169,160,0.25)"),
+        "available_synthetic": ("#F59E0B", "rgba(245,158,11,0.10)", "rgba(245,158,11,0.25)"),
+        "missing": ("#EF4444", "rgba(239,68,68,0.10)", "rgba(239,68,68,0.25)"),
+    }
+
+    render_top_cards([
+        {"value": str(_n_covered), "label": "✅ Covered", "color": "#33A9A0",
+         "bg": "rgba(51,169,160,0.10)", "border": "rgba(51,169,160,0.25)"},
+        {"value": str(_n_synthetic), "label": "🔄 Synthetic Available", "color": "#F59E0B",
+         "bg": "rgba(245,158,11,0.10)", "border": "rgba(245,158,11,0.25)"},
+        {"value": str(_n_missing), "label": "❌ Missing", "color": "#EF4444",
+         "bg": "rgba(239,68,68,0.10)", "border": "rgba(239,68,68,0.25)"},
+        {"value": f"{_conf_score}%", "label": "📊 Confidence Score", "color": "#33528A",
+         "bg": "rgba(51,82,138,0.10)", "border": "rgba(51,82,138,0.25)"},
+    ])
+
+    # ── Grouped coverage list ──────────────────────────────────────
+    st.markdown(
+        "<div style='font-size:1.05rem; font-weight:700; color:#0f172a; "
+        "margin:0.8rem 0 0.3rem 0;'>📋 Data Input Coverage</div>",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "What we already know about your asset, what can be generated synthetically, "
+        "and what you'll need to provide. This drives the workflow in the next steps."
+    )
+
+    _SOURCE_BADGE = {
+        "EPC": ("#33A9A0", "rgba(51,169,160,0.12)"),
+        "TABULA": ("#33528A", "rgba(51,82,138,0.10)"),
+        "Boverket": ("#8AB62E", "rgba(138,182,46,0.10)"),
+        "Wikells": ("#8B5CF6", "rgba(139,92,246,0.10)"),
+        "Synthetic": ("#F59E0B", "rgba(245,158,11,0.10)"),
+    }
+    _STATUS_ICON = {
+        "covered": "✅",
+        "available_synthetic": "🔄",
+        "missing": "❌",
+    }
+
+    for _cat_name, _cat_items in _grouped.items():
+        _cat_covered = sum(1 for r in _cat_items if r["status"] == "covered")
+        _cat_total = len(_cat_items)
+        _pct = int(_cat_covered / _cat_total * 100) if _cat_total else 0
+        _bar_color = "#33A9A0" if _pct >= 80 else "#F59E0B" if _pct >= 40 else "#EF4444"
+
+        with st.expander(f"{_cat_name}  —  {_cat_covered}/{_cat_total} covered ({_pct}%)", expanded=(_pct < 100)):
+            for _item in _cat_items:
+                _icon = _STATUS_ICON.get(_item["status"], "")
+                _src = _item["source"]
+                _val = _item["value"]
+
+                # Source badge
+                _src_html = ""
+                if _src and _src in _SOURCE_BADGE:
+                    _sc, _sbg = _SOURCE_BADGE[_src]
+                    _src_html = (
+                        f"<span style='background:{_sbg}; color:{_sc}; "
+                        f"padding:1px 8px; border-radius:6px; font-size:0.7rem; "
+                        f"font-weight:600; margin-left:6px;'>{_src}</span>"
+                    )
+
+                # Value display
+                _val_html = ""
+                if _val is not None and _item["status"] == "covered":
+                    _val_str = str(_val)
+                    if len(_val_str) > 40:
+                        _val_str = _val_str[:40] + "…"
+                    _unit_str = f" {_item['unit']}" if _item["unit"] else ""
+                    _val_html = (
+                        f"<span style='color:#475569; font-size:0.8rem; margin-left:8px;'>"
+                        f"{_val_str}{_unit_str}</span>"
+                    )
+                elif _item["status"] == "available_synthetic":
+                    _val_html = (
+                        "<span style='color:#92400e; font-size:0.78rem; margin-left:8px; "
+                        "font-style:italic;'>Can be generated synthetically</span>"
+                    )
+
+                # Weight indicator
+                _w = _item["confidence_weight"]
+                _w_dots = "●" * min(_w // 2, 5) + "○" * (5 - min(_w // 2, 5))
+                _w_html = (
+                    f"<span style='color:#cbd5e1; font-size:0.65rem; margin-left:auto; "
+                    f"white-space:nowrap;' title='Impact weight: {_w}/10'>{_w_dots}</span>"
+                )
+
+                st.markdown(
+                    f"<div style='display:flex; align-items:center; gap:0.3rem; "
+                    f"padding:0.35rem 0; border-bottom:1px solid #f1f5f9;'>"
+                    f"<span style='font-size:0.85rem;'>{_icon}</span>"
+                    f"<span style='font-weight:600; font-size:0.88rem; color:#0f172a;'>"
+                    f"{_item['label']}</span>"
+                    f"{_src_html}{_val_html}{_w_html}"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+    # ── Workflow Assessment ──────────────────────────────────────
+    st.markdown(
+        "<div style='font-size:1.05rem; font-weight:700; color:#0f172a; "
+        "margin:1.2rem 0 0.3rem 0;'>⚙️ Generated Workflow</div>",
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Based on your data coverage, here's how the platform will handle each gap."
+    )
+
+    _workflow_steps = []
+    for _item in _coverage:
+        if _item["status"] == "covered":
+            continue
+        if _item["status"] == "available_synthetic":
+            _workflow_steps.append({
+                "label": _item["label"],
+                "action": "Generate synthetic proxy",
+                "detail": f"We'll generate a synthetic estimate for **{_item['label']}** using TABULA archetypes and statistical models.",
+                "icon": "🔄",
+                "color": "#F59E0B",
+            })
+        elif _item["status"] == "missing":
+            _workflow_steps.append({
+                "label": _item["label"],
+                "action": "User input required",
+                "detail": f"**{_item['label']}** is not available from any database. You'll be asked to provide this in the next step.",
+                "icon": "📝",
+                "color": "#EF4444",
+            })
+
+    if _workflow_steps:
+        for _ws in _workflow_steps:
+            st.markdown(
+                f"<div style='display:flex; align-items:flex-start; gap:0.6rem; "
+                f"padding:0.5rem 0.7rem; border-left:3px solid {_ws['color']}; "
+                f"background:{_ws['color']}08; border-radius:0 10px 10px 0; margin-bottom:0.4rem;'>"
+                f"<span style='font-size:1rem;'>{_ws['icon']}</span>"
+                f"<div>"
+                f"<div style='font-weight:700; font-size:0.88rem; color:#0f172a;'>{_ws['label']}</div>"
+                f"<div style='font-size:0.78rem; color:#475569;'>{_ws['action']}</div>"
+                f"</div></div>",
+                unsafe_allow_html=True,
+            )
+    else:
+        st.success("All required data inputs are covered! No additional input needed.")
+
+    # ── Expander: Full Building Passport + TABULA details ──────────
+    with st.expander("🔍 Building Data Sources — EPC & TABULA Details", expanded=False):
+        # Map (if available)
+        try:
+            if _reno_linked_points is not None and not _reno_linked_points.empty:
+                fmap = folium.Map(
+                    location=[_reno_map_center[0], _reno_map_center[1]],
+                    zoom_start=14, tiles="CartoDB positron",
+                    control_scale=False, prefer_canvas=True,
+                )
+                for _, r in _reno_linked_points.head(400).iterrows():
+                    tooltip = f"{r.get('address', 'Building')} · EPC {_display_value(r.get('energy_class'))}"
+                    folium.CircleMarker(
+                        location=[float(r["lat"]), float(r["lon"])],
+                        radius=3, weight=1, color="#33A9A0",
+                        fill=True, fill_color="#33A9A0", fill_opacity=0.8,
+                        tooltip=folium.Tooltip(tooltip, sticky=True),
+                    ).add_to(fmap)
+                st_folium(fmap, width=None, height=280, key="s2p_reno_map")
+        except NameError:
+            pass
+
+        if _reno_passport:
+            _pp = _reno_passport
+            _addr = _display_value(_pp.get("IdAdr", (_reno_selected_row.get("address") if _reno_selected_row is not None else "")))
+            _kommun = _display_value(_pp.get("IdKommun", (_reno_selected_row.get("municipality") if _reno_selected_row is not None else "")))
+            _eclass = _display_value(_pp.get("EgiEnergiklass"))
+            _eperf = _display_value(_pp.get("EgiEnergiPrestanda"))
+            _atemp = _display_value(_pp.get("EgenAtemp"), " m²")
+            _byear = _display_value(_pp.get("EgenNybyggAr"))
+            _nplan = _display_value(_pp.get("EgenAntalPlan"))
+
+            st.markdown(
+                f"<div style='display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem;'>"
+                f"<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.6rem;'>"
+                f"<div style='font-size:0.7rem; color:#64748b;'>Address</div>"
+                f"<div style='font-size:0.88rem; font-weight:700;'>{_addr}</div></div>"
+                f"<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.6rem;'>"
+                f"<div style='font-size:0.7rem; color:#64748b;'>Municipality</div>"
+                f"<div style='font-size:0.88rem; font-weight:700;'>{_kommun}</div></div>"
+                f"<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.6rem;'>"
+                f"<div style='font-size:0.7rem; color:#64748b;'>Energy Class</div>"
+                f"<div style='font-size:0.88rem; font-weight:700;'>{_eclass}</div></div>"
+                f"<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.6rem;'>"
+                f"<div style='font-size:0.7rem; color:#64748b;'>Energy Performance</div>"
+                f"<div style='font-size:0.88rem; font-weight:700;'>{_eperf}</div></div>"
+                f"<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.6rem;'>"
+                f"<div style='font-size:0.7rem; color:#64748b;'>Atemp</div>"
+                f"<div style='font-size:0.88rem; font-weight:700;'>{_atemp}</div></div>"
+                f"<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.6rem;'>"
+                f"<div style='font-size:0.7rem; color:#64748b;'>Build Year</div>"
+                f"<div style='font-size:0.88rem; font-weight:700;'>{_byear}</div></div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            # Full EPC fields toggle
+            show_full = st.toggle("Show all EPC fields", value=False, key="s2p_reno_full_epc")
+            if show_full:
+                derived_keys = {"FormularId", "energy_systems", "ventilation_modes", "available_field_count", "total_field_count"}
+                raw_rows = [
+                    {"Field": k, "Value": "—" if _is_missing(v) else v}
+                    for k, v in sorted(_pp.items(), key=lambda kv: kv[0].lower())
+                    if k not in derived_keys and not _is_missing(v)
+                ]
+                if raw_rows:
+                    st.dataframe(raw_rows, use_container_width=True, hide_index=True, height=300)
+
+        if _reno_tabula_match:
+            _conf = _reno_tabula_conf or {"level": "Medium", "score": 60, "reason": ""}
+            _conf_color = {"High": "#33A9A0", "Medium": "#33528A", "Low": "#F59E0B"}.get(_conf["level"], "#94a3b8")
+            st.markdown(
+                f"<div style='margin-top:0.8rem; font-size:0.8rem; font-weight:700; color:#33528A; "
+                f"text-transform:uppercase; letter-spacing:0.06em;'>TABULA Archetype</div>",
+                unsafe_allow_html=True,
+            )
+            _u = _reno_tabula_match.get("u_values", {})
+            _u_items = [(n, _u.get(n.lower())) for n in ["Wall", "Roof", "Floor", "Window", "Door"]]
+            _u_html = " · ".join(
+                f"{n}: {v:.2f}" for n, v in _u_items if v is not None and v > 0
+            )
+            st.markdown(
+                f"<div style='padding:0.6rem 0.8rem; background:#f8fafc; border:1px solid #e2e8f0; "
+                f"border-radius:10px; margin-top:0.3rem;'>"
+                f"<div style='font-weight:700; font-size:0.9rem;'>{_reno_tabula_match['type_label']}</div>"
+                f"<div style='font-size:0.8rem; color:#475569; margin-top:0.2rem;'>"
+                f"Code: {_reno_tabula_match['code']} · Period: {_reno_tabula_match['period']} · "
+                f"Zone {_reno_climate_zone}</div>"
+                f"<div style='font-size:0.78rem; color:#64748b; margin-top:0.3rem;'>"
+                f"U-values (W/m²K): {_u_html}</div>"
+                f"<div style='margin-top:0.2rem;'>"
+                f"<span style='background:rgba({_conf_color},0.12); color:{_conf_color}; "
+                f"padding:1px 8px; border-radius:6px; font-size:0.7rem; font-weight:600;'>"
+                f"{_conf['level']} confidence ({_conf['score']}%)</span></div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            # EPC ↔ TABULA delta
+            _epc_energy_perf = _reno_passport.get("EgiEnergiPrestanda")
+            _epc_energy_num = None
+            if _epc_energy_perf is not None:
+                try:
+                    _epc_energy_num = float(str(_epc_energy_perf))
+                except (ValueError, TypeError):
+                    pass
+            _tabula_net = get_tabula_energy_for_zone(_reno_tabula_match, _reno_climate_zone)
+            if _epc_energy_num and _tabula_net:
+                _delta_info = compute_epc_tabula_delta(_epc_energy_num, _reno_tabula_match, _reno_climate_zone)
+                if _delta_info:
+                    st.session_state["epc_tabula_delta"] = _delta_info
+                    _d_pct = _delta_info["delta_pct"]
+                    _d_color = "#33A9A0" if abs(_d_pct) < 5 else "#8AB62E" if _d_pct < -5 else "#FF6B6B"
+                    st.markdown(
+                        f"<div style='margin-top:0.5rem; padding:0.6rem 0.8rem; "
+                        f"border-left:3px solid {_d_color}; background:{_d_color}08; "
+                        f"border-radius:0 10px 10px 0;'>"
+                        f"<div style='font-size:0.78rem; font-weight:600; color:#334155;'>"
+                        f"EPC ↔ TABULA: {_delta_info['delta_pct']:+.1f}% "
+                        f"({_delta_info['epc']} vs {_delta_info['tabula']} kWh/m²)</div>"
+                        f"<div style='font-size:0.75rem; color:#64748b;'>"
+                        f"{_delta_info['interpretation']}</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+        elif not _reno_passport:
+            st.info("No building selected yet. Select a location in Step 1+ to see EPC and TABULA data.")
+
+    # Store coverage for downstream steps
+    st.session_state["renovation_coverage"] = _coverage
+    st.session_state["renovation_confidence_score"] = _conf_score
+
+else:
+    # ================================================================
+    # NON-RENOVATION — ORIGINAL TWO-COLUMN LAYOUT
+    # ================================================================
+    pass
+
+_is_reno_mode = (project_type == "Renovation Planning")
+
+# For non-renovation, use original two-column layout
+if not _is_reno_mode:
+    left_col, right_col = st.columns([0.65, 0.35])
 
 # ── Right: map + legend ────────────────────────────────
-with right_col:
+if not _is_reno_mode:
+  with right_col:
     st.markdown("<div style='height:0.25rem;'></div>", unsafe_allow_html=True)
 
     # Location map + existing local data coverage (moved from Step 1+)
@@ -1570,13 +2067,14 @@ with right_col:
                 unsafe_allow_html=True,
             )
             st.caption(location_note)
-            if project_scale == "Building":
-                st.caption("Teal point is the nearest footprint centroid for the selected building address.")
-            else:
-                st.caption("Teal points are buildings with linked EPC data inside your selected radius or bounding box.")
 
             selected_row = None
             if not linked_points_df.empty:
+              with st.expander("🗺️ Map — EPC Buildings", expanded=False):
+                if project_scale == "Building":
+                    st.caption("Teal point is the nearest footprint centroid for the selected building address.")
+                else:
+                    st.caption("Teal points are buildings with linked EPC data inside your selected radius or bounding box.")
                 fmap = folium.Map(
                     location=[map_center_lat, map_center_lon],
                     zoom_start=13,
@@ -1674,25 +2172,74 @@ with right_col:
                     selected_row = points_with_id[points_with_id["_label"] == chosen].iloc[0]
                     st.session_state["s2p_selected_formular_id"] = _safe_id_text(selected_row.get("FormularId"))
 
+                    # Fetch data silently for session state (no rendering here)
                     passport = get_epc_building_passport(selected_row.get("FormularId")) or {}
-                    completeness = sum(
-                        1
-                        for val in [
-                            passport.get("IdAdr", selected_row.get("address")),
-                            passport.get("IdKommun", selected_row.get("municipality")),
-                            passport.get("EgiEnergiklass", selected_row.get("energy_class")),
-                            passport.get("EgiEnergiPrestanda", selected_row.get("energy_performance")),
-                            passport.get("EgenNybyggAr", selected_row.get("build_year")),
-                            passport.get("EgenAtemp", selected_row.get("atemp")),
-                        ]
-                        if not _is_missing(val)
+                    st.session_state["epc_passport"] = passport
+
+                    # TABULA matching (silent)
+                    _epc_build_year = passport.get("EgenNybyggAr", selected_row.get("build_year"))
+                    _epc_btype_raw = passport.get("EgenByggnadsTyp") or passport.get("EgenByggnadsKat") or ""
+                    _epc_kommun = passport.get("IdKommun", selected_row.get("municipality")) or ""
+                    _build_year_num = None
+                    if _epc_build_year is not None:
+                        try:
+                            _build_year_num = int(float(str(_epc_build_year)))
+                        except (ValueError, TypeError):
+                            pass
+                    _climate_zone = climate_zone_from_county(_epc_kommun)
+                    if _climate_zone is None:
+                        _lat = float(selected_row.get("lat", 0)) if selected_row.get("lat") else None
+                        _climate_zone = climate_zone_from_lat(_lat) if _lat else 3
+                    _tabula_match = None
+                    _tabula_conf = None
+                    if _build_year_num and _epc_btype_raw:
+                        _tabula_match = match_archetype(_epc_btype_raw, _build_year_num)
+                        _tabula_conf = match_confidence(_epc_btype_raw, _build_year_num)
+                    elif _build_year_num:
+                        for _try_field in ["EgenTypkod_typ", "EgenByggnadsKat"]:
+                            _try_val = passport.get(_try_field, "")
+                            if _try_val:
+                                _tabula_match = match_archetype(str(_try_val), _build_year_num)
+                                _tabula_conf = match_confidence(str(_try_val), _build_year_num)
+                                if _tabula_match:
+                                    break
+                    st.session_state["tabula_archetype"] = _tabula_match
+                    st.session_state["tabula_confidence"] = _tabula_conf
+                    st.session_state["tabula_climate_zone"] = _climate_zone
+
+                    # Quick summary badges (compact, on main page)
+                    _epc_avail = int(passport.get("available_field_count", 0) or 0)
+                    _epc_total = int(passport.get("total_field_count", 0) or 0)
+                    _tab_lbl = _tabula_match["type_label"] if _tabula_match else "No match"
+                    st.markdown(
+                        f"<div style='display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.4rem;'>"
+                        f"<span style='background:rgba(51,169,160,0.10); color:#0f766e; "
+                        f"padding:0.18rem 0.55rem; border-radius:999px; font-size:0.7rem; font-weight:600; "
+                        f"border:1px solid rgba(51,169,160,0.25);'>"
+                        f"EPC: {_epc_avail}/{_epc_total} fields</span>"
+                        f"<span style='background:rgba(51,82,138,0.08); color:#33528A; "
+                        f"padding:0.18rem 0.55rem; border-radius:999px; font-size:0.7rem; font-weight:600; "
+                        f"border:1px solid rgba(51,82,138,0.15);'>"
+                        f"TABULA: {_tab_lbl}</span>"
+                        f"</div>",
+                        unsafe_allow_html=True,
                     )
+
+                # ── All details hidden behind expander ──
+                with st.expander("🔍 Check Data Available — EPC Passport, TABULA & Local Data", expanded=False):
+                    # Compute display variables needed by passport card
+                    _key_fields = [
+                        passport.get("IdAdr"), passport.get("IdKommun"),
+                        passport.get("EgiEnergiklass"), passport.get("EgiEnergiPrestanda"),
+                        passport.get("EgenNybyggAr"), passport.get("EgenAtemp"),
+                    ]
+                    completeness = sum(1 for v in _key_fields if not _is_missing(v))
+                    total_fields = int(passport.get("total_field_count", 0) or 0)
+                    available_fields = int(passport.get("available_field_count", 0) or 0)
                     energy_systems = passport.get("energy_systems", [])
                     ventilation_modes = passport.get("ventilation_modes", [])
                     systems_text = ", ".join(energy_systems) if energy_systems else "—"
                     ventilation_text = ", ".join(ventilation_modes) if ventilation_modes else "—"
-                    total_fields = int(passport.get("total_field_count", 0) or 0)
-                    available_fields = int(passport.get("available_field_count", 0) or 0)
 
                     suggested_labels = {
                         "AtgForslagStyrTeknisk": "Technical control optimization",
@@ -2040,26 +2587,27 @@ with right_col:
                             unsafe_allow_html=True,
                         )
 
-            st.markdown(
-                "<div style='font-size:0.92rem; font-weight:600; color:#334155; "
-                "margin:1.2rem 0 0.5rem 0; padding:10px 14px; "
-                "background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;'>"
-                "Local EPC data found near this location</div>",
-                unsafe_allow_html=True,
-            )
-            p1, p2 = st.columns([1, 1.4])
-            with p1:
-                st.markdown("**Energy class distribution**")
-                if classes_df.empty:
-                    st.caption("No EPC class records in selected area.")
-                else:
-                    st.dataframe(classes_df, use_container_width=True, hide_index=True)
-            with p2:
-                st.markdown("**Sample EPC records**")
-                if sample_df.empty:
-                    st.caption("No sample EPC records in selected area.")
-                else:
-                    st.dataframe(sample_df, use_container_width=True, hide_index=True)
+                    # Local EPC distribution (inside expander)
+                    st.markdown(
+                        "<div style='font-size:0.92rem; font-weight:600; color:#334155; "
+                        "margin:1.2rem 0 0.5rem 0; padding:10px 14px; "
+                        "background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;'>"
+                        "Local EPC data found near this location</div>",
+                        unsafe_allow_html=True,
+                    )
+                    p1, p2 = st.columns([1, 1.4])
+                    with p1:
+                        st.markdown("**Energy class distribution**")
+                        if classes_df.empty:
+                            st.caption("No EPC class records in selected area.")
+                        else:
+                            st.dataframe(classes_df, use_container_width=True, hide_index=True)
+                    with p2:
+                        st.markdown("**Sample EPC records**")
+                        if sample_df.empty:
+                            st.caption("No sample EPC records in selected area.")
+                        else:
+                            st.dataframe(sample_df, use_container_width=True, hide_index=True)
         else:
             st.info("No mapped area found yet. In Step 1+, set an address (and click Locate) or draw a bounding box.")
 
@@ -2076,7 +2624,8 @@ with right_col:
     )
 
 # ── Left: data inputs grouped by system ─────────────────────────────
-with left_col:
+if not _is_reno_mode:
+  with left_col:
     st.markdown(
         "<hr style='margin:0.3rem 0 0.7rem 0; border:none; "
         "border-top:1px solid #e2e8f0;'>",
@@ -2115,15 +2664,16 @@ with left_col:
 # PERSIST DATA CHOICES
 # ============================================================================
 
-_persisted = {}
-for it in all_items:
-    ik = it["key"]
-    _persisted[ik] = {
-        "has_data": st.session_state.get(f"{page_key}_{ik}_has", "Yes"),
-        "proxy": st.session_state.get(f"{page_key}_{ik}_proxy"),
-    }
-st.session_state["step2_data_choices"] = _persisted
-st.session_state["step2_page_key"] = page_key
+if not _is_reno_mode:
+    _persisted = {}
+    for it in all_items:
+        ik = it["key"]
+        _persisted[ik] = {
+            "has_data": st.session_state.get(f"{page_key}_{ik}_has", "Yes"),
+            "proxy": st.session_state.get(f"{page_key}_{ik}_proxy"),
+        }
+    st.session_state["step2_data_choices"] = _persisted
+    st.session_state["step2_page_key"] = page_key
 
 # ============================================================================
 # NAVIGATION

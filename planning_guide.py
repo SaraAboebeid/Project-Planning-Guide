@@ -2424,7 +2424,7 @@ if st.session_state.wizard_step == 0:
                 color:rgba(246,255,209,0.85); padding:0.3rem 0.9rem; border-radius:999px;
                 font-size:0.7rem; font-weight:600; letter-spacing:0.02em;
                 backdrop-filter:blur(4px);">
-                <span style="font-size:0.55rem;">&#9670;</span> 6-Step Guided Workflow
+                <span style="font-size:0.55rem;">&#9670;</span> 5-Step Guided Workflow
             </div>
             <div style="display:inline-flex; align-items:center; gap:0.35rem;
                 background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
@@ -2438,15 +2438,15 @@ if st.session_state.wizard_step == 0:
     """)
     # Overview diagram upload removed per request
 
-    # Interactive Process Diagram (Playful & Interactive)
-    diagram_cols = st.columns([1, 0.15, 1, 0.15, 1, 0.15, 1, 0.15, 1, 0.15, 1])
+    # Interactive Process Diagram — Plus Pipeline
+    diagram_cols = st.columns([1, 0.12, 1, 0.12, 1, 0.12, 1, 0.12, 1])
 
     with diagram_cols[0]:
         st.markdown("""
         <div class='step-card card-animate stagger-1'>
             <div class='step-index'>1</div>
-            <div class='step-title'>Define Scope & Context</div>
-            <div class='step-desc'>Choose analysis, scale, and context</div>
+            <div class='step-title'>Define Project</div>
+            <div class='step-desc'>Project type, scope, KPIs & location</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[1]:
@@ -2455,8 +2455,8 @@ if st.session_state.wizard_step == 0:
         st.markdown("""
         <div class='step-card card-animate stagger-2'>
             <div class='step-index'>2</div>
-            <div class='step-title'>Review Data</div>
-            <div class='step-desc'>Mark availability and select proxies</div>
+            <div class='step-title'>Data Coverage</div>
+            <div class='step-desc'>Review EPC, TABULA & data inputs</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[3]:
@@ -2465,8 +2465,8 @@ if st.session_state.wizard_step == 0:
         st.markdown("""
         <div class='step-card card-animate stagger-3'>
             <div class='step-index'>3</div>
-            <div class='step-title'>Confidence</div>
-            <div class='step-desc'>Review recommendations</div>
+            <div class='step-title'>Expected Results</div>
+            <div class='step-desc'>Review expected outcomes</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[5]:
@@ -2475,8 +2475,8 @@ if st.session_state.wizard_step == 0:
         st.markdown("""
         <div class='step-card card-animate stagger-4'>
             <div class='step-index'>4</div>
-            <div class='step-title'>Expected Results</div>
-            <div class='step-desc'>Review expected outcomes</div>
+            <div class='step-title'>Project Timeline</div>
+            <div class='step-desc'>Plan phases and tasks</div>
         </div>
         """, unsafe_allow_html=True)
     with diagram_cols[7]:
@@ -2485,18 +2485,8 @@ if st.session_state.wizard_step == 0:
         st.markdown("""
         <div class='step-card card-animate stagger-5'>
             <div class='step-index'>5</div>
-            <div class='step-title'>Project Timeline</div>
-            <div class='step-desc'>Plan phases and tasks</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with diagram_cols[9]:
-        st.markdown("<div class='step-arrow arrow-animate arrow-stagger-5'></div>", unsafe_allow_html=True)
-    with diagram_cols[10]:
-        st.markdown("""
-        <div class='step-card card-animate stagger-6'>
-            <div class='step-index'>6</div>
-            <div class='step-title'>Cost Estimation</div>
-            <div class='step-desc'>Budget, CAPEX, and OPEX</div>
+            <div class='step-title'>Budget / Cost</div>
+            <div class='step-desc'>CAPEX, OPEX & estimation</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -2506,23 +2496,16 @@ if st.session_state.wizard_step == 0:
             <div style='display:inline-block; background:#f1f5f9; border-radius:999px;
                 padding:0.35rem 1.2rem; font-family:Inter,sans-serif; font-size:0.72rem; font-weight:700;
                 text-transform:uppercase; letter-spacing:0.14em; color:#64748b;'>
-                Choose your starting point
+                Get started
             </div>
         </div>
         <div style='display:flex; justify-content:center; gap:2.5rem; margin-top:1.2rem;'>
-            <div style='text-align:center; max-width:240px;'>
+            <div style='text-align:center; max-width:360px;'>
                 <div style='font-family:Inter,sans-serif; font-size:0.82rem; font-weight:700; color:#0f172a;
-                    margin-bottom:0.25rem;'>Full Guided Workflow</div>
+                    margin-bottom:0.25rem;'>Project-Type Driven Workflow</div>
                 <div style='font-family:Inter,sans-serif; font-size:0.72rem; color:#64748b; line-height:1.45;'>
-                    Follow all 6 steps from scope definition through cost estimation
-                </div>
-            </div>
-            <div style='width:1px; background:#e2e8f0;'></div>
-            <div style='text-align:center; max-width:240px;'>
-                <div style='font-family:Inter,sans-serif; font-size:0.82rem; font-weight:700; color:#0f172a;
-                    margin-bottom:0.25rem;'>Project-Type Driven</div>
-                <div style='font-family:Inter,sans-serif; font-size:0.72rem; color:#64748b; line-height:1.45;'>
-                    Quick start with project type selection &amp; smart defaults
+                    Select your project type, configure scope &amp; KPIs, then follow the guided steps.
+                    Renovation projects get extra steps for data gaps &amp; recommendations.
                 </div>
             </div>
         </div>
@@ -2545,12 +2528,9 @@ if st.session_state.wizard_step == 0:
     </style>
     """, unsafe_allow_html=True)
 
-    center_cols = st.columns([1.5, 1, 0.5, 1, 1.5])
+    center_cols = st.columns([2, 1, 2])
     with center_cols[1]:
-        if st.button("▶  Start Workflow", type="primary", use_container_width=True, key="start_btn"):
-            st.switch_page("pages/1_Define_Scope_and_Context.py")
-    with center_cols[3]:
-        if st.button("⚡ Start (Step 1+)", use_container_width=True, key="start_plus_btn"):
+        if st.button("▶  Start", type="primary", use_container_width=True, key="start_btn"):
             st.switch_page("pages/0_Define_Project.py")
     
     # Close intro container

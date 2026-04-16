@@ -17,16 +17,16 @@ from pathlib import Path
 import streamlit as st
 
 # ── Step metadata used by the persistent stepper ──
+# Standard plus pipeline (EC / RE / non-renovation)
 _STEPS = [
-    ("1", "Define Scope",       "pages/1_Define_Scope_and_Context.py"),
-    ("2", "Review Data",        "pages/2_Review_Data.py"),
-    ("3", "Confidence",         "pages/3_Analysis_Method.py"),
-    ("4", "Expected Results",   "pages/4_Expected_Results.py"),
-    ("5", "Timeline",           "pages/5_Project_Timeline.py"),
-    ("6", "Cost Estimation",    "pages/6_Tasks_and_Cost.py"),
+    ("1", "Define Project",     "pages/0_Define_Project.py"),
+    ("2", "Data Coverage",      "pages/2plus_Review_Data.py"),
+    ("3", "Expected Results",   "pages/4_Expected_Results.py"),
+    ("4", "Timeline",           "pages/5_Project_Timeline.py"),
+    ("5", "Budget / Cost",      "pages/6_Tasks_and_Cost.py"),
 ]
 
-# ── Extended steps for the Renovation Planning + pipeline ──
+# ── Extended steps for the Renovation Planning pipeline ──
 _STEPS_PLUS = [
     ("1", "Define Project",     "pages/0_Define_Project.py"),
     ("2", "Building Baseline",  "pages/2plus_Review_Data.py"),
@@ -388,10 +388,9 @@ def render_step_indicator(current_step: int):
     current_step : int
         1-based index of the active step (1–6 for standard, 1–7 for + mode).
     """
-    # Auto-detect + pipeline mode
-    is_plus = st.session_state.get("pipeline_mode") == "step1plus"
+    # Auto-detect pipeline: renovation gets extended pipeline, everything else standard
     is_reno = st.session_state.get("project_type") == "Renovation Planning"
-    steps = _STEPS_PLUS if (is_plus and is_reno) else _STEPS
+    steps = _STEPS_PLUS if is_reno else _STEPS
 
     parts: list[str] = []
     for idx, (num, label, _page) in enumerate(steps):

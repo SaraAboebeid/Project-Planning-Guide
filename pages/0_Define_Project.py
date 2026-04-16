@@ -148,9 +148,10 @@ if project_type:
         "border-top: 1px solid #e2e8f0;'>",
         unsafe_allow_html=True,
     )
+    _scope_label = "Entities in Scope" if project_type == "Energy Community Planning" else "Systems in Scope"
     st.markdown(
-        "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>"
-        "Systems in Scope <span style='color:#dc2626'>*</span></div>",
+        f"<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>"
+        f"{_scope_label} <span style='color:#dc2626'>*</span></div>",
         unsafe_allow_html=True,
     )
 
@@ -164,7 +165,7 @@ if project_type:
     _safe_defaults = [s for s in _saved if s in selectable_systems]
 
     selected_systems = st.multiselect(
-        "Systems in Scope",
+        _scope_label,
         options=selectable_systems,
         default=_safe_defaults,
         placeholder="Choose systems...",
@@ -370,7 +371,7 @@ if project_type:
         )
         st.markdown(
             "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>"
-            "Energy Focus <span style='color:#dc2626'>*</span></div>",
+            "Energy System in Scope <span style='color:#dc2626'>*</span></div>",
             unsafe_allow_html=True,
         )
         _cur_focus = st.session_state.get("ec_energy_focus", [])
@@ -578,7 +579,7 @@ st.markdown(
 )
 st.markdown(
     "<div style='font-size:1.02rem; font-weight:600; margin-bottom:0.2rem;'>"
-    "Context <span style='color:#dc2626'>*</span></div>",
+    "Country <span style='color:#dc2626'>*</span></div>",
     unsafe_allow_html=True,
 )
 

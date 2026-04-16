@@ -1,0 +1,119 @@
+import { create } from "zustand";
+import type { ProjectType } from "../config/projectConfig";
+
+/* ── Pipeline definitions (mirrors shared_css.py) ── */
+
+export interface StepDef {
+  number: number;
+  label: string;
+  path: string;
+}
+
+const STEPS_STANDARD: StepDef[] = [
+  { number: 1, label: "Define Project", path: "/step/1" },
+  { number: 2, label: "Data Coverage", path: "/step/2" },
+  { number: 3, label: "Expected Results", path: "/step/3" },
+  { number: 4, label: "Timeline", path: "/step/4" },
+  { number: 5, label: "Budget / Cost", path: "/step/5" },
+];
+
+const STEPS_RENOVATION: StepDef[] = [
+  { number: 1, label: "Define Project", path: "/step/1" },
+  { number: 2, label: "Building Baseline", path: "/step/2" },
+  { number: 3, label: "Data & Assumptions", path: "/step/3" },
+  { number: 4, label: "Recommendations", path: "/step/4" },
+  { number: 5, label: "Expected Results", path: "/step/5" },
+  { number: 6, label: "Timeline", path: "/step/6" },
+  { number: 7, label: "Budget / Cost", path: "/step/7" },
+];
+
+/* ── State shape ── */
+
+interface ProjectState {
+  projectType: ProjectType | null;
+  projectName: string;
+  country: string | null;
+  scale: string | null;
+  systemsInScope: string[];
+  selectedKpis: string[];
+  explorationApproaches: string[];
+  /* follow-ups */
+  followUpAnswers: Record<string, boolean>;
+  renovationEnvelopeComponents: string[];
+  renovationExistingHeating: boolean;
+  renovationExistingCooling: boolean;
+  renovationExistingDhw: boolean;
+  ecExistingPv: boolean;
+  ecExistingBattery: boolean;
+  ecEnergyFocus: string[];
+  reElectricityThreshold: string;
+  /* scale extras */
+  buildingUses: string[];
+  /* location */
+  address: string;
+  lat: number | null;
+  lon: number | null;
+  locationLabel: string;
+  radiusM: number;
+  /* data coverage */
+  dataInputs: Record<string, { available: boolean; proxy: string | null; confidence: number }>;
+}
+
+interface WizardState {
+  project: ProjectState;
+  setProject: (partial: Partial<ProjectState>) => void;
+  currentStep: number;
+  steps: StepDef[];
+  setStep: (n: number) => void;
+  reset: () => void;
+}
+
+const DEFAULT_PROJECT: ProjectState = {
+  projectType: null,
+  projectName: "",
+  country: null,
+  scale: null,
+  systemsInScope: [],
+  selectedKpis: [],
+  explorationApproaches: [],
+  followUpAnswers: {},
+  renovationEnvelopeComponents: [],
+  renovationExistingHeating: true,
+  renovationExistingCooling: true,
+  renovationExistingDhw: true,
+  ecExistingPv: false,
+  ecExistingBattery: false,
+  ecEnergyFocus: [],
+  reElectricityThreshold: "Partial coverage",
+  buildingUses: [],
+  address: "",
+  lat: null,
+  lon: null,
+  locationLabel: "",
+  radiusM: 800,
+  dataInputs: {},
+};
+
+export const useWizardStore = create<WizardState>((set) => ({
+  project: { ...DEFAULT_PROJECT },
+  setProject: (partial) =>
+    set((s) => {
+      const next = { ...s.project, ...partial };
+      const isReno = next.projectType === "Renovation Planning";
+      return {
+        project: next,
+        steps: isReno ? STEPS_RENOVATION : STEPS_STANDARD,
+      };
+    }),
+
+  currentStep: 1,
+  steps: STEPS_STANDARD,
+  setStep: (n) => set({ currentStep: n }),
+
+  reset: () =>
+    set({
+      project: { ...DEFAULT_PROJECT },
+      currentStep: 1,
+      steps: STEPS_STANDARD,
+    }),
+}));

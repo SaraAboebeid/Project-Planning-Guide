@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* ── Design tokens from your Streamlit theme ── */
+@theme {
+  --color-ppg-navy: #33528A;
+  --color-ppg-teal: #33A9A0;
+  --color-ppg-lime: #C4E81D;
+  --color-ppg-green: #8AB62E;
+  --color-ppg-olive: #597001;
+  --color-ppg-dark: #0f172a;
+  --color-ppg-surface: #ffffff;
+  --color-ppg-bg: #f8fafc;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}

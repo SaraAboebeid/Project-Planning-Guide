@@ -31,17 +31,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Persistent step progress indicator
-is_plus_mode = st.session_state.get("pipeline_mode") == "step1plus"
-_is_plus_reno = (
-    is_plus_mode
-    and st.session_state.get("project_type") == "Renovation Planning"
-)
-render_step_indicator(5 if _is_plus_reno else 4)
+_is_plus_reno = st.session_state.get("project_type") == "Renovation Planning"
+render_step_indicator(5 if _is_plus_reno else 3)
 
-step1_page = "pages/0_Define_Project.py" if is_plus_mode else "pages/1_Define_Scope_and_Context.py"
-
-# ============================================================================
-# EXPECTED DELIVERABLES CATALOG
+step1_page = "pages/0_Define_Project.py"
+is_plus_mode = True  # Always plus mode now
 # ============================================================================
 
 # Each entry: (deliverable name, short description)

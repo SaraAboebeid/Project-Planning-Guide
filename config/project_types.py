@@ -19,8 +19,7 @@ PROJECT_TYPES = [
 # Short descriptions shown in the UI beneath each project type
 PROJECT_TYPE_DESCRIPTIONS = {
     "Energy Community Planning": (
-        "Plan shared energy systems across multiple buildings — "
-        "PV, storage, grid interaction, and cost sharing."
+        "Plan shared energy systems across multiple entities."
     ),
     "Renovation Planning": (
         "Assess and prioritise retrofit measures for existing buildings — "
@@ -133,20 +132,20 @@ KPIS_BY_PROJECT_TYPE = {
     "Energy Community Planning": [
         "Self-sufficiency",
         "Peak Load",
-        "Climate Impacts",
+        "Global Warming Potential",
         "Cost",
         "Return on Investment",
     ],
     "Renovation Planning": [
         "Cost",
         "Thermal Comfort",
-        "Climate Impacts",
+        "Global Warming Potential",
         "Energy Demand",
         "Return on Investment",
     ],
     "Renewable Energy Planning": [
         "Self-Sufficiency",
-        "Climate Impacts",
+        "Global Warming Potential",
         "Energy Import",
         "Peak Load",
         "Thermal Comfort",

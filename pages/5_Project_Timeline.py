@@ -26,17 +26,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Persistent step progress indicator
-is_plus_mode = st.session_state.get("pipeline_mode") == "step1plus"
-_is_plus_reno = (
-    is_plus_mode
-    and st.session_state.get("project_type") == "Renovation Planning"
-)
-render_step_indicator(6 if _is_plus_reno else 5)
+_is_plus_reno = st.session_state.get("project_type") == "Renovation Planning"
+render_step_indicator(6 if _is_plus_reno else 4)
 
-step1_page = "pages/0_Define_Project.py" if is_plus_mode else "pages/1_Define_Scope_and_Context.py"
-
-# ============================================================================
-# CHECK PREREQUISITES
+step1_page = "pages/0_Define_Project.py"
+is_plus_mode = True  # Always plus mode now
 # ============================================================================
 
 if "analysis_type" not in st.session_state or not st.session_state.analysis_type:
