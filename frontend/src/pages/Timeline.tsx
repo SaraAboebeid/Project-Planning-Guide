@@ -105,7 +105,7 @@ export default function Timeline() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-navy">{stepLabel}</h2>
+      <h2 className="text-xl font-bold text-slate-800">{stepLabel}</h2>
       <p className="text-sm text-gray-500">
         Plan your project schedule. Auto-generate phases from effort estimates
         or build your own.
@@ -114,22 +114,19 @@ export default function Timeline() {
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { value: `${userTotalHours} hrs`, label: "Estimated Effort", color: "navy" },
-          { value: `${userWeeks} wk`, label: "Duration", color: "teal" },
-          { value: String(PHASE_SPLIT.length), label: "Phases", color: "green" },
+          { value: `${userTotalHours} hrs`, label: "Estimated Effort", cls: "ppg-stat-navy", textCls: "text-[#2b4a7e]" },
+          { value: `${userWeeks} wk`, label: "Duration", cls: "ppg-stat-teal", textCls: "text-[#2e9e96]" },
+          { value: String(PHASE_SPLIT.length), label: "Phases", cls: "ppg-stat-green", textCls: "text-[#7da828]" },
         ].map((c) => (
-          <div
-            key={c.label}
-            className={`rounded-2xl border p-4 text-center bg-${c.color}/10 border-${c.color}/25`}
-          >
-            <div className={`text-2xl font-bold text-${c.color}`}>{c.value}</div>
-            <div className="text-xs text-gray-500">{c.label}</div>
+          <div key={c.label} className={`ppg-stat ${c.cls}`}>
+            <div className={`text-2xl font-bold ${c.textCls}`}>{c.value}</div>
+            <div className="text-xs text-slate-500">{c.label}</div>
           </div>
         ))}
       </div>
 
       {/* Phase breakdown editor */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5">
+      <div className="ppg-card p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-dark">Effort Breakdown</h3>
           <button
@@ -209,7 +206,7 @@ export default function Timeline() {
 
       {/* Timeline table */}
       {rows.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="ppg-card overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
@@ -249,7 +246,7 @@ export default function Timeline() {
 
       {/* Gantt-like bar chart */}
       {rows.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+        <div className="ppg-card p-5">
           <h3 className="font-semibold text-dark mb-3">Project Gantt</h3>
           <ResponsiveContainer width="100%" height={rows.length * 55 + 60}>
             <BarChart
@@ -272,18 +269,8 @@ export default function Timeline() {
 
       {/* Navigation */}
       <div className="flex justify-between pt-4 pb-8">
-        <button
-          onClick={() => navigate(prevPath)}
-          className="px-5 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
-        >
-          ← Back
-        </button>
-        <button
-          onClick={() => navigate(nextPath)}
-          className="px-6 py-2 rounded-lg bg-navy text-white text-sm font-medium hover:bg-navy/90"
-        >
-          Continue →
-        </button>
+        <button onClick={() => navigate(prevPath)} className="ppg-btn-secondary">← Back</button>
+        <button onClick={() => navigate(nextPath)} className="ppg-btn-primary">Continue →</button>
       </div>
     </div>
   );

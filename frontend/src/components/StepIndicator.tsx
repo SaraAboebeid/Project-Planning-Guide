@@ -8,28 +8,28 @@ export default function StepIndicator() {
   const location = useLocation();
 
   return (
-    <nav className="flex items-center gap-1 overflow-x-auto px-4 py-3 bg-surface border-b border-gray-200">
+    <nav className="flex items-center justify-center gap-0.5 overflow-x-auto px-6 py-2.5 bg-white border-b border-slate-200/80">
       {steps.map((s, i) => {
         const isActive = location.pathname === s.path;
         const isDone = s.number < currentStep;
         return (
           <div key={s.number} className="flex items-center">
-            {i > 0 && <div className="w-6 h-px bg-gray-300 mx-1" />}
+            {i > 0 && <div className="w-8 h-px bg-slate-200 mx-0.5" />}
             <button
               onClick={() => navigate(s.path)}
               className={clsx(
-                "flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition whitespace-nowrap",
-                isActive && "bg-navy text-white shadow",
-                isDone && !isActive && "bg-teal/15 text-teal",
-                !isActive && !isDone && "text-gray-400 hover:text-gray-600"
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all whitespace-nowrap",
+                isActive && "bg-gradient-to-r from-[#2b4a7e] to-[#2e9e96] text-white shadow-sm",
+                isDone && !isActive && "text-[#2e9e96] hover:bg-[#2e9e96]/5",
+                !isActive && !isDone && "text-slate-400 hover:text-slate-600"
               )}
             >
               <span
                 className={clsx(
-                  "w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold",
-                  isActive && "bg-white text-navy",
-                  isDone && !isActive && "bg-teal text-white",
-                  !isActive && !isDone && "bg-gray-200 text-gray-500"
+                  "w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold",
+                  isActive && "bg-white/20 text-white",
+                  isDone && !isActive && "bg-[#2e9e96]/10 text-[#2e9e96]",
+                  !isActive && !isDone && "bg-slate-100 text-slate-400"
                 )}
               >
                 {isDone ? "✓" : s.number}

@@ -1,7 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
-import { ChevronDown, ChevronUp, FileText, Layers, ShieldCheck } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, Layers, ShieldCheck, Activity, Database, Zap, X } from "lucide-react";
+
+const SensitivityPanel = lazy(() => import("../components/panels/SensitivityPanel"));
+const TabulaPanel = lazy(() => import("../components/panels/TabulaPanel"));
+const EpcPanel = lazy(() => import("../components/panels/EpcPanel"));
 
 /* ── Deliverables catalog (ported from pages/4_Expected_Results.py) ── */
 
@@ -92,6 +96,73 @@ function getSections(projectType: string | null, systems: string[]): [string, De
   return sections;
 }
 
+/* ── Data Explorer ── */
+
+type PanelId = "sensitivity" | "tabula" | "epc";
+
+const PANELS: { id: PanelId; label: string; icon: typeof Activity; color: string; desc: string }[] = [
+  { id: "sensitivity", label: "Sensitivity Analysis", icon: Activity, color: "from-[#2b4a7e] to-[#2e9e96]", desc: "OAT parameter importance & response curves" },
+  { id: "tabula", label: "TABULA Results", icon: Database, color: "from-[#f59e0b] to-[#ef4444]", desc: "Building archetype U-values & energy demand" },
+  { id: "epc", label: "EPC Results", icon: Zap, color: "from-[#7da828] to-[#2e9e96]", desc: "Energy performance certificates & trends" },
+];
+
+function DataExplorer() {
+  const [activePanel, setActivePanel] = useState<PanelId | null>(null);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="ppg-section-title">Data Explorer</p>
+        <h3 className="text-lg font-bold text-slate-800">Analysis Results & Reference Data</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Click a card below to explore pre-computed analysis results interactively.
+        </p>
+      </div>
+
+      {/* Toggle buttons */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {PANELS.map((p) => {
+          const Icon = p.icon;
+          const isActive = activePanel === p.id;
+          return (
+            <button
+              key={p.id}
+              onClick={() => setActivePanel(isActive ? null : p.id)}
+              className={`relative rounded-xl border-2 p-4 text-left transition-all ${
+                isActive
+                  ? "border-teal shadow-md bg-white"
+                  : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+              }`}
+            >
+              <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${p.color} flex items-center justify-center mb-2.5`}>
+                <Icon className="w-4.5 h-4.5 text-white" />
+              </div>
+              <h4 className="text-sm font-semibold text-slate-800">{p.label}</h4>
+              <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">{p.desc}</p>
+              {isActive && (
+                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
+                  <X className="w-3 h-3 text-gray-400" />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Panel content */}
+      {activePanel && (
+        <div className="ppg-card animate-in fade-in duration-200">
+          <Suspense fallback={<div className="text-center py-12 text-gray-400 text-sm">Loading…</div>}>
+            {activePanel === "sensitivity" && <SensitivityPanel />}
+            {activePanel === "tabula" && <TabulaPanel />}
+            {activePanel === "epc" && <EpcPanel />}
+          </Suspense>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════ */
 
 export default function ExpectedResults() {
@@ -124,7 +195,7 @@ export default function ExpectedResults() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-navy">Expected Results</h2>
+      <h2 className="text-xl font-bold text-slate-800">Expected Results</h2>
       <p className="text-sm text-gray-500">
         Deliverables that will be included in the final report based on your project type and systems.
       </p>
@@ -136,12 +207,12 @@ export default function ExpectedResults() {
           <div className="text-2xl font-bold text-navy">{totalDeliverables}</div>
           <div className="text-xs text-gray-500">Report Deliverables</div>
         </div>
-        <div className="rounded-2xl border p-4 text-center bg-teal/10 border-teal/25">
+        <div className="ppg-stat ppg-stat-teal">
           <Layers className="w-5 h-5 mx-auto mb-1 text-teal" />
           <div className="text-2xl font-bold text-teal">{sections.length}</div>
           <div className="text-xs text-gray-500">Analysis Sections</div>
         </div>
-        <div className="rounded-2xl border p-4 text-center bg-green/10 border-green/25">
+        <div className="ppg-stat ppg-stat-green">
           <ShieldCheck className="w-5 h-5 mx-auto mb-1 text-green" />
           <div className="text-2xl font-bold text-green">{CROSS_CUTTING.length}</div>
           <div className="text-xs text-gray-500">Cross-Cutting</div>
@@ -158,7 +229,7 @@ export default function ExpectedResults() {
           {sections.map(([title, items]) => {
             const open = expandedSections.has(title);
             return (
-              <div key={title} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <div key={title} className="ppg-card overflow-hidden">
                 <button
                   onClick={() => toggle(title)}
                   className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50"
@@ -187,7 +258,7 @@ export default function ExpectedResults() {
           })}
 
           {/* Cross-cutting */}
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="ppg-card overflow-hidden">
             <button
               onClick={() => setCrossExpanded((p) => !p)}
               className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50"
@@ -215,20 +286,13 @@ export default function ExpectedResults() {
         </div>
       )}
 
+      {/* ── Data Explorer ── */}
+      <DataExplorer />
+
       {/* Navigation */}
       <div className="flex justify-between pt-4 pb-8">
-        <button
-          onClick={() => navigate(prevPath)}
-          className="px-5 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
-        >
-          ← Back
-        </button>
-        <button
-          onClick={() => navigate(nextPath)}
-          className="px-6 py-2 rounded-lg bg-navy text-white text-sm font-medium hover:bg-navy/90"
-        >
-          Continue →
-        </button>
+        <button onClick={() => navigate(prevPath)} className="ppg-btn-secondary">← Back</button>
+        <button onClick={() => navigate(nextPath)} className="ppg-btn-primary">Continue →</button>
       </div>
     </div>
   );

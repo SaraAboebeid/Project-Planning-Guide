@@ -11,6 +11,9 @@ export default function WizardLayout() {
       <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8">
         <Outlet />
       </main>
+      <footer className="text-center text-[10px] text-slate-400 py-3 border-t border-slate-100">
+        Chalmers University of Technology × Chalmers Next Labs
+      </footer>
     </div>
   );
 }

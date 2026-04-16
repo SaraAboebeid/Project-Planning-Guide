@@ -1,13 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
-import { ArrowRight } from "lucide-react";
 
 const STEPS_PREVIEW = [
-  { icon: "📋", label: "Define Project", desc: "Scope, KPIs, location" },
-  { icon: "📊", label: "Data Coverage", desc: "EPC, TABULA, baselines" },
-  { icon: "📈", label: "Expected Results", desc: "Confidence & outputs" },
-  { icon: "📅", label: "Timeline", desc: "Milestones & phases" },
-  { icon: "💰", label: "Budget / Cost", desc: "Tasks & estimates" },
+  { label: "Define Project", desc: "Project type, scope, KPIs & location" },
+  { label: "Data Coverage", desc: "Review EPC, TABULA & data inputs" },
+  { label: "Expected Results", desc: "Review expected outcomes" },
+  { label: "Project Timeline", desc: "Plan phases and tasks" },
+  { label: "Budget / Cost", desc: "CAPEX, OPEX & estimation" },
 ];
 
 export default function LandingPage() {
@@ -20,45 +19,89 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-bg px-4">
-      {/* Hero */}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-extrabold text-navy mb-3">
-          Project Planning Guide
-        </h1>
-        <p className="text-lg text-gray-500 max-w-xl mx-auto">
-          A data-fidelity navigator for building energy &amp; carbon projects.
-          Choose your project type and follow a guided pipeline.
-        </p>
-      </div>
-
-      {/* 5-step diagram */}
-      <div className="flex items-center gap-2 mb-12 flex-wrap justify-center">
-        {STEPS_PREVIEW.map((s, i) => (
-          <div key={s.label} className="flex items-center">
-            <div className="flex flex-col items-center w-28 text-center">
-              <span className="text-3xl mb-1">{s.icon}</span>
-              <span className="text-sm font-semibold text-dark">{s.label}</span>
-              <span className="text-xs text-gray-400">{s.desc}</span>
+    <div className="min-h-screen bg-bg">
+      {/* ── Hero banner ── */}
+      <div className="bg-gradient-to-r from-[#1a2f5a] via-[#2b4a7e] to-[#256e68] shadow-lg">
+        <div className="max-w-[1100px] mx-auto px-8 py-10 flex items-center justify-between gap-10">
+          <div className="text-white max-w-xl">
+            <p className="text-[10px] tracking-[0.16em] uppercase font-semibold text-white/55 mb-2">
+              Chalmers University of Technology × Chalmers Next Labs
+            </p>
+            <h1 className="text-[2.4rem] font-extrabold leading-[1.15] tracking-tight">
+              Project Planning Guide
+            </h1>
+            <p className="mt-2.5 text-white/75 text-[15px] leading-relaxed">
+              Data Fidelity Navigator — Handle data gaps, review sensitivity
+              impacts &amp; plan with confidence
+            </p>
+            <div className="mt-5 flex items-center gap-2.5 text-[11px] font-semibold">
+              <span className="px-3 py-1 rounded-full bg-[#C4E81D]/20 text-[#e4f9a8] border border-[#C4E81D]/25">
+                5-Step Guided Workflow
+              </span>
+              <span className="px-3 py-1 rounded-full bg-white/8 text-white/70 border border-white/12">
+                Sensitivity Analysis Included
+              </span>
             </div>
-            {i < STEPS_PREVIEW.length - 1 && (
-              <ArrowRight className="text-teal w-5 h-5 mx-1 flex-shrink-0" />
-            )}
           </div>
-        ))}
+
+          <div className="flex items-center gap-5 shrink-0">
+            <img
+              src="/chalmers_next_labs_logo_white.svg"
+              alt="Chalmers Next Labs"
+              className="h-9 opacity-85"
+            />
+            <span className="w-px h-9 bg-white/20" />
+            <img
+              src="/chalmers_university_logo_white.svg"
+              alt="Chalmers University of Technology"
+              className="h-9 opacity-85"
+            />
+          </div>
+        </div>
+        <div className="ppg-accent-line" />
       </div>
 
-      {/* CTA */}
-      <button
-        onClick={handleStart}
-        className="px-8 py-3 rounded-xl bg-navy text-white font-semibold text-lg shadow-lg hover:bg-navy/90 transition flex items-center gap-2"
-      >
-        Start New Project <ArrowRight className="w-5 h-5" />
-      </button>
+      {/* ── Step cards ── */}
+      <div className="max-w-[1100px] mx-auto px-8 -mt-5">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          {STEPS_PREVIEW.map((step, i) => (
+            <div
+              key={step.label}
+              className="ppg-card text-center py-5 relative"
+            >
+              <div className="mx-auto w-7 h-7 rounded-md bg-gradient-to-br from-[#C4E81D] to-[#7da828] text-[#1a2f3f] text-xs font-bold flex items-center justify-center mb-2.5 shadow-sm">
+                {i + 1}
+              </div>
+              <h3 className="text-[13px] font-semibold text-slate-800">{step.label}</h3>
+              <p className="text-[11px] text-slate-400 mt-1 leading-snug">{step.desc}</p>
+              {i < STEPS_PREVIEW.length - 1 && (
+                <span className="hidden md:block absolute right-[-10px] top-1/2 -translate-y-1/2 text-slate-300 text-sm">›</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
 
-      <p className="mt-6 text-xs text-gray-400">
-        Chalmers University of Technology · Chalmers Next Labs
-      </p>
+      {/* ── CTA ── */}
+      <section className="mt-10 text-center max-w-md mx-auto px-4 pb-12">
+        <p className="ppg-section-title">Get Started</p>
+        <h2 className="text-lg font-bold text-slate-800">
+          Project-Type Driven Workflow
+        </h2>
+        <p className="mt-2 text-sm text-slate-400 leading-relaxed">
+          Select your project type, configure scope &amp; KPIs, then follow the
+          guided steps. Renovation projects get extra steps for data gaps &amp;
+          recommendations.
+        </p>
+
+        <button onClick={handleStart} className="ppg-btn-primary mt-6 px-10 py-3 text-[15px]">
+          ▶ Start
+        </button>
+
+        <p className="mt-6 text-[11px] text-slate-400">
+          S. Abouebeid · E. Malakhatka · L. Thuvander · H. Wallbaum
+        </p>
+      </section>
     </div>
   );
 }

@@ -68,26 +68,26 @@ export default function Budget() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-navy">Budget / Cost</h2>
+      <h2 className="text-xl font-bold text-slate-800">Budget / Cost</h2>
       <p className="text-sm text-gray-500">
         Estimate consultant costs and set your project budget.
       </p>
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-2xl border p-4 text-center bg-navy/10 border-navy/25">
-          <div className="text-2xl font-bold text-navy">
+        <div className="ppg-stat ppg-stat-navy">
+          <div className="text-2xl font-bold text-[#2b4a7e]">
             {fmtNum(serviceCost)} {currency}
           </div>
           <div className="text-xs text-gray-500">Service Cost</div>
         </div>
-        <div className="rounded-2xl border p-4 text-center bg-teal/10 border-teal/25">
+        <div className="ppg-stat ppg-stat-teal">
           <div className="text-2xl font-bold text-teal">
             {fmtNum(capexTotal)} {currency}
           </div>
           <div className="text-xs text-gray-500">CAPEX</div>
         </div>
-        <div className="rounded-2xl border p-4 text-center bg-green/10 border-green/25">
+        <div className="ppg-stat ppg-stat-green">
           <div className="text-2xl font-bold text-green">
             {fmtNum(opexTotal)} {currency}
           </div>
@@ -96,7 +96,7 @@ export default function Budget() {
       </div>
 
       {/* Currency & rate */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 grid grid-cols-2 gap-4">
+      <div className="ppg-card p-5 grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Currency
@@ -138,7 +138,7 @@ export default function Budget() {
       </div>
 
       {/* CAPEX */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5">
+      <div className="ppg-card p-5">
         <h3 className="font-semibold text-dark mb-3">
           CAPEX (Capital Expenditure)
         </h3>
@@ -181,7 +181,7 @@ export default function Budget() {
       </div>
 
       {/* OPEX */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5">
+      <div className="ppg-card p-5">
         <h3 className="font-semibold text-dark mb-3">
           OPEX (Annual Operating Expenditure)
         </h3>
@@ -212,7 +212,7 @@ export default function Budget() {
 
       {/* Pie chart */}
       {pieData.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+        <div className="ppg-card p-5">
           <h3 className="font-semibold text-dark mb-3">CAPEX Breakdown</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
@@ -238,18 +238,8 @@ export default function Budget() {
 
       {/* Navigation */}
       <div className="flex justify-between pt-4 pb-8">
-        <button
-          onClick={() => navigate(prevPath)}
-          className="px-5 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
-        >
-          ← Back
-        </button>
-        <button
-          onClick={() => navigate("/")}
-          className="px-6 py-2 rounded-lg bg-navy text-white text-sm font-medium hover:bg-navy/90"
-        >
-          Finish & Return Home
-        </button>
+        <button onClick={() => navigate(prevPath)} className="ppg-btn-secondary">← Back</button>
+        <button onClick={() => navigate("/")} className="ppg-btn-primary">Finish & Return Home</button>
       </div>
     </div>
   );

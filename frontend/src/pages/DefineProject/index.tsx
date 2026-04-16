@@ -44,9 +44,7 @@ function Card({
   className?: string;
 }) {
   return (
-    <div
-      className={`bg-white border border-gray-200 rounded-2xl p-5 mb-4 shadow-[0_1px_4px_rgba(0,0,0,0.03)] hover:border-teal/20 transition ${className}`}
-    >
+    <div className={`ppg-card mb-4 ${className}`}>
       {children}
     </div>
   );
@@ -730,18 +728,8 @@ export default function DefineProject() {
 
       {/* ── NAVIGATION ── */}
       <div className="flex justify-between items-center pt-4 pb-8">
-        <button
-          onClick={() => navigate("/")}
-          className="px-5 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
-        >
-          ← Back
-        </button>
-        <button
-          onClick={handleContinue}
-          className="px-6 py-2 rounded-lg bg-navy text-white text-sm font-medium hover:bg-navy/90 transition"
-        >
-          Continue →
-        </button>
+        <button onClick={() => navigate("/")} className="ppg-btn-secondary">← Back</button>
+        <button onClick={handleContinue} className="ppg-btn-primary">Continue →</button>
       </div>
     </div>
   );

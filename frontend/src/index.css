@@ -1,14 +1,131 @@
 @import "tailwindcss";
 
-/* ── Design tokens from your Streamlit theme ── */
+/* ── Design tokens ── */
 @theme {
-  --color-ppg-navy: #33528A;
-  --color-ppg-teal: #33A9A0;
+  --color-navy: #2b4a7e;
+  --color-navy-dark: #1a2f5a;
+  --color-teal: #2e9e96;
+  --color-lime: #C4E81D;
+  --color-green: #7da828;
+  --color-olive: #597001;
+  --color-dark: #0f172a;
+  --color-surface: #ffffff;
+  --color-bg: #f4f7fa;
+  --color-muted: #64748b;
+
+  --color-ppg-navy: #2b4a7e;
+  --color-ppg-navy-dark: #1a2f5a;
+  --color-ppg-teal: #2e9e96;
   --color-ppg-lime: #C4E81D;
-  --color-ppg-green: #8AB62E;
+  --color-ppg-green: #7da828;
   --color-ppg-olive: #597001;
   --color-ppg-dark: #0f172a;
   --color-ppg-surface: #ffffff;
-  --color-ppg-bg: #f8fafc;
+  --color-ppg-bg: #f4f7fa;
+  --color-ppg-muted: #64748b;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── Global refinements ── */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Shared card style ── */
+.ppg-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ppg-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Primary button ── */
+.ppg-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #2b4a7e 0%, #2e9e96 100%);
+  box-shadow: 0 1px 3px rgba(43, 74, 126, 0.25);
+  transition: opacity 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+  border: none;
+}
+.ppg-btn-primary:hover {
+  opacity: 0.92;
+  box-shadow: 0 2px 8px rgba(43, 74, 126, 0.3);
+}
+
+/* ── Secondary / back button ── */
+.ppg-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #475569;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.ppg-btn-secondary:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+/* ── Stat card (top summary) ── */
+.ppg-stat {
+  border-radius: 0.75rem;
+  padding: 1rem;
+  text-align: center;
+  border: 1px solid;
+}
+.ppg-stat-navy { background: rgba(43,74,126,0.06); border-color: rgba(43,74,126,0.15); }
+.ppg-stat-teal { background: rgba(46,158,150,0.06); border-color: rgba(46,158,150,0.15); }
+.ppg-stat-green { background: rgba(125,168,40,0.06); border-color: rgba(125,168,40,0.15); }
+
+/* ── Accent line reusable ── */
+.ppg-accent-line {
+  height: 2px;
+  background: linear-gradient(90deg, #C4E81D 0%, #7da828 50%, #2e9e96 100%);
+}
+
+/* ── Section heading ── */
+.ppg-section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Input styling ── */
+.ppg-input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+.ppg-input:focus {
+  border-color: #2e9e96;
+  box-shadow: 0 0 0 3px rgba(46, 158, 150, 0.1);
 }
