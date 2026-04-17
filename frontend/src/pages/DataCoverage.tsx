@@ -180,7 +180,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: true,
           },
           {
-            key: "r_hage", label: "Heating system age & capacity (kW)",
+            key: "r_hage", label: "Heating system age & capacity",
             primarySource: "Boiler plate / service log / installation permit", primaryConfidence: "High",
             fallbackSource: "Boverket building stock statistics (age distribution by system type)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -200,7 +200,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "r_cc",   label: "Cooling capacity (kW)",
+            key: "r_cc",   label: "Cooling capacity",
             primarySource: "Equipment nameplate / commissioning report", primaryConfidence: "High",
             fallbackSource: "— (no DB fallback; must be measured or input)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
             defaultHas: false,
@@ -247,13 +247,13 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_b_hgt",   label: "Building height (m)",
+            key: "ec_b_hgt",   label: "Building height",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Urban datasets / Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "ec_b_orient", label: "Building orientation (°)",
+            key: "ec_b_orient", label: "Building orientation",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery / GIS cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
@@ -283,7 +283,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_b_hcdem", label: "Heating / cooling demand – hourly profile (kWh)",
+            key: "ec_b_hcdem", label: "Heating / cooling demand – hourly profile",
             primarySource: "Smart meter / district heating metering data", primaryConfidence: "High",
             fallbackSource: "EPC national average heat demand by building type (Boverket)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
@@ -297,13 +297,13 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         category: "Buildings – Electricity",
         items: [
           {
-            key: "ec_be_fp",   label: "Building footprint dimensions (m²)",
+            key: "ec_be_fp",   label: "Building footprint dimensions",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Energy Performance Certificate / Cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "ec_be_hgt",  label: "Building height (m)",
+            key: "ec_be_hgt",  label: "Building height",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Urban datasets / Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
@@ -315,7 +315,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_be_edem", label: "Hourly electricity demand profile (kWh)",
+            key: "ec_be_edem", label: "Hourly electricity demand profile",
             primarySource: "Smart meter data (AMR/AMI)", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -329,25 +329,25 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         category: "Case: Rooftop PV",
         items: [
           {
-            key: "ec_rpv_area", label: "Roof area (m²)",
+            key: "ec_rpv_area", label: "Roof area",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "ec_rpv_tilt", label: "Roof tilt (°)",
+            key: "ec_rpv_tilt", label: "Roof tilt",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "ec_rpv_azimuth", label: "Building azimuth (°)",
+            key: "ec_rpv_azimuth", label: "Building azimuth",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "ec_rpv_demand", label: "Electricity demand – hourly profile (kWh)",
+            key: "ec_rpv_demand", label: "Electricity demand – hourly profile",
             primarySource: "Smart meter data", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -361,7 +361,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         category: "Case: Facade PV",
         items: [
           {
-            key: "ec_fpv_area", label: "Facade area (m²)",
+            key: "ec_fpv_area", label: "Facade area",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
@@ -379,7 +379,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_fpv_demand", label: "Electricity demand – hourly profile (kWh)",
+            key: "ec_fpv_demand", label: "Electricity demand – hourly profile",
             primarySource: "Smart meter data", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -393,7 +393,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         category: "Case: Community PV",
         items: [
           {
-            key: "ec_cpv_area", label: "Site area (m²)",
+            key: "ec_cpv_area", label: "Site area",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
@@ -425,13 +425,13 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         category: "Case: Battery Storage",
         items: [
           {
-            key: "ec_bc",  label: "Battery capacity (kWh)",
+            key: "ec_bc",  label: "Battery capacity",
             primarySource: "System specs / purchase contract", primaryConfidence: "High",
             fallbackSource: "— (capacity must be defined; no default)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
             defaultHas: false,
           },
           {
-            key: "ec_bp",  label: "Max charge / discharge power (kW)",
+            key: "ec_bp",  label: "Max charge / discharge power",
             primarySource: "System specs / datasheet", primaryConfidence: "High",
             fallbackSource: "— (must be specified; no reliable default)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
             defaultHas: false,
@@ -457,7 +457,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_evc", label: "EV charger rated power (kW)",
+            key: "ec_evc", label: "EV charger rated power",
             primarySource: "Charger spec", primaryConfidence: "High",
             fallbackSource: "— (rated power must be specified)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
             defaultHas: false,
@@ -480,7 +480,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         category: "Case: Rooftop PV",
         items: [
           {
-            key: "re_rpv_area", label: "Roof area (m²)",
+            key: "re_rpv_area", label: "Roof area",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
@@ -498,7 +498,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "re_rpv_demand", label: "Electricity demand – hourly profile (kWh)",
+            key: "re_rpv_demand", label: "Electricity demand – hourly profile",
             primarySource: "Smart meter data", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -512,7 +512,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         category: "Case: Facade PV",
         items: [
           {
-            key: "re_fpv_area", label: "Facade area (m²)",
+            key: "re_fpv_area", label: "Facade area",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
@@ -530,7 +530,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "re_fpv_demand", label: "Electricity demand – hourly profile (kWh)",
+            key: "re_fpv_demand", label: "Electricity demand – hourly profile",
             primarySource: "Smart meter data", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -544,7 +544,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         category: "Case: Community PV",
         items: [
           {
-            key: "re_cpv_area", label: "Site area (m²)",
+            key: "re_cpv_area", label: "Site area",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
