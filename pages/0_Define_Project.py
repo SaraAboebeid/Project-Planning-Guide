@@ -106,37 +106,46 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-current_pt = st.session_state.get("project_type")
-pt_index = PROJECT_TYPES.index(current_pt) if current_pt in PROJECT_TYPES else None
-
-project_type = st.selectbox(
-    "Project Type",
-    options=PROJECT_TYPES,
-    index=pt_index,
-    placeholder="Choose a project type...",
-    key="project_type_select",
-    label_visibility="collapsed",
-)
-st.session_state["project_type"] = project_type
-
-# Show description for the selected type
-if project_type:
-    desc = PROJECT_TYPE_DESCRIPTIONS.get(project_type, "")
-    st.caption(desc)
-
-# ── Reset systems / KPI checkboxes when project type changes ────────
-prev_pt = st.session_state.get("_prev_project_type")
-if project_type is not None and project_type != prev_pt:
-    if prev_pt is not None:
-        for key in list(st.session_state.keys()):
-            if key.startswith("p1p_"):
-                del st.session_state[key]
-        for key in ["systems_in_scope", "exploration_approaches",
-                    "selected_kpis"]:
-            st.session_state.pop(key, None)
+_PT_ICONS = {
+    "Renovation Planning": "🏠",
+    "Energy Community Planning": "🏘️",
+    "Renewable Energy Planning": "☀️",
+}
+project_type = st.session_state.get("project_type")
+_pt_cols = st.columns(len(PROJECT_TYPES))
+for _pti, _pt in enumerate(PROJECT_TYPES):
+    with _pt_cols[_pti]:
+        _is_sel = (project_type == _pt)
+        _bc = "#33A9A0" if _is_sel else "#e2e8f0"
+        _bg = "rgba(51,169,160,0.08)" if _is_sel else "#ffffff"
+        _desc_txt = PROJECT_TYPE_DESCRIPTIONS.get(_pt, "")
+        st.markdown(
+            f"<div style='border:2px solid {_bc};background:{_bg};border-radius:14px;"
+            f"padding:1.1rem 0.8rem 0.7rem 0.8rem;text-align:center;margin-bottom:0.35rem;"
+            f"min-height:110px;'>"
+            f"<div style='font-size:1.9rem;line-height:1;'>{_PT_ICONS.get(_pt, '📋')}</div>"
+            f"<div style='font-size:0.86rem;font-weight:700;color:#0f172a;margin:0.35rem 0 0.2rem 0;'>{_pt}</div>"
+            f"<div style='font-size:0.72rem;color:#64748b;line-height:1.35;'>{_desc_txt[:90]}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            "✓ Selected" if _is_sel else "Select",
+            key=f"p1p_pt_btn_{_pti}",
+            use_container_width=True,
+            type="primary" if _is_sel else "secondary",
+        ):
+            _prev_pt = st.session_state.get("_prev_project_type")
+            if _prev_pt is not None and _prev_pt != _pt:
+                for _k in [k for k in list(st.session_state.keys()) if k.startswith("p1p_")]:
+                    del st.session_state[_k]
+                for _k in ["systems_in_scope", "exploration_approaches", "selected_kpis"]:
+                    st.session_state.pop(_k, None)
+            st.session_state["project_type"] = _pt
+            st.session_state["_prev_project_type"] = _pt
+            st.rerun()
+if project_type and st.session_state.get("_prev_project_type") != project_type:
     st.session_state["_prev_project_type"] = project_type
-    if prev_pt is not None:
-        st.rerun()
 
 # ============================================================================
 # SYSTEMS IN SCOPE
@@ -164,15 +173,58 @@ if project_type:
     _saved = st.session_state.get("systems_in_scope", [])
     _safe_defaults = [s for s in _saved if s in selectable_systems]
 
-    selected_systems = st.multiselect(
-        _scope_label,
-        options=selectable_systems,
-        default=_safe_defaults,
-        placeholder="Choose systems...",
-        key="p1p_systems_select",
-        label_visibility="collapsed",
-    )
+    _cur_sys = [s for s in st.session_state.get("systems_in_scope", []) if s in selectable_systems]
+    _sys_per_row = 4
+    for _row_start in range(0, len(selectable_systems), _sys_per_row):
+        _row_opts = selectable_systems[_row_start:_row_start + _sys_per_row]
+        _sys_rcols = st.columns(len(_row_opts))
+        for _si, _sopt in enumerate(_row_opts):
+            with _sys_rcols[_si]:
+                _s_sel = _sopt in _cur_sys
+                _s_key = f"p1p_sys_{''.join(c for c in _sopt if c.isalnum())[:18]}_{_row_start+_si}"
+                if st.button(
+                    ("✓ " if _s_sel else "") + _sopt,
+                    key=_s_key,
+                    use_container_width=True,
+                    type="primary" if _s_sel else "secondary",
+                ):
+                    _new_sys = list(_cur_sys)
+                    if _sopt in _new_sys:
+                        _new_sys.remove(_sopt)
+                    else:
+                        _new_sys.append(_sopt)
+                    st.session_state["systems_in_scope"] = _new_sys
+                    st.rerun()
+    selected_systems = _cur_sys
     st.session_state["systems_in_scope"] = selected_systems
+
+    # ── EC project context: existing / new / mixed ────────────────
+    if project_type == "Energy Community Planning":
+        _ec_context_options = [
+            "Existing building stock",
+            "New development",
+            "Mixed (existing + new development)",
+        ]
+        _ec_context_saved = st.session_state.get("ec_project_context")
+        _ec_context_idx = (
+            _ec_context_options.index(_ec_context_saved)
+            if _ec_context_saved in _ec_context_options
+            else None
+        )
+        _ec_ctx_cols = st.columns(len(_ec_context_options))
+        for _ecxi, _ecxopt in enumerate(_ec_context_options):
+            with _ec_ctx_cols[_ecxi]:
+                _ecx_sel = (st.session_state.get("ec_project_context") == _ecxopt)
+                if st.button(
+                    ("✓ " if _ecx_sel else "") + _ecxopt,
+                    key=f"p1p_ecctx_{_ecxi}",
+                    use_container_width=True,
+                    type="primary" if _ecx_sel else "secondary",
+                ):
+                    st.session_state["ec_project_context"] = _ecxopt
+                    st.rerun()
+        _ec_project_context = st.session_state.get("ec_project_context")
+        st.session_state["ec_project_context"] = _ec_project_context
 
     # Show greyed-out unavailable systems as a note
     if disabled_list:
@@ -207,23 +259,25 @@ if project_type:
 
     # ── RE: electricity threshold follow-up ────────────────────────
     if project_type == "Renewable Energy Planning":
-        _pv_systems = {"Rooftop PV", "Community PV", "Facade PV (BIPV)"}
+        _pv_systems = {"Rooftop PV", "Community PV", "Facade PV"}
         if _pv_systems & set(selected_systems):
             _threshold_key = "p1p_re_electricity_threshold"
             _saved_threshold = st.session_state.get(_threshold_key, "Partial coverage")
             _threshold_options = ["Net zero", "Surplus", "Partial coverage"]
-            _threshold = st.selectbox(
-                "What is your electricity target?",
-                options=_threshold_options,
-                index=_threshold_options.index(_saved_threshold)
-                    if _saved_threshold in _threshold_options else 2,
-                key=_threshold_key,
-                help=(
-                    "Net zero — PV covers 100 % of annual demand. "
-                    "Surplus — PV exceeds demand (export to grid). "
-                    "Partial coverage — PV covers a share of demand."
-                ),
-            )
+            st.caption("Net zero = 100% demand · Surplus = export to grid · Partial = share of demand")
+            _thr_cols = st.columns(len(_threshold_options))
+            for _tri, _tropt in enumerate(_threshold_options):
+                with _thr_cols[_tri]:
+                    _tr_sel = (st.session_state.get(_threshold_key) == _tropt)
+                    if st.button(
+                        ("✓ " if _tr_sel else "") + _tropt,
+                        key=f"p1p_re_thr_{_tri}",
+                        use_container_width=True,
+                        type="primary" if _tr_sel else "secondary",
+                    ):
+                        st.session_state[_threshold_key] = _tropt
+                        st.rerun()
+            _threshold = st.session_state.get(_threshold_key, "Partial coverage")
             st.session_state["re_electricity_threshold"] = _threshold
 
     # ── Renovation Planning follow-up questions ────────────────────
@@ -334,7 +388,7 @@ if project_type:
 
     # ── EC-specific follow-ups (existing PV / battery on site) ─────
     if project_type == "Energy Community Planning" and selected_systems:
-        _ec_pv_systems = {"Rooftop PV", "Community PV", "Facade PV (BIPV)"}
+        _ec_pv_systems = {"Rooftop PV", "Community PV", "Facade PV"}
         _ec_has_pv = _ec_pv_systems & set(selected_systems)
         if _ec_has_pv:
             _ans_pv = st.radio(
@@ -375,14 +429,25 @@ if project_type:
             unsafe_allow_html=True,
         )
         _cur_focus = st.session_state.get("ec_energy_focus", [])
-        _ec_focus = st.multiselect(
-            "Energy focus",
-            options=EC_FOCUS_OPTIONS,
-            default=[f for f in _cur_focus if f in EC_FOCUS_OPTIONS],
-            placeholder="Choose focus...",
-            key="p1p_ec_focus_select",
-            label_visibility="collapsed",
-        )
+        _ec_foc_cur = [f for f in st.session_state.get("ec_energy_focus", []) if f in EC_FOCUS_OPTIONS]
+        _ec_foc_cols = st.columns(max(1, len(EC_FOCUS_OPTIONS)))
+        for _ecfi, _ecfopt in enumerate(EC_FOCUS_OPTIONS):
+            with _ec_foc_cols[_ecfi]:
+                _ecf_sel = _ecfopt in _ec_foc_cur
+                if st.button(
+                    ("✓ " if _ecf_sel else "") + _ecfopt,
+                    key=f"p1p_ecfoc_{_ecfi}",
+                    use_container_width=True,
+                    type="primary" if _ecf_sel else "secondary",
+                ):
+                    _new_foc = list(_ec_foc_cur)
+                    if _ecfopt in _new_foc:
+                        _new_foc.remove(_ecfopt)
+                    else:
+                        _new_foc.append(_ecfopt)
+                    st.session_state["ec_energy_focus"] = _new_foc
+                    st.rerun()
+        _ec_focus = _ec_foc_cur
         st.session_state["ec_energy_focus"] = _ec_focus
 
 # ============================================================================
@@ -402,14 +467,28 @@ if project_type:
         unsafe_allow_html=True,
     )
 
-    selected_explorations = st.multiselect(
-        "Exploration approaches",
-        options=_APPROACH_NAMES,
-        default=st.session_state.get("exploration_approaches", []),
-        placeholder="Choose approaches...",
-        key="p1p_exploration_select",
-        label_visibility="collapsed",
-    )
+    _expl_cur = [e for e in st.session_state.get("exploration_approaches", []) if e in _APPROACH_NAMES]
+    _expl_per_row = 3
+    for _exr_start in range(0, len(_APPROACH_NAMES), _expl_per_row):
+        _exr_opts = _APPROACH_NAMES[_exr_start:_exr_start + _expl_per_row]
+        _exr_cols = st.columns(len(_exr_opts))
+        for _exi, _exopt in enumerate(_exr_opts):
+            with _exr_cols[_exi]:
+                _ex_sel = _exopt in _expl_cur
+                if st.button(
+                    ("✓ " if _ex_sel else "") + _exopt,
+                    key=f"p1p_expl_{''.join(c for c in _exopt if c.isalnum())[:16]}_{_exr_start+_exi}",
+                    use_container_width=True,
+                    type="primary" if _ex_sel else "secondary",
+                ):
+                    _new_expl = list(_expl_cur)
+                    if _exopt in _new_expl:
+                        _new_expl.remove(_exopt)
+                    else:
+                        _new_expl.append(_exopt)
+                    st.session_state["exploration_approaches"] = _new_expl
+                    st.rerun()
+    selected_explorations = _expl_cur
     st.session_state["exploration_approaches"] = selected_explorations
 
     # Show brief descriptions for selected approaches
@@ -448,18 +527,39 @@ if project_type:
 
     # Clean stale defaults that are no longer in the available list
     _prev = st.session_state.get("selected_kpis", [])
+
+    # Backward-compatibility: migrate previous label to the clearer term
+    _kpi_rename_map = {
+        "Peak Load": "Peak Load Shaving",
+    }
+    _prev = [_kpi_rename_map.get(k, k) for k in _prev]
+
     _valid_prev = [k for k in _prev if k in _base_kpis]
     if _valid_prev != _prev:
         st.session_state["selected_kpis"] = _valid_prev
 
-    selected_kpis = st.multiselect(
-        "Key Performance Indicators",
-        options=_base_kpis,
-        default=st.session_state.get("selected_kpis", []),
-        placeholder="Choose KPIs...",
-        key="p1p_kpis_select",
-        label_visibility="collapsed",
-    )
+    _kpi_cur = [k for k in st.session_state.get("selected_kpis", []) if k in _base_kpis]
+    _kpi_per_row = 4
+    for _krow_start in range(0, len(_base_kpis), _kpi_per_row):
+        _krow_opts = _base_kpis[_krow_start:_krow_start + _kpi_per_row]
+        _krow_cols = st.columns(len(_krow_opts))
+        for _ki, _kopt in enumerate(_krow_opts):
+            with _krow_cols[_ki]:
+                _k_sel = _kopt in _kpi_cur
+                if st.button(
+                    ("✓ " if _k_sel else "") + _kopt,
+                    key=f"p1p_kpi_{''.join(c for c in _kopt if c.isalnum())[:16]}_{_krow_start+_ki}",
+                    use_container_width=True,
+                    type="primary" if _k_sel else "secondary",
+                ):
+                    _new_kpis = list(_kpi_cur)
+                    if _kopt in _new_kpis:
+                        _new_kpis.remove(_kopt)
+                    else:
+                        _new_kpis.append(_kopt)
+                    st.session_state["selected_kpis"] = _new_kpis
+                    st.rerun()
+    selected_kpis = _kpi_cur
     st.session_state["selected_kpis"] = selected_kpis
 
 # ============================================================================
@@ -483,24 +583,21 @@ if project_type == "Energy Community Planning":
         st.session_state["project_scale"] = None
 else:
     scale_options = ["Building", "Neighborhood", "City"]
-current_scale = st.session_state.get("project_scale")
-scale_index = (
-    scale_options.index(current_scale) if current_scale in scale_options else None
-)
-
-project_scale = st.selectbox(
-    "Project scale:",
-    options=scale_options,
-    index=scale_index,
-    placeholder="Choose option",
-    help=(
-        "Energy Community Planning is available at Neighborhood or City scale"
-        if project_type == "Energy Community Planning"
-        else "Select the geographic scope of your project"
-    ),
-    key="p1p_scale_select",
-    label_visibility="collapsed",
-)
+_scale_icons = {"Building": "🏢", "Neighborhood": "🏘️", "City": "🌆"}
+_sc_cols = st.columns(len(scale_options))
+for _sci, _scopt in enumerate(scale_options):
+    with _sc_cols[_sci]:
+        _sc_sel = (st.session_state.get("project_scale") == _scopt)
+        if st.button(
+            f"{_scale_icons.get(_scopt, '')} {'✓ ' if _sc_sel else ''}{_scopt}",
+            key=f"p1p_scale_{_sci}",
+            use_container_width=True,
+            type="primary" if _sc_sel else "secondary",
+        ):
+            st.session_state["project_scale"] = _scopt
+            st.session_state["analysis_scale"] = _scopt
+            st.rerun()
+project_scale = st.session_state.get("project_scale")
 st.session_state["project_scale"] = project_scale
 st.session_state["analysis_scale"] = project_scale
 
@@ -584,22 +681,21 @@ st.markdown(
 )
 
 country_options = ["Belgium", "Ireland", "Sweden", "United Kingdom"]
-current_country = st.session_state.get("country")
-country_index = (
-    country_options.index(current_country)
-    if current_country in country_options
-    else None
-)
-
-country = st.selectbox(
-    "Select country:",
-    options=country_options,
-    index=country_index,
-    placeholder="Choose option",
-    help="Select the country for your project",
-    key="p1p_country_select",
-    label_visibility="collapsed",
-)
+_ctry_icons = {"Belgium": "🇧🇪", "Ireland": "🇮🇪", "Sweden": "🇸🇪", "United Kingdom": "🇬🇧"}
+_ctry_cols = st.columns(len(country_options))
+for _ctri, _ctropt in enumerate(country_options):
+    with _ctry_cols[_ctri]:
+        _ctr_sel = (st.session_state.get("country") == _ctropt)
+        if st.button(
+            f"{_ctry_icons.get(_ctropt, '')} {'✓ ' if _ctr_sel else ''}{_ctropt}",
+            key=f"p1p_country_{_ctri}",
+            use_container_width=True,
+            type="primary" if _ctr_sel else "secondary",
+        ):
+            st.session_state["country"] = _ctropt
+            st.session_state["analysis_context"] = _ctropt
+            st.rerun()
+country = st.session_state.get("country")
 st.session_state["country"] = country
 st.session_state["analysis_context"] = country
 
@@ -842,6 +938,8 @@ with col2:
             missing.append("country")
         if project_type == "Energy Community Planning" and not st.session_state.get("ec_energy_focus", []):
             missing.append("energy focus")
+        if project_type == "Energy Community Planning" and not st.session_state.get("ec_project_context"):
+            missing.append("energy community development context")
 
         if missing:
             st.warning("Please select: " + ", ".join(missing) + " before proceeding.")

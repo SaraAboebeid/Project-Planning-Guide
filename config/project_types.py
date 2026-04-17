@@ -131,7 +131,7 @@ DISABLED_SYSTEMS = {
 KPIS_BY_PROJECT_TYPE = {
     "Energy Community Planning": [
         "Self-sufficiency",
-        "Peak Load",
+        "Peak Load Shaving",
         "Global Warming Potential",
         "Cost",
         "Return on Investment",
@@ -147,7 +147,7 @@ KPIS_BY_PROJECT_TYPE = {
         "Self-Sufficiency",
         "Global Warming Potential",
         "Energy Import",
-        "Peak Load",
+        "Peak Load Shaving",
         "Thermal Comfort",
         "Cost",
         "Return on Investment",

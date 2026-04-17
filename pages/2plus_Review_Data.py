@@ -1591,6 +1591,24 @@ if project_type == "Renovation Planning":
             else:
                 st.info("No EPC-linked buildings found near this location.")
 
+    # ── Shared table style dicts (used in both renovation and non-renovation paths) ──
+    _STATUS_CFG = {
+        "Available": ("#33A9A0", "rgba(51,169,160,0.10)", "✅"),
+        "Estimated": ("#F59E0B", "rgba(245,158,11,0.10)",  "⚠️"),
+        "Missing":   ("#EF4444", "rgba(239,68,68,0.10)",   "❌"),
+    }
+    _CONF_CFG = {
+        "High":   ("#33A9A0", "rgba(51,169,160,0.10)"),
+        "Medium": ("#F59E0B", "rgba(245,158,11,0.10)"),
+        "Low":    ("#EF4444", "rgba(239,68,68,0.10)"),
+        "—":      ("#94a3b8", "rgba(148,163,184,0.10)"),
+    }
+    _ACTION_CFG = {
+        "None":       ("#64748b", "rgba(100,116,139,0.08)"),
+        "Review":     ("#F59E0B", "rgba(245,158,11,0.10)"),
+        "User input": ("#EF4444", "rgba(239,68,68,0.10)"),
+    }
+
     # ── Assess data coverage ──────────────────────────────────────
     _coverage = assess_coverage(
         passport=_reno_passport,
@@ -1626,134 +1644,191 @@ if project_type == "Renovation Planning":
          "bg": "rgba(51,82,138,0.10)", "border": "rgba(51,82,138,0.25)"},
     ])
 
-    # ── Grouped coverage list ──────────────────────────────────────
+    # ── Coverage table (same design as EC / RE paths) ─────────────
     st.markdown(
         "<div style='font-size:1.05rem; font-weight:700; color:#0f172a; "
         "margin:0.8rem 0 0.3rem 0;'>📋 Data Input Coverage</div>",
         unsafe_allow_html=True,
     )
     st.caption(
-        "What we already know about your asset, what can be generated synthetically, "
-        "and what you'll need to provide. This drives the workflow in the next steps."
+        "What we already know about your asset, what can be estimated synthetically, "
+        "and what you will need to provide. Click a row to update its status."
     )
 
-    _SOURCE_BADGE = {
-        "EPC": ("#33A9A0", "rgba(51,169,160,0.12)"),
-        "TABULA": ("#33528A", "rgba(51,82,138,0.10)"),
-        "Boverket": ("#8AB62E", "rgba(138,182,46,0.10)"),
-        "Wikells": ("#8B5CF6", "rgba(139,92,246,0.10)"),
-        "Synthetic": ("#F59E0B", "rgba(245,158,11,0.10)"),
+    # Map internal statuses → display statuses / confidence / action
+    _RENO_STATUS_MAP = {
+        "covered":             ("Available", "High",   "None"),
+        "available_synthetic": ("Estimated", "Medium", "Review"),
+        "missing":             ("Missing",   "—",      "User input"),
     }
-    _STATUS_ICON = {
-        "covered": "✅",
-        "available_synthetic": "🔄",
-        "missing": "❌",
+    # Source confidence overrides based on source name
+    _RENO_CONF_MAP = {
+        "EPC":      "High",
+        "TABULA":   "Medium",
+        "Boverket": "Medium",
+        "Wikells":  "Medium",
+        "Synthetic": "Low",
     }
 
-    for _cat_name, _cat_items in _grouped.items():
-        _cat_covered = sum(1 for r in _cat_items if r["status"] == "covered")
-        _cat_total = len(_cat_items)
-        _pct = int(_cat_covered / _cat_total * 100) if _cat_total else 0
-        _bar_color = "#33A9A0" if _pct >= 80 else "#F59E0B" if _pct >= 40 else "#EF4444"
+    def _reno_tbl_rows(coverage_items):
+        rows = []
+        for item in coverage_items:
+            _st_disp, _conf, _action = _RENO_STATUS_MAP.get(item["status"], ("Missing", "—", "User input"))
+            _src = item.get("source") or "—"
+            # Refine confidence from known sources
+            if _src in _RENO_CONF_MAP:
+                _conf = _RENO_CONF_MAP[_src]
+            # Value hint for display
+            _val = item.get("value")
+            _unit = item.get("unit", "")
+            _val_str = ""
+            if _val is not None and not _is_missing(_val) and item["status"] == "covered":
+                _vt = str(_val)
+                if len(_vt) > 35:
+                    _vt = _vt[:35] + "…"
+                _val_str = f"{_vt}{' ' + _unit if _unit else ''}"
+            elif item["status"] == "available_synthetic":
+                _val_str = "Synthetic estimate"
+            _w = item.get("confidence_weight", 5)
+            rows.append({
+                "key": item.get("key", item["label"]),
+                "label": item["label"],
+                "status": _st_disp,
+                "source": _src,
+                "confidence": _conf,
+                "action": _action,
+                "val_str": _val_str,
+                "_category": item.get("category", "General"),
+                "weight": _w,
+            })
+        return rows
 
-        with st.expander(f"{_cat_name}  —  {_cat_covered}/{_cat_total} covered ({_pct}%)", expanded=(_pct < 100)):
-            for _item in _cat_items:
-                _icon = _STATUS_ICON.get(_item["status"], "")
-                _src = _item["source"]
-                _val = _item["value"]
+    _reno_tbl = _reno_tbl_rows(_coverage)
 
-                # Source badge
-                _src_html = ""
-                if _src and _src in _SOURCE_BADGE:
-                    _sc, _sbg = _SOURCE_BADGE[_src]
-                    _src_html = (
-                        f"<span style='background:{_sbg}; color:{_sc}; "
-                        f"padding:1px 8px; border-radius:6px; font-size:0.7rem; "
-                        f"font-weight:600; margin-left:6px;'>{_src}</span>"
-                    )
+    # Filter pills
+    _reno_filter_key = "s2p_reno_tbl_filter"
+    _reno_filter_opts = ["All", "Available", "Estimated", "Missing", "Needs user input"]
+    _reno_filter_icons = {"All": "📋", "Available": "✅", "Estimated": "⚠️", "Missing": "❌", "Needs user input": "📝"}
+    _reno_cur_filter = st.session_state.get(_reno_filter_key, "All")
 
-                # Value display
-                _val_html = ""
-                if _val is not None and _item["status"] == "covered":
-                    _val_str = str(_val)
-                    if len(_val_str) > 40:
-                        _val_str = _val_str[:40] + "…"
-                    _unit_str = f" {_item['unit']}" if _item["unit"] else ""
-                    _val_html = (
-                        f"<span style='color:#475569; font-size:0.8rem; margin-left:8px;'>"
-                        f"{_val_str}{_unit_str}</span>"
-                    )
-                elif _item["status"] == "available_synthetic":
-                    _val_html = (
-                        "<span style='color:#92400e; font-size:0.78rem; margin-left:8px; "
-                        "font-style:italic;'>Can be generated synthetically</span>"
-                    )
+    _rfc = st.columns(len(_reno_filter_opts))
+    for _rfi, _rfo in enumerate(_reno_filter_opts):
+        with _rfc[_rfi]:
+            if st.button(
+                f"{_reno_filter_icons[_rfo]} {_rfo}",
+                key=f"s2p_reno_filt_{_rfo}",
+                use_container_width=True,
+            ):
+                st.session_state[_reno_filter_key] = _rfo
+                _reno_cur_filter = _rfo
 
-                # Weight indicator
-                _w = _item["confidence_weight"]
-                _w_dots = "●" * min(_w // 2, 5) + "○" * (5 - min(_w // 2, 5))
-                _w_html = (
-                    f"<span style='color:#cbd5e1; font-size:0.65rem; margin-left:auto; "
-                    f"white-space:nowrap;' title='Impact weight: {_w}/10'>{_w_dots}</span>"
-                )
+    st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
 
-                st.markdown(
-                    f"<div style='display:flex; align-items:center; gap:0.3rem; "
-                    f"padding:0.35rem 0; border-bottom:1px solid #f1f5f9;'>"
-                    f"<span style='font-size:0.85rem;'>{_icon}</span>"
-                    f"<span style='font-weight:600; font-size:0.88rem; color:#0f172a;'>"
-                    f"{_item['label']}</span>"
-                    f"{_src_html}{_val_html}{_w_html}"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+    def _reno_matches_filter(r, filt):
+        if filt == "All": return True
+        if filt == "Available": return r["status"] == "Available"
+        if filt == "Estimated": return r["status"] == "Estimated"
+        if filt == "Missing": return r["status"] == "Missing"
+        if filt == "Needs user input": return r["action"] == "User input"
+        return True
 
-    # ── Workflow Assessment ──────────────────────────────────────
+    _reno_visible = [r for r in _reno_tbl if _reno_matches_filter(r, _reno_cur_filter)]
+    _rn_avail = sum(1 for r in _reno_tbl if r["status"] == "Available")
+    _rn_est   = sum(1 for r in _reno_tbl if r["status"] == "Estimated")
+    _rn_miss  = sum(1 for r in _reno_tbl if r["status"] == "Missing")
+
     st.markdown(
-        "<div style='font-size:1.05rem; font-weight:700; color:#0f172a; "
-        "margin:1.2rem 0 0.3rem 0;'>⚙️ Generated Workflow</div>",
+        f"<div style='font-size:0.8rem; color:#64748b; margin-bottom:0.4rem;'>"
+        f"Showing <b>{len(_reno_visible)}</b> of <b>{len(_reno_tbl)}</b> parameters &nbsp;·&nbsp; "
+        f"<span style='color:#33A9A0;'>✅ {_rn_avail} available</span> &nbsp;"
+        f"<span style='color:#F59E0B;'>⚠️ {_rn_est} estimated</span> &nbsp;"
+        f"<span style='color:#EF4444;'>❌ {_rn_miss} missing</span>"
+        f"</div>",
         unsafe_allow_html=True,
     )
-    st.caption(
-        "Based on your data coverage, here's how the platform will handle each gap."
-    )
 
-    _workflow_steps = []
-    for _item in _coverage:
-        if _item["status"] == "covered":
-            continue
-        if _item["status"] == "available_synthetic":
-            _workflow_steps.append({
-                "label": _item["label"],
-                "action": "Generate synthetic proxy",
-                "detail": f"We'll generate a synthetic estimate for **{_item['label']}** using TABULA archetypes and statistical models.",
-                "icon": "🔄",
-                "color": "#F59E0B",
-            })
-        elif _item["status"] == "missing":
-            _workflow_steps.append({
-                "label": _item["label"],
-                "action": "User input required",
-                "detail": f"**{_item['label']}** is not available from any database. You'll be asked to provide this in the next step.",
-                "icon": "📝",
-                "color": "#EF4444",
-            })
+    if not _reno_visible:
+        st.info("No parameters match the selected filter.")
+    else:
+        # Column header
+        st.markdown(
+            "<div style='display:grid; grid-template-columns:2fr 1fr 1.5fr 0.9fr 1.1fr; "
+            "gap:0.4rem; padding:0.3rem 0.6rem; background:#f8fafc; "
+            "border:1px solid #e2e8f0; border-radius:10px 10px 0 0; "
+            "font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase; "
+            "letter-spacing:0.06em;'>"
+            "<div>Parameter</div><div>Status</div><div>Source</div>"
+            "<div>Confidence</div><div>Action Required</div></div>",
+            unsafe_allow_html=True,
+        )
 
-    if _workflow_steps:
-        for _ws in _workflow_steps:
+        # Group by category
+        _reno_cat_groups: dict = {}
+        for _rr in _reno_visible:
+            _rc = _rr["_category"]
+            if _rc not in _reno_cat_groups:
+                _reno_cat_groups[_rc] = []
+            _reno_cat_groups[_rc].append(_rr)
+
+        for _rcat, _rcat_rows in _reno_cat_groups.items():
             st.markdown(
-                f"<div style='display:flex; align-items:flex-start; gap:0.6rem; "
-                f"padding:0.5rem 0.7rem; border-left:3px solid {_ws['color']}; "
-                f"background:{_ws['color']}08; border-radius:0 10px 10px 0; margin-bottom:0.4rem;'>"
-                f"<span style='font-size:1rem;'>{_ws['icon']}</span>"
-                f"<div>"
-                f"<div style='font-weight:700; font-size:0.88rem; color:#0f172a;'>{_ws['label']}</div>"
-                f"<div style='font-size:0.78rem; color:#475569;'>{_ws['action']}</div>"
-                f"</div></div>",
+                f"<div style='font-size:0.75rem; font-weight:700; color:#33528A; "
+                f"text-transform:uppercase; letter-spacing:0.07em; "
+                f"padding:0.35rem 0.6rem; background:rgba(51,82,138,0.05); "
+                f"border-left:3px solid #33528A; border-right:1px solid #e2e8f0; "
+                f"border-bottom:1px solid #e2e8f0; margin-top:2px;'>"
+                f"{_rcat}</div>",
                 unsafe_allow_html=True,
             )
-    else:
-        st.success("All required data inputs are covered! No additional input needed.")
+            for _rrow in _rcat_rows:
+                _rsc, _rsbg, _rsicon = _STATUS_CFG[_rrow["status"]]
+                _rcc, _rcbg = _CONF_CFG[_rrow["confidence"]]
+                _rac, _rabg = _ACTION_CFG[_rrow["action"]]
+                _exp_lbl = f"{_rrow['label']} — {_rrow['status']}"
+                with st.expander(_exp_lbl, expanded=False):
+                    st.markdown(
+                        "<div style='display:grid; grid-template-columns:2fr 1fr 1.5fr 0.9fr 1.1fr; "
+                        "gap:0.4rem; padding:0 0.1rem 0.3rem 0; border-bottom:1px solid #f1f5f9; "
+                        "font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase; "
+                        "letter-spacing:0.06em;'>"
+                        "<div>Parameter</div><div>Status</div><div>Source</div>"
+                        "<div>Confidence</div><div>Action</div></div>",
+                        unsafe_allow_html=True,
+                    )
+                    _val_detail = (
+                        f"<span style='color:#475569; font-size:0.78rem;'> · {_rrow['val_str']}</span>"
+                        if _rrow["val_str"] else ""
+                    )
+                    _rrow_weight = _rrow["weight"]
+                    _imp_dots = "●" * min(_rrow_weight // 2, 5) + "○" * (5 - min(_rrow_weight // 2, 5))
+                    st.markdown(
+                        f"<div style='display:grid; grid-template-columns:2fr 1fr 1.5fr 0.9fr 1.1fr; "
+                        f"align-items:center; gap:0.4rem; padding:0.45rem 0.1rem;'>"
+                        f"<div><span style='font-weight:600; font-size:0.88rem; color:#0f172a;'>"
+                        f"{_rrow['label']}</span>"
+                        f"<span style='color:#cbd5e1; font-size:0.65rem; margin-left:6px;' "
+                        f"title='Impact weight: {_rrow_weight}/10'>{_imp_dots}</span>"
+                        f"{_val_detail}</div>"
+                        f"<div><span style='background:{_rsbg}; color:{_rsc}; border:1px solid {_rsc}33; "
+                        f"padding:2px 9px; border-radius:999px; font-size:0.73rem; font-weight:700; "
+                        f"white-space:nowrap;'>{_rsicon} {_rrow['status']}</span></div>"
+                        f"<div style='font-size:0.78rem; color:#475569;'>{_rrow['source']}</div>"
+                        f"<div><span style='background:{_rcbg}; color:{_rcc}; "
+                        f"padding:2px 8px; border-radius:999px; font-size:0.72rem; font-weight:600;'>"
+                        f"{_rrow['confidence']}</span></div>"
+                        f"<div><span style='background:{_rabg}; color:{_rac}; "
+                        f"padding:2px 8px; border-radius:999px; font-size:0.72rem; font-weight:600;'>"
+                        f"{_rrow['action']}</span></div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+                    # Contextual hint
+                    if _rrow["status"] == "Estimated":
+                        st.caption(f"ℹ️ This value will be generated synthetically from {_rrow['source']} data. Review before proceeding.")
+                    elif _rrow["status"] == "Missing":
+                        st.caption("📝 This parameter is not available from any database. You will be prompted to enter it in Step 3.")
+                    elif _rrow["val_str"]:
+                        st.caption(f"✅ Value from {_rrow['source']}: {_rrow['val_str']}")
 
     # ── Expander: Full Building Passport + TABULA details ──────────
     with st.expander("🔍 Building Data Sources — EPC & TABULA Details", expanded=False):
@@ -2623,42 +2698,370 @@ if not _is_reno_mode:
         unsafe_allow_html=True,
     )
 
-# ── Left: data inputs grouped by system ─────────────────────────────
+# ============================================================================
+# COVERAGE TABLE HELPERS  (non-renovation path)
+# ============================================================================
+
+def _item_coverage_row(item, pg_key, cntry, sa_type):
+    """Derive status / source / confidence / action for one data item."""
+    ik = item["key"]
+    has_key  = f"{pg_key}_{ik}_has"
+    proxy_key = f"{pg_key}_{ik}_proxy"
+    has_data = st.session_state.get(has_key, "Yes")
+    proxy_options = item.get("proxy_options", [])
+    selected_proxy = st.session_state.get(proxy_key)
+
+    if has_data == "Yes":
+        status     = "Available"
+        source     = item.get("recommended_source") or "User-provided"
+        confidence = "High"
+        action     = "None"
+    elif selected_proxy or proxy_options:
+        prx = selected_proxy or proxy_options[0]
+        ci  = get_proxy_confidence(cntry, ik, prx)
+        cv  = ci.get("confidence", 70)
+        status     = "Estimated"
+        source     = prx
+        confidence = "High" if cv >= 85 else "Medium" if cv >= 70 else "Low"
+        action     = "Review"
+    else:
+        status     = "Missing"
+        source     = "—"
+        confidence = "—"
+        action     = "User input"
+
+    imp = get_importance_rank(ik, sa_type)
+    return {
+        "key": ik, "label": item["label"],
+        "status": status, "source": source,
+        "confidence": confidence, "action": action,
+        "imp": imp, "proxy_options": proxy_options,
+        "has_key": has_key, "proxy_key": proxy_key,
+        "recommended_source": item.get("recommended_source", ""),
+        "temporal_resolution": item.get("temporal_resolution", False),
+    }
+
+
+_STATUS_CFG = {
+    "Available": ("#33A9A0", "rgba(51,169,160,0.10)", "✅"),
+    "Estimated": ("#F59E0B", "rgba(245,158,11,0.10)",  "⚠️"),
+    "Missing":   ("#EF4444", "rgba(239,68,68,0.10)",   "❌"),
+}
+_CONF_CFG = {
+    "High":   ("#33A9A0", "rgba(51,169,160,0.10)"),
+    "Medium": ("#F59E0B", "rgba(245,158,11,0.10)"),
+    "Low":    ("#EF4444", "rgba(239,68,68,0.10)"),
+    "—":      ("#94a3b8", "rgba(148,163,184,0.10)"),
+}
+_ACTION_CFG = {
+    "None":       ("#64748b", "rgba(100,116,139,0.08)"),
+    "Review":     ("#F59E0B", "rgba(245,158,11,0.10)"),
+    "User input": ("#EF4444", "rgba(239,68,68,0.10)"),
+}
+
+
+def _render_coverage_row(row, pg_key, cntry):
+    """Render one collapsible row in the coverage table."""
+    sc, sbg, sicon = _STATUS_CFG[row["status"]]
+    cc, cbg = _CONF_CFG[row["confidence"]]
+    ac, abg = _ACTION_CFG[row["action"]]
+
+    badge_html = (
+        f"<span style='background:{row['imp']['color']}18; border:1px solid {row['imp']['color']}40; "
+        f"color:{row['imp']['color']}; font-size:0.65rem; font-weight:700; "
+        f"padding:0 5px; border-radius:6px; margin-left:4px; vertical-align:middle;'>"
+        f"{row['imp']['icon']} {row['imp']['label']}</span>"
+    )
+    header_html = (
+        f"<div style='display:grid; grid-template-columns:2fr 1fr 1.5fr 0.9fr 1.1fr; "
+        f"align-items:center; gap:0.4rem; padding:0.45rem 0.1rem;'>"
+        # Parameter
+        f"<div><span style='font-weight:600; font-size:0.88rem; color:#0f172a;'>"
+        f"{row['label']}</span>{badge_html}</div>"
+        # Status pill
+        f"<div><span style='background:{sbg}; color:{sc}; border:1px solid {sc}33; "
+        f"padding:2px 9px; border-radius:999px; font-size:0.73rem; font-weight:700; "
+        f"white-space:nowrap;'>{sicon} {row['status']}</span></div>"
+        # Source
+        f"<div style='font-size:0.78rem; color:#475569; overflow:hidden; "
+        f"text-overflow:ellipsis; white-space:nowrap;' title='{row['source']}'>"
+        f"{row['source'][:32] + '…' if len(row['source']) > 32 else row['source']}</div>"
+        # Confidence
+        f"<div><span style='background:{cbg}; color:{cc}; "
+        f"padding:2px 8px; border-radius:999px; font-size:0.72rem; font-weight:600;'>"
+        f"{row['confidence']}</span></div>"
+        # Action
+        f"<div><span style='background:{abg}; color:{ac}; "
+        f"padding:2px 8px; border-radius:999px; font-size:0.72rem; font-weight:600;'>"
+        f"{row['action']}</span></div>"
+        f"</div>"
+    )
+
+    exp_label = f"{row['label']} — {row['status']}"
+    with st.expander(exp_label, expanded=False):
+        # Column header (only renders inside expander to avoid duplication)
+        st.markdown(
+            "<div style='display:grid; grid-template-columns:2fr 1fr 1.5fr 0.9fr 1.1fr; "
+            "gap:0.4rem; padding:0 0.1rem 0.3rem 0; border-bottom:1px solid #f1f5f9; "
+            "font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase; "
+            "letter-spacing:0.06em;'>"
+            "<div>Parameter</div><div>Status</div><div>Source</div>"
+            "<div>Confidence</div><div>Action</div></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(header_html, unsafe_allow_html=True)
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+        # Editable status: let user toggle Available / Estimated / Missing
+        cur_has = st.session_state.get(row["has_key"], "Yes")
+        new_has = st.radio(
+            "Do you have this data?",
+            ["Yes", "No"], index=0 if cur_has == "Yes" else 1,
+            horizontal=True, key=f"tbl_{row['key']}_has",
+            label_visibility="visible",
+        )
+        st.session_state[row["has_key"]] = new_has
+
+        if new_has == "No" and row["proxy_options"]:
+            cur_proxy = st.session_state.get(row["proxy_key"])
+            idx = row["proxy_options"].index(cur_proxy) if cur_proxy in row["proxy_options"] else 0
+            sel_proxy = st.selectbox(
+                "Best available proxy / alternative source:",
+                row["proxy_options"], index=idx,
+                key=f"tbl_{row['key']}_proxy",
+            )
+            st.session_state[row["proxy_key"]] = sel_proxy
+            # Confidence detail
+            ci2 = get_proxy_confidence(cntry, row["key"], sel_proxy)
+            cv2 = ci2.get("confidence")
+            if cv2 is not None:
+                col = "#33A9A0" if cv2 >= 85 else "#33528A" if cv2 >= 70 else "#F59E0B"
+                lvl = "Good" if cv2 >= 85 else "Moderate" if cv2 >= 70 else "Low"
+                st.markdown(
+                    f"<span style='font-size:0.8rem;'>Proxy confidence: </span>"
+                    f"<span style='background:{col}; color:#fff; padding:1px 7px; "
+                    f"border-radius:4px; font-size:0.78rem; font-weight:600;'>"
+                    f"{cv2}% ({lvl})</span>",
+                    unsafe_allow_html=True,
+                )
+            # Source links
+            lnks = _source_links(row["proxy_options"])
+            if lnks:
+                lhtml = " · ".join(
+                    f"<a href='{u}' target='_blank' style='color:#33528A; "
+                    f"font-weight:500; font-size:0.78rem;'>{n}</a>"
+                    for n, u in lnks
+                )
+                st.markdown(
+                    f"<div style='font-size:0.78rem; color:#64748b;'>Sources: {lhtml}</div>",
+                    unsafe_allow_html=True,
+                )
+        elif new_has == "No":
+            st.caption("No proxy sources available for this parameter.")
+
+        if row["temporal_resolution"] and new_has == "Yes":
+            st.selectbox(
+                "Temporal resolution available:",
+                ["Hourly", "Daily", "Monthly", "Annual"],
+                key=f"tbl_{row['key']}_resolution",
+            )
+
+
+# ── Left: coverage table ─────────────────────────────────────────────
 if not _is_reno_mode:
   with left_col:
     st.markdown(
-        "<hr style='margin:0.3rem 0 0.7rem 0; border:none; "
+        "<hr style='margin:0.3rem 0 0.6rem 0; border:none; "
         "border-top:1px solid #e2e8f0;'>",
         unsafe_allow_html=True,
     )
+
+    # ── Collect all rows ──────────────────────────────────────────
+    _tbl_rows = []
+    for sys_group in data_inputs:
+        for cat in sys_group["categories"]:
+            sorted_items = sorted(
+                cat["items"],
+                key=lambda it: get_sensitivity_weight(it["key"], sa_analysis_type),
+                reverse=True,
+            )
+            for item in sorted_items:
+                row = _item_coverage_row(item, page_key, country, sa_analysis_type)
+                row["_system"] = sys_group["system"]
+                row["_category"] = cat["category"]
+                _tbl_rows.append(row)
+
+    # ── Filter pills ──────────────────────────────────────────────
+    _filter_opts  = ["All", "Available", "Estimated", "Missing", "Needs user input"]
+    _filter_key   = f"s2p_tbl_filter_{page_key}"
+    _filter_icons = {"All": "📋", "Available": "✅", "Estimated": "⚠️", "Missing": "❌", "Needs user input": "📝"}
+    _cur_filter   = st.session_state.get(_filter_key, "All")
+
+    _fc = st.columns(len(_filter_opts))
+    for _fi, _fo in enumerate(_filter_opts):
+        _is_active = (_cur_filter == _fo)
+        _pill_bg   = "#33528A" if _is_active else "#f1f5f9"
+        _pill_fg   = "#ffffff" if _is_active else "#475569"
+        with _fc[_fi]:
+            if st.button(
+                f"{_filter_icons[_fo]} {_fo}",
+                key=f"s2p_filt_{_fo}_{page_key}",
+                use_container_width=True,
+                help=f"Show {_fo.lower()} parameters",
+            ):
+                st.session_state[_filter_key] = _fo
+                _cur_filter = _fo
+
+    st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
+
+    # ── Apply filter ──────────────────────────────────────────────
+    def _matches_filter(r, filt):
+        if filt == "All":
+            return True
+        if filt == "Available":
+            return r["status"] == "Available"
+        if filt == "Estimated":
+            return r["status"] == "Estimated"
+        if filt == "Missing":
+            return r["status"] == "Missing"
+        if filt == "Needs user input":
+            return r["action"] == "User input"
+        return True
+
+    _visible = [r for r in _tbl_rows if _matches_filter(r, _cur_filter)]
+    _n_avail  = sum(1 for r in _tbl_rows if r["status"] == "Available")
+    _n_est    = sum(1 for r in _tbl_rows if r["status"] == "Estimated")
+    _n_miss   = sum(1 for r in _tbl_rows if r["status"] == "Missing")
+
     st.markdown(
-        "<div style='font-size:1.02rem; font-weight:600; "
-        "margin-bottom:0.2rem;'>Do you have the following data inputs?</div>",
+        f"<div style='font-size:0.8rem; color:#64748b; margin-bottom:0.4rem;'>"
+        f"Showing <b>{len(_visible)}</b> of <b>{len(_tbl_rows)}</b> parameters &nbsp;·&nbsp; "
+        f"<span style='color:#33A9A0;'>✅ {_n_avail} available</span> &nbsp;"
+        f"<span style='color:#F59E0B;'>⚠️ {_n_est} estimated</span> &nbsp;"
+        f"<span style='color:#EF4444;'>❌ {_n_miss} missing</span>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
-    for sys_group in data_inputs:
-        sys_name = sys_group["system"]
-        sys_items_count = sum(len(c["items"]) for c in sys_group["categories"])
-        _expander_key = f"s2p_expand_{sys_name.replace(' ','_')}"
-        _show_sys = st.toggle(f"{sys_name}  ({sys_items_count} inputs)", value=False, key=_expander_key)
-        if _show_sys:
-            for cat in sys_group["categories"]:
-                # Lightweight sub-header for each category
+    if not _visible:
+        st.info("No parameters match the selected filter.")
+    else:
+        # ── Column header row ──────────────────────────────────────
+        st.markdown(
+            "<div style='display:grid; grid-template-columns:2fr 1fr 1.5fr 0.9fr 1.1fr; "
+            "gap:0.4rem; padding:0.3rem 0.6rem; background:#f8fafc; "
+            "border:1px solid #e2e8f0; border-radius:10px 10px 0 0; "
+            "font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase; "
+            "letter-spacing:0.06em;'>"
+            "<div>Parameter</div><div>Status</div><div>Source</div>"
+            "<div>Confidence</div><div>Action Required</div></div>",
+            unsafe_allow_html=True,
+        )
+
+        # ── Group by system ────────────────────────────────────────
+        _seen_sys = []
+        _sys_groups: dict = {}
+        for r in _visible:
+            s = r["_system"]
+            if s not in _sys_groups:
+                _sys_groups[s] = []
+            _sys_groups[s].append(r)
+
+        for _sys_name, _sys_rows in _sys_groups.items():
+            st.markdown(
+                f"<div style='font-size:0.78rem; font-weight:800; color:#33528A; "
+                f"text-transform:uppercase; letter-spacing:0.07em; "
+                f"padding:0.45rem 0.6rem; background:rgba(51,82,138,0.05); "
+                f"border-left:3px solid #33528A; border-right:1px solid #e2e8f0; "
+                f"border-bottom:1px solid #e2e8f0; margin-top:2px;'>"
+                f"⚙️ {_sys_name}</div>",
+                unsafe_allow_html=True,
+            )
+
+            # Group by category within system
+            _cat_groups: dict = {}
+            for r in _sys_rows:
+                c = r["_category"]
+                if c not in _cat_groups:
+                    _cat_groups[c] = []
+                _cat_groups[c].append(r)
+
+            for _cat_name, _cat_rows in _cat_groups.items():
                 st.markdown(
-                    f"<div style='font-size:0.85rem; font-weight:600; "
-                    f"color:#475569; border-bottom:2px solid #e2e8f0; "
-                    f"padding-bottom:2px; margin:0.6rem 0 0.3rem 0;'>"
-                    f"{cat['category']}</div>",
+                    f"<div style='font-size:0.75rem; font-weight:600; color:#64748b; "
+                    f"padding:0.25rem 0.6rem; border-left:1px solid #e2e8f0; "
+                    f"border-right:1px solid #e2e8f0; border-bottom:1px solid #f1f5f9; "
+                    f"background:#ffffff;'>{_cat_name}</div>",
                     unsafe_allow_html=True,
                 )
-                sorted_items = sorted(
-                    cat["items"],
-                    key=lambda it: get_sensitivity_weight(it["key"], sa_analysis_type),
-                    reverse=True,
+                for _row in _cat_rows:
+                    _render_coverage_row(_row, page_key, country)
+
+    # ── "Check data available" button — EPC / TABULA detail ───────
+    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+    with st.expander("🔍 Check data available — EPC & Local Data", expanded=False):
+        st.caption(
+            "This section shows what is already known from public databases "
+            "(EPC registry, TABULA archetypes) for buildings in your selected area."
+        )
+        _passport = st.session_state.get("epc_passport", {})
+        _tab_match = st.session_state.get("tabula_archetype")
+        _tab_conf  = st.session_state.get("tabula_confidence")
+        _clim_zone = st.session_state.get("tabula_climate_zone", 3)
+
+        if _passport:
+            _p = _passport
+            _fields = [
+                ("Address",            _p.get("IdAdr", "—")),
+                ("Municipality",       _p.get("IdKommun", "—")),
+                ("Energy Class",       _p.get("EgiEnergiklass", "—")),
+                ("Energy Performance", _p.get("EgiEnergiPrestanda", "—")),
+                ("Atemp (m²)",         _p.get("EgenAtemp", "—")),
+                ("Build Year",         _p.get("EgenNybyggAr", "—")),
+                ("Floors",             _p.get("EgenAntalPlan", "—")),
+            ]
+            st.markdown("**📋 EPC Data**")
+            st.markdown(
+                "<div style='display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.4rem;'>"
+                + "".join(
+                    f"<div style='background:#f8fafc; border:1px solid #e2e8f0; "
+                    f"border-radius:8px; padding:0.5rem 0.7rem;'>"
+                    f"<div style='font-size:0.68rem; color:#64748b;'>{lbl}</div>"
+                    f"<div style='font-weight:700; font-size:0.85rem;'>"
+                    f"{'—' if _is_missing(val) else val}</div></div>"
+                    for lbl, val in _fields
                 )
-                for item in sorted_items:
-                    _render_item(item, sa_analysis_type)
+                + "</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("No EPC building selected yet. Set an address in Step 1+ and the nearest EPC record will be shown here.")
+
+        if _tab_match:
+            _c = _tab_conf or {"level": "Medium", "score": 60}
+            _cc = {"High": "#33A9A0", "Medium": "#33528A", "Low": "#F59E0B"}.get(_c["level"], "#94a3b8")
+            _u = _tab_match.get("u_values", {})
+            _u_str = "  ·  ".join(
+                f"{n}: {v:.2f}" for n, v in [
+                    ("Wall", _u.get("wall")), ("Roof", _u.get("roof")),
+                    ("Floor", _u.get("floor")), ("Window", _u.get("window"))
+                ] if v
+            )
+            st.markdown("**🏗️ TABULA Archetype**")
+            st.markdown(
+                f"<div style='padding:0.6rem 0.8rem; background:#f8fafc; border:1px solid #e2e8f0; "
+                f"border-radius:10px; margin-top:0.3rem;'>"
+                f"<div style='font-weight:700; font-size:0.9rem;'>{_tab_match.get('type_label','')}</div>"
+                f"<div style='font-size:0.78rem; color:#475569; margin-top:0.2rem;'>"
+                f"Code: {_tab_match.get('code','')} · Period: {_tab_match.get('period','')} · Zone {_clim_zone}</div>"
+                f"<div style='font-size:0.77rem; color:#64748b; margin-top:0.3rem;'>U-values (W/m²K): {_u_str}</div>"
+                f"<div style='margin-top:0.3rem;'>"
+                f"<span style='background:{_cc}22; color:{_cc}; padding:1px 8px; "
+                f"border-radius:6px; font-size:0.7rem; font-weight:600;'>"
+                f"{_c['level']} match confidence ({_c['score']}%)</span></div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
 
 # ============================================================================
 # PERSIST DATA CHOICES
