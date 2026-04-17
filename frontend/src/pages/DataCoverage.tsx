@@ -644,6 +644,23 @@ export default function DataCoverage() {
     setProject({ dataCoveragePct: confPct } as never);
   }, [confPct, setProject]);
 
+  /* Sync resolved items to store so Step 3 can read them */
+  useEffect(() => {
+    const inputs: Record<string, { available: boolean; proxy: string | null; confidence: number }> = {};
+    resolved.forEach(cat => cat.items.forEach(item => {
+      const conf = item.confidence === "High" ? 0.9
+        : item.confidence === "Medium" ? 0.55
+        : item.confidence === "Low"    ? 0.25
+        : 0;
+      inputs[item.key] = {
+        available:  item.hasData,
+        proxy:      item.hasData ? null : item.source,
+        confidence: conf,
+      };
+    }));
+    setProject({ dataInputs: inputs });
+  }, [resolved, setProject]);
+
   const filteredItems = (items: DataItemResolved[]) => {
     if (activeFilter === "All") return items;
     if (activeFilter === "Needs user input") return items.filter(i => i.action === "User input");
