@@ -1,4 +1,4 @@
-/* ── Shared types mirroring your Streamlit session_state ── */
+/* ── Shared TypeScript types for the wizard ── */
 
 export type ProjectType =
   | "Embodied Carbon Assessment"
