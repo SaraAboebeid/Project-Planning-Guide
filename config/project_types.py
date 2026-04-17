@@ -40,10 +40,10 @@ SYSTEMS_BY_PROJECT_TYPE = {
         "Buildings",
         "Rooftop PV",
         "Community PV",
-        "Facade PV (BIPV)",
+        "Facade PV",
         "Battery System",
         "EV Charging",
-        "Vehicle to Grid (V2G)",
+        "Vehicle to Grid",
         "Grid",
     ],
     "Renovation Planning": [
@@ -55,7 +55,7 @@ SYSTEMS_BY_PROJECT_TYPE = {
     "Renewable Energy Planning": [
         "Rooftop PV",
         "Community PV",
-        "Facade PV (BIPV)",
+        "Facade PV",
         "Offshore Wind",
         "Onshore Wind",
         "Solar Thermal",
@@ -70,7 +70,7 @@ SYSTEMS_BY_PROJECT_TYPE = {
 FOLLOW_UP_SYSTEMS = {
     "Renewable Energy Planning": {
         "Battery System": {
-            "triggers": ["Rooftop PV", "Community PV", "Facade PV (BIPV)"],
+            "triggers": ["Rooftop PV", "Community PV", "Facade PV"],
             "question": "Are you planning to include a battery storage system?",
             "help": (
                 "Battery storage can improve self-sufficiency, enable "
@@ -85,7 +85,7 @@ FOLLOW_UP_SYSTEMS = {
 # which changes the data input list (measured vs. planned data).
 EC_FOLLOW_UP_QUESTIONS = {
     "existing_pv": {
-        "triggers": ["Rooftop PV", "Community PV", "Facade PV (BIPV)"],
+        "triggers": ["Rooftop PV", "Community PV", "Facade PV"],
         "question": "Is there PV already installed on site?",
         "help": (
             "If PV is already installed, we will ask for measured "
@@ -283,7 +283,7 @@ def translate_to_legacy_keys(project_type, systems, kpis):
     _RE_MAP = {
         "Rooftop PV": "Solar PV",
         "Community PV": "Solar PV",
-        "Facade PV (BIPV)": "Solar PV",
+        "Facade PV": "Solar PV",
         "Solar Thermal": "Solar Thermal",
         "Onshore Wind": "Onshore Wind",
         "Offshore Wind": "Offshore Wind",
@@ -308,7 +308,7 @@ def translate_to_legacy_keys(project_type, systems, kpis):
         result["analysis_type"] = ["Energy & Carbon Performance"]
         result["analysis_focus"] = "Whole system interaction"
         result["energy_system_focus"] = "Whole system interaction"
-        pv_systems = {"Rooftop PV", "Community PV", "Facade PV (BIPV)",
+        pv_systems = {"Rooftop PV", "Community PV", "Facade PV",
                       "Battery System"}
         if pv_systems & systems_set:
             result["analysis_type"].append("Renewable Energy & Local Production")

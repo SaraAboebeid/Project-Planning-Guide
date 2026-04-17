@@ -60,7 +60,6 @@ export default function Timeline() {
   const dataCovPct = 50; // placeholder until data coverage is wired
   const completenessMult = 1.0 + (1.0 - dataCovPct / 100) * 0.7;
   const totalHours = Math.round(baseHours * scaleMult * completenessMult);
-  const durationWeeks = Math.max(1, Math.round(totalHours / 30));
 
   const [phaseHours, setPhaseHours] = useState<Record<string, number>>(
     () =>

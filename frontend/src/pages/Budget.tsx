@@ -16,14 +16,14 @@ const COLORS = ["#33528A", "#33A9A0", "#8AB62E", "#C4E81D", "#597001"];
 
 export default function Budget() {
   const navigate = useNavigate();
-  const { project, steps } = useWizardStore();
+  const { } = useWizardStore();
 
   /* effort estimation (simplified – mirrors Streamlit) */
   const totalHours = 100; // placeholder
   const effectiveHours = totalHours;
 
   const [currency, setCurrency] = useState("SEK");
-  const [rate, setRate] = useState(CONSULTANT_RATES.SEK);
+  const [rate, setRate] = useState<number>(CONSULTANT_RATES.SEK ?? 1400);
   const overheadMult = 1.1;
   const serviceCost = Math.round(effectiveHours * rate * overheadMult);
 
@@ -59,8 +59,7 @@ export default function Budget() {
     ].filter((d) => d.value > 0);
   }, [capex, capexTotal, capexBase]);
 
-  const isReno = project.projectType === "Renovation Planning";
-  const prevPath = isReno ? "/step/6" : "/step/4";
+  const prevPath = "/step/4";
 
   function fmtNum(n: number) {
     return n.toLocaleString();
@@ -128,7 +127,7 @@ export default function Budget() {
         </div>
         <div className="col-span-2 rounded-xl bg-teal/5 border-l-4 border-teal p-4">
           <p className="text-xs text-gray-500">
-            Estimated Service Cost ({effectiveHours} hrs × {fmtNum(rate)}{" "}
+            Estimated Service Cost ({effectiveHours} hrs × {fmtNum(rate ?? 0)}{" "}
             {currency}/hr × 1.10 overhead)
           </p>
           <p className="text-xl font-bold text-navy">

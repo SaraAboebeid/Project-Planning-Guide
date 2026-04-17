@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+﻿import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../../store/wizard";
 import {
@@ -163,17 +163,79 @@ export default function DefineProject() {
   const systemsSet = new Set(project.systemsInScope);
 
   // Check if any PV trigger is selected (for RE and EC follow-ups)
-  const pvTriggers = new Set(["Rooftop PV", "Community PV", "Facade PV (BIPV)"]);
+  const pvTriggers = new Set(["Rooftop PV", "Community PV", "Facade PV"]);
   const hasPvSelected = [...pvTriggers].some((t) => systemsSet.has(t));
+
+  /* ── progressive reveal conditions ────────────────────────────── */
+  const showSystems        = !!pt;
+  const showEcFocus        = pt === "Energy Community Planning" && project.systemsInScope.length > 0;
+  const showExploration    = showSystems && project.systemsInScope.length > 0
+                              && (pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0);
+  const showKpis           = showExploration && project.explorationApproaches.length > 0;
+  const showScale          = showKpis && project.selectedKpis.length > 0;
+  const showBuildingUses   = project.scale === "Neighborhood";
+  const showCountry        = showScale && !!project.scale;
+  const showProjectName    = showCountry && !!project.country;
+  const showLocation       = showProjectName;
+
+  /* ── progress tracker ──────────────────────────────────────── */
+  // Each entry: [label, isDone]
+  const progressSteps: [string, boolean][] = [
+    ["Project type",       !!pt],
+    ["Systems in scope",   project.systemsInScope.length > 0],
+    ...(pt === "Energy Community Planning"
+      ? [["Energy focus", project.ecEnergyFocus.length > 0] as [string, boolean]]
+      : []),
+    ["Exploration",        project.explorationApproaches.length > 0],
+    ["KPIs",              project.selectedKpis.length > 0],
+    ["Scale",             !!project.scale],
+    ...(project.scale === "Neighborhood"
+      ? [["Building uses", project.buildingUses.length > 0] as [string, boolean]]
+      : []),
+    ["Country",           !!project.country],
+    ["Project name",      !!project.projectName.trim()],
+    ["Location",          !!project.address.trim()],
+  ];
+  const totalSteps = progressSteps.length;
+  const doneSteps  = progressSteps.filter(([, done]) => done).length;
+  const pct        = Math.round((doneSteps / totalSteps) * 100);
+  // Next pending label
+  const nextStep   = progressSteps.find(([, done]) => !done);
 
   /* ════════════════════════════════════════════════════════════════
      RENDER
      ════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="max-w-3xl mx-auto space-y-2">
-      {/* ── PROJECT TYPE ── */}
+    <div className="space-y-2">
+
+      {/* ── PROJECT TYPE (with slim inline progress hint) ── */}
       <Card>
+        {/* slim progress hint */}
+        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+          <div className="flex-1 h-1 rounded-full bg-gray-100 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${pct}%`,
+                background: pct === 100
+                  ? "#7da828"
+                  : "linear-gradient(90deg,#2e9e96,#2b4a7e)",
+              }}
+            />
+          </div>
+          <span className="text-xs text-muted whitespace-nowrap">
+            <span className="font-semibold text-dark">{doneSteps}</span>
+            {"\u00a0/\u00a0"}{totalSteps}
+            {nextStep && pct < 100 && (
+              <> &middot; next: <span className="font-medium text-dark">{nextStep[0]}</span></>
+            )}
+            {pct === 100 && (
+              <span className="text-green font-semibold"> &middot; complete ✓</span>
+            )}
+          </span>
+        </div>
+
         <Label required>Project Type</Label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
           {PROJECT_TYPES.map((t) => (
@@ -196,8 +258,8 @@ export default function DefineProject() {
       </Card>
 
       {/* ── SYSTEMS IN SCOPE ── */}
-      {pt && (
-        <Card>
+      {showSystems && (
+        <Card className="animate-fadeIn">
           <Label required>
             {pt === "Energy Community Planning"
               ? "Entities in Scope"
@@ -380,10 +442,10 @@ export default function DefineProject() {
               {hasPvSelected && (
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                   <p className="text-sm font-medium">
-                    {EC_FOLLOW_UP_QUESTIONS.existing_pv.question}
+                    {EC_FOLLOW_UP_QUESTIONS.existing_pv?.question}
                   </p>
                   <p className="text-xs text-gray-500 mb-2">
-                    {EC_FOLLOW_UP_QUESTIONS.existing_pv.help}
+                    {EC_FOLLOW_UP_QUESTIONS.existing_pv?.help}
                   </p>
                   <div className="flex gap-3">
                     {[true, false].map((val) => (
@@ -405,10 +467,10 @@ export default function DefineProject() {
               {systemsSet.has("Battery System") && (
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                   <p className="text-sm font-medium">
-                    {EC_FOLLOW_UP_QUESTIONS.existing_battery.question}
+                    {EC_FOLLOW_UP_QUESTIONS.existing_battery?.question}
                   </p>
                   <p className="text-xs text-gray-500 mb-2">
-                    {EC_FOLLOW_UP_QUESTIONS.existing_battery.help}
+                    {EC_FOLLOW_UP_QUESTIONS.existing_battery?.help}
                   </p>
                   <div className="flex gap-3">
                     {[true, false].map((val) => (
@@ -462,7 +524,7 @@ export default function DefineProject() {
       )}
 
       {/* ── EC ENERGY FOCUS ── */}
-      {pt === "Energy Community Planning" && (
+      {showEcFocus && (
         <Card>
           <Label required>Energy System in Scope</Label>
           <div className="flex gap-2 mt-2">
@@ -489,12 +551,13 @@ export default function DefineProject() {
       )}
 
       {/* ── EXPLORATION APPROACHES ── */}
-      {pt && (
-        <Card>
+      {showExploration && (
+        <Card className="animate-fadeIn">
           <Label required>How would you like to explore this?</Label>
           <div className="space-y-2 mt-2">
             {EXPLORATION_OPTIONS.map((approach) => {
               const cfg = EXPLORATION_CONSTRAINTS[approach];
+              if (!cfg) return null;
               const selected = project.explorationApproaches.includes(approach);
               return (
                 <button
@@ -526,8 +589,8 @@ export default function DefineProject() {
       )}
 
       {/* ── KPIs ── */}
-      {pt && (
-        <Card>
+      {showKpis && (
+        <Card className="animate-fadeIn">
           <Label required>Key Performance Indicators</Label>
           <div className="flex flex-wrap gap-2 mt-2">
             {availableKpis.map((kpi) => (
@@ -548,7 +611,7 @@ export default function DefineProject() {
       )}
 
       {/* ── SCALE ── */}
-      <Card>
+      {showScale && <Card className="animate-fadeIn">
         <Label required>Scale</Label>
         {pt === "Energy Community Planning" && (
           <p className="text-xs text-gray-500 mb-2">
@@ -570,11 +633,11 @@ export default function DefineProject() {
             </button>
           ))}
         </div>
-      </Card>
+      </Card>}
 
       {/* ── BUILDING USES (Neighborhood) ── */}
-      {project.scale === "Neighborhood" && (
-        <Card>
+      {showBuildingUses && (
+        <Card className="animate-fadeIn">
           <div className="flex items-center justify-between mb-2">
             <Label>Building Uses Included</Label>
             <div className="flex gap-2">
@@ -617,7 +680,7 @@ export default function DefineProject() {
       )}
 
       {/* ── COUNTRY ── */}
-      <Card>
+      {showCountry && <Card className="animate-fadeIn">
         <Label required>Country</Label>
         <div className="flex gap-2 mt-1">
           {COUNTRY_OPTIONS.map((c) => (
@@ -634,10 +697,10 @@ export default function DefineProject() {
             </button>
           ))}
         </div>
-      </Card>
+      </Card>}
 
       {/* ── PROJECT NAME ── */}
-      <Card>
+      {showProjectName && <Card className="animate-fadeIn">
         <Label>Project Name</Label>
         <input
           type="text"
@@ -646,10 +709,10 @@ export default function DefineProject() {
           placeholder="e.g. Lindholmen Retrofit Study"
           className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
         />
-      </Card>
+      </Card>}
 
       {/* ── LOCATION ── */}
-      <Card>
+      {showLocation && <Card className="animate-fadeIn">
         <Label>Project Location</Label>
         <div className="flex gap-3 mt-1">
           <input
@@ -712,7 +775,7 @@ export default function DefineProject() {
             {project.lon.toFixed(4)} (Leaflet integration coming next)
           </div>
         )}
-      </Card>
+      </Card>}
 
       {/* ── VALIDATION ERRORS ── */}
       {validationErrors.length > 0 && (

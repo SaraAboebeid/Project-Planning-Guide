@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { ProjectType } from "../config/projectConfig";
 
-/* ── Pipeline definitions (mirrors shared_css.py) ── */
+/* ── Pipeline definitions ── */
 
 export interface StepDef {
   number: number;
@@ -9,22 +9,12 @@ export interface StepDef {
   path: string;
 }
 
-const STEPS_STANDARD: StepDef[] = [
+const STEPS: StepDef[] = [
   { number: 1, label: "Define Project", path: "/step/1" },
-  { number: 2, label: "Data Coverage", path: "/step/2" },
-  { number: 3, label: "Expected Results", path: "/step/3" },
-  { number: 4, label: "Timeline", path: "/step/4" },
-  { number: 5, label: "Budget / Cost", path: "/step/5" },
-];
-
-const STEPS_RENOVATION: StepDef[] = [
-  { number: 1, label: "Define Project", path: "/step/1" },
-  { number: 2, label: "Building Baseline", path: "/step/2" },
-  { number: 3, label: "Data & Assumptions", path: "/step/3" },
-  { number: 4, label: "Recommendations", path: "/step/4" },
-  { number: 5, label: "Expected Results", path: "/step/5" },
-  { number: 6, label: "Timeline", path: "/step/6" },
-  { number: 7, label: "Budget / Cost", path: "/step/7" },
+  { number: 2, label: "Data Requirements", path: "/step/2" },
+  { number: 3, label: "Review & Confidence", path: "/step/3" },
+  { number: 4, label: "Expected Results", path: "/step/4" },
+  { number: 5, label: "Cost Estimate", path: "/step/5" },
 ];
 
 /* ── State shape ── */
@@ -97,23 +87,16 @@ const DEFAULT_PROJECT: ProjectState = {
 export const useWizardStore = create<WizardState>((set) => ({
   project: { ...DEFAULT_PROJECT },
   setProject: (partial) =>
-    set((s) => {
-      const next = { ...s.project, ...partial };
-      const isReno = next.projectType === "Renovation Planning";
-      return {
-        project: next,
-        steps: isReno ? STEPS_RENOVATION : STEPS_STANDARD,
-      };
-    }),
+    set((s) => ({ project: { ...s.project, ...partial } })),
 
   currentStep: 1,
-  steps: STEPS_STANDARD,
+  steps: STEPS,
   setStep: (n) => set({ currentStep: n }),
 
   reset: () =>
     set({
       project: { ...DEFAULT_PROJECT },
       currentStep: 1,
-      steps: STEPS_STANDARD,
+      steps: STEPS,
     }),
 }));

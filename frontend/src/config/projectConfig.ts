@@ -28,7 +28,7 @@ export const SYSTEMS_BY_PROJECT_TYPE: Record<ProjectType, string[]> = {
     "Buildings",
     "Rooftop PV",
     "Community PV",
-    "Facade PV (BIPV)",
+    "Facade PV",
     "Battery System",
     "EV Charging",
     "Vehicle to Grid (V2G)",
@@ -43,7 +43,7 @@ export const SYSTEMS_BY_PROJECT_TYPE: Record<ProjectType, string[]> = {
   "Renewable Energy Planning": [
     "Rooftop PV",
     "Community PV",
-    "Facade PV (BIPV)",
+    "Facade PV",
     "Offshore Wind",
     "Onshore Wind",
     "Solar Thermal",
@@ -77,7 +77,7 @@ export const FOLLOW_UP_SYSTEMS: Partial<
 > = {
   "Renewable Energy Planning": {
     "Battery System": {
-      triggers: ["Rooftop PV", "Community PV", "Facade PV (BIPV)"],
+      triggers: ["Rooftop PV", "Community PV", "Facade PV"],
       question: "Are you planning to include a battery storage system?",
       help: "Battery storage can improve self-sufficiency, enable energy export, and smooth peak loads.",
     },
@@ -167,11 +167,7 @@ export interface ExplorationConstraint {
 export const EXPLORATION_OPTIONS: string[] = [
   "Baseline Assessment",
   "Scenario Comparison",
-  "What-if Simulation",
   "Multi-objective Optimization",
-  "Resource Allocation Planning",
-  "Roadmap Planning",
-  "Risk & Uncertainty Analysis",
 ];
 
 export const EXPLORATION_CONSTRAINTS: Record<string, ExplorationConstraint> = {

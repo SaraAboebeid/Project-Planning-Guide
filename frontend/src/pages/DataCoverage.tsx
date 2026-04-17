@@ -112,277 +112,308 @@ const ACTION_CFG: Record<Action, { bg: string; border: string; text: string }> =
 /* ─────────────────────────────────────────────
    Data definitions (all project types)
 ───────────────────────────────────────────── */
-function buildDefs(projectType: string | null, systems: string[]): DataCategoryDef[] {
+function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus: string[]): DataCategoryDef[] {
   if (!projectType) return [];
   const sys = new Set(systems);
 
   /* ══ RENOVATION PLANNING ══ */
   if (projectType === "Renovation Planning") {
-    const cats: DataCategoryDef[] = [
-      {
-        category: "Building Geometry",
+    const cats: DataCategoryDef[] = [];
+
+    if (sys.has("Building Envelope (Windows, Roof, Walls, Floors)")) {
+      cats.push({
+        category: "Building Information",
         items: [
           {
-            key: "r_fp",   label: "Building footprint",
-            primarySource: "Architectural drawing", primaryConfidence: "High",
-            fallbackSource: "Boverket building register (GIS footprint)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            key: "r_fp",   label: "Building footprint dimensions",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Energy Performance Certificate / Cadastral Data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: true,
           },
           {
             key: "r_hgt",  label: "Building height",
-            primarySource: "Architectural drawing", primaryConfidence: "High",
-            fallbackSource: "Lantmäteriet 3D building model", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "r_ori",  label: "Building orientation",
-            primarySource: "Site plan / architectural drawing", primaryConfidence: "High",
-            fallbackSource: "Derived from GIS coordinates (OpenStreetMap)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Urban datasets", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: true,
           },
           {
             key: "r_flrs", label: "Number of floors",
-            primarySource: "Architectural drawing / EPC", primaryConfidence: "High",
-            fallbackSource: "Boverket building register", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Energy Performance Certificate / Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: true,
           },
           {
-            key: "r_atemp",label: "Heated floor area (Atemp)",
-            primarySource: "EPC certificate", primaryConfidence: "High",
-            fallbackSource: "Boverket building register (gross area estimate)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+            key: "r_use",  label: "Building use",
+            primarySource: "Planning permission", primaryConfidence: "High",
+            fallbackSource: "Energy Performance Certificate", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: true,
           },
         ],
-      },
-      {
-        category: "Energy Performance",
-        items: [
-          {
-            key: "r_epc",  label: "Energy performance class (A–G)",
-            primarySource: "EPC certificate", primaryConfidence: "High",
-            fallbackSource: "National EPC distribution (Boverket statistics)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "r_dem",  label: "Annual energy demand (kWh/m²)",
-            primarySource: "EPC certificate / utility bills", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype energy demand by construction year", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "r_hvac", label: "HVAC system type",
-            primarySource: "Building permit / energy declaration", primaryConfidence: "High",
-            fallbackSource: "Boverket building stock statistics (dominant system by era)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "r_hd",   label: "Heating / cooling demand split",
-            primarySource: "EPC certificate", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype demand split by building type", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
-          },
-        ],
-      },
-    ];
-
-    if (sys.has("Building Envelope (Windows, Roof, Walls, Floors)")) {
+      });
       cats.push({
         category: "Building Envelope",
         items: [
           {
-            key: "r_mat",  label: "Construction materials / wall build-up",
-            primarySource: "Architectural / structural drawing", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype (material by construction year & type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            key: "r_mat",  label: "Existing construction materials",
+            primarySource: "Design drawings / BIM model", primaryConfidence: "High",
+            fallbackSource: "Archetype model", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "r_wwr",  label: "Window-to-wall ratio",
-            primarySource: "Architectural drawing (facade elevation)", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype WWR by building type & era", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: false,
-          },
-          {
-            key: "r_uw",   label: "U-value – Walls",
-            primarySource: "Building survey / thermography report", primaryConfidence: "High",
-            fallbackSource: "— (no reliable DB fallback; must be measured or input)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
-            defaultHas: false,
-          },
-          {
-            key: "r_ur",   label: "U-value – Roof",
-            primarySource: "Building survey / thermography report", primaryConfidence: "High",
-            fallbackSource: "— (no reliable DB fallback; must be measured or input)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
-            defaultHas: false,
-          },
-          {
-            key: "r_uwin", label: "U-value – Windows",
-            primarySource: "Building survey / product specification", primaryConfidence: "High",
-            fallbackSource: "TABULA default window U-value by era (less reliable)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: false,
-          },
-          {
-            key: "r_uf",   label: "U-value – Floor / slab",
-            primarySource: "Building survey / structural drawing", primaryConfidence: "High",
-            fallbackSource: "— (no reliable DB fallback; must be measured or input)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
-            defaultHas: false,
-          },
-          {
-            key: "r_tb",   label: "Thermal bridges (linear ψ-values)",
-            primarySource: "Detailed design calculation", primaryConfidence: "High",
-            fallbackSource: "TABULA default psi-values (catalogue method EN ISO 14683)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+            key: "r_matlist", label: "List of materials to test",
+            primarySource: "User-provided material list", primaryConfidence: "High",
+            fallbackSource: "Curated material library (provided — no action needed)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "None",
             defaultHas: false,
           },
         ],
       });
     }
 
-    const sysItems: DataItemDef[] = [];
     if (sys.has("Heating System")) {
-      sysItems.push(
-        {
-          key: "r_ht",   label: "Heating system type",
-          primarySource: "Building energy declaration / boiler room inspection", primaryConfidence: "High",
-          fallbackSource: "Boverket building stock statistics (dominant system by era & type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-          defaultHas: true,
-        },
-        {
-          key: "r_hage", label: "Heating system age & capacity (kW)",
-          primarySource: "Boiler plate / service log / installation permit", primaryConfidence: "High",
-          fallbackSource: "Boverket building stock statistics (age distribution by system type)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-          defaultHas: false,
-        },
-      );
+      cats.push({
+        category: "Heating System",
+        items: [
+          {
+            key: "r_ht",   label: "Heating system type",
+            primarySource: "Building energy declaration / boiler room inspection", primaryConfidence: "High",
+            fallbackSource: "Boverket building stock statistics (dominant system by era & type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: true,
+          },
+          {
+            key: "r_hage", label: "Heating system age & capacity (kW)",
+            primarySource: "Boiler plate / service log / installation permit", primaryConfidence: "High",
+            fallbackSource: "Boverket building stock statistics (age distribution by system type)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+            defaultHas: false,
+          },
+        ],
+      });
     }
+
     if (sys.has("Cooling System")) {
-      sysItems.push(
-        {
-          key: "r_ct",   label: "Cooling system type",
-          primarySource: "Building energy declaration / inspection", primaryConfidence: "High",
-          fallbackSource: "— (cooling rarely registered; user must confirm)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
-          defaultHas: false,
-        },
-        {
-          key: "r_cc",   label: "Cooling capacity (kW)",
-          primarySource: "Equipment nameplate / commissioning report", primaryConfidence: "High",
-          fallbackSource: "— (no DB fallback; must be measured or input)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
-          defaultHas: false,
-        },
-      );
+      cats.push({
+        category: "Cooling System",
+        items: [
+          {
+            key: "r_ct",   label: "Cooling system type",
+            primarySource: "Building energy declaration / inspection", primaryConfidence: "High",
+            fallbackSource: "— (cooling rarely registered; user must confirm)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            defaultHas: false,
+          },
+          {
+            key: "r_cc",   label: "Cooling capacity (kW)",
+            primarySource: "Equipment nameplate / commissioning report", primaryConfidence: "High",
+            fallbackSource: "— (no DB fallback; must be measured or input)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            defaultHas: false,
+          },
+        ],
+      });
     }
+
     if (sys.has("Domestic Hot Water System (DHW)")) {
-      sysItems.push(
-        {
-          key: "r_dhw",  label: "DHW system type",
-          primarySource: "Building energy declaration / inspection", primaryConfidence: "High",
-          fallbackSource: "TABULA archetype / Boverket statistics (dominant DHW by era)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-          defaultHas: false,
-        },
-        {
-          key: "r_dh",   label: "DHW annual demand (kWh/year)",
-          primarySource: "Utility bill (measured hot water meter)", primaryConfidence: "High",
-          fallbackSource: "EPC national average DHW by building type (Boverket)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-          defaultHas: false,
-        },
-      );
+      cats.push({
+        category: "Domestic Hot Water",
+        items: [
+          {
+            key: "r_dhw",  label: "DHW system type",
+            primarySource: "Building energy declaration / inspection", primaryConfidence: "High",
+            fallbackSource: "TABULA archetype / Boverket statistics (dominant DHW by era)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "r_dh",   label: "DHW annual demand (kWh/year)",
+            primarySource: "Utility bill (measured hot water meter)", primaryConfidence: "High",
+            fallbackSource: "EPC national average DHW by building type (Boverket)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+        ],
+      });
     }
-    if (sysItems.length) cats.push({ category: "Installed Systems", items: sysItems });
+
     return cats;
   }
 
   /* ══ ENERGY COMMUNITY PLANNING ══ */
   if (projectType === "Energy Community Planning") {
-    const cats: DataCategoryDef[] = [
-      {
-        category: "Building Stock",
-        items: [
-          {
-            key: "ec_fp",   label: "Building footprints",
-            primarySource: "GIS / municipal open data", primaryConfidence: "High",
-            fallbackSource: "OpenStreetMap building footprints", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "ec_hgt",  label: "Building heights",
-            primarySource: "Lantmäteriet 3D city model / GIS", primaryConfidence: "High",
-            fallbackSource: "Estimated from floor count × typical storey height", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "ec_use",  label: "Building use category",
-            primarySource: "Municipal planning register / tax records", primaryConfidence: "High",
-            fallbackSource: "Boverket building register (use category by property type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "ec_flrs", label: "Number of floors per building",
-            primarySource: "Building register / EPC", primaryConfidence: "High",
-            fallbackSource: "Boverket building register (floors by building type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "ec_epc",  label: "Energy performance class (A–G) per building",
-            primarySource: "National EPC register (Boverket)", primaryConfidence: "High",
-            fallbackSource: "Statistical distribution of EPC classes by era & type (Boverket)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: true,
-          },
-        ],
-      },
-      {
-        category: "Energy Demand",
-        items: [
-          {
-            key: "ec_ed",  label: "Annual electricity consumption per building",
-            primarySource: "Smart meter / utility billing data", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype electricity demand (kWh/m²·year by type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
-          },
-          {
-            key: "ec_hd",  label: "Annual heating demand per building",
-            primarySource: "EPC / utility heat meter", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype heating demand by construction year & type", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "ec_ep",  label: "Hourly electricity load profile",
-            primarySource: "Smart meter interval data (15-min or hourly)", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype hourly load profiles (synthetic)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: false,
-          },
-          {
-            key: "ec_hp",  label: "Hourly heating load profile",
-            primarySource: "District heat meter interval data", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype heating load profiles (degree-day normalised)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: false,
-          },
-        ],
-      },
-    ];
+    const cats: DataCategoryDef[] = [];
 
-    if (sys.has("Rooftop PV") || sys.has("Community PV") || sys.has("Facade PV (BIPV)")) {
+    if (sys.has("Buildings") && (ecEnergyFocus.includes("Heating") || ecEnergyFocus.includes("Cooling"))) {
       cats.push({
-        category: "Case: PV Generation",
+        category: "Buildings – Envelope & Thermal",
         items: [
           {
-            key: "ec_pvc", label: "PV installed / planned capacity (kWp)",
-            primarySource: "System design / installation permit", primaryConfidence: "High",
-            fallbackSource: "— (capacity must be defined; no default)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            key: "ec_b_fp",    label: "Building footprint dimensions (m²)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Energy Performance Certificate / Cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "ec_pva", label: "PV panel azimuth & tilt",
-            primarySource: "Site plan / installation drawing", primaryConfidence: "High",
-            fallbackSource: "PVGIS typical south-facing roof assumption (180° / 35°)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            key: "ec_b_hgt",   label: "Building height (m)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Urban datasets / Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "ec_ghi", label: "Solar irradiance (GHI) time series",
-            primarySource: "On-site pyranometer data", primaryConfidence: "High",
-            fallbackSource: "PVGIS ERA5 reanalysis + satellite data (hourly, 2005–2020)", fallbackStatus: "Estimated", fallbackConfidence: "High", fallbackAction: "None",
+            key: "ec_b_orient", label: "Building orientation (°)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery / GIS cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "ec_pvl", label: "System losses (soiling, wiring, inverter)",
-            primarySource: "Commissioning report / measured performance ratio", primaryConfidence: "High",
-            fallbackSource: "PVGIS default loss model (14% total losses)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            key: "ec_b_flrs",  label: "Number of floors",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Energy Performance Certificate / Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_b_wwr",   label: "Window-to-wall ratio (WWR)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery / TABULA archetype defaults", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_b_mat",   label: "Building construction materials",
+            primarySource: "Design drawings / BIM model", primaryConfidence: "High",
+            fallbackSource: "TABULA archetype model (by construction year & type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_b_hvac",  label: "HVAC system type",
+            primarySource: "Building energy declaration / inspection", primaryConfidence: "High",
+            fallbackSource: "Boverket building stock statistics (dominant system by era & type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_b_hcdem", label: "Heating / cooling demand – hourly profile (kWh)",
+            primarySource: "Smart meter / district heating metering data", primaryConfidence: "High",
+            fallbackSource: "EPC national average heat demand by building type (Boverket)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+        ],
+      });
+    }
+
+    if (sys.has("Buildings") && ecEnergyFocus.includes("Electricity")) {
+      cats.push({
+        category: "Buildings – Electricity",
+        items: [
+          {
+            key: "ec_be_fp",   label: "Building footprint dimensions (m²)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Energy Performance Certificate / Cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_be_hgt",  label: "Building height (m)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Urban datasets / Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_be_use",  label: "Building use / occupancy type",
+            primarySource: "Planning permission / EPC", primaryConfidence: "High",
+            fallbackSource: "Energy Performance Certificate", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_be_edem", label: "Hourly electricity demand profile (kWh)",
+            primarySource: "Smart meter data (AMR/AMI)", primaryConfidence: "High",
+            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+            defaultHas: false,
+          },
+        ],
+      });
+    }
+
+    if (sys.has("Rooftop PV")) {
+      cats.push({
+        category: "Case: Rooftop PV",
+        items: [
+          {
+            key: "ec_rpv_area", label: "Roof area (m²)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_rpv_tilt", label: "Roof tilt (°)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_rpv_azimuth", label: "Building azimuth (°)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_rpv_demand", label: "Electricity demand – hourly profile (kWh)",
+            primarySource: "Smart meter data", primaryConfidence: "High",
+            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+            defaultHas: false,
+          },
+        ],
+      });
+    }
+
+    if (sys.has("Facade PV")) {
+      cats.push({
+        category: "Case: Facade PV",
+        items: [
+          {
+            key: "ec_fpv_area", label: "Facade area (m²)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_fpv_wwr", label: "Window-to-wall ratio (WWR)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_fpv_orient", label: "Building orientation (°)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_fpv_demand", label: "Electricity demand – hourly profile (kWh)",
+            primarySource: "Smart meter data", primaryConfidence: "High",
+            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+            defaultHas: false,
+          },
+        ],
+      });
+    }
+
+    if (sys.has("Community PV")) {
+      cats.push({
+        category: "Case: Community PV",
+        items: [
+          {
+            key: "ec_cpv_area", label: "Site area (m²)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_cpv_slope", label: "Slope & terrain",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_cpv_grid", label: "Grid connection availability",
+            primarySource: "DSO grid capacity report / Grid network", primaryConfidence: "High",
+            fallbackSource: "— (grid connection status must be confirmed)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            defaultHas: false,
+          },
+          {
+            key: "ec_cpv_infra", label: "Existing infrastructure on site",
+            primarySource: "Site survey / Utilities map", primaryConfidence: "High",
+            fallbackSource: "— (must be confirmed on site)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
             defaultHas: false,
           },
         ],
@@ -427,7 +458,7 @@ function buildDefs(projectType: string | null, systems: string[]): DataCategoryD
           },
           {
             key: "ec_evc", label: "EV charger rated power (kW)",
-            primarySource: "Charger nameplate / installation spec", primaryConfidence: "High",
+            primarySource: "Charger spec", primaryConfidence: "High",
             fallbackSource: "— (rated power must be specified)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
             defaultHas: false,
           },
@@ -435,229 +466,110 @@ function buildDefs(projectType: string | null, systems: string[]): DataCategoryD
       });
     }
 
-    cats.push({
-      category: "Grid & Tariffs",
-      items: [
-        {
-          key: "ec_gt",  label: "Grid import / export tariff structure",
-          primarySource: "Utility contract / tariff schedule", primaryConfidence: "High",
-          fallbackSource: "Typical Swedish utility tariff structure (Energimarknadsinspektionen)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-          defaultHas: true,
-        },
-        {
-          key: "ec_gef", label: "Grid emission factor (gCO₂/kWh)",
-          primarySource: "Utility declaration / AIB certificate", primaryConfidence: "High",
-          fallbackSource: "Swedish Energy Agency marginal emission factor (2023)", fallbackStatus: "Estimated", fallbackConfidence: "High", fallbackAction: "None",
-          defaultHas: false,
-        },
-        {
-          key: "ec_tou", label: "Hourly spot price profile",
-          primarySource: "Nordpool day-ahead prices (downloaded)", primaryConfidence: "High",
-          fallbackSource: "Nordpool historical SE3 spot prices (annual average profile)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-          defaultHas: false,
-        },
-      ],
-    });
+ 
 
     return cats;
   }
 
   /* ══ RENEWABLE ENERGY PLANNING ══ */
   if (projectType === "Renewable Energy Planning") {
-    const cats: DataCategoryDef[] = [
-      {
-        category: "Site & Climate",
-        items: [
-          {
-            key: "re_ghi",  label: "Solar irradiance (GHI) time series",
-            primarySource: "On-site pyranometer data", primaryConfidence: "High",
-            fallbackSource: "PVGIS ERA5 reanalysis + satellite (hourly, 2005–2020)", fallbackStatus: "Estimated", fallbackConfidence: "High", fallbackAction: "None",
-            defaultHas: false,
-          },
-          {
-            key: "re_temp", label: "Ambient temperature profile",
-            primarySource: "On-site weather station data", primaryConfidence: "High",
-            fallbackSource: "PVGIS / SMHI climate data for nearest station", fallbackStatus: "Estimated", fallbackConfidence: "High", fallbackAction: "None",
-            defaultHas: false,
-          },
-          {
-            key: "re_wind", label: "Wind speed time series",
-            primarySource: "On-site anemometer data (hub height)", primaryConfidence: "High",
-            fallbackSource: "ERA5 reanalysis wind at 100m (SMHI / Copernicus)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
-          },
-          {
-            key: "re_shad", label: "Shading analysis / horizon profile",
-            primarySource: "Site survey / LiDAR scan / 3D model", primaryConfidence: "High",
-            fallbackSource: "— (shading cannot be estimated without site data)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
-            defaultHas: false,
-          },
-        ],
-      },
-      {
-        category: "Electricity Demand",
-        items: [
-          {
-            key: "re_fp",  label: "Building / site footprint",
-            primarySource: "Site plan / GIS data", primaryConfidence: "High",
-            fallbackSource: "OpenStreetMap / Lantmäteriet building footprints", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "re_use", label: "Building use / occupancy category",
-            primarySource: "Planning permission / energy declaration", primaryConfidence: "High",
-            fallbackSource: "Boverket building register (use by property type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "re_elp", label: "Hourly electricity demand profile",
-            primarySource: "Smart meter interval data (hourly or 15-min)", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype hourly load profiles by use type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: false,
-          },
-        ],
-      },
-    ];
+    const cats: DataCategoryDef[] = [];
 
-    if (sys.has("Rooftop PV") || sys.has("Community PV") || sys.has("Facade PV (BIPV)")) {
+    if (sys.has("Rooftop PV")) {
       cats.push({
-        category: "Case: PV Generation",
+        category: "Case: Rooftop PV",
         items: [
           {
-            key: "re_pvc", label: "Planned PV capacity (kWp)",
-            primarySource: "System design / layout drawing", primaryConfidence: "High",
-            fallbackSource: "— (capacity must be defined; no default)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            key: "re_rpv_area", label: "Roof area (m²)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "re_pvm", label: "Module specs (Pmax, efficiency η)",
-            primarySource: "Manufacturer datasheet", primaryConfidence: "High",
-            fallbackSource: "IEC 61215 standard module (320 Wp, 19.5% η)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            key: "re_rpv_tilt", label: "Roof tilt (°)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "re_pvt", label: "Panel tilt & azimuth",
-            primarySource: "Site plan / installation drawing", primaryConfidence: "High",
-            fallbackSource: "PVGIS optimal tilt for latitude (south-facing default)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            key: "re_rpv_azimuth", label: "Building azimuth (°)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "re_pvl", label: "System losses (soiling, wiring, inverter)",
-            primarySource: "Commissioning report / measured PR", primaryConfidence: "High",
-            fallbackSource: "PVGIS default loss model (14% total losses)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            key: "re_rpv_demand", label: "Electricity demand – hourly profile (kWh)",
+            primarySource: "Smart meter data", primaryConfidence: "High",
+            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
           },
         ],
       });
     }
 
-    if (sys.has("Battery System")) {
+    if (sys.has("Facade PV")) {
       cats.push({
-        category: "Case: Battery Storage",
+        category: "Case: Facade PV",
         items: [
           {
-            key: "re_bc",  label: "Battery capacity (kWh)",
-            primarySource: "System specs / purchase contract", primaryConfidence: "High",
-            fallbackSource: "— (capacity must be defined; no default)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            key: "re_fpv_area", label: "Facade area (m²)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "re_bp",  label: "Max charge / discharge power (kW)",
-            primarySource: "System specs / datasheet", primaryConfidence: "High",
-            fallbackSource: "— (must be specified)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            key: "re_fpv_wwr", label: "Window-to-wall ratio (WWR)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "re_soc", label: "State-of-charge limits (min / max %)",
-            primarySource: "Manufacturer commissioning settings", primaryConfidence: "High",
-            fallbackSource: "IEC 62619 default (10–90% SOC window)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            key: "re_fpv_orient", label: "Building orientation (°)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "re_eff", label: "Round-trip cycle efficiency (%)",
-            primarySource: "Manufacturer datasheet", primaryConfidence: "High",
-            fallbackSource: "IEC 62619 / literature default (90% round-trip)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            key: "re_fpv_demand", label: "Electricity demand – hourly profile (kWh)",
+            primarySource: "Smart meter data", primaryConfidence: "High",
+            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
           },
         ],
       });
     }
 
-    if (sys.has("Onshore Wind") || sys.has("Offshore Wind")) {
+    if (sys.has("Community PV")) {
       cats.push({
-        category: "Case: Wind Generation",
+        category: "Case: Community PV",
         items: [
           {
-            key: "re_wc",  label: "Turbine rated capacity (kW)",
-            primarySource: "System design / purchase contract", primaryConfidence: "High",
-            fallbackSource: "— (capacity must be defined)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            key: "re_cpv_area", label: "Site area (m²)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "re_wh",  label: "Hub height (m)",
-            primarySource: "System design drawing", primaryConfidence: "High",
-            fallbackSource: "— (hub height must be specified)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            key: "re_cpv_slope", label: "Slope & terrain",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "re_wpc", label: "Turbine power curve",
-            primarySource: "Manufacturer datasheet", primaryConfidence: "High",
-            fallbackSource: "Generic IEC class II turbine power curve (literature)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+            key: "re_cpv_grid", label: "Grid connection availability",
+            primarySource: "DSO grid capacity report / connection offer", primaryConfidence: "High",
+            fallbackSource: "— (grid connection status must be confirmed)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            defaultHas: false,
+          },
+          {
+            key: "re_cpv_infra", label: "Existing infrastructure on site",
+            primarySource: "Site survey / utilities map", primaryConfidence: "High",
+            fallbackSource: "— (must be confirmed on site)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
             defaultHas: false,
           },
         ],
       });
     }
-
-    if (sys.has("Heat Pump") || sys.has("District Heating") || sys.has("Solar Thermal")) {
-      cats.push({
-        category: "Case: Heating System",
-        items: [
-          {
-            key: "re_hpc", label: "Heat pump COP / seasonal SCOP",
-            primarySource: "Manufacturer datasheet / measured data", primaryConfidence: "High",
-            fallbackSource: "EU Ecodesign regulation default SCOP by climate zone", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
-          },
-          {
-            key: "re_hed", label: "Annual heating demand (kWh/year)",
-            primarySource: "EPC certificate / heat meter", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype heating demand by construction year & type", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
-          },
-          {
-            key: "re_hep", label: "Hourly heating load profile",
-            primarySource: "District heat meter interval data", primaryConfidence: "High",
-            fallbackSource: "TABULA archetype heating load profiles (degree-day normalised)", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: false,
-          },
-        ],
-      });
-    }
-
-    cats.push({
-      category: "Grid & Tariffs",
-      items: [
-        {
-          key: "re_gt",  label: "Grid import / export tariff structure",
-          primarySource: "Utility contract / tariff schedule", primaryConfidence: "High",
-          fallbackSource: "Typical Swedish tariff structure (Energimarknadsinspektionen)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-          defaultHas: true,
-        },
-        {
-          key: "re_ef",  label: "Grid emission factor (gCO₂/kWh)",
-          primarySource: "Utility declaration / AIB certificate", primaryConfidence: "High",
-          fallbackSource: "Swedish Energy Agency marginal emission factor (2023)", fallbackStatus: "Estimated", fallbackConfidence: "High", fallbackAction: "None",
-          defaultHas: false,
-        },
-        {
-          key: "re_tou", label: "Hourly spot price profile",
-          primarySource: "Nordpool day-ahead prices (downloaded)", primaryConfidence: "High",
-          fallbackSource: "Nordpool historical SE3 spot prices (annual average profile)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-          defaultHas: false,
-        },
-      ],
-    });
 
     return cats;
   }
@@ -673,8 +585,8 @@ export default function DataCoverage() {
   const { project, setProject } = useWizardStore();
 
   const defs = useMemo(
-    () => buildDefs(project.projectType, project.systemsInScope),
-    [project.projectType, project.systemsInScope],
+    () => buildDefs(project.projectType, project.systemsInScope, project.ecEnergyFocus ?? []),
+    [project.projectType, project.systemsInScope, project.ecEnergyFocus],
   );
 
   /* Per-item "user has this data" state — keyed by item.key */
@@ -936,7 +848,11 @@ export default function DataCoverage() {
                           <span className="text-sm text-slate-800 font-medium leading-tight">{item.label}</span>
                           {def && (
                             <div className="text-[10px] text-slate-400 mt-0.5">
-                              {item.hasData
+                              {item.key === "r_matlist" ? (
+                                item.hasData
+                                  ? <span className="text-emerald-600 font-medium">✓ Your material list will be used</span>
+                                  : <span className="text-amber-600 font-medium">No problem — we have a curated material library for you</span>
+                              ) : item.hasData
                                 ? <span>Your data: <span className="text-slate-500 font-medium">{def.primarySource}</span></span>
                                 : <span>Fallback: <span className="text-slate-500 font-medium">{def.fallbackSource}</span></span>
                               }

@@ -185,7 +185,7 @@ EC_ROOFTOP_PV_INPUTS = {
 
 EC_FACADE_PV_INPUTS = {
     "geometry": {
-        "category": "Facade PV (BIPV) — Geometry",
+        "category": "Facade PV — Geometry",
         "items": [
             {
                 "key": "ec_fpv_facade_area",
@@ -208,7 +208,7 @@ EC_FACADE_PV_INPUTS = {
         ],
     },
     "measured": {
-        "category": "Facade PV (BIPV) — Measured Production",
+        "category": "Facade PV — Measured Production",
         "existing_only": True,
         "items": [
             {
@@ -293,9 +293,20 @@ EC_BATTERY_INPUTS = {
         "items": [
             {
                 "key": "ec_bat_location",
-                "label": "Do you have the available area?",
-                "type": "yes_no",
+                "label": "Installation location",
                 "recommended_source": "Site plan",
+                "proxy_options": [],
+            },
+            {
+                "key": "ec_bat_area",
+                "label": "Area of installation location (m\u00b2)",
+                "recommended_source": "Site plan",
+                "proxy_options": [],
+            },
+            {
+                "key": "ec_bat_budget",
+                "label": "Budget",
+                "recommended_source": "Project brief / cost estimates",
                 "proxy_options": [],
             },
             {
@@ -368,7 +379,7 @@ EC_EV_CHARGING_INPUTS = {
 
 EC_V2G_INPUTS = {
     "fleet": {
-        "category": "V2G — Fleet",
+        "category": "Vehicle to Grid — Fleet",
         "items": [
             {
                 "key": "ec_v2g_num_ev",
@@ -378,7 +389,7 @@ EC_V2G_INPUTS = {
             },
             {
                 "key": "ec_v2g_export_allowed",
-                "label": "Is V2G export allowed?",
+                "label": "Is Vehicle to Grid export allowed?",
                 "type": "yes_no",
                 "recommended_source": "Grid operator / contract",
                 "proxy_options": [],
@@ -398,6 +409,18 @@ EC_GRID_INPUTS = {
                 "options": ["Variable pricing", "Fixed pricing"],
                 "recommended_source": "Utility contract",
                 "proxy_options": [],
+            },
+            {
+                "key": "ec_market_buying_price",
+                "label": "Market buying price (\u20ac/kWh)",
+                "recommended_source": "Utility contract / energy market data",
+                "proxy_options": ["Nordpool spot prices", "National energy agency"],
+            },
+            {
+                "key": "ec_market_selling_price",
+                "label": "Market selling price (\u20ac/kWh)",
+                "recommended_source": "Utility contract / feed-in tariff",
+                "proxy_options": ["Nordpool spot prices", "National energy agency"],
             },
         ],
     },
@@ -424,12 +447,6 @@ RE_ROOFTOP_PV_INPUTS = {
         "category": "Rooftop PV — Roof & Site",
         "items": [
             {
-                "key": "re_rpv_location",
-                "label": "Building address / location",
-                "recommended_source": "Property records",
-                "proxy_options": ["Google Maps"],
-            },
-            {
                 "key": "re_rpv_roof_area",
                 "label": "Available roof area (m²)",
                 "recommended_source": "Architectural drawing / LiDAR",
@@ -453,7 +470,7 @@ RE_ROOFTOP_PV_INPUTS = {
 
 RE_FACADE_PV_INPUTS = {
     "demand": {
-        "category": "Facade PV (BIPV) — Electricity Demand",
+        "category": "Facade PV — Electricity Demand",
         "items": [
             {
                 "key": "re_fpv_electricity_demand",
@@ -464,14 +481,8 @@ RE_FACADE_PV_INPUTS = {
         ],
     },
     "facade": {
-        "category": "Facade PV (BIPV) — Façade & Site",
+        "category": "Facade PV — Façade & Site",
         "items": [
-            {
-                "key": "re_fpv_location",
-                "label": "Building address / location",
-                "recommended_source": "Property records",
-                "proxy_options": ["Google Maps"],
-            },
             {
                 "key": "re_fpv_facade_area",
                 "label": "Available façade area (m²)",
@@ -635,17 +646,17 @@ _EC_SYSTEM_MAP = {
     "Buildings":            (EC_BUILDING_INPUTS,    False, None),
     "Rooftop PV":           (EC_ROOFTOP_PV_INPUTS,  True,  ["Electricity"]),
     "Community PV":         (EC_COMMUNITY_PV_INPUTS, True,  ["Electricity"]),
-    "Facade PV (BIPV)":     (EC_FACADE_PV_INPUTS,   True,  ["Electricity"]),
+    "Facade PV":            (EC_FACADE_PV_INPUTS,   True,  ["Electricity"]),
     "Battery System":       (EC_BATTERY_INPUTS,      True,  None),
     "EV Charging":          (EC_EV_CHARGING_INPUTS,  False, ["Electricity"]),
-    "Vehicle to Grid (V2G)":(EC_V2G_INPUTS,          False, ["Electricity"]),
+    "Vehicle to Grid":      (EC_V2G_INPUTS,          False, ["Electricity"]),
     "Grid":                 (EC_GRID_INPUTS,         False, ["Electricity"]),
 }
 
 _RE_SYSTEM_MAP = {
     "Rooftop PV":           (RE_ROOFTOP_PV_INPUTS,  False),
     "Community PV":         (RE_COMMUNITY_PV_INPUTS, False),
-    "Facade PV (BIPV)":     (RE_FACADE_PV_INPUTS,   False),
+    "Facade PV":            (RE_FACADE_PV_INPUTS,   False),
     "Battery System":       (RE_BATTERY_INPUTS,      False),
 }
 
@@ -666,7 +677,7 @@ def get_ec_data_inputs(systems, focus=None,
     """
     focus_set = set(focus) if focus else set()
     result = []
-    pv_systems = {"Rooftop PV", "Community PV", "Facade PV (BIPV)"}
+    pv_systems = {"Rooftop PV", "Community PV", "Facade PV"}
     for sys_name in systems:
         entry = _EC_SYSTEM_MAP.get(sys_name)
         if not entry:
