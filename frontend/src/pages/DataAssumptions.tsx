@@ -9,6 +9,7 @@ import {
 import SensitivityPanel from "../components/panels/SensitivityPanel";
 import EpcPanel from "../components/panels/EpcPanel";
 import TabulaPanel from "../components/panels/TabulaPanel";
+import WikellsPanel from "../components/panels/WikellsPanel";
 import { getImportanceRanking } from "../config/sensitivityData";
 
 /* ─────────────────────────────────────────────
@@ -304,6 +305,17 @@ export default function DataAssumptions() {
           </div>
         </div>
       ),
+    }] : []),
+    ...(isRenovation ? [{
+      id: "wikells",
+      icon: <FileText className="w-5 h-5 text-violet-600" />,
+      iconBg: "bg-violet-50",
+      title: "Wikells Sektionsfakta — Material Costs",
+      subtitle: "Installed section costs for exterior & interior wall assemblies · SEK/m²",
+      badge: "Swedish standard",
+      badgeColor: "bg-violet-50 border-violet-200 text-violet-700",
+      relevance: "Reference cost database for renovation material and assembly pricing. Use to estimate CAPEX for wall insulation upgrades, façade replacements, and structural changes. Covers timber stud and CLT assemblies with U-values, fire classes, and acoustic performance.",
+      panel: <WikellsPanel />,
     }] : []),
   ];
 

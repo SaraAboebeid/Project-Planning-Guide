@@ -36,9 +36,6 @@ export const SYSTEMS_BY_PROJECT_TYPE: Record<ProjectType, string[]> = {
   ],
   "Renovation Planning": [
     "Building Envelope (Windows, Roof, Walls, Floors)",
-    "Domestic Hot Water System (DHW)",
-    "Heating System",
-    "Cooling System",
   ],
   "Renewable Energy Planning": [
     "Rooftop PV",

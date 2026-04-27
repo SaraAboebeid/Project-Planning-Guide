@@ -167,9 +167,13 @@ export default function DefineProject() {
   const hasPvSelected = [...pvTriggers].some((t) => systemsSet.has(t));
 
   /* ── progressive reveal conditions ────────────────────────────── */
-  const showSystems        = !!pt;
+  // For Renovation Planning, Building Envelope is always in scope — auto-select it
+  if (pt === "Renovation Planning" && !systemsSet.has("Building Envelope (Windows, Roof, Walls, Floors)")) {
+    setProject({ systemsInScope: ["Building Envelope (Windows, Roof, Walls, Floors)"] });
+  }
+  const showSystems        = !!pt && pt !== "Renovation Planning";
   const showEcFocus        = pt === "Energy Community Planning" && project.systemsInScope.length > 0;
-  const showExploration    = showSystems && project.systemsInScope.length > 0
+  const showExploration    = !!pt && project.systemsInScope.length > 0
                               && (pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0);
   const showKpis           = showExploration && project.explorationApproaches.length > 0;
   const showScale          = showKpis && project.selectedKpis.length > 0;
@@ -257,6 +261,26 @@ export default function DefineProject() {
         </div>
       </Card>
 
+      {/* ── RENOVATION ENVELOPE COMPONENTS (shown directly, no systems toggle needed) ── */}
+      {pt === "Renovation Planning" && (
+        <Card className="animate-fadeIn">
+          <Label required>Which components are included in the renovation?</Label>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {ENVELOPE_COMPONENTS.map((comp) => (
+              <label key={comp} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={project.renovationEnvelopeComponents.includes(comp)}
+                  onChange={() => toggleEnvelopeComponent(comp)}
+                  className="rounded border-gray-300 text-teal focus:ring-teal"
+                />
+                {comp}
+              </label>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* ── SYSTEMS IN SCOPE ── */}
       {showSystems && (
         <Card className="animate-fadeIn">
@@ -327,114 +351,7 @@ export default function DefineProject() {
             );
           })}
 
-          {/* Renovation follow-ups */}
-          {pt === "Renovation Planning" && (
-            <>
-              {systemsSet.has(
-                "Building Envelope (Windows, Roof, Walls, Floors)"
-              ) && (
-                <div className="mt-4">
-                  <SectionDivider />
-                  <Label required>
-                    Which components are included in the renovation?
-                  </Label>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    {ENVELOPE_COMPONENTS.map((comp) => (
-                      <label
-                        key={comp}
-                        className="flex items-center gap-2 text-sm cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={project.renovationEnvelopeComponents.includes(
-                            comp
-                          )}
-                          onChange={() => toggleEnvelopeComponent(comp)}
-                          className="rounded border-gray-300 text-teal focus:ring-teal"
-                        />
-                        {comp}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
 
-              {systemsSet.has("Heating System") && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm font-medium">
-                    Is there an existing heating system installed?
-                  </p>
-                  <div className="flex gap-3 mt-2">
-                    {[true, false].map((val) => (
-                      <button
-                        key={String(val)}
-                        onClick={() =>
-                          setProject({ renovationExistingHeating: val })
-                        }
-                        className={`px-4 py-1 rounded-lg text-sm font-medium border ${
-                          project.renovationExistingHeating === val
-                            ? "bg-teal text-white border-teal"
-                            : "bg-white border-gray-300"
-                        }`}
-                      >
-                        {val ? "Yes" : "No"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {systemsSet.has("Cooling System") && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm font-medium">
-                    Is there an existing cooling system installed?
-                  </p>
-                  <div className="flex gap-3 mt-2">
-                    {[true, false].map((val) => (
-                      <button
-                        key={String(val)}
-                        onClick={() =>
-                          setProject({ renovationExistingCooling: val })
-                        }
-                        className={`px-4 py-1 rounded-lg text-sm font-medium border ${
-                          project.renovationExistingCooling === val
-                            ? "bg-teal text-white border-teal"
-                            : "bg-white border-gray-300"
-                        }`}
-                      >
-                        {val ? "Yes" : "No"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {systemsSet.has("Domestic Hot Water System (DHW)") && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm font-medium">
-                    Is there an existing domestic hot water system?
-                  </p>
-                  <div className="flex gap-3 mt-2">
-                    {[true, false].map((val) => (
-                      <button
-                        key={String(val)}
-                        onClick={() =>
-                          setProject({ renovationExistingDhw: val })
-                        }
-                        className={`px-4 py-1 rounded-lg text-sm font-medium border ${
-                          project.renovationExistingDhw === val
-                            ? "bg-teal text-white border-teal"
-                            : "bg-white border-gray-300"
-                        }`}
-                      >
-                        {val ? "Yes" : "No"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
 
           {/* EC follow-ups: existing PV / battery */}
           {pt === "Energy Community Planning" && (
