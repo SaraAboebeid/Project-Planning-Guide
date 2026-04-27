@@ -1,6 +1,6 @@
 export default function BrandedHeader() {
   return (
-    <header className="bg-gradient-to-r from-[#1a2f5a] via-[#2b4a7e] to-[#256e68] shadow-md">
+    <header className="bg-gradient-to-r from-[#421869] via-[#721CB8] to-[#5a1490] shadow-md">
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
         {/* Left — Logos */}
         <div className="flex items-center gap-4">

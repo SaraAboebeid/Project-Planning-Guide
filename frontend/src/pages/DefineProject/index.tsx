@@ -219,8 +219,8 @@ export default function DefineProject() {
               style={{
                 width: `${pct}%`,
                 background: pct === 100
-                  ? "#7da828"
-                  : "linear-gradient(90deg,#2e9e96,#2b4a7e)",
+                  ? "#509724"
+                  : "linear-gradient(90deg,#995BD5,#721CB8)",
               }}
             />
           </div>

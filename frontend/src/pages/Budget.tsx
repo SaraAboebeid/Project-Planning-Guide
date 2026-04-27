@@ -12,7 +12,7 @@ const CONSULTANT_RATES: Record<string, number> = {
   DKK: 1050,
 };
 
-const COLORS = ["#33528A", "#33A9A0", "#8AB62E", "#C4E81D", "#597001"];
+const COLORS = ["#721CB8", "#96D74C", "#509724", "#995BD5", "#421869"];
 
 export default function Budget() {
   const navigate = useNavigate();
@@ -75,7 +75,7 @@ export default function Budget() {
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
         <div className="ppg-stat ppg-stat-navy">
-          <div className="text-2xl font-bold text-[#2b4a7e]">
+          <div className="text-2xl font-bold text-[#721CB8]">
             {fmtNum(serviceCost)} {currency}
           </div>
           <div className="text-xs text-gray-500">Service Cost</div>

@@ -8,7 +8,7 @@ import {
   OAT_PARAMETERS, BASELINE_HEATING_KWH, getImportanceRanking, type OatParam,
 } from "../../config/sensitivityData";
 
-const COLORS = ["#2b4a7e", "#2e9e96", "#7da828", "#C4E81D", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#64748b", "#1a2f5a", "#597001", "#d946ef"];
+const COLORS = ["#721CB8", "#96D74C", "#509724", "#995BD5", "#f59e0b", "#ef4444", "#421869", "#ec4899", "#06b6d4", "#64748b", "#3a6e1a", "#96D74C", "#d946ef"];
 
 function fmt(n: number) {
   return n >= 1000 ? `${(n / 1000).toFixed(0)}k` : n.toFixed(0);
@@ -175,10 +175,10 @@ export default function SensitivityPanel() {
                   <Line
                     type="monotone"
                     dataKey="heating"
-                    stroke="#2e9e96"
+                    stroke="#96D74C"
                     strokeWidth={2.5}
-                    dot={{ fill: "#2e9e96", r: 4 }}
-                    activeDot={{ r: 6, fill: "#2b4a7e" }}
+                    dot={{ fill: "#96D74C", r: 4 }}
+                    activeDot={{ r: 6, fill: "#721CB8" }}
                   />
                 </LineChart>
               </ResponsiveContainer>

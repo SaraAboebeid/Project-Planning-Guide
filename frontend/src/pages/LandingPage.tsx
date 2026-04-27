@@ -21,7 +21,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-bg">
       {/* ── Hero banner ── */}
-      <div className="bg-gradient-to-r from-[#1a2f5a] via-[#2b4a7e] to-[#256e68] shadow-lg">
+      <div className="bg-gradient-to-r from-[#421869] via-[#721CB8] to-[#5a1490] shadow-lg">
         <div className="max-w-[1100px] mx-auto px-8 py-10 flex items-center justify-between gap-10">
           <div className="text-white max-w-xl">
             <p className="text-[10px] tracking-[0.16em] uppercase font-semibold text-white/55 mb-2">
@@ -35,7 +35,7 @@ export default function LandingPage() {
               impacts &amp; plan with confidence
             </p>
             <div className="mt-5 flex items-center gap-2.5 text-[11px] font-semibold">
-              <span className="px-3 py-1 rounded-full bg-[#C4E81D]/20 text-[#e4f9a8] border border-[#C4E81D]/25">
+              <span className="px-3 py-1 rounded-full bg-[#96D74C]/20 text-[#d4f5a0] border border-[#96D74C]/30">
                 5-Step Guided Workflow
               </span>
               <span className="px-3 py-1 rounded-full bg-white/8 text-white/70 border border-white/12">
@@ -69,7 +69,7 @@ export default function LandingPage() {
               key={step.label}
               className="ppg-card text-center py-5 relative"
             >
-              <div className="mx-auto w-7 h-7 rounded-md bg-gradient-to-br from-[#C4E81D] to-[#7da828] text-[#1a2f3f] text-xs font-bold flex items-center justify-center mb-2.5 shadow-sm">
+              <div className="mx-auto w-7 h-7 rounded-md bg-gradient-to-br from-[#721CB8] to-[#421869] text-white text-xs font-bold flex items-center justify-center mb-2.5 shadow-sm">
                 {i + 1}
               </div>
               <h3 className="text-[13px] font-semibold text-slate-800">{step.label}</h3>
