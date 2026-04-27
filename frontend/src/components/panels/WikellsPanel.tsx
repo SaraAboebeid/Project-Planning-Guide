@@ -32,9 +32,6 @@ function ItemRow({ item, min, max }: { item: WikellsItem; min: number; max: numb
       <td className="py-2.5 pr-4 text-[11px] text-slate-500 whitespace-nowrap">
         {item.weightKgM2 != null ? `${item.weightKgM2} kg/m²` : "—"}
       </td>
-      <td className="py-2.5 pr-4 text-[11px] text-slate-600 whitespace-nowrap">
-        {item.fireClass ?? "—"}
-      </td>
       <td className="py-2.5 pr-3 whitespace-nowrap">
         {ub ? (
           <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${ub.cls}`}>
@@ -52,12 +49,32 @@ function ItemRow({ item, min, max }: { item: WikellsItem; min: number; max: numb
 export default function WikellsPanel() {
   const [query,      setQuery]      = useState("");
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(["ch7-Timber Stud Frame"]));
-  const [sortBy,     setSortBy]     = useState<"cost-asc" | "cost-desc" | "code">("code");
+  const [sortBy,     setSortBy]     = useState<"cost-asc" | "cost-desc">("cost-asc");
   const [activeChap, setActiveChap] = useState("ch7");
 
   const stats = wikellsStats();
 
   const chapter = WIKELLS_CHAPTERS.find(c => c.id === activeChap)!;
+
+  // Chapter-specific stats
+  const chapterItems = useMemo(() => chapter.subGroups.flatMap(sg => sg.items), [chapter]);
+  const chapterStats = useMemo(() => {
+    if (chapterItems.length === 0) return null;
+    const costs = chapterItems.map(i => i.costSEK);
+    let minItem = chapterItems[0]!;
+    let maxItem = chapterItems[0]!;
+    for (const item of chapterItems) {
+      if (item.costSEK < minItem.costSEK) minItem = item;
+      if (item.costSEK > maxItem.costSEK) maxItem = item;
+    }
+    return {
+      count: chapterItems.length,
+      minCost: Math.min(...costs),
+      maxCost: Math.max(...costs),
+      minItem,
+      maxItem,
+    };
+  }, [chapterItems]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
@@ -71,8 +88,7 @@ export default function WikellsPanel() {
         )
         .sort((a, b) => {
           if (sortBy === "cost-asc")  return a.costSEK - b.costSEK;
-          if (sortBy === "cost-desc") return b.costSEK - a.costSEK;
-          return a.code.localeCompare(b.code);
+          return b.costSEK - a.costSEK;
         }),
     })).filter(sg => sg.items.length > 0);
   }, [chapter, query, sortBy]);
@@ -88,19 +104,24 @@ export default function WikellsPanel() {
     <div className="space-y-4">
 
       {/* ── Stats bar ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Total assemblies",  value: stats.totalItems.toString() },
-          { label: "Min cost",          value: `${stats.minCost.toLocaleString("sv-SE")} SEK/m²` },
-          { label: "Max cost",          value: `${stats.maxCost.toLocaleString("sv-SE")} SEK/m²` },
-          { label: "Average cost",      value: `${stats.avgCost.toLocaleString("sv-SE")} SEK/m²` },
-        ].map(({ label, value }) => (
-          <div key={label} className="rounded-xl bg-[#f7f5fb] border border-[#e8e0f5] px-3 py-2.5 text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-            <p className="text-sm font-bold text-[#721CB8] mt-0.5">{value}</p>
+      {chapterStats && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-xl bg-[#f7f5fb] border border-[#e8e0f5] px-3 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 text-center">Options Available</p>
+            <p className="text-lg font-bold text-[#721CB8] mt-0.5 text-center">{chapterStats.count}</p>
           </div>
-        ))}
-      </div>
+          <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mb-1">Lowest Cost</p>
+            <p className="text-[11px] text-slate-700 leading-tight mb-0.5">{chapterStats.minItem.description}</p>
+            <p className="text-sm font-bold text-emerald-700">{chapterStats.minCost.toLocaleString("sv-SE")} SEK/m²</p>
+          </div>
+          <div className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 mb-1">Highest Cost</p>
+            <p className="text-[11px] text-slate-700 leading-tight mb-0.5">{chapterStats.maxItem.description}</p>
+            <p className="text-sm font-bold text-rose-700">{chapterStats.maxCost.toLocaleString("sv-SE")} SEK/m²</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Chapter tabs ── */}
       <div className="flex gap-2 border-b border-slate-200 pb-0">
@@ -114,7 +135,7 @@ export default function WikellsPanel() {
                 : "bg-slate-50 border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
-            Ch.{c.chapter} – {c.titleEN}
+            {c.titleEN}
           </button>
         ))}
       </div>
@@ -131,8 +152,8 @@ export default function WikellsPanel() {
           />
         </div>
         <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <span className="font-medium">Sort:</span>
-          {(["code", "cost-asc", "cost-desc"] as const).map(s => (
+          <span className="font-medium">Sort by price:</span>
+          {(["cost-asc", "cost-desc"] as const).map(s => (
             <button
               key={s}
               onClick={() => setSortBy(s)}
@@ -142,9 +163,9 @@ export default function WikellsPanel() {
                   : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
               }`}
             >
-              {s === "code" ? "Code" : s === "cost-asc"
-                ? <><TrendingDown className="w-3 h-3" /> Price ↑</>
-                : <><TrendingUp   className="w-3 h-3" /> Price ↓</>}
+              {s === "cost-asc"
+                ? <><TrendingDown className="w-3 h-3" /> Low to High</>
+                : <><TrendingUp   className="w-3 h-3" /> High to Low</>}
             </button>
           ))}
         </div>
@@ -204,7 +225,6 @@ export default function WikellsPanel() {
                           <th className="py-2 pr-4 whitespace-nowrap">Cost</th>
                           <th className="py-2 pr-4 whitespace-nowrap">Unit</th>
                           <th className="py-2 pr-4 whitespace-nowrap">Weight</th>
-                          <th className="py-2 pr-4 whitespace-nowrap">Fire class</th>
                           <th className="py-2 pr-3 whitespace-nowrap">Thermal / Sound</th>
                         </tr>
                       </thead>
