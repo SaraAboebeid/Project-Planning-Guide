@@ -60,3 +60,6 @@ Thumbs.db
 *.backup
 
 data/sensitivity/*.duckdb
+
+# Large archive data files (EUBUCCO downloads)
+data/sensitivity/archive/
