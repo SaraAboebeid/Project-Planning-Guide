@@ -632,16 +632,13 @@ def create_combined_importance() -> go.Figure:
     align = {
         "infiltration": "infiltration",
         "construction_package": "construction_pkg",
-        "wwr_north": "wwr_n",
-        "wwr_south": "wwr_s",
-        "wwr_east": "wwr_e",
-        "wwr_west": "wwr_w",
+        "window_to_wall_ratio": "wwr_n",  # Use north as representative since it has largest impact
         "floors_total": "floors_total",
         "footprint_length": "length_factor",
         "footprint_width": "width_factor",
         "glazing_package": "glazing_pkg",
-        "roof_pitch_gable": "roof_pitch_deg",
-        # No direct Global SA match: heating_setpoint, roof_pitch_shed
+        "roof_shape_angle": "roof_pitch_deg",
+        # No direct Global SA match: heating_setpoint
     }
     # Reverse map: global col -> OAT name
     align_rev = {v: k for k, v in align.items()}

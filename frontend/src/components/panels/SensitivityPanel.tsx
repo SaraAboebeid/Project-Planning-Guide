@@ -3,10 +3,11 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, ReferenceLine, Cell,
 } from "recharts";
-import { Activity, TrendingUp } from "lucide-react";
+import { Activity, TrendingUp, Grid3x3, GitBranch, Circle, Layers } from "lucide-react";
 import {
   OAT_PARAMETERS, BASELINE_HEATING_KWH, getImportanceRanking, type OatParam,
 } from "../../config/sensitivityData";
+import { TreemapView, SankeyFlowView, RadialImpactView, BubbleScatterView } from "./InnovativeCharts";
 
 const COLORS = ["#721CB8", "#96D74C", "#509724", "#995BD5", "#f59e0b", "#ef4444", "#421869", "#ec4899", "#06b6d4", "#64748b", "#3a6e1a", "#96D74C", "#d946ef"];
 
@@ -17,7 +18,7 @@ function fmt(n: number) {
 export default function SensitivityPanel() {
   const ranking = getImportanceRanking();
   const [selectedParam, setSelectedParam] = useState<string | null>(null);
-  const [view, setView] = useState<"importance" | "detail">("importance");
+  const [view, setView] = useState<"importance" | "detail" | "treemap" | "sankey" | "radial" | "bubble">("importance");
 
   const importanceData = ranking.map((r, i) => ({
     name: r.label,
@@ -38,29 +39,69 @@ export default function SensitivityPanel() {
   return (
     <div className="space-y-4">
       {/* Tab toggle */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setView("importance")}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition ${
             view === "importance"
               ? "bg-navy text-white shadow-sm"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
           }`}
         >
-          <Activity className="w-4 h-4" /> Parameter Importance
+          <Activity className="w-4 h-4" /> Bar Chart
         </button>
         <button
           onClick={() => {
             setView("detail");
             if (!selectedParam && ranking.length > 0) setSelectedParam(ranking[0]!.key);
           }}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition ${
             view === "detail"
               ? "bg-navy text-white shadow-sm"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
           }`}
         >
-          <TrendingUp className="w-4 h-4" /> Parameter Detail
+          <TrendingUp className="w-4 h-4" /> Detail
+        </button>
+        <button
+          onClick={() => setView("treemap")}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition ${
+            view === "treemap"
+              ? "bg-green text-white shadow-sm"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          <Grid3x3 className="w-4 h-4" /> Treemap
+        </button>
+        <button
+          onClick={() => setView("sankey")}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition ${
+            view === "sankey"
+              ? "bg-green text-white shadow-sm"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          <GitBranch className="w-4 h-4" /> Flow
+        </button>
+        <button
+          onClick={() => setView("radial")}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition ${
+            view === "radial"
+              ? "bg-green text-white shadow-sm"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          <Circle className="w-4 h-4" /> Radial
+        </button>
+        <button
+          onClick={() => setView("bubble")}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition ${
+            view === "bubble"
+              ? "bg-green text-white shadow-sm"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          <Layers className="w-4 h-4" /> Bubble
         </button>
       </div>
 
@@ -120,6 +161,11 @@ export default function SensitivityPanel() {
         </>
       )}
 
+      {view === "treemap" && <TreemapView />}
+      {view === "sankey" && <SankeyFlowView />}
+      {view === "radial" && <RadialImpactView />}
+      {view === "bubble" && <BubbleScatterView />}
+
       {view === "detail" && param && (
         <>
           {/* Parameter selector pills */}
@@ -151,6 +197,23 @@ export default function SensitivityPanel() {
                 {((param.range_kwh / BASELINE_HEATING_KWH) * 100).toFixed(0)}% of baseline
               </span>
             </div>
+            
+            {/* Facade details for WWR parameter */}
+            {param.facadeDetails && (
+              <div className="mb-4 p-3 bg-gradient-to-r from-teal/10 to-green/10 rounded-lg border border-teal/20">
+                <h5 className="text-xs font-bold text-slate-700 mb-2">🧭 Facade-Specific Impact</h5>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(param.facadeDetails).map(([direction, details]) => (
+                    <div key={direction} className="bg-white/60 rounded px-2 py-1.5">
+                      <div className="text-xs font-semibold text-slate-800 capitalize">{direction}</div>
+                      <div className="text-[10px] text-gray-600">Range: {Math.round(details.range).toLocaleString()} kWh</div>
+                      <div className="text-[10px] text-gray-500 italic">{details.impact}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={detailData} margin={{ top: 10, right: 20, left: 20, bottom: 5 }}>

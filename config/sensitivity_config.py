@@ -47,70 +47,60 @@ OAT_PARAMETERS = {
         "range_kwh": 78284.37,
         "baseline_value": "P1 Baseline",
     },
-    "wwr_north": {
-        "label": "WWR North",
-        "unit": "ratio",
+    "window_to_wall_ratio": {
+        "label": "Window-to-Wall Ratio",
+        "unit": "ratio (0-1)",
         "data_keys": ["wwr"],
-        "values": [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
-        "outputs_kwh": [
-            220166.13, 223635.98, 227028.12, 230419.99, 233855.33,
-            237277.13, 240684.87, 244000.08, 247388.97, 250767.13,
+        "values": [
+            "North (Low 4%)", "North (High 49%)",
+            "South (Low 4%)", "South (High 49%)",
+            "East (Low 4%)", "East (High 49%)",
+            "West (Low 4%)", "West (High 49%)"
         ],
-        "range_kwh": 30601.0,
-        "baseline_value": 0.24,
-    },
-    "wwr_south": {
-        "label": "WWR South",
-        "unit": "ratio",
-        "data_keys": ["wwr"],
-        "values": [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
         "outputs_kwh": [
-            232793.26, 230955.88, 229269.27, 227746.60, 226335.41,
-            225070.15, 223991.71, 223019.81, 222163.65, 221334.63,
+            # Combined range from all facades showing min/max for each
+            220166.13,  # North low (worst case - max heat loss)
+            250767.13,  # North high
+            221334.63,  # South low (best case for south - less solar gain needed in heating)
+            232793.26,  # South high
+            226335.41,  # East low (baseline)
+            231005.21,  # East high
+            226335.41,  # West low (baseline)
+            227201.51,  # West high
         ],
-        "range_kwh": 11458.63,
-        "baseline_value": 0.24,
-    },
-    "wwr_east": {
-        "label": "WWR East",
-        "unit": "ratio",
-        "data_keys": ["wwr"],
-        "values": [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
-        "outputs_kwh": [
-            226335.41, 226847.50, 227353.04, 227855.17, 228295.53,
-            228811.72, 229375.06, 229895.35, 230449.54, 231005.21,
-        ],
-        "range_kwh": 4669.80,
-        "baseline_value": 0.24,
-    },
-    "wwr_west": {
-        "label": "WWR West",
-        "unit": "ratio",
-        "data_keys": ["wwr"],
-        "values": [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
-        "outputs_kwh": [
-            226335.41, 226395.50, 226452.13, 226512.16, 226581.38,
-            226591.01, 226708.05, 226785.22, 227033.05, 227201.51,
-        ],
-        "range_kwh": 866.10,
-        "baseline_value": 0.24,
+        "range_kwh": 30601.0,  # Maximum range (North facade has largest impact)
+        "baseline_value": "All facades 24%",
+        "facade_details": {
+            "North": {"range_kwh": 30601.0, "impact": "High - heat loss dominates"},
+            "South": {"range_kwh": 11458.63, "impact": "Moderate - solar gain vs heat loss"},
+            "East": {"range_kwh": 4669.80, "impact": "Low - morning sun"},
+            "West": {"range_kwh": 866.10, "impact": "Very Low - afternoon sun"},
+        }
     },
 
     # ------------------------------------------------------------------
     # NEW OAT PARAMETERS (added from latest simulation results)
     # ------------------------------------------------------------------
 
-    "roof_pitch_gable": {
-        "label": "Roof Pitch (Gable)",
-        "unit": "degrees",
+    "roof_shape_angle": {
+        "label": "Roof Shape & Angle",
+        "unit": "degrees or type",
         "data_keys": ["roof_shape_angle"],
-        "values": [0, 10, 15, 25, 35, 45],
+        "values": ["Flat (0°)", "Low (10°)", "Moderate (15-25°)", "Steep (35-45°)", "Gable", "Shed"],
         "outputs_kwh": [
-            225100.96, 244381.48, 261399.58,
-            304791.38, 361038.53, 436418.24,
+            # Combined range from both gable and shed roof types
+            # Flat: 224629.69 (shed) to 225100.96 (gable)
+            # Steep gable: up to 436418.24
+            # Shows uncertainty from not knowing roof shape/angle
+            224865.33,  # Flat (average of both types)
+            235129.42,  # Low pitch (average ~10°)
+            244228.38,  # Moderate pitch (average 15-25°)
+            299146.88,  # Steep pitch (average 35-45°)
+            225100.96,  # Gable baseline (flat)
+            247602.52,  # Shed maximum
         ],
-        "range_kwh": 211317.28,
-        "baseline_value": 0,
+        "range_kwh": 211553.11,  # Maximum range across all roof shapes/angles
+        "baseline_value": "Flat (0°)",
     },
     "heating_setpoint": {
         "label": "Heating Setpoint",
@@ -158,18 +148,6 @@ OAT_PARAMETERS = {
         "outputs_kwh": [225390.84, 213962.33, 202041.01],
         "range_kwh": 23349.83,
         "baseline_value": "P1 Baseline",
-    },
-    "roof_pitch_shed": {
-        "label": "Roof Pitch (Shed)",
-        "unit": "degrees",
-        "data_keys": ["roof_shape_angle"],
-        "values": [0, 10, 15, 25, 35, 45],
-        "outputs_kwh": [
-            224629.69, 225877.35, 227057.18,
-            230904.45, 237255.22, 247602.52,
-        ],
-        "range_kwh": 22972.83,
-        "baseline_value": 0,
     },
 }
 

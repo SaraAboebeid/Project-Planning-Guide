@@ -11,6 +11,12 @@ export interface OatParam {
   outputs_kwh: number[];
   range_kwh: number;
   baseline_value: number | string;
+  facadeDetails?: {
+    north: { range: number; impact: string };
+    south: { range: number; impact: string };
+    east: { range: number; impact: string };
+    west: { range: number; impact: string };
+  };
 }
 
 export const OAT_PARAMETERS: Record<string, OatParam> = {
@@ -30,13 +36,13 @@ export const OAT_PARAMETERS: Record<string, OatParam> = {
     range_kwh: 78284.37,
     baseline_value: "P1 Baseline",
   },
-  roof_pitch_gable: {
-    label: "Roof Pitch (Gable)",
-    unit: "degrees",
-    values: [0, 10, 15, 25, 35, 45],
-    outputs_kwh: [225100.96, 244381.48, 261399.58, 304791.38, 361038.53, 436418.24],
-    range_kwh: 211317.28,
-    baseline_value: 0,
+  roof_shape_angle: {
+    label: "Roof Shape & Angle",
+    unit: "configuration",
+    values: ["Flat (0°)", "Low (10°)", "Moderate (15-25°)", "Steep (35-45°)", "Gable", "Shed"],
+    outputs_kwh: [225100.96, 234629.42, 283095.48, 398728.38, 436418.24, 247602.52],
+    range_kwh: 211553.0,
+    baseline_value: "Flat (0°)",
   },
   heating_setpoint: {
     label: "Heating Setpoint",
@@ -70,13 +76,19 @@ export const OAT_PARAMETERS: Record<string, OatParam> = {
     range_kwh: 52823.69,
     baseline_value: 1.0,
   },
-  wwr_north: {
-    label: "WWR North",
-    unit: "ratio",
-    values: [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
-    outputs_kwh: [220166.13, 223635.98, 227028.12, 230419.99, 233855.33, 237277.13, 240684.87, 244000.08, 247388.97, 250767.13],
+  window_to_wall_ratio: {
+    label: "Window-to-Wall Ratio",
+    unit: "by facade",
+    values: ["North (Low 4%)", "North (High 49%)", "South (Low 4%)", "South (High 49%)", "East (Low 4%)", "East (High 49%)", "West (Low 4%)", "West (High 49%)"],
+    outputs_kwh: [220166.13, 250767.13, 232793.26, 221334.63, 226335.41, 231005.21, 226335.41, 227201.51],
     range_kwh: 30601.0,
-    baseline_value: 0.24,
+    baseline_value: "North (24%)",
+    facadeDetails: {
+      north: { range: 30601.0, impact: "High - heat loss dominates" },
+      south: { range: 11458.63, impact: "Moderate - solar gain vs heat loss" },
+      east: { range: 4669.80, impact: "Low - morning sun" },
+      west: { range: 866.10, impact: "Very Low - afternoon sun" },
+    },
   },
   glazing_package: {
     label: "Glazing Quality",
@@ -86,38 +98,8 @@ export const OAT_PARAMETERS: Record<string, OatParam> = {
     range_kwh: 23349.83,
     baseline_value: "P1 Baseline",
   },
-  roof_pitch_shed: {
-    label: "Roof Pitch (Shed)",
-    unit: "degrees",
-    values: [0, 10, 15, 25, 35, 45],
-    outputs_kwh: [224629.69, 225877.35, 227057.18, 230904.45, 237255.22, 247602.52],
-    range_kwh: 22972.83,
-    baseline_value: 0,
-  },
-  wwr_south: {
-    label: "WWR South",
-    unit: "ratio",
-    values: [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
-    outputs_kwh: [232793.26, 230955.88, 229269.27, 227746.60, 226335.41, 225070.15, 223991.71, 223019.81, 222163.65, 221334.63],
-    range_kwh: 11458.63,
-    baseline_value: 0.24,
-  },
-  wwr_east: {
-    label: "WWR East",
-    unit: "ratio",
-    values: [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
-    outputs_kwh: [226335.41, 226847.50, 227353.04, 227855.17, 228295.53, 228811.72, 229375.06, 229895.35, 230449.54, 231005.21],
-    range_kwh: 4669.80,
-    baseline_value: 0.24,
-  },
-  wwr_west: {
-    label: "WWR West",
-    unit: "ratio",
-    values: [0.04, 0.09, 0.14, 0.19, 0.24, 0.29, 0.34, 0.39, 0.44, 0.49],
-    outputs_kwh: [226335.41, 226395.50, 226452.13, 226512.16, 226581.38, 226591.01, 226708.05, 226785.22, 227033.05, 227201.51],
-    range_kwh: 866.10,
-    baseline_value: 0.24,
-  },
+
+
 };
 
 /** Sorted by impact (descending) */

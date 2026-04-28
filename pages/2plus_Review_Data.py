@@ -905,6 +905,13 @@ def show_re_sensitivity():
 def show_renovation_sensitivity():
     """OAT sensitivity analysis for Renovation Planning (heating/cooling focus)."""
     import plotly.graph_objects as go
+    from utils.sensitivity_plots_innovative import (
+        create_treemap_importance,
+        create_sankey_flow,
+        create_sunburst_chart,
+        create_ridgeline_distributions,
+        create_bubble_chart_impact,
+    )
 
     st.markdown(
         "<style>"
@@ -970,7 +977,14 @@ def show_renovation_sensitivity():
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    rtab1, rtab2, rtab3 = st.tabs(["Impact Butterfly", "Parameter Ranking", "Stakeholder Guide"])
+    rtab1, rtab2, rtab3, rtab4, rtab5, rtab6 = st.tabs([
+        "Impact Butterfly", 
+        "Parameter Ranking",
+        "🔥 Treemap",
+        "🌊 Flow Diagram",
+        "🌅 Sunburst",
+        "Stakeholder Guide"
+    ])
 
     with rtab1:
         st.info(
@@ -1054,6 +1068,61 @@ def show_renovation_sensitivity():
             )
 
     with rtab3:
+        st.info(
+            "**Treemap Hierarchy:** Visualizes how uncertainty is distributed across "
+            "parameter categories. Larger boxes = more important parameters. "
+            "Colors indicate criticality (🔴 red = critical, 🟡 amber = medium, 🟢 green = low).",
+            icon="🔥"
+        )
+        try:
+            treemap_fig = create_treemap_importance()
+            st.plotly_chart(treemap_fig, key="reno_treemap", use_container_width=True)
+            st.success(
+                f"📊 **Building Envelope** and **Building Geometry** are the dominant "
+                f"uncertainty categories. Parameters like **{rtop3[0]}** take up the most "
+                f"\"visual space\" because they drive the largest output variability."
+            )
+        except Exception as e:
+            st.warning(f"Could not generate treemap: {str(e)}")
+
+    with rtab4:
+        st.info(
+            "**Sankey Flow Diagram:** Shows how uncertainty \"flows\" from high-level "
+            "categories through sub-categories to the final output. Wider flows = "
+            "larger contribution to total uncertainty.",
+            icon="🌊"
+        )
+        try:
+            sankey_fig = create_sankey_flow()
+            st.plotly_chart(sankey_fig, key="reno_sankey", use_container_width=True)
+            st.success(
+                "🌊 **Follow the flow:** Building Envelope uncertainties flow through "
+                "Insulation/Air Tightness and Windows, then converge on the final "
+                "heating demand output. This view helps identify which sub-systems "
+                "need attention."
+            )
+        except Exception as e:
+            st.warning(f"Could not generate Sankey diagram: {str(e)}")
+
+    with rtab5:
+        st.info(
+            "**Sunburst Chart:** Interactive hierarchical view. Click on any segment "
+            "to zoom in. Inner ring shows categories, outer ring shows individual "
+            "parameters. Size represents relative importance.",
+            icon="🌅"
+        )
+        try:
+            sunburst_fig = create_sunburst_chart()
+            st.plotly_chart(sunburst_fig, key="reno_sunburst", use_container_width=True)
+            st.success(
+                "☀️ **Explore interactively:** Click on the inner ring segments to "
+                "drill down into specific parameter categories. The visualization "
+                "scales to show detail at each level."
+            )
+        except Exception as e:
+            st.warning(f"Could not generate sunburst chart: {str(e)}")
+
+    with rtab6:
         st.markdown("**🏗️ Which parameters matter most for your renovation?**")
         _reno_guide = [
             ("Infiltration Rate", "🔴 High", "#FF6B6B",
