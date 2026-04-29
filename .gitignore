@@ -63,3 +63,7 @@ data/sensitivity/*.duckdb
 
 # Large archive data files (EUBUCCO downloads)
 data/sensitivity/archive/
+
+# EUBUCCO local datasets and generated maps (too large for normal Git)
+data/eubucco/
+!data/eubucco/.gitkeep
