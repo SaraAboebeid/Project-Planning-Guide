@@ -49,22 +49,36 @@ USE_LABELS = {
     "ovrigt":            "Other / unknown",
 }
 
+import unicodedata
+
+def _norm(s: str) -> str:
+    """Fold Swedish å/ä/ö → a/a/o so plain ASCII substrings match."""
+    return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii").lower()
+
 def andamal_to_use(andamal: str) -> str:
     """Map EPC andamal1 string to a colour category key."""
     if not isinstance(andamal, str):
         return "ovrigt"
-    a = andamal.lower()
+    a = _norm(andamal)
+    # Outbuildings / garages first (often attached to residential)
     if "komplement" in a or "ekonomi" in a:
         return "komplement"
+    # Multi-family before generic 'bostad'
     if "flerfamilj" in a or "flerbostad" in a or "hyreshus" in a:
         return "bostad_flerfamilj"
-    if "bostad" in a or "smahus" in a or "småhus" in a or "radhus" in a or "kedjehus" in a:
+    # Single/semi-detached residential
+    if "bostad" in a or "smahus" in a or "radhus" in a or "kedjehus" in a:
         return "bostad_enfamilj"
-    if "verksamhet" in a or "handel" in a or "kontor" in a:
+    # Commercial / offices
+    if "verksamhet" in a or "handel" in a or "kontor" in a or "hotell" in a or "restaurang" in a:
         return "verksamhet"
+    # Industrial
     if "industri" in a or "tillverkning" in a or "lager" in a:
         return "industri"
-    if "samhall" in a or "skola" in a or "vård" in a or "vard" in a or "samfund" in a or "offentlig" in a:
+    # Public / civic  (samhallsfunktion after normalization, skola, vard, etc.)
+    if ("samhall" in a or "skola" in a or "vard" in a
+            or "samfund" in a or "offentlig" in a or "special" in a
+            or "idrott" in a or "bad" in a or "kultur" in a):
         return "samhalle"
     return "ovrigt"
 
@@ -91,15 +105,8 @@ gdf = gdf.cx[LON_MIN:LON_MAX, LAT_MIN:LAT_MAX].copy()
 print(f"  {len(gdf):,} buildings in crop area")
 
 # ---------------------------------------------------------------------------
-# Simplify geometries to reduce file size
-# Tolerance ~1m in EPSG:3035 equivalent; simplify BEFORE reprojecting is better,
-# but we already reprojected. Use a small degree-unit tolerance (~5-10m).
-# ---------------------------------------------------------------------------
-print("  Simplifying geometries …")
-gdf["geometry"] = gdf["geometry"].simplify(tolerance=0.00005, preserve_topology=True)
-
-# ---------------------------------------------------------------------------
 # Join EPC footprints → get building use (andamal1) via spatial join
+# NOTE: must happen BEFORE simplification so original polygon boundaries are used
 # ---------------------------------------------------------------------------
 import duckdb
 from shapely import wkb as shapely_wkb
@@ -107,71 +114,120 @@ from shapely import wkb as shapely_wkb
 print("Loading EPC footprints for building use …")
 con = duckdb.connect("data/sensitivity/epc_sweden.duckdb", read_only=True)
 epc_raw = con.execute("""
-    SELECT f.FormularId, f.geom, f.andamal1
+    SELECT
+        f.FormularId,
+        f.geom,
+        f.andamal1,
+        e.EgenNybyggAr          AS year_built,
+        e.EgenAntalPlan         AS floors_epc,
+        e.EgenAtemp             AS area_atemp,
+        e.EgiSpecifikEnergianvandning AS energy_kwh_m2,
+        e.EgiEnergiklass        AS energy_class,
+        e.IdAdr                 AS address
     FROM footprints f
+    LEFT JOIN epc e ON f.FormularId = e.FormularId
 """).fetchdf()
 con.close()
 
 epc_raw["geometry"] = epc_raw["geom"].apply(lambda b: shapely_wkb.loads(bytes(b)))
-epc_gdf = gpd.GeoDataFrame(epc_raw[["FormularId", "andamal1", "geometry"]], crs="EPSG:4326")
+epc_cols = ["FormularId", "andamal1", "year_built", "floors_epc", "area_atemp", "energy_kwh_m2", "energy_class", "address", "geometry"]
+epc_gdf = gpd.GeoDataFrame(epc_raw[epc_cols], crs="EPSG:4326")
 
-# Compute centroids for spatial join (EPC point-in-polygon against EUBUCCO footprints)
-epc_gdf["geometry"] = epc_gdf["geometry"].centroid
+# Project both datasets to EPSG:3006 (metric CRS) for accurate distance matching
+epc_3006 = epc_gdf.to_crs("EPSG:3006")
+gdf_3006 = gdf.to_crs("EPSG:3006")
 
-# Filter EPC to bbox to speed up join
-epc_gdf = epc_gdf.cx[LON_MIN:LON_MAX, LAT_MIN:LAT_MAX].copy()
-print(f"  EPC footprints in bbox: {len(epc_gdf):,}")
+# Use representative_point() — guaranteed to be inside even complex MultiPolygons
+epc_pts = epc_3006.copy()
+epc_pts["geometry"] = epc_3006.geometry.representative_point()
 
-# Spatial join: which EUBUCCO polygon does each EPC centroid fall inside?
-gdf_indexed = gdf[["geometry"]].copy()
-gdf_indexed.index.name = "eubucco_idx"
-joined = gpd.sjoin(epc_gdf, gdf_indexed.reset_index(), how="inner", predicate="within")
+# Crop EPC points to bbox (with small buffer for edge buildings)
+bbox_poly = gpd.GeoDataFrame(
+    geometry=gpd.GeoSeries.from_wkt(
+        [f"POLYGON(({LON_MIN} {LAT_MIN},{LON_MAX} {LAT_MIN},{LON_MAX} {LAT_MAX},{LON_MIN} {LAT_MAX},{LON_MIN} {LAT_MIN}))"]
+    ), crs="EPSG:4326"
+).to_crs("EPSG:3006").geometry.iloc[0]
+epc_pts = epc_pts[epc_pts.geometry.within(bbox_poly.buffer(200))].copy()
+print(f"  EPC footprints in bbox: {len(epc_pts):,}")
 
-# Pick the dominant andamal1 per EUBUCCO building index (most common EPC use)
-use_per_building = (
-    joined.groupby("eubucco_idx")["andamal1"]
-    .agg(lambda x: x.value_counts().index[0])  # mode
-    .rename("andamal1_epc")
+# Step 1: exact sjoin — EPC point falls inside a EUBUCCO polygon
+gdf_3006_idx = gdf_3006[["geometry"]].copy().reset_index().rename(columns={"index": "eubucco_idx"})
+joined_exact = gpd.sjoin(epc_pts, gdf_3006_idx, how="inner", predicate="within")
+
+# Step 2: nearest-neighbour join for the remaining unmatched EPC points
+#   (handles cases where EPC and EUBUCCO footprints are slightly offset)
+MAX_DIST_M = 25  # max 25 m to nearest EUBUCCO polygon centroid
+matched_epc_ids = set(joined_exact.index)
+epc_unmatched = epc_pts[~epc_pts.index.isin(matched_epc_ids)].copy()
+joined_nearest = gpd.sjoin_nearest(
+    epc_unmatched, gdf_3006_idx,
+    how="inner", max_distance=MAX_DIST_M, distance_col="dist_m"
 )
-gdf = gdf.join(use_per_building)
-print(f"  Matched {use_per_building.notna().sum():,} of {len(gdf):,} buildings to EPC use")
+# Drop duplicates from nearest — keep closest match per EPC point
+joined_nearest = joined_nearest.sort_values("dist_m").drop_duplicates(subset=[joined_nearest.index.name or "FormularId"])
 
-# Assign use category
+# Combine exact + nearest matches
+EXTRA_COLS = ["andamal1", "year_built", "floors_epc", "area_atemp", "energy_kwh_m2", "energy_class", "address", "eubucco_idx"]
+joined = pd.concat([
+    joined_exact[[c for c in EXTRA_COLS if c in joined_exact.columns]],
+    joined_nearest[[c for c in EXTRA_COLS if c in joined_nearest.columns]],
+], ignore_index=False)
+
+# Per EUBUCCO building: aggregate — mode for categorical, median for numeric
+def _mode(x):
+    vc = x.dropna().value_counts()
+    return vc.index[0] if len(vc) else None
+def _med(x):   v = pd.to_numeric(x, errors="coerce").dropna(); return round(float(v.median()), 1) if len(v) else None
+
+agg = joined.groupby("eubucco_idx").agg(
+    andamal1_epc   =("andamal1",      _mode),
+    year_built_epc =("year_built",     _med),
+    floors_epc     =("floors_epc",     _med),
+    area_atemp_epc =("area_atemp",     _med),
+    energy_kwh_m2  =("energy_kwh_m2",  _med),
+    energy_class   =("energy_class",   _mode),
+    address_epc    =("address",        _mode),
+)
+gdf = gdf.join(agg)
+matched = gdf["andamal1_epc"].notna().sum()
+n_exact = len(joined_exact)
+n_near  = len(joined_nearest)
+print(f"  Matched {matched:,} of {len(gdf):,} buildings to EPC use ({matched/len(gdf)*100:.1f}%)")
+print(f"  (exact 'within': {n_exact:,} EPC pts | nearest ≤{MAX_DIST_M}m: {n_near:,} EPC pts)")
+print(f"  Top andamal1 values:")
+print(joined["andamal1"].value_counts().head(10).to_string())
+
+# Assign use category (with unicode-normalised matching)
 gdf["use_cat"] = gdf["andamal1_epc"].apply(andamal_to_use)
 
 # ---------------------------------------------------------------------------
-# Prepare extrusion height
-# Use 'height' if available; fall back to n_floors * 3m
+# Simplify geometries to reduce HTML file size (AFTER EPC join)
 # ---------------------------------------------------------------------------
-height_col = None
-for c in ["height", "Height", "building_height"]:
-    if c in gdf.columns:
-        height_col = c
-        break
+print("  Simplifying geometries …")
+gdf["geometry"] = gdf["geometry"].simplify(tolerance=0.00005, preserve_topology=True)
 
-floors_col = None
-for c in ["n_floors", "floors", "num_floors"]:
-    if c in gdf.columns:
-        floors_col = c
-        break
+# ---------------------------------------------------------------------------
+# Prepare extrusion height from EUBUCCO
+# Primary: 'height' field (metres, 100% coverage in SE23)
+# Fallback: floors * 3.2m (typical Swedish storey height)
+# ---------------------------------------------------------------------------
+print("  Processing heights from EUBUCCO …")
+gdf["elev"] = pd.to_numeric(gdf["height"], errors="coerce").clip(lower=0)
+# Fill any rare nulls with floors * 3.2
+fl = pd.to_numeric(gdf["floors"], errors="coerce")
+null_mask = gdf["elev"].isna() | (gdf["elev"] == 0)
+gdf.loc[null_mask, "elev"] = fl[null_mask] * 3.2
+gdf["elev"] = gdf["elev"].fillna(3.2)  # absolute fallback: 1-storey
 
-print(f"  Height col: {height_col}, Floors col: {floors_col}")
-
-if height_col:
-    gdf["elev"] = pd.to_numeric(gdf[height_col], errors="coerce").fillna(0).clip(lower=0)
-    # Fallback for zeros using floors
-    if floors_col:
-        mask = gdf["elev"] == 0
-        gdf.loc[mask, "elev"] = pd.to_numeric(gdf.loc[mask, floors_col], errors="coerce").fillna(0) * 3.0
-elif floors_col:
-    gdf["elev"] = pd.to_numeric(gdf[floors_col], errors="coerce").fillna(0) * 3.0
-else:
-    gdf["elev"] = 10.0  # fallback flat 10m
-
-# Cap extreme outliers (some EUBUCCO heights are noisy)
-p999 = gdf["elev"].quantile(0.999)
-gdf["elev"] = gdf["elev"].clip(upper=p999)
-print(f"  Height stats: mean={gdf['elev'].mean():.1f}m  median={gdf['elev'].median():.1f}m  p99={gdf['elev'].quantile(0.99):.1f}m  max={gdf['elev'].max():.0f}m")
+# Hard cap at 100m — tallest building in Gothenburg is ~86m (Gothia Towers).
+# Anything above is a EUBUCCO data error (bridges, cranes, etc.)
+outliers = (gdf["elev"] > 100).sum()
+if outliers:
+    print(f"  Capping {outliers} height outlier(s) >100m (max was {gdf['elev'].max():.0f}m)")
+gdf["elev"] = gdf["elev"].clip(upper=100)
+print(f"  Height stats: mean={gdf['elev'].mean():.1f}m  median={gdf['elev'].median():.1f}m  "
+      f"p99={gdf['elev'].quantile(0.99):.1f}m  max={gdf['elev'].max():.0f}m")
+print(f"  Zero/null heights remaining: {(gdf['elev']==0).sum()}")
 
 # ---------------------------------------------------------------------------
 # Building use colour (from EPC join)
@@ -207,10 +263,31 @@ print(f"  {len(gdf):,} valid buildings after geometry conversion")
 print("  Building JSON payload …")
 records = []
 for _, row in gdf.iterrows():
+    # EUBUCCO fields
+    btype = row.get("type", None)
+    # EPC fields
+    andamal  = row.get("andamal1_epc", None)
+    use      = row.get("use_cat", "ovrigt")
+    yr_epc   = row.get("year_built_epc", None)
+    fl_epc   = row.get("floors_epc", None)
+    area     = row.get("area_atemp_epc", None)
+    enrg     = row.get("energy_kwh_m2", None)
+    eklass   = row.get("energy_class", None)
+    addr     = row.get("address_epc", None)
+    def _safe_int(v):  return int(v) if v is not None and v == v else None
+    def _safe_f1(v):   return round(float(v), 1) if v is not None and v == v else None
     records.append({
         "coordinates": row["coordinates"],
-        "height": float(row["elev"]),
-        "color": row["color"],
+        "height":      round(float(row["elev"]), 1),
+        "color":       row["color"],
+        "floors":      _safe_f1(fl_epc),
+        "year":        _safe_int(yr_epc),
+        "area":        _safe_int(area),
+        "energy":      _safe_f1(enrg),
+        "eclass":      str(eklass) if eklass and eklass == eklass else None,
+        "andamal":     str(andamal) if andamal and andamal == andamal else None,
+        "use_cat":     use,
+        "address":     str(addr) if addr and addr == addr else None,
     })
 
 data_json = json.dumps(records)
@@ -218,8 +295,9 @@ data_json = json.dumps(records)
 # ---------------------------------------------------------------------------
 # Compute map centre
 # ---------------------------------------------------------------------------
-cx = gdf.geometry.centroid.x.median()
-cy = gdf.geometry.centroid.y.median()
+_gdf_proj = gdf.to_crs("EPSG:3006")
+cx = _gdf_proj.geometry.centroid.to_crs("EPSG:4326").x.median()
+cy = _gdf_proj.geometry.centroid.to_crs("EPSG:4326").y.median()
 
 # ---------------------------------------------------------------------------
 # Statistics for legend
@@ -275,11 +353,16 @@ html = f"""<!DOCTYPE html>
     .legend {{ font-size:11px; color:#cbd5e1; }}
     #tooltip {{
       position:absolute; pointer-events:none; z-index:20;
-      background:rgba(15,17,23,0.92); border:1px solid rgba(255,255,255,0.12);
-      border-radius:8px; padding:10px 14px; font-size:12px; line-height:1.7;
-      max-width:240px; display:none;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      background:rgba(15,17,23,0.95); border:1px solid rgba(255,255,255,0.12);
+      border-radius:10px; padding:12px 16px; font-size:12px; line-height:1.6;
+      min-width:220px; max-width:300px; display:none;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.5);
     }}
+    .tt-title {{ font-size:13px; font-weight:700; color:#a78bfa; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:6px; }}
+    .tt-row {{ display:flex; justify-content:space-between; gap:12px; padding:2px 0; }}
+    .tt-lbl {{ color:#64748b; font-size:11px; }}
+    .tt-val {{ color:#e2e8f0; font-size:11px; font-weight:600; text-align:right; }}
+    .tt-divider {{ border:none; border-top:1px solid rgba(255,255,255,0.07); margin:6px 0; }}
     #controls {{
       position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
       z-index:10; display:flex; gap:10px; pointer-events:auto;
@@ -295,6 +378,51 @@ html = f"""<!DOCTYPE html>
       z-index:10; font-size:11px; color:#64748b; text-align:center;
       white-space:nowrap;
     }}
+
+    /* ---- Search bar ---- */
+    #search-box {{
+      position:absolute; top:16px; right:16px; z-index:10;
+      display:flex; flex-direction:column; gap:6px; width:300px;
+      pointer-events:auto;
+    }}
+    #search-row {{
+      display:flex; gap:6px;
+    }}
+    #search-input {{
+      flex:1; background:rgba(15,17,23,0.88); backdrop-filter:blur(8px);
+      border:1px solid rgba(255,255,255,0.15); border-radius:8px;
+      padding:8px 12px; color:#e2e8f0; font-size:13px;
+      outline:none; transition:border-color 0.2s;
+    }}
+    #search-input::placeholder {{ color:#64748b; }}
+    #search-input:focus {{ border-color:rgba(167,139,250,0.6); }}
+    #search-btn {{
+      background:rgba(167,139,250,0.2); border:1px solid rgba(167,139,250,0.4);
+      border-radius:8px; color:#a78bfa; padding:8px 14px; cursor:pointer;
+      font-size:14px; transition:background 0.2s; backdrop-filter:blur(8px);
+      white-space:nowrap;
+    }}
+    #search-btn:hover {{ background:rgba(167,139,250,0.4); }}
+    #search-btn.loading {{ opacity:0.5; pointer-events:none; }}
+    #search-results {{
+      background:rgba(15,17,23,0.95); backdrop-filter:blur(8px);
+      border:1px solid rgba(255,255,255,0.1); border-radius:8px;
+      overflow:hidden; display:none;
+    }}
+    .result-item {{
+      padding:9px 12px; cursor:pointer; font-size:12px; color:#cbd5e1;
+      border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.15s;
+      line-height:1.4;
+    }}
+    .result-item:last-child {{ border-bottom:none; }}
+    .result-item:hover {{ background:rgba(167,139,250,0.15); color:#e2e8f0; }}
+    .result-item .result-name {{ font-weight:600; color:#e2e8f0; }}
+    .result-item .result-addr {{ font-size:11px; color:#64748b; margin-top:2px; }}
+    #search-status {{
+      font-size:11px; color:#64748b; padding:6px 12px;
+      background:rgba(15,17,23,0.88); border:1px solid rgba(255,255,255,0.08);
+      border-radius:8px; backdrop-filter:blur(8px); display:none;
+    }}
   </style>
 </head>
 <body>
@@ -306,6 +434,16 @@ html = f"""<!DOCTYPE html>
   <div class="legend-title">Building use (from EPC)</div>
   <div class="legend">{type_legend_html}</div>
 </div>
+<!-- Address search -->
+<div id="search-box">
+  <div id="search-row">
+    <input id="search-input" type="text" placeholder="Search address in Gothenburg…" autocomplete="off"/>
+    <button id="search-btn">🔍 Search</button>
+  </div>
+  <div id="search-results"></div>
+  <div id="search-status"></div>
+</div>
+
 <div id="tooltip"></div>
 <div id="hint">Scroll to zoom · Drag to pan · Right-drag or Ctrl+drag to tilt/rotate · Hover buildings for details</div>
 <div id="controls">
@@ -376,15 +514,55 @@ map.on('load', () => {{
 // ---------------------------------------------------------------------------
 const tooltip = document.getElementById('tooltip');
 
+const USE_LABELS_JS = {{
+  bostad_enfamilj:   'Single-family home',
+  bostad_flerfamilj: 'Multi-family residential',
+  komplement:        'Outbuilding / garage',
+  verksamhet:        'Commercial / office',
+  industri:          'Industrial',
+  samhalle:          'Public / civic',
+  ovrigt:            'Unknown / other',
+}};
+
+function row(label, value) {{
+  if (value === null || value === undefined) return '';
+  return `<div class="tt-row"><span class="tt-lbl">${{label}}</span><span class="tt-val">${{value}}</span></div>`;
+}}
+
 function showTooltip(info) {{
   if (info.object) {{
     const d = info.object;
+    // Keep tooltip inside viewport
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let tx = info.x + 16, ty = info.y + 16;
+    if (tx + 310 > vw) tx = info.x - 310;
+    if (ty + 280 > vh) ty = info.y - 280;
+    tooltip.style.left = tx + 'px';
+    tooltip.style.top  = ty + 'px';
     tooltip.style.display = 'block';
-    tooltip.style.left = (info.x + 14) + 'px';
-    tooltip.style.top  = (info.y + 14) + 'px';
+
+    const useLabel = USE_LABELS_JS[d.use_cat] || d.use_cat || 'Unknown';
+    const subStr   = d.subtype ? d.subtype.replace(/_/g,' ') : null;
+    const andamal  = d.andamal ? d.andamal.replace(/;/g, ' · ').replace(/[ ]+/g,' ').trim() : null;
+
+    const eclassColor = {{'A':'#22c55e','B':'#86efac','C':'#bef264','D':'#fde047','E':'#fb923c','F':'#f87171','G':'#dc2626'}};
+    const eclassHtml  = d.eclass && eclassColor[d.eclass]
+      ? `<span style="background:${{eclassColor[d.eclass]}};color:#000;font-weight:700;padding:1px 6px;border-radius:4px">${{d.eclass}}</span>`
+      : d.eclass || null;
+
+    const title = d.address ? d.address : '🏢 Building';
     tooltip.innerHTML =
-      '<b style="color:#a78bfa">Building</b><br/>' +
-      'Height: <b>' + d.height.toFixed(1) + ' m</b>';
+      `<div class="tt-title">${{title}}</div>` +
+      row('Building use', useLabel) +
+      (andamal ? row('EPC category', andamal) : '') +
+      `<hr class="tt-divider"/>` +
+      row('Year built', d.year) +
+      row('Storeys', d.floors ? d.floors.toFixed(0) : null) +
+      row('Heated area (Atemp)', d.area ? d.area.toLocaleString() + ' m²' : null) +
+      row('Energy use', d.energy ? d.energy.toFixed(0) + ' kWh/m²·yr' : null) +
+      row('Energy class', eclassHtml) +
+      `<hr class="tt-divider"/>` +
+      row('Height', d.height.toFixed(1) + ' m');
   }} else {{
     tooltip.style.display = 'none';
   }}
@@ -408,17 +586,163 @@ document.getElementById('btn-toggle').addEventListener('click', () => {{
   overlay.setProps({{ layers: [ buildLayer() ] }});
   map.easeTo({{ pitch: is3D ? 50 : 0, duration: 700 }});
 }});
+
+// ---------------------------------------------------------------------------
+// Address search via Nominatim (OpenStreetMap) – no API key needed
+// ---------------------------------------------------------------------------
+let searchMarker = null;
+
+const searchInput   = document.getElementById('search-input');
+const searchBtn     = document.getElementById('search-btn');
+const searchResults = document.getElementById('search-results');
+const searchStatus  = document.getElementById('search-status');
+
+function setStatus(msg, isError) {{
+  searchStatus.style.display = msg ? 'block' : 'none';
+  searchStatus.style.color = isError ? '#f87171' : '#94a3b8';
+  searchStatus.textContent  = msg;
+}}
+
+async function geocodeAddress() {{
+  const q = searchInput.value.trim();
+  if (!q) return;
+
+  searchBtn.classList.add('loading');
+  searchBtn.textContent = '…';
+  searchResults.style.display = 'none';
+  setStatus('');
+
+  try {{
+    // Bias search to Gothenburg region using viewbox
+    const url = `https://nominatim.openstreetmap.org/search?` +
+      `q=${{encodeURIComponent(q + ', Gothenburg, Sweden')}}` +
+      `&format=jsonv2&limit=5&addressdetails=1` +
+      `&viewbox=11.7,57.5,12.3,57.9&bounded=0`;
+
+    const resp = await fetch(url, {{
+      headers: {{ 'Accept-Language': 'en', 'User-Agent': 'GothenburgBuildingViewer/1.0' }}
+    }});
+    const data = await resp.json();
+
+    if (!data.length) {{
+      setStatus('No results found. Try a street name or postcode.', true);
+      return;
+    }}
+
+    // Render result list
+    searchResults.innerHTML = data.map((r, i) => {{
+      const name = r.name || r.display_name.split(',')[0];
+      const addr = r.display_name.split(',').slice(1, 4).join(',').trim();
+      return `<div class="result-item" data-idx="${{i}}">
+        <div class="result-name">${{name}}</div>
+        <div class="result-addr">${{addr}}</div>
+      </div>`;
+    }}).join('');
+    searchResults.style.display = 'block';
+    setStatus(`${{data.length}} result${{data.length > 1 ? 's' : ''}} found`);
+
+    // Store results for click handler
+    searchResults._data = data;
+
+  }} catch(e) {{
+    setStatus('Search failed – check your internet connection.', true);
+  }} finally {{
+    searchBtn.classList.remove('loading');
+    searchBtn.textContent = '🔍 Search';
+  }}
+}}
+
+// Fly to a result and drop a marker
+function flyToResult(r) {{
+  const lng = parseFloat(r.lon);
+  const lat = parseFloat(r.lat);
+
+  // Remove old marker
+  if (searchMarker) {{ searchMarker.remove(); searchMarker = null; }}
+
+  // Create a pulsing marker element
+  const el = document.createElement('div');
+  el.style.cssText = `
+    width:18px; height:18px; border-radius:50%;
+    background:rgba(167,139,250,0.9);
+    border:3px solid white;
+    box-shadow:0 0 0 4px rgba(167,139,250,0.3);
+    animation:pulse 1.5s infinite;
+  `;
+  // Add pulse keyframes once
+  if (!document.getElementById('pulse-style')) {{
+    const s = document.createElement('style');
+    s.id = 'pulse-style';
+    s.textContent = `@keyframes pulse {{
+      0%   {{ box-shadow:0 0 0 0 rgba(167,139,250,0.5); }}
+      70%  {{ box-shadow:0 0 0 10px rgba(167,139,250,0); }}
+      100% {{ box-shadow:0 0 0 0 rgba(167,139,250,0); }}
+    }}`;
+    document.head.appendChild(s);
+  }}
+
+  searchMarker = new maplibregl.Marker({{ element: el, anchor: 'center' }})
+    .setLngLat([lng, lat])
+    .setPopup(
+      new maplibregl.Popup({{ offset: 16, closeButton: false }})
+        .setHTML(`<div style="font-size:12px;color:#1e293b;max-width:200px">
+          <b>${{r.name || r.display_name.split(',')[0]}}</b><br/>
+          <span style="color:#475569">${{r.display_name.split(',').slice(1,3).join(',').trim()}}</span>
+        </div>`)
+    )
+    .addTo(map);
+  searchMarker.togglePopup();
+
+  // Work out zoom based on result type
+  const zoomMap = {{
+    'house': 18, 'building': 18, 'road': 16, 'residential': 16,
+    'suburb': 14, 'neighbourhood': 14, 'postcode': 15,
+    'city': 13, 'town': 13,
+  }};
+  const zoom = zoomMap[r.type] || zoomMap[r.addresstype] || 17;
+
+  map.flyTo({{
+    center: [lng, lat],
+    zoom,
+    pitch: is3D ? 50 : 0,
+    bearing: map.getBearing(),
+    duration: 1400,
+    essential: true,
+  }});
+
+  // Close dropdown
+  searchResults.style.display = 'none';
+  setStatus('');
+}}
+
+// Wire up events
+searchBtn.addEventListener('click', geocodeAddress);
+searchInput.addEventListener('keydown', e => {{ if (e.key === 'Enter') geocodeAddress(); }});
+
+searchResults.addEventListener('click', e => {{
+  const item = e.target.closest('.result-item');
+  if (!item) return;
+  const idx  = parseInt(item.dataset.idx);
+  flyToResult(searchResults._data[idx]);
+}});
+
+// Close results on outside click
+document.addEventListener('click', e => {{
+  if (!document.getElementById('search-box').contains(e.target)) {{
+    searchResults.style.display = 'none';
+  }}
+}});
 </script>
 </body>
 </html>
 """
 
 os.makedirs("assets", exist_ok=True)
-with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
+with open(OUTPUT_HTML, "w", encoding="utf-8", errors="replace") as f:
     f.write(html)
 
 file_size_mb = os.path.getsize(OUTPUT_HTML) / 1e6
-print(f"\n✅  Saved: {OUTPUT_HTML}  ({file_size_mb:.1f} MB)")
+print(f"\nSaved: {OUTPUT_HTML}  ({file_size_mb:.1f} MB)")
 print(f"   Open in a browser:  {os.path.abspath(OUTPUT_HTML)}")
 print(f"\nStats:")
 print(f"   Buildings : {n_total:,}")
