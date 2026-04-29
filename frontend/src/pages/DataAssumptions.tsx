@@ -4,9 +4,10 @@ import { useWizardStore } from "../store/wizard";
 import {
   CheckCircle2, AlertTriangle, XCircle,
   ChevronDown, ChevronUp, Database,
-  FileText, Layers, Zap, TrendingUp, Activity, Info, ArrowRight,
+  FileText, Layers, Zap, TrendingUp, Activity, Info, ArrowRight, MapPin,
 } from "lucide-react";
 import SensitivityPanel from "../components/panels/SensitivityPanel";
+import EubuccoValidationPanel from "../components/panels/EubuccoValidationPanel";
 import EpcPanel from "../components/panels/EpcPanel";
 import TabulaPanel from "../components/panels/TabulaPanel";
 import WikellsPanel from "../components/panels/WikellsPanel";
@@ -123,7 +124,7 @@ export default function DataAssumptions() {
   const { project } = useWizardStore();
 
   const [openSec, setOpenSec] = useState<Set<string>>(
-    () => new Set(["confidence", "sensitivity", "data"])
+    () => new Set(["confidence", "sensitivity", "eubucco", "data"])
   );
   const [openDb, setOpenDb] = useState<Set<string>>(new Set());
 
@@ -522,6 +523,19 @@ export default function DataAssumptions() {
             Select a project type in Step 1 to see relevant sensitivity drivers.
           </div>
         )}
+      </SectionCard>
+
+      {/* ══════════════════════════════════════════
+          SECTION 2b – EUBUCCO Building Data Validation
+      ══════════════════════════════════════════ */}
+      <SectionCard
+        icon={<MapPin className="w-5 h-5 text-violet-600" />}
+        title="EUBUCCO Building Data — Validation vs EPC"
+        subtitle="Cross-check: floors accuracy for 90 198 buildings in Gothenburg (SE23)"
+        open={openSec.has("eubucco")}
+        onToggle={() => toggleSec("eubucco")}
+      >
+        <EubuccoValidationPanel />
       </SectionCard>
 
       {/* ══════════════════════════════════════════
