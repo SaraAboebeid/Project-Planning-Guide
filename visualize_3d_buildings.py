@@ -118,19 +118,31 @@ epc_raw = con.execute("""
         f.FormularId,
         f.geom,
         f.andamal1,
-        e.EgenNybyggAr          AS year_built,
-        e.EgenAntalPlan         AS floors_epc,
-        e.EgenAtemp             AS area_atemp,
-        e.EgiSpecifikEnergianvandning AS energy_kwh_m2,
-        e.EgiEnergiklass        AS energy_class,
-        e.IdAdr                 AS address
+        f.fastighetsbeteckning,
+        e.year_built,
+        e.floors_epc,
+        e.area_atemp,
+        e.energy_kwh_m2,
+        e.energy_class,
+        e.address
     FROM footprints f
-    LEFT JOIN epc e ON f.FormularId = e.FormularId
+    LEFT JOIN (
+        SELECT
+            FormularId,
+            MIN(EgenNybyggAr)              AS year_built,
+            MIN(EgenAntalPlan)             AS floors_epc,
+            MIN(EgenAtemp)                AS area_atemp,
+            MIN(EgiSpecifikEnergianvandning) AS energy_kwh_m2,
+            MIN(EgiEnergiklass)            AS energy_class,
+            MIN(IdAdr)                    AS address
+        FROM epc
+        GROUP BY FormularId
+    ) e ON f.FormularId = e.FormularId
 """).fetchdf()
 con.close()
 
 epc_raw["geometry"] = epc_raw["geom"].apply(lambda b: shapely_wkb.loads(bytes(b)))
-epc_cols = ["FormularId", "andamal1", "year_built", "floors_epc", "area_atemp", "energy_kwh_m2", "energy_class", "address", "geometry"]
+epc_cols = ["FormularId", "andamal1", "fastighetsbeteckning", "year_built", "floors_epc", "area_atemp", "energy_kwh_m2", "energy_class", "address", "geometry"]
 epc_gdf = gpd.GeoDataFrame(epc_raw[epc_cols], crs="EPSG:4326")
 
 # Project both datasets to EPSG:3006 (metric CRS) for accurate distance matching
@@ -167,7 +179,7 @@ joined_nearest = gpd.sjoin_nearest(
 joined_nearest = joined_nearest.sort_values("dist_m").drop_duplicates(subset=[joined_nearest.index.name or "FormularId"])
 
 # Combine exact + nearest matches
-EXTRA_COLS = ["andamal1", "year_built", "floors_epc", "area_atemp", "energy_kwh_m2", "energy_class", "address", "eubucco_idx"]
+EXTRA_COLS = ["andamal1", "fastighetsbeteckning", "year_built", "floors_epc", "area_atemp", "energy_kwh_m2", "energy_class", "address", "eubucco_idx"]
 joined = pd.concat([
     joined_exact[[c for c in EXTRA_COLS if c in joined_exact.columns]],
     joined_nearest[[c for c in EXTRA_COLS if c in joined_nearest.columns]],
@@ -180,13 +192,14 @@ def _mode(x):
 def _med(x):   v = pd.to_numeric(x, errors="coerce").dropna(); return round(float(v.median()), 1) if len(v) else None
 
 agg = joined.groupby("eubucco_idx").agg(
-    andamal1_epc   =("andamal1",      _mode),
-    year_built_epc =("year_built",     _med),
-    floors_epc     =("floors_epc",     _med),
-    area_atemp_epc =("area_atemp",     _med),
-    energy_kwh_m2  =("energy_kwh_m2",  _med),
-    energy_class   =("energy_class",   _mode),
-    address_epc    =("address",        _mode),
+    andamal1_epc   =("andamal1",              _mode),
+    fastighet_epc  =("fastighetsbeteckning",  _mode),
+    year_built_epc =("year_built",            _med),
+    floors_epc     =("floors_epc",            _med),
+    area_atemp_epc =("area_atemp",            _med),
+    energy_kwh_m2  =("energy_kwh_m2",         _med),
+    energy_class   =("energy_class",          _mode),
+    address_epc    =("address",               _mode),
 )
 gdf = gdf.join(agg)
 matched = gdf["andamal1_epc"].notna().sum()
@@ -274,6 +287,15 @@ for _, row in gdf.iterrows():
     enrg     = row.get("energy_kwh_m2", None)
     eklass   = row.get("energy_class", None)
     addr     = row.get("address_epc", None)
+    fastbet  = row.get("fastighet_epc", None)
+    # Strip apartment suffix (e.g. 'Mandolingatan 80 LGH 1001' -> 'Mandolingatan 80')
+    if addr and addr == addr:
+        import re
+        addr = re.sub(r'\s+(LGH|lgh|ANL|LOKAL|KONTOR|GAR|P-PLATS).*$', '', str(addr)).strip()
+    else:
+        addr = None
+    # Fallback to fastighetsbeteckning if no street address
+    display_addr = addr if addr else (str(fastbet).strip() if fastbet and fastbet == fastbet and str(fastbet).strip() else None)
     def _safe_int(v):  return int(v) if v is not None and v == v else None
     def _safe_f1(v):   return round(float(v), 1) if v is not None and v == v else None
     records.append({
@@ -287,7 +309,7 @@ for _, row in gdf.iterrows():
         "eclass":      str(eklass) if eklass and eklass == eklass else None,
         "andamal":     str(andamal) if andamal and andamal == andamal else None,
         "use_cat":     use,
-        "address":     str(addr) if addr and addr == addr else None,
+        "address":     display_addr,
     })
 
 data_json = json.dumps(records)
