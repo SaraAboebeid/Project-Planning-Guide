@@ -31,8 +31,7 @@ export default function LandingPage() {
               Project Planning Guide
             </h1>
             <p className="mt-2.5 text-white/75 text-[15px] leading-relaxed">
-              Data Fidelity Navigator — Handle data gaps, review sensitivity
-              impacts &amp; plan with confidence
+              Data Fidelity Navigator — Early Stage decision insights
             </p>
             <div className="mt-5 flex items-center gap-2.5 text-[11px] font-semibold">
               <span className="px-3 py-1 rounded-full bg-[#96D74C]/20 text-[#d4f5a0] border border-[#96D74C]/30">
@@ -89,9 +88,7 @@ export default function LandingPage() {
           Project-Type Driven Workflow
         </h2>
         <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-          Select your project type, configure scope &amp; KPIs, then follow the
-          guided steps. Renovation projects get extra steps for data gaps &amp;
-          recommendations.
+          Tailored guidance based on your project type, scope &amp; goals.
         </p>
 
         <button onClick={handleStart} className="ppg-btn-primary mt-6 px-10 py-3 text-[15px]">

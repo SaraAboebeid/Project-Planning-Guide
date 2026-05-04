@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
+import BuildingMapPanel from "../components/panels/BuildingMap";
 import {
   CheckCircle2, AlertTriangle, XCircle,
   ChevronDown, ChevronUp, MapPin, Layers, Database, Check, X,
@@ -705,6 +706,9 @@ export default function DataCoverage() {
           </span>
         )}
       </div>
+
+      {/* 3D Building Map */}
+      <BuildingMapPanel />
 
       {/* Instruction callout */}
       {totalCount > 0 && (

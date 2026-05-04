@@ -14,6 +14,7 @@ import pandas as pd
 import numpy as np
 import json
 import os
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Config
@@ -47,6 +48,17 @@ USE_LABELS = {
     "samhalle":          "Public / civic",
     "komplement":        "Outbuilding / garage",
     "ovrigt":            "Other / unknown",
+}
+
+# Energy class colour palette (EPC A–G scale)
+ECLASS_COLORS = {
+    "A": [ 22, 163,  74, 230],   # vivid green
+    "B": [ 74, 222, 128, 220],   # light green
+    "C": [190, 242,  60, 210],   # yellow-green
+    "D": [250, 204,  21, 215],   # yellow
+    "E": [251, 146,  60, 220],   # orange
+    "F": [239,  68,  68, 225],   # red
+    "G": [153,  27,  27, 230],   # dark red
 }
 
 import unicodedata
@@ -203,6 +215,111 @@ agg = joined.groupby("eubucco_idx").agg(
 )
 gdf = gdf.join(agg)
 matched = gdf["andamal1_epc"].notna().sum()
+
+# Assign use category NOW so TABULA matching can use it
+gdf["use_cat"] = gdf["andamal1_epc"].apply(andamal_to_use)
+
+# ---------------------------------------------------------------------------
+# TABULA archetype matching by construction year
+# Loads both JSON files directly (no streamlit dependency needed here)
+# ---------------------------------------------------------------------------
+_TABULA_DIR = Path("data/sensitivity/FW_ Map selection in notebook")
+
+def _load_tabula_lookup():
+    with open(_TABULA_DIR / "tabula_swedish_data.json", encoding="utf-8") as f:
+        envelope = json.load(f)
+    with open(_TABULA_DIR / "tabula_webtool_scraped.json", encoding="utf-8") as f:
+        energy = json.load(f)
+    buildings_energy = energy.get("buildings", {})
+    lookup = {}
+    for code, env in envelope.items():
+        btype  = env["building_type"]
+        period = env["period"]
+        eng    = buildings_energy.get(code, {})
+        zones  = eng.get("zones", {})
+        lookup[(btype, period)] = {
+            "period":       period,
+            "u_wall":       env["u_values"].get("wall"),
+            "u_roof":       env["u_values"].get("roof"),
+            "u_window":     env["u_values"].get("window"),
+            "u_floor":      env["u_values"].get("floor"),
+            "heat_z3":      zones.get("3", {}).get("net_energy_demand"),
+            "heat_z2":      zones.get("2", {}).get("net_energy_demand"),
+            "heat_z1":      zones.get("1", {}).get("net_energy_demand"),
+            "constr_wall":  env.get("construction_types", {}).get("wall"),
+            "constr_roof":  env.get("construction_types", {}).get("roof"),
+            "constr_floor": env.get("construction_types", {}).get("floor"),
+        }
+    return lookup
+
+print("Loading TABULA archetypes …")
+_tabula_lookup = _load_tabula_lookup()
+print(f"  {len(_tabula_lookup)} TABULA archetypes loaded")
+
+TABULA_PERIODS = ["...1960", "1961-1975", "1976-1985", "1986-1995", "1996-2005"]
+
+def _year_to_period(year):
+    if year is None or (isinstance(year, float) and np.isnan(year)):
+        return None
+    y = int(year)
+    if y <= 1960:   return "...1960"
+    elif y <= 1975: return "1961-1975"
+    elif y <= 1985: return "1976-1985"
+    elif y <= 1995: return "1986-1995"
+    elif y <= 2005: return "1996-2005"
+    return "post-2005"
+
+def _use_to_btype(use_cat):
+    if use_cat == "bostad_enfamilj":   return "SFH"
+    if use_cat == "bostad_flerfamilj": return "MFH"
+    return None
+
+def _tabula_match(year, use_cat):
+    period = _year_to_period(year)
+    btype  = _use_to_btype(use_cat)
+    if not period or not btype or period == "post-2005":
+        return None, period
+    return _tabula_lookup.get((btype, period)), period
+
+print("  Matching buildings to TABULA archetypes …")
+_tabula_rows = []
+for _, _row in gdf.iterrows():
+    _arch, _period = _tabula_match(_row.get("year_built_epc"), _row.get("use_cat"))
+    _tabula_rows.append({
+        "tabula_period":  _period,
+        "tabula_u_wall":  _arch["u_wall"]       if _arch else None,
+        "tabula_u_roof":  _arch["u_roof"]       if _arch else None,
+        "tabula_u_win":   _arch["u_window"]     if _arch else None,
+        "tabula_heat_z3": _arch["heat_z3"]      if _arch else None,
+        "tabula_wall":    _arch["constr_wall"]  if _arch else None,
+        "tabula_roof":    _arch["constr_roof"]  if _arch else None,
+    })
+_tabula_df = pd.DataFrame(_tabula_rows, index=gdf.index)
+gdf = pd.concat([gdf, _tabula_df], axis=1)
+n_tab = gdf["tabula_period"].notna().sum()
+print(f"  TABULA matched: {n_tab:,} of {len(gdf):,} buildings ({n_tab/len(gdf)*100:.1f}%)")
+for _p in TABULA_PERIODS + ["post-2005"]:
+    _c = (gdf["tabula_period"] == _p).sum()
+    if _c: print(f"    {_p}: {_c:,}")
+
+# Compute within-period energy performance percentile
+# 0.0 = best performer (lowest kWh/m²) for that era
+# 1.0 = worst performer (highest kWh/m²) for that era
+# NaN  = no energy data available
+print("  Computing within-period energy performance percentiles …")
+gdf["perf_pct"] = np.nan
+for _p in TABULA_PERIODS + ["post-2005"]:
+    _mask = (gdf["tabula_period"] == _p) & pd.to_numeric(gdf["energy_kwh_m2"], errors="coerce").notna()
+    if _mask.sum() < 2:
+        continue
+    _vals = pd.to_numeric(gdf.loc[_mask, "energy_kwh_m2"], errors="coerce")
+    _min, _max = _vals.quantile(0.02), _vals.quantile(0.98)  # clip outliers
+    if _max > _min:
+        gdf.loc[_mask, "perf_pct"] = ((_vals - _min) / (_max - _min)).clip(0, 1)
+    else:
+        gdf.loc[_mask, "perf_pct"] = 0.5
+has_perf = gdf["perf_pct"].notna().sum()
+print(f"  Energy compare data: {has_perf:,} buildings with within-period ranking")
 n_exact = len(joined_exact)
 n_near  = len(joined_nearest)
 print(f"  Matched {matched:,} of {len(gdf):,} buildings to EPC use ({matched/len(gdf)*100:.1f}%)")
@@ -210,11 +327,8 @@ print(f"  (exact 'within': {n_exact:,} EPC pts | nearest ≤{MAX_DIST_M}m: {n_ne
 print(f"  Top andamal1 values:")
 print(joined["andamal1"].value_counts().head(10).to_string())
 
-# Assign use category (with unicode-normalised matching)
-gdf["use_cat"] = gdf["andamal1_epc"].apply(andamal_to_use)
-
 # ---------------------------------------------------------------------------
-# Simplify geometries to reduce HTML file size (AFTER EPC join)
+# Simplify geometries to reduce HTML file size (AFTER EPC + TABULA join)
 # ---------------------------------------------------------------------------
 print("  Simplifying geometries …")
 gdf["geometry"] = gdf["geometry"].simplify(tolerance=0.00005, preserve_topology=True)
@@ -307,9 +421,19 @@ for _, row in gdf.iterrows():
         "area":        _safe_int(area),
         "energy":      _safe_f1(enrg),
         "eclass":      str(eklass) if eklass and eklass == eklass else None,
+        "eclass_color": ECLASS_COLORS.get(str(eklass).strip().upper(), None) if eklass and eklass == eklass else None,
+        "has_epc":     bool(andamal and andamal == andamal),
         "andamal":     str(andamal) if andamal and andamal == andamal else None,
         "use_cat":     use,
         "address":     display_addr,
+        "tabula_period":  row.get("tabula_period", None),
+        "tabula_u_wall":  round(float(row["tabula_u_wall"]),  2) if row.get("tabula_u_wall")  is not None and row.get("tabula_u_wall")  == row.get("tabula_u_wall")  else None,
+        "tabula_u_roof":  round(float(row["tabula_u_roof"]),  2) if row.get("tabula_u_roof")  is not None and row.get("tabula_u_roof")  == row.get("tabula_u_roof")  else None,
+        "tabula_u_win":   round(float(row["tabula_u_win"]),   2) if row.get("tabula_u_win")   is not None and row.get("tabula_u_win")   == row.get("tabula_u_win")   else None,
+        "tabula_heat_z3": round(float(row["tabula_heat_z3"]), 1) if row.get("tabula_heat_z3") is not None and row.get("tabula_heat_z3") == row.get("tabula_heat_z3") else None,
+        "tabula_wall":    str(row["tabula_wall"]) if row.get("tabula_wall") and row.get("tabula_wall") == row.get("tabula_wall") else None,
+        "tabula_roof":    str(row["tabula_roof"]) if row.get("tabula_roof") and row.get("tabula_roof") == row.get("tabula_roof") else None,
+        "perf_pct":       round(float(row["perf_pct"]), 3) if row.get("perf_pct") is not None and row.get("perf_pct") == row.get("perf_pct") else None,
     })
 
 data_json = json.dumps(records)
@@ -326,6 +450,35 @@ cy = _gdf_proj.geometry.centroid.to_crs("EPSG:4326").y.median()
 # ---------------------------------------------------------------------------
 n_total    = len(gdf)
 use_counts = gdf["use_cat"].value_counts().to_dict()
+n_epc_matched = int(gdf["andamal1_epc"].notna().sum())
+n_eclass      = int(pd.to_numeric(gdf["energy_class"].replace('nan', None), errors='coerce').isna().sum())
+n_with_eclass = n_epc_matched - n_eclass
+
+# Energy class counts for legend
+eclass_counts = {}
+for _cls in ["A","B","C","D","E","F","G"]:
+    eclass_counts[_cls] = int((gdf["energy_class"].astype(str).str.strip().str.upper() == _cls).sum())
+n_eclass_total = sum(eclass_counts.values())
+
+ECLASS_LABELS = {
+    "A": "A – Very efficient",
+    "B": "B – Efficient",
+    "C": "C – Above average",
+    "D": "D – Average",
+    "E": "E – Below average",
+    "F": "F – Poor",
+    "G": "G – Very poor",
+}
+eclass_legend_html = ""
+for _cls, _lbl in ECLASS_LABELS.items():
+    _r, _g, _b, _ = ECLASS_COLORS[_cls]
+    _cnt = eclass_counts.get(_cls, 0)
+    eclass_legend_html += f"""
+      <div style="display:flex;align-items:center;gap:6px;margin:5px 0">
+        <div style="width:12px;height:12px;border-radius:3px;background:rgb({_r},{_g},{_b});flex-shrink:0"></div>
+        <span>{_lbl}</span>
+        <span style="margin-left:auto;color:#64748b">{_cnt:,}</span>
+      </div>"""
 
 type_legend_html = ""
 for key, label in USE_LABELS.items():
@@ -338,6 +491,55 @@ for key, label in USE_LABELS.items():
         <span>{label}</span>
         <span style="margin-left:auto;color:#64748b">{cnt:,}</span>
       </div>"""
+
+# ---------------------------------------------------------------------------
+# Per-period energy extremes: top-3 best (lowest kWh) + worst (highest kWh)
+# Only for buildings that have: tabula_period, energy, address/fastighet, use_cat
+# ---------------------------------------------------------------------------
+PERIOD_KEYS = ['...1960','1961-1975','1976-1985','1986-1995','1996-2005','post-2005']
+_ef = gdf[
+    gdf["tabula_period"].notna() &
+    gdf["energy_kwh_m2"].notna() &
+    (pd.to_numeric(gdf["energy_kwh_m2"], errors="coerce") > 0)
+].copy()
+_ef["_energy"] = pd.to_numeric(_ef["energy_kwh_m2"], errors="coerce")
+
+def _fmt_addr(row):
+    a = row.get("address_epc", None)
+    f = row.get("fastighet_epc", None)
+    if a and str(a).strip() not in ("", "nan", "None"):
+        import re as _re
+        return _re.sub(r'\s+(LGH|lgh|ANL|LOKAL|KONTOR|GAR|P-PLATS).*$', '', str(a)).strip()
+    if f and str(f).strip() not in ("", "nan", "None"):
+        return str(f).strip()
+    return "Unknown address"
+
+_ef["_addr"] = _ef.apply(_fmt_addr, axis=1)
+
+period_cards_json = {}
+for _p in PERIOD_KEYS:
+    _sub = _ef[_ef["tabula_period"] == _p].copy()
+    if _sub.empty:
+        period_cards_json[_p] = {"best": [], "worst": []}
+        continue
+    _sub_sorted = _sub.sort_values("_energy")
+    def _row_to_card(r):
+        eklass = str(r.get("energy_class","")).strip().upper()
+        if eklass in ("","NAN","NONE"): eklass = None
+        return {
+            "addr":   r["_addr"],
+            "energy": round(float(r["_energy"]), 0),
+            "eclass": eklass,
+            "use":    r.get("use_cat","ovrigt"),
+            "area":   int(r["area_atemp_epc"]) if r.get("area_atemp_epc") and str(r.get("area_atemp_epc")) not in ("nan","None") else None,
+        }
+    period_cards_json[_p] = {
+        "best":  [_row_to_card(r) for _, r in _sub_sorted.head(3).iterrows()],
+        "worst": [_row_to_card(r) for _, r in _sub_sorted.tail(3).iloc[::-1].iterrows()],
+    }
+
+import json as _json
+period_cards_js = _json.dumps(period_cards_json)
 
 # ---------------------------------------------------------------------------
 # Generate HTML
@@ -400,6 +602,78 @@ html = f"""<!DOCTYPE html>
       z-index:10; font-size:11px; color:#64748b; text-align:center;
       white-space:nowrap;
     }}
+
+    /* ---- Year-mode panel ---- */
+    #year-panel {{
+      position:absolute; top:16px; left:16px; z-index:10;
+      background:rgba(15,17,23,0.88); backdrop-filter:blur(8px);
+      border:1px solid rgba(255,255,255,0.1); border-radius:12px;
+      padding:16px 18px; width:220px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.5);
+      pointer-events:auto; display:none;
+    }}
+    #year-panel h2 {{ font-size:13px; font-weight:700; color:#34d399; margin-bottom:4px; letter-spacing:.5px; text-transform:uppercase; }}
+    #year-panel .sub {{ font-size:11px; color:#94a3b8; margin-bottom:12px; }}
+    .period-item {{
+      display:flex; align-items:center; gap:8px; padding:6px 8px;
+      border-radius:8px; cursor:pointer; transition:background 0.15s;
+      margin:3px 0;
+    }}
+    .period-item:hover {{ background:rgba(255,255,255,0.08); }}
+    .period-item.active {{ background:rgba(52,211,153,0.15); border:1px solid rgba(52,211,153,0.3); }}
+    .period-swatch {{ width:12px; height:12px; border-radius:3px; flex-shrink:0; }}
+    .period-label {{ font-size:11px; color:#cbd5e1; flex:1; }}
+    .period-count {{ font-size:11px; color:#64748b; }}
+    #year-clear {{
+      margin-top:10px; width:100%; font-size:11px; padding:5px 0;
+      background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
+      border-radius:6px; color:#94a3b8; cursor:pointer;
+    }}
+    #year-clear:hover {{ background:rgba(255,255,255,0.1); }}
+
+    /* ---- Energy-class panel ---- */
+    #eclass-panel {{
+      position:absolute; top:16px; left:16px; z-index:10;
+      background:rgba(15,17,23,0.88); backdrop-filter:blur(8px);
+      border:1px solid rgba(255,255,255,0.1); border-radius:12px;
+      padding:16px 18px; width:220px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.5);
+      pointer-events:auto; display:none;
+    }}
+    #eclass-panel h2 {{ font-size:13px; font-weight:700; color:#4ade80; margin-bottom:4px; letter-spacing:.5px; text-transform:uppercase; }}
+    #eclass-panel .sub {{ font-size:11px; color:#94a3b8; margin-bottom:12px; }}
+    .eclass-item {{
+      display:flex; align-items:center; gap:8px; padding:5px 8px;
+      border-radius:8px; cursor:pointer; transition:background 0.15s; margin:2px 0;
+    }}
+    .eclass-item:hover {{ background:rgba(255,255,255,0.08); }}
+    .eclass-item.active {{ background:rgba(74,222,128,0.15); border:1px solid rgba(74,222,128,0.3); }}
+    .eclass-swatch {{ width:12px; height:12px; border-radius:3px; flex-shrink:0; }}
+    .eclass-label {{ font-size:11px; color:#cbd5e1; flex:1; }}
+    .eclass-count {{ font-size:11px; color:#64748b; }}
+    #eclass-clear {{
+      margin-top:10px; width:100%; font-size:11px; padding:5px 0;
+      background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
+      border-radius:6px; color:#94a3b8; cursor:pointer;
+    }}
+    #eclass-clear:hover {{ background:rgba(255,255,255,0.1); }}
+    .no-epc-note {{ font-size:10px; color:#475569; margin-top:8px; line-height:1.4; }}
+
+    /* ---- Energy-compare sub-panel ---- */
+    #perf-legend {{
+      margin-top:12px; display:none;
+    }}
+    #perf-legend .perf-title {{ font-size:11px; color:#94a3b8; margin-bottom:6px; text-transform:uppercase; letter-spacing:.4px; }}
+    .perf-bar-wrap {{ position:relative; height:14px; border-radius:4px; overflow:visible; margin-bottom:4px; }}
+    .perf-bar {{ height:100%; border-radius:4px; }}
+    .perf-bar-labels {{ display:flex; justify-content:space-between; font-size:10px; color:#64748b; }}
+    #btn-energy-compare {{
+      margin-top:10px; width:100%; font-size:11px; padding:6px 0;
+      background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
+      border-radius:6px; color:#94a3b8; cursor:pointer; transition:background 0.2s;
+    }}
+    #btn-energy-compare:hover  {{ background:rgba(255,255,255,0.1); }}
+    #btn-energy-compare.active {{ background:rgba(251,191,36,0.15); border-color:rgba(251,191,36,0.4); color:#fbbf24; }}
 
     /* ---- Search bar ---- */
     #search-box {{
@@ -466,11 +740,38 @@ html = f"""<!DOCTYPE html>
   <div id="search-status"></div>
 </div>
 
+<!-- Energy-class panel (shown when colorMode === 'eclass') -->
+<div id="eclass-panel">
+  <h2>⚡ EPC Energy Class</h2>
+  <div class="sub">{n_eclass_total:,} buildings with EPC · click to filter</div>
+  <div id="eclass-legend">{eclass_legend_html}</div>
+  <div class="no-epc-note">{n_total - n_eclass_total:,} buildings have no EPC on record (shown dimmed)</div>
+  <button id="eclass-clear">✕ Clear filter</button>
+</div>
+
+<!-- Year-mode legend panel (shown when colorMode === 'year') -->
+<div id="year-panel">
+  <h2>🗓 Construction Year</h2>
+  <div class="sub">TABULA periods · click to highlight</div>
+  <div id="period-legend"></div>
+  <button id="year-clear">✕ Clear highlight</button>
+  <button id="btn-energy-compare">⚡ Compare energy use</button>
+  <div id="perf-legend">
+    <div class="perf-title">Energy use within era</div>
+    <div class="perf-bar-wrap">
+      <canvas id="perf-gradient-bar" height="14" style="border-radius:4px;display:block;width:100%"></canvas>
+    </div>
+    <div class="perf-bar-labels"><span>Best (low kWh)</span><span>Worst (high kWh)</span></div>
+  </div>
+</div>
+
 <div id="tooltip"></div>
 <div id="hint">Scroll to zoom · Drag to pan · Right-drag or Ctrl+drag to tilt/rotate · Hover buildings for details</div>
 <div id="controls">
   <button class="btn" id="btn-reset">⌂ Reset view</button>
   <button class="btn" id="btn-toggle">⇅ Toggle flat / 3D</button>
+  <button class="btn" id="btn-eclass-mode">⚡ Energy class</button>
+  <button class="btn" id="btn-year-mode">🗓 Year mode</button>
 </div>
 
 <script>
@@ -478,7 +779,134 @@ const {{ MapboxOverlay, PolygonLayer }} = deck;
 
 const DATA = {data_json};
 
-let is3D = true;
+let is3D      = true;
+let colorMode = 'use';       // 'use' | 'year'
+let highlightPeriod = null;  // null = show all
+
+// ---- TABULA period colour palette ----------------------------------------
+const PERIOD_COLORS = {{
+  '...1960':   [220,  60,  50, 220],
+  '1961-1975': [235, 130,  40, 220],
+  '1976-1985': [235, 200,  40, 220],
+  '1986-1995': [ 90, 200,  60, 220],
+  '1996-2005': [ 40, 195, 170, 220],
+  'post-2005': [ 60, 140, 235, 220],
+}};
+const PERIOD_LABELS = {{
+  '...1960':   'Pre-1960',
+  '1961-1975': '1961 – 1975',
+  '1976-1985': '1976 – 1985',
+  '1986-1995': '1986 – 1995',
+  '1996-2005': '1996 – 2005',
+  'post-2005': 'Post-2005',
+}};
+const PERIOD_ORDER = ['...1960','1961-1975','1976-1985','1986-1995','1996-2005','post-2005'];
+
+let energyCompare = false;
+let highlightEclass = null;  // null = all, or 'A'..'G'
+
+// ---- EPC energy-class colour map (mirrors Python) -------------------------
+const ECLASS_COLORS_JS = {{
+  'A': [ 22, 163,  74, 230],
+  'B': [ 74, 222, 128, 220],
+  'C': [190, 242,  60, 210],
+  'D': [250, 204,  21, 215],
+  'E': [251, 146,  60, 220],
+  'F': [239,  68,  68, 225],
+  'G': [153,  27,  27, 230],
+}};
+
+// ---- Per-period energy stats for legend gradient -------------------------
+const periodEnergyStats = {{}};
+function computePeriodStats() {{
+  PERIOD_ORDER.forEach(p => {{
+    const vals = DATA
+      .filter(d => d.tabula_period === p && d.perf_pct !== null && d.perf_pct !== undefined)
+      .map(d => d.energy);
+    if (!vals.length) return;
+    vals.sort((a,b) => a-b);
+    periodEnergyStats[p] = {{
+      min: Math.round(vals[0]),
+      max: Math.round(vals[vals.length-1]),
+      p10: Math.round(vals[Math.floor(vals.length*0.10)] || vals[0]),
+      p90: Math.round(vals[Math.floor(vals.length*0.90)] || vals[vals.length-1]),
+      n:   vals.length,
+    }};
+  }});
+}}
+computePeriodStats();
+
+// Shade a period base color by performance (0=best→bright, 1=worst→dark)
+function perfColor(baseCol, pct) {{
+  // pct=0 → very bright (best); pct=1 → very dark (worst)
+  // Best: lerp base toward [255,255,255] by 40%
+  // Worst: lerp base toward [20,20,20] by 60%
+  const [r, g, b] = baseCol;
+  let fr, fg, fb;
+  if (pct <= 0.5) {{
+    // best half: brighten
+    const t = (0.5 - pct) * 2 * 0.55;  // 0 at mid, 0.55 at best
+    fr = Math.round(r + (255 - r) * t);
+    fg = Math.round(g + (255 - g) * t);
+    fb = Math.round(b + (255 - b) * t);
+  }} else {{
+    // worst half: darken
+    const t = (pct - 0.5) * 2 * 0.72;  // 0 at mid, 0.72 at worst
+    fr = Math.round(r * (1 - t));
+    fg = Math.round(g * (1 - t));
+    fb = Math.round(b * (1 - t));
+  }}
+  return [fr, fg, fb, 230];
+}}
+
+// Draw gradient bar for the active period (or default first period)
+function drawGradientBar(period) {{
+  const canvas = document.getElementById('perf-gradient-bar');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth || 180;
+  const ctx = canvas.getContext('2d');
+  const col = PERIOD_COLORS[period] || [180,180,180,200];
+  const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+  for (let i = 0; i <= 10; i++) {{
+    const t = i / 10;
+    const [r,g,b] = perfColor(col, t);
+    grad.addColorStop(t, `rgb(${{r}},${{g}},${{b}})`);
+  }}
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}}
+
+// Pre-count buildings per period for the legend
+const periodCounts = {{}};
+DATA.forEach(d => {{
+  const p = d.tabula_period || '__unknown__';
+  periodCounts[p] = (periodCounts[p] || 0) + 1;
+}});
+
+// Build year-mode legend items
+function buildPeriodLegend() {{
+  const container = document.getElementById('period-legend');
+  container.innerHTML = '';
+  PERIOD_ORDER.concat(['__unknown__']).forEach(p => {{
+    const cnt = periodCounts[p] || 0;
+    if (!cnt) return;
+    const col = PERIOD_COLORS[p] || [100,100,110,200];
+    const lbl = PERIOD_LABELS[p] || 'Year unknown';
+    const div = document.createElement('div');
+    div.className = 'period-item' + (highlightPeriod === p ? ' active' : '');
+    div.dataset.period = p;
+    div.innerHTML = `
+      <div class="period-swatch" style="background:rgb(${{col[0]}},${{col[1]}},${{col[2]}})"></div>
+      <span class="period-label">${{lbl}}</span>
+      <span class="period-count">${{cnt.toLocaleString()}}</span>`;
+    div.addEventListener('click', () => {{
+      highlightPeriod = (highlightPeriod === p) ? null : p;
+      buildPeriodLegend();
+      overlay.setProps({{ layers: [ buildLayer() ] }});
+    }});
+    container.appendChild(div);
+  }});
+}}
 
 // ---------------------------------------------------------------------------
 // MapLibre GL map (handles all pan / zoom / tilt navigation)
@@ -498,6 +926,56 @@ const map = new maplibregl.Map({{
 // ---------------------------------------------------------------------------
 let overlay;
 
+function getBuildingColor(d) {{
+
+  // ---- ENERGY CLASS mode: color all EPC buildings by A-G rating ----
+  if (colorMode === 'eclass') {{
+    if (!d.eclass_color) {{
+      // No EPC data at all: very dim
+      return [60, 60, 70, 40];
+    }}
+    const col = d.eclass_color;
+    if (highlightEclass !== null) {{
+      return (d.eclass === highlightEclass) ? col : [col[0], col[1], col[2], 30];
+    }}
+    return col;
+  }}
+
+  // ---- YEAR mode ----
+  if (colorMode === 'year') {{
+    const baseCol = PERIOD_COLORS[d.tabula_period] || null;
+
+    // No period data: dim EPC buildings slightly, hide non-EPC buildings
+    if (!baseCol) {{
+      return d.has_epc ? [120, 120, 130, 60] : [40, 40, 45, 20];
+    }}
+
+    if (energyCompare) {{
+      if (d.perf_pct === null || d.perf_pct === undefined) {{
+        return [60, 60, 65, 60];
+      }}
+      const col = perfColor(baseCol, d.perf_pct);
+      if (highlightPeriod !== null && (d.tabula_period || '__unknown__') !== highlightPeriod) {{
+        return [col[0], col[1], col[2], 30];
+      }}
+      return col;
+    }}
+
+    if (highlightPeriod !== null) {{
+      const match = (d.tabula_period || '__unknown__') === highlightPeriod;
+      return match ? baseCol : [baseCol[0], baseCol[1], baseCol[2], 35];
+    }}
+    return baseCol;
+  }}
+
+  // ---- USE mode (default) ----
+  if (highlightPeriod !== null) {{
+    const match = (d.tabula_period || '__unknown__') === highlightPeriod;
+    return match ? d.color : [d.color[0], d.color[1], d.color[2], 35];
+  }}
+  return d.color;
+}}
+
 function buildLayer() {{
   return new PolygonLayer({{
     id: 'buildings',
@@ -508,7 +986,7 @@ function buildLayer() {{
     getPolygon:   d => d.coordinates[0],
     getElevation: d => d.height,
     elevationScale: is3D ? 1 : 0,
-    getFillColor: d => d.color,
+    getFillColor: d => getBuildingColor(d),
     getLineColor: [255, 255, 255, 20],
     lineWidthMinPixels: 0,
     material: {{
@@ -518,7 +996,7 @@ function buildLayer() {{
       specularColor: [60, 64, 70],
     }},
     transitions: {{ elevationScale: {{ duration: 700, type: 'spring' }} }},
-    updateTriggers: {{ elevationScale: is3D }},
+    updateTriggers: {{ elevationScale: is3D, getFillColor: [colorMode, highlightPeriod] }},
     onHover: (info) => showTooltip(info),
   }});
 }}
@@ -573,21 +1051,113 @@ function showTooltip(info) {{
       : d.eclass || null;
 
     const title = d.address ? d.address : '🏢 Building';
+    const periodLabel = d.tabula_period ? (PERIOD_LABELS[d.tabula_period] || d.tabula_period) : null;
+    const periodCol   = d.tabula_period ? PERIOD_COLORS[d.tabula_period] : null;
+    const periodBadge = periodLabel && periodCol
+      ? `<span style="background:rgb(${{periodCol[0]}},${{periodCol[1]}},${{periodCol[2]}});color:#000;font-weight:700;padding:1px 7px;border-radius:4px;font-size:10px">${{periodLabel}}</span>`
+      : (periodLabel || null);
     tooltip.innerHTML =
       `<div class="tt-title">${{title}}</div>` +
       row('Building use', useLabel) +
       (andamal ? row('EPC category', andamal) : '') +
       `<hr class="tt-divider"/>` +
       row('Year built', d.year) +
+      row('TABULA period', periodBadge) +
       row('Storeys', d.floors ? d.floors.toFixed(0) : null) +
       row('Heated area (Atemp)', d.area ? d.area.toLocaleString() + ' m²' : null) +
       row('Energy use', d.energy ? d.energy.toFixed(0) + ' kWh/m²·yr' : null) +
       row('Energy class', eclassHtml) +
       `<hr class="tt-divider"/>` +
+      (d.tabula_u_wall  ? row('U wall',   d.tabula_u_wall  + ' W/m²K') : '') +
+      (d.tabula_u_roof  ? row('U roof',   d.tabula_u_roof  + ' W/m²K') : '') +
+      (d.tabula_u_win   ? row('U window', d.tabula_u_win   + ' W/m²K') : '') +
+      (d.tabula_heat_z3 ? row('TABULA heat demand (Z3)', d.tabula_heat_z3 + ' kWh/m²·yr') : '') +
+      (d.tabula_wall    ? row('Wall construction', d.tabula_wall) : '') +
+      (d.tabula_roof    ? row('Roof construction', d.tabula_roof) : '') +
+      (energyCompare && d.perf_pct !== null && d.perf_pct !== undefined
+        ? (() => {{
+            const pct = d.perf_pct;
+            const label = pct < 0.2 ? '🟢 Top 20% (best for its era)'
+                        : pct < 0.4 ? '🟡 Above average'
+                        : pct < 0.6 ? '🟠 Average'
+                        : pct < 0.8 ? '🔴 Below average'
+                                    : '🔴 Bottom 20% (worst for its era)';
+            return `<hr class="tt-divider"/>` +
+              row('Era performance', label) +
+              row('Percentile (within era)', `top ${{Math.round((1-pct)*100)}}%`);
+          }})()
+        : '') +
+      `<hr class="tt-divider"/>` +
       row('Height', d.height.toFixed(1) + ' m');
   }} else {{
     tooltip.style.display = 'none';
   }}
+}}
+
+// ---------------------------------------------------------------------------
+// Energy-class legend builder
+// ---------------------------------------------------------------------------
+function buildEclassLegend() {{
+  const container = document.getElementById('eclass-legend');
+  if (!container) return;
+  const items = container.querySelectorAll('.eclass-item');
+  items.forEach(item => {{
+    const cls = item.dataset.eclass;
+    item.classList.toggle('active', highlightEclass === cls);
+  }});
+}}
+
+document.getElementById('eclass-legend').addEventListener('click', (e) => {{
+  const item = e.target.closest('.eclass-item');
+  if (!item) return;
+  const cls = item.dataset.eclass;
+  highlightEclass = (highlightEclass === cls) ? null : cls;
+  buildEclassLegend();
+  overlay.setProps({{ layers: [ buildLayer() ] }});
+}});
+
+// ---------------------------------------------------------------------------
+// Unified mode switcher
+// ---------------------------------------------------------------------------
+function switchMode(newMode) {{
+  colorMode = newMode;
+  highlightPeriod = null;
+  highlightEclass = null;
+
+  const usePanel   = document.getElementById('panel');
+  const yearPanel  = document.getElementById('year-panel');
+  const eclassPanel= document.getElementById('eclass-panel');
+
+  const btnYear  = document.getElementById('btn-year-mode');
+  const btnEclass= document.getElementById('btn-eclass-mode');
+
+  // Reset button styles
+  [btnYear, btnEclass].forEach(b => {{ b.style.borderColor = ''; b.style.color = ''; }});
+
+  if (newMode === 'year') {{
+    usePanel.style.display   = 'none';
+    yearPanel.style.display  = 'block';
+    eclassPanel.style.display= 'none';
+    btnYear.textContent      = '🏷 Use mode';
+    btnYear.style.borderColor= 'rgba(52,211,153,0.5)';
+    btnYear.style.color      = '#34d399';
+    buildPeriodLegend();
+  }} else if (newMode === 'eclass') {{
+    usePanel.style.display   = 'none';
+    yearPanel.style.display  = 'none';
+    eclassPanel.style.display= 'block';
+    btnEclass.textContent    = '🏷 Use mode';
+    btnEclass.style.borderColor= 'rgba(96,165,250,0.5)';
+    btnEclass.style.color    = '#60a5fa';
+    buildEclassLegend();
+  }} else {{
+    usePanel.style.display   = 'block';
+    yearPanel.style.display  = 'none';
+    eclassPanel.style.display= 'none';
+    btnYear.textContent      = '🗓 Year mode';
+    btnEclass.textContent    = '⚡ Energy class';
+  }}
+  overlay.setProps({{ layers: [ buildLayer() ] }});
 }}
 
 // ---------------------------------------------------------------------------
@@ -608,6 +1178,57 @@ document.getElementById('btn-toggle').addEventListener('click', () => {{
   overlay.setProps({{ layers: [ buildLayer() ] }});
   map.easeTo({{ pitch: is3D ? 50 : 0, duration: 700 }});
 }});
+
+document.getElementById('btn-year-mode').addEventListener('click', () => {{
+  switchMode(colorMode === 'year' ? 'use' : 'year');
+}});
+
+document.getElementById('btn-eclass-mode').addEventListener('click', () => {{
+  switchMode(colorMode === 'eclass' ? 'use' : 'eclass');
+}});
+
+document.getElementById('year-clear').addEventListener('click', () => {{
+  highlightPeriod = null;
+  buildPeriodLegend();
+  overlay.setProps({{ layers: [ buildLayer() ] }});
+}});
+
+document.getElementById('eclass-clear').addEventListener('click', () => {{
+  highlightEclass = null;
+  buildEclassLegend();
+  overlay.setProps({{ layers: [ buildLayer() ] }});
+}});
+
+document.getElementById('btn-energy-compare').addEventListener('click', () => {{
+  energyCompare = !energyCompare;
+  const btn = document.getElementById('btn-energy-compare');
+  const perfLegend = document.getElementById('perf-legend');
+  if (energyCompare) {{
+    btn.classList.add('active');
+    btn.textContent = '⚡ Energy compare ON';
+    perfLegend.style.display = 'block';
+    // Draw gradient for the highlighted period or first with data
+    const activePeriod = highlightPeriod || PERIOD_ORDER.find(p => periodEnergyStats[p]) || PERIOD_ORDER[0];
+    setTimeout(() => drawGradientBar(activePeriod), 50);
+  }} else {{
+    btn.classList.remove('active');
+    btn.textContent = '⚡ Compare energy use';
+    perfLegend.style.display = 'none';
+  }}
+  overlay.setProps({{ layers: [ buildLayer() ] }});
+}});
+
+// Redraw gradient bar when period highlight changes (only in energy compare mode)
+const _origBuildPeriodLegend = buildPeriodLegend;
+function buildPeriodLegendWithGradient() {{
+  _origBuildPeriodLegend();
+  if (energyCompare) {{
+    const activePeriod = highlightPeriod || PERIOD_ORDER.find(p => periodEnergyStats[p]) || PERIOD_ORDER[0];
+    setTimeout(() => drawGradientBar(activePeriod), 50);
+  }}
+}}
+// Override the legend builder used by period click handlers
+Object.defineProperty(window, 'buildPeriodLegend', {{ value: buildPeriodLegendWithGradient, writable: true }});
 
 // ---------------------------------------------------------------------------
 // Address search via Nominatim (OpenStreetMap) – no API key needed
