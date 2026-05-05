@@ -821,11 +821,28 @@ html = f"""<!DOCTYPE html>
   </div>
 </div>
 
+<!-- Token panel (shown if tiles fail) -->
+<div class="panel" id="token-panel" style="top:16px;right:16px;width:300px;display:none">
+  <h2>&#128273; Cesium Ion Token Required</h2>
+  <div class="sub">Google Photorealistic 3D Tiles need a free Cesium ion token with Google 3D Maps access.</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+    1. Sign up free at <a href="https://ion.cesium.com" target="_blank" style="color:#a78bfa">ion.cesium.com</a><br>
+    2. Create token with <b>Google Photorealistic 3D Tiles</b> asset<br>
+    3. Paste it below
+  </div>
+  <input id="token-input" type="text" placeholder="Paste your Cesium ion token…"
+    style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);
+           background:rgba(255,255,255,0.06);color:var(--text);font-size:12px;margin-bottom:8px;outline:none">
+  <button class="btn" id="token-apply" style="width:100%">&#128640; Apply &amp; Load 3D Tiles</button>
+</div>
+
 <!-- Controls -->
 <div id="controls">
   <button class="btn active" id="btn-use">&#127968; Use type</button>
   <button class="btn" id="btn-eclass">&#9889; Energy class</button>
   <button class="btn" id="btn-year">&#128197; Year era</button>
+  <button class="btn" id="btn-tiles">&#127759; Photorealistic Tiles</button>
+  <button class="btn" id="btn-eubucco">&#127963; EUBUCCO Overlay</button>
   <button class="btn" id="btn-reset">&#8962; Reset view</button>
 </div>
 
@@ -904,22 +921,95 @@ if (window.location.protocol === 'file:') {{
   throw new Error('file:// not supported');
 }}
 
-Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMWFjYmFkNjc4ZTciLCJpZCI6NTc3MzMsImlhdCI6MTYyNzg0NTE4Mn0.XcKpgANiY19MC4bdFUXMVEBToBmqS8kuYpUlxJHYZxk';
+// ─────────────────────────────────────────────────────────────────
+// Cesium ion token — REPLACE with your own from ion.cesium.com
+// Requires: Google Photorealistic 3D Tiles (asset 2275207)
+// ─────────────────────────────────────────────────────────────────
+let ION_TOKEN = localStorage.getItem('cesium_ion_token') ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMWFjYmFkNjc4ZTciLCJpZCI6NTc3MzMsImlhdCI6MTYyNzg0NTE4Mn0.XcKpgANiY19MC4bdFUXMVEBToBmqS8kuYpUlxJHYZxk';
+Cesium.Ion.defaultAccessToken = ION_TOKEN;
 
 const viewer = new Cesium.Viewer('cesium-container', {{
   timeline:false, animation:false, baseLayerPicker:false,
   geocoder:false, homeButton:false, sceneModePicker:false,
   navigationHelpButton:false, fullscreenButton:false,
   selectionIndicator:false, infoBox:false,
+  // No imagery / terrain — photorealistic tiles provide both
+  imageryProvider: false,
   terrainProvider: new Cesium.EllipsoidTerrainProvider(),
-  imageryProvider: new Cesium.UrlTemplateImageryProvider({{
-    url:'https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',
-    credit: new Cesium.Credit('OpenStreetMap contributors', false),
-  }}),
 }});
 viewer.cesiumWidget.creditContainer.style.display = 'none';
+viewer.scene.globe.show = false;   // hide globe — tiles replace it entirely
 viewer.scene.globe.enableLighting = false;
-viewer.scene.globe.showGroundAtmosphere = false;
+
+// ─────────────────────────────────────────────────────────────────
+// Google Photorealistic 3D Tiles — streams on demand, no download needed
+// Tiles cover the entire world including Gothenburg
+// ─────────────────────────────────────────────────────────────────
+let googleTileset = null;
+let tilesEnabled  = false;
+let eubuccoVisible = true;
+
+async function loadGoogleTiles(token) {{
+  try {{
+    setLoading('Loading Google Photorealistic 3D Tiles…');
+    Cesium.Ion.defaultAccessToken = token;
+    // Remove existing tileset
+    if (googleTileset) {{ viewer.scene.primitives.remove(googleTileset); googleTileset = null; }}
+    googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
+    viewer.scene.primitives.add(googleTileset);
+    tilesEnabled = true;
+    document.getElementById('btn-tiles').classList.add('active');
+    document.getElementById('token-panel').style.display = 'none';
+    localStorage.setItem('cesium_ion_token', token);
+    setLoading('');
+    console.log('Google 3D Tiles loaded OK');
+  }} catch(err) {{
+    setLoading('');
+    console.warn('Google 3D Tiles failed:', err.message);
+    // Show token panel so user can paste their own token
+    document.getElementById('token-panel').style.display = 'block';
+    document.getElementById('btn-tiles').classList.remove('active');
+    // Fall back to OSM imagery on the globe
+    viewer.scene.globe.show = true;
+    viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({{
+      url: 'https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',
+      credit: new Cesium.Credit('OpenStreetMap contributors', false),
+    }}));
+  }}
+}}
+
+// Token apply button
+document.getElementById('token-apply').addEventListener('click', () => {{
+  const t = document.getElementById('token-input').value.trim();
+  if (t) loadGoogleTiles(t);
+}});
+document.getElementById('token-input').addEventListener('keydown', e => {{
+  if (e.key === 'Enter') document.getElementById('token-apply').click();
+}});
+
+// Toggle tiles on/off
+document.getElementById('btn-tiles').addEventListener('click', () => {{
+  if (!tilesEnabled) {{
+    loadGoogleTiles(ION_TOKEN);
+  }} else {{
+    tilesEnabled = false;
+    if (googleTileset) {{ viewer.scene.primitives.remove(googleTileset); googleTileset = null; }}
+    viewer.scene.globe.show = true;
+    viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({{
+      url: 'https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',
+      credit: new Cesium.Credit('OpenStreetMap contributors', false),
+    }}));
+    document.getElementById('btn-tiles').classList.remove('active');
+  }}
+}});
+
+// Toggle EUBUCCO overlay
+document.getElementById('btn-eubucco').addEventListener('click', () => {{
+  eubuccoVisible = !eubuccoVisible;
+  document.getElementById('btn-eubucco').classList.toggle('active', eubuccoVisible);
+  if (buildingDS) buildingDS.show = eubuccoVisible;
+}});
 
 // ─────────────────────────────────────────────────────────────────
 // Build extruded buildings — CustomDataSource (no Cesium workers needed)
@@ -980,12 +1070,16 @@ function setLoading(msg) {{
 // Fly to Gothenburg + start building
 // ─────────────────────────────────────────────────────────────────
 viewer.camera.flyTo({{
-  destination: Cesium.Cartesian3.fromDegrees({cx:.6f}, {cy:.6f}, 1800),
-  orientation: {{ heading:0, pitch: Cesium.Math.toRadians(-50), roll:0 }},
+  destination: Cesium.Cartesian3.fromDegrees({cx:.6f}, {cy:.6f}, 800),
+  orientation: {{ heading:0, pitch: Cesium.Math.toRadians(-40), roll:0 }},
   duration: 0,
 }});
 
-setTimeout(rebuildBuildings, 300);
+// Start: load Google tiles first, then EUBUCCO overlay
+(async () => {{
+  await loadGoogleTiles(ION_TOKEN);
+  await rebuildBuildings();
+}})();
 
 // ─────────────────────────────────────────────────────────────────
 // Pick / click
@@ -1224,8 +1318,8 @@ document.getElementById('btn-year').addEventListener('click',   () => setColorMo
 // ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-reset').addEventListener('click', () => {{
   viewer.camera.flyTo({{
-    destination: Cesium.Cartesian3.fromDegrees({cx:.6f}, {cy:.6f}, 1800),
-    orientation: {{ heading:0, pitch:Cesium.Math.toRadians(-50), roll:0 }},
+    destination: Cesium.Cartesian3.fromDegrees({cx:.6f}, {cy:.6f}, 800),
+    orientation: {{ heading:0, pitch:Cesium.Math.toRadians(-40), roll:0 }},
     duration: 1.5,
   }});
 }});
