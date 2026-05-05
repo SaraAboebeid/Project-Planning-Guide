@@ -614,9 +614,9 @@ html = f"""<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="cesium-widgets.css">
-  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.117.0/Build/Cesium/';</script>
-  <script src="Cesium.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Widgets/widgets.css">
+  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/';</script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
   <style>
     :root {{
       --navy:    #721CB8; --navy-dark:#421869; --teal:#995BD5;
@@ -821,19 +821,21 @@ html = f"""<!DOCTYPE html>
   </div>
 </div>
 
-<!-- Token panel (shown if tiles fail) -->
-<div class="panel" id="token-panel" style="top:16px;right:16px;width:300px;display:none">
+<!-- Token panel — shown on startup until a valid token is applied -->
+<div class="panel" id="token-panel" style="top:16px;right:16px;width:320px;display:none">
   <h2>&#128273; Cesium Ion Token Required</h2>
-  <div class="sub">Google Photorealistic 3D Tiles need a free Cesium ion token with Google 3D Maps access.</div>
+  <div class="sub">Google Photorealistic 3D Tiles stream real building facade &amp; roof textures directly from Google Maps.</div>
   <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
     1. Sign up free at <a href="https://ion.cesium.com" target="_blank" style="color:#a78bfa">ion.cesium.com</a><br>
-    2. Create token with <b>Google Photorealistic 3D Tiles</b> asset<br>
-    3. Paste it below
+    2. Go to <b>Access Tokens</b> → create a token<br>
+    3. Enable <b>Google Photorealistic 3D Tiles</b> asset (2275207)<br>
+    4. Paste your token below and click Apply
   </div>
   <input id="token-input" type="text" placeholder="Paste your Cesium ion token…"
     style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);
            background:rgba(255,255,255,0.06);color:var(--text);font-size:12px;margin-bottom:8px;outline:none">
-  <button class="btn" id="token-apply" style="width:100%">&#128640; Apply &amp; Load 3D Tiles</button>
+  <button class="btn" id="token-apply" style="width:100%;margin-bottom:6px">&#128640; Apply &amp; Load 3D Tiles</button>
+  <div id="token-error" style="font-size:11px;color:#f87171;min-height:14px"></div>
 </div>
 
 <!-- Controls -->
@@ -922,29 +924,38 @@ if (window.location.protocol === 'file:') {{
 }}
 
 // ─────────────────────────────────────────────────────────────────
-// Cesium ion token — REPLACE with your own from ion.cesium.com
-// Requires: Google Photorealistic 3D Tiles (asset 2275207)
+// Cesium ion token — get yours free at ion.cesium.com
+// Required for Google Photorealistic 3D Tiles (real building textures)
 // ─────────────────────────────────────────────────────────────────
 let ION_TOKEN = localStorage.getItem('cesium_ion_token') ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMWFjYmFkNjc4ZTciLCJpZCI6NTc3MzMsImlhdCI6MTYyNzg0NTE4Mn0.XcKpgANiY19MC4bdFUXMVEBToBmqS8kuYpUlxJHYZxk';
-Cesium.Ion.defaultAccessToken = ION_TOKEN;
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4NmE0YWM4NS1hMjI0LTRiY2YtOGFkYS0yOGNiNTA2ZGM2MGIiLCJpZCI6NDI3NDMzLCJzdWIiOiJzYXJhYWJvIiwiaXNzIjoiaHR0cHM6Ly9pb24uY2VzaXVtLmNvbSIsImF1ZCI6IkJ1aWxkaW5ncyIsImlhdCI6MTc3Nzk4NDUwMn0.YfKFn0wvu95IcXJORmvmhTMAQ44-y8_qoajP_339Y4o';
+if (ION_TOKEN) Cesium.Ion.defaultAccessToken = ION_TOKEN;
 
+// Viewer: globe:false per Cesium guide — photorealistic tiles replace the globe entirely
 const viewer = new Cesium.Viewer('cesium-container', {{
   timeline:false, animation:false, baseLayerPicker:false,
   geocoder:false, homeButton:false, sceneModePicker:false,
   navigationHelpButton:false, fullscreenButton:false,
   selectionIndicator:false, infoBox:false,
-  // No imagery / terrain — photorealistic tiles provide both
-  imageryProvider: false,
-  terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+  globe: false,
 }});
 viewer.cesiumWidget.creditContainer.style.display = 'none';
-viewer.scene.globe.show = false;   // hide globe — tiles replace it entirely
-viewer.scene.globe.enableLighting = false;
+// Fix black sky — enable atmosphere and sky box
+viewer.scene.skyAtmosphere = new Cesium.SkyAtmosphere();
+viewer.scene.skyBox = new Cesium.SkyBox({{
+  sources: {{
+    positiveX: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg',
+    negativeX: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg',
+    positiveY: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg',
+    negativeY: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg',
+    positiveZ: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg',
+    negativeZ: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg',
+  }}
+}});
+viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#87CEEB');  // sky blue fallback
 
 // ─────────────────────────────────────────────────────────────────
-// Google Photorealistic 3D Tiles — streams on demand, no download needed
-// Tiles cover the entire world including Gothenburg
+// Google Photorealistic 3D Tiles — real facade + roof textures from Google Maps
 // ─────────────────────────────────────────────────────────────────
 let googleTileset = null;
 let tilesEnabled  = false;
@@ -954,28 +965,26 @@ async function loadGoogleTiles(token) {{
   try {{
     setLoading('Loading Google Photorealistic 3D Tiles…');
     Cesium.Ion.defaultAccessToken = token;
-    // Remove existing tileset
     if (googleTileset) {{ viewer.scene.primitives.remove(googleTileset); googleTileset = null; }}
+    // Exactly as per https://cesium.com/learn/cesiumjs-learn/cesiumjs-photorealistic-3d-tiles/
     googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
     viewer.scene.primitives.add(googleTileset);
     tilesEnabled = true;
+    ION_TOKEN = token;
     document.getElementById('btn-tiles').classList.add('active');
     document.getElementById('token-panel').style.display = 'none';
     localStorage.setItem('cesium_ion_token', token);
     setLoading('');
-    console.log('Google 3D Tiles loaded OK');
+    console.log('✅ Google Photorealistic 3D Tiles loaded');
   }} catch(err) {{
     setLoading('');
-    console.warn('Google 3D Tiles failed:', err.message);
-    // Show token panel so user can paste their own token
-    document.getElementById('token-panel').style.display = 'block';
+    tilesEnabled = false;
     document.getElementById('btn-tiles').classList.remove('active');
-    // Fall back to OSM imagery on the globe
-    viewer.scene.globe.show = true;
-    viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({{
-      url: 'https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',
-      credit: new Cesium.Credit('OpenStreetMap contributors', false),
-    }}));
+    console.error('❌ Google 3D Tiles failed:', err.message);
+    // Always show token panel on failure
+    const panel = document.getElementById('token-panel');
+    panel.style.display = 'block';
+    document.getElementById('token-error').textContent = 'Error: ' + err.message + ' — Paste a valid token from ion.cesium.com';
   }}
 }}
 
@@ -991,15 +1000,11 @@ document.getElementById('token-input').addEventListener('keydown', e => {{
 // Toggle tiles on/off
 document.getElementById('btn-tiles').addEventListener('click', () => {{
   if (!tilesEnabled) {{
-    loadGoogleTiles(ION_TOKEN);
+    if (ION_TOKEN) {{ loadGoogleTiles(ION_TOKEN); }}
+    else {{ document.getElementById('token-panel').style.display = 'block'; }}
   }} else {{
     tilesEnabled = false;
     if (googleTileset) {{ viewer.scene.primitives.remove(googleTileset); googleTileset = null; }}
-    viewer.scene.globe.show = true;
-    viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({{
-      url: 'https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',
-      credit: new Cesium.Credit('OpenStreetMap contributors', false),
-    }}));
     document.getElementById('btn-tiles').classList.remove('active');
   }}
 }});
@@ -1029,7 +1034,7 @@ async function rebuildBuildings() {{
   setLoading('Loading ' + DATA.length.toLocaleString() + ' buildings…');
   if (buildingDS) {{ viewer.dataSources.remove(buildingDS, true); buildingDS = null; }}
   buildingDS = new Cesium.CustomDataSource('buildings');
-  const CHUNK = 400;
+  const CHUNK = 300;
   for (let start = 0; start < DATA.length; start += CHUNK) {{
     const end = Math.min(start + CHUNK, DATA.length);
     for (let i = start; i < end; i++) {{
@@ -1039,15 +1044,34 @@ async function rebuildBuildings() {{
       const flat = [];
       for (const [lo, la] of ring) {{ flat.push(lo, la); }}
       const h = Math.max(3, b.height || (b.floors ? b.floors * 3 : 6));
-      const e = buildingDS.entities.add({{
+      const col = getBuildingColor(b);
+
+      // Roof cap — flat polygon on top
+      const eRoof = buildingDS.entities.add({{
         polygon: {{
           hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
-          extrudedHeight: h, height: 0,
-          material: getBuildingColor(b).withAlpha(0.88),
+          height: h,
+          material: col.brighten(0.15, new Cesium.Color()).withAlpha(0.95),
           outline: false,
         }},
       }});
-      e._dataIdx = i;
+      eRoof._dataIdx = i;
+
+      // Facade walls — explicit vertical surfaces, clearly visible from any angle
+      const wallPositions = Cesium.Cartesian3.fromDegreesArray(flat);
+      const maxH = new Array(ring.length).fill(h);
+      const minH = new Array(ring.length).fill(0);
+      const eWall = buildingDS.entities.add({{
+        wall: {{
+          positions: wallPositions,
+          maximumHeights: maxH,
+          minimumHeights: minH,
+          material: col.withAlpha(0.90),
+          outline: true,
+          outlineColor: col.darken(0.3, new Cesium.Color()).withAlpha(1.0),
+        }},
+      }});
+      eWall._dataIdx = i;
     }}
     setLoading('Loading buildings… ' + Math.round(end / DATA.length * 100) + '%');
     await new Promise(r => setTimeout(r, 0));
@@ -1075,9 +1099,12 @@ viewer.camera.flyTo({{
   duration: 0,
 }});
 
-// Start: load Google tiles first, then EUBUCCO overlay
+// Start: if token already saved, load tiles immediately; always load buildings
 (async () => {{
-  await loadGoogleTiles(ION_TOKEN);
+  if (ION_TOKEN) {{
+    document.getElementById('token-panel').style.display = 'none';
+    await loadGoogleTiles(ION_TOKEN);
+  }}
   await rebuildBuildings();
 }})();
 
