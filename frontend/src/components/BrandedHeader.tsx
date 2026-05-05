@@ -5,15 +5,15 @@ export default function BrandedHeader() {
         {/* Left — Logos */}
         <div className="flex items-center gap-4">
           <img
-            src="/chalmers_university_logo_white.svg"
+            src="/CTH_new_logo_white.png"
             alt="Chalmers University of Technology"
-            className="h-8 opacity-90"
+            className="h-16 opacity-90"
           />
           <span className="w-px h-6 bg-white/25" />
           <img
-            src="/chalmers_next_labs_logo_white.svg"
+            src="/CNL_new_logo_white.png"
             alt="Chalmers Next Labs"
-            className="h-7 opacity-90"
+            className="h-16 opacity-90"
           />
         </div>
 

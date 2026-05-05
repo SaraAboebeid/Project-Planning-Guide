@@ -45,15 +45,15 @@ export default function LandingPage() {
 
           <div className="flex items-center gap-5 shrink-0">
             <img
-              src="/chalmers_next_labs_logo_white.svg"
+              src="/CNL_new_logo_white.png"
               alt="Chalmers Next Labs"
-              className="h-9 opacity-85"
+              className="h-18 opacity-85"
             />
             <span className="w-px h-9 bg-white/20" />
             <img
-              src="/chalmers_university_logo_white.svg"
+              src="/CTH_new_logo_white.png"
               alt="Chalmers University of Technology"
-              className="h-9 opacity-85"
+              className="h-18 opacity-85"
             />
           </div>
         </div>

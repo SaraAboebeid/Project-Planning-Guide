@@ -28,7 +28,7 @@ export default function BuildingMapPanel() {
 
         {/* Launch button */}
         <a
-          href="/gothenburg_3d.html"
+          href="file:///C:/Users/saraabo/Desktop/Project%20Planning%20Guide/assets/gothenburg_3d.html"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-navy text-white text-xs font-semibold hover:bg-navy-dark transition-colors shadow-sm flex-shrink-0"

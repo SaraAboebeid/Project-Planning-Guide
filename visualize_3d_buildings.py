@@ -439,6 +439,42 @@ for _, row in gdf.iterrows():
 data_json = json.dumps(records)
 
 # ---------------------------------------------------------------------------
+# Build EPC footprint layer (flat polygons colored by energy class)
+# ---------------------------------------------------------------------------
+print("  Building EPC footprint JSON …")
+_epc_bbox = epc_gdf.cx[LON_MIN:LON_MAX, LAT_MIN:LAT_MAX].copy()
+# Merge energy_class from EPC table into footprints gdf
+_epc_bbox = _epc_bbox.join(
+    gdf[["energy_class", "address_epc", "andamal1_epc"]]
+    .rename(columns={"andamal1_epc": "andamal1_merged"})
+    .dropna(subset=["energy_class"]),
+    how="left"
+) if False else _epc_bbox  # skip join — energy_class already in epc_gdf via FormularId
+# Simplify geometries (tolerance ~2m in degrees at this latitude)
+_epc_bbox["geometry"] = _epc_bbox.geometry.simplify(0.00003, preserve_topology=False)
+epc_records = []
+for _, _r in _epc_bbox.iterrows():
+    _g = _r.geometry
+    if _g is None or _g.is_empty:
+        continue
+    # Take largest sub-polygon for MultiPolygon
+    if _g.geom_type == "MultiPolygon":
+        _g = max(_g.geoms, key=lambda x: x.area)
+    if _g.geom_type != "Polygon" or _g.exterior is None:
+        continue
+    _coords = [[round(c[0], 6), round(c[1], 6)] for c in _g.exterior.coords]
+    _ek = str(_r.get("energy_class", "") or "").strip().upper()
+    _ek = _ek if _ek in ("A","B","C","D","E","F","G") else None
+    epc_records.append({
+        "coordinates": _coords,
+        "andamal": str(_r["andamal1"]) if _r["andamal1"] and _r["andamal1"] == _r["andamal1"] else None,
+        "eclass": _ek,
+        "address": str(_r["address"]) if _r.get("address") and str(_r.get("address")).strip() not in ("","nan","None") else None,
+    })
+print(f"  EPC footprints for layer: {len(epc_records):,}")
+epc_json = json.dumps(epc_records)
+
+# ---------------------------------------------------------------------------
 # Compute map centre
 # ---------------------------------------------------------------------------
 _gdf_proj = gdf.to_crs("EPSG:3006")
@@ -552,157 +588,204 @@ html = f"""<!DOCTYPE html>
   <title>Gothenburg 3D Buildings – EUBUCCO v0.2</title>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://unpkg.com/deck.gl@8.9.35/dist.min.js"></script>
-  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="deck.gl.min.js"></script>
   <style>
+    :root {{
+      --navy:      #721CB8;
+      --navy-dark: #421869;
+      --teal:      #995BD5;
+      --lime:      #96D74C;
+      --green:     #509724;
+      --surface:   rgba(10,10,20,0.82);
+      --border:    rgba(114,28,184,0.22);
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --faint:     #475569;
+      --radius:    14px;
+      --shadow:    0 8px 40px rgba(0,0,0,0.55);
+    }}
     * {{ margin:0; padding:0; box-sizing:border-box; }}
-    body {{ font-family: 'Segoe UI', sans-serif; background:#0f1117; color:#e2e8f0; }}
-    #map {{ width:100vw; height:100vh; }}
+    body {{ font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(--text); }}
+    #map {{ position:relative; width:100vw; height:100vh; }}
 
-    #panel {{
+    /* ── Shared panel shell ── */
+    .ppg-panel {{
       position:absolute; top:16px; left:16px; z-index:10;
-      background:rgba(15,17,23,0.88); backdrop-filter:blur(8px);
-      border:1px solid rgba(255,255,255,0.1); border-radius:12px;
-      padding:16px 18px; width:220px;
-      box-shadow:0 8px 32px rgba(0,0,0,0.5);
+      background:var(--surface); backdrop-filter:blur(14px);
+      border:1px solid var(--border); border-radius:var(--radius);
+      padding:16px 18px; width:240px;
+      box-shadow:var(--shadow);
       pointer-events:auto;
     }}
-    #panel h2 {{ font-size:13px; font-weight:700; color:#a78bfa; margin-bottom:4px; letter-spacing:.5px; text-transform:uppercase; }}
-    #panel .sub {{ font-size:11px; color:#94a3b8; margin-bottom:12px; }}
+    .ppg-panel h2 {{
+      font-size:12px; font-weight:700; color:var(--lime);
+      margin-bottom:3px; letter-spacing:.6px; text-transform:uppercase;
+    }}
+    .ppg-panel .sub {{ font-size:11px; color:var(--muted); margin-bottom:12px; }}
     .stat {{ display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.06); }}
-    .stat .lbl {{ font-size:11px; color:#94a3b8; }}
+    .stat .lbl {{ font-size:11px; color:var(--muted); }}
     .stat .val {{ font-size:12px; font-weight:600; color:#f1f5f9; }}
-    .legend-title {{ font-size:11px; color:#94a3b8; margin:12px 0 6px; text-transform:uppercase; letter-spacing:.4px; }}
+    .legend-title {{ font-size:11px; color:var(--muted); margin:12px 0 6px; text-transform:uppercase; letter-spacing:.4px; }}
     .legend {{ font-size:11px; color:#cbd5e1; }}
+
+    /* ── Tooltip ── */
     #tooltip {{
       position:absolute; pointer-events:none; z-index:20;
-      background:rgba(15,17,23,0.95); border:1px solid rgba(255,255,255,0.12);
-      border-radius:10px; padding:12px 16px; font-size:12px; line-height:1.6;
+      background:rgba(10,10,20,0.97); border:1px solid var(--border);
+      border-radius:var(--radius); padding:12px 16px; font-size:12px; line-height:1.6;
       min-width:220px; max-width:300px; display:none;
-      box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+      box-shadow:var(--shadow);
     }}
-    .tt-title {{ font-size:13px; font-weight:700; color:#a78bfa; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:6px; }}
+    .tt-title {{ font-size:13px; font-weight:700; color:var(--lime); margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:6px; }}
     .tt-row {{ display:flex; justify-content:space-between; gap:12px; padding:2px 0; }}
-    .tt-lbl {{ color:#64748b; font-size:11px; }}
+    .tt-lbl {{ color:var(--faint); font-size:11px; }}
     .tt-val {{ color:#e2e8f0; font-size:11px; font-weight:600; text-align:right; }}
     .tt-divider {{ border:none; border-top:1px solid rgba(255,255,255,0.07); margin:6px 0; }}
+
+    /* ── Controls ── */
     #controls {{
       position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
-      z-index:10; display:flex; gap:10px; pointer-events:auto;
+      z-index:10; display:flex; gap:8px; pointer-events:auto;
     }}
     .btn {{
-      background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.4);
-      color:#a78bfa; padding:7px 16px; border-radius:6px; cursor:pointer; font-size:12px;
+      background:rgba(114,28,184,0.18); border:1px solid rgba(114,28,184,0.5);
+      color:#c4b5fd; padding:7px 16px; border-radius:8px; cursor:pointer; font-size:12px;
+      font-family:inherit; font-weight:500;
       transition:background 0.2s; backdrop-filter:blur(6px);
     }}
-    .btn:hover {{ background:rgba(167,139,250,0.3); }}
+    .btn:hover {{ background:rgba(114,28,184,0.38); color:#fff; }}
     #hint {{
-      position:absolute; bottom:70px; left:50%; transform:translateX(-50%);
-      z-index:10; font-size:11px; color:#64748b; text-align:center;
+      position:absolute; bottom:68px; left:50%; transform:translateX(-50%);
+      z-index:10; font-size:11px; color:var(--faint); text-align:center;
       white-space:nowrap;
     }}
 
-    /* ---- Year-mode panel ---- */
-    #year-panel {{
-      position:absolute; top:16px; left:16px; z-index:10;
-      background:rgba(15,17,23,0.88); backdrop-filter:blur(8px);
-      border:1px solid rgba(255,255,255,0.1); border-radius:12px;
-      padding:16px 18px; width:220px;
-      box-shadow:0 8px 32px rgba(0,0,0,0.5);
-      pointer-events:auto; display:none;
+    /* ── Branding badge ── */
+    #ppg-brand {{
+      position:absolute; bottom:24px; right:20px; z-index:10;
+      display:flex; align-items:center; gap:8px;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:10px; padding:6px 12px;
+      font-size:11px; font-weight:600; color:var(--lime);
+      letter-spacing:.4px; backdrop-filter:blur(10px);
     }}
-    #year-panel h2 {{ font-size:13px; font-weight:700; color:#34d399; margin-bottom:4px; letter-spacing:.5px; text-transform:uppercase; }}
-    #year-panel .sub {{ font-size:11px; color:#94a3b8; margin-bottom:12px; }}
+    #ppg-brand span {{ color:var(--muted); font-weight:400; }}
+
+    /* ── Year-mode panel ── */
+    #year-panel {{
+      display:none;
+    }}
+    #year-panel h2 {{ color:var(--lime); }}
+    #year-panel .sub {{ font-size:11px; color:var(--muted); margin-bottom:12px; }}
     .period-item {{
       display:flex; align-items:center; gap:8px; padding:6px 8px;
       border-radius:8px; cursor:pointer; transition:background 0.15s;
       margin:3px 0;
     }}
-    .period-item:hover {{ background:rgba(255,255,255,0.08); }}
-    .period-item.active {{ background:rgba(52,211,153,0.15); border:1px solid rgba(52,211,153,0.3); }}
+    .period-item:hover {{ background:rgba(150,215,76,0.08); }}
+    .period-item.active {{ background:rgba(150,215,76,0.15); border:1px solid rgba(150,215,76,0.35); }}
     .period-swatch {{ width:12px; height:12px; border-radius:3px; flex-shrink:0; }}
     .period-label {{ font-size:11px; color:#cbd5e1; flex:1; }}
-    .period-count {{ font-size:11px; color:#64748b; }}
+    .period-count {{ font-size:11px; color:var(--faint); }}
     #year-clear {{
       margin-top:10px; width:100%; font-size:11px; padding:5px 0;
-      background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
-      border-radius:6px; color:#94a3b8; cursor:pointer;
+      background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+      border-radius:8px; color:var(--muted); cursor:pointer; font-family:inherit;
     }}
-    #year-clear:hover {{ background:rgba(255,255,255,0.1); }}
+    #year-clear:hover {{ background:rgba(255,255,255,0.09); }}
 
-    /* ---- Energy-class panel ---- */
-    #eclass-panel {{
-      position:absolute; top:16px; left:16px; z-index:10;
-      background:rgba(15,17,23,0.88); backdrop-filter:blur(8px);
-      border:1px solid rgba(255,255,255,0.1); border-radius:12px;
-      padding:16px 18px; width:220px;
-      box-shadow:0 8px 32px rgba(0,0,0,0.5);
-      pointer-events:auto; display:none;
+    /* ── Energy extreme cards ── */
+    #energy-cards {{
+      margin-top:14px; display:none;
     }}
-    #eclass-panel h2 {{ font-size:13px; font-weight:700; color:#4ade80; margin-bottom:4px; letter-spacing:.5px; text-transform:uppercase; }}
-    #eclass-panel .sub {{ font-size:11px; color:#94a3b8; margin-bottom:12px; }}
+    #energy-cards .ec-header {{
+      font-size:10px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.5px; color:var(--lime); margin-bottom:6px;
+    }}
+    .ec-section {{ margin-bottom:10px; }}
+    .ec-section-title {{
+      font-size:10px; color:var(--muted); text-transform:uppercase;
+      letter-spacing:.4px; margin-bottom:4px;
+    }}
+    .ec-card {{
+      padding:6px 8px; border-radius:8px; margin-bottom:4px;
+      display:flex; align-items:center; gap:6px;
+      background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
+    }}
+    .ec-card.best {{ border-color:rgba(150,215,76,0.3); background:rgba(150,215,76,0.07); }}
+    .ec-card.worst {{ border-color:rgba(239,68,68,0.3); background:rgba(239,68,68,0.06); }}
+    .ec-addr {{ font-size:10px; color:#cbd5e1; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+    .ec-badge {{
+      font-size:9px; font-weight:700; padding:1px 5px; border-radius:4px;
+      color:#000; flex-shrink:0;
+    }}
+    .ec-val {{ font-size:10px; font-weight:600; color:var(--muted); flex-shrink:0; }}
+
+    /* ── Energy-class panel ── */
+    #eclass-panel {{
+      display:none;
+    }}
+    #eclass-panel h2 {{ color:var(--lime); }}
+    #eclass-panel .sub {{ font-size:11px; color:var(--muted); margin-bottom:12px; }}
     .eclass-item {{
       display:flex; align-items:center; gap:8px; padding:5px 8px;
       border-radius:8px; cursor:pointer; transition:background 0.15s; margin:2px 0;
     }}
-    .eclass-item:hover {{ background:rgba(255,255,255,0.08); }}
-    .eclass-item.active {{ background:rgba(74,222,128,0.15); border:1px solid rgba(74,222,128,0.3); }}
+    .eclass-item:hover {{ background:rgba(150,215,76,0.08); }}
+    .eclass-item.active {{ background:rgba(150,215,76,0.15); border:1px solid rgba(150,215,76,0.3); }}
     .eclass-swatch {{ width:12px; height:12px; border-radius:3px; flex-shrink:0; }}
     .eclass-label {{ font-size:11px; color:#cbd5e1; flex:1; }}
-    .eclass-count {{ font-size:11px; color:#64748b; }}
+    .eclass-count {{ font-size:11px; color:var(--faint); }}
     #eclass-clear {{
       margin-top:10px; width:100%; font-size:11px; padding:5px 0;
-      background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
-      border-radius:6px; color:#94a3b8; cursor:pointer;
+      background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+      border-radius:8px; color:var(--muted); cursor:pointer; font-family:inherit;
     }}
-    #eclass-clear:hover {{ background:rgba(255,255,255,0.1); }}
-    .no-epc-note {{ font-size:10px; color:#475569; margin-top:8px; line-height:1.4; }}
+    #eclass-clear:hover {{ background:rgba(255,255,255,0.09); }}
+    .no-epc-note {{ font-size:10px; color:var(--faint); margin-top:8px; line-height:1.4; }}
 
-    /* ---- Energy-compare sub-panel ---- */
-    #perf-legend {{
-      margin-top:12px; display:none;
-    }}
-    #perf-legend .perf-title {{ font-size:11px; color:#94a3b8; margin-bottom:6px; text-transform:uppercase; letter-spacing:.4px; }}
+    /* ── Energy-compare sub-panel ── */
+    #perf-legend {{ margin-top:12px; display:none; }}
+    #perf-legend .perf-title {{ font-size:11px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.4px; }}
     .perf-bar-wrap {{ position:relative; height:14px; border-radius:4px; overflow:visible; margin-bottom:4px; }}
     .perf-bar {{ height:100%; border-radius:4px; }}
-    .perf-bar-labels {{ display:flex; justify-content:space-between; font-size:10px; color:#64748b; }}
+    .perf-bar-labels {{ display:flex; justify-content:space-between; font-size:10px; color:var(--faint); }}
     #btn-energy-compare {{
       margin-top:10px; width:100%; font-size:11px; padding:6px 0;
-      background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
-      border-radius:6px; color:#94a3b8; cursor:pointer; transition:background 0.2s;
+      background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+      border-radius:8px; color:var(--muted); cursor:pointer; transition:background 0.2s; font-family:inherit;
     }}
-    #btn-energy-compare:hover  {{ background:rgba(255,255,255,0.1); }}
-    #btn-energy-compare.active {{ background:rgba(251,191,36,0.15); border-color:rgba(251,191,36,0.4); color:#fbbf24; }}
+    #btn-energy-compare:hover  {{ background:rgba(255,255,255,0.09); }}
+    #btn-energy-compare.active {{ background:rgba(150,215,76,0.12); border-color:rgba(150,215,76,0.4); color:var(--lime); }}
 
-    /* ---- Search bar ---- */
+    /* ── Search bar ── */
     #search-box {{
       position:absolute; top:16px; right:16px; z-index:10;
       display:flex; flex-direction:column; gap:6px; width:300px;
       pointer-events:auto;
     }}
-    #search-row {{
-      display:flex; gap:6px;
-    }}
+    #search-row {{ display:flex; gap:6px; }}
     #search-input {{
-      flex:1; background:rgba(15,17,23,0.88); backdrop-filter:blur(8px);
-      border:1px solid rgba(255,255,255,0.15); border-radius:8px;
-      padding:8px 12px; color:#e2e8f0; font-size:13px;
+      flex:1; background:var(--surface); backdrop-filter:blur(14px);
+      border:1px solid var(--border); border-radius:10px;
+      padding:8px 12px; color:#e2e8f0; font-size:13px; font-family:inherit;
       outline:none; transition:border-color 0.2s;
     }}
-    #search-input::placeholder {{ color:#64748b; }}
-    #search-input:focus {{ border-color:rgba(167,139,250,0.6); }}
+    #search-input::placeholder {{ color:var(--faint); }}
+    #search-input:focus {{ border-color:rgba(114,28,184,0.7); }}
     #search-btn {{
-      background:rgba(167,139,250,0.2); border:1px solid rgba(167,139,250,0.4);
-      border-radius:8px; color:#a78bfa; padding:8px 14px; cursor:pointer;
+      background:rgba(114,28,184,0.25); border:1px solid rgba(114,28,184,0.5);
+      border-radius:10px; color:#c4b5fd; padding:8px 14px; cursor:pointer;
       font-size:14px; transition:background 0.2s; backdrop-filter:blur(8px);
       white-space:nowrap;
     }}
-    #search-btn:hover {{ background:rgba(167,139,250,0.4); }}
+    #search-btn:hover {{ background:rgba(114,28,184,0.45); }}
     #search-btn.loading {{ opacity:0.5; pointer-events:none; }}
     #search-results {{
-      background:rgba(15,17,23,0.95); backdrop-filter:blur(8px);
-      border:1px solid rgba(255,255,255,0.1); border-radius:8px;
+      background:rgba(10,10,20,0.97); backdrop-filter:blur(14px);
+      border:1px solid var(--border); border-radius:10px;
       overflow:hidden; display:none;
     }}
     .result-item {{
@@ -711,25 +794,37 @@ html = f"""<!DOCTYPE html>
       line-height:1.4;
     }}
     .result-item:last-child {{ border-bottom:none; }}
-    .result-item:hover {{ background:rgba(167,139,250,0.15); color:#e2e8f0; }}
+    .result-item:hover {{ background:rgba(114,28,184,0.18); color:#e2e8f0; }}
     .result-item .result-name {{ font-weight:600; color:#e2e8f0; }}
-    .result-item .result-addr {{ font-size:11px; color:#64748b; margin-top:2px; }}
+    .result-item .result-addr {{ font-size:11px; color:var(--faint); margin-top:2px; }}
     #search-status {{
-      font-size:11px; color:#64748b; padding:6px 12px;
-      background:rgba(15,17,23,0.88); border:1px solid rgba(255,255,255,0.08);
-      border-radius:8px; backdrop-filter:blur(8px); display:none;
+      font-size:11px; color:var(--faint); padding:6px 12px;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:10px; backdrop-filter:blur(14px); display:none;
     }}
   </style>
 </head>
 <body>
-<div id="map"></div>
-<div id="panel">
+<div id="map"><canvas id="deck-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas></div>
+
+<!-- Cesium Globe overlay (lazy-loaded when first opened) -->
+<div id="cesium-globe" style="display:none;position:fixed;inset:0;z-index:2000;background:#000;flex-direction:column">
+  <div style="position:absolute;top:14px;right:14px;z-index:10;display:flex;gap:8px">
+    <div style="color:#e2e8f0;font-size:13px;font-weight:600;padding:8px 14px;background:rgba(10,10,20,0.85);border-radius:10px;backdrop-filter:blur(12px);border:1px solid rgba(114,28,184,0.3)">
+      🌍 Globe View — click a city pin to fly there
+    </div>
+    <button id="cesium-close" style="padding:8px 14px;border-radius:10px;background:rgba(114,28,184,0.7);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:600">✕ Close</button>
+  </div>
+  <div id="cesium-container" style="width:100%;height:100%"></div>
+</div>
+<div id="panel" class="ppg-panel">
   <h2>🏙 Gothenburg 3D</h2>
   <div class="sub">EUBUCCO v0.2 · EPC building use</div>
   <div class="stat"><span class="lbl">Buildings</span><span class="val">{n_total:,}</span></div>
   <div class="legend-title">Building use (from EPC)</div>
   <div class="legend">{type_legend_html}</div>
 </div>
+
 <!-- Address search -->
 <div id="search-box">
   <div id="search-row">
@@ -741,7 +836,7 @@ html = f"""<!DOCTYPE html>
 </div>
 
 <!-- Energy-class panel (shown when colorMode === 'eclass') -->
-<div id="eclass-panel">
+<div id="eclass-panel" class="ppg-panel">
   <h2>⚡ EPC Energy Class</h2>
   <div class="sub">{n_eclass_total:,} buildings with EPC · click to filter</div>
   <div id="eclass-legend">{eclass_legend_html}</div>
@@ -750,8 +845,8 @@ html = f"""<!DOCTYPE html>
 </div>
 
 <!-- Year-mode legend panel (shown when colorMode === 'year') -->
-<div id="year-panel">
-  <h2>🗓 Construction Year</h2>
+<div id="year-panel" class="ppg-panel">
+  <h2>🗓 Construction Era</h2>
   <div class="sub">TABULA periods · click to highlight</div>
   <div id="period-legend"></div>
   <button id="year-clear">✕ Clear highlight</button>
@@ -763,21 +858,45 @@ html = f"""<!DOCTYPE html>
     </div>
     <div class="perf-bar-labels"><span>Best (low kWh)</span><span>Worst (high kWh)</span></div>
   </div>
+  <!-- Energy extreme cards (shown when a period is highlighted) -->
+  <div id="energy-cards">
+    <div class="ec-header">⚡ Energy Extremes</div>
+    <div class="ec-section">
+      <div class="ec-section-title">🟢 Most efficient</div>
+      <div id="ec-best-list"></div>
+    </div>
+    <div class="ec-section">
+      <div class="ec-section-title">🔴 Least efficient</div>
+      <div id="ec-worst-list"></div>
+    </div>
+  </div>
 </div>
 
 <div id="tooltip"></div>
 <div id="hint">Scroll to zoom · Drag to pan · Right-drag or Ctrl+drag to tilt/rotate · Hover buildings for details</div>
 <div id="controls">
-  <button class="btn" id="btn-reset">⌂ Reset view</button>
-  <button class="btn" id="btn-toggle">⇅ Toggle flat / 3D</button>
+  <button class="btn" id="btn-reset">⌂ Reset</button>
+  <button class="btn" id="btn-toggle">⇅ Flat / 3D</button>
   <button class="btn" id="btn-eclass-mode">⚡ Energy class</button>
-  <button class="btn" id="btn-year-mode">🗓 Year mode</button>
+  <button class="btn" id="btn-year-mode">🗓 Year era</button>
+  <button class="btn" id="btn-epc-layer">🏠 EPC footprints</button>
+  <button class="btn" id="btn-globe">🌍 Globe</button>
 </div>
+<div id="ppg-brand">PPG <span>· Chalmers / Boverket</span></div>
 
 <script>
-const {{ MapboxOverlay, PolygonLayer }} = deck;
+const {{ Deck, MapView, PolygonLayer, TileLayer, BitmapLayer, ScatterplotLayer, FlyToInterpolator }} = deck;
 
 const DATA = {data_json};
+const EPC_DATA = {epc_json};
+const PERIOD_CARDS = {period_cards_js};
+
+let showEpc   = false;
+let markerData = [];   // search result pin
+let currentViewState = {{
+  longitude: {cx:.6f}, latitude: {cy:.6f},
+  zoom: 13, pitch: 50, bearing: -15,
+}};
 
 let is3D      = true;
 let colorMode = 'use';       // 'use' | 'year'
@@ -902,30 +1021,57 @@ function buildPeriodLegend() {{
     div.addEventListener('click', () => {{
       highlightPeriod = (highlightPeriod === p) ? null : p;
       buildPeriodLegend();
-      overlay.setProps({{ layers: [ buildLayer() ] }});
+      buildEnergyCards(highlightPeriod);
+      deckgl.setProps({{ layers: getLayers() }});
     }});
     container.appendChild(div);
   }});
 }}
 
 // ---------------------------------------------------------------------------
-// MapLibre GL map (handles all pan / zoom / tilt navigation)
+// Optional CARTO raster basemap via deck.gl TileLayer — works over HTTP/HTTPS,
+// silently absent when offline / file://. Buildings always render regardless.
 // ---------------------------------------------------------------------------
-const map = new maplibregl.Map({{
-  container: 'map',
-  style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-  center:  [{cx:.6f}, {cy:.6f}],
-  zoom:    13,
-  pitch:   50,
-  bearing: -15,
-  antialias: true,
-}});
+function buildTileLayer() {{
+  return new TileLayer({{
+    id: 'basemap',
+    data: [
+      'https://a.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}@2x.png',
+      'https://b.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}@2x.png',
+      'https://c.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}@2x.png',
+    ],
+    tileSize: 256,
+    renderSubLayers: props => {{
+      const {{ data, tile }} = props;
+      if (!data) return null;
+      const {{ west, south, east, north }} = tile.bbox;
+      return new BitmapLayer(props, {{
+        data: null, image: data,
+        bounds: [west, south, east, north],
+      }});
+    }},
+  }});
+}}
+
+function buildMarkerLayer() {{
+  if (!markerData.length) return null;
+  return new ScatterplotLayer({{
+    id: 'search-marker',
+    data: markerData,
+    getPosition: d => d.position,
+    getRadius: 10,
+    getFillColor: [167, 139, 250, 220],
+    getLineColor: [255, 255, 255, 255],
+    lineWidthMinPixels: 2,
+    stroked: true,
+    radiusUnits: 'pixels',
+    pickable: false,
+  }});
+}}
 
 // ---------------------------------------------------------------------------
-// deck.gl overlay (renders on top of the MapLibre canvas)
+// Building colour function
 // ---------------------------------------------------------------------------
-let overlay;
-
 function getBuildingColor(d) {{
 
   // ---- ENERGY CLASS mode: color all EPC buildings by A-G rating ----
@@ -1001,12 +1147,70 @@ function buildLayer() {{
   }});
 }}
 
-map.on('load', () => {{
-  overlay = new MapboxOverlay({{
-    interleaved: false,
-    layers: [ buildLayer() ],
+// EPC footprint colour map (same as ECLASS_COLORS_JS + grey for unknown)
+const EPC_ECLASS_COLORS = {{
+  'A': [22,  163,  74, 180],
+  'B': [74,  222, 128, 170],
+  'C': [190, 242,  60, 165],
+  'D': [250, 204,  21, 170],
+  'E': [251, 146,  60, 175],
+  'F': [239,  68,  68, 180],
+  'G': [153,  27,  27, 185],
+}};
+
+function buildEpcLayer() {{
+  return new PolygonLayer({{
+    id: 'epc-footprints',
+    data: EPC_DATA,
+    visible: showEpc,
+    pickable: true,
+    extruded: false,
+    getPolygon: d => d.coordinates,
+    getFillColor: d => EPC_ECLASS_COLORS[d.eclass] || [120, 120, 140, 120],
+    getLineColor: [255, 255, 255, 60],
+    lineWidthMinPixels: 0.5,
+    onHover: (info) => {{
+      if (!showEpc) return;
+      if (info.object) {{
+        const d = info.object;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        let tx = info.x + 16, ty = info.y + 16;
+        if (tx + 260 > vw) tx = info.x - 260;
+        if (ty + 120 > vh) ty = info.y - 120;
+        tooltip.style.left = tx + 'px';
+        tooltip.style.top  = ty + 'px';
+        tooltip.style.display = 'block';
+        let epcHtml = '<div class="tt-header">EPC Footprint</div>';
+        if (d.andamal) epcHtml += '<div class="tt-row"><span class="tt-lbl">Use</span><span class="tt-val">' + d.andamal + '</span></div>';
+        if (d.eclass)  epcHtml += '<div class="tt-row"><span class="tt-lbl">Energy class</span><span class="tt-val">' + d.eclass + '</span></div>';
+        if (d.address) epcHtml += '<div class="tt-row"><span class="tt-lbl">Address</span><span class="tt-val">' + d.address + '</span></div>';
+        tooltip.innerHTML = epcHtml;
+      }} else {{
+        tooltip.style.display = 'none';
+      }}
+    }},
   }});
-  map.addControl(overlay);
+}}
+
+function getLayers() {{
+  const layers = [ buildTileLayer(), buildLayer() ];
+  if (showEpc) layers.push(buildEpcLayer());
+  const mk = buildMarkerLayer();
+  if (mk) layers.push(mk);
+  return layers.filter(Boolean);
+}}
+
+// ---------------------------------------------------------------------------
+// deck.gl Deck — standalone renderer, works from file:// and any HTTP origin
+// ---------------------------------------------------------------------------
+const deckgl = new Deck({{
+  canvas: document.getElementById('deck-canvas'),
+  views: new MapView({{ repeat: true }}),
+  controller: true,
+  initialViewState: currentViewState,
+  onViewStateChange: ({{ viewState }}) => {{ currentViewState = viewState; }},
+  layers: getLayers(),
+  _onMetrics: null,
 }});
 
 // ---------------------------------------------------------------------------
@@ -1026,7 +1230,7 @@ const USE_LABELS_JS = {{
 
 function row(label, value) {{
   if (value === null || value === undefined) return '';
-  return `<div class="tt-row"><span class="tt-lbl">${{label}}</span><span class="tt-val">${{value}}</span></div>`;
+  return '<div class="tt-row"><span class="tt-lbl">' + label + '</span><span class="tt-val">' + value + '</span></div>';
 }}
 
 function showTooltip(info) {{
@@ -1113,8 +1317,38 @@ document.getElementById('eclass-legend').addEventListener('click', (e) => {{
   const cls = item.dataset.eclass;
   highlightEclass = (highlightEclass === cls) ? null : cls;
   buildEclassLegend();
-  overlay.setProps({{ layers: [ buildLayer() ] }});
+  deckgl.setProps({{ layers: getLayers() }});
 }});
+
+// ---------------------------------------------------------------------------
+// Energy extreme cards (best / worst buildings per construction era)
+// ---------------------------------------------------------------------------
+function buildEnergyCards(period) {{
+  const cardsEl = document.getElementById('energy-cards');
+  if (!period || !PERIOD_CARDS[period]) {{
+    cardsEl.style.display = 'none';
+    return;
+  }}
+  cardsEl.style.display = 'block';
+  const ECLASS_BG = {{
+    A:'#16a34a', B:'#4ade80', C:'#bef264',
+    D:'#fde047', E:'#fb923c', F:'#f87171', G:'#dc2626'
+  }};
+  ['best','worst'].forEach(type => {{
+    const list = document.getElementById('ec-' + type + '-list');
+    list.innerHTML = '';
+    (PERIOD_CARDS[period][type] || []).forEach(c => {{
+      const badge = c.eclass
+        ? `<span class="ec-badge" style="background:${{ECLASS_BG[c.eclass]||'#475569'}};color:${{['D','E'].includes(c.eclass)?'#000':'#fff'}}">${{c.eclass}}</span>`
+        : '';
+      list.innerHTML += `<div class="ec-card ${{type}}">
+        <span class="ec-addr" title="${{c.addr}}">${{c.addr}}</span>
+        ${{badge}}
+        <span class="ec-val">${{Math.round(c.energy)}} kWh/m²</span>
+      </div>`;
+    }});
+  }});
+}}
 
 // ---------------------------------------------------------------------------
 // Unified mode switcher
@@ -1123,6 +1357,7 @@ function switchMode(newMode) {{
   colorMode = newMode;
   highlightPeriod = null;
   highlightEclass = null;
+  buildEnergyCards(null);
 
   const usePanel   = document.getElementById('panel');
   const yearPanel  = document.getElementById('year-panel');
@@ -1139,44 +1374,141 @@ function switchMode(newMode) {{
     yearPanel.style.display  = 'block';
     eclassPanel.style.display= 'none';
     btnYear.textContent      = '🏷 Use mode';
-    btnYear.style.borderColor= 'rgba(52,211,153,0.5)';
-    btnYear.style.color      = '#34d399';
+    btnYear.style.borderColor= 'rgba(150,215,76,0.5)';
+    btnYear.style.color      = '#96d74c';
     buildPeriodLegend();
   }} else if (newMode === 'eclass') {{
     usePanel.style.display   = 'none';
     yearPanel.style.display  = 'none';
     eclassPanel.style.display= 'block';
     btnEclass.textContent    = '🏷 Use mode';
-    btnEclass.style.borderColor= 'rgba(96,165,250,0.5)';
-    btnEclass.style.color    = '#60a5fa';
+    btnEclass.style.borderColor= 'rgba(150,215,76,0.5)';
+    btnEclass.style.color    = '#96d74c';
     buildEclassLegend();
   }} else {{
     usePanel.style.display   = 'block';
     yearPanel.style.display  = 'none';
     eclassPanel.style.display= 'none';
-    btnYear.textContent      = '🗓 Year mode';
+    btnYear.textContent      = '🗓 Year era';
     btnEclass.textContent    = '⚡ Energy class';
   }}
-  overlay.setProps({{ layers: [ buildLayer() ] }});
+  deckgl.setProps({{ layers: getLayers() }});
 }}
 
 // ---------------------------------------------------------------------------
 // Controls
 // ---------------------------------------------------------------------------
 document.getElementById('btn-reset').addEventListener('click', () => {{
-  map.flyTo({{
-    center:  [{cx:.6f}, {cy:.6f}],
-    zoom:    13,
-    pitch:   is3D ? 50 : 0,
-    bearing: -15,
-    duration: 1200,
-  }});
+  deckgl.setProps({{ initialViewState: {{
+    longitude: {cx:.6f}, latitude: {cy:.6f},
+    zoom: 13, pitch: is3D ? 50 : 0, bearing: -15,
+    transitionDuration: 1200,
+    transitionInterpolator: new FlyToInterpolator({{ speed: 1.5 }}),
+  }} }});
 }});
 
 document.getElementById('btn-toggle').addEventListener('click', () => {{
   is3D = !is3D;
-  overlay.setProps({{ layers: [ buildLayer() ] }});
-  map.easeTo({{ pitch: is3D ? 50 : 0, duration: 700 }});
+  deckgl.setProps({{
+    layers: getLayers(),
+    initialViewState: {{ ...currentViewState, pitch: is3D ? 50 : 0, transitionDuration: 700 }},
+  }});
+}});
+
+document.getElementById('btn-epc-layer').addEventListener('click', () => {{
+  showEpc = !showEpc;
+  document.getElementById('btn-epc-layer').classList.toggle('active', showEpc);
+  deckgl.setProps({{ layers: getLayers() }});
+}});
+
+// ---------------------------------------------------------------------------
+// Cesium Globe
+// ---------------------------------------------------------------------------
+let cesiumViewer = null;
+const CITIES = [
+  {{ name: 'Gothenburg', lon: {cx:.6f}, lat: {cy:.6f}, active: true }},
+];
+
+function initCesium() {{
+  if (cesiumViewer) return;  // already initialised
+  // Lazy-load Cesium from CDN
+  const cssLink = document.createElement('link');
+  cssLink.rel = 'stylesheet';
+  cssLink.href = 'https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css';
+  document.head.appendChild(cssLink);
+
+  const script = document.createElement('script');
+  script.src = 'https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Cesium.js';
+  script.onload = () => {{
+    Cesium.Ion.defaultAccessToken = undefined;  // no token — uses free offline ellipsoid
+    cesiumViewer = new Cesium.Viewer('cesium-container', {{
+      timeline: false, animation: false, baseLayerPicker: false,
+      geocoder: false, homeButton: false, sceneModePicker: false,
+      navigationHelpButton: false, fullscreenButton: false,
+      imageryProvider: new Cesium.TileMapServiceImageryProvider({{
+        url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII'),
+      }}),
+    }});
+    cesiumViewer.scene.globe.enableLighting = true;
+    cesiumViewer.scene.skyBox.show = true;
+
+    // Add city pins
+    CITIES.forEach(city => {{
+      const entity = cesiumViewer.entities.add({{
+        name: city.name,
+        position: Cesium.Cartesian3.fromDegrees(city.lon, city.lat, 0),
+        billboard: {{
+          image: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">'+
+            '<ellipse cx="16" cy="38" rx="6" ry="2.5" fill="rgba(0,0,0,0.35)"/>'+
+            '<path d="M16 0 C7.163 0 0 7.163 0 16 C0 28 16 40 16 40 C16 40 32 28 32 16 C32 7.163 24.837 0 16 0Z" fill="'+(city.active ? '#721CB8' : '#64748b')+'"/>'+
+            '<circle cx="16" cy="16" r="7" fill="white" opacity="0.9"/>'+
+            '</svg>'
+          ),
+          width: 32, height: 40, verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        }},
+        label: {{
+          text: city.name,
+          font: '13px Inter, sans-serif',
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.TOP,
+          pixelOffset: new Cesium.Cartesian2(0, 4),
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        }},
+      }});
+    }});
+
+    // Fly to first city
+    cesiumViewer.camera.flyTo({{
+      destination: Cesium.Cartesian3.fromDegrees({cx:.6f}, {cy:.6f}, 800000),
+      duration: 2,
+    }});
+
+    // Click on a pin → close globe, fly to that city in deck.gl
+    cesiumViewer.screenSpaceEventHandler.setInputAction(movement => {{
+      const picked = cesiumViewer.scene.pick(movement.position);
+      if (Cesium.defined(picked) && picked.id) {{
+        const city = picked.id.properties;
+        // Currently we only have Gothenburg — extend this when more cities added
+        document.getElementById('cesium-globe').style.display = 'none';
+      }}
+    }}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  }};
+  document.head.appendChild(script);
+}}
+
+document.getElementById('btn-globe').addEventListener('click', () => {{
+  const globe = document.getElementById('cesium-globe');
+  globe.style.display = 'flex';
+  initCesium();
+}});
+document.getElementById('cesium-close').addEventListener('click', () => {{
+  document.getElementById('cesium-globe').style.display = 'none';
 }});
 
 document.getElementById('btn-year-mode').addEventListener('click', () => {{
@@ -1190,13 +1522,14 @@ document.getElementById('btn-eclass-mode').addEventListener('click', () => {{
 document.getElementById('year-clear').addEventListener('click', () => {{
   highlightPeriod = null;
   buildPeriodLegend();
-  overlay.setProps({{ layers: [ buildLayer() ] }});
+  buildEnergyCards(null);
+  deckgl.setProps({{ layers: getLayers() }});
 }});
 
 document.getElementById('eclass-clear').addEventListener('click', () => {{
   highlightEclass = null;
   buildEclassLegend();
-  overlay.setProps({{ layers: [ buildLayer() ] }});
+  deckgl.setProps({{ layers: getLayers() }});
 }});
 
 document.getElementById('btn-energy-compare').addEventListener('click', () => {{
@@ -1215,26 +1548,23 @@ document.getElementById('btn-energy-compare').addEventListener('click', () => {{
     btn.textContent = '⚡ Compare energy use';
     perfLegend.style.display = 'none';
   }}
-  overlay.setProps({{ layers: [ buildLayer() ] }});
+  deckgl.setProps({{ layers: getLayers() }});
 }});
 
 // Redraw gradient bar when period highlight changes (only in energy compare mode)
+// Patch buildPeriodLegend in-place so existing click handlers pick up the change
 const _origBuildPeriodLegend = buildPeriodLegend;
-function buildPeriodLegendWithGradient() {{
+buildPeriodLegend = function buildPeriodLegendWithGradient() {{
   _origBuildPeriodLegend();
   if (energyCompare) {{
     const activePeriod = highlightPeriod || PERIOD_ORDER.find(p => periodEnergyStats[p]) || PERIOD_ORDER[0];
     setTimeout(() => drawGradientBar(activePeriod), 50);
   }}
-}}
-// Override the legend builder used by period click handlers
-Object.defineProperty(window, 'buildPeriodLegend', {{ value: buildPeriodLegendWithGradient, writable: true }});
+}};
 
 // ---------------------------------------------------------------------------
 // Address search via Nominatim (OpenStreetMap) – no API key needed
 // ---------------------------------------------------------------------------
-let searchMarker = null;
-
 const searchInput   = document.getElementById('search-input');
 const searchBtn     = document.getElementById('search-btn');
 const searchResults = document.getElementById('search-results');
@@ -1276,10 +1606,10 @@ async function geocodeAddress() {{
     searchResults.innerHTML = data.map((r, i) => {{
       const name = r.name || r.display_name.split(',')[0];
       const addr = r.display_name.split(',').slice(1, 4).join(',').trim();
-      return `<div class="result-item" data-idx="${{i}}">
-        <div class="result-name">${{name}}</div>
-        <div class="result-addr">${{addr}}</div>
-      </div>`;
+      return '<div class="result-item" data-idx="' + i + '">' +
+        '<div class="result-name">' + name + '</div>' +
+        '<div class="result-addr">' + addr + '</div>' +
+        '</div>';
     }}).join('');
     searchResults.style.display = 'block';
     setStatus(`${{data.length}} result${{data.length > 1 ? 's' : ''}} found`);
@@ -1300,43 +1630,8 @@ function flyToResult(r) {{
   const lng = parseFloat(r.lon);
   const lat = parseFloat(r.lat);
 
-  // Remove old marker
-  if (searchMarker) {{ searchMarker.remove(); searchMarker = null; }}
-
-  // Create a pulsing marker element
-  const el = document.createElement('div');
-  el.style.cssText = `
-    width:18px; height:18px; border-radius:50%;
-    background:rgba(167,139,250,0.9);
-    border:3px solid white;
-    box-shadow:0 0 0 4px rgba(167,139,250,0.3);
-    animation:pulse 1.5s infinite;
-  `;
-  // Add pulse keyframes once
-  if (!document.getElementById('pulse-style')) {{
-    const s = document.createElement('style');
-    s.id = 'pulse-style';
-    s.textContent = `@keyframes pulse {{
-      0%   {{ box-shadow:0 0 0 0 rgba(167,139,250,0.5); }}
-      70%  {{ box-shadow:0 0 0 10px rgba(167,139,250,0); }}
-      100% {{ box-shadow:0 0 0 0 rgba(167,139,250,0); }}
-    }}`;
-    document.head.appendChild(s);
-  }}
-
-  searchMarker = new maplibregl.Marker({{ element: el, anchor: 'center' }})
-    .setLngLat([lng, lat])
-    .setPopup(
-      new maplibregl.Popup({{ offset: 16, closeButton: false }})
-        .setHTML(`<div style="font-size:12px;color:#1e293b;max-width:200px">
-          <b>${{r.name || r.display_name.split(',')[0]}}</b><br/>
-          <span style="color:#475569">${{r.display_name.split(',').slice(1,3).join(',').trim()}}</span>
-        </div>`)
-    )
-    .addTo(map);
-  searchMarker.togglePopup();
-
-  // Work out zoom based on result type
+  // Update marker ScatterplotLayer
+  markerData = [{{ position: [lng, lat] }}];
   const zoomMap = {{
     'house': 18, 'building': 18, 'road': 16, 'residential': 16,
     'suburb': 14, 'neighbourhood': 14, 'postcode': 15,
@@ -1344,16 +1639,17 @@ function flyToResult(r) {{
   }};
   const zoom = zoomMap[r.type] || zoomMap[r.addresstype] || 17;
 
-  map.flyTo({{
-    center: [lng, lat],
-    zoom,
-    pitch: is3D ? 50 : 0,
-    bearing: map.getBearing(),
-    duration: 1400,
-    essential: true,
+  deckgl.setProps({{
+    layers: getLayers(),
+    initialViewState: {{
+      longitude: lng, latitude: lat, zoom,
+      pitch: is3D ? 50 : 0,
+      bearing: currentViewState.bearing,
+      transitionDuration: 1400,
+      transitionInterpolator: new FlyToInterpolator({{ speed: 1.5 }}),
+    }},
   }});
 
-  // Close dropdown
   searchResults.style.display = 'none';
   setStatus('');
 }}
