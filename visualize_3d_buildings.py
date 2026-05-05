@@ -323,7 +323,7 @@ print(f"  Energy compare data: {has_perf:,} buildings with within-period ranking
 n_exact = len(joined_exact)
 n_near  = len(joined_nearest)
 print(f"  Matched {matched:,} of {len(gdf):,} buildings to EPC use ({matched/len(gdf)*100:.1f}%)")
-print(f"  (exact 'within': {n_exact:,} EPC pts | nearest ≤{MAX_DIST_M}m: {n_near:,} EPC pts)")
+print(f"  (exact 'within': {n_exact:,} EPC pts | nearest <={MAX_DIST_M}m: {n_near:,} EPC pts)")
 print(f"  Top andamal1 values:")
 print(joined["andamal1"].value_counts().head(10).to_string())
 
@@ -465,11 +465,35 @@ for _, _r in _epc_bbox.iterrows():
     _coords = [[round(c[0], 6), round(c[1], 6)] for c in _g.exterior.coords]
     _ek = str(_r.get("energy_class", "") or "").strip().upper()
     _ek = _ek if _ek in ("A","B","C","D","E","F","G") else None
+    def _safe(v):
+        s = str(v).strip() if v is not None else ""
+        return s if s not in ("", "nan", "None", "<NA>") else None
+    def _safe_float(v, digits=1):
+        s = str(v).strip() if v is not None else ""
+        if s in ("", "nan", "None", "<NA>"):
+            return None
+        try:
+            return round(float(s), digits)
+        except (ValueError, TypeError):
+            return None
+    def _safe_int(v):
+        s = str(v).strip() if v is not None else ""
+        if s in ("", "nan", "None", "<NA>"):
+            return None
+        try:
+            return int(float(s))
+        except (ValueError, TypeError):
+            return None
     epc_records.append({
         "coordinates": _coords,
-        "andamal": str(_r["andamal1"]) if _r["andamal1"] and _r["andamal1"] == _r["andamal1"] else None,
+        "andamal": _safe(_r.get("andamal1")),
         "eclass": _ek,
-        "address": str(_r["address"]) if _r.get("address") and str(_r.get("address")).strip() not in ("","nan","None") else None,
+        "address": _safe(_r.get("address")),
+        "energy": _safe_float(_r.get("energy_kwh_m2"), 1),
+        "area": _safe_int(_r.get("area_atemp")),
+        "year": _safe_int(_r.get("year_built")),
+        "floors": _safe_float(_r.get("floors_epc"), 1),
+        "prop_id": _safe(_r.get("fastighetsbeteckning")),
     })
 print(f"  EPC footprints for layer: {len(epc_records):,}")
 epc_json = json.dumps(epc_records)
@@ -585,1091 +609,672 @@ print("  Writing HTML …")
 html = f"""<!DOCTYPE html>
 <html>
 <head>
-  <title>Gothenburg 3D Buildings – EUBUCCO v0.2</title>
+  <title>Gothenburg 3D – Facade Inspector</title>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="deck.gl.min.js"></script>
+  <link rel="stylesheet" href="cesium-widgets.css">
+  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.117.0/Build/Cesium/';</script>
+  <script src="Cesium.js"></script>
   <style>
     :root {{
-      --navy:      #721CB8;
-      --navy-dark: #421869;
-      --teal:      #995BD5;
-      --lime:      #96D74C;
-      --green:     #509724;
-      --surface:   rgba(10,10,20,0.82);
-      --border:    rgba(114,28,184,0.22);
-      --text:      #e2e8f0;
-      --muted:     #94a3b8;
-      --faint:     #475569;
-      --radius:    14px;
-      --shadow:    0 8px 40px rgba(0,0,0,0.55);
+      --navy:    #721CB8; --navy-dark:#421869; --teal:#995BD5;
+      --lime:    #96D74C; --green:#509724;
+      --surface: rgba(10,10,20,0.85); --border:rgba(114,28,184,0.3);
+      --text:    #e2e8f0; --muted:#94a3b8; --faint:#475569;
+      --radius:  14px;   --shadow:0 8px 40px rgba(0,0,0,0.6);
     }}
     * {{ margin:0; padding:0; box-sizing:border-box; }}
-    body {{ font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(--text); }}
-    #map {{ position:relative; width:100vw; height:100vh; }}
+    body {{ font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(--text); overflow:hidden; }}
+    #cesium-container {{ position:fixed; inset:0; width:100vw; height:100vh; }}
 
-    /* ── Shared panel shell ── */
-    .ppg-panel {{
-      position:absolute; top:16px; left:16px; z-index:10;
-      background:var(--surface); backdrop-filter:blur(14px);
+    /* ─── panels ─── */
+    .panel {{
+      position:absolute; z-index:20;
+      background:var(--surface); backdrop-filter:blur(16px);
       border:1px solid var(--border); border-radius:var(--radius);
-      padding:16px 18px; width:240px;
-      box-shadow:var(--shadow);
-      pointer-events:auto;
+      padding:14px 16px; box-shadow:var(--shadow);
     }}
-    .ppg-panel h2 {{
-      font-size:12px; font-weight:700; color:var(--lime);
-      margin-bottom:3px; letter-spacing:.6px; text-transform:uppercase;
+    .panel h2 {{
+      font-size:11px; font-weight:700; color:var(--lime);
+      text-transform:uppercase; letter-spacing:.7px; margin-bottom:4px;
     }}
-    .ppg-panel .sub {{ font-size:11px; color:var(--muted); margin-bottom:12px; }}
-    .stat {{ display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.06); }}
-    .stat .lbl {{ font-size:11px; color:var(--muted); }}
-    .stat .val {{ font-size:12px; font-weight:600; color:#f1f5f9; }}
-    .legend-title {{ font-size:11px; color:var(--muted); margin:12px 0 6px; text-transform:uppercase; letter-spacing:.4px; }}
-    .legend {{ font-size:11px; color:#cbd5e1; }}
+    .panel .sub {{ font-size:11px; color:var(--muted); margin-bottom:10px; }}
 
-    /* ── Tooltip ── */
-    #tooltip {{
-      position:absolute; pointer-events:none; z-index:20;
-      background:rgba(10,10,20,0.97); border:1px solid var(--border);
-      border-radius:var(--radius); padding:12px 16px; font-size:12px; line-height:1.6;
-      min-width:220px; max-width:300px; display:none;
-      box-shadow:var(--shadow);
-    }}
-    .tt-title {{ font-size:13px; font-weight:700; color:var(--lime); margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:6px; }}
-    .tt-row {{ display:flex; justify-content:space-between; gap:12px; padding:2px 0; }}
-    .tt-lbl {{ color:var(--faint); font-size:11px; }}
-    .tt-val {{ color:#e2e8f0; font-size:11px; font-weight:600; text-align:right; }}
-    .tt-divider {{ border:none; border-top:1px solid rgba(255,255,255,0.07); margin:6px 0; }}
+    /* left info panel */
+    #left-panel {{ top:16px; left:16px; width:236px; }}
 
-    /* ── Controls ── */
+    /* controls bar */
     #controls {{
       position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
-      z-index:10; display:flex; gap:8px; pointer-events:auto;
+      z-index:20; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
     }}
     .btn {{
-      background:rgba(114,28,184,0.18); border:1px solid rgba(114,28,184,0.5);
-      color:#c4b5fd; padding:7px 16px; border-radius:8px; cursor:pointer; font-size:12px;
-      font-family:inherit; font-weight:500;
-      transition:background 0.2s; backdrop-filter:blur(6px);
-    }}
-    .btn:hover {{ background:rgba(114,28,184,0.38); color:#fff; }}
-    #hint {{
-      position:absolute; bottom:68px; left:50%; transform:translateX(-50%);
-      z-index:10; font-size:11px; color:var(--faint); text-align:center;
+      padding:7px 14px; border-radius:10px; border:1px solid var(--border);
+      background:var(--surface); color:var(--text); font-size:12px; font-weight:500;
+      cursor:pointer; backdrop-filter:blur(12px); transition:all .15s;
       white-space:nowrap;
     }}
+    .btn:hover {{ background:rgba(114,28,184,0.35); border-color:#7c3aed; }}
+    .btn.active {{ background:rgba(114,28,184,0.5); border-color:#a78bfa; color:#a78bfa; }}
 
-    /* ── Branding badge ── */
-    #ppg-brand {{
-      position:absolute; bottom:24px; right:20px; z-index:10;
-      display:flex; align-items:center; gap:8px;
-      background:var(--surface); border:1px solid var(--border);
-      border-radius:10px; padding:6px 12px;
-      font-size:11px; font-weight:600; color:var(--lime);
-      letter-spacing:.4px; backdrop-filter:blur(10px);
+    /* building info panel */
+    #info-panel {{
+      top:16px; right:16px; width:270px; display:none;
     }}
-    #ppg-brand span {{ color:var(--muted); font-weight:400; }}
+    #info-panel .close-btn {{
+      position:absolute; top:10px; right:12px; background:none; border:none;
+      color:var(--muted); cursor:pointer; font-size:16px; line-height:1;
+    }}
+    .tt-row {{ display:flex; justify-content:space-between; padding:3px 0;
+               border-bottom:1px solid rgba(255,255,255,0.05); font-size:12px; }}
+    .tt-lbl {{ color:var(--muted); }}
+    .tt-val {{ color:#f1f5f9; font-weight:500; text-align:right; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
 
-    /* ── Year-mode panel ── */
-    #year-panel {{
-      display:none;
+    /* facade inspector */
+    #facade-panel {{
+      bottom:80px; left:50%; transform:translateX(-50%);
+      width:560px; display:none;
     }}
-    #year-panel h2 {{ color:var(--lime); }}
-    #year-panel .sub {{ font-size:11px; color:var(--muted); margin-bottom:12px; }}
-    .period-item {{
-      display:flex; align-items:center; gap:8px; padding:6px 8px;
-      border-radius:8px; cursor:pointer; transition:background 0.15s;
-      margin:3px 0;
+    #facade-views {{ display:flex; gap:8px; margin-top:10px; }}
+    .facade-thumb {{
+      flex:1; aspect-ratio:4/3; border-radius:8px; overflow:hidden;
+      border:2px solid var(--border); cursor:pointer; position:relative;
     }}
-    .period-item:hover {{ background:rgba(150,215,76,0.08); }}
-    .period-item.active {{ background:rgba(150,215,76,0.15); border:1px solid rgba(150,215,76,0.35); }}
-    .period-swatch {{ width:12px; height:12px; border-radius:3px; flex-shrink:0; }}
-    .period-label {{ font-size:11px; color:#cbd5e1; flex:1; }}
-    .period-count {{ font-size:11px; color:var(--faint); }}
-    #year-clear {{
-      margin-top:10px; width:100%; font-size:11px; padding:5px 0;
-      background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
-      border-radius:8px; color:var(--muted); cursor:pointer; font-family:inherit;
+    .facade-thumb img {{ width:100%; height:100%; object-fit:cover; }}
+    .facade-thumb canvas {{ width:100%; height:100%; object-fit:cover; }}
+    .facade-thumb .dir-label {{
+      position:absolute; bottom:4px; left:50%; transform:translateX(-50%);
+      font-size:10px; font-weight:700; background:rgba(0,0,0,0.7);
+      color:#fff; padding:2px 8px; border-radius:4px;
     }}
-    #year-clear:hover {{ background:rgba(255,255,255,0.09); }}
+    .facade-thumb.active {{ border-color:#a78bfa; }}
 
-    /* ── Energy extreme cards ── */
-    #energy-cards {{
-      margin-top:14px; display:none;
+    /* wwr result */
+    #wwr-panel {{
+      bottom:80px; right:16px; width:220px; display:none;
     }}
-    #energy-cards .ec-header {{
-      font-size:10px; font-weight:700; text-transform:uppercase;
-      letter-spacing:.5px; color:var(--lime); margin-bottom:6px;
-    }}
-    .ec-section {{ margin-bottom:10px; }}
-    .ec-section-title {{
-      font-size:10px; color:var(--muted); text-transform:uppercase;
-      letter-spacing:.4px; margin-bottom:4px;
-    }}
-    .ec-card {{
-      padding:6px 8px; border-radius:8px; margin-bottom:4px;
-      display:flex; align-items:center; gap:6px;
-      background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
-    }}
-    .ec-card.best {{ border-color:rgba(150,215,76,0.3); background:rgba(150,215,76,0.07); }}
-    .ec-card.worst {{ border-color:rgba(239,68,68,0.3); background:rgba(239,68,68,0.06); }}
-    .ec-addr {{ font-size:10px; color:#cbd5e1; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-    .ec-badge {{
-      font-size:9px; font-weight:700; padding:1px 5px; border-radius:4px;
-      color:#000; flex-shrink:0;
-    }}
-    .ec-val {{ font-size:10px; font-weight:600; color:var(--muted); flex-shrink:0; }}
+    .wwr-bar-wrap {{ margin:8px 0 4px; height:10px; border-radius:5px;
+                     background:rgba(255,255,255,0.08); overflow:hidden; }}
+    .wwr-bar {{ height:100%; border-radius:5px;
+                background:linear-gradient(90deg,#7c3aed,#a78bfa); transition:width .4s; }}
+    .wwr-value {{ font-size:22px; font-weight:700; color:var(--lime); }}
+    .wwr-unit  {{ font-size:11px; color:var(--muted); }}
 
-    /* ── Energy-class panel ── */
-    #eclass-panel {{
-      display:none;
+    /* loading overlay */
+    #loading {{
+      position:fixed; inset:0; z-index:999;
+      background:#0f1117; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:16px;
     }}
-    #eclass-panel h2 {{ color:var(--lime); }}
-    #eclass-panel .sub {{ font-size:11px; color:var(--muted); margin-bottom:12px; }}
-    .eclass-item {{
-      display:flex; align-items:center; gap:8px; padding:5px 8px;
-      border-radius:8px; cursor:pointer; transition:background 0.15s; margin:2px 0;
+    #loading h1 {{ font-size:18px; font-weight:700; color:var(--lime); }}
+    #loading p  {{ font-size:13px; color:var(--muted); }}
+    .spinner {{
+      width:40px; height:40px; border:3px solid rgba(114,28,184,0.3);
+      border-top-color:#a78bfa; border-radius:50%;
+      animation:spin .8s linear infinite;
     }}
-    .eclass-item:hover {{ background:rgba(150,215,76,0.08); }}
-    .eclass-item.active {{ background:rgba(150,215,76,0.15); border:1px solid rgba(150,215,76,0.3); }}
-    .eclass-swatch {{ width:12px; height:12px; border-radius:3px; flex-shrink:0; }}
-    .eclass-label {{ font-size:11px; color:#cbd5e1; flex:1; }}
-    .eclass-count {{ font-size:11px; color:var(--faint); }}
-    #eclass-clear {{
-      margin-top:10px; width:100%; font-size:11px; padding:5px 0;
-      background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
-      border-radius:8px; color:var(--muted); cursor:pointer; font-family:inherit;
-    }}
-    #eclass-clear:hover {{ background:rgba(255,255,255,0.09); }}
-    .no-epc-note {{ font-size:10px; color:var(--faint); margin-top:8px; line-height:1.4; }}
+    @keyframes spin {{ to {{ transform:rotate(360deg); }} }}
 
-    /* ── Energy-compare sub-panel ── */
-    #perf-legend {{ margin-top:12px; display:none; }}
-    #perf-legend .perf-title {{ font-size:11px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.4px; }}
-    .perf-bar-wrap {{ position:relative; height:14px; border-radius:4px; overflow:visible; margin-bottom:4px; }}
-    .perf-bar {{ height:100%; border-radius:4px; }}
-    .perf-bar-labels {{ display:flex; justify-content:space-between; font-size:10px; color:var(--faint); }}
-    #btn-energy-compare {{
-      margin-top:10px; width:100%; font-size:11px; padding:6px 0;
-      background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
-      border-radius:8px; color:var(--muted); cursor:pointer; transition:background 0.2s; font-family:inherit;
-    }}
-    #btn-energy-compare:hover  {{ background:rgba(255,255,255,0.09); }}
-    #btn-energy-compare.active {{ background:rgba(150,215,76,0.12); border-color:rgba(150,215,76,0.4); color:var(--lime); }}
+    /* legend */
+    .legend-row {{ display:flex; align-items:center; gap:6px; margin:4px 0; font-size:11px; cursor:pointer; }}
+    .legend-row:hover {{ color:#fff; }}
+    .legend-dot {{ width:10px; height:10px; border-radius:3px; flex-shrink:0; }}
+    .legend-cnt {{ margin-left:auto; color:var(--faint); }}
 
-    /* ── Search bar ── */
+    /* search */
     #search-box {{
-      position:absolute; top:16px; right:16px; z-index:10;
-      display:flex; flex-direction:column; gap:6px; width:300px;
-      pointer-events:auto;
+      position:absolute; top:16px; left:50%; transform:translateX(-50%);
+      z-index:20; display:flex; gap:6px;
     }}
-    #search-row {{ display:flex; gap:6px; }}
     #search-input {{
-      flex:1; background:var(--surface); backdrop-filter:blur(14px);
-      border:1px solid var(--border); border-radius:10px;
-      padding:8px 12px; color:#e2e8f0; font-size:13px; font-family:inherit;
-      outline:none; transition:border-color 0.2s;
+      width:260px; padding:8px 12px; border-radius:10px;
+      border:1px solid var(--border); background:var(--surface);
+      color:var(--text); font-size:13px; backdrop-filter:blur(12px);
+      outline:none;
     }}
-    #search-input::placeholder {{ color:var(--faint); }}
-    #search-input:focus {{ border-color:rgba(114,28,184,0.7); }}
-    #search-btn {{
-      background:rgba(114,28,184,0.25); border:1px solid rgba(114,28,184,0.5);
-      border-radius:10px; color:#c4b5fd; padding:8px 14px; cursor:pointer;
-      font-size:14px; transition:background 0.2s; backdrop-filter:blur(8px);
-      white-space:nowrap;
-    }}
-    #search-btn:hover {{ background:rgba(114,28,184,0.45); }}
-    #search-btn.loading {{ opacity:0.5; pointer-events:none; }}
+    #search-input:focus {{ border-color:#7c3aed; }}
     #search-results {{
-      background:rgba(10,10,20,0.97); backdrop-filter:blur(14px);
-      border:1px solid var(--border); border-radius:10px;
-      overflow:hidden; display:none;
-    }}
-    .result-item {{
-      padding:9px 12px; cursor:pointer; font-size:12px; color:#cbd5e1;
-      border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.15s;
-      line-height:1.4;
-    }}
-    .result-item:last-child {{ border-bottom:none; }}
-    .result-item:hover {{ background:rgba(114,28,184,0.18); color:#e2e8f0; }}
-    .result-item .result-name {{ font-weight:600; color:#e2e8f0; }}
-    .result-item .result-addr {{ font-size:11px; color:var(--faint); margin-top:2px; }}
-    #search-status {{
-      font-size:11px; color:var(--faint); padding:6px 12px;
+      position:absolute; top:calc(100% + 6px); left:0; right:0;
       background:var(--surface); border:1px solid var(--border);
-      border-radius:10px; backdrop-filter:blur(14px); display:none;
+      border-radius:10px; backdrop-filter:blur(16px); display:none;
+      max-height:240px; overflow-y:auto;
+    }}
+    .result-item {{ padding:8px 12px; cursor:pointer; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.05); }}
+    .result-item:hover {{ background:rgba(114,28,184,0.2); }}
+
+    /* brand */
+    #ppg-brand {{
+      position:absolute; bottom:24px; right:20px; z-index:20;
+      font-size:10px; font-weight:700; color:rgba(255,255,255,0.25);
+      letter-spacing:.8px; text-transform:uppercase; pointer-events:none;
     }}
   </style>
 </head>
 <body>
-<div id="map"><canvas id="deck-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas></div>
 
-<!-- Cesium Globe overlay (lazy-loaded when first opened) -->
-<div id="cesium-globe" style="display:none;position:fixed;inset:0;z-index:2000;background:#000;flex-direction:column">
-  <div style="position:absolute;top:14px;right:14px;z-index:10;display:flex;gap:8px">
-    <div style="color:#e2e8f0;font-size:13px;font-weight:600;padding:8px 14px;background:rgba(10,10,20,0.85);border-radius:10px;backdrop-filter:blur(12px);border:1px solid rgba(114,28,184,0.3)">
-      🌍 Globe View — click a city pin to fly there
-    </div>
-    <button id="cesium-close" style="padding:8px 14px;border-radius:10px;background:rgba(114,28,184,0.7);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:600">✕ Close</button>
-  </div>
-  <div id="cesium-container" style="width:100%;height:100%"></div>
-</div>
-<div id="panel" class="ppg-panel">
-  <h2>🏙 Gothenburg 3D</h2>
-  <div class="sub">EUBUCCO v0.2 · EPC building use</div>
-  <div class="stat"><span class="lbl">Buildings</span><span class="val">{n_total:,}</span></div>
-  <div class="legend-title">Building use (from EPC)</div>
-  <div class="legend">{type_legend_html}</div>
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="spinner"></div>
+  <h1>&#127963; Gothenburg 3D</h1>
+  <p id="loading-status">Initialising Cesium…</p>
 </div>
 
-<!-- Address search -->
+<!-- Cesium main viewer -->
+<div id="cesium-container"></div>
+
+<!-- Search bar -->
 <div id="search-box">
-  <div id="search-row">
-    <input id="search-input" type="text" placeholder="Search address in Gothenburg…" autocomplete="off"/>
-    <button id="search-btn">🔍 Search</button>
-  </div>
+  <input id="search-input" type="text" placeholder="Search address…" autocomplete="off">
+  <button class="btn" id="search-btn">&#128269; Search</button>
   <div id="search-results"></div>
-  <div id="search-status"></div>
 </div>
 
-<!-- Energy-class panel (shown when colorMode === 'eclass') -->
-<div id="eclass-panel" class="ppg-panel">
-  <h2>⚡ EPC Energy Class</h2>
-  <div class="sub">{n_eclass_total:,} buildings with EPC · click to filter</div>
-  <div id="eclass-legend">{eclass_legend_html}</div>
-  <div class="no-epc-note">{n_total - n_eclass_total:,} buildings have no EPC on record (shown dimmed)</div>
-  <button id="eclass-clear">✕ Clear filter</button>
-</div>
-
-<!-- Year-mode legend panel (shown when colorMode === 'year') -->
-<div id="year-panel" class="ppg-panel">
-  <h2>🗓 Construction Era</h2>
-  <div class="sub">TABULA periods · click to highlight</div>
-  <div id="period-legend"></div>
-  <button id="year-clear">✕ Clear highlight</button>
-  <button id="btn-energy-compare">⚡ Compare energy use</button>
-  <div id="perf-legend">
-    <div class="perf-title">Energy use within era</div>
-    <div class="perf-bar-wrap">
-      <canvas id="perf-gradient-bar" height="14" style="border-radius:4px;display:block;width:100%"></canvas>
-    </div>
-    <div class="perf-bar-labels"><span>Best (low kWh)</span><span>Worst (high kWh)</span></div>
-  </div>
-  <!-- Energy extreme cards (shown when a period is highlighted) -->
-  <div id="energy-cards">
-    <div class="ec-header">⚡ Energy Extremes</div>
-    <div class="ec-section">
-      <div class="ec-section-title">🟢 Most efficient</div>
-      <div id="ec-best-list"></div>
-    </div>
-    <div class="ec-section">
-      <div class="ec-section-title">🔴 Least efficient</div>
-      <div id="ec-worst-list"></div>
-    </div>
+<!-- Left info panel -->
+<div class="panel" id="left-panel">
+  <h2>&#127963; Gothenburg 3D</h2>
+  <div class="sub">EUBUCCO v0.2 + EPC · {n_total:,} buildings</div>
+  <div id="legend-container">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Building use</div>
+    {type_legend_html}
   </div>
 </div>
 
-<div id="tooltip"></div>
-<div id="hint">Scroll to zoom · Drag to pan · Right-drag or Ctrl+drag to tilt/rotate · Hover buildings for details</div>
+<!-- Building info panel -->
+<div class="panel" id="info-panel">
+  <button class="close-btn" id="info-close">&#x2715;</button>
+  <h2>&#127963; Building</h2>
+  <div id="info-content"></div>
+  <button class="btn" style="width:100%;margin-top:10px;font-size:12px" id="btn-inspect">
+    &#128247; Inspect Facades + WWR
+  </button>
+</div>
+
+<!-- Facade inspector -->
+<div class="panel" id="facade-panel">
+  <h2>&#128247; Facade Inspector</h2>
+  <div class="sub" id="facade-sub">Click a facade view to capture screenshot and estimate WWR</div>
+  <div id="facade-views">
+    <div class="facade-thumb" id="thumb-N"><canvas id="canvas-N" width="200" height="150"></canvas><div class="dir-label">N</div></div>
+    <div class="facade-thumb" id="thumb-E"><canvas id="canvas-E" width="200" height="150"></canvas><div class="dir-label">E</div></div>
+    <div class="facade-thumb" id="thumb-S"><canvas id="canvas-S" width="200" height="150"></canvas><div class="dir-label">S</div></div>
+    <div class="facade-thumb" id="thumb-W"><canvas id="canvas-W" width="200" height="150"></canvas><div class="dir-label">W</div></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <button class="btn" id="btn-capture-all" style="flex:1">&#128247; Capture All Facades</button>
+    <button class="btn" id="btn-exit-inspect" style="flex:1">&#x2715; Exit Inspector</button>
+  </div>
+</div>
+
+<!-- WWR result panel -->
+<div class="panel" id="wwr-panel">
+  <h2>&#128438; WWR Estimate</h2>
+  <div class="sub">Window-to-Wall Ratio</div>
+  <div class="wwr-value" id="wwr-value">–</div>
+  <span class="wwr-unit">% average across facades</span>
+  <div class="wwr-bar-wrap"><div class="wwr-bar" id="wwr-bar" style="width:0%"></div></div>
+  <div id="wwr-breakdown" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
+  <div style="margin-top:8px;font-size:10px;color:var(--faint)">
+    Heuristic based on TABULA archetype · era · energy class.<br>
+    Visual analysis from captured facade screenshots.
+  </div>
+</div>
+
+<!-- Controls -->
 <div id="controls">
-  <button class="btn" id="btn-reset">⌂ Reset</button>
-  <button class="btn" id="btn-toggle">⇅ Flat / 3D</button>
-  <button class="btn" id="btn-eclass-mode">⚡ Energy class</button>
-  <button class="btn" id="btn-year-mode">🗓 Year era</button>
-  <button class="btn" id="btn-epc-layer">🏠 EPC footprints</button>
-  <button class="btn" id="btn-globe">🌍 Globe</button>
+  <button class="btn active" id="btn-use">&#127968; Use type</button>
+  <button class="btn" id="btn-eclass">&#9889; Energy class</button>
+  <button class="btn" id="btn-year">&#128197; Year era</button>
+  <button class="btn" id="btn-reset">&#8962; Reset view</button>
 </div>
-<div id="ppg-brand">PPG <span>· Chalmers / Boverket</span></div>
+
+<div id="ppg-brand">PPG · Chalmers / Boverket</div>
 
 <script>
-const {{ Deck, MapView, PolygonLayer, TileLayer, BitmapLayer, ScatterplotLayer, FlyToInterpolator }} = deck;
-
+// ─────────────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────────────
 const DATA = {data_json};
-const EPC_DATA = {epc_json};
-const PERIOD_CARDS = {period_cards_js};
 
-let showEpc   = false;
-let markerData = [];   // search result pin
-let currentViewState = {{
-  longitude: {cx:.6f}, latitude: {cy:.6f},
-  zoom: 13, pitch: 50, bearing: -15,
+const USE_COLORS = {{
+  bostad_enfamilj:   Cesium.Color.fromBytes(255,165, 50,210),
+  bostad_flerfamilj: Cesium.Color.fromBytes(255,210, 60,210),
+  verksamhet:        Cesium.Color.fromBytes( 70,180,255,210),
+  industri:          Cesium.Color.fromBytes(200, 80, 60,210),
+  samhalle:          Cesium.Color.fromBytes( 70,210,140,210),
+  komplement:        Cesium.Color.fromBytes(140,140,160,180),
+  ovrigt:            Cesium.Color.fromBytes(160,120,200,180),
 }};
-
-let is3D      = true;
-let colorMode = 'use';       // 'use' | 'year'
-let highlightPeriod = null;  // null = show all
-
-// ---- TABULA period colour palette ----------------------------------------
+const ECLASS_COLORS = {{
+  A: Cesium.Color.fromBytes( 22,163, 74,230),
+  B: Cesium.Color.fromBytes( 74,222,128,220),
+  C: Cesium.Color.fromBytes(190,242, 60,210),
+  D: Cesium.Color.fromBytes(250,204, 21,215),
+  E: Cesium.Color.fromBytes(251,146, 60,220),
+  F: Cesium.Color.fromBytes(239, 68, 68,225),
+  G: Cesium.Color.fromBytes(153, 27, 27,230),
+}};
 const PERIOD_COLORS = {{
-  '...1960':   [220,  60,  50, 220],
-  '1961-1975': [235, 130,  40, 220],
-  '1976-1985': [235, 200,  40, 220],
-  '1986-1995': [ 90, 200,  60, 220],
-  '1996-2005': [ 40, 195, 170, 220],
-  'post-2005': [ 60, 140, 235, 220],
-}};
-const PERIOD_LABELS = {{
-  '...1960':   'Pre-1960',
-  '1961-1975': '1961 – 1975',
-  '1976-1985': '1976 – 1985',
-  '1986-1995': '1986 – 1995',
-  '1996-2005': '1996 – 2005',
-  'post-2005': 'Post-2005',
-}};
-const PERIOD_ORDER = ['...1960','1961-1975','1976-1985','1986-1995','1996-2005','post-2005'];
-
-let energyCompare = false;
-let highlightEclass = null;  // null = all, or 'A'..'G'
-
-// ---- EPC energy-class colour map (mirrors Python) -------------------------
-const ECLASS_COLORS_JS = {{
-  'A': [ 22, 163,  74, 230],
-  'B': [ 74, 222, 128, 220],
-  'C': [190, 242,  60, 210],
-  'D': [250, 204,  21, 215],
-  'E': [251, 146,  60, 220],
-  'F': [239,  68,  68, 225],
-  'G': [153,  27,  27, 230],
+  '...1960':     Cesium.Color.fromBytes(100,149,237,220),
+  '1961-1975':   Cesium.Color.fromBytes(255,165, 50,220),
+  '1976-1985':   Cesium.Color.fromBytes(154,205, 50,220),
+  '1986-1995':   Cesium.Color.fromBytes(218,165, 32,220),
+  '1996-2005':   Cesium.Color.fromBytes(255, 99, 71,220),
+  'post-2005':   Cesium.Color.fromBytes(147,112,219,220),
 }};
 
-// ---- Per-period energy stats for legend gradient -------------------------
-const periodEnergyStats = {{}};
-function computePeriodStats() {{
-  PERIOD_ORDER.forEach(p => {{
-    const vals = DATA
-      .filter(d => d.tabula_period === p && d.perf_pct !== null && d.perf_pct !== undefined)
-      .map(d => d.energy);
-    if (!vals.length) return;
-    vals.sort((a,b) => a-b);
-    periodEnergyStats[p] = {{
-      min: Math.round(vals[0]),
-      max: Math.round(vals[vals.length-1]),
-      p10: Math.round(vals[Math.floor(vals.length*0.10)] || vals[0]),
-      p90: Math.round(vals[Math.floor(vals.length*0.90)] || vals[vals.length-1]),
-      n:   vals.length,
-    }};
-  }});
+// ─────────────────────────────────────────────────────────────────
+// WWR heuristic lookup (from TABULA archetypes + literature)
+// keyed by [use_cat][tabula_period]
+// ─────────────────────────────────────────────────────────────────
+const WWR_TABLE = {{
+  bostad_enfamilj:   {{ '...1960':15, '1961-1975':17, '1976-1985':19, '1986-1995':21, '1996-2005':23, 'post-2005':26 }},
+  bostad_flerfamilj: {{ '...1960':22, '1961-1975':28, '1976-1985':26, '1986-1995':30, '1996-2005':33, 'post-2005':38 }},
+  verksamhet:        {{ '...1960':30, '1961-1975':40, '1976-1985':45, '1986-1995':50, '1996-2005':55, 'post-2005':60 }},
+  industri:          {{ '...1960': 8, '1961-1975':10, '1976-1985':12, '1986-1995':12, '1996-2005':14, 'post-2005':15 }},
+  samhalle:          {{ '...1960':25, '1961-1975':35, '1976-1985':38, '1986-1995':40, '1996-2005':45, 'post-2005':50 }},
+  komplement:        {{ '...1960': 5, '1961-1975': 5, '1976-1985': 5, '1986-1995': 8, '1996-2005':10, 'post-2005':10 }},
+  ovrigt:            {{ '...1960':20, '1961-1975':22, '1976-1985':24, '1986-1995':25, '1996-2005':28, 'post-2005':30 }},
+}};
+
+// Energy class modifier on WWR heuristic (A=very glazed efficient vs G=poorly insulated old)
+const ECLASS_WWR_ADJ = {{ A:+5, B:+3, C:+1, D:0, E:-1, F:-2, G:-3 }};
+
+function heuristicWWR(building) {{
+  const use = building.use_cat || 'ovrigt';
+  const period = building.tabula_period || '1961-1975';
+  const eclass = building.eclass || null;
+  const base = (WWR_TABLE[use] || WWR_TABLE.ovrigt)[period] || 20;
+  const adj  = eclass ? (ECLASS_WWR_ADJ[eclass] || 0) : 0;
+  return Math.min(75, Math.max(5, base + adj));
 }}
-computePeriodStats();
 
-// Shade a period base color by performance (0=best→bright, 1=worst→dark)
-function perfColor(baseCol, pct) {{
-  // pct=0 → very bright (best); pct=1 → very dark (worst)
-  // Best: lerp base toward [255,255,255] by 40%
-  // Worst: lerp base toward [20,20,20] by 60%
-  const [r, g, b] = baseCol;
-  let fr, fg, fb;
-  if (pct <= 0.5) {{
-    // best half: brighten
-    const t = (0.5 - pct) * 2 * 0.55;  // 0 at mid, 0.55 at best
-    fr = Math.round(r + (255 - r) * t);
-    fg = Math.round(g + (255 - g) * t);
-    fb = Math.round(b + (255 - b) * t);
-  }} else {{
-    // worst half: darken
-    const t = (pct - 0.5) * 2 * 0.72;  // 0 at mid, 0.72 at worst
-    fr = Math.round(r * (1 - t));
-    fg = Math.round(g * (1 - t));
-    fb = Math.round(b * (1 - t));
+// ─────────────────────────────────────────────────────────────────
+if (window.location.protocol === 'file:') {{
+  document.getElementById('loading').innerHTML =
+    '<div style="text-align:center;padding:40px;max-width:440px">' +
+    '<div style="font-size:48px;margin-bottom:16px">&#128274;</div>' +
+    '<h1 style="color:#96D74C;font-size:18px;margin-bottom:12px">Run via local server</h1>' +
+    '<p style="color:#94a3b8;font-size:13px;line-height:1.8">Cesium cannot load its 3D engine from <b>file://</b>.<br><br>' +
+    'Open a terminal in the project folder and run:<br><br>' +
+    '<code style="background:rgba(255,255,255,0.1);padding:8px 20px;border-radius:8px;font-size:14px">python launch.py</code><br><br>' +
+    'Your browser will open automatically at<br><b style="color:#a78bfa">http://localhost:8765</b></p>' +
+    '</div>';
+  throw new Error('file:// not supported');
+}}
+
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMWFjYmFkNjc4ZTciLCJpZCI6NTc3MzMsImlhdCI6MTYyNzg0NTE4Mn0.XcKpgANiY19MC4bdFUXMVEBToBmqS8kuYpUlxJHYZxk';
+
+const viewer = new Cesium.Viewer('cesium-container', {{
+  timeline:false, animation:false, baseLayerPicker:false,
+  geocoder:false, homeButton:false, sceneModePicker:false,
+  navigationHelpButton:false, fullscreenButton:false,
+  selectionIndicator:false, infoBox:false,
+  terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+  imageryProvider: new Cesium.UrlTemplateImageryProvider({{
+    url:'https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',
+    credit: new Cesium.Credit('OpenStreetMap contributors', false),
+  }}),
+}});
+viewer.cesiumWidget.creditContainer.style.display = 'none';
+viewer.scene.globe.enableLighting = false;
+viewer.scene.globe.showGroundAtmosphere = false;
+
+// ─────────────────────────────────────────────────────────────────
+// Build extruded buildings — CustomDataSource (no Cesium workers needed)
+// ─────────────────────────────────────────────────────────────────
+let colorMode = 'use';
+let buildingDS = null;
+
+function getBuildingColor(b) {{
+  if (colorMode === 'eclass')
+    return (b.eclass && ECLASS_COLORS[b.eclass]) ? ECLASS_COLORS[b.eclass] : Cesium.Color.fromBytes(60,60,70,140);
+  if (colorMode === 'year')
+    return (b.tabula_period && PERIOD_COLORS[b.tabula_period]) ? PERIOD_COLORS[b.tabula_period] : Cesium.Color.fromBytes(60,60,70,140);
+  return USE_COLORS[b.use_cat] || USE_COLORS.ovrigt;
+}}
+
+async function rebuildBuildings() {{
+  setLoading('Loading ' + DATA.length.toLocaleString() + ' buildings…');
+  if (buildingDS) {{ viewer.dataSources.remove(buildingDS, true); buildingDS = null; }}
+  buildingDS = new Cesium.CustomDataSource('buildings');
+  const CHUNK = 400;
+  for (let start = 0; start < DATA.length; start += CHUNK) {{
+    const end = Math.min(start + CHUNK, DATA.length);
+    for (let i = start; i < end; i++) {{
+      const b = DATA[i];
+      const ring = b.coordinates[0];
+      if (!ring || ring.length < 3) continue;
+      const flat = [];
+      for (const [lo, la] of ring) {{ flat.push(lo, la); }}
+      const h = Math.max(3, b.height || (b.floors ? b.floors * 3 : 6));
+      const e = buildingDS.entities.add({{
+        polygon: {{
+          hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
+          extrudedHeight: h, height: 0,
+          material: getBuildingColor(b).withAlpha(0.88),
+          outline: false,
+        }},
+      }});
+      e._dataIdx = i;
+    }}
+    setLoading('Loading buildings… ' + Math.round(end / DATA.length * 100) + '%');
+    await new Promise(r => setTimeout(r, 0));
   }}
-  return [fr, fg, fb, 230];
+  await viewer.dataSources.add(buildingDS);
+  setLoading('');
 }}
 
-// Draw gradient bar for the active period (or default first period)
-function drawGradientBar(period) {{
-  const canvas = document.getElementById('perf-gradient-bar');
-  if (!canvas) return;
-  canvas.width = canvas.offsetWidth || 180;
+// ─────────────────────────────────────────────────────────────────
+// Loading helpers
+// ─────────────────────────────────────────────────────────────────
+function setLoading(msg) {{
+  const el = document.getElementById('loading');
+  if (!msg) {{ el.style.display = 'none'; return; }}
+  document.getElementById('loading-status').textContent = msg;
+  el.style.display = 'flex';
+}}
+
+// ─────────────────────────────────────────────────────────────────
+// Fly to Gothenburg + start building
+// ─────────────────────────────────────────────────────────────────
+viewer.camera.flyTo({{
+  destination: Cesium.Cartesian3.fromDegrees({cx:.6f}, {cy:.6f}, 1800),
+  orientation: {{ heading:0, pitch: Cesium.Math.toRadians(-50), roll:0 }},
+  duration: 0,
+}});
+
+setTimeout(rebuildBuildings, 300);
+
+// ─────────────────────────────────────────────────────────────────
+// Pick / click
+// ─────────────────────────────────────────────────────────────────
+let selectedBuilding = null;
+let highlightEntity  = null;
+
+viewer.screenSpaceEventHandler.setInputAction(movement => {{
+  const picked = viewer.scene.pick(movement.position);
+  if (Cesium.defined(picked) && picked.id && picked.id._dataIdx !== undefined) {{
+    const b = DATA[picked.id._dataIdx];
+    if (b) showInfoPanel(b, picked.id._dataIdx);
+  }} else {{
+    hideInfoPanel();
+  }}
+}}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+function showInfoPanel(b, idx) {{
+  selectedBuilding = {{ ...b, _idx: idx }};
+  const rows = [];
+  const row = (l,v) => v != null && v !== '' ? rows.push('<div class="tt-row"><span class="tt-lbl">'+l+'</span><span class="tt-val">'+v+'</span></div>') : null;
+  row('Address',  b.address);
+  row('Use',      b.use_cat ? b.use_cat.replace(/_/g,' ') : null);
+  row('Energy class', b.eclass);
+  row('Energy',   b.energy ? b.energy + ' kWh/m²' : null);
+  row('Year',     b.year);
+  row('Area',     b.area  ? b.area  + ' m²' : null);
+  row('Height',   b.height ? Math.round(b.height) + ' m' : null);
+  row('Floors',   b.floors);
+  row('Period',   b.tabula_period);
+  row('U-wall',   b.tabula_u_wall ? b.tabula_u_wall + ' W/m²K' : null);
+  row('U-win',    b.tabula_u_win  ? b.tabula_u_win  + ' W/m²K' : null);
+  document.getElementById('info-content').innerHTML = rows.join('');
+  document.getElementById('info-panel').style.display = 'block';
+
+  // Highlight outline
+  if (highlightEntity) viewer.entities.remove(highlightEntity);
+  const ring = b.coordinates[0];
+  if (ring && ring.length >= 3) {{
+    const flat = [];
+    for (const [lo, la] of ring) {{ flat.push(lo, la); }}
+    highlightEntity = viewer.entities.add({{
+      polygon: {{
+        hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
+        extrudedHeight: Math.max(3, b.height || 6) + 0.5,
+        height: 0,
+        material: Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.0),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString('#a78bfa'),
+        outlineWidth: 3,
+      }},
+    }});
+  }}
+}}
+
+function hideInfoPanel() {{
+  document.getElementById('info-panel').style.display = 'none';
+  if (highlightEntity) {{ viewer.entities.remove(highlightEntity); highlightEntity = null; }}
+  selectedBuilding = null;
+}}
+
+document.getElementById('info-close').addEventListener('click', hideInfoPanel);
+
+// ─────────────────────────────────────────────────────────────────
+// Facade Inspector
+// ─────────────────────────────────────────────────────────────────
+let facadeBuilding = null;
+const DIRS = ['N','E','S','W'];
+const DIR_HEADINGS = {{ N:0, E:90, S:180, W:270 }};
+
+document.getElementById('btn-inspect').addEventListener('click', () => {{
+  if (!selectedBuilding) return;
+  facadeBuilding = selectedBuilding;
+  document.getElementById('info-panel').style.display = 'none';
+  document.getElementById('facade-panel').style.display = 'block';
+  document.getElementById('wwr-panel').style.display = 'block';
+  // Clear canvases
+  for (const d of DIRS) {{
+    const ctx = document.getElementById('canvas-'+d).getContext('2d');
+    ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,200,150);
+    ctx.fillStyle = '#475569'; ctx.font = '11px Inter';
+    ctx.textAlign = 'center'; ctx.fillText('Click to capture', 100, 75);
+  }}
+  // Fly to first facade
+  flyToFacade('N');
+  // Show heuristic WWR immediately
+  showWWR(heuristicWWR(facadeBuilding), null, 'heuristic');
+}});
+
+function getBuildingCenter(b) {{
+  const ring = b.coordinates[0];
+  let lo = 0, la = 0;
+  for (const [x, y] of ring) {{ lo += x; la += y; }}
+  return {{ lon: lo / ring.length, lat: la / ring.length }};
+}}
+
+function getBuildingRadius(b) {{
+  const ring = b.coordinates[0];
+  const c = getBuildingCenter(b);
+  let maxDeg = 0;
+  for (const [x, y] of ring) {{
+    const d = Math.sqrt((x-c.lon)**2 + (y-c.lat)**2);
+    if (d > maxDeg) maxDeg = d;
+  }}
+  // Convert degrees to approx metres at this latitude
+  return Math.max(15, maxDeg * 111320 * Math.cos(c.lat * Math.PI / 180));
+}}
+
+function flyToFacade(dir) {{
+  if (!facadeBuilding) return;
+  const c = getBuildingCenter(facadeBuilding);
+  const r = getBuildingRadius(facadeBuilding);
+  const dist = r * 3.5;
+  const h = DIR_HEADINGS[dir] * Math.PI / 180;
+  const offsetLon = Math.sin(h) * dist / (111320 * Math.cos(c.lat * Math.PI/180));
+  const offsetLat = Math.cos(h) * dist / 111320;
+  const bldH = Math.max(3, facadeBuilding.height || 6);
+  viewer.camera.flyTo({{
+    destination: Cesium.Cartesian3.fromDegrees(c.lon + offsetLon, c.lat + offsetLat, bldH * 0.6),
+    orientation: {{
+      heading: Cesium.Math.toRadians(DIR_HEADINGS[dir] + 180),
+      pitch:   Cesium.Math.toRadians(-5),
+      roll: 0,
+    }},
+    duration: 1.2,
+  }});
+  // Highlight active thumb
+  for (const d of DIRS) document.getElementById('thumb-'+d).classList.remove('active');
+  document.getElementById('thumb-'+dir).classList.add('active');
+}}
+
+// Capture facade
+function captureToCanvas(dir) {{
+  flyToFacade(dir);
+  setTimeout(() => {{
+    viewer.render();
+    const srcCanvas = viewer.canvas;
+    const dstCanvas = document.getElementById('canvas-'+dir);
+    const ctx = dstCanvas.getContext('2d');
+    ctx.drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height,
+                  0, 0, dstCanvas.width, dstCanvas.height);
+  }}, 1400);
+}}
+
+// Visual WWR from canvas pixel analysis
+function analyseCanvasWWR(canvas) {{
   const ctx = canvas.getContext('2d');
-  const col = PERIOD_COLORS[period] || [180,180,180,200];
-  const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
-  for (let i = 0; i <= 10; i++) {{
-    const t = i / 10;
-    const [r,g,b] = perfColor(col, t);
-    grad.addColorStop(t, `rgb(${{r}},${{g}},${{b}})`);
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let windowPx = 0, wallPx = 0;
+  // Heuristic: dark-grey/reflective = window; warm/opaque = wall
+  for (let i = 0; i < imgData.length; i += 4) {{
+    const r = imgData[i], g = imgData[i+1], b = imgData[i+2];
+    const bright = (r + g + b) / 3;
+    const sat = Math.max(r,g,b) - Math.min(r,g,b);
+    if (bright < 90 && sat < 30) windowPx++;   // dark unsaturated = window/glass
+    else if (bright > 40)        wallPx++;
   }}
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const total = windowPx + wallPx;
+  return total > 0 ? Math.round((windowPx / total) * 100) : null;
 }}
 
-// Pre-count buildings per period for the legend
-const periodCounts = {{}};
-DATA.forEach(d => {{
-  const p = d.tabula_period || '__unknown__';
-  periodCounts[p] = (periodCounts[p] || 0) + 1;
-}});
-
-// Build year-mode legend items
-function buildPeriodLegend() {{
-  const container = document.getElementById('period-legend');
-  container.innerHTML = '';
-  PERIOD_ORDER.concat(['__unknown__']).forEach(p => {{
-    const cnt = periodCounts[p] || 0;
-    if (!cnt) return;
-    const col = PERIOD_COLORS[p] || [100,100,110,200];
-    const lbl = PERIOD_LABELS[p] || 'Year unknown';
-    const div = document.createElement('div');
-    div.className = 'period-item' + (highlightPeriod === p ? ' active' : '');
-    div.dataset.period = p;
-    div.innerHTML = `
-      <div class="period-swatch" style="background:rgb(${{col[0]}},${{col[1]}},${{col[2]}})"></div>
-      <span class="period-label">${{lbl}}</span>
-      <span class="period-count">${{cnt.toLocaleString()}}</span>`;
-    div.addEventListener('click', () => {{
-      highlightPeriod = (highlightPeriod === p) ? null : p;
-      buildPeriodLegend();
-      buildEnergyCards(highlightPeriod);
-      deckgl.setProps({{ layers: getLayers() }});
+document.getElementById('btn-capture-all').addEventListener('click', async () => {{
+  document.getElementById('facade-sub').textContent = 'Capturing all 4 facades…';
+  const visualWWRs = [];
+  for (const dir of DIRS) {{
+    await new Promise(resolve => {{
+      flyToFacade(dir);
+      setTimeout(() => {{
+        viewer.render();
+        const src = viewer.canvas;
+        const dst = document.getElementById('canvas-'+dir);
+        const ctx = dst.getContext('2d');
+        ctx.drawImage(src,0,0,src.width,src.height,0,0,dst.width,dst.height);
+        const w = analyseCanvasWWR(dst);
+        if (w !== null) visualWWRs.push(w);
+        resolve();
+      }}, 1500);
     }});
-    container.appendChild(div);
-  }});
-}}
-
-// ---------------------------------------------------------------------------
-// Optional CARTO raster basemap via deck.gl TileLayer — works over HTTP/HTTPS,
-// silently absent when offline / file://. Buildings always render regardless.
-// ---------------------------------------------------------------------------
-function buildTileLayer() {{
-  return new TileLayer({{
-    id: 'basemap',
-    data: [
-      'https://a.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}@2x.png',
-      'https://b.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}@2x.png',
-      'https://c.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}@2x.png',
-    ],
-    tileSize: 256,
-    renderSubLayers: props => {{
-      const {{ data, tile }} = props;
-      if (!data) return null;
-      const {{ west, south, east, north }} = tile.bbox;
-      return new BitmapLayer(props, {{
-        data: null, image: data,
-        bounds: [west, south, east, north],
-      }});
-    }},
-  }});
-}}
-
-function buildMarkerLayer() {{
-  if (!markerData.length) return null;
-  return new ScatterplotLayer({{
-    id: 'search-marker',
-    data: markerData,
-    getPosition: d => d.position,
-    getRadius: 10,
-    getFillColor: [167, 139, 250, 220],
-    getLineColor: [255, 255, 255, 255],
-    lineWidthMinPixels: 2,
-    stroked: true,
-    radiusUnits: 'pixels',
-    pickable: false,
-  }});
-}}
-
-// ---------------------------------------------------------------------------
-// Building colour function
-// ---------------------------------------------------------------------------
-function getBuildingColor(d) {{
-
-  // ---- ENERGY CLASS mode: color all EPC buildings by A-G rating ----
-  if (colorMode === 'eclass') {{
-    if (!d.eclass_color) {{
-      // No EPC data at all: very dim
-      return [60, 60, 70, 40];
-    }}
-    const col = d.eclass_color;
-    if (highlightEclass !== null) {{
-      return (d.eclass === highlightEclass) ? col : [col[0], col[1], col[2], 30];
-    }}
-    return col;
   }}
-
-  // ---- YEAR mode ----
-  if (colorMode === 'year') {{
-    const baseCol = PERIOD_COLORS[d.tabula_period] || null;
-
-    // No period data: dim EPC buildings slightly, hide non-EPC buildings
-    if (!baseCol) {{
-      return d.has_epc ? [120, 120, 130, 60] : [40, 40, 45, 20];
-    }}
-
-    if (energyCompare) {{
-      if (d.perf_pct === null || d.perf_pct === undefined) {{
-        return [60, 60, 65, 60];
-      }}
-      const col = perfColor(baseCol, d.perf_pct);
-      if (highlightPeriod !== null && (d.tabula_period || '__unknown__') !== highlightPeriod) {{
-        return [col[0], col[1], col[2], 30];
-      }}
-      return col;
-    }}
-
-    if (highlightPeriod !== null) {{
-      const match = (d.tabula_period || '__unknown__') === highlightPeriod;
-      return match ? baseCol : [baseCol[0], baseCol[1], baseCol[2], 35];
-    }}
-    return baseCol;
+  document.getElementById('facade-sub').textContent = 'Capture complete';
+  const hWWR = heuristicWWR(facadeBuilding);
+  if (visualWWRs.length > 0) {{
+    const visualAvg = Math.round(visualWWRs.reduce((a,b) => a+b,0) / visualWWRs.length);
+    // Weighted blend: 40% visual + 60% heuristic (visual is noisy from OSM tiles)
+    const blended = Math.round(0.4 * visualAvg + 0.6 * hWWR);
+    showWWR(blended, visualWWRs, 'blended');
+  }} else {{
+    showWWR(hWWR, null, 'heuristic');
   }}
-
-  // ---- USE mode (default) ----
-  if (highlightPeriod !== null) {{
-    const match = (d.tabula_period || '__unknown__') === highlightPeriod;
-    return match ? d.color : [d.color[0], d.color[1], d.color[2], 35];
-  }}
-  return d.color;
-}}
-
-function buildLayer() {{
-  return new PolygonLayer({{
-    id: 'buildings',
-    data: DATA,
-    pickable: true,
-    extruded: is3D,
-    wireframe: false,
-    getPolygon:   d => d.coordinates[0],
-    getElevation: d => d.height,
-    elevationScale: is3D ? 1 : 0,
-    getFillColor: d => getBuildingColor(d),
-    getLineColor: [255, 255, 255, 20],
-    lineWidthMinPixels: 0,
-    material: {{
-      ambient: 0.35,
-      diffuse: 0.6,
-      shininess: 32,
-      specularColor: [60, 64, 70],
-    }},
-    transitions: {{ elevationScale: {{ duration: 700, type: 'spring' }} }},
-    updateTriggers: {{ elevationScale: is3D, getFillColor: [colorMode, highlightPeriod] }},
-    onHover: (info) => showTooltip(info),
-  }});
-}}
-
-// EPC footprint colour map (same as ECLASS_COLORS_JS + grey for unknown)
-const EPC_ECLASS_COLORS = {{
-  'A': [22,  163,  74, 180],
-  'B': [74,  222, 128, 170],
-  'C': [190, 242,  60, 165],
-  'D': [250, 204,  21, 170],
-  'E': [251, 146,  60, 175],
-  'F': [239,  68,  68, 180],
-  'G': [153,  27,  27, 185],
-}};
-
-function buildEpcLayer() {{
-  return new PolygonLayer({{
-    id: 'epc-footprints',
-    data: EPC_DATA,
-    visible: showEpc,
-    pickable: true,
-    extruded: false,
-    getPolygon: d => d.coordinates,
-    getFillColor: d => EPC_ECLASS_COLORS[d.eclass] || [120, 120, 140, 120],
-    getLineColor: [255, 255, 255, 60],
-    lineWidthMinPixels: 0.5,
-    onHover: (info) => {{
-      if (!showEpc) return;
-      if (info.object) {{
-        const d = info.object;
-        const vw = window.innerWidth, vh = window.innerHeight;
-        let tx = info.x + 16, ty = info.y + 16;
-        if (tx + 260 > vw) tx = info.x - 260;
-        if (ty + 120 > vh) ty = info.y - 120;
-        tooltip.style.left = tx + 'px';
-        tooltip.style.top  = ty + 'px';
-        tooltip.style.display = 'block';
-        let epcHtml = '<div class="tt-header">EPC Footprint</div>';
-        if (d.andamal) epcHtml += '<div class="tt-row"><span class="tt-lbl">Use</span><span class="tt-val">' + d.andamal + '</span></div>';
-        if (d.eclass)  epcHtml += '<div class="tt-row"><span class="tt-lbl">Energy class</span><span class="tt-val">' + d.eclass + '</span></div>';
-        if (d.address) epcHtml += '<div class="tt-row"><span class="tt-lbl">Address</span><span class="tt-val">' + d.address + '</span></div>';
-        tooltip.innerHTML = epcHtml;
-      }} else {{
-        tooltip.style.display = 'none';
-      }}
-    }},
-  }});
-}}
-
-function getLayers() {{
-  const layers = [ buildTileLayer(), buildLayer() ];
-  if (showEpc) layers.push(buildEpcLayer());
-  const mk = buildMarkerLayer();
-  if (mk) layers.push(mk);
-  return layers.filter(Boolean);
-}}
-
-// ---------------------------------------------------------------------------
-// deck.gl Deck — standalone renderer, works from file:// and any HTTP origin
-// ---------------------------------------------------------------------------
-const deckgl = new Deck({{
-  canvas: document.getElementById('deck-canvas'),
-  views: new MapView({{ repeat: true }}),
-  controller: true,
-  initialViewState: currentViewState,
-  onViewStateChange: ({{ viewState }}) => {{ currentViewState = viewState; }},
-  layers: getLayers(),
-  _onMetrics: null,
 }});
 
-// ---------------------------------------------------------------------------
-// Tooltip
-// ---------------------------------------------------------------------------
-const tooltip = document.getElementById('tooltip');
-
-const USE_LABELS_JS = {{
-  bostad_enfamilj:   'Single-family home',
-  bostad_flerfamilj: 'Multi-family residential',
-  komplement:        'Outbuilding / garage',
-  verksamhet:        'Commercial / office',
-  industri:          'Industrial',
-  samhalle:          'Public / civic',
-  ovrigt:            'Unknown / other',
-}};
-
-function row(label, value) {{
-  if (value === null || value === undefined) return '';
-  return '<div class="tt-row"><span class="tt-lbl">' + label + '</span><span class="tt-val">' + value + '</span></div>';
+// Thumb click → fly + capture
+for (const dir of DIRS) {{
+  document.getElementById('thumb-'+dir).addEventListener('click', () => captureToCanvas(dir));
 }}
 
-function showTooltip(info) {{
-  if (info.object) {{
-    const d = info.object;
-    // Keep tooltip inside viewport
-    const vw = window.innerWidth, vh = window.innerHeight;
-    let tx = info.x + 16, ty = info.y + 16;
-    if (tx + 310 > vw) tx = info.x - 310;
-    if (ty + 280 > vh) ty = info.y - 280;
-    tooltip.style.left = tx + 'px';
-    tooltip.style.top  = ty + 'px';
-    tooltip.style.display = 'block';
-
-    const useLabel = USE_LABELS_JS[d.use_cat] || d.use_cat || 'Unknown';
-    const subStr   = d.subtype ? d.subtype.replace(/_/g,' ') : null;
-    const andamal  = d.andamal ? d.andamal.replace(/;/g, ' · ').replace(/[ ]+/g,' ').trim() : null;
-
-    const eclassColor = {{'A':'#22c55e','B':'#86efac','C':'#bef264','D':'#fde047','E':'#fb923c','F':'#f87171','G':'#dc2626'}};
-    const eclassHtml  = d.eclass && eclassColor[d.eclass]
-      ? `<span style="background:${{eclassColor[d.eclass]}};color:#000;font-weight:700;padding:1px 6px;border-radius:4px">${{d.eclass}}</span>`
-      : d.eclass || null;
-
-    const title = d.address ? d.address : '🏢 Building';
-    const periodLabel = d.tabula_period ? (PERIOD_LABELS[d.tabula_period] || d.tabula_period) : null;
-    const periodCol   = d.tabula_period ? PERIOD_COLORS[d.tabula_period] : null;
-    const periodBadge = periodLabel && periodCol
-      ? `<span style="background:rgb(${{periodCol[0]}},${{periodCol[1]}},${{periodCol[2]}});color:#000;font-weight:700;padding:1px 7px;border-radius:4px;font-size:10px">${{periodLabel}}</span>`
-      : (periodLabel || null);
-    tooltip.innerHTML =
-      `<div class="tt-title">${{title}}</div>` +
-      row('Building use', useLabel) +
-      (andamal ? row('EPC category', andamal) : '') +
-      `<hr class="tt-divider"/>` +
-      row('Year built', d.year) +
-      row('TABULA period', periodBadge) +
-      row('Storeys', d.floors ? d.floors.toFixed(0) : null) +
-      row('Heated area (Atemp)', d.area ? d.area.toLocaleString() + ' m²' : null) +
-      row('Energy use', d.energy ? d.energy.toFixed(0) + ' kWh/m²·yr' : null) +
-      row('Energy class', eclassHtml) +
-      `<hr class="tt-divider"/>` +
-      (d.tabula_u_wall  ? row('U wall',   d.tabula_u_wall  + ' W/m²K') : '') +
-      (d.tabula_u_roof  ? row('U roof',   d.tabula_u_roof  + ' W/m²K') : '') +
-      (d.tabula_u_win   ? row('U window', d.tabula_u_win   + ' W/m²K') : '') +
-      (d.tabula_heat_z3 ? row('TABULA heat demand (Z3)', d.tabula_heat_z3 + ' kWh/m²·yr') : '') +
-      (d.tabula_wall    ? row('Wall construction', d.tabula_wall) : '') +
-      (d.tabula_roof    ? row('Roof construction', d.tabula_roof) : '') +
-      (energyCompare && d.perf_pct !== null && d.perf_pct !== undefined
-        ? (() => {{
-            const pct = d.perf_pct;
-            const label = pct < 0.2 ? '🟢 Top 20% (best for its era)'
-                        : pct < 0.4 ? '🟡 Above average'
-                        : pct < 0.6 ? '🟠 Average'
-                        : pct < 0.8 ? '🔴 Below average'
-                                    : '🔴 Bottom 20% (worst for its era)';
-            return `<hr class="tt-divider"/>` +
-              row('Era performance', label) +
-              row('Percentile (within era)', `top ${{Math.round((1-pct)*100)}}%`);
-          }})()
-        : '') +
-      `<hr class="tt-divider"/>` +
-      row('Height', d.height.toFixed(1) + ' m');
-  }} else {{
-    tooltip.style.display = 'none';
+function showWWR(wwr, perFacade, source) {{
+  document.getElementById('wwr-value').textContent = wwr;
+  document.getElementById('wwr-bar').style.width = Math.min(100, wwr * 1.4) + '%';
+  let breakdown = source === 'heuristic'
+    ? 'Source: TABULA archetype heuristic'
+    : 'Source: blended (visual + heuristic)';
+  if (perFacade) {{
+    breakdown += '<br>Per facade: ' + DIRS.map((d,i) => d+':'+perFacade[i]+'%').join(' ');
   }}
+  document.getElementById('wwr-breakdown').innerHTML = breakdown;
 }}
 
-// ---------------------------------------------------------------------------
-// Energy-class legend builder
-// ---------------------------------------------------------------------------
-function buildEclassLegend() {{
-  const container = document.getElementById('eclass-legend');
-  if (!container) return;
-  const items = container.querySelectorAll('.eclass-item');
-  items.forEach(item => {{
-    const cls = item.dataset.eclass;
-    item.classList.toggle('active', highlightEclass === cls);
+document.getElementById('btn-exit-inspect').addEventListener('click', () => {{
+  document.getElementById('facade-panel').style.display = 'none';
+  document.getElementById('wwr-panel').style.display = 'none';
+  facadeBuilding = null;
+  viewer.camera.flyTo({{
+    destination: Cesium.Cartesian3.fromDegrees({cx:.6f}, {cy:.6f}, 1800),
+    orientation: {{ heading:0, pitch:Cesium.Math.toRadians(-50), roll:0 }},
+    duration: 1.5,
   }});
-}}
-
-document.getElementById('eclass-legend').addEventListener('click', (e) => {{
-  const item = e.target.closest('.eclass-item');
-  if (!item) return;
-  const cls = item.dataset.eclass;
-  highlightEclass = (highlightEclass === cls) ? null : cls;
-  buildEclassLegend();
-  deckgl.setProps({{ layers: getLayers() }});
 }});
 
-// ---------------------------------------------------------------------------
-// Energy extreme cards (best / worst buildings per construction era)
-// ---------------------------------------------------------------------------
-function buildEnergyCards(period) {{
-  const cardsEl = document.getElementById('energy-cards');
-  if (!period || !PERIOD_CARDS[period]) {{
-    cardsEl.style.display = 'none';
-    return;
-  }}
-  cardsEl.style.display = 'block';
-  const ECLASS_BG = {{
-    A:'#16a34a', B:'#4ade80', C:'#bef264',
-    D:'#fde047', E:'#fb923c', F:'#f87171', G:'#dc2626'
-  }};
-  ['best','worst'].forEach(type => {{
-    const list = document.getElementById('ec-' + type + '-list');
-    list.innerHTML = '';
-    (PERIOD_CARDS[period][type] || []).forEach(c => {{
-      const badge = c.eclass
-        ? `<span class="ec-badge" style="background:${{ECLASS_BG[c.eclass]||'#475569'}};color:${{['D','E'].includes(c.eclass)?'#000':'#fff'}}">${{c.eclass}}</span>`
-        : '';
-      list.innerHTML += `<div class="ec-card ${{type}}">
-        <span class="ec-addr" title="${{c.addr}}">${{c.addr}}</span>
-        ${{badge}}
-        <span class="ec-val">${{Math.round(c.energy)}} kWh/m²</span>
-      </div>`;
-    }});
+// ─────────────────────────────────────────────────────────────────
+// Color mode toggle
+// ─────────────────────────────────────────────────────────────────
+function setColorMode(mode) {{
+  colorMode = mode;
+  ['use','eclass','year'].forEach(m => {{
+    document.getElementById('btn-'+m).classList.toggle('active', m === mode);
   }});
+  rebuildBuildings();
 }}
+document.getElementById('btn-use').addEventListener('click',    () => setColorMode('use'));
+document.getElementById('btn-eclass').addEventListener('click', () => setColorMode('eclass'));
+document.getElementById('btn-year').addEventListener('click',   () => setColorMode('year'));
 
-// ---------------------------------------------------------------------------
-// Unified mode switcher
-// ---------------------------------------------------------------------------
-function switchMode(newMode) {{
-  colorMode = newMode;
-  highlightPeriod = null;
-  highlightEclass = null;
-  buildEnergyCards(null);
-
-  const usePanel   = document.getElementById('panel');
-  const yearPanel  = document.getElementById('year-panel');
-  const eclassPanel= document.getElementById('eclass-panel');
-
-  const btnYear  = document.getElementById('btn-year-mode');
-  const btnEclass= document.getElementById('btn-eclass-mode');
-
-  // Reset button styles
-  [btnYear, btnEclass].forEach(b => {{ b.style.borderColor = ''; b.style.color = ''; }});
-
-  if (newMode === 'year') {{
-    usePanel.style.display   = 'none';
-    yearPanel.style.display  = 'block';
-    eclassPanel.style.display= 'none';
-    btnYear.textContent      = '🏷 Use mode';
-    btnYear.style.borderColor= 'rgba(150,215,76,0.5)';
-    btnYear.style.color      = '#96d74c';
-    buildPeriodLegend();
-  }} else if (newMode === 'eclass') {{
-    usePanel.style.display   = 'none';
-    yearPanel.style.display  = 'none';
-    eclassPanel.style.display= 'block';
-    btnEclass.textContent    = '🏷 Use mode';
-    btnEclass.style.borderColor= 'rgba(150,215,76,0.5)';
-    btnEclass.style.color    = '#96d74c';
-    buildEclassLegend();
-  }} else {{
-    usePanel.style.display   = 'block';
-    yearPanel.style.display  = 'none';
-    eclassPanel.style.display= 'none';
-    btnYear.textContent      = '🗓 Year era';
-    btnEclass.textContent    = '⚡ Energy class';
-  }}
-  deckgl.setProps({{ layers: getLayers() }});
-}}
-
-// ---------------------------------------------------------------------------
-// Controls
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────
+// Reset view
+// ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-reset').addEventListener('click', () => {{
-  deckgl.setProps({{ initialViewState: {{
-    longitude: {cx:.6f}, latitude: {cy:.6f},
-    zoom: 13, pitch: is3D ? 50 : 0, bearing: -15,
-    transitionDuration: 1200,
-    transitionInterpolator: new FlyToInterpolator({{ speed: 1.5 }}),
-  }} }});
-}});
-
-document.getElementById('btn-toggle').addEventListener('click', () => {{
-  is3D = !is3D;
-  deckgl.setProps({{
-    layers: getLayers(),
-    initialViewState: {{ ...currentViewState, pitch: is3D ? 50 : 0, transitionDuration: 700 }},
+  viewer.camera.flyTo({{
+    destination: Cesium.Cartesian3.fromDegrees({cx:.6f}, {cy:.6f}, 1800),
+    orientation: {{ heading:0, pitch:Cesium.Math.toRadians(-50), roll:0 }},
+    duration: 1.5,
   }});
 }});
 
-document.getElementById('btn-epc-layer').addEventListener('click', () => {{
-  showEpc = !showEpc;
-  document.getElementById('btn-epc-layer').classList.toggle('active', showEpc);
-  deckgl.setProps({{ layers: getLayers() }});
-}});
-
-// ---------------------------------------------------------------------------
-// Cesium Globe
-// ---------------------------------------------------------------------------
-let cesiumViewer = null;
-const CITIES = [
-  {{ name: 'Gothenburg', lon: {cx:.6f}, lat: {cy:.6f}, active: true }},
-];
-
-function initCesium() {{
-  if (cesiumViewer) return;  // already initialised
-  // Lazy-load Cesium from CDN
-  const cssLink = document.createElement('link');
-  cssLink.rel = 'stylesheet';
-  cssLink.href = 'https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css';
-  document.head.appendChild(cssLink);
-
-  const script = document.createElement('script');
-  script.src = 'https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Cesium.js';
-  script.onload = () => {{
-    Cesium.Ion.defaultAccessToken = undefined;  // no token — uses free offline ellipsoid
-    cesiumViewer = new Cesium.Viewer('cesium-container', {{
-      timeline: false, animation: false, baseLayerPicker: false,
-      geocoder: false, homeButton: false, sceneModePicker: false,
-      navigationHelpButton: false, fullscreenButton: false,
-      imageryProvider: new Cesium.TileMapServiceImageryProvider({{
-        url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII'),
-      }}),
-    }});
-    cesiumViewer.scene.globe.enableLighting = true;
-    cesiumViewer.scene.skyBox.show = true;
-
-    // Add city pins
-    CITIES.forEach(city => {{
-      const entity = cesiumViewer.entities.add({{
-        name: city.name,
-        position: Cesium.Cartesian3.fromDegrees(city.lon, city.lat, 0),
-        billboard: {{
-          image: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
-            '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">'+
-            '<ellipse cx="16" cy="38" rx="6" ry="2.5" fill="rgba(0,0,0,0.35)"/>'+
-            '<path d="M16 0 C7.163 0 0 7.163 0 16 C0 28 16 40 16 40 C16 40 32 28 32 16 C32 7.163 24.837 0 16 0Z" fill="'+(city.active ? '#721CB8' : '#64748b')+'"/>'+
-            '<circle cx="16" cy="16" r="7" fill="white" opacity="0.9"/>'+
-            '</svg>'
-          ),
-          width: 32, height: 40, verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-        }},
-        label: {{
-          text: city.name,
-          font: '13px Inter, sans-serif',
-          fillColor: Cesium.Color.WHITE,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 2,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          verticalOrigin: Cesium.VerticalOrigin.TOP,
-          pixelOffset: new Cesium.Cartesian2(0, 4),
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        }},
-      }});
-    }});
-
-    // Fly to first city
-    cesiumViewer.camera.flyTo({{
-      destination: Cesium.Cartesian3.fromDegrees({cx:.6f}, {cy:.6f}, 800000),
-      duration: 2,
-    }});
-
-    // Click on a pin → close globe, fly to that city in deck.gl
-    cesiumViewer.screenSpaceEventHandler.setInputAction(movement => {{
-      const picked = cesiumViewer.scene.pick(movement.position);
-      if (Cesium.defined(picked) && picked.id) {{
-        const city = picked.id.properties;
-        // Currently we only have Gothenburg — extend this when more cities added
-        document.getElementById('cesium-globe').style.display = 'none';
-      }}
-    }}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-  }};
-  document.head.appendChild(script);
-}}
-
-document.getElementById('btn-globe').addEventListener('click', () => {{
-  const globe = document.getElementById('cesium-globe');
-  globe.style.display = 'flex';
-  initCesium();
-}});
-document.getElementById('cesium-close').addEventListener('click', () => {{
-  document.getElementById('cesium-globe').style.display = 'none';
-}});
-
-document.getElementById('btn-year-mode').addEventListener('click', () => {{
-  switchMode(colorMode === 'year' ? 'use' : 'year');
-}});
-
-document.getElementById('btn-eclass-mode').addEventListener('click', () => {{
-  switchMode(colorMode === 'eclass' ? 'use' : 'eclass');
-}});
-
-document.getElementById('year-clear').addEventListener('click', () => {{
-  highlightPeriod = null;
-  buildPeriodLegend();
-  buildEnergyCards(null);
-  deckgl.setProps({{ layers: getLayers() }});
-}});
-
-document.getElementById('eclass-clear').addEventListener('click', () => {{
-  highlightEclass = null;
-  buildEclassLegend();
-  deckgl.setProps({{ layers: getLayers() }});
-}});
-
-document.getElementById('btn-energy-compare').addEventListener('click', () => {{
-  energyCompare = !energyCompare;
-  const btn = document.getElementById('btn-energy-compare');
-  const perfLegend = document.getElementById('perf-legend');
-  if (energyCompare) {{
-    btn.classList.add('active');
-    btn.textContent = '⚡ Energy compare ON';
-    perfLegend.style.display = 'block';
-    // Draw gradient for the highlighted period or first with data
-    const activePeriod = highlightPeriod || PERIOD_ORDER.find(p => periodEnergyStats[p]) || PERIOD_ORDER[0];
-    setTimeout(() => drawGradientBar(activePeriod), 50);
-  }} else {{
-    btn.classList.remove('active');
-    btn.textContent = '⚡ Compare energy use';
-    perfLegend.style.display = 'none';
-  }}
-  deckgl.setProps({{ layers: getLayers() }});
-}});
-
-// Redraw gradient bar when period highlight changes (only in energy compare mode)
-// Patch buildPeriodLegend in-place so existing click handlers pick up the change
-const _origBuildPeriodLegend = buildPeriodLegend;
-buildPeriodLegend = function buildPeriodLegendWithGradient() {{
-  _origBuildPeriodLegend();
-  if (energyCompare) {{
-    const activePeriod = highlightPeriod || PERIOD_ORDER.find(p => periodEnergyStats[p]) || PERIOD_ORDER[0];
-    setTimeout(() => drawGradientBar(activePeriod), 50);
-  }}
-}};
-
-// ---------------------------------------------------------------------------
-// Address search via Nominatim (OpenStreetMap) – no API key needed
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────
+// Address search (Nominatim)
+// ─────────────────────────────────────────────────────────────────
 const searchInput   = document.getElementById('search-input');
 const searchBtn     = document.getElementById('search-btn');
 const searchResults = document.getElementById('search-results');
-const searchStatus  = document.getElementById('search-status');
-
-function setStatus(msg, isError) {{
-  searchStatus.style.display = msg ? 'block' : 'none';
-  searchStatus.style.color = isError ? '#f87171' : '#94a3b8';
-  searchStatus.textContent  = msg;
-}}
 
 async function geocodeAddress() {{
   const q = searchInput.value.trim();
   if (!q) return;
-
-  searchBtn.classList.add('loading');
   searchBtn.textContent = '…';
-  searchResults.style.display = 'none';
-  setStatus('');
-
   try {{
-    // Bias search to Gothenburg region using viewbox
-    const url = `https://nominatim.openstreetmap.org/search?` +
-      `q=${{encodeURIComponent(q + ', Gothenburg, Sweden')}}` +
-      `&format=jsonv2&limit=5&addressdetails=1` +
-      `&viewbox=11.7,57.5,12.3,57.9&bounded=0`;
-
-    const resp = await fetch(url, {{
-      headers: {{ 'Accept-Language': 'en', 'User-Agent': 'GothenburgBuildingViewer/1.0' }}
-    }});
-    const data = await resp.json();
-
-    if (!data.length) {{
-      setStatus('No results found. Try a street name or postcode.', true);
-      return;
-    }}
-
-    // Render result list
-    searchResults.innerHTML = data.map((r, i) => {{
-      const name = r.name || r.display_name.split(',')[0];
-      const addr = r.display_name.split(',').slice(1, 4).join(',').trim();
-      return '<div class="result-item" data-idx="' + i + '">' +
-        '<div class="result-name">' + name + '</div>' +
-        '<div class="result-addr">' + addr + '</div>' +
-        '</div>';
-    }}).join('');
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=6&q=' +
+                encodeURIComponent(q + ' Gothenburg');
+    const data = await (await fetch(url)).json();
+    if (!data.length) {{ searchResults.innerHTML='<div class="result-item">No results</div>'; searchResults.style.display='block'; return; }}
+    searchResults.innerHTML = data.map((r,i) =>
+      '<div class="result-item" data-idx="'+i+'">'+r.display_name+'</div>'
+    ).join('');
     searchResults.style.display = 'block';
-    setStatus(`${{data.length}} result${{data.length > 1 ? 's' : ''}} found`);
-
-    // Store results for click handler
     searchResults._data = data;
-
   }} catch(e) {{
-    setStatus('Search failed – check your internet connection.', true);
+    searchResults.innerHTML = '<div class="result-item">Search failed</div>';
+    searchResults.style.display = 'block';
   }} finally {{
-    searchBtn.classList.remove('loading');
-    searchBtn.textContent = '🔍 Search';
+    searchBtn.textContent = '&#128269; Search';
   }}
 }}
 
-// Fly to a result and drop a marker
-function flyToResult(r) {{
-  const lng = parseFloat(r.lon);
-  const lat = parseFloat(r.lat);
-
-  // Update marker ScatterplotLayer
-  markerData = [{{ position: [lng, lat] }}];
-  const zoomMap = {{
-    'house': 18, 'building': 18, 'road': 16, 'residential': 16,
-    'suburb': 14, 'neighbourhood': 14, 'postcode': 15,
-    'city': 13, 'town': 13,
-  }};
-  const zoom = zoomMap[r.type] || zoomMap[r.addresstype] || 17;
-
-  deckgl.setProps({{
-    layers: getLayers(),
-    initialViewState: {{
-      longitude: lng, latitude: lat, zoom,
-      pitch: is3D ? 50 : 0,
-      bearing: currentViewState.bearing,
-      transitionDuration: 1400,
-      transitionInterpolator: new FlyToInterpolator({{ speed: 1.5 }}),
-    }},
-  }});
-
-  searchResults.style.display = 'none';
-  setStatus('');
-}}
-
-// Wire up events
 searchBtn.addEventListener('click', geocodeAddress);
-searchInput.addEventListener('keydown', e => {{ if (e.key === 'Enter') geocodeAddress(); }});
-
+searchInput.addEventListener('keydown', e => {{ if (e.key==='Enter') geocodeAddress(); }});
 searchResults.addEventListener('click', e => {{
   const item = e.target.closest('.result-item');
   if (!item) return;
-  const idx  = parseInt(item.dataset.idx);
-  flyToResult(searchResults._data[idx]);
+  const r = searchResults._data[parseInt(item.dataset.idx)];
+  viewer.camera.flyTo({{
+    destination: Cesium.Cartesian3.fromDegrees(parseFloat(r.lon), parseFloat(r.lat), 300),
+    orientation: {{ heading:0, pitch:Cesium.Math.toRadians(-45), roll:0 }},
+    duration: 1.5,
+  }});
+  searchResults.style.display = 'none';
 }});
-
-// Close results on outside click
 document.addEventListener('click', e => {{
-  if (!document.getElementById('search-box').contains(e.target)) {{
+  if (!document.getElementById('search-box').contains(e.target))
     searchResults.style.display = 'none';
-  }}
 }});
 </script>
 </body>
