@@ -126,30 +126,46 @@ from shapely import wkb as shapely_wkb
 print("Loading EPC footprints for building use …")
 con = duckdb.connect("data/sensitivity/epc_sweden.duckdb", read_only=True)
 epc_raw = con.execute("""
+    -- One row per footprint polygon, with the most specific address for that unit.
+    -- If footprint.husnummer matches an EPC row's IdHusnr, use that address;
+    -- otherwise fall back to MIN(IdAdr) across the whole FormularId.
     SELECT
         f.FormularId,
         f.geom,
         f.andamal1,
         f.fastighetsbeteckning,
-        e.year_built,
-        e.floors_epc,
-        e.area_atemp,
-        e.energy_kwh_m2,
-        e.energy_class,
-        e.address
+        e_agg.year_built,
+        e_agg.floors_epc,
+        e_agg.area_atemp,
+        e_agg.energy_kwh_m2,
+        e_agg.energy_class,
+        COALESCE(
+            MIN(CASE WHEN TRY_CAST(f.husnummer AS BIGINT) = e.IdHusnr
+                          THEN TRIM(e.IdAdr) END),
+            e_agg.address
+        ) AS address
     FROM footprints f
+    LEFT JOIN epc e ON f.FormularId = e.FormularId
+                    AND e.IdAdr IS NOT NULL
+                    AND TRIM(e.IdAdr) != ''
     LEFT JOIN (
         SELECT
             FormularId,
-            MIN(EgenNybyggAr)              AS year_built,
-            MIN(EgenAntalPlan)             AS floors_epc,
-            MIN(EgenAtemp)                AS area_atemp,
-            MIN(EgiSpecifikEnergianvandning) AS energy_kwh_m2,
-            MIN(EgiEnergiklass)            AS energy_class,
-            MIN(IdAdr)                    AS address
+            MIN(EgenNybyggAr)                   AS year_built,
+            MIN(EgenAntalPlan)                  AS floors_epc,
+            MIN(EgenAtemp)                      AS area_atemp,
+            MIN(EgiSpecifikEnergianvandning)     AS energy_kwh_m2,
+            MIN(EgiEnergiklass)                 AS energy_class,
+            MIN(IdAdr)                          AS address
         FROM epc
+        WHERE IdAdr IS NOT NULL AND TRIM(IdAdr) != ''
         GROUP BY FormularId
-    ) e ON f.FormularId = e.FormularId
+    ) e_agg ON f.FormularId = e_agg.FormularId
+    WHERE f.geom IS NOT NULL
+    GROUP BY f.FormularId, f.objektidentitet, f.geom,
+             f.andamal1, f.fastighetsbeteckning, f.husnummer,
+             e_agg.year_built, e_agg.floors_epc, e_agg.area_atemp,
+             e_agg.energy_kwh_m2, e_agg.energy_class, e_agg.address
 """).fetchdf()
 con.close()
 
@@ -161,41 +177,34 @@ epc_gdf = gpd.GeoDataFrame(epc_raw[epc_cols], crs="EPSG:4326")
 epc_3006 = epc_gdf.to_crs("EPSG:3006")
 gdf_3006 = gdf.to_crs("EPSG:3006")
 
-# Use representative_point() — guaranteed to be inside even complex MultiPolygons
-epc_pts = epc_3006.copy()
-epc_pts["geometry"] = epc_3006.geometry.representative_point()
-
-# Crop EPC points to bbox (with small buffer for edge buildings)
+# Crop EPC polygons to bbox (with small buffer for edge buildings)
 bbox_poly = gpd.GeoDataFrame(
     geometry=gpd.GeoSeries.from_wkt(
         [f"POLYGON(({LON_MIN} {LAT_MIN},{LON_MAX} {LAT_MIN},{LON_MAX} {LAT_MAX},{LON_MIN} {LAT_MAX},{LON_MIN} {LAT_MIN}))"]
     ), crs="EPSG:4326"
 ).to_crs("EPSG:3006").geometry.iloc[0]
-epc_pts = epc_pts[epc_pts.geometry.within(bbox_poly.buffer(200))].copy()
-print(f"  EPC footprints in bbox: {len(epc_pts):,}")
+epc_polys = epc_3006[epc_3006.geometry.intersects(bbox_poly.buffer(200))].copy()
+print(f"  EPC footprints in bbox: {len(epc_polys):,}")
 
-# Step 1: exact sjoin — EPC point falls inside a EUBUCCO polygon
-gdf_3006_idx = gdf_3006[["geometry"]].copy().reset_index().rename(columns={"index": "eubucco_idx"})
-joined_exact = gpd.sjoin(epc_pts, gdf_3006_idx, how="inner", predicate="within")
+# Use EPC polygon centroids for reliable nearest-neighbour matching
+# (individual footprints are ~88 m² — too small for "within" predicate)
+epc_cents = epc_polys.copy()
+epc_cents["geometry"] = epc_polys.geometry.centroid
 
-# Step 2: nearest-neighbour join for the remaining unmatched EPC points
-#   (handles cases where EPC and EUBUCCO footprints are slightly offset)
-MAX_DIST_M = 25  # max 25 m to nearest EUBUCCO polygon centroid
-matched_epc_ids = set(joined_exact.index)
-epc_unmatched = epc_pts[~epc_pts.index.isin(matched_epc_ids)].copy()
+# EUBUCCO centroids — used as query points
+gdf_3006_pts = gdf_3006.copy()
+gdf_3006_pts = gdf_3006_pts.reset_index().rename(columns={"index": "eubucco_idx"})
+gdf_3006_pts["geometry"] = gdf_3006_pts["geometry"].centroid
+gdf_3006_pts = gdf_3006_pts[["eubucco_idx", "geometry"]]
+
+# Single nearest-neighbour pass: each EUBUCCO building → nearest EPC footprint centroid
+MAX_DIST_M = 30  # metres — tight enough to avoid cross-street mismatches
 joined_nearest = gpd.sjoin_nearest(
-    epc_unmatched, gdf_3006_idx,
-    how="inner", max_distance=MAX_DIST_M, distance_col="dist_m"
+    gdf_3006_pts, epc_cents,
+    how="left", max_distance=MAX_DIST_M, distance_col="dist_m"
 )
-# Drop duplicates from nearest — keep closest match per EPC point
-joined_nearest = joined_nearest.sort_values("dist_m").drop_duplicates(subset=[joined_nearest.index.name or "FormularId"])
-
-# Combine exact + nearest matches
-EXTRA_COLS = ["andamal1", "fastighetsbeteckning", "year_built", "floors_epc", "area_atemp", "energy_kwh_m2", "energy_class", "address", "eubucco_idx"]
-joined = pd.concat([
-    joined_exact[[c for c in EXTRA_COLS if c in joined_exact.columns]],
-    joined_nearest[[c for c in EXTRA_COLS if c in joined_nearest.columns]],
-], ignore_index=False)
+# One EPC footprint per EUBUCCO building — keep closest
+joined = joined_nearest.sort_values("dist_m").drop_duplicates("eubucco_idx")
 
 # Per EUBUCCO building: aggregate — mode for categorical, median for numeric
 def _mode(x):
@@ -212,6 +221,7 @@ agg = joined.groupby("eubucco_idx").agg(
     energy_kwh_m2  =("energy_kwh_m2",         _med),
     energy_class   =("energy_class",          _mode),
     address_epc    =("address",               _mode),
+    formular_id    =("FormularId",            _mode),
 )
 gdf = gdf.join(agg)
 matched = gdf["andamal1_epc"].notna().sum()
@@ -259,7 +269,7 @@ print(f"  {len(_tabula_lookup)} TABULA archetypes loaded")
 TABULA_PERIODS = ["...1960", "1961-1975", "1976-1985", "1986-1995", "1996-2005"]
 
 def _year_to_period(year):
-    if year is None or (isinstance(year, float) and np.isnan(year)):
+    if year is None or pd.isna(year):
         return None
     y = int(year)
     if y <= 1960:   return "...1960"
@@ -320,10 +330,9 @@ for _p in TABULA_PERIODS + ["post-2005"]:
         gdf.loc[_mask, "perf_pct"] = 0.5
 has_perf = gdf["perf_pct"].notna().sum()
 print(f"  Energy compare data: {has_perf:,} buildings with within-period ranking")
-n_exact = len(joined_exact)
-n_near  = len(joined_nearest)
+n_matched = joined["andamal1"].notna().sum()
 print(f"  Matched {matched:,} of {len(gdf):,} buildings to EPC use ({matched/len(gdf)*100:.1f}%)")
-print(f"  (exact 'within': {n_exact:,} EPC pts | nearest <={MAX_DIST_M}m: {n_near:,} EPC pts)")
+print(f"  (nearest <={MAX_DIST_M}m: {n_matched:,} EPC pts matched)")
 print(f"  Top andamal1 values:")
 print(joined["andamal1"].value_counts().head(10).to_string())
 
@@ -401,17 +410,24 @@ for _, row in gdf.iterrows():
     enrg     = row.get("energy_kwh_m2", None)
     eklass   = row.get("energy_class", None)
     addr     = row.get("address_epc", None)
+    all_addr = row.get("all_addresses", None)
     fastbet  = row.get("fastighet_epc", None)
-    # Strip apartment suffix (e.g. 'Mandolingatan 80 LGH 1001' -> 'Mandolingatan 80')
+    # Strip apartment suffix from primary address
     if addr and addr == addr:
         import re
         addr = re.sub(r'\s+(LGH|lgh|ANL|LOKAL|KONTOR|GAR|P-PLATS).*$', '', str(addr)).strip()
     else:
         addr = None
+    # Clean all_addresses
+    if all_addr and all_addr == all_addr and str(all_addr).strip() not in ('', 'nan', 'None'):
+        import re as _re
+        all_addr = _re.sub(r'\s+(LGH|lgh|ANL|LOKAL|KONTOR|GAR|P-PLATS)[^,]*', '', str(all_addr)).strip(', ')
+    else:
+        all_addr = None
     # Fallback to fastighetsbeteckning if no street address
-    display_addr = addr if addr else (str(fastbet).strip() if fastbet and fastbet == fastbet and str(fastbet).strip() else None)
-    def _safe_int(v):  return int(v) if v is not None and v == v else None
-    def _safe_f1(v):   return round(float(v), 1) if v is not None and v == v else None
+    display_addr = addr if addr else (str(fastbet).strip() if fastbet and not pd.isna(fastbet) and str(fastbet).strip() else None)
+    def _safe_int(v):  return int(v) if v is not None and not pd.isna(v) else None
+    def _safe_f1(v):   return round(float(v), 1) if v is not None and not pd.isna(v) else None
     records.append({
         "coordinates": row["coordinates"],
         "height":      round(float(row["elev"]), 1),
@@ -426,6 +442,7 @@ for _, row in gdf.iterrows():
         "andamal":     str(andamal) if andamal and andamal == andamal else None,
         "use_cat":     use,
         "address":     display_addr,
+        "all_addresses": all_addr,
         "tabula_period":  row.get("tabula_period", None),
         "tabula_u_wall":  round(float(row["tabula_u_wall"]),  2) if row.get("tabula_u_wall")  is not None and row.get("tabula_u_wall")  == row.get("tabula_u_wall")  else None,
         "tabula_u_roof":  round(float(row["tabula_u_roof"]),  2) if row.get("tabula_u_roof")  is not None and row.get("tabula_u_roof")  == row.get("tabula_u_roof")  else None,
@@ -586,11 +603,16 @@ for _p in PERIOD_KEYS:
     def _row_to_card(r):
         eklass = str(r.get("energy_class","")).strip().upper()
         if eklass in ("","NAN","NONE"): eklass = None
+        yr = r.get("year_built_epc", None)
+        try: yr = int(yr) if yr and not pd.isna(yr) else None
+        except: yr = None
         return {
             "addr":   r["_addr"],
             "energy": round(float(r["_energy"]), 0),
             "eclass": eklass,
             "use":    r.get("use_cat","ovrigt"),
+            "period": r.get("tabula_period", None),
+            "year":   yr,
             "area":   int(r["area_atemp_epc"]) if r.get("area_atemp_epc") and str(r.get("area_atemp_epc")) not in ("nan","None") else None,
         }
     period_cards_json[_p] = {
@@ -600,6 +622,50 @@ for _p in PERIOD_KEYS:
 
 import json as _json
 period_cards_js = _json.dumps(period_cards_json)
+
+# Per-energy-class performance extremes
+eclass_cards_json = {}
+for _cls in ["A","B","C","D","E","F","G"]:
+    _sub = _ef[_ef["energy_class"].astype(str).str.strip().str.upper() == _cls].copy()
+    if _sub.empty:
+        eclass_cards_json[_cls] = {"best": [], "worst": []}
+        continue
+    _sub_sorted = _sub.sort_values("_energy")
+    eclass_cards_json[_cls] = {
+        "best":  [_row_to_card(r) for _, r in _sub_sorted.head(3).iterrows()],
+        "worst": [_row_to_card(r) for _, r in _sub_sorted.tail(3).iloc[::-1].iterrows()],
+    }
+eclass_cards_js = _json.dumps(eclass_cards_json)
+
+# Per-use-category: top-50 best + top-50 worst (for sortable table)
+use_cards_json = {}
+for _use in ["bostad_enfamilj","bostad_flerfamilj","verksamhet","industri","samhalle","komplement","ovrigt"]:
+    _sub = _ef[_ef["use_cat"] == _use].copy()
+    if _sub.empty:
+        use_cards_json[_use] = {"buildings": []}
+        continue
+    _sub_sorted = _sub.sort_values("_energy")
+    # Take best 50 + worst 50, deduplicated
+    _best  = list(_sub_sorted.head(50).index)
+    _worst = list(_sub_sorted.tail(50).index)
+    _combined = {i for i in _best + _worst}
+    _rows = _sub_sorted.loc[_sub_sorted.index.isin(_combined)]
+    use_cards_json[_use] = {"buildings": [_row_to_card(r) for _, r in _rows.iterrows()]}
+use_cards_js = _json.dumps(use_cards_json)
+
+# Per-year-era summary stats for legend
+period_stats = {}
+for _p in PERIOD_KEYS:
+    _sub = gdf[gdf["tabula_period"] == _p]
+    _energies = pd.to_numeric(_sub["energy_kwh_m2"], errors="coerce").dropna()
+    period_stats[_p] = {
+        "count": int(len(_sub)),
+        "median_kwh": round(float(_energies.median()), 0) if len(_energies) else None,
+    }
+period_stats_js = _json.dumps(period_stats)
+
+# No-EPC count
+n_no_epc = int(gdf["andamal1_epc"].isna().sum())
 
 # ---------------------------------------------------------------------------
 # Generate HTML
@@ -750,6 +816,11 @@ html = f"""<!DOCTYPE html>
       font-size:10px; font-weight:700; color:rgba(255,255,255,0.25);
       letter-spacing:.8px; text-transform:uppercase; pointer-events:none;
     }}
+    #controls-hint {{
+      position:absolute; bottom:8px; left:50%; transform:translateX(-50%); z-index:20;
+      font-size:11px; color:rgba(255,255,255,0.45); pointer-events:none;
+      white-space:nowrap; letter-spacing:.3px;
+    }}
   </style>
 </head>
 <body>
@@ -775,9 +846,32 @@ html = f"""<!DOCTYPE html>
 <div class="panel" id="left-panel">
   <h2>&#127963; Gothenburg 3D</h2>
   <div class="sub">EUBUCCO v0.2 + EPC · {n_total:,} buildings</div>
+
+  <!-- Stats bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0 12px">
+    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:#a78bfa">{n_epc_matched:,}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">EPC matched</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:#64748b">{n_no_epc:,}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">No EPC</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:#22c55e">{n_with_eclass:,}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">Energy class</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:#f59e0b">{n_eclass_total:,}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">TABULA matched</div>
+    </div>
+  </div>
+
   <div id="legend-container">
-    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Building use</div>
-    {type_legend_html}
+    <!-- Filled dynamically by updateLegend() -->
+  </div>
+  <div style="font-size:10px;color:var(--faint);margin-top:10px;line-height:1.5">
+    Click a row to see best &amp; worst performers
   </div>
 </div>
 
@@ -790,6 +884,15 @@ html = f"""<!DOCTYPE html>
     &#128247; Inspect Facades + WWR
   </button>
 </div>
+
+<!-- Hover tooltip card -->
+<div id="hover-card" style="
+  display:none; position:fixed; pointer-events:none; z-index:9999;
+  background:rgba(10,10,20,0.92); border:1px solid rgba(114,28,184,0.5);
+  border-radius:10px; padding:10px 13px; min-width:200px; max-width:280px;
+  font-family:Inter,sans-serif; font-size:12px; color:#e2e8f0;
+  box-shadow:0 4px 20px rgba(0,0,0,0.6); backdrop-filter:blur(6px);
+"></div>
 
 <!-- Facade inspector -->
 <div class="panel" id="facade-panel">
@@ -838,6 +941,14 @@ html = f"""<!DOCTYPE html>
   <div id="token-error" style="font-size:11px;color:#f87171;min-height:14px"></div>
 </div>
 
+<!-- Performance card panel — sortable + compare -->
+<div class="panel" id="perf-panel" style="display:none;top:16px;right:16px;width:320px;max-height:82vh;flex-direction:column;overflow:hidden">
+  <button class="close-btn" id="perf-close">&#x2715;</button>
+  <h2 id="perf-title">Performance</h2>
+  <div class="sub" id="perf-sub"></div>
+  <div id="perf-content" style="margin-top:10px;overflow-y:auto;flex:1"></div>
+</div>
+
 <!-- Controls -->
 <div id="controls">
   <button class="btn active" id="btn-use">&#127968; Use type</button>
@@ -849,12 +960,250 @@ html = f"""<!DOCTYPE html>
 </div>
 
 <div id="ppg-brand">PPG · Chalmers / Boverket</div>
+<div id="controls-hint">&#128205; Scroll to zoom &nbsp;·&nbsp; Drag to pan &nbsp;·&nbsp; Right-drag or Ctrl+drag to tilt/rotate &nbsp;·&nbsp; Hover buildings for details</div>
 
 <script>
 // ─────────────────────────────────────────────────────────────────
 // DATA
 // ─────────────────────────────────────────────────────────────────
 const DATA = {data_json};
+const PERIOD_CARDS  = {period_cards_js};
+const ECLASS_CARDS  = {eclass_cards_js};
+const USE_CARDS     = {use_cards_js};
+const PERIOD_STATS  = {period_stats_js};
+
+// Legend metadata
+const USE_LABELS_JS = {{
+  bostad_enfamilj:   'Single-family residential',
+  bostad_flerfamilj: 'Multi-family residential',
+  verksamhet:        'Commercial / Workplace',
+  industri:          'Industrial',
+  samhalle:          'Public / School / Care',
+  komplement:        'Complement (garage/shed)',
+  ovrigt:            'Other / Unknown',
+}};
+const ECLASS_LABELS_JS = {{
+  A:'A – Very efficient', B:'B – Efficient', C:'C – Above average',
+  D:'D – Average', E:'E – Below average', F:'F – Poor', G:'G – Very poor',
+}};
+const PERIOD_LABELS_JS = {{
+  '...1960':'Pre-1960','1961-1975':'1961–1975','1976-1985':'1976–1985',
+  '1986-1995':'1986–1995','1996-2005':'1996–2005','post-2005':'Post-2005',
+}};
+
+// CSS colour strings for legend dots
+const USE_CSS = {{
+  bostad_enfamilj:'rgb(255,165,50)',   bostad_flerfamilj:'rgb(255,210,60)',
+  verksamhet:'rgb(70,180,255)',         industri:'rgb(200,80,60)',
+  samhalle:'rgb(70,210,140)',           komplement:'rgb(140,140,160)',
+  ovrigt:'rgb(160,120,200)',
+}};
+const ECLASS_CSS = {{
+  A:'rgb(22,163,74)',   B:'rgb(74,222,128)',  C:'rgb(190,242,60)',
+  D:'rgb(250,204,21)',  E:'rgb(251,146,60)',  F:'rgb(239,68,68)',
+  G:'rgb(153,27,27)',
+}};
+const PERIOD_CSS = {{
+  '...1960':'rgb(100,149,237)', '1961-1975':'rgb(255,165,50)',
+  '1976-1985':'rgb(154,205,50)','1986-1995':'rgb(218,165,32)',
+  '1996-2005':'rgb(255,99,71)', 'post-2005':'rgb(147,112,219)',
+}};
+
+// Count buildings per key from DATA array (computed once)
+const _useCounts = {{}}, _eclassCounts = {{}}, _periodCounts = {{}};
+for (const b of DATA) {{
+  _useCounts[b.use_cat]         = (_useCounts[b.use_cat]         || 0) + 1;
+  if (b.eclass)      _eclassCounts[b.eclass]      = (_eclassCounts[b.eclass]      || 0) + 1;
+  if (b.tabula_period) _periodCounts[b.tabula_period] = (_periodCounts[b.tabula_period] || 0) + 1;
+}}
+
+function updateLegend(mode) {{
+  const container = document.getElementById('legend-container');
+  let rows = [];
+
+  if (mode === 'use') {{
+    rows = Object.entries(USE_LABELS_JS).map(([key, lbl]) => {{
+      const cnt = _useCounts[key] || 0;
+      const cards = USE_CARDS[key];
+      return {{ key, lbl, color: USE_CSS[key], cnt, hasCards: cards && cards.buildings.length > 0 }};
+    }});
+    container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Building use type</div>';
+
+  }} else if (mode === 'eclass') {{
+    rows = Object.entries(ECLASS_LABELS_JS).map(([key, lbl]) => {{
+      const cnt = _eclassCounts[key] || 0;
+      const stats = PERIOD_STATS;  // reuse — eclass cards loaded separately
+      const cards = ECLASS_CARDS[key];
+      return {{ key, lbl, color: ECLASS_CSS[key], cnt, hasCards: cards && (cards.best.length || cards.worst.length) }};
+    }});
+    container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Energy class (A–G)</div>';
+
+  }} else {{ // year/period
+    rows = Object.keys(PERIOD_LABELS_JS).map(key => {{
+      const cnt = _periodCounts[key] || 0;
+      const st  = PERIOD_STATS[key] || {{}};
+      const cards = PERIOD_CARDS[key];
+      const sub = st.median_kwh ? ' · ' + st.median_kwh + ' kWh/m²' : '';
+      return {{ key, lbl: PERIOD_LABELS_JS[key] + sub, color: PERIOD_CSS[key], cnt, hasCards: cards && (cards.best.length || cards.worst.length) }};
+    }});
+    container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Construction era</div>';
+  }}
+
+  for (const r of rows) {{
+    const div = document.createElement('div');
+    div.className = 'legend-row';
+    div.style.cssText = 'display:flex;align-items:center;gap:6px;margin:5px 0;font-size:11px;cursor:'+(r.hasCards?'pointer':'default')+';border-radius:6px;padding:3px 5px;transition:background .15s';
+    if (r.hasCards) div.style.cursor = 'pointer';
+    div.innerHTML = '<div style="width:12px;height:12px;border-radius:3px;background:'+r.color+';flex-shrink:0"></div>'
+      + '<span style="flex:1">'+r.lbl+'</span>'
+      + '<span style="color:var(--faint);font-size:10px">'+r.cnt.toLocaleString()+'</span>'
+      + (r.hasCards ? '<span style="margin-left:4px;font-size:10px;color:#a78bfa" title="Click to see best/worst">&#9654;</span>' : '');
+    if (r.hasCards) {{
+      const _key = r.key, _mode = mode;
+      div.addEventListener('mouseenter', () => div.style.background = 'rgba(167,139,250,0.1)');
+      div.addEventListener('mouseleave', () => div.style.background = '');
+      div.addEventListener('click', () => showPerfCards(_mode, _key));
+    }}
+    container.appendChild(div);
+  }}
+}}
+
+// ─────────────────────────────────────────────────────────────────
+// Performance card panel — sortable + compare
+// ─────────────────────────────────────────────────────────────────
+const ECLASS_BADGE = {{ A:'#16a34a',B:'#4ade80',C:'#bef264',D:'#facc15',E:'#fb923c',F:'#ef4444',G:'#991b1b' }};
+const ECLASS_TEXT  = {{ A:'#fff',   B:'#000',   C:'#000',   D:'#000',   E:'#fff',   F:'#fff',   G:'#fff' }};
+const PERIOD_SHORT = {{ '...1960':'<1960','1961-1975':'61–75','1976-1985':'76–85','1986-1995':'86–95','1996-2005':'96–05','post-2005':'>2005' }};
+
+let _perfMode = null, _perfKey = null;
+let _sortMode  = 'energy';    // 'energy' | 'year' | 'eclass'
+let _compareSet = new Set();  // addresses in compare basket
+let _perfList   = [];         // full building list for current panel
+
+function showPerfCards(mode, key) {{
+  _perfMode = mode; _perfKey = key;
+  _compareSet.clear();
+
+  if (mode === 'use') {{
+    const entry = USE_CARDS[key];
+    if (!entry || !entry.buildings.length) return;
+    _perfList = [...entry.buildings];
+    document.getElementById('perf-title').textContent = USE_LABELS_JS[key];
+    document.getElementById('perf-sub').textContent = _perfList.length + ' buildings with EPC data';
+  }} else if (mode === 'eclass') {{
+    const cards = ECLASS_CARDS[key];
+    if (!cards) return;
+    // merge best+worst, deduplicate by addr
+    const seen = new Set();
+    _perfList = [...cards.best, ...cards.worst].filter(c => {{ const ok = !seen.has(c.addr); seen.add(c.addr); return ok; }});
+    document.getElementById('perf-title').textContent = 'Energy Class ' + key;
+    document.getElementById('perf-sub').textContent = (ECLASS_LABELS_JS[key]||key) + ' · ' + _perfList.length + ' shown';
+  }} else {{
+    const cards = PERIOD_CARDS[key];
+    if (!cards) return;
+    const seen = new Set();
+    _perfList = [...cards.best, ...cards.worst].filter(c => {{ const ok = !seen.has(c.addr); seen.add(c.addr); return ok; }});
+    document.getElementById('perf-title').textContent = PERIOD_LABELS_JS[key] || key;
+    document.getElementById('perf-sub').textContent = 'Construction era · ' + _perfList.length + ' shown';
+  }}
+
+  _sortMode = 'energy';
+  renderPerfList();
+  document.getElementById('token-panel').style.display = 'none';
+  document.getElementById('perf-panel').style.display = 'flex';
+}}
+
+function renderPerfList() {{
+  // ---- sort ----
+  const sorted = [..._perfList].sort((a,b) => {{
+    if (_sortMode === 'year')   return (a.year||9999) - (b.year||9999);
+    if (_sortMode === 'eclass') return (a.eclass||'Z').localeCompare(b.eclass||'Z');
+    return (a.energy||9999) - (b.energy||9999);
+  }});
+
+  // ---- sort tabs ----
+  const tabs = [['energy','⚡ Energy'],['year','📅 Year built'],['eclass','🏷 Class']].map(([m,lbl]) =>
+    '<button onclick="_sortMode=\''+m+'\';renderPerfList()" style="flex:1;padding:5px 0;font-size:11px;border:none;border-radius:6px;cursor:pointer;font-family:inherit;'
+    +(_sortMode===m?'background:#7c3aed;color:#fff;font-weight:600':'background:rgba(255,255,255,0.07);color:var(--muted)')
+    +'">'+lbl+'</button>'
+  ).join('');
+
+  // ---- compare bar ----
+  let cmpHtml = '';
+  if (_compareSet.size >= 2) {{
+    const sel = sorted.filter(b => _compareSet.has(b.addr));
+    const minE = Math.min(...sel.map(b=>b.energy||999));
+    const maxE = Math.max(...sel.map(b=>b.energy||0));
+    cmpHtml = '<div style="background:#7c3aed22;border:1px solid #7c3aed55;border-radius:8px;padding:10px;margin-bottom:8px">';
+    cmpHtml += '<div style="font-weight:600;color:#a78bfa;font-size:11px;margin-bottom:8px">⚖ Compare ('+_compareSet.size+')</div>';
+    for (const b of sel) {{
+      const span = maxE > minE ? (b.energy - minE)/(maxE - minE) : 0.5;
+      const pct  = Math.round(span * 100);
+      const barC = pct < 33 ? '#22c55e' : pct < 66 ? '#f59e0b' : '#ef4444';
+      const badge = b.eclass ? '<span style="background:'+(ECLASS_BADGE[b.eclass]||'#555')+';color:'+(ECLASS_TEXT[b.eclass]||'#fff')+';border-radius:3px;padding:0 4px;font-size:9px">'+b.eclass+'</span>' : '';
+      cmpHtml += '<div style="margin-bottom:7px">';
+      cmpHtml +=   '<div style="display:flex;align-items:center;gap:5px"><span style="flex:1;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+b.addr+'</span>'+badge+'</div>';
+      cmpHtml +=   '<div style="display:flex;align-items:center;gap:6px;margin-top:3px">';
+      cmpHtml +=     '<div style="flex:1;height:6px;background:rgba(255,255,255,0.1);border-radius:3px"><div style="width:'+Math.max(4,pct)+'%;height:100%;background:'+barC+';border-radius:3px;transition:width .3s"></div></div>';
+      cmpHtml +=     '<span style="font-size:11px;color:'+barC+';font-weight:700;white-space:nowrap">'+b.energy+' kWh/m²</span>';
+      cmpHtml +=   '</div>';
+      const meta = [b.year?'Built '+b.year:'', b.area?b.area+' m²':''].filter(Boolean).join(' · ');
+      if (meta) cmpHtml += '<div style="font-size:9px;color:var(--faint);margin-top:1px">'+meta+'</div>';
+      cmpHtml += '</div>';
+    }}
+    cmpHtml += '</div>';
+  }}
+
+  // ---- building rows ----
+  let rows = '';
+  for (const b of sorted) {{
+    const inCmp = _compareSet.has(b.addr);
+    const ec    = b.energy || 0;
+    const eColor = ec < 100 ? '#22c55e' : ec < 200 ? '#f59e0b' : '#ef4444';
+    const badge = b.eclass
+      ? '<span style="background:'+(ECLASS_BADGE[b.eclass]||'#555')+';color:'+(ECLASS_TEXT[b.eclass]||'#fff')+';border-radius:3px;padding:1px 5px;font-size:10px">'+b.eclass+'</span>'
+      : '<span style="color:var(--faint);font-size:10px">–</span>';
+    const perBadge = b.period
+      ? '<span style="background:rgba(255,255,255,0.08);border-radius:3px;padding:1px 4px;font-size:9px;color:var(--muted)">'+(PERIOD_SHORT[b.period]||b.period)+'</span>'
+      : '';
+    const meta = [b.year?'Built '+b.year:'', b.area?b.area+' m²':''].filter(Boolean).join(' · ');
+    const safeAddr = b.addr.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    rows += '<div onclick="toggleCompare(\''+safeAddr+'\')"'
+      + ' style="background:'+(inCmp?'rgba(124,58,237,0.18)':'rgba(255,255,255,0.04)')+';border-radius:8px;padding:8px 10px;margin:4px 0;cursor:pointer;'
+      + 'border:1px solid '+(inCmp?'#7c3aed':'transparent')+';transition:all .15s"'
+      + ' onmouseenter="this.style.background=\'rgba(255,255,255,0.08)\'"'
+      + ' onmouseleave="this.style.background=\''+(inCmp?'rgba(124,58,237,0.18)':'rgba(255,255,255,0.04)')+'\'">';
+    rows +=   '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
+            + '<span style="flex:1;font-size:11px;font-weight:600;line-height:1.3">'+b.addr+'</span>'
+            + badge + ' ' + perBadge
+            + '</div>';
+    rows +=   '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
+            + '<span style="font-size:13px;font-weight:700;color:'+eColor+'">'+b.energy+'</span>'
+            + '<span style="font-size:10px;color:var(--muted)">kWh/m²</span>'
+            + (meta?'<span style="font-size:10px;color:var(--faint);margin-left:auto">'+meta+'</span>':'')
+            + '</div>';
+    rows += '</div>';
+  }}
+
+  const hint = '<div style="text-align:center;font-size:10px;color:var(--faint);padding:8px 0">Tap a card to add to compare (max 3)</div>';
+
+  document.getElementById('perf-content').innerHTML =
+    '<div style="display:flex;gap:4px;margin-bottom:10px">'+tabs+'</div>'
+    + cmpHtml
+    + rows
+    + hint;
+}}
+
+function toggleCompare(addr) {{
+  if (_compareSet.has(addr)) {{ _compareSet.delete(addr); renderPerfList(); return; }}
+  if (_compareSet.size >= 3) {{ return; }}  // max 3
+  _compareSet.add(addr);
+  renderPerfList();
+}}
+
+document.getElementById('perf-close').addEventListener('click', () => {{
+  document.getElementById('perf-panel').style.display = 'none';
+}});
 
 const USE_COLORS = {{
   bostad_enfamilj:   Cesium.Color.fromBytes(255,165, 50,210),
@@ -953,6 +1302,22 @@ viewer.scene.skyBox = new Cesium.SkyBox({{
   }}
 }});
 viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#87CEEB');  // sky blue fallback
+
+// Maps-style camera controls
+// Scroll = zoom · Drag = pan · Right-drag / Ctrl+drag = tilt/rotate
+const camCtrl = viewer.scene.screenSpaceCameraController;
+camCtrl.zoomEventTypes        = [Cesium.CameraEventType.WHEEL, Cesium.CameraEventType.PINCH];
+camCtrl.translateEventTypes   = Cesium.CameraEventType.LEFT_DRAG;
+camCtrl.tiltEventTypes        = [
+  Cesium.CameraEventType.RIGHT_DRAG,
+  {{ eventType: Cesium.CameraEventType.LEFT_DRAG, modifier: Cesium.KeyboardEventModifier.CTRL }},
+];
+camCtrl.rotateEventTypes      = [
+  Cesium.CameraEventType.RIGHT_DRAG,
+  {{ eventType: Cesium.CameraEventType.LEFT_DRAG, modifier: Cesium.KeyboardEventModifier.CTRL }},
+];
+camCtrl.lookEventTypes        = [];
+camCtrl.enableCollisionDetection = false;
 
 // ─────────────────────────────────────────────────────────────────
 // Google Photorealistic 3D Tiles — real facade + roof textures from Google Maps
@@ -1115,14 +1480,101 @@ let selectedBuilding = null;
 let highlightEntity  = null;
 
 viewer.screenSpaceEventHandler.setInputAction(movement => {{
-  const picked = viewer.scene.pick(movement.position);
-  if (Cesium.defined(picked) && picked.id && picked.id._dataIdx !== undefined) {{
-    const b = DATA[picked.id._dataIdx];
-    if (b) showInfoPanel(b, picked.id._dataIdx);
+  const hits = viewer.scene.drillPick(movement.position, 10);
+  let found = null;
+  for (const h of hits) {{ if (h && h.id && h.id._dataIdx !== undefined) {{ found = h; break; }} }}
+  if (found) {{
+    const b = DATA[found.id._dataIdx];
+    if (b) showInfoPanel(b, found.id._dataIdx);
   }} else {{
     hideInfoPanel();
   }}
 }}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+// ─────────────────────────────────────────────────────────────────
+// Hover tooltip
+// ─────────────────────────────────────────────────────────────────
+const TABULA_LABELS = {{
+  '...1960':    'Pre-1960 (SFH/MFH)',
+  '1961-1975':  '1961–1975 (Miljonprogrammet)',
+  '1976-1985':  '1976–1985',
+  '1986-1995':  '1986–1995',
+  '1996-2005':  '1996–2005',
+  'post-2005':  'Post-2005',
+}};
+const RESIDENTIAL = new Set(['bostad_enfamilj','bostad_flerfamilj']);
+const ECLASS_COLORS_CSS = {{ A:'#16a34a',B:'#4ade80',C:'#a3e635',D:'#facc15',E:'#fb923c',F:'#f87171',G:'#dc2626' }};
+
+const hoverCard = document.getElementById('hover-card');
+let lastHoverId = null;
+let hoverThrottle = 0;
+
+viewer.screenSpaceEventHandler.setInputAction(movement => {{
+  // Throttle to ~30fps
+  const now = Date.now();
+  if (now - hoverThrottle < 33) {{
+    // Still move card if already showing
+    if (hoverCard.style.display !== 'none') {{
+      const x = movement.endPosition.x, y = movement.endPosition.y;
+      hoverCard.style.left = Math.min(x + 18, window.innerWidth  - hoverCard.offsetWidth  - 10) + 'px';
+      hoverCard.style.top  = Math.min(y - 10,  window.innerHeight - hoverCard.offsetHeight - 10) + 'px';
+    }}
+    return;
+  }}
+  hoverThrottle = now;
+
+  // drillPick pierces Google 3D tile mesh to reach EUBUCCO entities underneath
+  const hits = viewer.scene.drillPick(movement.endPosition, 10);
+  let found = null;
+  for (const h of hits) {{
+    if (h && h.id && h.id._dataIdx !== undefined) {{ found = h; break; }}
+  }}
+
+  if (found) {{
+    const idx = found.id._dataIdx;
+    const x = movement.endPosition.x, y = movement.endPosition.y;
+    hoverCard.style.left = Math.min(x + 18, window.innerWidth  - 300) + 'px';
+    hoverCard.style.top  = Math.min(y - 10,  window.innerHeight - 200) + 'px';
+
+    if (idx === lastHoverId) {{ hoverCard.style.display = 'block'; return; }}
+    lastHoverId = idx;
+    const b = DATA[idx];
+    const isResidential = RESIDENTIAL.has(b.use_cat);
+    const eclassColor = b.eclass ? (ECLASS_COLORS_CSS[b.eclass] || '#94a3b8') : '#94a3b8';
+    const tabulaLabel = b.tabula_period ? (TABULA_LABELS[b.tabula_period] || b.tabula_period) : null;
+
+    let html = '<div style="font-weight:600;font-size:13px;margin-bottom:4px;color:#c4b5fd">' +
+      (b.address || b.all_addresses || 'Building') + '</div>';
+    // Show all addresses if multiple units share this EPC
+    if (b.all_addresses && b.all_addresses !== b.address && b.all_addresses.includes(',')) {{
+      html += '<div style="font-size:10px;color:#94a3b8;margin-bottom:5px">' + b.all_addresses + '</div>';
+    }}
+    const useLabel = b.use_cat ? b.use_cat.replace(/_/g,' ') : 'Unknown';
+    html += '<div style="margin-bottom:6px"><span style="background:rgba(114,28,184,0.4);border-radius:4px;padding:2px 7px;font-size:11px">' + useLabel + '</span></div>';
+    html += '<table style="width:100%;border-collapse:collapse">';
+    const row = (lbl, val, color) => (val != null && val !== '') ?
+      '<tr><td style="color:#94a3b8;padding:2px 0;white-space:nowrap">' + lbl + '</td>' +
+      '<td style="text-align:right;padding:2px 0;font-weight:500' + (color?';color:'+color:'') + '">' + val + '</td></tr>' : '';
+    if (b.eclass) html += row('Energy class','<span style="background:'+eclassColor+';color:#000;border-radius:3px;padding:1px 6px;font-weight:700">'+b.eclass+'</span>',null);
+    if (b.energy) html += row('Energy use', b.energy+' kWh/m&#178;yr', b.energy>150?'#fb923c':'#4ade80');
+    if (b.year)   html += row('Year built', b.year, null);
+    if (b.area)   html += row('Floor area', b.area+' m&#178;', null);
+    if (b.height) html += row('Height', Math.round(b.height)+' m', null);
+    if (b.floors) html += row('Floors', b.floors, null);
+    if (isResidential && tabulaLabel) {{
+      html += '<tr><td colspan="2" style="padding-top:6px;padding-bottom:2px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:.5px">TABULA Archetype</td></tr>';
+      html += row('Era', tabulaLabel, '#a78bfa');
+      if (b.tabula_u_wall) html += row('U-wall', b.tabula_u_wall+' W/m&#178;K', null);
+      if (b.tabula_u_win)  html += row('U-window', b.tabula_u_win+' W/m&#178;K', null);
+    }}
+    html += '</table>';
+    hoverCard.innerHTML = html;
+    hoverCard.style.display = 'block';
+  }} else {{
+    hoverCard.style.display = 'none';
+    lastHoverId = null;
+  }}
+}}, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
 function showInfoPanel(b, idx) {{
   selectedBuilding = {{ ...b, _idx: idx }};
@@ -1334,11 +1786,15 @@ function setColorMode(mode) {{
   ['use','eclass','year'].forEach(m => {{
     document.getElementById('btn-'+m).classList.toggle('active', m === mode);
   }});
+  updateLegend(mode);
   rebuildBuildings();
 }}
 document.getElementById('btn-use').addEventListener('click',    () => setColorMode('use'));
 document.getElementById('btn-eclass').addEventListener('click', () => setColorMode('eclass'));
 document.getElementById('btn-year').addEventListener('click',   () => setColorMode('year'));
+
+// Initialise legend for default mode
+updateLegend('use');
 
 // ─────────────────────────────────────────────────────────────────
 // Reset view
