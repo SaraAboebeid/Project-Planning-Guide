@@ -107,9 +107,17 @@ export const ENVELOPE_COMPONENTS = [
   "Roof",
   "Balcony",
   "Insulation",
+  "Vertical Extension (New Floor)",
 ];
 
 // ── KPIs ───────────────────────────────────────────────────────────────────
+
+export const UNIVERSAL_KPIS = [
+  "Environmental",
+  "Economic",
+  "Social",
+  "Performance / Technical",
+];
 
 export const KPIS_BY_PROJECT_TYPE: Record<ProjectType, string[]> = {
   "Energy Community Planning": [
@@ -229,9 +237,9 @@ export const EXPLORATION_CONSTRAINTS: Record<string, ExplorationConstraint> = {
 // ── Scale ──────────────────────────────────────────────────────────────────
 
 export const SCALE_OPTIONS_BY_TYPE: Record<ProjectType, string[]> = {
-  "Energy Community Planning": ["Neighborhood", "City"],
-  "Renovation Planning": ["Building", "Neighborhood", "City"],
-  "Renewable Energy Planning": ["Building", "Neighborhood", "City"],
+  "Energy Community Planning": ["Neighborhood", "Portfolio"],
+  "Renovation Planning": ["Building", "Neighborhood", "Portfolio"],
+  "Renewable Energy Planning": ["Building", "Neighborhood", "Portfolio"],
 };
 
 // ── Countries ──────────────────────────────────────────────────────────────

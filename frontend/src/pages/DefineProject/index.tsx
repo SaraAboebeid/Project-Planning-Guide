@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../../store/wizard";
 import {
@@ -10,8 +10,7 @@ import {
   EC_FOLLOW_UP_QUESTIONS,
   EC_FOCUS_OPTIONS,
   ENVELOPE_COMPONENTS,
-  KPIS_BY_PROJECT_TYPE,
-  CONDITIONAL_KPIS,
+  UNIVERSAL_KPIS,
   EXPLORATION_OPTIONS,
   EXPLORATION_CONSTRAINTS,
   SCALE_OPTIONS_BY_TYPE,
@@ -20,6 +19,8 @@ import {
   RE_ELECTRICITY_THRESHOLDS,
   type ProjectType,
 } from "../../config/projectConfig";
+
+import LocationMap from "../../components/LocationMap";
 
 /* ── tiny reusable bits ─────────────────────────────────────────── */
 
@@ -67,20 +68,6 @@ export default function DefineProject() {
   const selectableSystems = allSystems.filter(
     (s) => !disabledSystems.includes(s)
   );
-
-  const availableKpis = useMemo(() => {
-    if (!pt) return [];
-    const base = [...KPIS_BY_PROJECT_TYPE[pt]];
-    const cond = CONDITIONAL_KPIS[pt] || {};
-    for (const [trigger, extras] of Object.entries(cond)) {
-      if (project.systemsInScope.includes(trigger)) {
-        for (const k of extras) {
-          if (!base.includes(k)) base.push(k);
-        }
-      }
-    }
-    return base;
-  }, [pt, project.systemsInScope]);
 
   const scaleOptions = pt ? SCALE_OPTIONS_BY_TYPE[pt] : ["Building", "Neighborhood", "City"];
 
@@ -487,15 +474,11 @@ export default function DefineProject() {
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{cfg.icon}</span>
                     <span className="font-semibold text-sm text-dark">
                       {approach}
                     </span>
-                    <span className="text-xs text-gray-400 ml-auto">
-                      {cfg.hint}
-                    </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1 ml-8">
+                  <p className="text-xs text-gray-500 mt-1">
                     {cfg.description}
                   </p>
                 </button>
@@ -510,7 +493,7 @@ export default function DefineProject() {
         <Card className="animate-fadeIn">
           <Label required>Key Performance Indicators</Label>
           <div className="flex flex-wrap gap-2 mt-2">
-            {availableKpis.map((kpi) => (
+            {UNIVERSAL_KPIS.map((kpi) => (
               <button
                 key={kpi}
                 onClick={() => toggleKpi(kpi)}
@@ -532,7 +515,7 @@ export default function DefineProject() {
         <Label required>Scale</Label>
         {pt === "Energy Community Planning" && (
           <p className="text-xs text-gray-500 mb-2">
-            Energy Community Planning is available at Neighborhood or City scale
+            Energy Community Planning is available at Neighborhood or Portfolio scale
           </p>
         )}
         <div className="flex gap-3 mt-1">
@@ -600,19 +583,26 @@ export default function DefineProject() {
       {showCountry && <Card className="animate-fadeIn">
         <Label required>Country</Label>
         <div className="flex gap-2 mt-1">
-          {COUNTRY_OPTIONS.map((c) => (
-            <button
-              key={c}
-              onClick={() => setProject({ country: c })}
-              className={`px-4 py-2 rounded-lg text-sm font-medium border ${
-                project.country === c
-                  ? "bg-navy text-white border-navy"
-                  : "bg-white border-gray-300 hover:border-gray-400"
-              }`}
-            >
-              {c}
-            </button>
-          ))}
+          {COUNTRY_OPTIONS.map((c) => {
+            const isDisabled = c === "Belgium" || c === "Ireland" || c === "United Kingdom";
+            return (
+              <button
+                key={c}
+                onClick={() => !isDisabled && setProject({ country: c })}
+                disabled={isDisabled}
+                title={isDisabled ? "Coming soon" : undefined}
+                className={`px-4 py-2 rounded-lg text-sm font-medium border ${
+                  isDisabled
+                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                    : project.country === c
+                    ? "bg-navy text-white border-navy"
+                    : "bg-white border-gray-300 hover:border-gray-400"
+                }`}
+              >
+                {c}
+              </button>
+            );
+          })}
         </div>
       </Card>}
 
@@ -629,70 +619,15 @@ export default function DefineProject() {
       </Card>}
 
       {/* ── LOCATION ── */}
-      {showLocation && <Card className="animate-fadeIn">
-        <Label>Project Location</Label>
-        <div className="flex gap-3 mt-1">
-          <input
-            type="text"
-            value={project.address}
-            onChange={(e) => setProject({ address: e.target.value })}
-            placeholder="e.g. Johanneberg, Gothenburg"
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal"
+      {showLocation && (
+        <Card className="animate-fadeIn">
+          <Label>Project Location</Label>
+          <LocationMap
+            scale={project.scale}
+            onAddressChange={(addr) => setProject({ address: addr })}
           />
-          {project.scale !== "Building" && (
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 whitespace-nowrap">
-                Radius (m)
-              </label>
-              <input
-                type="number"
-                min={300}
-                max={3000}
-                step={100}
-                value={project.radiusM}
-                onChange={(e) =>
-                  setProject({ radiusM: Number(e.target.value) })
-                }
-                className="w-20 rounded-lg border border-gray-300 px-2 py-2 text-sm"
-              />
-            </div>
-          )}
-          <button
-            onClick={async () => {
-              if (!project.address.trim()) return;
-              try {
-                const res = await fetch(
-                  `/api/geocode?address=${encodeURIComponent(project.address)}`
-                );
-                if (res.ok) {
-                  const data = await res.json();
-                  setProject({
-                    lat: data.lat,
-                    lon: data.lon,
-                    locationLabel: data.display_name,
-                  });
-                }
-              } catch {
-                /* backend may not be running */
-              }
-            }}
-            className="px-4 py-2 rounded-lg bg-teal text-white text-sm font-medium hover:bg-teal/90 transition whitespace-nowrap"
-          >
-            Locate
-          </button>
-        </div>
-        {project.locationLabel && (
-          <p className="text-xs text-gray-500 mt-2">
-            📍 {project.locationLabel}
-          </p>
-        )}
-        {project.lat && project.lon && (
-          <div className="mt-3 h-48 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-sm text-gray-400">
-            Map view — lat {project.lat.toFixed(4)}, lon{" "}
-            {project.lon.toFixed(4)} (Leaflet integration coming next)
-          </div>
-        )}
-      </Card>}
+        </Card>
+      )}
 
       {/* ── VALIDATION ERRORS ── */}
       {validationErrors.length > 0 && (
