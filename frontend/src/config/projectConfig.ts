@@ -237,9 +237,9 @@ export const EXPLORATION_CONSTRAINTS: Record<string, ExplorationConstraint> = {
 // ── Scale ──────────────────────────────────────────────────────────────────
 
 export const SCALE_OPTIONS_BY_TYPE: Record<ProjectType, string[]> = {
-  "Energy Community Planning": ["Neighborhood", "Portfolio"],
-  "Renovation Planning": ["Building", "Neighborhood", "Portfolio"],
-  "Renewable Energy Planning": ["Building", "Neighborhood", "Portfolio"],
+  "Energy Community Planning": ["Neighborhood", "Portfolio", "City"],
+  "Renovation Planning": ["Building", "Neighborhood", "Portfolio", "City"],
+  "Renewable Energy Planning": ["Building", "Neighborhood", "Portfolio", "City"],
 };
 
 // ── Countries ──────────────────────────────────────────────────────────────

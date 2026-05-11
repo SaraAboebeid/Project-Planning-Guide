@@ -45,6 +45,7 @@ interface ProjectState {
   lon: number | null;
   locationLabel: string;
   radiusM: number;
+  buildingPoints: { lat: number; lon: number; label: string }[];
   /* data coverage */
   dataInputs: Record<string, { available: boolean; proxy: string | null; confidence: number }>;
 }
@@ -81,6 +82,7 @@ const DEFAULT_PROJECT: ProjectState = {
   lon: null,
   locationLabel: "",
   radiusM: 800,
+  buildingPoints: [],
   dataInputs: {},
 };
 

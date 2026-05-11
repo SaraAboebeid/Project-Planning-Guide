@@ -625,6 +625,7 @@ export default function DefineProject() {
           <LocationMap
             scale={project.scale}
             onAddressChange={(addr) => setProject({ address: addr })}
+            onPointsChange={(pts) => setProject({ buildingPoints: pts })}
           />
         </Card>
       )}
