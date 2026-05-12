@@ -164,7 +164,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           {
             key: "r_matlist", label: "List of materials to test",
             primarySource: "User-provided material list", primaryConfidence: "High",
-            fallbackSource: "Curated material library (provided — no action needed)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "None",
+            fallbackSource: "Boverket & Wikells material library (provided — no action needed)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "None",
             defaultHas: false,
           },
         ],
@@ -1138,7 +1138,7 @@ export default function DataCoverage() {
                               {item.key === "r_matlist" ? (
                                 item.hasData
                                   ? <span className="text-emerald-600 font-medium">✓ Your material list will be used</span>
-                                  : <span className="text-amber-600 font-medium">No problem — we have a curated material library for you</span>
+                                  : <span className="text-amber-600 font-medium">No problem — Boverket &amp; Wikells material library will be used</span>
                               ) : item.hasData
                                 ? (() => {
                                     const bbText = bboxSourceText(item.key, bboxStats);
@@ -1164,6 +1164,7 @@ export default function DataCoverage() {
                         <span className="text-xs text-slate-500 leading-tight">
                           {item.hasData
                             ? (() => {
+                                if (item.key === "r_matlist") return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
                                 if (bboxSourceText(item.key, bboxStats))
                                   return <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold border border-blue-200">EUBUCCO</span>;
                                 const eubText = eubuccoSourceText(item.key, building);
@@ -1176,6 +1177,7 @@ export default function DataCoverage() {
                                 return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
                               })()
                             : (() => {
+                                if (item.key === "r_matlist") return <><span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-orange-200">Boverket</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">Wikells</span></>;
                                 const src = item.source.toLowerCase();
                                 if (src.includes("tabula"))  return <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold border border-amber-200">TABULA</span>;
                                 if (src.includes("boverket")) return <span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-orange-200">Boverket</span>;
