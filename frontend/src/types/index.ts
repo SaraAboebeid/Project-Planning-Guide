@@ -57,6 +57,26 @@ export interface EpcSnapshot {
   sample: Record<string, unknown>[];
 }
 
+/** Nearest EUBUCCO building returned by /api/building */
+export interface BuildingLookup {
+  address: string | null;
+  height: number | null;
+  floors: number | null;
+  area_atemp: number | null;    // total Atemp (GFA) from EPC
+  footprint_m2: number | null; // Atemp/floors or polygon shoelace
+  use_cat: string | null;
+  year: number | null;
+  energy: number | null;        // kWh/m²/yr
+  eclass: string | null;
+  tabula_period: string | null;
+  tabula_u_wall: number | null;
+  tabula_u_win: number | null;
+  has_epc: boolean;
+  lat: number;
+  lon: number;
+  dist_m: number;
+}
+
 export interface EpcPoint {
   FormularId: string;
   lat: number;

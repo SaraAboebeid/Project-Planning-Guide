@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { ProjectType } from "../config/projectConfig";
+import type { BuildingLookup } from "../types";
 
 /* ── Pipeline definitions ── */
 
@@ -48,6 +49,8 @@ interface ProjectState {
   buildingPoints: { lat: number; lon: number; label: string }[];
   /* data coverage */
   dataInputs: Record<string, { available: boolean; proxy: string | null; confidence: number }>;
+  /* looked-up building from EUBUCCO */
+  lookedUpBuilding: BuildingLookup | null;
 }
 
 interface WizardState {
@@ -84,6 +87,7 @@ const DEFAULT_PROJECT: ProjectState = {
   radiusM: 800,
   buildingPoints: [],
   dataInputs: {},
+  lookedUpBuilding: null,
 };
 
 export const useWizardStore = create<WizardState>((set) => ({

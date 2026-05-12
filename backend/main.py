@@ -179,6 +179,85 @@ def tabula_match(
     return {"archetype": archetype, "confidence": confidence}
 
 
+# ── Single building lookup by lat/lon ────────────────────────────────────────
+
+def _polygon_centroid(coords: list) -> tuple[float, float]:
+    ring = coords[0] if coords else []
+    if not ring:
+        return (0.0, 0.0)
+    c_lon = sum(c[0] for c in ring) / len(ring)
+    c_lat = sum(c[1] for c in ring) / len(ring)
+    return (c_lat, c_lon)
+
+def _shoelace_m2(coords: list) -> float | None:
+    ring = coords[0] if coords else []
+    if len(ring) < 3:
+        return None
+    total = 0.0
+    for i in range(len(ring)):
+        x0, y0 = ring[i - 1]
+        x1, y1 = ring[i]
+        total += (x0 + x1) * (y1 - y0)
+    deg2 = abs(total) / 2.0
+    lat_rad = math.radians(ring[0][1])
+    m2_per_deg2 = (111_320 ** 2) * math.cos(lat_rad)
+    return deg2 * m2_per_deg2
+
+
+@app.get("/api/building")
+def get_building(lat: float = Query(...), lon: float = Query(...)):
+    """Return the nearest EUBUCCO building within 80 m, enriched with derived fields."""
+    buildings = _get_buildings_list()
+    best: dict | None = None
+    best_dist = float("inf")
+
+    for b in buildings:
+        coords = b.get("coordinates") or []
+        c_lat, c_lon = _polygon_centroid(coords)
+        if c_lat == 0.0 and c_lon == 0.0:
+            continue
+        d = _haversine_m(lat, lon, c_lat, c_lon)
+        if d < best_dist:
+            best_dist = d
+            best = b
+
+    if best is None or best_dist > 150:
+        raise HTTPException(404, "No building found within 150 m of the given point")
+
+    # Compute footprint
+    area_atemp = best.get("area")
+    floors = best.get("floors")
+    footprint: float | None = None
+    if area_atemp and floors and floors > 0:
+        footprint = round(area_atemp / floors, 1)
+    else:
+        fp = _shoelace_m2(best.get("coordinates") or [])
+        if fp:
+            footprint = round(fp, 1)
+
+    # Centroid
+    c_lat, c_lon = _polygon_centroid(best.get("coordinates") or [])
+
+    return {
+        "address":       best.get("address"),
+        "height":        best.get("height"),
+        "floors":        best.get("floors"),
+        "area_atemp":    best.get("area"),      # total GFA / Atemp from EPC
+        "footprint_m2":  footprint,
+        "use_cat":       best.get("use_cat"),
+        "year":          best.get("year"),
+        "energy":        best.get("energy"),    # kWh/m²/yr
+        "eclass":        best.get("eclass"),
+        "tabula_period": best.get("tabula_period"),
+        "tabula_u_wall": best.get("tabula_u_wall"),
+        "tabula_u_win":  best.get("tabula_u_win"),
+        "has_epc":       bool(best.get("has_epc")),
+        "lat":           round(c_lat, 6),
+        "lon":           round(c_lon, 6),
+        "dist_m":        round(best_dist, 1),
+    }
+
+
 # ── Boverket materials ───────────────────────────────────────────────────────
 @app.get("/api/boverket/materials")
 def boverket_materials(component: str = Query(...)):

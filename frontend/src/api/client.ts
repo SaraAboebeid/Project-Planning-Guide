@@ -24,7 +24,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 /* ── Endpoints ── */
 
-import type { EpcSnapshot, EpcPassport, TabulaArchetype, MatchConfidence } from "../types";
+import type { EpcSnapshot, EpcPassport, TabulaArchetype, MatchConfidence, BuildingLookup } from "../types";
 
 export const api = {
   /** Geocode an address → { lat, lon, display_name } */
@@ -57,6 +57,10 @@ export const api = {
   /** Run sensitivity analysis */
   sensitivity: (params: Record<string, unknown>) =>
     post<Record<string, unknown>>("/sensitivity/run", params),
+
+  /** Look up nearest EUBUCCO building by lat/lon */
+  lookupBuilding: (lat: number, lon: number) =>
+    get<BuildingLookup>("/building", { lat: String(lat), lon: String(lon) }),
 
   /** Health check */
   health: () => get<{ status: string }>("/health"),

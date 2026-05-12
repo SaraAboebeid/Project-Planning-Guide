@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
+import type { BuildingLookup } from "../types";
 import BuildingMapPanel from "../components/panels/BuildingMap";
 import {
   CheckCircle2, AlertTriangle, XCircle,
@@ -579,11 +580,142 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
 }
 
 /* ─────────────────────────────────────────────
+   Building data → DataCoverage key mapping
+   Keys here signal "we have EUBUCCO data for this parameter"
+───────────────────────────────────────────── */
+type BKey = keyof BuildingLookup;
+
+// Which EUBUCCO field (non-null) proves a DataCoverage item is available
+const FIELD_MAP: Record<string, BKey> = {
+  // Renovation Planning
+  r_fp:    "footprint_m2",
+  r_hgt:   "height",
+  r_flrs:  "floors",
+  r_use:   "use_cat",
+  r_mat:   "tabula_u_wall",   // if u_wall known → archetype/materials known
+  // EC – Buildings
+  ec_b_fp:    "footprint_m2",
+  ec_b_hgt:   "height",
+  ec_b_flrs:  "floors",
+  ec_b_use:   "use_cat",
+  ec_b_mat:   "tabula_u_wall",
+  ec_b_hvac:  "eclass",       // eclass implies EPC → system info likely
+  ec_be_fp:   "footprint_m2",
+  ec_be_hgt:  "height",
+  ec_be_use:  "use_cat",
+  // EC – PV
+  ec_rpv_area: "footprint_m2",
+  ec_fpv_area: "height",      // facade area derivable from height + perimeter
+  // RE – PV
+  re_rpv_area: "footprint_m2",
+  re_fpv_area: "height",
+};
+
+// Keys that are starred as critical for each project type
+const CRITICAL_KEYS: Record<string, Set<string>> = {
+  "Renovation Planning":       new Set(["r_fp","r_hgt","r_flrs","r_use","r_mat","r_ht"]),
+  "Energy Community Planning": new Set(["ec_b_fp","ec_b_hgt","ec_b_flrs","ec_b_use","ec_b_mat",
+                                         "ec_b_hvac","ec_rpv_area","ec_fpv_area","ec_be_edem"]),
+  "Renewable Energy Planning": new Set(["re_rpv_area","re_rpv_azimuth","re_rpv_demand",
+                                         "re_fpv_area","re_fpv_wwr"]),
+};
+
+// Build initial hasData state from EUBUCCO building (auto-fills available fields)
+function initFromBuilding(
+  defs: DataCategoryDef[],
+  building: BuildingLookup | null,
+): Record<string, boolean> {
+  const init: Record<string, boolean> = {};
+  defs.forEach(cat => cat.items.forEach(i => {
+    const bKey = FIELD_MAP[i.key];
+    const fromBuilding = bKey && building && building[bKey] !== null && building[bKey] !== undefined;
+    init[i.key] = fromBuilding ? true : i.defaultHas;
+  }));
+  return init;
+}
+
+/* ─────────────────────────────────────────────
+   Building data summary banner
+───────────────────────────────────────────── */
+function BuildingDataBanner({
+  building,
+  projectType,
+  defs,
+  hasData,
+}: {
+  building: BuildingLookup;
+  projectType: string | null;
+  defs: DataCategoryDef[];
+  hasData: Record<string, boolean>;
+}) {
+  const critical = projectType ? (CRITICAL_KEYS[projectType] ?? new Set()) : new Set<string>();
+  const allKeys  = defs.flatMap(c => c.items.map(i => i.key));
+  const autoFilled = allKeys.filter(k => {
+    const bKey = FIELD_MAP[k];
+    return bKey && building[bKey] !== null && building[bKey] !== undefined;
+  });
+
+  const missingCritical = [...critical].filter(k => {
+    const bKey = FIELD_MAP[k];
+    return !bKey || building[bKey] === null || building[bKey] === undefined;
+  });
+
+  return (
+    <div className="rounded-xl border border-purple-200 bg-purple-50 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-purple-100">
+        <div className="flex items-center gap-2">
+          <span>🏗️</span>
+          <span className="text-xs font-semibold text-purple-900">
+            EUBUCCO data pre-filled — {autoFilled.length} parameter{autoFilled.length !== 1 ? "s" : ""} auto-set
+          </span>
+          {building.has_epc && (
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC ✓</span>
+          )}
+        </div>
+        <a
+          href="http://127.0.0.1:8765/gothenburg_3d.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] font-medium text-purple-700 hover:text-purple-900 underline underline-offset-2 whitespace-nowrap"
+        >
+          📷 3D Inspector →
+        </a>
+      </div>
+
+      {/* Key stats */}
+      <div className="flex flex-wrap gap-x-5 gap-y-1 px-4 py-2.5 text-xs text-purple-800">
+        {building.address && <span>📍 {building.address}</span>}
+        {building.use_cat  && <span>🏢 {building.use_cat}</span>}
+        {building.year     && <span>📅 {building.year}</span>}
+        {building.floors   && <span>⬆ {building.floors} floors</span>}
+        {building.footprint_m2 && <span>📐 {Math.round(building.footprint_m2)} m² footprint</span>}
+        {building.eclass   && <span>⚡ Energy class {building.eclass}</span>}
+        {building.energy   && <span>🔥 {building.energy} kWh/m²</span>}
+        {building.tabula_u_wall && <span>🧱 U-wall {building.tabula_u_wall} W/m²K</span>}
+        {building.tabula_u_win  && <span>🪟 U-win {building.tabula_u_win} W/m²K</span>}
+      </div>
+
+      {/* Missing critical data alert */}
+      {missingCritical.length > 0 && (
+        <div className="mx-3 mb-3 flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+          <span className="mt-0.5">⚠️</span>
+          <span>
+            <span className="font-semibold">Critical data missing from EUBUCCO for {projectType}.</span>{" "}
+            Check the starred (★) rows below and toggle them off — the system will suggest the best available fallback.
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    Component
 ───────────────────────────────────────────── */
 export default function DataCoverage() {
   const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
+  const building = project.lookedUpBuilding ?? null;
 
   const defs = useMemo(
     () => buildDefs(project.projectType, project.systemsInScope, project.ecEnergyFocus ?? []),
@@ -591,18 +723,15 @@ export default function DataCoverage() {
   );
 
   /* Per-item "user has this data" state — keyed by item.key */
-  const [hasData, setHasData] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    defs.forEach(cat => cat.items.forEach(i => { init[i.key] = i.defaultHas; }));
-    return init;
-  });
+  const [hasData, setHasData] = useState<Record<string, boolean>>(() =>
+    initFromBuilding(defs, building),
+  );
 
-  /* Reset when project type / systems change */
+  /* Reset when project type / systems change OR when building lookup updates */
   useEffect(() => {
-    const init: Record<string, boolean> = {};
-    defs.forEach(cat => cat.items.forEach(i => { init[i.key] = i.defaultHas; }));
-    setHasData(init);
-  }, [defs]);
+    setHasData(initFromBuilding(defs, building));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defs, building]);
 
   const toggleHas = (key: string) =>
     setHasData(prev => ({ ...prev, [key]: !prev[key] }));
@@ -676,6 +805,8 @@ export default function DataCoverage() {
     { id: "Needs user input", dot: "bg-red-300",     count: userInputCount },
   ];
 
+  const criticalKeys = project.projectType ? (CRITICAL_KEYS[project.projectType] ?? new Set<string>()) : new Set<string>();
+
   return (
     <div className="space-y-6">
 
@@ -709,6 +840,16 @@ export default function DataCoverage() {
 
       {/* 3D Building Map */}
       <BuildingMapPanel />
+
+      {/* EUBUCCO building data banner */}
+      {building && (
+        <BuildingDataBanner
+          building={building}
+          projectType={project.projectType}
+          defs={defs}
+          hasData={hasData}
+        />
+      )}
 
       {/* Instruction callout */}
       {totalCount > 0 && (
@@ -867,6 +1008,9 @@ export default function DataCoverage() {
                         {/* Parameter */}
                         <div>
                           <span className="text-sm text-slate-800 font-medium leading-tight">{item.label}</span>
+                          {criticalKeys.has(item.key) && (
+                            <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200">★ critical</span>
+                          )}
                           {def && (
                             <div className="text-[10px] text-slate-400 mt-0.5">
                               {item.key === "r_matlist" ? (
