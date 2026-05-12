@@ -646,49 +646,49 @@ const ECLASS_TEXT  = { A:'#fff',   B:'#000',   C:'#000',   D:'#000',   E:'#fff',
 const PERIOD_SHORT = { '...1960':'<1960','1961-1975':'61–75','1976-1985':'76–85','1986-1995':'86–95','1996-2005':'96–05','post-2005':'>2005' };
 
 let _perfMode = null, _perfKey = null;
-let _sortMode  = 'energy';    // 'energy' | 'year' | 'eclass'
-let _scopeMode = 'all';       // 'all' | 'view'
-let _compareSet = new Set();  // addresses in compare basket
-let _perfList   = [];         // full building list for current panel
-let _perfBest   = [];         // best performers (period/eclass modes)
-let _perfWorst  = [];         // worst performers (period/eclass modes)
+let _sortMode  = 'energy';
+let _scopeMode = 'all';       // 'all' | 'selected'
+let _compareSet = new Set();
+let _perfList   = [];
+let _perfBest   = [];
+let _perfWorst  = [];
 
-// Filter buildings.json data by current Cesium camera viewport for a given use_cat
-function getViewportBuildingsForUse(key) {
-  if (!window.viewer || !DATA) return null;
-  try {
-    const rect = window.viewer.camera.computeViewRectangle();
-    if (!rect) return null;
-    const west  = Cesium.Math.toDegrees(rect.west);
-    const east  = Cesium.Math.toDegrees(rect.east);
-    const south = Cesium.Math.toDegrees(rect.south);
-    const north = Cesium.Math.toDegrees(rect.north);
-    const result = DATA
-      .filter(b => b.use_cat === key && b.energy != null && b.address)
-      .filter(b => {
-        const c = b.coordinates && b.coordinates[0] && b.coordinates[0][0];
-        return c && c[0] >= west && c[0] <= east && c[1] >= south && c[1] <= north;
-      })
-      .map(b => ({
-        addr: b.address, energy: b.energy, eclass: b.eclass || null,
-        use: b.use_cat, period: b.tabula_period || null,
-        year: b.year || null, area: b.area || null
-      }))
-      .sort((a, b) => (a.energy || 9999) - (b.energy || 9999));
-    return result.length ? result : null;
-  } catch(e) { return null; }
+// Parse Step 1 bbox from URL params once
+const _p = new URLSearchParams(window.location.search);
+const _urlBbox = (() => {
+  const s = parseFloat(_p.get('minLat')||''), n = parseFloat(_p.get('maxLat')||''),
+        w = parseFloat(_p.get('minLon')||''), e = parseFloat(_p.get('maxLon')||'');
+  return (!isNaN(s)&&!isNaN(n)&&!isNaN(w)&&!isNaN(e)) ? {s,n,w,e} : null;
+})();
+
+// Filter DATA by Step 1 bbox for a given use_cat
+function getBboxBuildingsForUse(key) {
+  if (!DATA || !_urlBbox) return null;
+  const {s, n, w, e} = _urlBbox;
+  const result = DATA
+    .filter(b => b.use_cat === key && b.energy != null && b.address)
+    .filter(b => {
+      const c = b.coordinates && b.coordinates[0] && b.coordinates[0][0];
+      return c && c[0] >= w && c[0] <= e && c[1] >= s && c[1] <= n;
+    })
+    .map(b => ({
+      addr: b.address, energy: b.energy, eclass: b.eclass || null,
+      use: b.use_cat, period: b.tabula_period || null,
+      year: b.year || null, area: b.area || null
+    }))
+    .sort((a, b) => (a.energy || 9999) - (b.energy || 9999));
+  return result.length ? result : null;
 }
 
 // Called when scope toggle is clicked
 function refreshPerfScope() {
   if (_perfMode !== 'use') return;
-  if (_scopeMode === 'view') {
-    const result = getViewportBuildingsForUse(_perfKey);
-    if (!result) {
-      _scopeMode = 'all';
-    } else {
+  if (_scopeMode === 'selected') {
+    const result = getBboxBuildingsForUse(_perfKey);
+    if (!result) { _scopeMode = 'all'; }
+    else {
       _perfList = result;
-      document.getElementById('perf-sub').textContent = _perfList.length + ' buildings in current view';
+      document.getElementById('perf-sub').textContent = result.length + ' buildings in selected area';
     }
   }
   if (_scopeMode === 'all') {
@@ -696,6 +696,10 @@ function refreshPerfScope() {
     _perfList = entry ? [...entry.buildings] : [];
     document.getElementById('perf-sub').textContent = _perfList.length + ' buildings with EPC data';
   }
+  // Always keep 3 best + 3 worst
+  const sorted = [..._perfList].sort((a,b) => (a.energy||9999)-(b.energy||9999));
+  _perfBest  = sorted.slice(0, 3);
+  _perfWorst = sorted.slice(-3).reverse();
   _compareSet.clear();
   _sortMode = 'energy';
   renderPerfList();
@@ -711,8 +715,11 @@ function showPerfCards(mode, key) {
     const entry = USE_CARDS[key];
     if (!entry || !entry.buildings.length) return;
     _perfList = [...entry.buildings];
+    const sorted = [..._perfList].sort((a,b)=>(a.energy||9999)-(b.energy||9999));
+    _perfBest  = sorted.slice(0, 3);
+    _perfWorst = sorted.slice(-3).reverse();
     document.getElementById('perf-title').textContent = USE_LABELS_JS[key];
-    document.getElementById('perf-sub').textContent = _perfList.length + ' buildings with EPC data';
+    document.getElementById('perf-sub').textContent = _perfBest.length + ' best, ' + _perfWorst.length + ' worst';
   } else if (mode === 'eclass') {
     const cards = ECLASS_CARDS[key];
     if (!cards) return;
@@ -744,30 +751,23 @@ function renderPerfList() {
   let scopeToggle = '';
   if (_perfMode === 'use') {
     const allOn  = _scopeMode === 'all';
-    const viewOn = _scopeMode === 'view';
+    const selOn  = _scopeMode === 'selected';
+    const hasBbox = !!_urlBbox;
     scopeToggle = '<div style="display:flex;gap:4px;margin-bottom:8px">'
       + '<button onclick="_scopeMode=\'all\';refreshPerfScope()" style="flex:1;padding:5px 0;font-size:11px;border:none;border-radius:6px;cursor:pointer;font-family:inherit;'
       + (allOn  ? 'background:#7c3aed;color:#fff;font-weight:600' : 'background:rgba(255,255,255,0.07);color:var(--muted)')
       + '">🌆 All Gothenburg</button>'
-      + '<button onclick="_scopeMode=\'view\';refreshPerfScope()" style="flex:1;padding:5px 0;font-size:11px;border:none;border-radius:6px;cursor:pointer;font-family:inherit;'
-      + (viewOn ? 'background:#7c3aed;color:#fff;font-weight:600' : 'background:rgba(255,255,255,0.07);color:var(--muted)')
-      + '">📍 Visible area</button>'
+      + '<button '
+      + (hasBbox ? 'onclick="_scopeMode=\'selected\';refreshPerfScope()"' : 'disabled title="No area selected in Step 1"')
+      + ' style="flex:1;padding:5px 0;font-size:11px;border:none;border-radius:6px;font-family:inherit;'
+      + (hasBbox ? 'cursor:pointer;' : 'cursor:not-allowed;opacity:0.4;')
+      + (selOn   ? 'background:#7c3aed;color:#fff;font-weight:600' : 'background:rgba(255,255,255,0.07);color:var(--muted)')
+      + '">📍 Selected area</button>'
       + '</div>';
   }
 
-  // ---- sort ----
-  const sortedAll = [..._perfList].sort((a,b) => {
-    if (_sortMode === 'year')   return (a.year||9999) - (b.year||9999);
-    if (_sortMode === 'eclass') return (a.eclass||'Z').localeCompare(b.eclass||'Z');
-    return (a.energy||9999) - (b.energy||9999);
-  });
-
-  // ---- sort tabs ----
-  const tabs = [['energy','⚡ Energy'],['year','📅 Year built'],['eclass','🏷 Class']].map(([m,lbl]) =>
-    '<button onclick="_sortMode=\'' + m + '\';renderPerfList()" style="flex:1;padding:5px 0;font-size:11px;border:none;border-radius:6px;cursor:pointer;font-family:inherit;'
-    +(_sortMode===m?'background:#7c3aed;color:#fff;font-weight:600':'background:rgba(255,255,255,0.07);color:var(--muted)')
-    +'">'+lbl+'</button>'
-  ).join('');
+  // ---- sort by energy only ----
+  const sortedAll = [..._perfList].sort((a,b) => (a.energy||9999) - (b.energy||9999));
 
   // ---- compare bar ----
   let cmpHtml = '';
@@ -830,31 +830,17 @@ function renderPerfList() {
     return '<div style="font-size:10px;font-weight:700;color:'+color+';padding:8px 4px 2px;border-bottom:1px solid rgba(255,255,255,0.07);margin-bottom:2px">'+label+'</div>';
   }
 
-  // ---- building rows ----
+  // ---- building rows — always 3 best + 3 worst ----
   let rows = '';
-  if (_perfMode !== 'use' && _sortMode === 'energy') {
-    // Period/eclass: show labeled best and worst sections
-    rows += sectionHdr('🏆 Best performers — lowest energy use', '#22c55e');
-    for (const b of _perfBest)  rows += buildRow(b, '🏆');
-    rows += sectionHdr('🔴 Highest energy use — needs attention', '#ef4444');
-    for (const b of _perfWorst) rows += buildRow(b, '🔴');
-  } else {
-    const n = sortedAll.length;
-    for (let i = 0; i < n; i++) {
-      let rankIcon = '';
-      if (_perfMode === 'use' && _sortMode === 'energy') {
-        if (i < 3)           rankIcon = '🏆';
-        else if (i >= n - 3) rankIcon = '🔴';
-      }
-      rows += buildRow(sortedAll[i], rankIcon);
-    }
-  }
+  rows += sectionHdr('🏆 Best performers — lowest energy use', '#22c55e');
+  for (const b of _perfBest)  rows += buildRow(b, '🏆');
+  rows += sectionHdr('🔴 Highest energy use — needs attention', '#ef4444');
+  for (const b of _perfWorst) rows += buildRow(b, '🔴');
 
   const hint = '<div style="text-align:center;font-size:10px;color:var(--faint);padding:8px 0">Tap a card to add to compare (max 3)</div>';
 
   document.getElementById('perf-content').innerHTML =
     scopeToggle
-    + '<div style="display:flex;gap:4px;margin-bottom:10px">'+tabs+'</div>'
     + cmpHtml
     + rows
     + hint;
