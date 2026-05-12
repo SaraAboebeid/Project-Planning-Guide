@@ -28,7 +28,7 @@ export default function BrandedHeader() {
         </div>
 
         {/* Right — Team */}
-        <div className="text-right text-[10px] text-white/60 leading-relaxed">
+        <div className="text-left text-[10px] text-white/60 leading-relaxed">
           <p className="font-semibold text-white/80 tracking-[0.12em] uppercase text-[9px] mb-0.5">
             Team
           </p>
