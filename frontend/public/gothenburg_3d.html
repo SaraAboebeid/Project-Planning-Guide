@@ -13,9 +13,9 @@
     :root {
       --navy:    #721CB8; --navy-dark:#421869; --teal:#995BD5;
       --lime:    #96D74C; --green:#509724;
-      --surface: rgba(10,10,20,0.85); --border:rgba(114,28,184,0.3);
-      --text:    #e2e8f0; --muted:#94a3b8; --faint:#475569;
-      --radius:  14px;   --shadow:0 8px 40px rgba(0,0,0,0.6);
+      --surface: rgba(255,255,255,0.97); --border:rgba(114,28,184,0.22);
+      --text:    #1f2937; --muted:#6b7280; --faint:#9ca3af;
+      --radius:  14px;   --shadow:0 4px 20px rgba(0,0,0,0.13);
     }
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(--text); overflow:hidden; }
@@ -29,7 +29,7 @@
       padding:14px 16px; box-shadow:var(--shadow);
     }
     .panel h2 {
-      font-size:11px; font-weight:700; color:var(--lime);
+      font-size:11px; font-weight:700; color:var(--navy);
       text-transform:uppercase; letter-spacing:.7px; margin-bottom:4px;
       cursor:grab; user-select:none;
     }
@@ -38,8 +38,13 @@
     }
     .panel .sub { font-size:11px; color:var(--muted); margin-bottom:10px; }
 
+    /* left column – stacks search bar → main panel → building panel */
+    #left-col {
+      position:absolute; top:16px; left:16px; width:260px; z-index:20;
+      display:flex; flex-direction:column; gap:8px;
+    }
     /* left info panel */
-    #left-panel { top:60px; left:16px; width:260px; }
+    #left-panel { position:relative; top:auto; left:auto; width:100%; }
 
     /* controls bar */
     #controls {
@@ -48,7 +53,7 @@
     }
     .btn {
       padding:7px 14px; border-radius:10px; border:1px solid var(--border);
-      background:var(--surface); color:var(--text); font-size:12px; font-weight:500;
+      background:rgba(114,28,184,0.07); color:var(--text); font-size:12px; font-weight:500;
       cursor:pointer; backdrop-filter:blur(12px); transition:all .15s;
       white-space:nowrap;
     }
@@ -57,14 +62,14 @@
 
     /* building info panel */
     #info-panel {
-      top:60px; left:16px; width:260px; display:none;
+      position:relative; top:auto; left:auto; width:100%; display:none;
     }
     #info-panel .close-btn {
       position:absolute; top:10px; right:12px; background:none; border:none;
       color:var(--muted); cursor:pointer; font-size:16px; line-height:1;
     }
     .tt-row { display:flex; justify-content:space-between; padding:3px 0;
-               border-bottom:1px solid rgba(255,255,255,0.05); font-size:12px; }
+               border-bottom:1px solid rgba(0,0,0,0.07); font-size:12px; }
     .tt-lbl { color:var(--muted); }
     .tt-val { color:#f1f5f9; font-weight:500; text-align:right; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
@@ -121,8 +126,7 @@
 
     /* search */
     #search-box {
-      position:absolute; top:16px; left:16px;
-      z-index:20; display:flex; gap:6px; width:260px;
+      display:flex; gap:6px; width:100%;
     }
     #search-input {
       flex:1; min-width:0; padding:8px 12px; border-radius:10px;
@@ -137,7 +141,7 @@
       border-radius:10px; backdrop-filter:blur(16px); display:none;
       max-height:240px; overflow-y:auto;
     }
-    .result-item { padding:8px 12px; cursor:pointer; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .result-item { padding:8px 12px; cursor:pointer; font-size:12px; border-bottom:1px solid rgba(0,0,0,0.07); }
     .result-item:hover { background:rgba(114,28,184,0.2); }
 
     /* brand */
@@ -189,6 +193,7 @@
   </svg>
 </div>
 
+<div id="left-col">
 <!-- Search bar -->
 <div id="search-box">
   <input id="search-input" type="text" placeholder="Search address…" autocomplete="off">
@@ -203,11 +208,11 @@
 
   <!-- Stats bar -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0 12px">
-    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;text-align:center">
-      <div style="font-size:18px;font-weight:700;color:#a78bfa">87,712</div>
+    <div style="background:rgba(114,28,184,0.07);border-radius:8px;padding:8px 10px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:#7c3aed">87,712</div>
       <div style="font-size:10px;color:var(--muted);margin-top:2px">EPC matched</div>
     </div>
-    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;text-align:center">
+    <div style="background:rgba(114,28,184,0.07);border-radius:8px;padding:8px 10px;text-align:center">
       <div style="font-size:18px;font-weight:700;color:#f59e0b">18,744</div>
       <div style="font-size:10px;color:var(--muted);margin-top:2px">TABULA matched</div>
     </div>
@@ -229,11 +234,12 @@
   <button class="btn" style="width:100%;margin-top:10px;font-size:12px" id="btn-pv">
     &#9728;&#65039; PV Potential
   </button>
-  <div id="pv-result" style="display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px"></div>
+  <div id="pv-result" style="display:none;margin-top:10px;border-top:1px solid rgba(0,0,0,0.1);padding-top:10px"></div>
   <button class="btn" style="width:100%;margin-top:8px;font-size:12px" id="btn-inspect">
     &#128247; Inspect Facades + WWR
   </button>
 </div>
+</div><!-- /left-col -->
 
 <!-- Hover tooltip card -->
 <div id="hover-card" style="
