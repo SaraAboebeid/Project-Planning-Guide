@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
-import type { BuildingLookup } from "../types";
+import type { BuildingLookup, BboxStats } from "../types";
 import BuildingMapPanel from "../components/panels/BuildingMap";
 import {
   CheckCircle2, AlertTriangle, XCircle,
@@ -661,6 +661,46 @@ function eubuccoSourceText(key: string, building: BuildingLookup | null): string
 }
 
 /* ─────────────────────────────────────────────
+   Bbox data summary banner (multi-building mode)
+───────────────────────────────────────────── */
+function BboxDataBanner({ bboxStats }: { bboxStats: BboxStats }) {
+  const epcPct = Math.round((bboxStats.with_epc / bboxStats.count) * 100);
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-blue-100">
+        <div className="flex items-center gap-2">
+          <span>🏙️</span>
+          <span className="text-xs font-semibold text-blue-900">
+            {bboxStats.count.toLocaleString()} buildings in bounding box — EUBUCCO aggregate data loaded
+          </span>
+          <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">
+            {epcPct}% have EPC
+          </span>
+        </div>
+        <a
+          href="http://127.0.0.1:8765/gothenburg_3d.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] font-medium text-blue-700 hover:text-blue-900 underline underline-offset-2 whitespace-nowrap"
+        >
+          📷 3D Inspector →
+        </a>
+      </div>
+      <div className="flex flex-wrap gap-x-5 gap-y-1 px-4 py-2.5 text-xs text-blue-800">
+        {bboxStats.common_use  && <span>🏢 Most common: {bboxStats.common_use}</span>}
+        {bboxStats.avg_year    && <span>📅 Avg built: {bboxStats.avg_year}</span>}
+        {bboxStats.avg_floors  && <span>⬆ Avg {bboxStats.avg_floors} floors</span>}
+        {bboxStats.avg_footprint && <span>📐 Avg footprint: {Math.round(bboxStats.avg_footprint)} m\u00b2</span>}
+        {bboxStats.avg_height  && <span>📏 Avg height: {bboxStats.avg_height} m</span>}
+        {bboxStats.avg_energy  && <span>🔥 Avg energy: {bboxStats.avg_energy} kWh/m\u00b2</span>}
+        <span>📊 Height data: {bboxStats.with_height}/{bboxStats.count} ({Math.round(bboxStats.with_height/bboxStats.count*100)}%)</span>
+        <span>📊 Floor data: {bboxStats.with_floors}/{bboxStats.count} ({Math.round(bboxStats.with_floors/bboxStats.count*100)}%)</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    Building data summary banner
 ───────────────────────────────────────────── */
 function BuildingDataBanner({
@@ -741,7 +781,8 @@ function BuildingDataBanner({
 export default function DataCoverage() {
   const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
-  const building = project.lookedUpBuilding ?? null;
+  const building   = project.lookedUpBuilding ?? null;
+  const bboxStats  = project.bboxStats ?? null;
 
   const defs = useMemo(
     () => buildDefs(project.projectType, project.systemsInScope, project.ecEnergyFocus ?? []),
@@ -750,14 +791,14 @@ export default function DataCoverage() {
 
   /* Per-item "user has this data" state — keyed by item.key */
   const [hasData, setHasData] = useState<Record<string, boolean>>(() =>
-    initFromBuilding(defs, building),
+    bboxStats ? initFromBboxStats(defs, bboxStats) : initFromBuilding(defs, building),
   );
 
-  /* Reset when project type / systems change OR when building lookup updates */
+  /* Reset when project type / systems change OR when building/bbox lookup updates */
   useEffect(() => {
-    setHasData(initFromBuilding(defs, building));
+    setHasData(bboxStats ? initFromBboxStats(defs, bboxStats) : initFromBuilding(defs, building));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defs, building]);
+  }, [defs, building, bboxStats]);
 
   const toggleHas = (key: string) =>
     setHasData(prev => ({ ...prev, [key]: !prev[key] }));
@@ -867,8 +908,8 @@ export default function DataCoverage() {
       {/* 3D Building Map */}
       <BuildingMapPanel />
 
-      {/* EUBUCCO building data banner */}
-      {building && (
+      {/* EUBUCCO building data banner (single building) */}
+      {building && !bboxStats && (
         <BuildingDataBanner
           building={building}
           projectType={project.projectType}
@@ -876,6 +917,9 @@ export default function DataCoverage() {
           hasData={hasData}
         />
       )}
+
+      {/* EUBUCCO bbox aggregate banner (multi-building) */}
+      {bboxStats && <BboxDataBanner bboxStats={bboxStats} />}
 
       {/* Instruction callout */}
       {totalCount > 0 && (
@@ -1045,6 +1089,8 @@ export default function DataCoverage() {
                                   : <span className="text-amber-600 font-medium">No problem — we have a curated material library for you</span>
                               ) : item.hasData
                                 ? (() => {
+                                    const bbText = bboxSourceText(item.key, bboxStats);
+                                    if (bbText) return <span className="text-blue-600 font-medium">🗃 {bbText}</span>;
                                     const eubuccoText = eubuccoSourceText(item.key, building);
                                     return eubuccoText
                                       ? <span className="text-purple-600 font-medium">🗄 {eubuccoText}</span>

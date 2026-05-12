@@ -2,7 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../../store/wizard";
 import { api } from "../../api/client";
-import type { BuildingLookup } from "../../types";
+import type { BuildingLookup, BboxStats } from "../../types";
 import {
   PROJECT_TYPES,
   PROJECT_TYPE_DESCRIPTIONS,
@@ -153,6 +153,56 @@ function BuildingPreviewCard({ b, projectType }: { b: BuildingLookup; projectTyp
   );
 }
 
+/* ── Bbox stats preview card (shown in Step 1 after drawing a bbox) ── */
+function BboxStatsCard({ stats }: { stats: BboxStats }) {
+  const epcPct = Math.round((stats.with_epc  / stats.count) * 100);
+  const hgtPct = Math.round((stats.with_height / stats.count) * 100);
+  const fpPct  = Math.round((stats.with_footprint / stats.count) * 100);
+  const chips: { label: string; value: string | number | null }[] = [
+    { label: "Buildings",       value: stats.count.toLocaleString() },
+    { label: "Avg height (m)",  value: stats.avg_height },
+    { label: "Avg floors",      value: stats.avg_floors },
+    { label: "Avg footprint",   value: stats.avg_footprint != null ? Math.round(stats.avg_footprint) : null },
+    { label: "Common use",      value: stats.common_use },
+    { label: "Avg year built",  value: stats.avg_year },
+    { label: "Avg energy use",  value: stats.avg_energy != null ? `${stats.avg_energy} kWh/m²` : null },
+    { label: `EPC data`,        value: `${stats.with_epc}/${stats.count} (${epcPct}%)` },
+    { label: `Height data`,     value: `${stats.with_height}/${stats.count} (${hgtPct}%)` },
+    { label: `Footprint data`,  value: `${stats.with_footprint}/${stats.count} (${fpPct}%)` },
+  ];
+  return (
+    <div className="mt-4 rounded-xl border border-blue-200 bg-white overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border-b border-blue-100">
+        <span className="text-base">🏙️</span>
+        <span className="text-xs font-semibold text-blue-900">
+          {stats.count.toLocaleString()} buildings found in bounding box — EUBUCCO data loaded
+        </span>
+        <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">
+          {epcPct}% have EPC
+        </span>
+      </div>
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 p-3">
+        {chips.map(c => (
+          <div key={c.label} className="flex flex-col px-2.5 py-2 rounded-lg border text-[11px] bg-blue-50 border-blue-200 text-blue-900">
+            <span className="font-semibold leading-tight">{c.value ?? "—"}</span>
+            <span className="text-[10px] opacity-70 mt-0.5">{c.label}</span>
+          </div>
+        ))}
+      </div>
+      <div className="px-3 pb-3">
+        <a
+          href="http://127.0.0.1:8765/gothenburg_3d.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-blue-700 hover:text-blue-900 underline underline-offset-2"
+        >
+          📷 Open 3D Facade Inspector →
+        </a>
+      </div>
+    </div>
+  );
+}
+
 /* ════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ════════════════════════════════════════════════════════════════════ */
@@ -163,6 +213,23 @@ export default function DefineProject() {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [buildingLoading, setBuildingLoading] = useState(false);
   const lookupDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ── Bbox lookup — fires when user finishes drawing a bbox ──── */
+  async function handleBboxChange(bbox: { north: number; south: number; east: number; west: number } | null) {
+    if (!bbox) {
+      setProject({ bboxStats: null, lookedUpBuilding: null });
+      return;
+    }
+    setBuildingLoading(true);
+    try {
+      const stats = await api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west);
+      setProject({ bboxStats: stats, lookedUpBuilding: null });
+    } catch {
+      setProject({ bboxStats: null });
+    } finally {
+      setBuildingLoading(false);
+    }
+  }
 
   /* ── Building lookup — fires when buildingPoints changes ─────── */
   useEffect(() => {
@@ -754,6 +821,7 @@ export default function DefineProject() {
             scale={project.scale}
             onAddressChange={(addr) => setProject({ address: addr })}
             onPointsChange={(pts) => setProject({ buildingPoints: pts })}
+            onBboxChange={handleBboxChange}
           />
 
           {/* Building lookup preview */}
@@ -769,6 +837,10 @@ export default function DefineProject() {
 
           {!buildingLoading && project.lookedUpBuilding && (
             <BuildingPreviewCard b={project.lookedUpBuilding} projectType={pt} />
+          )}
+
+          {!buildingLoading && project.bboxStats && (
+            <BboxStatsCard stats={project.bboxStats} />
           )}
         </Card>
       )}

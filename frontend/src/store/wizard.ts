@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { ProjectType } from "../config/projectConfig";
-import type { BuildingLookup } from "../types";
+import type { BuildingLookup, BboxStats } from "../types";
 
 /* ── Pipeline definitions ── */
 
@@ -49,8 +49,10 @@ interface ProjectState {
   buildingPoints: { lat: number; lon: number; label: string }[];
   /* data coverage */
   dataInputs: Record<string, { available: boolean; proxy: string | null; confidence: number }>;
-  /* looked-up building from EUBUCCO */
+  /* looked-up building from EUBUCCO (single-address mode) */
   lookedUpBuilding: BuildingLookup | null;
+  /* aggregate stats from EUBUCCO for a bbox (multi-building mode) */
+  bboxStats: BboxStats | null;
 }
 
 interface WizardState {
@@ -88,6 +90,7 @@ const DEFAULT_PROJECT: ProjectState = {
   buildingPoints: [],
   dataInputs: {},
   lookedUpBuilding: null,
+  bboxStats: null,
 };
 
 export const useWizardStore = create<WizardState>((set) => ({

@@ -258,6 +258,69 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
     }
 
 
+# ── All buildings within a bounding box — aggregate stats ───────────────────
+@app.get("/api/buildings/bbox/stats")
+def buildings_bbox_stats(
+    north: float = Query(...),
+    south: float = Query(...),
+    east:  float = Query(...),
+    west:  float = Query(...),
+):
+    """Return aggregate EUBUCCO stats for every building whose centroid is inside the bbox."""
+    from collections import Counter
+    all_buildings = _get_buildings_list()
+    matched: list = []
+    for b in all_buildings:
+        coords = b.get("coordinates") or []
+        c_lat, c_lon = _polygon_centroid(coords)
+        if c_lat == 0.0 and c_lon == 0.0:
+            continue
+        if south <= c_lat <= north and west <= c_lon <= east:
+            matched.append(b)
+
+    count = len(matched)
+    if count == 0:
+        raise HTTPException(404, "No buildings found in bounding box")
+
+    def cnt(key: str) -> int:
+        return sum(1 for b in matched if b.get(key) is not None)
+
+    def avg_field(key: str) -> float | None:
+        vals = [b[key] for b in matched if b.get(key) is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    def common_val(key: str) -> str | None:
+        vals = [b[key] for b in matched if b.get(key)]
+        if not vals:
+            return None
+        return Counter(vals).most_common(1)[0][0]
+
+    footprints = [
+        b["area"] / b["floors"]
+        for b in matched
+        if b.get("area") and b.get("floors") and b["floors"] > 0
+    ]
+    yr_count = cnt("year")
+
+    return {
+        "count":          count,
+        "with_height":    cnt("height"),
+        "with_floors":    cnt("floors"),
+        "with_year":      yr_count,
+        "with_energy":    cnt("energy"),
+        "with_epc":       sum(1 for b in matched if b.get("has_epc")),
+        "with_use":       cnt("use_cat"),
+        "with_footprint": len(footprints),
+        "avg_height":     avg_field("height"),
+        "avg_floors":     avg_field("floors"),
+        "avg_year":       (round(sum(b["year"] for b in matched if b.get("year")) / yr_count)
+                           if yr_count > 0 else None),
+        "avg_energy":     avg_field("energy"),
+        "avg_footprint":  round(sum(footprints) / len(footprints), 1) if footprints else None,
+        "common_use":     common_val("use_cat"),
+    }
+
+
 # ── Boverket materials ───────────────────────────────────────────────────────
 @app.get("/api/boverket/materials")
 def boverket_materials(component: str = Query(...)):

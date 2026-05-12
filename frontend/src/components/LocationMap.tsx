@@ -281,12 +281,14 @@ interface LocationMapProps {
   scale: string | null;
   onAddressChange: (addressString: string) => void;
   onPointsChange?: (points: { lat: number; lon: number; label: string }[]) => void;
+  onBboxChange?: (bbox: { north: number; south: number; east: number; west: number } | null) => void;
 }
 
 export default function LocationMap({
   scale,
   onAddressChange,
   onPointsChange,
+  onBboxChange,
 }: LocationMapProps) {
   const isBuilding = scale === "Building";
 
@@ -309,6 +311,7 @@ export default function LocationMap({
     setBboxPreview(null);
     setBboxDone(false);
     onAddressChange("");
+    onBboxChange?.(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scale]);
 
@@ -347,10 +350,10 @@ export default function LocationMap({
         onAddressChange(
           `BBOX: N${preview.north.toFixed(4)} S${preview.south.toFixed(4)} E${preview.east.toFixed(4)} W${preview.west.toFixed(4)}`
         );
-        // Fire onPointsChange with bbox center so building lookup triggers
-        const centerLat = (preview.north + preview.south) / 2;
-        const centerLon = (preview.east + preview.west) / 2;
-        onPointsChange?.([{ lat: centerLat, lon: centerLon, label: "Bbox center" }]);
+        // Notify parent with the raw bbox so it can query ALL buildings inside it;
+        // clear any single-building points so the two modes don't conflict.
+        onBboxChange?.(preview);
+        onPointsChange?.([]);
       } else {
         // trivial drag — keep existing box
       }

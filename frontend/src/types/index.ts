@@ -57,6 +57,24 @@ export interface EpcSnapshot {
   sample: Record<string, unknown>[];
 }
 
+/** Aggregate EUBUCCO stats for all buildings inside a bounding box */
+export interface BboxStats {
+  count: number;
+  with_height: number;
+  with_floors: number;
+  with_year: number;
+  with_energy: number;
+  with_epc: number;
+  with_use: number;
+  with_footprint: number;
+  avg_height: number | null;
+  avg_floors: number | null;
+  avg_year: number | null;
+  avg_energy: number | null;
+  avg_footprint: number | null;
+  common_use: string | null;
+}
+
 /** Nearest EUBUCCO building returned by /api/building */
 export interface BuildingLookup {
   address: string | null;

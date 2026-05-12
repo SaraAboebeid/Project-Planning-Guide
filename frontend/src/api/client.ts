@@ -24,7 +24,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 /* ── Endpoints ── */
 
-import type { EpcSnapshot, EpcPassport, TabulaArchetype, MatchConfidence, BuildingLookup } from "../types";
+import type { EpcSnapshot, EpcPassport, TabulaArchetype, MatchConfidence, BuildingLookup, BboxStats } from "../types";
 
 export const api = {
   /** Geocode an address → { lat, lon, display_name } */
@@ -61,6 +61,13 @@ export const api = {
   /** Look up nearest EUBUCCO building by lat/lon */
   lookupBuilding: (lat: number, lon: number) =>
     get<BuildingLookup>("/building", { lat: String(lat), lon: String(lon) }),
+
+  /** Aggregate EUBUCCO stats for all buildings in a bounding box */
+  lookupBuildingsBbox: (north: number, south: number, east: number, west: number) =>
+    get<BboxStats>("/buildings/bbox/stats", {
+      north: String(north), south: String(south),
+      east:  String(east),  west:  String(west),
+    }),
 
   /** Health check */
   health: () => get<{ status: string }>("/health"),
