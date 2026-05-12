@@ -181,6 +181,48 @@ def tabula_match(
 
 # ── Single building lookup by lat/lon ────────────────────────────────────────
 
+# U-values derived from TABULA (Sweden) + Swedish BBR for post-2005.
+# Structure: {use_type: {period: (u_wall, u_win)}}
+# use_type: 'SFH' (enfamilj) or 'MFH' (flerfamilj)
+# Periods: as stored in buildings.json tabula_period field
+_TABULA_U: dict[str, dict[str, tuple[float, float]]] = {
+    "SFH": {
+        "...1960":    (0.60, 2.34),
+        "1961-1975":  (0.41, 2.22),
+        "1976-1985":  (0.27, 2.04),
+        "1986-1995":  (0.19, 1.80),
+        "1996-2005":  (0.17, 1.60),
+        "post-2005":  (0.13, 1.10),   # BBR 2006+ / NNE requirements
+    },
+    "MFH": {
+        "...1960":    (0.58, 2.22),
+        "1961-1975":  (0.41, 2.22),
+        "1976-1985":  (0.33, 2.04),
+        "1986-1995":  (0.22, 1.80),
+        "1996-2005":  (0.20, 1.97),
+        "post-2005":  (0.15, 1.20),   # BBR 2006+ / NNE requirements
+    },
+}
+
+# Map buildings.json use_cat → TABULA building type key
+_USE_TO_TABULA_TYPE: dict[str, str] = {
+    "bostad_enfamilj":   "SFH",
+    "bostad_flerfamilj": "MFH",
+}
+
+def _derive_u_values(use_cat: str | None, period: str | None) -> tuple[float | None, float | None]:
+    """Return (u_wall, u_win) from TABULA/BBR table, or (None, None) if not applicable."""
+    if not period:
+        return (None, None)
+    btype = _USE_TO_TABULA_TYPE.get(use_cat or "")
+    if not btype:
+        return (None, None)
+    pair = _TABULA_U.get(btype, {}).get(period)
+    if pair is None:
+        return (None, None)
+    return pair
+
+
 def _polygon_centroid(coords: list) -> tuple[float, float]:
     ring = coords[0] if coords else []
     if not ring:
@@ -253,6 +295,18 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
     # Centroid
     c_lat, c_lon = _polygon_centroid(best.get("coordinates") or [])
 
+    # U-values: use stored value if available, otherwise derive from TABULA/BBR table
+    u_wall = best.get("tabula_u_wall")
+    u_win  = best.get("tabula_u_win")
+    if u_wall is None or u_win is None:
+        derived_u_wall, derived_u_win = _derive_u_values(
+            best.get("use_cat"), best.get("tabula_period")
+        )
+        if u_wall is None:
+            u_wall = derived_u_wall
+        if u_win is None:
+            u_win = derived_u_win
+
     return {
         "address":       best.get("address"),
         "height":        best.get("height"),
@@ -264,8 +318,8 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
         "energy":        best.get("energy"),    # kWh/m²/yr
         "eclass":        best.get("eclass"),
         "tabula_period": best.get("tabula_period"),
-        "tabula_u_wall": best.get("tabula_u_wall"),
-        "tabula_u_win":  best.get("tabula_u_win"),
+        "tabula_u_wall": u_wall,
+        "tabula_u_win":  u_win,
         "has_epc":       bool(best.get("has_epc")),
         "lat":           round(c_lat, 6),
         "lon":           round(c_lon, 6),
