@@ -272,7 +272,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "ec_b_orient", label: "Building orientation (°)",
-            primarySource: "Gothenburg 3D", primaryConfidence: "High",
+            primarySource: "Cesium", primaryConfidence: "High",
             fallbackSource: "Street-level imagery / GIS cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: true,
           },
@@ -360,7 +360,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "ec_rpv_azimuth", label: "Building orientation (°)",
-            primarySource: "Gothenburg 3D", primaryConfidence: "High",
+            primarySource: "Cesium", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: true,
           },
@@ -392,7 +392,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "ec_fpv_orient", label: "Building orientation (°)",
-            primarySource: "Gothenburg 3D", primaryConfidence: "High",
+            primarySource: "Cesium", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: true,
           },
@@ -511,7 +511,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "re_rpv_azimuth", label: "Building orientation (°)",
-            primarySource: "Gothenburg 3D", primaryConfidence: "High",
+            primarySource: "Cesium", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: true,
           },
@@ -543,7 +543,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "re_fpv_orient", label: "Building orientation (°)",
-            primarySource: "Gothenburg 3D", primaryConfidence: "High",
+            primarySource: "Cesium", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: true,
           },
