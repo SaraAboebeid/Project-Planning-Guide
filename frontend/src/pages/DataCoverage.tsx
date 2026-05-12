@@ -1162,7 +1162,30 @@ export default function DataCoverage() {
 
                         {/* Source (short) */}
                         <span className="text-xs text-slate-500 leading-tight">
-                          {item.hasData ? "Provided by user" : item.source}
+                          {item.hasData
+                            ? (() => {
+                                if (bboxSourceText(item.key, bboxStats))
+                                  return <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold border border-blue-200">EUBUCCO</span>;
+                                const eubText = eubuccoSourceText(item.key, building);
+                                if (eubText) {
+                                  const isEpc = building?.has_epc && ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year"].includes(FIELD_MAP[item.key] ?? "");
+                                  return isEpc
+                                    ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span></>
+                                    : <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
+                                }
+                                return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
+                              })()
+                            : (() => {
+                                const src = item.source.toLowerCase();
+                                if (src.includes("tabula"))  return <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold border border-amber-200">TABULA</span>;
+                                if (src.includes("boverket")) return <span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-orange-200">Boverket</span>;
+                                if (src.includes("epc") || src.includes("energy performance")) return <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span>;
+                                if (src.includes("pvgis")) return <span className="px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-[9px] font-bold border border-yellow-200">PVGIS</span>;
+                                if (src.includes("eubucco")) return <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
+                                if (src.includes("—") || src.includes("no ") || src.includes("must")) return <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[9px] font-bold border border-red-200">Missing</span>;
+                                return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">Estimated</span>;
+                              })()
+                          }
                         </span>
 
                         {/* Confidence mini-bar */}
