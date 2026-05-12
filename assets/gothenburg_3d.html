@@ -230,7 +230,11 @@
   <button class="close-btn" id="info-close">&#x2715;</button>
   <h2>&#127963; Building</h2>
   <div id="info-content"></div>
-  <button class="btn" style="width:100%;margin-top:10px;font-size:12px" id="btn-inspect">
+  <button class="btn" style="width:100%;margin-top:10px;font-size:12px" id="btn-pv">
+    &#9728;&#65039; PV Potential
+  </button>
+  <div id="pv-result" style="display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px"></div>
+  <button class="btn" style="width:100%;margin-top:8px;font-size:12px" id="btn-inspect">
     &#128247; Inspect Facades + WWR
   </button>
 </div>
@@ -1196,6 +1200,7 @@ function showInfoPanel(b, idx, terrainH) {
   row('U-wall',   b.tabula_u_wall ? b.tabula_u_wall + ' W/m²K' : null);
   row('U-win',    b.tabula_u_win  ? b.tabula_u_win  + ' W/m²K' : null);
   document.getElementById('info-content').innerHTML = rows.join('');
+  document.getElementById('pv-result').style.display = 'none';
   document.getElementById('info-panel').style.display = 'block';
 
   // Highlight outline
@@ -1225,6 +1230,110 @@ function hideInfoPanel() {
 }
 
 document.getElementById('info-close').addEventListener('click', hideInfoPanel);
+
+// ─────────────────────────────────────────────────────────────────
+// PV Potential — PVGIS API integration
+// ─────────────────────────────────────────────────────────────────
+
+// Shoelace formula → roof footprint area in m²
+function computeFootprintArea(b) {
+  if (b.area && b.area > 0) return b.area;
+  const ring = b.coordinates[0];
+  let sum = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [x1, y1] = ring[i], [x0, y0] = ring[j];
+    sum += (x0 + x1) * (y1 - y0);
+  }
+  const degArea = Math.abs(sum) / 2;
+  const lat = b.coordinates[0][0][1];
+  const m2PerDeg2 = 111320 * 111320 * Math.cos(lat * Math.PI / 180);
+  return degArea * m2PerDeg2;
+}
+
+// Standard 450 W panel, ~2.2 m² physical area.
+// At 15° tilt in Sweden, each panel row needs ~3.0 m² of roof footprint (including spacing).
+// 65% usable roof fraction (setbacks, HVAC, access).
+const PV_PANEL_W         = 450;   // watts
+const PV_PANEL_AREA_M2   = 3.0;   // effective m² per panel incl. row spacing
+const PV_USABLE_FRACTION = 0.65;  // fraction of roof area usable
+const PV_TILT            = 15;    // degrees — common flat-roof angle in Sweden
+const PV_AZIMUTH         = 0;     // 0 = south-facing (optimal)
+const PV_LOSS            = 14;    // % system losses (wiring, inverter, temp)
+
+function computePVCapacity(b) {
+  const roofM2   = computeFootprintArea(b);
+  const usable   = roofM2 * PV_USABLE_FRACTION;
+  const nPanels  = Math.floor(usable / PV_PANEL_AREA_M2);
+  const kWp      = +(nPanels * PV_PANEL_W / 1000).toFixed(2);
+  return { roofM2: Math.round(roofM2), nPanels, kWp };
+}
+
+async function fetchPVGIS(lat, lon, kWp) {
+  const url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}` +
+    `&peakpower=${kWp}&loss=${PV_LOSS}&angle=${PV_TILT}&aspect=${PV_AZIMUTH}` +
+    `&outputformat=json&pvtechchoice=crystSi`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  if (!resp.ok) throw new Error(`PVGIS ${resp.status}`);
+  const data = await resp.json();
+  const totals = data.outputs.totals.fixed;
+  return {
+    E_y:  Math.round(totals.E_y),        // kWh/year
+    E_m:  Math.round(totals.E_m),        // kWh/month avg
+    Hy:   Math.round(totals['H(i)_y']),  // irradiation kWh/m²/year
+    specificYield: Math.round(totals.E_y / kWp), // kWh/kWp
+  };
+}
+
+document.getElementById('btn-pv').addEventListener('click', async () => {
+  if (!selectedBuilding) return;
+  const btn = document.getElementById('btn-pv');
+  const resultEl = document.getElementById('pv-result');
+  btn.disabled = true;
+  btn.innerHTML = '&#9728;&#65039; Loading PVGIS…';
+  resultEl.style.display = 'none';
+
+  try {
+    const b = selectedBuilding;
+    const { roofM2, nPanels, kWp } = computePVCapacity(b);
+    const center = getBuildingCenter(b);
+
+    let html = `<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">&#9728;&#65039; PV Potential</div>`;
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">`;
+    html += `<div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:7px 9px;text-align:center">`;
+    html += `<div style="font-size:18px;font-weight:700;color:#facc15">${kWp}</div>`;
+    html += `<div style="font-size:10px;color:#94a3b8;margin-top:2px">kWp installed</div></div>`;
+    html += `<div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:7px 9px;text-align:center">`;
+    html += `<div style="font-size:18px;font-weight:700;color:#facc15">${nPanels}</div>`;
+    html += `<div style="font-size:10px;color:#94a3b8;margin-top:2px">panels (450 W)</div></div></div>`;
+    html += `<div style="font-size:10px;color:#64748b;margin-bottom:8px">Roof: ${roofM2} m² · ${Math.round(roofM2 * PV_USABLE_FRACTION)} m² usable · ${PV_TILT}° tilt</div>`;
+
+    try {
+      const pv = await fetchPVGIS(center.lat, center.lon, kWp);
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">`;
+      html += `<div style="background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.2);border-radius:6px;padding:7px 9px;text-align:center">`;
+      html += `<div style="font-size:20px;font-weight:700;color:#facc15">${(pv.E_y/1000).toFixed(1)}</div>`;
+      html += `<div style="font-size:10px;color:#94a3b8;margin-top:2px">MWh / year</div></div>`;
+      html += `<div style="background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.2);border-radius:6px;padding:7px 9px;text-align:center">`;
+      html += `<div style="font-size:20px;font-weight:700;color:#facc15">${pv.specificYield}</div>`;
+      html += `<div style="font-size:10px;color:#94a3b8;margin-top:2px">kWh / kWp</div></div></div>`;
+      html += `<div style="font-size:10px;color:#64748b">Irradiation: ${pv.Hy} kWh/m²/yr · PVGIS-SARAH2</div>`;
+    } catch (pvErr) {
+      // Estimate without PVGIS using typical Gothenburg specific yield ~870 kWh/kWp at 15°
+      const estYield = Math.round(kWp * 870);
+      html += `<div style="background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.2);border-radius:6px;padding:8px 10px;text-align:center;margin-bottom:6px">`;
+      html += `<div style="font-size:20px;font-weight:700;color:#facc15">${(estYield/1000).toFixed(1)} MWh/yr</div>`;
+      html += `<div style="font-size:10px;color:#94a3b8;margin-top:2px">estimated (PVGIS offline)</div></div>`;
+    }
+    resultEl.innerHTML = html;
+    resultEl.style.display = 'block';
+  } catch (err) {
+    resultEl.innerHTML = `<div style="font-size:11px;color:#f87171">Error: ${err.message}</div>`;
+    resultEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#9728;&#65039; PV Potential';
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────
 // Facade Inspector
