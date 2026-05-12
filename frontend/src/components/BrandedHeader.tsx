@@ -30,10 +30,10 @@ export default function BrandedHeader() {
         {/* Right — Team */}
         <div className="text-right text-[10px] text-white/60 leading-relaxed">
           <p className="font-semibold text-white/80 tracking-[0.12em] uppercase text-[9px] mb-0.5">
-            Research Team
+            Team
           </p>
-          <p>S. Abouebeid &nbsp;·&nbsp; E. Malakhatka</p>
-          <p>L. Thuvander &nbsp;·&nbsp; H. Wallbaum</p>
+          <p>Sara Abouebeid &nbsp;·&nbsp; Elena Malakhatka</p>
+          <p>Liane Thuvander &nbsp;·&nbsp; Holger Wallbaum</p>
         </div>
       </div>
       <div className="ppg-accent-line" />
