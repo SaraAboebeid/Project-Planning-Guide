@@ -237,6 +237,8 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
   /* ══ ENERGY COMMUNITY PLANNING ══ */
   if (projectType === "Energy Community Planning") {
     const cats: DataCategoryDef[] = [];
+    const hasThermal = sys.has("Buildings") && (ecEnergyFocus.includes("Heating") || ecEnergyFocus.includes("Cooling"));
+    let demandAdded = false;
 
     if (sys.has("Buildings") && (ecEnergyFocus.includes("Heating") || ecEnergyFocus.includes("Cooling"))) {
       cats.push({
@@ -298,18 +300,20 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
       cats.push({
         category: "Buildings – Electricity",
         items: [
-          {
-            key: "ec_be_fp",   label: "Building footprint dimensions",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "Energy Performance Certificate / Cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
-          },
-          {
-            key: "ec_be_hgt",  label: "Building height",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "Urban datasets / Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
-          },
+          ...(!hasThermal ? [
+            {
+              key: "ec_be_fp",   label: "Building footprint dimensions",
+              primarySource: "Design drawings / Digital model", primaryConfidence: "High" as const,
+              fallbackSource: "Energy Performance Certificate / Cadastral data", fallbackStatus: "Estimated" as const, fallbackConfidence: "Medium" as const, fallbackAction: "Review" as const,
+              defaultHas: false,
+            },
+            {
+              key: "ec_be_hgt",  label: "Building height",
+              primarySource: "Design drawings / Digital model", primaryConfidence: "High" as const,
+              fallbackSource: "Urban datasets / Street-level imagery", fallbackStatus: "Estimated" as const, fallbackConfidence: "Medium" as const, fallbackAction: "Review" as const,
+              defaultHas: false,
+            },
+          ] : []),
           {
             key: "ec_be_use",  label: "Building use / occupancy type",
             primarySource: "Planning permission / EPC", primaryConfidence: "High",
@@ -324,9 +328,16 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
         ],
       });
+      demandAdded = true;
     }
 
     if (sys.has("Rooftop PV")) {
+      const demandItem: DataItemDef = {
+        key: "ec_rpv_demand", label: "Electricity demand – hourly profile",
+        primarySource: "Smart meter data", primaryConfidence: "High",
+        fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+        defaultHas: false,
+      };
       cats.push({
         category: "Case: Rooftop PV",
         items: [
@@ -348,17 +359,19 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
-          {
-            key: "ec_rpv_demand", label: "Electricity demand – hourly profile",
-            primarySource: "Smart meter data", primaryConfidence: "High",
-            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: false,
-          },
+          ...(!demandAdded ? [demandItem] : []),
         ],
       });
+      if (!demandAdded) demandAdded = true;
     }
 
     if (sys.has("Facade PV")) {
+      const demandItem: DataItemDef = {
+        key: "ec_fpv_demand", label: "Electricity demand – hourly profile",
+        primarySource: "Smart meter data", primaryConfidence: "High",
+        fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+        defaultHas: false,
+      };
       cats.push({
         category: "Case: Facade PV",
         items: [
@@ -380,14 +393,10 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
-          {
-            key: "ec_fpv_demand", label: "Electricity demand – hourly profile",
-            primarySource: "Smart meter data", primaryConfidence: "High",
-            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: false,
-          },
+          ...(!demandAdded ? [demandItem] : []),
         ],
       });
+      if (!demandAdded) demandAdded = true;
     }
 
     if (sys.has("Community PV")) {
@@ -476,6 +485,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
   /* ══ RENEWABLE ENERGY PLANNING ══ */
   if (projectType === "Renewable Energy Planning") {
     const cats: DataCategoryDef[] = [];
+    let reDemandAdded = false;
 
     if (sys.has("Rooftop PV")) {
       cats.push({
@@ -507,9 +517,16 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
         ],
       });
+      reDemandAdded = true;
     }
 
     if (sys.has("Facade PV")) {
+      const demandItem: DataItemDef = {
+        key: "re_fpv_demand", label: "Electricity demand – hourly profile",
+        primarySource: "Smart meter data", primaryConfidence: "High",
+        fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+        defaultHas: false,
+      };
       cats.push({
         category: "Case: Facade PV",
         items: [
@@ -531,12 +548,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
-          {
-            key: "re_fpv_demand", label: "Electricity demand – hourly profile",
-            primarySource: "Smart meter data", primaryConfidence: "High",
-            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-            defaultHas: false,
-          },
+          ...(!reDemandAdded ? [demandItem] : []),
         ],
       });
     }
@@ -1068,20 +1080,6 @@ export default function DataCoverage() {
 
       {/* EUBUCCO bbox aggregate banner (bbox draw mode) */}
       {bboxStats && <BboxDataBanner bboxStats={bboxStats} />}
-
-      {/* Instruction callout */}
-      {totalCount > 0 && (
-        <div className="flex items-start gap-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
-          <span className="text-lg leading-none mt-0.5">💡</span>
-          <span>
-            Toggle <span className="font-semibold">I have this</span> on/off for each row.
-            When toggled <span className="font-semibold">off</span>, the system automatically
-            selects the best available fallback database and updates the status to
-            <span className="font-semibold text-amber-700"> Estimated</span> or
-            <span className="font-semibold text-red-700"> Missing</span>.
-          </span>
-        </div>
-      )}
 
       {/* Coverage summary bar */}
       {totalCount > 0 && (
