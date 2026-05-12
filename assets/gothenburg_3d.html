@@ -255,7 +255,7 @@
 
   <!-- Manual capture slot (full-width, prominent) -->
   <div style="margin-top:10px;position:relative;border-radius:8px;overflow:hidden;border:2px solid #a78bfa;background:#0d0d1a">
-    <canvas id="canvas-manual" width="520" height="200" style="width:100%;height:120px;object-fit:cover;display:block"></canvas>
+    <canvas id="canvas-manual" width="240" height="360" style="width:100%;height:200px;object-fit:cover;display:block"></canvas>
     <div style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;background:rgba(114,28,184,0.85);color:#fff;padding:2px 10px;border-radius:4px">Manual View</div>
   </div>
 
@@ -318,7 +318,7 @@
   <div id="wwr-breakdown" style="margin-top:8px;font-size:11px;color:#64748b"></div>
   <div style="margin-top:6px;font-size:10px;color:#475569">
     Heuristic: TABULA archetype · era · energy class.<br>
-    AI: GPT-4.1 vision analysis of facade captures.
+    AI: AI vision model analysis of facade captures.
   </div>
 </div>
 
@@ -1401,10 +1401,10 @@ document.getElementById('btn-inspect').addEventListener('click', () => {
   }
   // Clear manual canvas
   const mctx = document.getElementById('canvas-manual').getContext('2d');
-  mctx.fillStyle = '#0d0d1a'; mctx.fillRect(0,0,520,200);
+  mctx.fillStyle = '#0d0d1a'; mctx.fillRect(0,0,240,360);
   mctx.fillStyle = '#a78bfa'; mctx.font = '600 13px Inter';
-  mctx.textAlign = 'center'; mctx.fillText('Pan & orbit to your desired angle,', 260, 85);
-  mctx.fillText('then click  📷 Manual Capture', 260, 105);
+  mctx.textAlign = 'center'; mctx.fillText('Pan & orbit to your desired angle,', 120, 168);
+  mctx.fillText('then click  📷 Manual Capture', 120, 188);
   // Fly to first facade
   flyToFacade('N');
   // Show heuristic WWR immediately
@@ -1569,21 +1569,20 @@ function showWWR(wwr, perFacade, source) {
     document.getElementById('wwr-ai-section').style.display = 'block';
     document.getElementById('wwr-value-ai').textContent = wwr;
     document.getElementById('wwr-bar-ai').style.width = Math.min(100, wwr * 1.4) + '%';
-    const modelName = source.includes('claude') ? 'Claude Vision'
-                    : source.includes('4.1')    ? 'GPT-4.1 Vision'
-                    : 'GPT-4o Vision';
+    const modelName = 'AI Vision Model';
     document.getElementById('wwr-ai-label').textContent = modelName;
     document.getElementById('wwr-breakdown').innerHTML = '';
 
-    // Per-facade bars
+    // Per-facade bars — works for any number of captures (1 manual or 1-4 cardinal)
     const perFacadeEl = document.getElementById('wwr-per-facade');
     const rowsEl = document.getElementById('wwr-facades-rows');
-    if (perFacade && perFacade.length === 4) {
-      rowsEl.innerHTML = DIRS.map((d, i) => {
-        const v = perFacade[i];
+    if (perFacade && perFacade.length >= 1) {
+      // labels: if only 1 result and manual was used, label it 'Manual'; otherwise use DIRS
+      const labels = perFacade.length === 1 ? ['Manual'] : DIRS.slice(0, perFacade.length);
+      rowsEl.innerHTML = perFacade.map((v, i) => {
         const barW = Math.min(100, v * 1.4);
         return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">' +
-          '<span style="width:14px;font-size:11px;font-weight:600;color:#a78bfa">' + d + '</span>' +
+          '<span style="width:42px;font-size:11px;font-weight:600;color:#a78bfa">' + (labels[i] || DIRS[i]) + '</span>' +
           '<div style="flex:1;height:7px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden">' +
           '<div style="width:' + barW + '%;height:100%;border-radius:4px;background:linear-gradient(90deg,#7c3aed,#a78bfa)"></div></div>' +
           '<span style="width:32px;text-align:right;font-size:11px;color:#e2e8f0">' + v + '%</span>' +
