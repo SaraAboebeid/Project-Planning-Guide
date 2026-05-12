@@ -301,7 +301,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_b_hcdem", label: "Heating / cooling demand – hourly profile",
+            key: "ec_b_hcdem", label: "Heating / cooling demand",
             primarySource: "Smart meter / district heating metering data", primaryConfidence: "High",
             fallbackSource: "EPC national average heat demand by building type (Boverket)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
@@ -333,7 +333,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_be_edem", label: "Electricity demand – hourly profile",
+            key: "ec_be_edem", label: "Electricity demand",
             primarySource: "Smart meter data (AMR/AMI)", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -365,7 +365,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: true,
           },
           {
-            key: "ec_rpv_demand", label: "Electricity demand – hourly profile",
+            key: "ec_rpv_demand", label: "Electricity demand",
             primarySource: "Smart meter data", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -397,7 +397,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: true,
           },
           {
-            key: "ec_fpv_demand", label: "Electricity demand – hourly profile",
+            key: "ec_fpv_demand", label: "Electricity demand",
             primarySource: "Smart meter data", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -516,7 +516,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: true,
           },
           {
-            key: "re_rpv_demand", label: "Electricity demand – hourly profile",
+            key: "re_rpv_demand", label: "Electricity demand",
             primarySource: "Smart meter data", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -548,7 +548,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: true,
           },
           {
-            key: "re_fpv_demand", label: "Electricity demand – hourly profile",
+            key: "re_fpv_demand", label: "Electricity demand",
             primarySource: "Smart meter data", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
@@ -625,15 +625,6 @@ const FIELD_MAP: Record<string, BKey> = {
   // RE – PV
   re_rpv_area: "footprint_m2",
   re_fpv_area: "height",
-};
-
-// Keys that are starred as critical for each project type
-const CRITICAL_KEYS: Record<string, Set<string>> = {
-  "Renovation Planning":       new Set(["r_fp","r_hgt","r_flrs","r_use","r_mat","r_ht"]),
-  "Energy Community Planning": new Set(["ec_b_fp","ec_b_hgt","ec_b_flrs","ec_b_use","ec_b_mat",
-                                         "ec_b_hvac","ec_rpv_area","ec_fpv_area","ec_be_edem"]),
-  "Renewable Energy Planning": new Set(["re_rpv_area","re_rpv_azimuth","re_rpv_demand",
-                                         "re_fpv_area","re_fpv_wwr"]),
 };
 
 // Build initial hasData state from EUBUCCO building (auto-fills available fields)
@@ -1058,7 +1049,6 @@ export default function DataCoverage() {
     { id: "Needs user input", dot: "bg-red-300",     count: userInputCount },
   ];
 
-  const criticalKeys = project.projectType ? (CRITICAL_KEYS[project.projectType] ?? new Set<string>()) : new Set<string>();
 
   return (
     <div className="space-y-6">
@@ -1271,9 +1261,6 @@ export default function DataCoverage() {
                           {/* Parameter */}
                           <div>
                             <span className="text-sm text-slate-800 font-medium leading-tight">{item.label}</span>
-                            {criticalKeys.has(item.key) && (
-                              <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200">★ critical</span>
-                            )}
                             {def && (
                               <div className="text-[10px] text-slate-400 mt-0.5">
                                 {item.key === "r_matlist" ? (
