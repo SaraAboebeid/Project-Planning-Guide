@@ -634,6 +634,19 @@ function initFromBuilding(
   return init;
 }
 
+function initFromBuildings(
+  defs: DataCategoryDef[],
+  buildings: BuildingLookup[],
+): Record<string, boolean> {
+  const init: Record<string, boolean> = {};
+  defs.forEach(cat => cat.items.forEach(i => {
+    const bKey = FIELD_MAP[i.key];
+    const fromAny = bKey && buildings.some(b => b[bKey] !== null && b[bKey] !== undefined);
+    init[i.key] = fromAny ? true : i.defaultHas;
+  }));
+  return init;
+}
+
 // Build initial hasData state from BboxStats (auto-fills fields covered by aggregate data)
 // Bbox provides: footprint, height, floors, use_cat — mark those as available
 const BBOX_COVERED_BKEYS = new Set<BKey>(["footprint_m2", "height", "floors", "use_cat"]);
@@ -830,13 +843,82 @@ function BuildingDataBanner({
 }
 
 /* ─────────────────────────────────────────────
+   Multi-building data summary banner (multiple addresses selected)
+───────────────────────────────────────────── */
+function MultiBuildingDataBanner({
+  buildings,
+  projectType,
+}: {
+  buildings: BuildingLookup[];
+  projectType: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const withEpc = buildings.filter(b => b.has_epc).length;
+  const shownBuildings = expanded ? buildings : buildings.slice(0, 3);
+
+  return (
+    <div className="rounded-xl border border-purple-200 bg-white overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-purple-50 border-b border-purple-100">
+        <div className="flex items-center gap-2">
+          <span className="text-base">🏗️</span>
+          <span className="text-xs font-semibold text-purple-900">
+            Data Available — {buildings.length} buildings
+          </span>
+          <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-300">EUBUCCO</span>
+          {withEpc > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">
+              EPC ({withEpc}/{buildings.length})
+            </span>
+          )}
+        </div>
+        <span className="text-[10px] text-purple-600">{projectType}</span>
+      </div>
+
+      {/* Building list */}
+      <div className="divide-y divide-slate-100">
+        {shownBuildings.map((b, i) => (
+          <div key={i} className="flex items-start gap-2 px-3 py-2">
+            <span className="text-[10px] text-slate-400 font-mono mt-0.5 w-4 flex-shrink-0">{i + 1}</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium text-slate-700 truncate">{b.address ?? "EUBUCCO building"}</div>
+              <div className="flex flex-wrap gap-x-3 mt-0.5 text-[10px] text-slate-500">
+                {b.use_cat    && <span>{b.use_cat}</span>}
+                {b.year       && <span>Built {b.year}</span>}
+                {b.floors     && <span>{b.floors} floors</span>}
+                {b.eclass     && <span>Class {b.eclass}</span>}
+                {b.tabula_u_wall && <span>U-wall {b.tabula_u_wall} W/m²K</span>}
+              </div>
+            </div>
+            {b.has_epc && (
+              <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200 mt-0.5 flex-shrink-0">EPC</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {buildings.length > 3 && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="w-full text-[11px] font-medium text-purple-700 hover:text-purple-900 py-2 border-t border-purple-100 hover:bg-purple-50/50 transition-colors"
+        >
+          {expanded ? `Show less ▲` : `Show all ${buildings.length} buildings ▼`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    Component
 ───────────────────────────────────────────── */
 export default function DataCoverage() {
   const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
   const building   = project.lookedUpBuilding ?? null;
+  const buildings  = project.lookedUpBuildings ?? [];
   const bboxStats  = project.bboxStats ?? null;
+  const isMulti    = buildings.length > 1;
 
   const defs = useMemo(
     () => buildDefs(project.projectType, project.systemsInScope, project.ecEnergyFocus ?? []),
@@ -845,14 +927,20 @@ export default function DataCoverage() {
 
   /* Per-item "user has this data" state — keyed by item.key */
   const [hasData, setHasData] = useState<Record<string, boolean>>(() =>
-    bboxStats ? initFromBboxStats(defs, bboxStats) : initFromBuilding(defs, building),
+    bboxStats       ? initFromBboxStats(defs, bboxStats)
+    : isMulti       ? initFromBuildings(defs, buildings)
+    :                 initFromBuilding(defs, building),
   );
 
   /* Reset when project type / systems change OR when building/bbox lookup updates */
   useEffect(() => {
-    setHasData(bboxStats ? initFromBboxStats(defs, bboxStats) : initFromBuilding(defs, building));
+    setHasData(
+      bboxStats       ? initFromBboxStats(defs, bboxStats)
+      : isMulti       ? initFromBuildings(defs, buildings)
+      :                 initFromBuilding(defs, building)
+    );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defs, building, bboxStats]);
+  }, [defs, building, bboxStats, buildings]);
 
   const toggleHas = (key: string) =>
     setHasData(prev => ({ ...prev, [key]: !prev[key] }));
@@ -963,14 +1051,22 @@ export default function DataCoverage() {
       <BuildingMapPanel />
 
       {/* EUBUCCO building data banner (single building) */}
-      {building && !bboxStats && (
+      {!isMulti && building && !bboxStats && (
         <BuildingDataBanner
           building={building}
           projectType={project.projectType}
         />
       )}
 
-      {/* EUBUCCO bbox aggregate banner (multi-building) */}
+      {/* EUBUCCO multi-building banner (multiple addresses selected) */}
+      {isMulti && !bboxStats && (
+        <MultiBuildingDataBanner
+          buildings={buildings}
+          projectType={project.projectType}
+        />
+      )}
+
+      {/* EUBUCCO bbox aggregate banner (bbox draw mode) */}
       {bboxStats && <BboxDataBanner bboxStats={bboxStats} />}
 
       {/* Instruction callout */}
@@ -1143,7 +1239,12 @@ export default function DataCoverage() {
                                 ? (() => {
                                     const bbText = bboxSourceText(item.key, bboxStats);
                                     if (bbText) return <span className="text-blue-600 font-medium">🗃 {bbText}</span>;
-                                    const eubuccoText = eubuccoSourceText(item.key, building);
+                                    const multiText = isMulti && FIELD_MAP[item.key]
+                                      ? buildings.some(b => b[FIELD_MAP[item.key] as BKey] !== null && b[FIELD_MAP[item.key] as BKey] !== undefined)
+                                        ? `EUBUCCO — ${buildings.length} buildings`
+                                        : null
+                                      : null;
+                                    const eubuccoText = multiText ?? eubuccoSourceText(item.key, building);
                                     return eubuccoText
                                       ? <span className="text-purple-600 font-medium">🗄 {eubuccoText}</span>
                                       : <span>Your data: <span className="text-slate-500 font-medium">{def.primarySource}</span></span>;
@@ -1167,6 +1268,17 @@ export default function DataCoverage() {
                                 if (item.key === "r_matlist") return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
                                 if (bboxSourceText(item.key, bboxStats))
                                   return <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold border border-blue-200">EUBUCCO</span>;
+                                if (isMulti) {
+                                  const bKey = FIELD_MAP[item.key] as BKey | undefined;
+                                  if (bKey && buildings.some(b => b[bKey] !== null && b[bKey] !== undefined)) {
+                                    const epcFields = ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year"];
+                                    const hasEpc = buildings.some(b => b.has_epc) && epcFields.includes(FIELD_MAP[item.key] ?? "");
+                                    return hasEpc
+                                      ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span></>
+                                      : <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
+                                  }
+                                  return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
+                                }
                                 const eubText = eubuccoSourceText(item.key, building);
                                 if (eubText) {
                                   const isEpc = building?.has_epc && ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year"].includes(FIELD_MAP[item.key] ?? "");

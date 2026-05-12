@@ -51,6 +51,8 @@ interface ProjectState {
   dataInputs: Record<string, { available: boolean; proxy: string | null; confidence: number }>;
   /* looked-up building from EUBUCCO (single-address mode) */
   lookedUpBuilding: BuildingLookup | null;
+  /* all looked-up buildings when multiple addresses are selected */
+  lookedUpBuildings: BuildingLookup[];
   /* aggregate stats from EUBUCCO for a bbox (multi-building mode) */
   bboxStats: BboxStats | null;
   /* raw bbox coords from the map draw (north/south/east/west) */
@@ -92,6 +94,7 @@ const DEFAULT_PROJECT: ProjectState = {
   buildingPoints: [],
   dataInputs: {},
   lookedUpBuilding: null,
+  lookedUpBuildings: [],
   bboxStats: null,
   currentBbox: null,
 };

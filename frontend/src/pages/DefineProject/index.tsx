@@ -84,21 +84,19 @@ export default function DefineProject() {
   useEffect(() => {
     const pts = project.buildingPoints;
     if (!pts || pts.length === 0) {
-      setProject({ lookedUpBuilding: null });
+      setProject({ lookedUpBuilding: null, lookedUpBuildings: [] });
       return;
     }
-    // Use first point for lookup
-    const first = pts[0];
-    if (!first) return;
-    const { lat, lon } = first;
     if (lookupDebounce.current) clearTimeout(lookupDebounce.current);
     lookupDebounce.current = setTimeout(async () => {
       setBuildingLoading(true);
       try {
-        const b = await api.lookupBuilding(lat, lon);
-        setProject({ lookedUpBuilding: b });
+        const results = await Promise.all(
+          pts.map((p) => api.lookupBuilding(p.lat, p.lon))
+        );
+        setProject({ lookedUpBuilding: results[0] ?? null, lookedUpBuildings: results });
       } catch {
-        setProject({ lookedUpBuilding: null });
+        setProject({ lookedUpBuilding: null, lookedUpBuildings: [] });
       } finally {
         setBuildingLoading(false);
       }
@@ -685,7 +683,13 @@ export default function DefineProject() {
               Looking up building data…
             </div>
           )}
-          {!buildingLoading && project.lookedUpBuilding && (
+          {!buildingLoading && project.lookedUpBuildings && project.lookedUpBuildings.length > 1 && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              <span>✓</span>
+              <span><span className="font-semibold">{project.lookedUpBuildings.length} buildings found</span>. Full data shown in Step 2.</span>
+            </div>
+          )}
+          {!buildingLoading && project.lookedUpBuilding && (!project.lookedUpBuildings || project.lookedUpBuildings.length <= 1) && (
             <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
               <span>✓</span>
               <span>Building found — <span className="font-semibold">{project.lookedUpBuilding.address ?? "EUBUCCO match"}</span>. Full data shown in Step 2.</span>
