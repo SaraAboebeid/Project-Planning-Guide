@@ -663,6 +663,26 @@ function initFromBuildings(
   return init;
 }
 
+/* Returns a formatted value string for a given building + EUBUCCO key, or null if absent */
+function buildingFieldDisplay(b: BuildingLookup, bKey: BKey): string | null {
+  const v = b[bKey];
+  if (v === null || v === undefined) return null;
+  if (bKey === "footprint_m2") return `${Math.round(v as number)} m²`;
+  if (bKey === "height")       return `${(v as number).toFixed(1)} m`;
+  if (bKey === "floors")       return `${v} floors`;
+  if (bKey === "use_cat")      return String(v);
+  if (bKey === "tabula_u_wall") return `U=${(v as number).toFixed(2)} W/m²K`;
+  if (bKey === "tabula_u_win")  return `U-win=${(v as number).toFixed(2)} W/m²K`;
+  if (bKey === "eclass")       return `Class ${v}`;
+  if (bKey === "year")         return String(v);
+  if (bKey === "energy")       return `${Math.round(v as number)} kWh/m²·yr`;
+  return String(v);
+}
+function buildingShortName(b: BuildingLookup, idx: number): string {
+  if (b.address) return b.address.split(",")[0] ?? b.address;
+  return `Building ${idx + 1}`;
+}
+
 // Build initial hasData state from BboxStats (auto-fills fields covered by aggregate data)
 // Bbox provides: footprint, height, floors, use_cat — mark those as available
 const BBOX_COVERED_BKEYS = new Set<BKey>(["footprint_m2", "height", "floors", "use_cat"]);
@@ -961,6 +981,14 @@ export default function DataCoverage() {
   const toggleHas = (key: string) =>
     setHasData(prev => ({ ...prev, [key]: !prev[key] }));
 
+  const [expandedBreakdownRows, setExpandedBreakdownRows] = useState<Set<string>>(new Set());
+  const toggleBreakdown = (key: string) =>
+    setExpandedBreakdownRows(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
   const [activeFilter, setActiveFilter] = useState<FilterId>("All");
   const [expandedCats, setExpandedCats] = useState<Set<string>>(
     () => new Set(defs.map(c => c.category)),
@@ -1203,146 +1231,222 @@ export default function DataCoverage() {
                     const def = defs.find(c => c.category === cat.category)
                       ?.items.find(d => d.key === item.key);
 
+                    /* Per-building availability (multi-address mode only) */
+                    const rowBKey = isMulti ? FIELD_MAP[item.key] as BKey | undefined : undefined;
+                    const haveBuildings = rowBKey
+                      ? buildings.filter(b => b[rowBKey] !== null && b[rowBKey] !== undefined)
+                      : [];
+                    const missingBuildings = rowBKey
+                      ? buildings.filter(b => b[rowBKey] === null || b[rowBKey] === undefined)
+                      : [];
+                    const isPartial = isMulti && rowBKey !== undefined
+                      && haveBuildings.length > 0
+                      && haveBuildings.length < buildings.length;
+                    const isBreakdownOpen = expandedBreakdownRows.has(item.key);
+                    const epcFields = ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year"];
+
                     return (
-                      <div
-                        key={item.key}
-                        className={`grid grid-cols-[36px_1fr_140px_180px_110px_130px] gap-x-3 items-center px-5 py-3 transition-colors ${sc.rowAccent} ${
-                          idx < visibleItems.length - 1 ? "border-b border-slate-100" : ""
-                        } ${!item.hasData ? "opacity-80" : ""}`}
-                      >
-                        {/* Toggle */}
-                        <button
-                          title={item.hasData ? "I have this data — click to mark as unavailable" : "I don't have this data — click to mark as available"}
-                          onClick={() => toggleHas(item.key)}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all flex-shrink-0 ${
-                            item.hasData
-                              ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
-                              : "bg-white border-slate-300 text-slate-300 hover:border-slate-400"
-                          }`}
+                      <div key={item.key}>
+                        {/* Main grid row */}
+                        <div
+                          className={`grid grid-cols-[36px_1fr_140px_180px_110px_130px] gap-x-3 items-center px-5 py-3 transition-colors ${sc.rowAccent} ${
+                            idx < visibleItems.length - 1 && !isBreakdownOpen ? "border-b border-slate-100" : ""
+                          } ${!item.hasData ? "opacity-80" : ""}`}
                         >
-                          {item.hasData
-                            ? <Check className="w-3.5 h-3.5" />
-                            : <X     className="w-3 h-3"   />}
-                        </button>
+                          {/* Toggle */}
+                          <button
+                            title={item.hasData ? "I have this data — click to mark as unavailable" : "I don't have this data — click to mark as available"}
+                            onClick={() => toggleHas(item.key)}
+                            className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all flex-shrink-0 ${
+                              item.hasData
+                                ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
+                                : "bg-white border-slate-300 text-slate-300 hover:border-slate-400"
+                            }`}
+                          >
+                            {item.hasData
+                              ? <Check className="w-3.5 h-3.5" />
+                              : <X     className="w-3 h-3"   />}
+                          </button>
 
-                        {/* Parameter */}
-                        <div>
-                          <span className="text-sm text-slate-800 font-medium leading-tight">{item.label}</span>
-                          {criticalKeys.has(item.key) && (
-                            <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200">★ critical</span>
-                          )}
-                          {def && (
-                            <div className="text-[10px] text-slate-400 mt-0.5">
-                              {item.key === "r_matlist" ? (
-                                item.hasData
-                                  ? <span className="text-emerald-600 font-medium">✓ Your material list will be used</span>
-                                  : <span className="text-amber-600 font-medium">No problem — Boverket &amp; Wikells material library will be used</span>
-                              ) : item.hasData
-                                ? (() => {
-                                    const bbText = bboxSourceText(item.key, bboxStats);
-                                    if (bbText) return <span className="text-blue-600 font-medium">🗃 {bbText}</span>;
-                                    const multiText = isMulti && FIELD_MAP[item.key]
-                                      ? buildings.some(b => b[FIELD_MAP[item.key] as BKey] !== null && b[FIELD_MAP[item.key] as BKey] !== undefined)
-                                        ? `EUBUCCO — ${buildings.length} buildings`
-                                        : null
-                                      : null;
-                                    const eubuccoText = multiText ?? eubuccoSourceText(item.key, building);
-                                    return eubuccoText
-                                      ? <span className="text-purple-600 font-medium">🗄 {eubuccoText}</span>
-                                      : <span>Your data: <span className="text-slate-500 font-medium">{def.primarySource}</span></span>;
-                                  })()
-                                : (
-                                  <span>
-                                    Fallback: <span className="text-slate-500 font-medium">{def.fallbackSource}</span>
-                                    {(item.key === "ec_b_wwr" || item.key === "ec_fpv_wwr" || item.key === "re_fpv_wwr") && (
-                                      <>
-                                        {" — "}
-                                        <a
-                                          href="http://127.0.0.1:8765/gothenburg_3d.html"
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-purple-600 font-semibold hover:text-purple-800 underline underline-offset-2"
-                                        >
-                                          measure in Gothenburg 3D →
-                                        </a>
-                                      </>
-                                    )}
-                                  </span>
-                                )
-                              }
-                            </div>
-                          )}
-                        </div>
+                          {/* Parameter */}
+                          <div>
+                            <span className="text-sm text-slate-800 font-medium leading-tight">{item.label}</span>
+                            {criticalKeys.has(item.key) && (
+                              <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200">★ critical</span>
+                            )}
+                            {def && (
+                              <div className="text-[10px] text-slate-400 mt-0.5">
+                                {item.key === "r_matlist" ? (
+                                  item.hasData
+                                    ? <span className="text-emerald-600 font-medium">✓ Your material list will be used</span>
+                                    : <span className="text-amber-600 font-medium">No problem — Boverket &amp; Wikells material library will be used</span>
+                                ) : item.hasData
+                                  ? (() => {
+                                      const bbText = bboxSourceText(item.key, bboxStats);
+                                      if (bbText) return <span className="text-blue-600 font-medium">🗃 {bbText}</span>;
+                                      if (isMulti && rowBKey) {
+                                        if (isPartial) return (
+                                          <button
+                                            onClick={() => toggleBreakdown(item.key)}
+                                            className="text-amber-600 font-medium hover:text-amber-800 flex items-center gap-1"
+                                          >
+                                            ⚠ {haveBuildings.length}/{buildings.length} buildings have this data
+                                            <span className="text-[9px]">{isBreakdownOpen ? "▲" : "▼"}</span>
+                                          </button>
+                                        );
+                                        if (haveBuildings.length === buildings.length) {
+                                          const isEpc = buildings.some(b => b.has_epc) && epcFields.includes(FIELD_MAP[item.key] ?? "");
+                                          return <span className="text-purple-600 font-medium">🗄 EUBUCCO{isEpc ? " + EPC" : ""} — all {buildings.length} buildings</span>;
+                                        }
+                                      }
+                                      const eubuccoText = eubuccoSourceText(item.key, building);
+                                      return eubuccoText
+                                        ? <span className="text-purple-600 font-medium">🗄 {eubuccoText}</span>
+                                        : <span>Your data: <span className="text-slate-500 font-medium">{def.primarySource}</span></span>;
+                                    })()
+                                  : (
+                                    <span>
+                                      Fallback: <span className="text-slate-500 font-medium">{def.fallbackSource}</span>
+                                      {(item.key === "ec_b_wwr" || item.key === "ec_fpv_wwr" || item.key === "re_fpv_wwr") && (
+                                        <>
+                                          {" — "}
+                                          <a
+                                            href="http://127.0.0.1:8765/gothenburg_3d.html"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-purple-600 font-semibold hover:text-purple-800 underline underline-offset-2"
+                                          >
+                                            measure in Gothenburg 3D →
+                                          </a>
+                                        </>
+                                      )}
+                                    </span>
+                                  )
+                                }
+                              </div>
+                            )}
+                          </div>
 
-                        {/* Status pill */}
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold w-fit ${sc.pillBg} ${sc.pillBorder} ${sc.pillText}`}>
-                          {sc.icon}
-                          {item.status}
-                        </span>
+                          {/* Status pill */}
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold w-fit ${sc.pillBg} ${sc.pillBorder} ${sc.pillText}`}>
+                            {sc.icon}
+                            {item.status}
+                          </span>
 
-                        {/* Source (short) */}
-                        <span className="text-xs text-slate-500 leading-tight">
-                          {item.hasData
-                            ? (() => {
-                                if (item.key === "r_matlist") return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
-                                if (bboxSourceText(item.key, bboxStats))
-                                  return <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold border border-blue-200">EUBUCCO</span>;
-                                if (isMulti) {
-                                  const bKey = FIELD_MAP[item.key] as BKey | undefined;
-                                  if (bKey && buildings.some(b => b[bKey] !== null && b[bKey] !== undefined)) {
-                                    const epcFields = ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year"];
-                                    const hasEpc = buildings.some(b => b.has_epc) && epcFields.includes(FIELD_MAP[item.key] ?? "");
-                                    return hasEpc
+                          {/* Source (short) */}
+                          <span className="text-xs text-slate-500 leading-tight">
+                            {item.hasData
+                              ? (() => {
+                                  if (item.key === "r_matlist") return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
+                                  if (bboxSourceText(item.key, bboxStats))
+                                    return <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold border border-blue-200">EUBUCCO</span>;
+                                  if (isMulti && rowBKey) {
+                                    if (isPartial) return (
+                                      <button
+                                        onClick={() => toggleBreakdown(item.key)}
+                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold border border-amber-200 hover:bg-amber-200 transition-colors"
+                                      >
+                                        {haveBuildings.length}/{buildings.length}
+                                        <span>{isBreakdownOpen ? "▲" : "▼"}</span>
+                                      </button>
+                                    );
+                                    if (haveBuildings.length === buildings.length) {
+                                      const isEpc = buildings.some(b => b.has_epc) && epcFields.includes(FIELD_MAP[item.key] ?? "");
+                                      return isEpc
+                                        ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span></>
+                                        : <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
+                                    }
+                                    if (def?.primarySource?.toLowerCase().includes("cesium"))
+                                      return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">Cesium</span>;
+                                    return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
+                                  }
+                                  if (def?.primarySource?.toLowerCase().includes("cesium"))
+                                    return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">Cesium</span>;
+                                  const eubText = eubuccoSourceText(item.key, building);
+                                  if (eubText) {
+                                    const isEpc = building?.has_epc && epcFields.includes(FIELD_MAP[item.key] ?? "");
+                                    return isEpc
                                       ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span></>
                                       : <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
                                   }
                                   return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
-                                }
-                                if (def?.primarySource?.toLowerCase().includes("cesium"))
-                                  return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">Cesium</span>;
-                                const eubText = eubuccoSourceText(item.key, building);
-                                if (eubText) {
-                                  const isEpc = building?.has_epc && ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year"].includes(FIELD_MAP[item.key] ?? "");
-                                  return isEpc
-                                    ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span></>
-                                    : <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
-                                }
-                                if (def?.primarySource?.toLowerCase().includes("cesium"))
-                                  return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">Cesium</span>;
-                                return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
-                              })()
-                            : (() => {
-                                if (item.key === "r_matlist") return <><span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-orange-200">Boverket</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">Wikells</span></>;
-                                const src = item.source.toLowerCase();
-                                if (src.includes("tabula"))  return <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold border border-amber-200">TABULA</span>;
-                                if (src.includes("boverket")) return <span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-orange-200">Boverket</span>;
-                                if (src.includes("epc") || src.includes("energy performance")) return <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span>;
-                                if (src.includes("pvgis")) return <span className="px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-[9px] font-bold border border-yellow-200">PVGIS</span>;
-                                if (src.includes("eubucco")) return <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
-                                if (src.includes("—") || src.includes("no ") || src.includes("must")) return <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[9px] font-bold border border-red-200">Missing</span>;
-                                return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">Estimated</span>;
-                              })()
-                          }
-                        </span>
+                                })()
+                              : (() => {
+                                  if (item.key === "r_matlist") return <><span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-orange-200">Boverket</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">Wikells</span></>;
+                                  const src = item.source.toLowerCase();
+                                  if (src.includes("tabula"))  return <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold border border-amber-200">TABULA</span>;
+                                  if (src.includes("boverket")) return <span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-orange-200">Boverket</span>;
+                                  if (src.includes("epc") || src.includes("energy performance")) return <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span>;
+                                  if (src.includes("pvgis")) return <span className="px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-[9px] font-bold border border-yellow-200">PVGIS</span>;
+                                  if (src.includes("eubucco")) return <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
+                                  if (src.includes("—") || src.includes("no ") || src.includes("must")) return <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[9px] font-bold border border-red-200">Missing</span>;
+                                  return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">Estimated</span>;
+                                })()
+                            }
+                          </span>
 
-                        {/* Confidence mini-bar */}
-                        <div className="flex items-center gap-1.5">
-                          {item.confidence !== "—" ? (
-                            <>
-                              <div className="w-12 h-1.5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-                                <div className={`h-full rounded-full ${conf.bar}`} style={{ width: `${conf.pct}%` }} />
-                              </div>
-                              <span className={`text-[11px] font-semibold ${conf.text}`}>{item.confidence}</span>
-                            </>
-                          ) : (
-                            <span className="text-xs text-slate-300">—</span>
-                          )}
+                          {/* Confidence mini-bar */}
+                          <div className="flex items-center gap-1.5">
+                            {item.confidence !== "—" ? (
+                              <>
+                                <div className="w-12 h-1.5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                                  <div className={`h-full rounded-full ${conf.bar}`} style={{ width: `${conf.pct}%` }} />
+                                </div>
+                                <span className={`text-[11px] font-semibold ${conf.text}`}>{item.confidence}</span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-slate-300">—</span>
+                            )}
+                          </div>
+
+                          {/* Action pill */}
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold w-fit ${act.bg} ${act.border} ${act.text}`}>
+                            {item.action}
+                          </span>
                         </div>
 
-                        {/* Action pill */}
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold w-fit ${act.bg} ${act.border} ${act.text}`}>
-                          {item.action}
-                        </span>
+                        {/* Per-building breakdown panel (partial coverage only) */}
+                        {isBreakdownOpen && isPartial && rowBKey && (
+                          <div className={`mx-5 mb-3 rounded-xl border border-amber-200 bg-amber-50 overflow-hidden ${
+                            idx < visibleItems.length - 1 ? "border-b border-slate-100" : ""
+                          }`}>
+                            <div className="px-4 py-2 bg-amber-100 border-b border-amber-200 flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-amber-800">
+                                Per-building data availability — {item.label}
+                              </span>
+                              <span className="text-[10px] text-amber-600">
+                                {haveBuildings.length} available · {missingBuildings.length} missing
+                              </span>
+                            </div>
+                            <div className="divide-y divide-amber-100">
+                              {buildings.map((b, bi) => {
+                                const hasVal = b[rowBKey] !== null && b[rowBKey] !== undefined;
+                                const displayVal = hasVal ? buildingFieldDisplay(b, rowBKey) : null;
+                                return (
+                                  <div key={bi} className="flex items-center gap-3 px-4 py-2">
+                                    <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${
+                                      hasVal ? "bg-emerald-500 text-white" : "bg-red-100 text-red-500 border border-red-200"
+                                    }`}>
+                                      {hasVal ? "✓" : "✗"}
+                                    </span>
+                                    <span className="text-xs text-slate-700 flex-1 truncate">
+                                      {buildingShortName(b, bi)}
+                                    </span>
+                                    {displayVal
+                                      ? <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">{displayVal}</span>
+                                      : <span className="text-[10px] text-slate-400 italic">not in EUBUCCO — fallback: {def?.fallbackSource ?? "estimated"}</span>
+                                    }
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Separator */}
+                        {idx < visibleItems.length - 1 && !isBreakdownOpen && (
+                          <div className="border-b border-slate-100 mx-0" />
+                        )}
                       </div>
                     );
                   })}
