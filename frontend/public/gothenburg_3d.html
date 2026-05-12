@@ -290,26 +290,26 @@
 <!-- WWR result panel -->
 <div class="panel" id="wwr-panel">
   <h2>WWR per Facade</h2>
-  <div class="sub" id="wwr-sub">Window-to-Wall Ratio · archetype estimate</div>
+  <div class="sub" id="wwr-sub">Window-to-Wall Ratio per facade</div>
 
-  <!-- Per-facade bars (heuristic, always visible) -->
-  <div id="wwr-heuristic-section" style="margin-top:10px">
-    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Archetype estimate &nbsp;<span style="font-weight:400;text-transform:none;letter-spacing:0">era · use · orientation</span></div>
-    <div id="wwr-heuristic-rows"></div>
-    <div style="margin-top:8px;display:flex;align-items:baseline;gap:5px">
-      <span style="font-size:10px;color:var(--muted)">Average:</span>
-      <span id="wwr-value-heuristic" style="font-size:18px;font-weight:700;color:#7c3aed">&#x2013;</span>
-      <span style="font-size:11px;color:var(--muted)">%</span>
-    </div>
-  </div>
-
-  <!-- AI row (hidden until AI estimate runs) -->
-  <div id="wwr-ai-section" style="margin-top:12px;border-top:1px solid rgba(0,0,0,0.07);padding-top:10px;display:none">
-    <div id="wwr-ai-label" style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">AI Vision estimate</div>
+  <!-- AI per-facade bars (primary — shown when AI estimate exists) -->
+  <div id="wwr-ai-section" style="margin-top:10px;display:none">
+    <div id="wwr-ai-label" style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">AI Vision estimate · per facade</div>
     <div id="wwr-facades-rows"></div>
     <div style="margin-top:8px;display:flex;align-items:baseline;gap:5px">
       <span style="font-size:10px;color:var(--muted)">Average:</span>
       <span id="wwr-value-ai" style="font-size:18px;font-weight:700;color:#7c3aed">&#x2013;</span>
+      <span style="font-size:11px;color:var(--muted)">%</span>
+    </div>
+  </div>
+
+  <!-- Archetype fallback (shown only when no AI estimate yet) -->
+  <div id="wwr-heuristic-section" style="margin-top:10px">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Archetype fallback &nbsp;<span style="font-weight:400;text-transform:none;letter-spacing:0">era · use · orientation</span></div>
+    <div id="wwr-heuristic-rows"></div>
+    <div style="margin-top:8px;display:flex;align-items:baseline;gap:5px">
+      <span style="font-size:10px;color:var(--muted)">Average:</span>
+      <span id="wwr-value-heuristic" style="font-size:18px;font-weight:700;color:#7c3aed">&#x2013;</span>
       <span style="font-size:11px;color:var(--muted)">%</span>
     </div>
   </div>
@@ -1807,13 +1807,15 @@ function showWWR(wwr, perFacade, source) {
       return facadeBar(labels[i] || DIRS[i], v, c);
     }).join('');
     document.getElementById('wwr-value-ai').textContent = wwr;
-    const labelMap = { blended: 'Visual Analysis', ai: 'AI Vision estimate' };
-    document.getElementById('wwr-ai-label').textContent = labelMap[source] || 'AI Vision estimate';
+    const labelMap = { blended: 'Visual Analysis · per facade', ai: 'AI Vision estimate · per facade' };
+    document.getElementById('wwr-ai-label').textContent = labelMap[source] || 'AI Vision estimate · per facade';
     document.getElementById('wwr-ai-section').style.display = 'block';
+    document.getElementById('wwr-heuristic-section').style.display = 'none';
     document.getElementById('wwr-sub').textContent = 'AI estimate · per facade';
   } else {
     document.getElementById('wwr-ai-section').style.display = 'none';
-    document.getElementById('wwr-sub').textContent = 'Archetype estimate · orientation adjusted';
+    document.getElementById('wwr-heuristic-section').style.display = 'block';
+    document.getElementById('wwr-sub').textContent = 'Archetype fallback · run AI Estimate for per-facade vision analysis';
   }
   document.getElementById('wwr-breakdown').innerHTML = '';
 }
