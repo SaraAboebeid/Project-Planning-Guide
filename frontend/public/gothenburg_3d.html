@@ -514,12 +514,15 @@ function findBuildingAtLonLat(lon, lat) {
   return -1;
 }
 
+let _lastPickTerrainH = 0;
+
 function pickBuildingAtScreen(screenPos) {
   if (!viewer.scene.pickPositionSupported) return -1;
   const cart = viewer.scene.pickPosition(screenPos);
   if (!Cesium.defined(cart)) return -1;
   const carto = Cesium.Cartographic.fromCartesian(cart);
   if (!Cesium.defined(carto)) return -1;
+  _lastPickTerrainH = carto.height;
   const lon = Cesium.Math.toDegrees(carto.longitude);
   const lat = Cesium.Math.toDegrees(carto.latitude);
   return findBuildingAtLonLat(lon, lat);
@@ -1061,7 +1064,7 @@ let highlightEntity  = null;
 viewer.screenSpaceEventHandler.setInputAction(movement => {
   const idx = pickBuildingAtScreen(movement.position);
   if (idx >= 0) {
-    showInfoPanel(DATA[idx], idx);
+    showInfoPanel(DATA[idx], idx, _lastPickTerrainH);
   } else {
     hideInfoPanel();
   }
@@ -1147,8 +1150,8 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
   }
 }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-function showInfoPanel(b, idx) {
-  selectedBuilding = { ...b, _idx: idx };
+function showInfoPanel(b, idx, terrainH) {
+  selectedBuilding = { ...b, _idx: idx, _terrainH: terrainH || 0 };
   const rows = [];
   const row = (l,v) => v != null && v !== '' ? rows.push('<div class="tt-row"><span class="tt-lbl">'+l+'</span><span class="tt-val">'+v+'</span></div>') : null;
   row('Address',  b.address);
@@ -1247,8 +1250,10 @@ function flyToFacade(dir) {
   const offsetLon = Math.sin(h) * dist / (111320 * Math.cos(c.lat * Math.PI/180));
   const offsetLat = Math.cos(h) * dist / 111320;
   const bldH = Math.max(3, facadeBuilding.height || 6);
+  const terrainBase = facadeBuilding._terrainH || 0;
+  const camAlt = terrainBase + bldH * 0.6;
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(c.lon + offsetLon, c.lat + offsetLat, bldH * 0.6),
+    destination: Cesium.Cartesian3.fromDegrees(c.lon + offsetLon, c.lat + offsetLat, camAlt),
     orientation: {
       heading: Cesium.Math.toRadians(DIR_HEADINGS[dir] + 180),
       pitch:   Cesium.Math.toRadians(-5),
