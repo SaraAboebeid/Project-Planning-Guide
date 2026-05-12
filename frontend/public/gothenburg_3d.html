@@ -271,19 +271,37 @@
 <!-- WWR result panel -->
 <div class="panel" id="wwr-panel">
   <h2>&#128438; WWR Estimate</h2>
-  <div class="sub">Window-to-Wall Ratio</div>
-  <div class="wwr-value" id="wwr-value">–</div>
-  <span class="wwr-unit">% average across facades</span>
-  <div class="wwr-bar-wrap"><div class="wwr-bar" id="wwr-bar" style="width:0%"></div></div>
-  <!-- Per-facade breakdown bars -->
-  <div id="wwr-per-facade" style="margin-top:10px;display:none">
-    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Per facade</div>
-    <div id="wwr-facades-rows"></div>
+  <div class="sub">Window-to-Wall Ratio comparison</div>
+
+  <!-- Heuristic row (always visible) -->
+  <div style="margin-top:10px">
+    <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Archetype heuristic</div>
+    <div style="display:flex;align-items:baseline;gap:6px">
+      <span id="wwr-value-heuristic" style="font-size:26px;font-weight:700;color:#4ade80">&#x2013;</span>
+      <span style="font-size:12px;color:#94a3b8">% &nbsp;era · use · EPC</span>
+    </div>
+    <div class="wwr-bar-wrap"><div id="wwr-bar-heuristic" style="height:100%;border-radius:5px;background:linear-gradient(90deg,#059669,#4ade80);transition:width .4s;width:0%"></div></div>
   </div>
-  <div id="wwr-breakdown" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
-  <div style="margin-top:8px;font-size:10px;color:var(--faint)">
-    Heuristic based on TABULA archetype · era · energy class.<br>
-    Visual analysis from captured facade screenshots.
+
+  <!-- AI row (hidden until AI estimate runs) -->
+  <div id="wwr-ai-section" style="margin-top:12px;display:none">
+    <div id="wwr-ai-label" style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">AI Vision</div>
+    <div style="display:flex;align-items:baseline;gap:6px">
+      <span id="wwr-value-ai" style="font-size:26px;font-weight:700;color:#a78bfa">&#x2013;</span>
+      <span style="font-size:12px;color:#94a3b8">%</span>
+    </div>
+    <div class="wwr-bar-wrap"><div id="wwr-bar-ai" style="height:100%;border-radius:5px;background:linear-gradient(90deg,#7c3aed,#a78bfa);transition:width .4s;width:0%"></div></div>
+    <!-- Per-facade breakdown bars (AI only) -->
+    <div id="wwr-per-facade" style="margin-top:8px;display:none">
+      <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Per facade</div>
+      <div id="wwr-facades-rows"></div>
+    </div>
+  </div>
+
+  <div id="wwr-breakdown" style="margin-top:8px;font-size:11px;color:#64748b"></div>
+  <div style="margin-top:6px;font-size:10px;color:#475569">
+    Heuristic: TABULA archetype · era · energy class.<br>
+    AI: GPT-4.1 vision analysis of facade captures.
   </div>
 </div>
 
@@ -1263,18 +1281,18 @@ function flyToFacade(dir) {
   const c = getBuildingCenter(facadeBuilding);
   const r = getBuildingRadius(facadeBuilding);
   _currentFacadeDir = dir;
-  const dist = r * 3.5 / _facadeZoom;
+  const dist = r * 1.8 / _facadeZoom;
   const h = DIR_HEADINGS[dir] * Math.PI / 180;
   const offsetLon = Math.sin(h) * dist / (111320 * Math.cos(c.lat * Math.PI/180));
   const offsetLat = Math.cos(h) * dist / 111320;
   const bldH = Math.max(3, facadeBuilding.height || 6);
   const terrainBase = facadeBuilding._terrainH || 0;
-  const camAlt = terrainBase + bldH * 0.6;
+  const camAlt = terrainBase + bldH * 0.5;
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(c.lon + offsetLon, c.lat + offsetLat, camAlt),
     orientation: {
       heading: Cesium.Math.toRadians(DIR_HEADINGS[dir] + 180),
-      pitch:   Cesium.Math.toRadians(-5),
+      pitch:   Cesium.Math.toRadians(0),
       roll: 0,
     },
     duration: 1.2,
@@ -1361,33 +1379,42 @@ for (const dir of DIRS) {
 }
 
 function showWWR(wwr, perFacade, source) {
-  document.getElementById('wwr-value').textContent = wwr;
-  document.getElementById('wwr-bar').style.width = Math.min(100, wwr * 1.4) + '%';
-  let sourceLabel = source === 'heuristic'
-    ? 'Archetype heuristic (era · use · EPC)'
-    : source === 'blended'
-    ? 'Blended (visual + heuristic)'
-    : source.includes('claude') ? 'Claude Vision'
-    : source.includes('gpt')   ? (source.includes('4.1') ? 'GPT-4.1 Vision' : 'GPT-4o Vision')
-    : 'AI Vision';
-  document.getElementById('wwr-breakdown').innerHTML = 'Source: ' + sourceLabel;
+  const isAI = source !== 'heuristic' && source !== 'blended';
+  const hVal = heuristicWWR(facadeBuilding);
 
-  const perFacadeEl = document.getElementById('wwr-per-facade');
-  const rowsEl = document.getElementById('wwr-facades-rows');
-  if (perFacade && perFacade.length === 4) {
-    rowsEl.innerHTML = DIRS.map((d, i) => {
-      const v = perFacade[i];
-      const barW = Math.min(100, v * 1.4);
-      return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">' +
-        '<span style="width:14px;font-size:11px;font-weight:600;color:var(--lime)">' + d + '</span>' +
-        '<div style="flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden">' +
-        '<div style="width:' + barW + '%;height:100%;border-radius:4px;background:linear-gradient(90deg,#7c3aed,#a78bfa)"></div></div>' +
-        '<span style="width:32px;text-align:right;font-size:11px;color:var(--text)">' + v + '%</span>' +
-        '</div>';
-    }).join('');
-    perFacadeEl.style.display = 'block';
+  document.getElementById('wwr-value-heuristic').textContent = hVal;
+  document.getElementById('wwr-bar-heuristic').style.width = Math.min(100, hVal * 1.4) + '%';
+
+  if (isAI) {
+    document.getElementById('wwr-ai-section').style.display = 'block';
+    document.getElementById('wwr-value-ai').textContent = wwr;
+    document.getElementById('wwr-bar-ai').style.width = Math.min(100, wwr * 1.4) + '%';
+    const modelName = source.includes('claude') ? 'Claude Vision'
+                    : source.includes('4.1')    ? 'GPT-4.1 Vision'
+                    : 'GPT-4o Vision';
+    document.getElementById('wwr-ai-label').textContent = modelName;
+    document.getElementById('wwr-breakdown').innerHTML = '';
+
+    const perFacadeEl = document.getElementById('wwr-per-facade');
+    const rowsEl = document.getElementById('wwr-facades-rows');
+    if (perFacade && perFacade.length === 4) {
+      rowsEl.innerHTML = DIRS.map((d, i) => {
+        const v = perFacade[i];
+        const barW = Math.min(100, v * 1.4);
+        return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">' +
+          '<span style="width:14px;font-size:11px;font-weight:600;color:#a78bfa">' + d + '</span>' +
+          '<div style="flex:1;height:7px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden">' +
+          '<div style="width:' + barW + '%;height:100%;border-radius:4px;background:linear-gradient(90deg,#7c3aed,#a78bfa)"></div></div>' +
+          '<span style="width:32px;text-align:right;font-size:11px;color:#e2e8f0">' + v + '%</span>' +
+          '</div>';
+      }).join('');
+      perFacadeEl.style.display = 'block';
+    } else {
+      perFacadeEl.style.display = 'none';
+    }
   } else {
-    perFacadeEl.style.display = 'none';
+    document.getElementById('wwr-ai-section').style.display = 'none';
+    document.getElementById('wwr-breakdown').innerHTML = '';
   }
 }
 
@@ -1543,7 +1570,7 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
     }
     if (results.length > 0) {
       const avg = Math.round(results.reduce((a, b) => a + b, 0) / results.length);
-      showWWR(avg, results, 'gpt');
+      showWWR(avg, results, 'gpt-4.1');
       document.getElementById('facade-sub').textContent = 'AI estimation complete ✓';
     } else {
       document.getElementById('facade-sub').textContent = 'AI unavailable — check backend /api/estimate-wwr';
