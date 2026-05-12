@@ -1345,7 +1345,7 @@ function showWWR(wwr, perFacade, source) {
     : source === 'blended'
     ? 'Blended (visual + heuristic)'
     : source.includes('claude') ? 'Claude Vision'
-    : source.includes('gpt')   ? 'GPT-4o Vision'
+    : source.includes('gpt')   ? (source.includes('4.1') ? 'GPT-4.1 Vision' : 'GPT-4o Vision')
     : 'AI Vision';
   document.getElementById('wwr-breakdown').innerHTML = 'Source: ' + sourceLabel;
 
@@ -1565,7 +1565,7 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
     const avg = Math.round(results.reduce((a, b) => a + b, 0) / results.length);
     showWWR(avg, results, source === 'heuristic' ? 'heuristic' : source);
     const sourceLabel = source.includes('claude') ? 'Claude Vision &#129302;'
-                      : source.includes('gpt')    ? 'GPT-4o Vision &#129302;'
+                      : source.includes('gpt')    ? (source.includes('4.1') ? 'GPT-4.1 Vision &#129302;' : 'GPT-4o Vision &#129302;')
                       : 'Archetype heuristic (era · use · EPC)';
     document.getElementById('wwr-breakdown').innerHTML = 'Source: ' + sourceLabel;
   } catch (err) {

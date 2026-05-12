@@ -291,10 +291,10 @@ async def estimate_wwr(req: WWRRequest):
         except Exception as exc:
             print(f"[estimate-wwr] Anthropic call failed: {exc}")
 
-    # ── OpenAI GPT-4o ─────────────────────────────────────────────────────────
+    # ── OpenAI GPT-4.1 ──────────────────────────────────────────────────────
     if openai_key:
         payload = {
-            "model": "gpt-4o",
+            "model": "gpt-4.1",
             "max_tokens": 150,
             "messages": [
                 {
@@ -305,7 +305,7 @@ async def estimate_wwr(req: WWRRequest):
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:image/jpeg;base64,{req.image_base64}",
-                                "detail": "low",
+                                "detail": "high",
                             },
                         },
                     ],
@@ -329,7 +329,7 @@ async def estimate_wwr(req: WWRRequest):
                         "wwr": int(parsed.get("wwr", 25)),
                         "confidence": parsed.get("confidence", "medium"),
                         "notes": parsed.get("notes", ""),
-                        "source": "gpt-4o-vision",
+                        "source": "gpt-4.1-vision",
                     }
         except Exception as exc:
             # Fall through to heuristic on any error

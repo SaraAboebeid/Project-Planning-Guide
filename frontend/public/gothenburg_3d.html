@@ -1344,7 +1344,7 @@ function showWWR(wwr, perFacade, source) {
     : source === 'blended'
     ? 'Blended (visual + heuristic)'
     : source.includes('claude') ? 'Claude Vision'
-    : source.includes('gpt')   ? 'GPT-4o Vision'
+    : source.includes('gpt')   ? (source.includes('4.1') ? 'GPT-4.1 Vision' : 'GPT-4o Vision')
     : 'AI Vision';
   document.getElementById('wwr-breakdown').innerHTML = 'Source: ' + sourceLabel;
 
