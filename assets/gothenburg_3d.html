@@ -1163,13 +1163,47 @@ function setLoading(msg) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Fly to Gothenburg + start building
+// Fly to Gothenburg (or URL-specified location) + start building
 // ─────────────────────────────────────────────────────────────────
-viewer.camera.flyTo({
-  destination: Cesium.Cartesian3.fromDegrees(11.962039, 57.703044, 800),
-  orientation: { heading:0, pitch: Cesium.Math.toRadians(-40), roll:0 },
-  duration: 0,
-});
+(function applyInitialCamera() {
+  const p = new URLSearchParams(window.location.search);
+
+  // Bbox mode: ?minLat=&maxLat=&minLon=&maxLon=
+  const minLat = parseFloat(p.get('minLat') || '');
+  const maxLat = parseFloat(p.get('maxLat') || '');
+  const minLon = parseFloat(p.get('minLon') || '');
+  const maxLon = parseFloat(p.get('maxLon') || '');
+  if (!isNaN(minLat) && !isNaN(maxLat) && !isNaN(minLon) && !isNaN(maxLon)) {
+    viewer.camera.flyTo({
+      destination: Cesium.Rectangle.fromDegrees(minLon, minLat, maxLon, maxLat),
+      orientation: { heading:0, pitch: Cesium.Math.toRadians(-50), roll:0 },
+      duration: 0,
+    });
+    return;
+  }
+
+  // Address/point mode: ?lat=&lon=&zoom= (zoom optional, default 17 → ~200m altitude)
+  const lat  = parseFloat(p.get('lat')  || '');
+  const lon  = parseFloat(p.get('lon')  || '');
+  const zoom = parseFloat(p.get('zoom') || '17');
+  if (!isNaN(lat) && !isNaN(lon)) {
+    // Convert zoom-like level to approximate altitude (rough heuristic)
+    const alt = 156543 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat, Math.max(alt, 150)),
+      orientation: { heading:0, pitch: Cesium.Math.toRadians(-45), roll:0 },
+      duration: 0,
+    });
+    return;
+  }
+
+  // Default: Gothenburg city overview
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(11.962039, 57.703044, 800),
+    orientation: { heading:0, pitch: Cesium.Math.toRadians(-40), roll:0 },
+    duration: 0,
+  });
+})();
 
 // Start: load tiles if token available; always build EUBUCCO geometry.
 // View mode auto-selects: 'photo' if tiles succeed, else 'simple'.

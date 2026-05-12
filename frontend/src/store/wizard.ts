@@ -53,6 +53,8 @@ interface ProjectState {
   lookedUpBuilding: BuildingLookup | null;
   /* aggregate stats from EUBUCCO for a bbox (multi-building mode) */
   bboxStats: BboxStats | null;
+  /* raw bbox coords from the map draw (north/south/east/west) */
+  currentBbox: { north: number; south: number; east: number; west: number } | null;
 }
 
 interface WizardState {
@@ -91,6 +93,7 @@ const DEFAULT_PROJECT: ProjectState = {
   dataInputs: {},
   lookedUpBuilding: null,
   bboxStats: null,
+  currentBbox: null,
 };
 
 export const useWizardStore = create<WizardState>((set) => ({

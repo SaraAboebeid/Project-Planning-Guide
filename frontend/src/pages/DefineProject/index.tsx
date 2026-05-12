@@ -84,6 +84,7 @@ function FieldChip({
 
 function BuildingPreviewCard({ b, projectType }: { b: BuildingLookup; projectType: string | null }) {
   const critical = new Set(projectType ? (CRITICAL_BY_TYPE[projectType] ?? []) : []);
+  const viewerUrl = `http://127.0.0.1:8765/gothenburg_3d.html?lat=${b.lat}&lon=${b.lon}&zoom=17`;
   const fields: { key: keyof BuildingLookup; label: string }[] = [
     { key: "use_cat",       label: "Use" },
     { key: "year",          label: "Year built" },
@@ -141,7 +142,7 @@ function BuildingPreviewCard({ b, projectType }: { b: BuildingLookup; projectTyp
       {/* 3D Inspector link */}
       <div className="px-3 pb-3">
         <a
-          href={`http://127.0.0.1:8765/gothenburg_3d.html`}
+          href={viewerUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-700 hover:text-purple-900 underline underline-offset-2"
@@ -154,10 +155,13 @@ function BuildingPreviewCard({ b, projectType }: { b: BuildingLookup; projectTyp
 }
 
 /* ── Bbox stats preview card (shown in Step 1 after drawing a bbox) ── */
-function BboxStatsCard({ stats }: { stats: BboxStats }) {
+function BboxStatsCard({ stats, bbox }: { stats: BboxStats; bbox: { north: number; south: number; east: number; west: number } | null }) {
   const epcPct = Math.round((stats.with_epc  / stats.count) * 100);
   const hgtPct = Math.round((stats.with_height / stats.count) * 100);
   const fpPct  = Math.round((stats.with_footprint / stats.count) * 100);
+  const viewerUrl = bbox
+    ? `http://127.0.0.1:8765/gothenburg_3d.html?minLat=${bbox.south}&maxLat=${bbox.north}&minLon=${bbox.west}&maxLon=${bbox.east}`
+    : `http://127.0.0.1:8765/gothenburg_3d.html`;
   const chips: { label: string; value: string | number | null }[] = [
     { label: "Buildings",       value: stats.count.toLocaleString() },
     { label: "Avg height (m)",  value: stats.avg_height },
@@ -191,7 +195,7 @@ function BboxStatsCard({ stats }: { stats: BboxStats }) {
       </div>
       <div className="px-3 pb-3">
         <a
-          href="http://127.0.0.1:8765/gothenburg_3d.html"
+          href={viewerUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-[11px] font-medium text-blue-700 hover:text-blue-900 underline underline-offset-2"
@@ -223,7 +227,7 @@ export default function DefineProject() {
     setBuildingLoading(true);
     try {
       const stats = await api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west);
-      setProject({ bboxStats: stats, lookedUpBuilding: null });
+      setProject({ bboxStats: stats, lookedUpBuilding: null, currentBbox: bbox });
     } catch {
       setProject({ bboxStats: null });
     } finally {
@@ -840,7 +844,7 @@ export default function DefineProject() {
           )}
 
           {!buildingLoading && project.bboxStats && (
-            <BboxStatsCard stats={project.bboxStats} />
+            <BboxStatsCard stats={project.bboxStats} bbox={project.currentBbox} />
           )}
         </Card>
       )}
