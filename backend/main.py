@@ -204,25 +204,40 @@ def _shoelace_m2(coords: list) -> float | None:
     return deg2 * m2_per_deg2
 
 
+# Building types considered "secondary" — only chosen if no primary building is nearby
+_SECONDARY_USE = {"komplement", "industri"}
+
 @app.get("/api/building")
 def get_building(lat: float = Query(...), lon: float = Query(...)):
-    """Return the nearest EUBUCCO building within 80 m, enriched with derived fields."""
-    buildings = _get_buildings_list()
-    best: dict | None = None
-    best_dist = float("inf")
+    """Return the nearest meaningful EUBUCCO building within 150 m, enriched with derived fields.
 
+    Prefers primary use types (residential, civic, etc.) over secondary ones (komplement, industri)
+    so that a residential tower 60 m away beats a garage/annex 10 m away.
+    """
+    buildings = _get_buildings_list()
+
+    # Collect all candidates within 150 m with their distances
+    candidates: list[tuple[float, dict]] = []
     for b in buildings:
         coords = b.get("coordinates") or []
         c_lat, c_lon = _polygon_centroid(coords)
         if c_lat == 0.0 and c_lon == 0.0:
             continue
         d = _haversine_m(lat, lon, c_lat, c_lon)
-        if d < best_dist:
-            best_dist = d
-            best = b
+        if d <= 150:
+            candidates.append((d, b))
 
-    if best is None or best_dist > 150:
+    if not candidates:
         raise HTTPException(404, "No building found within 150 m of the given point")
+
+    # Sort: primary use types first, then by distance
+    def _rank(item: tuple[float, dict]) -> tuple[int, float]:
+        d, b = item
+        is_secondary = int((b.get("use_cat") or "") in _SECONDARY_USE)
+        return (is_secondary, d)
+
+    candidates.sort(key=_rank)
+    best_dist, best = candidates[0]
 
     # Compute footprint
     area_atemp = best.get("area")
