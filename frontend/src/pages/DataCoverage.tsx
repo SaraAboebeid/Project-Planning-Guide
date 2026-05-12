@@ -128,27 +128,27 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         items: [
           {
             key: "r_fp",   label: "Building footprint dimensions",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            primarySource: "EUBUCCO / EPC database", primaryConfidence: "High",
             fallbackSource: "Energy Performance Certificate / Cadastral Data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
+            defaultHas: false,
           },
           {
             key: "r_hgt",  label: "Building height",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            primarySource: "EUBUCCO / urban dataset", primaryConfidence: "High",
             fallbackSource: "Urban datasets", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
+            defaultHas: false,
           },
           {
             key: "r_flrs", label: "Number of floors",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            primarySource: "EUBUCCO / EPC database", primaryConfidence: "High",
             fallbackSource: "Energy Performance Certificate / Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
+            defaultHas: false,
           },
           {
             key: "r_use",  label: "Building use",
-            primarySource: "Planning permission", primaryConfidence: "High",
+            primarySource: "EUBUCCO / EPC database", primaryConfidence: "High",
             fallbackSource: "Energy Performance Certificate", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: true,
+            defaultHas: false,
           },
         ],
       });
@@ -634,6 +634,32 @@ function initFromBuilding(
   return init;
 }
 
+// Format actual EUBUCCO value for display in source column
+const EUBUCCO_LABELS: Partial<Record<BKey, { label: string; unit?: string }>> = {
+  footprint_m2:  { label: "footprint",   unit: "m²" },
+  height:        { label: "height",      unit: "m" },
+  floors:        { label: "floors" },
+  use_cat:       { label: "use" },
+  tabula_u_wall: { label: "U-wall",      unit: "W/m²K" },
+  tabula_u_win:  { label: "U-win",       unit: "W/m²K" },
+  eclass:        { label: "energy class" },
+  energy:        { label: "energy use",  unit: "kWh/m²" },
+};
+
+function eubuccoSourceText(key: string, building: BuildingLookup | null): string | null {
+  if (!building) return null;
+  const bKey = FIELD_MAP[key] as BKey | undefined;
+  if (!bKey) return null;
+  const val = building[bKey];
+  if (val === null || val === undefined) return null;
+  const meta = EUBUCCO_LABELS[bKey];
+  if (!meta) return `EUBUCCO — ${val}`;
+  const formatted = typeof val === "number" && !Number.isInteger(val)
+    ? val.toFixed(2)
+    : String(val);
+  return `EUBUCCO — ${meta.label}: ${formatted}${meta.unit ? " " + meta.unit : ""}`;
+}
+
 /* ─────────────────────────────────────────────
    Building data summary banner
 ───────────────────────────────────────────── */
@@ -1018,7 +1044,12 @@ export default function DataCoverage() {
                                   ? <span className="text-emerald-600 font-medium">✓ Your material list will be used</span>
                                   : <span className="text-amber-600 font-medium">No problem — we have a curated material library for you</span>
                               ) : item.hasData
-                                ? <span>Your data: <span className="text-slate-500 font-medium">{def.primarySource}</span></span>
+                                ? (() => {
+                                    const eubuccoText = eubuccoSourceText(item.key, building);
+                                    return eubuccoText
+                                      ? <span className="text-purple-600 font-medium">🗄 {eubuccoText}</span>
+                                      : <span>Your data: <span className="text-slate-500 font-medium">{def.primarySource}</span></span>;
+                                  })()
                                 : <span>Fallback: <span className="text-slate-500 font-medium">{def.fallbackSource}</span></span>
                               }
                             </div>

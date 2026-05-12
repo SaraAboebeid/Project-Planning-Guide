@@ -347,6 +347,10 @@ export default function LocationMap({
         onAddressChange(
           `BBOX: N${preview.north.toFixed(4)} S${preview.south.toFixed(4)} E${preview.east.toFixed(4)} W${preview.west.toFixed(4)}`
         );
+        // Fire onPointsChange with bbox center so building lookup triggers
+        const centerLat = (preview.north + preview.south) / 2;
+        const centerLon = (preview.east + preview.west) / 2;
+        onPointsChange?.([{ lat: centerLat, lon: centerLon, label: "Bbox center" }]);
       } else {
         // trivial drag — keep existing box
       }
