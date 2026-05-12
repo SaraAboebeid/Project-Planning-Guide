@@ -721,7 +721,7 @@ function BboxDataBanner({ bboxStats }: { bboxStats: BboxStats }) {
           rel="noopener noreferrer"
           className="text-[11px] font-medium text-blue-700 hover:text-blue-900 underline underline-offset-2 whitespace-nowrap"
         >
-          📷 3D Inspector →
+          📷 Gothenburg 3D →
         </a>
       </div>
       <div className="flex flex-wrap gap-x-5 gap-y-1 px-4 py-2.5 text-xs text-blue-800">
@@ -835,7 +835,7 @@ function BuildingDataBanner({
       <div className="px-3 pb-3">
         <a href={viewerUrl} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-700 hover:text-purple-900 underline underline-offset-2">
-          📷 Open 3D Facade Inspector →
+          📷 Open Gothenburg 3D →
         </a>
       </div>
     </div>
@@ -1249,7 +1249,24 @@ export default function DataCoverage() {
                                       ? <span className="text-purple-600 font-medium">🗄 {eubuccoText}</span>
                                       : <span>Your data: <span className="text-slate-500 font-medium">{def.primarySource}</span></span>;
                                   })()
-                                : <span>Fallback: <span className="text-slate-500 font-medium">{def.fallbackSource}</span></span>
+                                : (
+                                  <span>
+                                    Fallback: <span className="text-slate-500 font-medium">{def.fallbackSource}</span>
+                                    {(item.key === "ec_b_wwr" || item.key === "ec_fpv_wwr" || item.key === "re_fpv_wwr") && (
+                                      <>
+                                        {" — "}
+                                        <a
+                                          href="http://127.0.0.1:8765/gothenburg_3d.html"
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-purple-600 font-semibold hover:text-purple-800 underline underline-offset-2"
+                                        >
+                                          measure in Gothenburg 3D →
+                                        </a>
+                                      </>
+                                    )}
+                                  </span>
+                                )
                               }
                             </div>
                           )}
