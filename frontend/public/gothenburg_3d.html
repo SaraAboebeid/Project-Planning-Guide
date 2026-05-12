@@ -1233,9 +1233,25 @@ let facadeBuilding = null;
 const DIRS = ['N','E','S','W'];
 const DIR_HEADINGS = { N:0, E:90, S:180, W:270 };
 
+function getGroundAlt(building) {
+  const c = getBuildingCenter(building);
+  const rough = building._terrainH || 50;
+  const bldH  = Math.max(5, building.height || 10);
+  const startAlt = rough - bldH - 30;
+  const startPos = Cesium.Cartesian3.fromDegrees(c.lon, c.lat, startAlt);
+  const up = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(
+    Cesium.Cartesian3.fromDegrees(c.lon, c.lat), new Cesium.Cartesian3());
+  const hit = viewer.scene.pickFromRay(new Cesium.Ray(startPos, up));
+  if (hit && hit.position) {
+    return Cesium.Cartographic.fromCartesian(hit.position).height;
+  }
+  return rough - bldH;
+}
+
 document.getElementById('btn-inspect').addEventListener('click', () => {
   if (!selectedBuilding) return;
   facadeBuilding = selectedBuilding;
+  facadeBuilding._groundH = getGroundAlt(facadeBuilding);
   _facadeZoom = 1.0;
   document.getElementById('zoom-label').textContent = '1×';
   document.getElementById('info-panel').style.display = 'none';
@@ -1282,7 +1298,7 @@ function flyToFacade(dir) {
   const r = getBuildingRadius(facadeBuilding);
   _currentFacadeDir = dir;
   const bldH = Math.max(5, facadeBuilding.height || 10);
-  const terrainBase = facadeBuilding._terrainH || 0;
+  const terrainBase = facadeBuilding._groundH ?? facadeBuilding._terrainH ?? 0;
   // Distance: large enough to fit the full building height in 60° vertical FOV (with margin)
   // AND large enough to clear the building footprint width
   const distForHeight = bldH * 1.1;
