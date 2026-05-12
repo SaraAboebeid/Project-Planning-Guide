@@ -114,6 +114,22 @@ const ACTION_CFG: Record<Action, { bg: string; border: string; text: string }> =
 /* ─────────────────────────────────────────────
    Data definitions (all project types)
 ───────────────────────────────────────────── */
+
+/** Remove items whose label has already appeared in an earlier category. */
+function dedupeByLabel(cats: DataCategoryDef[]): DataCategoryDef[] {
+  const seen = new Set<string>();
+  return cats
+    .map(cat => ({
+      ...cat,
+      items: cat.items.filter(item => {
+        if (seen.has(item.label)) return false;
+        seen.add(item.label);
+        return true;
+      }),
+    }))
+    .filter(cat => cat.items.length > 0);
+}
+
 function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus: string[]): DataCategoryDef[] {
   if (!projectType) return [];
   const sys = new Set(systems);
@@ -231,21 +247,19 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
       });
     }
 
-    return cats;
+    return dedupeByLabel(cats);
   }
 
   /* ══ ENERGY COMMUNITY PLANNING ══ */
   if (projectType === "Energy Community Planning") {
     const cats: DataCategoryDef[] = [];
-    const hasThermal = sys.has("Buildings") && (ecEnergyFocus.includes("Heating") || ecEnergyFocus.includes("Cooling"));
-    let demandAdded = false;
 
     if (sys.has("Buildings") && (ecEnergyFocus.includes("Heating") || ecEnergyFocus.includes("Cooling"))) {
       cats.push({
         category: "Buildings – Envelope & Thermal",
         items: [
           {
-            key: "ec_b_fp",    label: "Building footprint dimensions (m²)",
+            key: "ec_b_fp",    label: "Building footprint dimensions",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Energy Performance Certificate / Cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
@@ -257,7 +271,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_b_orient", label: "Building orientation",
+            key: "ec_b_orient", label: "Building orientation (°)",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery / GIS cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
@@ -300,20 +314,18 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
       cats.push({
         category: "Buildings – Electricity",
         items: [
-          ...(!hasThermal ? [
-            {
-              key: "ec_be_fp",   label: "Building footprint dimensions",
-              primarySource: "Design drawings / Digital model", primaryConfidence: "High" as const,
-              fallbackSource: "Energy Performance Certificate / Cadastral data", fallbackStatus: "Estimated" as const, fallbackConfidence: "Medium" as const, fallbackAction: "Review" as const,
-              defaultHas: false,
-            },
-            {
-              key: "ec_be_hgt",  label: "Building height",
-              primarySource: "Design drawings / Digital model", primaryConfidence: "High" as const,
-              fallbackSource: "Urban datasets / Street-level imagery", fallbackStatus: "Estimated" as const, fallbackConfidence: "Medium" as const, fallbackAction: "Review" as const,
-              defaultHas: false,
-            },
-          ] : []),
+          {
+            key: "ec_be_fp",   label: "Building footprint dimensions",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Energy Performance Certificate / Cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_be_hgt",  label: "Building height",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Urban datasets / Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
           {
             key: "ec_be_use",  label: "Building use / occupancy type",
             primarySource: "Planning permission / EPC", primaryConfidence: "High",
@@ -321,23 +333,16 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_be_edem", label: "Hourly electricity demand profile",
+            key: "ec_be_edem", label: "Electricity demand – hourly profile",
             primarySource: "Smart meter data (AMR/AMI)", primaryConfidence: "High",
             fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
             defaultHas: false,
           },
         ],
       });
-      demandAdded = true;
     }
 
     if (sys.has("Rooftop PV")) {
-      const demandItem: DataItemDef = {
-        key: "ec_rpv_demand", label: "Electricity demand – hourly profile",
-        primarySource: "Smart meter data", primaryConfidence: "High",
-        fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-        defaultHas: false,
-      };
       cats.push({
         category: "Case: Rooftop PV",
         items: [
@@ -348,30 +353,28 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_rpv_tilt", label: "Roof tilt",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
-          },
-          {
-            key: "ec_rpv_azimuth", label: "Building azimuth",
+            key: "ec_rpv_tilt", label: "Roof tilt (°)",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
-          ...(!demandAdded ? [demandItem] : []),
+          {
+            key: "ec_rpv_azimuth", label: "Building orientation (°)",
+            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            defaultHas: false,
+          },
+          {
+            key: "ec_rpv_demand", label: "Electricity demand – hourly profile",
+            primarySource: "Smart meter data", primaryConfidence: "High",
+            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+            defaultHas: false,
+          },
         ],
       });
-      if (!demandAdded) demandAdded = true;
     }
 
     if (sys.has("Facade PV")) {
-      const demandItem: DataItemDef = {
-        key: "ec_fpv_demand", label: "Electricity demand – hourly profile",
-        primarySource: "Smart meter data", primaryConfidence: "High",
-        fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-        defaultHas: false,
-      };
       cats.push({
         category: "Case: Facade PV",
         items: [
@@ -393,10 +396,14 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
-          ...(!demandAdded ? [demandItem] : []),
+          {
+            key: "ec_fpv_demand", label: "Electricity demand – hourly profile",
+            primarySource: "Smart meter data", primaryConfidence: "High",
+            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+            defaultHas: false,
+          },
         ],
       });
-      if (!demandAdded) demandAdded = true;
     }
 
     if (sys.has("Community PV")) {
@@ -479,13 +486,12 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
 
  
 
-    return cats;
+    return dedupeByLabel(cats);
   }
 
   /* ══ RENEWABLE ENERGY PLANNING ══ */
   if (projectType === "Renewable Energy Planning") {
     const cats: DataCategoryDef[] = [];
-    let reDemandAdded = false;
 
     if (sys.has("Rooftop PV")) {
       cats.push({
@@ -500,13 +506,13 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           {
             key: "re_rpv_tilt", label: "Roof tilt (°)",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
-            key: "re_rpv_azimuth", label: "Building azimuth (°)",
+            key: "re_rpv_azimuth", label: "Building orientation (°)",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
@@ -517,23 +523,16 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
         ],
       });
-      reDemandAdded = true;
     }
 
     if (sys.has("Facade PV")) {
-      const demandItem: DataItemDef = {
-        key: "re_fpv_demand", label: "Electricity demand – hourly profile",
-        primarySource: "Smart meter data", primaryConfidence: "High",
-        fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
-        defaultHas: false,
-      };
       cats.push({
         category: "Case: Facade PV",
         items: [
           {
             key: "re_fpv_area", label: "Facade area",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
@@ -545,10 +544,15 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           {
             key: "re_fpv_orient", label: "Building orientation (°)",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "Street-level imagery ", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
-          ...(!reDemandAdded ? [demandItem] : []),
+          {
+            key: "re_fpv_demand", label: "Electricity demand – hourly profile",
+            primarySource: "Smart meter data", primaryConfidence: "High",
+            fallbackSource: "Synthetic electricity demand profile by building type", fallbackStatus: "Estimated", fallbackConfidence: "Low", fallbackAction: "Review",
+            defaultHas: false,
+          },
         ],
       });
     }
@@ -585,7 +589,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
       });
     }
 
-    return cats;
+    return dedupeByLabel(cats);
   }
 
   return [];
