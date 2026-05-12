@@ -634,6 +634,31 @@ function initFromBuilding(
   return init;
 }
 
+// Build initial hasData state from BboxStats (auto-fills fields covered by aggregate data)
+// Bbox provides: footprint, height, floors, use_cat — mark those as available
+const BBOX_COVERED_BKEYS = new Set<BKey>(["footprint_m2", "height", "floors", "use_cat"]);
+function initFromBboxStats(
+  defs: DataCategoryDef[],
+  _stats: BboxStats | null,
+): Record<string, boolean> {
+  const init: Record<string, boolean> = {};
+  defs.forEach(cat => cat.items.forEach(i => {
+    const bKey = FIELD_MAP[i.key] as BKey | undefined;
+    init[i.key] = (bKey && BBOX_COVERED_BKEYS.has(bKey)) ? true : i.defaultHas;
+  }));
+  return init;
+}
+
+// Return a display string when a field is sourced from bbox aggregate data
+function bboxSourceText(key: string, bboxStats: BboxStats | null): string | null {
+  if (!bboxStats) return null;
+  const bKey = FIELD_MAP[key] as BKey | undefined;
+  if (!bKey || !BBOX_COVERED_BKEYS.has(bKey)) return null;
+  const meta = EUBUCCO_LABELS[bKey];
+  if (!meta) return `EUBUCCO aggregate — ${bboxStats.count} buildings`;
+  return `EUBUCCO aggregate — ${bboxStats.count} buildings`;
+}
+
 // Format actual EUBUCCO value for display in source column
 const EUBUCCO_LABELS: Partial<Record<BKey, { label: string; unit?: string }>> = {
   footprint_m2:  { label: "footprint",   unit: "m²" },

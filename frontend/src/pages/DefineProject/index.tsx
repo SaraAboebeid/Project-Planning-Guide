@@ -2,7 +2,6 @@
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../../store/wizard";
 import { api } from "../../api/client";
-import type { BuildingLookup, BboxStats } from "../../types";
 import {
   PROJECT_TYPES,
   PROJECT_TYPE_DESCRIPTIONS,
@@ -89,7 +88,9 @@ export default function DefineProject() {
       return;
     }
     // Use first point for lookup
-    const { lat, lon } = pts[0];
+    const first = pts[0];
+    if (!first) return;
+    const { lat, lon } = first;
     if (lookupDebounce.current) clearTimeout(lookupDebounce.current);
     lookupDebounce.current = setTimeout(async () => {
       setBuildingLoading(true);
