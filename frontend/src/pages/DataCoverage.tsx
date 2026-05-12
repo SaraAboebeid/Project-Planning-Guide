@@ -788,7 +788,7 @@ function BuildingDataBanner({
           <span className="text-xs font-semibold text-purple-900">Data Available</span>
           <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-300">EUBUCCO</span>
           {building.has_epc && (
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC ✓</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span>
           )}
         </div>
         {building.address && <span className="text-[10px] text-purple-700 truncate max-w-[200px]">{building.address}</span>}
