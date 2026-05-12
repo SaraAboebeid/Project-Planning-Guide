@@ -1253,13 +1253,11 @@ document.getElementById('info-close').addEventListener('click', hideInfoPanel);
 // ─────────────────────────────────────────────────────────────────
 
 // Shoelace formula → roof footprint area in m²
-// b.area = Atemp from EPC (total heated floor area across all floors).
-// Atemp / floors = per-floor footprint area — preferred when EPC data is available.
-// Fall back to polygon shoelace if EPC data is missing.
+// EUBUCCO b.area = Atemp/GFA (total heated floor area across ALL floors).
+// The polygon coordinates are the direct building footprint — always prefer those.
+// Fall back to area/floors only if no coordinates are present.
 function computeFootprintArea(b) {
-  if (b.area && b.area > 0 && b.floors && b.floors > 0) {
-    return b.area / b.floors;
-  }
+  // Primary: shoelace on building polygon (direct ground footprint)
   const ring = b.coordinates && b.coordinates[0];
   if (ring && ring.length >= 3) {
     let sum = 0;
@@ -1270,7 +1268,12 @@ function computeFootprintArea(b) {
     const degArea = Math.abs(sum) / 2;
     const lat = ring[0][1];
     const m2PerDeg2 = 111320 * 111320 * Math.cos(lat * Math.PI / 180);
-    return degArea * m2PerDeg2;
+    const polyArea = degArea * m2PerDeg2;
+    if (polyArea > 5) return polyArea;   // sanity: must be > 5 m²
+  }
+  // Fallback: GFA / floors (approximate — only used when no polygon available)
+  if (b.area && b.area > 0 && b.floors && b.floors > 0) {
+    return b.area / b.floors;
   }
   return 0;
 }
