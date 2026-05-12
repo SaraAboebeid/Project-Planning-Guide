@@ -24,7 +24,7 @@ print(f"Serving from:  {FOLDER}")
 print(f"Opening:       {URL}")
 print(f"Press Ctrl+C to stop the server.\n")
 
-server = http.server.HTTPServer(("localhost", PORT), Handler)
+server = http.server.HTTPServer(("127.0.0.1", PORT), Handler)
 threading.Thread(target=lambda: webbrowser.open(URL), daemon=True).start()
 try:
     server.serve_forever()

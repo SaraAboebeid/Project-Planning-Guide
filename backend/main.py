@@ -7,8 +7,14 @@ from __future__ import annotations
 import gzip
 import json
 import math
+import os
 import sys
 from pathlib import Path
+
+# ── API keys — paste your keys here if not using environment variables ───────
+os.environ.setdefault("OPENAI_API_KEY", "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")      # ← paste OpenAI key
+# os.environ.setdefault("ANTHROPIC_API_KEY", "sk-ant-...") # ← paste Anthropic key
+# ────────────────────────────────────────────────────────────────────────────
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -182,3 +188,184 @@ def boverket_materials(component: str = Query(...)):
         raise HTTPException(501, "Boverket module not available")
 
     return fetch_materials(component)
+
+
+# ── WWR estimation via vision LLM ────────────────────────────────────────────
+from pydantic import BaseModel
+from typing import Any, Optional
+import base64
+
+
+class WWRRequest(BaseModel):
+    image_base64: str
+    direction: str = "N"
+    building_info: Optional[dict[str, Any]] = None
+
+
+@app.post("/api/estimate-wwr")
+async def estimate_wwr(req: WWRRequest):
+    """
+    Estimate Window-to-Wall Ratio from a base64-encoded facade image.
+    Priority: Claude (ANTHROPIC_API_KEY) → OpenAI GPT-4o (OPENAI_API_KEY) → heuristic.
+    """
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+
+    # ── Shared prompt ─────────────────────────────────────────────────────────
+    def build_prompt() -> str:
+        p = (
+            "You are an architectural analyst. I am showing you a photograph of a "
+            "building facade captured from a 3D city model viewer.\n\n"
+            "Task: Estimate the Window-to-Wall Ratio (WWR) — the percentage of the "
+            "visible facade area that is glazed (windows, glass doors, curtain wall, "
+            "etc.).\n\n"
+            "Instructions:\n"
+            "- Focus only on the dominant building in the frame.\n"
+            "- Count window openings relative to total wall area.\n"
+            "- If the image is unclear or shows only ground/sky, give your best "
+            "estimate based on the building type and era.\n\n"
+            "Building info: "
+        )
+        if req.building_info:
+            info = req.building_info
+            p += (
+                f"Address: {info.get('address', 'N/A')}, "
+                f"Year: {info.get('year', 'N/A')}, "
+                f"Use: {info.get('use', 'N/A')}, "
+                f"Energy class: {info.get('eclass', 'N/A')}. "
+            )
+        p += (
+            f"Facade direction: {req.direction}.\n\n"
+            "Respond with ONLY a JSON object, no other text:\n"
+            '{"wwr": <integer 0-100>, "confidence": "low"|"medium"|"high", '
+            '"notes": "<one sentence>"}'
+        )
+        return p
+
+    import httpx, re as _re
+
+    # ── Claude (Anthropic) ────────────────────────────────────────────────────
+    if anthropic_key:
+        try:
+            payload = {
+                "model": "claude-sonnet-4-5",
+                "max_tokens": 256,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/jpeg",
+                                    "data": req.image_base64,
+                                },
+                            },
+                            {"type": "text", "text": build_prompt()},
+                        ],
+                    }
+                ],
+            }
+            async with httpx.AsyncClient(timeout=30) as client:
+                r = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": anthropic_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json=payload,
+                )
+                r.raise_for_status()
+                content = r.json()["content"][0]["text"].strip()
+                match = _re.search(r'\{.*\}', content, _re.DOTALL)
+                if match:
+                    parsed = json.loads(match.group())
+                    return {
+                        "wwr": int(parsed.get("wwr", 25)),
+                        "confidence": parsed.get("confidence", "medium"),
+                        "notes": parsed.get("notes", ""),
+                        "source": "claude-sonnet-4-5-vision",
+                    }
+        except Exception as exc:
+            print(f"[estimate-wwr] Anthropic call failed: {exc}")
+
+    # ── OpenAI GPT-4o ─────────────────────────────────────────────────────────
+    if openai_key:
+        payload = {
+            "model": "gpt-4o",
+            "max_tokens": 150,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": build_prompt()},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{req.image_base64}",
+                                "detail": "low",
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                r = await client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {openai_key}"},
+                    json=payload,
+                )
+                r.raise_for_status()
+                content = r.json()["choices"][0]["message"]["content"].strip()
+                match = _re.search(r'\{.*\}', content, _re.DOTALL)
+                if match:
+                    parsed = json.loads(match.group())
+                    return {
+                        "wwr": int(parsed.get("wwr", 25)),
+                        "confidence": parsed.get("confidence", "medium"),
+                        "notes": parsed.get("notes", ""),
+                        "source": "gpt-4o-vision",
+                    }
+        except Exception as exc:
+            # Fall through to heuristic on any error
+            print(f"[estimate-wwr] OpenAI call failed: {exc}")
+
+    # ── Heuristic fallback (no API key or LLM error) ──────────────────────────
+    info = req.building_info or {}
+    use = info.get("use", "ovrigt")
+    year = info.get("year") or 1980
+    eclass = info.get("eclass", "D")
+
+    # Base WWR by use type
+    use_base = {
+        "bostad_enfamilj": 18, "bostad_flerfamilj": 28,
+        "verksamhet": 45, "industri": 10, "samhalle": 38,
+        "komplement": 5, "ovrigt": 22,
+    }.get(use, 22)
+
+    # Era adjustment
+    if year < 1960:
+        era_adj = -3
+    elif year < 1976:
+        era_adj = 0
+    elif year < 1996:
+        era_adj = +2
+    else:
+        era_adj = +5
+
+    eclass_adj = {"A": +5, "B": +3, "C": +1, "D": 0, "E": -1, "F": -2, "G": -3}.get(
+        eclass or "D", 0
+    )
+
+    wwr = max(5, min(75, use_base + era_adj + eclass_adj))
+    return {
+        "wwr": wwr,
+        "confidence": "low",
+        "notes": "Heuristic estimate (no OPENAI_API_KEY configured).",
+        "source": "heuristic",
+    }

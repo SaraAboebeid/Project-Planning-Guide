@@ -147,6 +147,21 @@
       font-size:11px; color:rgba(255,255,255,0.45); pointer-events:none;
       white-space:nowrap; letter-spacing:.3px;
     }
+
+    /* north arrow compass */
+    #north-arrow {
+      position:absolute; bottom:56px; right:16px; z-index:20;
+      width:52px; height:52px; border-radius:50%;
+      background:var(--surface); border:1px solid var(--border);
+      backdrop-filter:blur(12px); display:flex; align-items:center;
+      justify-content:center; cursor:default;
+    }
+
+    /* view mode + color mode rows in controls */
+    #view-mode-row, #color-mode-row {
+      display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
+    }
+    #controls { flex-direction:column; align-items:center; gap:8px; }
   </style>
 </head>
 <body>
@@ -160,6 +175,15 @@
 
 <!-- Cesium main viewer -->
 <div id="cesium-container"></div>
+
+<!-- North arrow compass -->
+<div id="north-arrow" title="North indicator">
+  <svg id="north-arrow-svg" viewBox="0 0 40 40" width="38" height="38" style="transform-origin:20px 20px;transition:transform 0.12s linear">
+    <polygon points="20,4 17,21 20,18 23,21" fill="#ef4444"/>
+    <polygon points="20,36 17,21 20,24 23,21" fill="#64748b"/>
+    <text x="20" y="12" text-anchor="middle" font-size="8" fill="#ef4444" font-weight="700" font-family="Inter,sans-serif">N</text>
+  </svg>
+</div>
 
 <!-- Search bar -->
 <div id="search-box">
@@ -231,8 +255,9 @@
     <div class="facade-thumb" id="thumb-W"><canvas id="canvas-W" width="200" height="150"></canvas><div class="dir-label">W</div></div>
   </div>
   <div style="display:flex;gap:8px;margin-top:10px">
-    <button class="btn" id="btn-capture-all" style="flex:1">&#128247; Capture All Facades</button>
-    <button class="btn" id="btn-exit-inspect" style="flex:1">&#x2715; Exit Inspector</button>
+    <button class="btn" id="btn-capture-all" style="flex:1">&#128247; Capture All</button>
+    <button class="btn" id="btn-ai-wwr" style="flex:1">&#129302; AI Estimate</button>
+    <button class="btn" id="btn-exit-inspect" style="flex:1">&#x2715; Exit</button>
   </div>
 </div>
 
@@ -277,12 +302,19 @@
 
 <!-- Controls -->
 <div id="controls">
-  <button class="btn active" id="btn-use">&#127968; Use type</button>
-  <button class="btn" id="btn-eclass">&#9889; Energy class</button>
-  <button class="btn" id="btn-year">&#128197; Year era</button>
-  <button class="btn" id="btn-tiles">&#127759; Photorealistic Tiles</button>
-  <button class="btn" id="btn-eubucco">&#127963; EUBUCCO Overlay</button>
-  <button class="btn" id="btn-reset">&#8962; Reset view</button>
+  <!-- View mode row -->
+  <div id="view-mode-row">
+    <button class="btn" id="btn-mode-simple">&#127963; Simplified</button>
+    <button class="btn active" id="btn-mode-photo">&#127759; Photorealistic</button>
+    <button class="btn" id="btn-reset">&#8962; Reset</button>
+  </div>
+  <!-- Color mode row — shown only in Simplified mode -->
+  <div id="color-mode-row" style="display:none">
+    <button class="btn active" id="btn-use">&#127968; Use type</button>
+    <button class="btn" id="btn-eclass">&#9889; Energy class</button>
+    <button class="btn" id="btn-year">&#128197; Year era</button>
+    <button class="btn" id="btn-height">&#128207; Height</button>
+  </div>
 </div>
 
 <div id="ppg-brand">PPG · Chalmers / Boverket</div>
@@ -380,7 +412,7 @@ async function loadData(){
 
     // Not cached — fetch from local file and store
     setLoadingProgress(10, 'Downloading building data (first time only)…');
-    const resp = await fetch('/buildings.json');
+    const resp = await fetch('./buildings.json');
     setLoadingProgress(60, 'Parsing data…');
     DATA = await resp.json();
     setLoadingProgress(80, 'Saving to local cache…');
@@ -391,7 +423,7 @@ async function loadData(){
   } catch(e) {
     // IndexedDB unavailable — fall back to direct fetch
     setLoadingProgress(10, 'Downloading building data…');
-    const resp = await fetch('/buildings.json');
+    const resp = await fetch('./buildings.json');
     DATA = await resp.json();
     hideLoadingOverlay();
     initViewer();
@@ -449,6 +481,50 @@ for (const b of DATA) {
   if (b.tabula_period) _periodCounts[b.tabula_period] = (_periodCounts[b.tabula_period] || 0) + 1;
 }
 
+// ── Spatial index: bounding boxes for fast point-in-polygon lookup ────────────────
+// Used by hover + click handlers via pickPosition (works with Google Photorealistic tiles)
+const _BBOXES = DATA.map(b => {
+  const ring = b.coordinates && b.coordinates[0];
+  if (!ring || ring.length < 3) return null;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [x, y] of ring) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return [x0, y0, x1, y1];
+});
+
+function _pointInRing(px, py, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if (((yi > py) !== (yj > py)) && px < ((xj - xi) * (py - yi) / (yj - yi) + xi))
+      inside = !inside;
+  }
+  return inside;
+}
+
+function findBuildingAtLonLat(lon, lat) {
+  for (let i = 0; i < DATA.length; i++) {
+    const bb = _BBOXES[i];
+    if (!bb || lon < bb[0] || lon > bb[2] || lat < bb[1] || lat > bb[3]) continue;
+    const ring = DATA[i].coordinates[0];
+    if (ring && _pointInRing(lon, lat, ring)) return i;
+  }
+  return -1;
+}
+
+function pickBuildingAtScreen(screenPos) {
+  if (!viewer.scene.pickPositionSupported) return -1;
+  const cart = viewer.scene.pickPosition(screenPos);
+  if (!Cesium.defined(cart)) return -1;
+  const carto = Cesium.Cartographic.fromCartesian(cart);
+  if (!Cesium.defined(carto)) return -1;
+  const lon = Cesium.Math.toDegrees(carto.longitude);
+  const lat = Cesium.Math.toDegrees(carto.latitude);
+  return findBuildingAtLonLat(lon, lat);
+}
+
 function updateLegend(mode) {
   const container = document.getElementById('legend-container');
   let rows = [];
@@ -470,6 +546,16 @@ function updateLegend(mode) {
     });
     container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Energy class (A–G)</div>';
 
+  } else if (mode === 'height') {
+    const HEIGHT_BINS = [
+      { key: '<5m',    lbl: 'Under 5 m (1–2 floors)',    color: 'rgb(70,130,180)' },
+      { key: '5-10m',  lbl: '5 – 10 m (2–3 floors)',    color: 'rgb(100,200,100)' },
+      { key: '10-20m', lbl: '10 – 20 m (4–6 floors)',   color: 'rgb(255,200,50)' },
+      { key: '20-40m', lbl: '20 – 40 m (7–13 floors)',  color: 'rgb(255,130,50)' },
+      { key: '>40m',   lbl: 'Over 40 m (high-rise)',     color: 'rgb(220,50,50)' },
+    ];
+    rows = HEIGHT_BINS.map(b => ({ key: b.key, lbl: b.lbl, color: b.color, cnt: 0, hasCards: false }));
+    container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Building height</div>';
   } else { // year/period
     rows = Object.keys(PERIOD_LABELS_JS).map(key => {
       const cnt = _periodCounts[key] || 0;
@@ -768,17 +854,23 @@ async function loadGoogleTiles(token) {
     viewer.scene.primitives.add(googleTileset);
     tilesEnabled = true;
     ION_TOKEN = token;
-    document.getElementById('btn-tiles').classList.add('active');
     document.getElementById('token-panel').style.display = 'none';
     localStorage.setItem('cesium_ion_token', token);
+    // Activate photo mode UI without recursing into loadGoogleTiles again
+    viewMode = 'photo';
+    eubuccoVisible = false;
+    if (buildingDS) buildingDS.show = false;
+    document.getElementById('btn-mode-photo').classList.add('active');
+    document.getElementById('btn-mode-simple').classList.remove('active');
+    document.getElementById('color-mode-row').style.display = 'none';
     setLoading('');
     console.log('✅ Google Photorealistic 3D Tiles loaded');
   } catch(err) {
     setLoading('');
     tilesEnabled = false;
-    document.getElementById('btn-tiles').classList.remove('active');
     console.error('❌ Google 3D Tiles failed:', err.message);
-    // Always show token panel on failure
+    // Fall back to simplified mode
+    setViewMode('simple');
     const panel = document.getElementById('token-panel');
     panel.style.display = 'block';
     document.getElementById('token-error').textContent = 'Error: ' + err.message + ' — Paste a valid token from ion.cesium.com';
@@ -795,44 +887,79 @@ document.getElementById('token-input').addEventListener('keydown', e => {
 });
 
 // Toggle tiles on/off
-document.getElementById('btn-tiles').addEventListener('click', () => {
-  if (!tilesEnabled) {
-    if (ION_TOKEN) { loadGoogleTiles(ION_TOKEN); }
-    else { document.getElementById('token-panel').style.display = 'block'; }
-  } else {
-    tilesEnabled = false;
-    if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
-    document.getElementById('btn-tiles').classList.remove('active');
-  }
-});
+// ─────────────────────────────────────────────────────────────────
+// View mode: 'photo' = Google Photorealistic tiles (EUBUCCO hidden)
+//            'simple' = EUBUCCO coloured buildings (no tiles)
+// ─────────────────────────────────────────────────────────────────
+let viewMode = 'photo';
 
-// Toggle EUBUCCO overlay
-document.getElementById('btn-eubucco').addEventListener('click', () => {
-  eubuccoVisible = !eubuccoVisible;
-  document.getElementById('btn-eubucco').classList.toggle('active', eubuccoVisible);
+function setViewMode(mode) {
+  viewMode = mode;
+  const isPhoto = mode === 'photo';
+
+  // Tiles
+  if (isPhoto) {
+    if (!tilesEnabled) {
+      if (ION_TOKEN) loadGoogleTiles(ION_TOKEN);
+      else document.getElementById('token-panel').style.display = 'block';
+    }
+  } else {
+    if (tilesEnabled && googleTileset) {
+      viewer.scene.primitives.remove(googleTileset);
+      googleTileset = null;
+      tilesEnabled = false;
+    }
+    document.getElementById('token-panel').style.display = 'none';
+  }
+
+  // EUBUCCO overlay
+  eubuccoVisible = !isPhoto;
   if (buildingDS) buildingDS.show = eubuccoVisible;
-});
+
+  // Button states
+  document.getElementById('btn-mode-photo').classList.toggle('active', isPhoto);
+  document.getElementById('btn-mode-simple').classList.toggle('active', !isPhoto);
+
+  // Show/hide color controls
+  const colorRow = document.getElementById('color-mode-row');
+  colorRow.style.display = isPhoto ? 'none' : 'flex';
+  if (!isPhoto) updateLegend(colorMode);
+}
+
+document.getElementById('btn-mode-photo').addEventListener('click', () => setViewMode('photo'));
+document.getElementById('btn-mode-simple').addEventListener('click', () => setViewMode('simple'));
 
 // ─────────────────────────────────────────────────────────────────
 // Build extruded buildings — CustomDataSource (no Cesium workers needed)
 // ─────────────────────────────────────────────────────────────────
 let colorMode = 'use';
 let buildingDS = null;
+let _rebuildGen = 0;
 
 function getBuildingColor(b) {
   if (colorMode === 'eclass')
     return (b.eclass && ECLASS_COLORS[b.eclass]) ? ECLASS_COLORS[b.eclass] : Cesium.Color.fromBytes(60,60,70,140);
   if (colorMode === 'year')
     return (b.tabula_period && PERIOD_COLORS[b.tabula_period]) ? PERIOD_COLORS[b.tabula_period] : Cesium.Color.fromBytes(60,60,70,140);
+  if (colorMode === 'height') {
+    const h = b.height || (b.floors ? b.floors * 3 : 6);
+    if (h <  5) return Cesium.Color.fromBytes( 70, 130, 180, 200);
+    if (h < 10) return Cesium.Color.fromBytes(100, 200, 100, 200);
+    if (h < 20) return Cesium.Color.fromBytes(255, 200,  50, 200);
+    if (h < 40) return Cesium.Color.fromBytes(255, 130,  50, 200);
+    return          Cesium.Color.fromBytes(220,  50,  50, 200);
+  }
   return USE_COLORS[b.use_cat] || USE_COLORS.ovrigt;
 }
 
 async function rebuildBuildings() {
+  const myGen = ++_rebuildGen;
   setLoading('Loading ' + DATA.length.toLocaleString() + ' buildings…');
   if (buildingDS) { viewer.dataSources.remove(buildingDS, true); buildingDS = null; }
   buildingDS = new Cesium.CustomDataSource('buildings');
   const CHUNK = 300;
   for (let start = 0; start < DATA.length; start += CHUNK) {
+    if (_rebuildGen !== myGen) return; // preempted by newer rebuild
     const end = Math.min(start + CHUNK, DATA.length);
     for (let i = start; i < end; i++) {
       const b = DATA[i];
@@ -873,6 +1000,7 @@ async function rebuildBuildings() {
     setLoading('Loading buildings… ' + Math.round(end / DATA.length * 100) + '%');
     await new Promise(r => setTimeout(r, 0));
   }
+  if (_rebuildGen !== myGen) return; // preempted before final add
   await viewer.dataSources.add(buildingDS);
   setLoading('');
 }
@@ -896,13 +1024,32 @@ viewer.camera.flyTo({
   duration: 0,
 });
 
-// Start: if token already saved, load tiles immediately; always load buildings
+// Start: load tiles if token available; always build EUBUCCO geometry.
+// View mode auto-selects: 'photo' if tiles succeed, else 'simple'.
 (async () => {
   if (ION_TOKEN) {
     document.getElementById('token-panel').style.display = 'none';
     await loadGoogleTiles(ION_TOKEN);
   }
   await rebuildBuildings();
+  // Apply initial view mode
+  if (tilesEnabled) {
+    // Tiles loaded — photorealistic mode; EUBUCCO hidden visually (pickPosition used instead of drillPick)
+    eubuccoVisible = false;
+    if (buildingDS) buildingDS.show = false;
+    document.getElementById('btn-mode-photo').classList.add('active');
+    document.getElementById('btn-mode-simple').classList.remove('active');
+    document.getElementById('color-mode-row').style.display = 'none';
+  } else {
+    // No tiles — switch to simplified mode
+    viewMode = 'simple';
+    eubuccoVisible = true;
+    if (buildingDS) buildingDS.show = true;
+    document.getElementById('btn-mode-photo').classList.remove('active');
+    document.getElementById('btn-mode-simple').classList.add('active');
+    document.getElementById('color-mode-row').style.display = 'flex';
+    updateLegend(colorMode);
+  }
 })();
 
 // ─────────────────────────────────────────────────────────────────
@@ -912,12 +1059,9 @@ let selectedBuilding = null;
 let highlightEntity  = null;
 
 viewer.screenSpaceEventHandler.setInputAction(movement => {
-  const hits = viewer.scene.drillPick(movement.position, 10);
-  let found = null;
-  for (const h of hits) { if (h && h.id && h.id._dataIdx !== undefined) { found = h; break; } }
-  if (found) {
-    const b = DATA[found.id._dataIdx];
-    if (b) showInfoPanel(b, found.id._dataIdx);
+  const idx = pickBuildingAtScreen(movement.position);
+  if (idx >= 0) {
+    showInfoPanel(DATA[idx], idx);
   } else {
     hideInfoPanel();
   }
@@ -955,15 +1099,10 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
   }
   hoverThrottle = now;
 
-  // drillPick pierces Google 3D tile mesh to reach EUBUCCO entities underneath
-  const hits = viewer.scene.drillPick(movement.endPosition, 10);
-  let found = null;
-  for (const h of hits) {
-    if (h && h.id && h.id._dataIdx !== undefined) { found = h; break; }
-  }
+  // Use pickPosition + point-in-polygon (works with Google Photorealistic 3D Tiles)
+  const idx = pickBuildingAtScreen(movement.endPosition);
 
-  if (found) {
-    const idx = found.id._dataIdx;
+  if (idx >= 0) {
     const x = movement.endPosition.x, y = movement.endPosition.y;
     hoverCard.style.left = Math.min(x + 18, window.innerWidth  - 300) + 'px';
     hoverCard.style.top  = Math.min(y - 10,  window.innerHeight - 200) + 'px';
@@ -1215,8 +1354,9 @@ document.getElementById('btn-exit-inspect').addEventListener('click', () => {
 // ─────────────────────────────────────────────────────────────────
 function setColorMode(mode) {
   colorMode = mode;
-  ['use','eclass','year'].forEach(m => {
-    document.getElementById('btn-'+m).classList.toggle('active', m === mode);
+  ['use','eclass','year','height'].forEach(m => {
+    const btn = document.getElementById('btn-'+m);
+    if (btn) btn.classList.toggle('active', m === mode);
   });
   updateLegend(mode);
   rebuildBuildings();
@@ -1224,6 +1364,7 @@ function setColorMode(mode) {
 document.getElementById('btn-use').addEventListener('click',    () => setColorMode('use'));
 document.getElementById('btn-eclass').addEventListener('click', () => setColorMode('eclass'));
 document.getElementById('btn-year').addEventListener('click',   () => setColorMode('year'));
+document.getElementById('btn-height').addEventListener('click', () => setColorMode('height'));
 
 // Initialise legend for default mode
 updateLegend('use');
@@ -1284,6 +1425,114 @@ searchResults.addEventListener('click', e => {
 document.addEventListener('click', e => {
   if (!document.getElementById('search-box').contains(e.target))
     searchResults.style.display = 'none';
+});
+
+// ─────────────────────────────────────────────────────────────────
+// North arrow — N always points toward true North on screen
+// ─────────────────────────────────────────────────────────────────
+viewer.camera.changed.addEventListener(() => {
+  const headingDeg = Cesium.Math.toDegrees(viewer.camera.heading);
+  document.getElementById('north-arrow-svg').style.transform =
+    `rotate(${-headingDeg}deg)`;
+});
+
+// ─────────────────────────────────────────────────────────────────
+// Heuristic WWR fallback (mirrors backend logic, no server needed)
+// ─────────────────────────────────────────────────────────────────
+function wwrHeuristic(buildingInfo) {
+  const use = (buildingInfo && buildingInfo.use) || 'ovrigt';
+  const year = (buildingInfo && buildingInfo.year) || 1980;
+  const eclass = (buildingInfo && buildingInfo.eclass) || 'D';
+  const useBase = {
+    bostad_enfamilj: 18, bostad_flerfamilj: 28,
+    verksamhet: 45, industri: 10, samhalle: 38,
+    komplement: 5, ovrigt: 22,
+  }[use] ?? 22;
+  const eraAdj = year < 1960 ? -3 : year < 1976 ? 0 : year < 1996 ? 2 : 5;
+  const eclassAdj = {A:5, B:3, C:1, D:0, E:-1, F:-2, G:-3}[eclass] ?? 0;
+  return Math.max(5, Math.min(75, useBase + eraAdj + eclassAdj));
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AI WWR estimation via backend GPT-4o vision endpoint
+// Falls back to JS heuristic when backend is unavailable
+// ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
+  if (!facadeBuilding) return;
+  const canvases = DIRS.map(d => document.getElementById('canvas-' + d));
+  // Check if facades have been captured (not just the initial dark fill #1a1a2e = 26,26,46)
+  const hasCaptured = canvases.some(c => {
+    const px = c.getContext('2d').getImageData(50, 50, 1, 1).data;
+    return !(px[0] === 26 && px[1] === 26 && px[2] === 46);
+  });
+  if (!hasCaptured) {
+    document.getElementById('facade-sub').textContent = 'Capture facades first — click "Capture All"';
+    return;
+  }
+  const btn = document.getElementById('btn-ai-wwr');
+  btn.disabled = true;
+  document.getElementById('facade-sub').textContent = 'Sending facade images to AI vision model…';
+
+  const buildingInfo = {
+    address: facadeBuilding.address || '',
+    year: facadeBuilding.year || null,
+    use: facadeBuilding.use_cat || '',
+    eclass: facadeBuilding.eclass || null,
+  };
+
+  try {
+    const results = [];
+    let source = 'ai';
+    let backendAvailable = true;
+
+    for (let i = 0; i < DIRS.length; i++) {
+      const imageBase64 = canvases[i].toDataURL('image/jpeg', 0.75).split(',')[1];
+      try {
+        const resp = await fetch('http://localhost:8000/api/estimate-wwr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_base64: imageBase64, direction: DIRS[i], building_info: buildingInfo }),
+          signal: AbortSignal.timeout(5000),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.wwr !== undefined && data.wwr !== null) {
+            results.push(Math.round(data.wwr));
+            source = data.source || 'ai';
+          }
+        } else {
+          backendAvailable = false;
+          break;
+        }
+      } catch (_) {
+        backendAvailable = false;
+        break;
+      }
+    }
+
+    if (!backendAvailable || results.length === 0) {
+      // JS heuristic fallback — same formula as backend Python code
+      const h = wwrHeuristic(buildingInfo);
+      DIRS.forEach(() => results.push(h));
+      source = 'heuristic';
+      document.getElementById('facade-sub').textContent = 'Backend offline — using archetype heuristic ✓';
+    } else {
+      document.getElementById('facade-sub').textContent = 'AI estimation complete ✓';
+    }
+
+    const avg = Math.round(results.reduce((a, b) => a + b, 0) / results.length);
+    showWWR(avg, results, source === 'heuristic' ? 'heuristic' : 'ai');
+    const sourceLabel = source.includes('claude') ? 'Claude Vision &#129302;'
+                      : source.includes('gpt')    ? 'GPT-4o Vision &#129302;'
+                      : 'Archetype heuristic (era · use · EPC)';
+    document.getElementById('wwr-breakdown').innerHTML =
+      'Source: ' + sourceLabel + '<br>' +
+      'Per facade: ' + DIRS.map((d, i) => d + ':' + results[i] + '%').join(' ');
+  } catch (err) {
+    document.getElementById('facade-sub').textContent = 'Error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 }
