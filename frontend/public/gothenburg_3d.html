@@ -1283,11 +1283,13 @@ function flyToFacade(dir) {
   _currentFacadeDir = dir;
   const bldH = Math.max(5, facadeBuilding.height || 10);
   const terrainBase = facadeBuilding._terrainH || 0;
-  const dist = r * 2.0 / _facadeZoom;
-  // Camera at lower-quarter of building; pitch computed to aim at vertical midpoint
-  const camAlt = terrainBase + bldH * 0.25;
-  const midAlt = terrainBase + bldH * 0.5;
-  const pitchDeg = Math.atan2(midAlt - camAlt, dist) * 180 / Math.PI;
+  // Distance: large enough to fit the full building height in 60° vertical FOV (with margin)
+  // AND large enough to clear the building footprint width
+  const distForHeight = bldH * 1.1;
+  const distForWidth  = r * 1.4;
+  const dist = Math.max(distForHeight, distForWidth) / _facadeZoom;
+  // Camera at exact mid-height, pitch=0 → building centered, no sky/ground waste
+  const camAlt = terrainBase + bldH * 0.5;
   const h = DIR_HEADINGS[dir] * Math.PI / 180;
   const offsetLon = Math.sin(h) * dist / (111320 * Math.cos(c.lat * Math.PI / 180));
   const offsetLat = Math.cos(h) * dist / 111320;
@@ -1295,8 +1297,8 @@ function flyToFacade(dir) {
     destination: Cesium.Cartesian3.fromDegrees(c.lon + offsetLon, c.lat + offsetLat, camAlt),
     orientation: {
       heading: Cesium.Math.toRadians(DIR_HEADINGS[dir] + 180),
-      pitch:   Cesium.Math.toRadians(pitchDeg),
-      roll: 0,
+      pitch:   0,
+      roll:    0,
     },
     duration: 1.2,
   });
