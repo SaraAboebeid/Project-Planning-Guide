@@ -1298,6 +1298,8 @@ export default function DataCoverage() {
                                   }
                                   return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
                                 }
+                                if (def?.primarySource?.toLowerCase().includes("cesium"))
+                                  return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">Cesium</span>;
                                 const eubText = eubuccoSourceText(item.key, building);
                                 if (eubText) {
                                   const isEpc = building?.has_epc && ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year"].includes(FIELD_MAP[item.key] ?? "");
@@ -1305,6 +1307,8 @@ export default function DataCoverage() {
                                     ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span></>
                                     : <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
                                 }
+                                if (def?.primarySource?.toLowerCase().includes("cesium"))
+                                  return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">Cesium</span>;
                                 return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
                               })()
                             : (() => {
