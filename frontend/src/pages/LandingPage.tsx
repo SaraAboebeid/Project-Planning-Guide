@@ -96,7 +96,7 @@ export default function LandingPage() {
         </button>
 
         <p className="mt-6 text-[11px] text-slate-400">
-          S. Abouebeid · E. Malakhatka · L. Thuvander · H. Wallbaum
+          Sara Abouebeid · Elena Malakhatka · Liane Thuvander · Holger Wallbaum
         </p>
       </section>
     </div>
