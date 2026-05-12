@@ -1810,11 +1810,16 @@ function showWWR(wwr, perFacade, source) {
     const labelMap = { blended: 'Visual Analysis · per facade', ai: 'AI Vision estimate · per facade' };
     document.getElementById('wwr-ai-label').textContent = labelMap[source] || 'AI Vision estimate · per facade';
     document.getElementById('wwr-ai-section').style.display = 'block';
-    document.getElementById('wwr-heuristic-section').style.display = 'none';
+    document.getElementById('wwr-heuristic-section').style.display = 'block';
+    document.getElementById('wwr-heuristic-section').style.borderTop = '1px solid rgba(0,0,0,0.07)';
+    document.getElementById('wwr-heuristic-section').style.marginTop = '12px';
+    document.getElementById('wwr-heuristic-section').style.paddingTop = '10px';
     document.getElementById('wwr-sub').textContent = 'AI estimate · per facade';
   } else {
     document.getElementById('wwr-ai-section').style.display = 'none';
     document.getElementById('wwr-heuristic-section').style.display = 'block';
+    document.getElementById('wwr-heuristic-section').style.borderTop = 'none';
+    document.getElementById('wwr-heuristic-section').style.paddingTop = '0';
     document.getElementById('wwr-sub').textContent = 'Archetype fallback · run AI Estimate for per-facade vision analysis';
   }
   document.getElementById('wwr-breakdown').innerHTML = '';
