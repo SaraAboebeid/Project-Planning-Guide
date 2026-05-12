@@ -24,7 +24,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 /* ── Endpoints ── */
 
-import type { EpcSnapshot, EpcPassport, TabulaArchetype, MatchConfidence, BuildingLookup, BboxStats } from "../types";
+import type { EpcSnapshot, EpcPassport, TabulaArchetype, MatchConfidence, BuildingLookup, BboxStats, WWRRecord } from "../types";
 
 export const api = {
   /** Geocode an address → { lat, lon, display_name } */
@@ -67,6 +67,12 @@ export const api = {
     get<BboxStats>("/buildings/bbox/stats", {
       north: String(north), south: String(south),
       east:  String(east),  west:  String(west),
+    }),
+
+  /** Look up saved AI WWR for a building (null if none saved) */
+  lookupWWR: (lat: number, lon: number) =>
+    get<{ found: boolean; record: WWRRecord | null; dist_m?: number }>("/wwr-lookup", {
+      lat: String(lat), lon: String(lon),
     }),
 
   /** Health check */

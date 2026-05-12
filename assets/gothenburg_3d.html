@@ -315,6 +315,14 @@
   </div>
 
   <div id="wwr-breakdown" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
+
+  <!-- Save to database -->
+  <div id="wwr-save-row" style="margin-top:10px;display:none">
+    <button id="btn-wwr-save" class="btn" style="width:100%;font-size:11px;background:rgba(124,58,237,0.18);border-color:#a78bfa;color:#c4b5fd;font-weight:600">
+      Save to WWR Database
+    </button>
+    <div id="wwr-save-status" style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px;min-height:14px"></div>
+  </div>
 </div>
 
 <!-- Token panel — shown on startup until a valid token is applied -->
@@ -2037,11 +2045,59 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
     }
 
     const avg = Math.round(results.reduce((a, b) => a + b, 0) / results.length);
+    const dirs = toSend.map(t => t.dir);
     showWWR(avg, results, source === 'heuristic' ? 'heuristic' : source);
+
+    // Show Save button with pending data attached
+    if (source !== 'heuristic') {
+      const saveRow = document.getElementById('wwr-save-row');
+      saveRow.style.display = 'block';
+      saveRow._pendingWWR = { avg, results, dirs, source, buildingInfo };
+      document.getElementById('wwr-save-status').textContent = '';
+      document.getElementById('btn-wwr-save').textContent = 'Save to WWR Database';
+      document.getElementById('btn-wwr-save').disabled = false;
+    }
   } catch (err) {
     document.getElementById('facade-sub').textContent = 'Error: ' + err.message;
   } finally {
     btn.disabled = false;
+  }
+});
+
+document.getElementById('btn-wwr-save').addEventListener('click', async () => {
+  const saveRow = document.getElementById('wwr-save-row');
+  const pending = saveRow._pendingWWR;
+  if (!pending || !facadeBuilding) return;
+  const saveBtn = document.getElementById('btn-wwr-save');
+  const statusEl = document.getElementById('wwr-save-status');
+  saveBtn.disabled = true;
+  statusEl.textContent = 'Saving…';
+  try {
+    const resp = await fetch('http://localhost:8000/api/wwr-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lat: facadeBuilding.lat ?? facadeBuilding.latitude ?? 0,
+        lon: facadeBuilding.lon ?? facadeBuilding.longitude ?? 0,
+        address: facadeBuilding.address || null,
+        average_wwr: pending.avg,
+        per_facade: pending.results,
+        directions: pending.dirs,
+        source: pending.source,
+        building_info: pending.buildingInfo,
+      }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      statusEl.textContent = `✓ Saved! Database has ${data.total_records} record${data.total_records !== 1 ? 's' : ''}.`;
+      saveBtn.textContent = 'Saved ✓';
+    } else {
+      statusEl.textContent = 'Save failed (backend error).';
+      saveBtn.disabled = false;
+    }
+  } catch (_) {
+    statusEl.textContent = 'Save failed (backend offline).';
+    saveBtn.disabled = false;
   }
 });
 

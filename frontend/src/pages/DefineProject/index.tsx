@@ -94,7 +94,16 @@ export default function DefineProject() {
         const results = await Promise.all(
           pts.map((p) => api.lookupBuilding(p.lat, p.lon))
         );
-        setProject({ lookedUpBuilding: results[0] ?? null, lookedUpBuildings: results });
+        // Also check the WWR database for the first building
+        let savedWWR = null;
+        try {
+          const first = pts[0];
+          if (first) {
+            const wwrRes = await api.lookupWWR(first.lat, first.lon);
+            if (wwrRes.found) savedWWR = wwrRes.record;
+          }
+        } catch { /* ignore — backend may not be running */ }
+        setProject({ lookedUpBuilding: results[0] ?? null, lookedUpBuildings: results, savedWWR });
       } catch {
         setProject({ lookedUpBuilding: null, lookedUpBuildings: [] });
       } finally {

@@ -580,3 +580,78 @@ async def estimate_wwr(req: WWRRequest):
         "notes": "Heuristic estimate (no OPENAI_API_KEY configured).",
         "source": "heuristic",
     }
+
+
+# ── WWR database (JSON file, grows over time) ────────────────────────────────
+import datetime
+
+WWR_DB_PATH = PROJECT_ROOT / "data" / "wwr_database.json"
+
+def _load_wwr_db() -> list:
+    if WWR_DB_PATH.exists():
+        try:
+            return json.loads(WWR_DB_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    return []
+
+def _save_wwr_db(records: list) -> None:
+    WWR_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    WWR_DB_PATH.write_text(json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+class WWRSaveRequest(BaseModel):
+    lat: float
+    lon: float
+    address: Optional[str] = None
+    average_wwr: int
+    per_facade: list[int]
+    directions: list[str]
+    source: str = "ai"
+    building_info: Optional[dict[str, Any]] = None
+
+
+@app.post("/api/wwr-save")
+async def save_wwr(req: WWRSaveRequest):
+    """Persist an AI-detected WWR record to the local database."""
+    records = _load_wwr_db()
+    # Replace existing record for same building (within 20 m)
+    records = [
+        r for r in records
+        if _haversine_m(r["lat"], r["lon"], req.lat, req.lon) > 20
+    ]
+    records.append({
+        "lat": req.lat,
+        "lon": req.lon,
+        "address": req.address,
+        "average_wwr": req.average_wwr,
+        "per_facade": req.per_facade,
+        "directions": req.directions,
+        "source": req.source,
+        "building_info": req.building_info or {},
+        "saved_at": datetime.datetime.utcnow().isoformat() + "Z",
+    })
+    _save_wwr_db(records)
+    return {"ok": True, "total_records": len(records)}
+
+
+@app.get("/api/wwr-lookup")
+async def lookup_wwr(lat: float = Query(...), lon: float = Query(...), radius_m: float = Query(25)):
+    """Return the nearest saved WWR record within radius_m metres, or null."""
+    records = _load_wwr_db()
+    best = None
+    best_dist = radius_m
+    for r in records:
+        d = _haversine_m(r["lat"], r["lon"], lat, lon)
+        if d <= best_dist:
+            best_dist = d
+            best = r
+    if best is None:
+        return {"found": False, "record": None}
+    return {"found": True, "record": best, "dist_m": round(best_dist, 1)}
+
+
+@app.get("/api/wwr-database")
+async def get_wwr_database():
+    """Return all saved WWR records."""
+    return {"records": _load_wwr_db()}

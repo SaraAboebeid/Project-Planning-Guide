@@ -945,7 +945,10 @@ export default function DataCoverage() {
   const building   = project.lookedUpBuilding ?? null;
   const buildings  = project.lookedUpBuildings ?? [];
   const bboxStats  = project.bboxStats ?? null;
+  const savedWWR   = project.savedWWR ?? null;
   const isMulti    = buildings.length > 1;
+
+  const WWR_KEYS = ["ec_b_wwr", "ec_fpv_wwr", "re_fpv_wwr"];
 
   const defs = useMemo(
     () => buildDefs(project.projectType, project.systemsInScope, project.ecEnergyFocus ?? []),
@@ -953,21 +956,23 @@ export default function DataCoverage() {
   );
 
   /* Per-item "user has this data" state — keyed by item.key */
-  const [hasData, setHasData] = useState<Record<string, boolean>>(() =>
-    bboxStats       ? initFromBboxStats(defs, bboxStats)
-    : isMulti       ? initFromBuildings(defs, buildings)
-    :                 initFromBuilding(defs, building),
-  );
+  const [hasData, setHasData] = useState<Record<string, boolean>>(() => {
+    const base = bboxStats       ? initFromBboxStats(defs, bboxStats)
+               : isMulti        ? initFromBuildings(defs, buildings)
+               :                  initFromBuilding(defs, building);
+    if (savedWWR) WWR_KEYS.forEach(k => { base[k] = true; });
+    return base;
+  });
 
   /* Reset when project type / systems change OR when building/bbox lookup updates */
   useEffect(() => {
-    setHasData(
-      bboxStats       ? initFromBboxStats(defs, bboxStats)
-      : isMulti       ? initFromBuildings(defs, buildings)
-      :                 initFromBuilding(defs, building)
-    );
+    const base = bboxStats       ? initFromBboxStats(defs, bboxStats)
+               : isMulti        ? initFromBuildings(defs, buildings)
+               :                  initFromBuilding(defs, building);
+    if (savedWWR) WWR_KEYS.forEach(k => { base[k] = true; });
+    setHasData(base);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defs, building, bboxStats, buildings]);
+  }, [defs, building, bboxStats, buildings, savedWWR]);
 
   const toggleHas = (key: string) =>
     setHasData(prev => ({ ...prev, [key]: !prev[key] }));
@@ -1269,6 +1274,11 @@ export default function DataCoverage() {
                                     : <span className="text-amber-600 font-medium">No problem — Boverket &amp; Wikells material library will be used</span>
                                 ) : item.hasData
                                   ? (() => {
+                                      // WWR database hit
+                                      if (savedWWR && WWR_KEYS.includes(item.key)) {
+                                        const saved = new Date(savedWWR.saved_at).toLocaleDateString();
+                                        return <span className="text-sky-600 font-medium">🏛 WWR database — avg {savedWWR.average_wwr}% · saved {saved}</span>;
+                                      }
                                       const bbText = bboxSourceText(item.key, bboxStats);
                                       if (bbText) return <span className="text-blue-600 font-medium">🗃 {bbText}</span>;
                                       if (isMulti && rowBKey) {
@@ -1325,6 +1335,8 @@ export default function DataCoverage() {
                             {item.hasData
                               ? (() => {
                                   if (item.key === "r_matlist") return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
+                                  if (savedWWR && WWR_KEYS.includes(item.key))
+                                    return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">WWR DB</span>;
                                   if (bboxSourceText(item.key, bboxStats))
                                     return <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold border border-blue-200">EUBUCCO</span>;
                                   if (isMulti && rowBKey) {

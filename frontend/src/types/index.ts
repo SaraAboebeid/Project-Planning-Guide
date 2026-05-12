@@ -75,6 +75,19 @@ export interface BboxStats {
   common_use: string | null;
 }
 
+/** Saved AI WWR record from the local database */
+export interface WWRRecord {
+  lat: number;
+  lon: number;
+  address: string | null;
+  average_wwr: number;
+  per_facade: number[];
+  directions: string[];
+  source: string;
+  building_info: Record<string, unknown>;
+  saved_at: string;
+}
+
 /** Nearest EUBUCCO building returned by /api/building */
 export interface BuildingLookup {
   address: string | null;
