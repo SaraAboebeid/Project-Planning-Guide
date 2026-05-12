@@ -703,74 +703,104 @@ function BboxDataBanner({ bboxStats }: { bboxStats: BboxStats }) {
 /* ─────────────────────────────────────────────
    Building data summary banner
 ───────────────────────────────────────────── */
+// Fields critical for each project type (maps to BuildingLookup keys)
+const BUILDING_CRITICAL: Record<string, Set<keyof BuildingLookup>> = {
+  "Renovation Planning":       new Set(["year","eclass","tabula_u_wall","tabula_u_win","use_cat","floors"]),
+  "Energy Community Planning": new Set(["footprint_m2","floors","height","use_cat","eclass","energy"]),
+  "Renewable Energy Planning": new Set(["footprint_m2","floors","height","use_cat"]),
+};
+
+function FieldChip({
+  label, value, critical,
+}: { label: string; value: string | number | null | undefined; critical: boolean }) {
+  const hasVal = value !== null && value !== undefined;
+  const base = "flex flex-col px-2.5 py-2 rounded-lg border text-[11px]";
+  const colors = hasVal
+    ? critical ? "bg-purple-50 border-purple-200 text-purple-900"
+               : "bg-emerald-50 border-emerald-200 text-emerald-800"
+    : critical ? "bg-red-50 border-red-200 text-red-700"
+               : "bg-slate-50 border-slate-200 text-slate-500";
+  return (
+    <div className={`${base} ${colors}`}>
+      <span className="font-semibold leading-tight">{hasVal ? String(value) : "—"}</span>
+      <span className="text-[10px] opacity-70 mt-0.5">{label}{critical && " ★"}</span>
+    </div>
+  );
+}
+
 function BuildingDataBanner({
   building,
   projectType,
-  defs,
-  hasData,
 }: {
   building: BuildingLookup;
   projectType: string | null;
-  defs: DataCategoryDef[];
-  hasData: Record<string, boolean>;
 }) {
-  const critical = projectType ? (CRITICAL_KEYS[projectType] ?? new Set()) : new Set<string>();
-  const allKeys  = defs.flatMap(c => c.items.map(i => i.key));
-  const autoFilled = allKeys.filter(k => {
-    const bKey = FIELD_MAP[k];
-    return bKey && building[bKey] !== null && building[bKey] !== undefined;
-  });
+  const critical = projectType ? (BUILDING_CRITICAL[projectType] ?? new Set<keyof BuildingLookup>()) : new Set<keyof BuildingLookup>();
+  const viewerUrl = `http://127.0.0.1:8765/gothenburg_3d.html?lat=${building.lat}&lon=${building.lon}&zoom=17`;
 
-  const missingCritical = [...critical].filter(k => {
-    const bKey = FIELD_MAP[k];
-    return !bKey || building[bKey] === null || building[bKey] === undefined;
-  });
+  const fields: { key: keyof BuildingLookup; label: string }[] = [
+    { key: "use_cat",       label: "Use" },
+    { key: "year",          label: "Year built" },
+    { key: "floors",        label: "Floors" },
+    { key: "height",        label: "Height (m)" },
+    { key: "footprint_m2",  label: "Footprint (m²)" },
+    { key: "eclass",        label: "Energy class" },
+    { key: "energy",        label: "Energy (kWh/m²)" },
+    { key: "tabula_u_wall", label: "U-wall (W/m²K)" },
+    { key: "tabula_u_win",  label: "U-win (W/m²K)" },
+  ];
+
+  const missingCritical = fields.filter(
+    f => critical.has(f.key) && (building[f.key] === null || building[f.key] === undefined)
+  );
 
   return (
-    <div className="rounded-xl border border-purple-200 bg-purple-50 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-purple-100">
+    <div className="rounded-xl border border-purple-200 bg-white overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-purple-50 border-b border-purple-100">
         <div className="flex items-center gap-2">
-          <span>🏗️</span>
+          <span className="text-base">🏗️</span>
           <span className="text-xs font-semibold text-purple-900">
-            EUBUCCO data pre-filled — {autoFilled.length} parameter{autoFilled.length !== 1 ? "s" : ""} auto-set
+            Building found in EUBUCCO — {building.dist_m} m away
           </span>
           {building.has_epc && (
             <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC ✓</span>
           )}
         </div>
-        <a
-          href="http://127.0.0.1:8765/gothenburg_3d.html"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[11px] font-medium text-purple-700 hover:text-purple-900 underline underline-offset-2 whitespace-nowrap"
-        >
-          📷 3D Inspector →
-        </a>
+        {building.address && <span className="text-[10px] text-purple-700 truncate max-w-[200px]">{building.address}</span>}
       </div>
 
-      {/* Key stats */}
-      <div className="flex flex-wrap gap-x-5 gap-y-1 px-4 py-2.5 text-xs text-purple-800">
-        {building.address && <span>📍 {building.address}</span>}
-        {building.use_cat  && <span>🏢 {building.use_cat}</span>}
-        {building.year     && <span>📅 {building.year}</span>}
-        {building.floors   && <span>⬆ {building.floors} floors</span>}
-        {building.footprint_m2 && <span>📐 {Math.round(building.footprint_m2)} m² footprint</span>}
-        {building.eclass   && <span>⚡ Energy class {building.eclass}</span>}
-        {building.energy   && <span>🔥 {building.energy} kWh/m²</span>}
-        {building.tabula_u_wall && <span>🧱 U-wall {building.tabula_u_wall} W/m²K</span>}
-        {building.tabula_u_win  && <span>🪟 U-win {building.tabula_u_win} W/m²K</span>}
+      {/* Fields grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 p-3">
+        {fields.map(f => (
+          <FieldChip
+            key={String(f.key)}
+            label={f.label}
+            value={building[f.key] as string | number | null}
+            critical={critical.has(f.key)}
+          />
+        ))}
       </div>
 
-      {/* Missing critical data alert */}
+      {/* Missing critical data warning */}
       {missingCritical.length > 0 && (
         <div className="mx-3 mb-3 flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-          <span className="mt-0.5">⚠️</span>
+          <span className="text-sm mt-0.5">⚠️</span>
           <span>
-            <span className="font-semibold">Critical data missing from EUBUCCO for {projectType}.</span>{" "}
-            Check the starred (★) rows below and toggle them off — the system will suggest the best available fallback.
+            <span className="font-semibold">Missing critical data for {projectType}:</span>{" "}
+            {missingCritical.map(f => f.label).join(", ")}.
+            {" "}Check the starred (★) rows below and toggle them off for fallback options.
           </span>
         </div>
       )}
+
+      {/* 3D Inspector link */}
+      <div className="px-3 pb-3">
+        <a href={viewerUrl} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-700 hover:text-purple-900 underline underline-offset-2">
+          📷 Open 3D Facade Inspector →
+        </a>
+      </div>
     </div>
   );
 }
@@ -913,8 +943,6 @@ export default function DataCoverage() {
         <BuildingDataBanner
           building={building}
           projectType={project.projectType}
-          defs={defs}
-          hasData={hasData}
         />
       )}
 
