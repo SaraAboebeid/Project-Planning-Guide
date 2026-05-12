@@ -272,9 +272,9 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "ec_b_orient", label: "Building orientation (°)",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            primarySource: "Gothenburg 3D", primaryConfidence: "High",
             fallbackSource: "Street-level imagery / GIS cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
+            defaultHas: true,
           },
           {
             key: "ec_b_flrs",  label: "Number of floors",
@@ -360,9 +360,9 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "ec_rpv_azimuth", label: "Building orientation (°)",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            primarySource: "Gothenburg 3D", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
+            defaultHas: true,
           },
           {
             key: "ec_rpv_demand", label: "Electricity demand – hourly profile",
@@ -392,9 +392,9 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "ec_fpv_orient", label: "Building orientation (°)",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            primarySource: "Gothenburg 3D", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
+            defaultHas: true,
           },
           {
             key: "ec_fpv_demand", label: "Electricity demand – hourly profile",
@@ -511,9 +511,9 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "re_rpv_azimuth", label: "Building orientation (°)",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            primarySource: "Gothenburg 3D", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
+            defaultHas: true,
           },
           {
             key: "re_rpv_demand", label: "Electricity demand – hourly profile",
@@ -543,9 +543,9 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "re_fpv_orient", label: "Building orientation (°)",
-            primarySource: "Design drawings / Digital model", primaryConfidence: "High",
+            primarySource: "Gothenburg 3D", primaryConfidence: "High",
             fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
+            defaultHas: true,
           },
           {
             key: "re_fpv_demand", label: "Electricity demand – hourly profile",
