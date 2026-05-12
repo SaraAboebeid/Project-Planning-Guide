@@ -446,7 +446,7 @@ export default function DefineProject() {
               <SectionDivider />
               <Label>What is your electricity target?</Label>
               <p className="text-xs text-gray-500 mb-2">
-                Net zero — PV covers 100% of annual demand. Surplus — PV exceeds
+                Energy balance — PV covers 100% of annual demand. Surplus — PV exceeds
                 demand. Partial coverage — PV covers a share.
               </p>
               <div className="flex gap-2">

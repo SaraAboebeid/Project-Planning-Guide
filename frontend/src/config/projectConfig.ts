@@ -267,7 +267,7 @@ export const BUILDING_USES = [
 // ── RE electricity threshold ───────────────────────────────────────────────
 
 export const RE_ELECTRICITY_THRESHOLDS = [
-  "Net zero",
+  "Energy balance",
   "Surplus",
   "Partial coverage",
 ];
