@@ -67,11 +67,11 @@
     /* facade inspector */
     #facade-panel {
       bottom:80px; left:50%; transform:translateX(-50%);
-      width:560px; display:none;
+      width:580px; display:none;
     }
-    #facade-views { display:flex; gap:8px; margin-top:10px; }
+    #facade-views { display:flex; gap:6px; margin-top:10px; }
     .facade-thumb {
-      flex:1; aspect-ratio:4/3; border-radius:8px; overflow:hidden;
+      flex:1; border-radius:8px; overflow:hidden;
       border:2px solid var(--border); cursor:pointer; position:relative;
     }
     .facade-thumb img { width:100%; height:100%; object-fit:cover; }
@@ -251,18 +251,31 @@
 <!-- Facade inspector -->
 <div class="panel" id="facade-panel">
   <h2>&#128247; Facade Inspector</h2>
-  <div class="sub" id="facade-sub">Click a facade view to capture screenshot and estimate WWR</div>
-  <div id="facade-views">
-    <div class="facade-thumb" id="thumb-N"><canvas id="canvas-N" width="200" height="150"></canvas><div class="dir-label">N</div></div>
-    <div class="facade-thumb" id="thumb-E"><canvas id="canvas-E" width="200" height="150"></canvas><div class="dir-label">E</div></div>
-    <div class="facade-thumb" id="thumb-S"><canvas id="canvas-S" width="200" height="150"></canvas><div class="dir-label">S</div></div>
-    <div class="facade-thumb" id="thumb-W"><canvas id="canvas-W" width="200" height="150"></canvas><div class="dir-label">W</div></div>
+  <div class="sub" id="facade-sub">Orbit freely to the angle you want, then click <b>&#128247; Manual Capture</b> — or fly to a cardinal view below</div>
+
+  <!-- Manual capture slot (full-width, prominent) -->
+  <div style="margin-top:10px;position:relative;border-radius:8px;overflow:hidden;border:2px solid #a78bfa;background:#0d0d1a">
+    <canvas id="canvas-manual" width="520" height="200" style="width:100%;height:120px;object-fit:cover;display:block"></canvas>
+    <div style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;background:rgba(114,28,184,0.85);color:#fff;padding:2px 10px;border-radius:4px">Manual View</div>
   </div>
-  <div style="display:flex;gap:8px;margin-top:10px">
-    <button class="btn" id="btn-capture-all" style="flex:1">&#128247; Capture All</button>
-    <button class="btn" id="btn-ai-wwr" style="flex:1">&#129302; AI Estimate</button>
-    <button class="btn" id="btn-exit-inspect" style="flex:1">&#x2715; Exit</button>
+
+  <!-- Cardinal views row -->
+  <div style="font-size:10px;color:#64748b;margin:8px 0 4px">Cardinal views — click to fly &amp; capture:</div>
+  <div id="facade-views" style="display:flex;gap:6px">
+    <div class="facade-thumb" id="thumb-N" style="height:68px"><canvas id="canvas-N" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">N</div></div>
+    <div class="facade-thumb" id="thumb-E" style="height:68px"><canvas id="canvas-E" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">E</div></div>
+    <div class="facade-thumb" id="thumb-S" style="height:68px"><canvas id="canvas-S" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">S</div></div>
+    <div class="facade-thumb" id="thumb-W" style="height:68px"><canvas id="canvas-W" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">W</div></div>
   </div>
+
+  <!-- Action buttons -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px">
+    <button class="btn" id="btn-manual-capture" style="background:rgba(114,28,184,0.4);border-color:#a78bfa;color:#c4b5fd;font-weight:600">&#128247; Manual Capture</button>
+    <button class="btn" id="btn-capture-all">&#9654; Capture All (N/E/S/W)</button>
+    <button class="btn" id="btn-ai-wwr">&#129302; AI Estimate</button>
+    <button class="btn" id="btn-exit-inspect">&#x2715; Exit</button>
+  </div>
+
   <!-- Zoom control -->
   <div style="display:flex;align-items:center;gap:6px;margin-top:8px;justify-content:center">
     <button class="btn" id="btn-zoom-out" style="width:32px;height:28px;padding:0;font-size:16px;line-height:1" title="Zoom out">&#x2212;</button>
@@ -1379,13 +1392,19 @@ document.getElementById('btn-inspect').addEventListener('click', () => {
   document.getElementById('info-panel').style.display = 'none';
   document.getElementById('facade-panel').style.display = 'block';
   document.getElementById('wwr-panel').style.display = 'block';
-  // Clear canvases
+  // Clear cardinal canvases
   for (const d of DIRS) {
     const ctx = document.getElementById('canvas-'+d).getContext('2d');
     ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,200,150);
     ctx.fillStyle = '#475569'; ctx.font = '11px Inter';
     ctx.textAlign = 'center'; ctx.fillText('Click to capture', 100, 75);
   }
+  // Clear manual canvas
+  const mctx = document.getElementById('canvas-manual').getContext('2d');
+  mctx.fillStyle = '#0d0d1a'; mctx.fillRect(0,0,520,200);
+  mctx.fillStyle = '#a78bfa'; mctx.font = '600 13px Inter';
+  mctx.textAlign = 'center'; mctx.fillText('Pan & orbit to your desired angle,', 260, 85);
+  mctx.fillText('then click  📷 Manual Capture', 260, 105);
   // Fly to first facade
   flyToFacade('N');
   // Show heuristic WWR immediately
@@ -1522,6 +1541,20 @@ document.getElementById('btn-capture-all').addEventListener('click', async () =>
 for (const dir of DIRS) {
   document.getElementById('thumb-'+dir).addEventListener('click', () => captureToCanvas(dir));
 }
+
+// Manual capture — snapshot current camera view into the manual canvas immediately
+document.getElementById('btn-manual-capture').addEventListener('click', () => {
+  viewer.render();
+  const src = viewer.canvas;
+  const dst = document.getElementById('canvas-manual');
+  const ctx = dst.getContext('2d');
+  ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, dst.width, dst.height);
+  document.getElementById('facade-sub').textContent = '✓ Manual view captured — click AI Estimate to analyse it';
+  // Flash the border to confirm
+  const border = dst.parentElement;
+  border.style.borderColor = '#4ade80';
+  setTimeout(() => { border.style.borderColor = '#a78bfa'; }, 1200);
+});
 
 function showWWR(wwr, perFacade, source) {
   const isAI = source !== 'heuristic' && source !== 'blended';
@@ -1701,15 +1734,30 @@ function cropFacadeCanvas(srcCanvas) {
 document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
   if (!facadeBuilding) return;
   const canvases = DIRS.map(d => document.getElementById('canvas-' + d));
-  // Check if facades have been captured (not just the initial dark fill #1a1a2e = 26,26,46)
-  const hasCaptured = canvases.some(c => {
+  const manualCanvas = document.getElementById('canvas-manual');
+
+  // Check if anything has been captured: manual canvas (not the placeholder dark-purple #0d0d1a = 13,13,26)
+  // or any cardinal canvas (not the initial #1a1a2e = 26,26,46)
+  const manualCaptured = (() => {
+    const px = manualCanvas.getContext('2d').getImageData(50, 50, 1, 1).data;
+    return !(px[0] === 13 && px[1] === 13 && px[2] === 26);
+  })();
+  const hasCaptured = manualCaptured || canvases.some(c => {
     const px = c.getContext('2d').getImageData(50, 50, 1, 1).data;
     return !(px[0] === 26 && px[1] === 26 && px[2] === 46);
   });
   if (!hasCaptured) {
-    document.getElementById('facade-sub').textContent = 'Capture facades first — click "Capture All"';
+    document.getElementById('facade-sub').textContent = 'Capture first — click "📷 Manual Capture" or a cardinal view';
     return;
   }
+
+  // Build list of canvases to send: prefer manual if captured, otherwise cardinal views
+  const toSend = manualCaptured
+    ? [{ canvas: manualCanvas, dir: 'Manual' }]
+    : canvases.map((c, i) => ({ canvas: c, dir: DIRS[i] })).filter(({ canvas }) => {
+        const px = canvas.getContext('2d').getImageData(50, 50, 1, 1).data;
+        return !(px[0] === 26 && px[1] === 26 && px[2] === 46);
+      });
   const btn = document.getElementById('btn-ai-wwr');
   btn.disabled = true;
   document.getElementById('facade-sub').textContent = 'Sending facade images to AI vision model…';
@@ -1726,13 +1774,13 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
     let source = 'ai';
     let backendAvailable = true;
 
-    for (let i = 0; i < DIRS.length; i++) {
-      const imageBase64 = cropFacadeCanvas(canvases[i]).toDataURL('image/jpeg', 0.82).split(',')[1];
+    for (const { canvas, dir } of toSend) {
+      const imageBase64 = cropFacadeCanvas(canvas).toDataURL('image/jpeg', 0.82).split(',')[1];
       try {
         const resp = await fetch('http://localhost:8000/api/estimate-wwr', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_base64: imageBase64, direction: DIRS[i], building_info: buildingInfo }),
+          body: JSON.stringify({ image_base64: imageBase64, direction: dir, building_info: buildingInfo }),
           signal: AbortSignal.timeout(5000),
         });
         if (resp.ok) {

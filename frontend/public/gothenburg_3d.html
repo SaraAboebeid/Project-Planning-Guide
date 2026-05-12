@@ -67,11 +67,11 @@
     /* facade inspector */
     #facade-panel {
       bottom:80px; left:50%; transform:translateX(-50%);
-      width:560px; display:none;
+      width:580px; display:none;
     }
-    #facade-views { display:flex; gap:8px; margin-top:10px; }
+    #facade-views { display:flex; gap:6px; margin-top:10px; }
     .facade-thumb {
-      flex:1; aspect-ratio:4/3; border-radius:8px; overflow:hidden;
+      flex:1; border-radius:8px; overflow:hidden;
       border:2px solid var(--border); cursor:pointer; position:relative;
     }
     .facade-thumb img { width:100%; height:100%; object-fit:cover; }
@@ -251,22 +251,35 @@
 <!-- Facade inspector -->
 <div class="panel" id="facade-panel">
   <h2>&#128247; Facade Inspector</h2>
-  <div class="sub" id="facade-sub">Click a facade view to capture screenshot and estimate WWR</div>
-  <div id="facade-views">
-    <div class="facade-thumb" id="thumb-N"><canvas id="canvas-N" width="200" height="150"></canvas><div class="dir-label">N</div></div>
-    <div class="facade-thumb" id="thumb-E"><canvas id="canvas-E" width="200" height="150"></canvas><div class="dir-label">E</div></div>
-    <div class="facade-thumb" id="thumb-S"><canvas id="canvas-S" width="200" height="150"></canvas><div class="dir-label">S</div></div>
-    <div class="facade-thumb" id="thumb-W"><canvas id="canvas-W" width="200" height="150"></canvas><div class="dir-label">W</div></div>
+  <div class="sub" id="facade-sub">Orbit freely to the angle you want, then click <b>&#128247; Manual Capture</b> — or fly to a cardinal view below</div>
+
+  <!-- Manual capture slot (full-width, prominent) -->
+  <div style="margin-top:10px;position:relative;border-radius:8px;overflow:hidden;border:2px solid #a78bfa;background:#0d0d1a">
+    <canvas id="canvas-manual" width="520" height="200" style="width:100%;height:120px;object-fit:cover;display:block"></canvas>
+    <div style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;background:rgba(114,28,184,0.85);color:#fff;padding:2px 10px;border-radius:4px">Manual View</div>
   </div>
-  <div style="display:flex;gap:8px;margin-top:10px">
-    <button class="btn" id="btn-capture-all" style="flex:1">&#128247; Capture All</button>
-    <button class="btn" id="btn-ai-wwr" style="flex:1">&#129302; AI Estimate</button>
-    <button class="btn" id="btn-exit-inspect" style="flex:1">&#x2715; Exit</button>
+
+  <!-- Cardinal views row -->
+  <div style="font-size:10px;color:#64748b;margin:8px 0 4px">Cardinal views — click to fly &amp; capture:</div>
+  <div id="facade-views" style="display:flex;gap:6px">
+    <div class="facade-thumb" id="thumb-N" style="height:68px"><canvas id="canvas-N" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">N</div></div>
+    <div class="facade-thumb" id="thumb-E" style="height:68px"><canvas id="canvas-E" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">E</div></div>
+    <div class="facade-thumb" id="thumb-S" style="height:68px"><canvas id="canvas-S" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">S</div></div>
+    <div class="facade-thumb" id="thumb-W" style="height:68px"><canvas id="canvas-W" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">W</div></div>
   </div>
+
+  <!-- Action buttons -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px">
+    <button class="btn" id="btn-manual-capture" style="background:rgba(114,28,184,0.4);border-color:#a78bfa;color:#c4b5fd;font-weight:600">&#128247; Manual Capture</button>
+    <button class="btn" id="btn-capture-all">&#9654; Capture All (N/E/S/W)</button>
+    <button class="btn" id="btn-ai-wwr">&#129302; AI Estimate</button>
+    <button class="btn" id="btn-exit-inspect">&#x2715; Exit</button>
+  </div>
+
   <!-- Zoom control -->
   <div style="display:flex;align-items:center;gap:6px;margin-top:8px;justify-content:center">
     <button class="btn" id="btn-zoom-out" style="width:32px;height:28px;padding:0;font-size:16px;line-height:1" title="Zoom out">&#x2212;</button>
-    <span id="zoom-label" style="font-size:11px;color:var(--muted);min-width:34px;text-align:center">1×</span>
+    <span id="zoom-label" style="font-size:11px;color:var(--muted);min-width:34px;text-align:center">1.0×</span>
     <button class="btn" id="btn-zoom-in"  style="width:32px;height:28px;padding:0;font-size:16px;line-height:1" title="Zoom in">+</button>
     <span style="font-size:10px;color:var(--faint);margin-left:4px">adjust camera distance</span>
   </div>
@@ -446,7 +459,7 @@ async function loadData(){
 
     // Not cached — fetch from local file and store
     setLoadingProgress(10, 'Downloading building data (first time only)…');
-    const resp = await fetch('/buildings.json');
+    const resp = await fetch('./buildings.json');
     setLoadingProgress(60, 'Parsing data…');
     DATA = await resp.json();
     setLoadingProgress(80, 'Saving to local cache…');
@@ -457,7 +470,7 @@ async function loadData(){
   } catch(e) {
     // IndexedDB unavailable — fall back to direct fetch
     setLoadingProgress(10, 'Downloading building data…');
-    const resp = await fetch('/buildings.json');
+    const resp = await fetch('./buildings.json');
     DATA = await resp.json();
     hideLoadingOverlay();
     initViewer();
@@ -556,7 +569,7 @@ function pickBuildingAtScreen(screenPos) {
   if (!Cesium.defined(cart)) return -1;
   const carto = Cesium.Cartographic.fromCartesian(cart);
   if (!Cesium.defined(carto)) return -1;
-  _lastPickTerrainH = carto.height;
+  _lastPickTerrainH = carto.height; // store terrain elevation for flyToFacade
   const lon = Cesium.Math.toDegrees(carto.longitude);
   const lat = Cesium.Math.toDegrees(carto.latitude);
   return findBuildingAtLonLat(lon, lat);
@@ -1235,6 +1248,7 @@ document.getElementById('info-close').addEventListener('click', hideInfoPanel);
 // PV Potential — PVGIS API integration
 // ─────────────────────────────────────────────────────────────────
 
+// Shoelace formula → roof footprint area in m²
 // b.area = Atemp from EPC (total heated floor area across all floors).
 // Atemp / floors = per-floor footprint area — preferred when EPC data is available.
 // Fall back to polygon shoelace if EPC data is missing.
@@ -1257,18 +1271,21 @@ function computeFootprintArea(b) {
   return 0;
 }
 
-const PV_PANEL_W         = 450;
-const PV_PANEL_AREA_M2   = 3.0;
-const PV_USABLE_FRACTION = 0.65;
-const PV_TILT            = 15;
-const PV_AZIMUTH         = 0;
-const PV_LOSS            = 14;
+// Standard 450 W panel, ~2.2 m² physical area.
+// At 15° tilt in Sweden, each panel row needs ~3.0 m² of roof footprint (including spacing).
+// 65% usable roof fraction (setbacks, HVAC, access).
+const PV_PANEL_W         = 450;   // watts
+const PV_PANEL_AREA_M2   = 3.0;   // effective m² per panel incl. row spacing
+const PV_USABLE_FRACTION = 0.65;  // fraction of roof area usable
+const PV_TILT            = 15;    // degrees — common flat-roof angle in Sweden
+const PV_AZIMUTH         = 0;     // 0 = south-facing (optimal)
+const PV_LOSS            = 14;    // % system losses (wiring, inverter, temp)
 
 function computePVCapacity(b) {
-  const roofM2  = computeFootprintArea(b);
-  const usable  = roofM2 * PV_USABLE_FRACTION;
-  const nPanels = Math.floor(usable / PV_PANEL_AREA_M2);
-  const kWp     = +(nPanels * PV_PANEL_W / 1000).toFixed(2);
+  const roofM2   = computeFootprintArea(b);
+  const usable   = roofM2 * PV_USABLE_FRACTION;
+  const nPanels  = Math.floor(usable / PV_PANEL_AREA_M2);
+  const kWp      = +(nPanels * PV_PANEL_W / 1000).toFixed(2);
   return { roofM2: Math.round(roofM2), nPanels, kWp };
 }
 
@@ -1281,10 +1298,10 @@ async function fetchPVGIS(lat, lon, kWp) {
   const data = await resp.json();
   const totals = data.outputs.totals.fixed;
   return {
-    E_y: Math.round(totals.E_y),
-    E_m: Math.round(totals.E_m),
-    Hy:  Math.round(totals['H(i)_y']),
-    specificYield: Math.round(totals.E_y / kWp),
+    E_y:  Math.round(totals.E_y),        // kWh/year
+    E_m:  Math.round(totals.E_m),        // kWh/month avg
+    Hy:   Math.round(totals['H(i)_y']),  // irradiation kWh/m²/year
+    specificYield: Math.round(totals.E_y / kWp), // kWh/kWp
   };
 }
 
@@ -1295,10 +1312,12 @@ document.getElementById('btn-pv').addEventListener('click', async () => {
   btn.disabled = true;
   btn.innerHTML = '&#9728;&#65039; Loading PVGIS…';
   resultEl.style.display = 'none';
+
   try {
     const b = selectedBuilding;
     const { roofM2, nPanels, kWp } = computePVCapacity(b);
     const center = getBuildingCenter(b);
+
     let html = `<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">&#9728;&#65039; PV Potential</div>`;
     html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">`;
     html += `<div style="background:rgba(255,255,255,0.05);border-radius:6px;padding:7px 9px;text-align:center">`;
@@ -1308,6 +1327,7 @@ document.getElementById('btn-pv').addEventListener('click', async () => {
     html += `<div style="font-size:18px;font-weight:700;color:#facc15">${nPanels}</div>`;
     html += `<div style="font-size:10px;color:#94a3b8;margin-top:2px">panels (450 W)</div></div></div>`;
     html += `<div style="font-size:10px;color:#64748b;margin-bottom:8px">Roof: ${roofM2} m² · ${Math.round(roofM2 * PV_USABLE_FRACTION)} m² usable · ${PV_TILT}° tilt</div>`;
+
     try {
       const pv = await fetchPVGIS(center.lat, center.lon, kWp);
       html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">`;
@@ -1318,7 +1338,8 @@ document.getElementById('btn-pv').addEventListener('click', async () => {
       html += `<div style="font-size:20px;font-weight:700;color:#facc15">${pv.specificYield}</div>`;
       html += `<div style="font-size:10px;color:#94a3b8;margin-top:2px">kWh / kWp</div></div></div>`;
       html += `<div style="font-size:10px;color:#64748b">Irradiation: ${pv.Hy} kWh/m²/yr · PVGIS-SARAH2</div>`;
-    } catch (_) {
+    } catch (pvErr) {
+      // Estimate without PVGIS using typical Gothenburg specific yield ~870 kWh/kWp at 15°
       const estYield = Math.round(kWp * 870);
       html += `<div style="background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.2);border-radius:6px;padding:8px 10px;text-align:center;margin-bottom:6px">`;
       html += `<div style="font-size:20px;font-weight:700;color:#facc15">${(estYield/1000).toFixed(1)} MWh/yr</div>`;
@@ -1342,10 +1363,13 @@ let facadeBuilding = null;
 const DIRS = ['N','E','S','W'];
 const DIR_HEADINGS = { N:0, E:90, S:180, W:270 };
 
+// Shoot a ray upward from well below the building to find true ground altitude.
+// _terrainH from pickPosition may be the roof/wall click height, not ground.
 function getGroundAlt(building) {
   const c = getBuildingCenter(building);
   const rough = building._terrainH || 50;
   const bldH  = Math.max(5, building.height || 10);
+  // Start 30m below the lowest possible ground (rough - bldH = ground if click was at roof)
   const startAlt = rough - bldH - 30;
   const startPos = Cesium.Cartesian3.fromDegrees(c.lon, c.lat, startAlt);
   const up = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(
@@ -1354,25 +1378,33 @@ function getGroundAlt(building) {
   if (hit && hit.position) {
     return Cesium.Cartographic.fromCartesian(hit.position).height;
   }
+  // Fallback: assume click was at rooftop level
   return rough - bldH;
 }
 
 document.getElementById('btn-inspect').addEventListener('click', () => {
   if (!selectedBuilding) return;
   facadeBuilding = selectedBuilding;
+  // Detect true ground elevation (pickPosition may have been a rooftop/wall click)
   facadeBuilding._groundH = getGroundAlt(facadeBuilding);
   _facadeZoom = 1.0;
   document.getElementById('zoom-label').textContent = '1×';
   document.getElementById('info-panel').style.display = 'none';
   document.getElementById('facade-panel').style.display = 'block';
   document.getElementById('wwr-panel').style.display = 'block';
-  // Clear canvases
+  // Clear cardinal canvases
   for (const d of DIRS) {
     const ctx = document.getElementById('canvas-'+d).getContext('2d');
     ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,200,150);
     ctx.fillStyle = '#475569'; ctx.font = '11px Inter';
     ctx.textAlign = 'center'; ctx.fillText('Click to capture', 100, 75);
   }
+  // Clear manual canvas
+  const mctx = document.getElementById('canvas-manual').getContext('2d');
+  mctx.fillStyle = '#0d0d1a'; mctx.fillRect(0,0,520,200);
+  mctx.fillStyle = '#a78bfa'; mctx.font = '600 13px Inter';
+  mctx.textAlign = 'center'; mctx.fillText('Pan & orbit to your desired angle,', 260, 85);
+  mctx.fillText('then click  📷 Manual Capture', 260, 105);
   // Fly to first facade
   flyToFacade('N');
   // Show heuristic WWR immediately
@@ -1407,9 +1439,16 @@ function flyToFacade(dir) {
   const r = getBuildingRadius(facadeBuilding);
   _currentFacadeDir = dir;
   const bldH = Math.max(5, facadeBuilding.height || 10);
+  // Use ray-detected ground, not click altitude
   const terrainBase = facadeBuilding._groundH ?? facadeBuilding._terrainH ?? 0;
-  const dist = r * 3.5 / _facadeZoom;
-  const camAlt = terrainBase + bldH * 0.6;
+  // Cesium default vertical FOV is 60°. To fit full building height with 15% margin:
+  // dist = bldH / (2 * tan(30°)) * 1.15  ≈  bldH * 1.0
+  // Also must clear the building footprint width.
+  const distForHeight = bldH * 1.1;
+  const distForWidth  = r * 1.4;
+  const dist = Math.max(distForHeight, distForWidth) / _facadeZoom;
+  // Camera exactly at mid-height, looking straight at the facade (pitch = 0)
+  const camAlt = terrainBase + bldH * 0.5;
   const h = DIR_HEADINGS[dir] * Math.PI / 180;
   const offsetLon = Math.sin(h) * dist / (111320 * Math.cos(c.lat * Math.PI / 180));
   const offsetLat = Math.cos(h) * dist / 111320;
@@ -1417,7 +1456,7 @@ function flyToFacade(dir) {
     destination: Cesium.Cartesian3.fromDegrees(c.lon + offsetLon, c.lat + offsetLat, camAlt),
     orientation: {
       heading: Cesium.Math.toRadians(DIR_HEADINGS[dir] + 180),
-      pitch:   Cesium.Math.toRadians(-5),
+      pitch:   0,
       roll:    0,
     },
     duration: 1.2,
@@ -1503,14 +1542,30 @@ for (const dir of DIRS) {
   document.getElementById('thumb-'+dir).addEventListener('click', () => captureToCanvas(dir));
 }
 
+// Manual capture — snapshot current camera view into the manual canvas immediately
+document.getElementById('btn-manual-capture').addEventListener('click', () => {
+  viewer.render();
+  const src = viewer.canvas;
+  const dst = document.getElementById('canvas-manual');
+  const ctx = dst.getContext('2d');
+  ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, dst.width, dst.height);
+  document.getElementById('facade-sub').textContent = '✓ Manual view captured — click AI Estimate to analyse it';
+  // Flash the border to confirm
+  const border = dst.parentElement;
+  border.style.borderColor = '#4ade80';
+  setTimeout(() => { border.style.borderColor = '#a78bfa'; }, 1200);
+});
+
 function showWWR(wwr, perFacade, source) {
   const isAI = source !== 'heuristic' && source !== 'blended';
   const hVal = heuristicWWR(facadeBuilding);
 
+  // Always update heuristic bar
   document.getElementById('wwr-value-heuristic').textContent = hVal;
   document.getElementById('wwr-bar-heuristic').style.width = Math.min(100, hVal * 1.4) + '%';
 
   if (isAI) {
+    // Show AI section
     document.getElementById('wwr-ai-section').style.display = 'block';
     document.getElementById('wwr-value-ai').textContent = wwr;
     document.getElementById('wwr-bar-ai').style.width = Math.min(100, wwr * 1.4) + '%';
@@ -1520,6 +1575,7 @@ function showWWR(wwr, perFacade, source) {
     document.getElementById('wwr-ai-label').textContent = modelName;
     document.getElementById('wwr-breakdown').innerHTML = '';
 
+    // Per-facade bars
     const perFacadeEl = document.getElementById('wwr-per-facade');
     const rowsEl = document.getElementById('wwr-facades-rows');
     if (perFacade && perFacade.length === 4) {
@@ -1538,6 +1594,7 @@ function showWWR(wwr, perFacade, source) {
       perFacadeEl.style.display = 'none';
     }
   } else {
+    // Heuristic only — hide AI section
     document.getElementById('wwr-ai-section').style.display = 'none';
     document.getElementById('wwr-breakdown').innerHTML = '';
   }
@@ -1642,9 +1699,28 @@ viewer.camera.changed.addEventListener(() => {
 });
 
 // ─────────────────────────────────────────────────────────────────
+// Heuristic WWR fallback (mirrors backend logic, no server needed)
+// ─────────────────────────────────────────────────────────────────
+function wwrHeuristic(buildingInfo) {
+  const use = (buildingInfo && buildingInfo.use) || 'ovrigt';
+  const year = (buildingInfo && buildingInfo.year) || 1980;
+  const eclass = (buildingInfo && buildingInfo.eclass) || 'D';
+  const useBase = {
+    bostad_enfamilj: 18, bostad_flerfamilj: 28,
+    verksamhet: 45, industri: 10, samhalle: 38,
+    komplement: 5, ovrigt: 22,
+  }[use] ?? 22;
+  const eraAdj = year < 1960 ? -3 : year < 1976 ? 0 : year < 1996 ? 2 : 5;
+  const eclassAdj = {A:5, B:3, C:1, D:0, E:-1, F:-2, G:-3}[eclass] ?? 0;
+  return Math.max(5, Math.min(75, useBase + eraAdj + eclassAdj));
+}
+
+// ─────────────────────────────────────────────────────────────────
 // AI WWR estimation via backend GPT-4o vision endpoint
+// Falls back to JS heuristic when backend is unavailable
 // ─────────────────────────────────────────────────────────────────
 // Crop canvas to centre region so AI only sees the target building facade
+// Removes sky (top 20%), ground (bottom 20%), side clutter (left/right 15%)
 function cropFacadeCanvas(srcCanvas) {
   const sw = srcCanvas.width, sh = srcCanvas.height;
   const cx = Math.round(sw * 0.15), cy = Math.round(sh * 0.20);
@@ -1658,48 +1734,83 @@ function cropFacadeCanvas(srcCanvas) {
 document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
   if (!facadeBuilding) return;
   const canvases = DIRS.map(d => document.getElementById('canvas-' + d));
-  // Check if facades have been captured (not just the initial dark fill #1a1a2e = 26,26,46)
-  const hasCaptured = canvases.some(c => {
+  const manualCanvas = document.getElementById('canvas-manual');
+
+  // Check if anything has been captured: manual canvas (not the placeholder dark-purple #0d0d1a = 13,13,26)
+  // or any cardinal canvas (not the initial #1a1a2e = 26,26,46)
+  const manualCaptured = (() => {
+    const px = manualCanvas.getContext('2d').getImageData(50, 50, 1, 1).data;
+    return !(px[0] === 13 && px[1] === 13 && px[2] === 26);
+  })();
+  const hasCaptured = manualCaptured || canvases.some(c => {
     const px = c.getContext('2d').getImageData(50, 50, 1, 1).data;
     return !(px[0] === 26 && px[1] === 26 && px[2] === 46);
   });
   if (!hasCaptured) {
-    document.getElementById('facade-sub').textContent = 'Capture facades first — click "Capture All"';
+    document.getElementById('facade-sub').textContent = 'Capture first — click "📷 Manual Capture" or a cardinal view';
     return;
   }
+
+  // Build list of canvases to send: prefer manual if captured, otherwise cardinal views
+  const toSend = manualCaptured
+    ? [{ canvas: manualCanvas, dir: 'Manual' }]
+    : canvases.map((c, i) => ({ canvas: c, dir: DIRS[i] })).filter(({ canvas }) => {
+        const px = canvas.getContext('2d').getImageData(50, 50, 1, 1).data;
+        return !(px[0] === 26 && px[1] === 26 && px[2] === 46);
+      });
   const btn = document.getElementById('btn-ai-wwr');
   btn.disabled = true;
   document.getElementById('facade-sub').textContent = 'Sending facade images to AI vision model…';
+
+  const buildingInfo = {
+    address: facadeBuilding.address || '',
+    year: facadeBuilding.year || null,
+    use: facadeBuilding.use_cat || '',
+    eclass: facadeBuilding.eclass || null,
+  };
+
   try {
     const results = [];
-    for (let i = 0; i < DIRS.length; i++) {
-      const imageBase64 = cropFacadeCanvas(canvases[i]).toDataURL('image/jpeg', 0.82).split(',')[1];
-      const resp = await fetch('http://localhost:8000/api/estimate-wwr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_base64: imageBase64,
-          direction: DIRS[i],
-          building_info: {
-            address: facadeBuilding.address || '',
-            year: facadeBuilding.year || null,
-            use: facadeBuilding.use_cat || '',
-            eclass: facadeBuilding.eclass || null,
-          },
-        }),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.wwr !== undefined && data.wwr !== null) results.push(Math.round(data.wwr));
+    let source = 'ai';
+    let backendAvailable = true;
+
+    for (const { canvas, dir } of toSend) {
+      const imageBase64 = cropFacadeCanvas(canvas).toDataURL('image/jpeg', 0.82).split(',')[1];
+      try {
+        const resp = await fetch('http://localhost:8000/api/estimate-wwr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_base64: imageBase64, direction: dir, building_info: buildingInfo }),
+          signal: AbortSignal.timeout(5000),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.wwr !== undefined && data.wwr !== null) {
+            results.push(Math.round(data.wwr));
+            source = data.source || 'ai';
+          }
+        } else {
+          backendAvailable = false;
+          break;
+        }
+      } catch (_) {
+        backendAvailable = false;
+        break;
       }
     }
-    if (results.length > 0) {
-      const avg = Math.round(results.reduce((a, b) => a + b, 0) / results.length);
-      showWWR(avg, results, 'gpt-4.1');
-      document.getElementById('facade-sub').textContent = 'AI estimation complete ✓';
+
+    if (!backendAvailable || results.length === 0) {
+      // JS heuristic fallback — same formula as backend Python code
+      const h = wwrHeuristic(buildingInfo);
+      DIRS.forEach(() => results.push(h));
+      source = 'heuristic';
+      document.getElementById('facade-sub').textContent = 'Backend offline — using archetype heuristic ✓';
     } else {
-      document.getElementById('facade-sub').textContent = 'AI unavailable — check backend /api/estimate-wwr';
+      document.getElementById('facade-sub').textContent = 'AI estimation complete ✓';
     }
+
+    const avg = Math.round(results.reduce((a, b) => a + b, 0) / results.length);
+    showWWR(avg, results, source === 'heuristic' ? 'heuristic' : source);
   } catch (err) {
     document.getElementById('facade-sub').textContent = 'Error: ' + err.message;
   } finally {
