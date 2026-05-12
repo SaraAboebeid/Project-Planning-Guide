@@ -85,7 +85,7 @@
 
     /* wwr result */
     #wwr-panel {
-      bottom:80px; right:16px; width:220px; display:none;
+      bottom:80px; right:16px; width:260px; display:none;
     }
     .wwr-bar-wrap { margin:8px 0 4px; height:10px; border-radius:5px;
                      background:rgba(255,255,255,0.08); overflow:hidden; }
@@ -268,6 +268,11 @@
   <div class="wwr-value" id="wwr-value">–</div>
   <span class="wwr-unit">% average across facades</span>
   <div class="wwr-bar-wrap"><div class="wwr-bar" id="wwr-bar" style="width:0%"></div></div>
+  <!-- Per-facade breakdown bars -->
+  <div id="wwr-per-facade" style="margin-top:10px;display:none">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Per facade</div>
+    <div id="wwr-facades-rows"></div>
+  </div>
   <div id="wwr-breakdown" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
   <div style="margin-top:8px;font-size:10px;color:var(--faint)">
     Heuristic based on TABULA archetype · era · energy class.<br>
@@ -1334,13 +1339,32 @@ for (const dir of DIRS) {
 function showWWR(wwr, perFacade, source) {
   document.getElementById('wwr-value').textContent = wwr;
   document.getElementById('wwr-bar').style.width = Math.min(100, wwr * 1.4) + '%';
-  let breakdown = source === 'heuristic'
-    ? 'Source: TABULA archetype heuristic'
-    : 'Source: blended (visual + heuristic)';
-  if (perFacade) {
-    breakdown += '<br>Per facade: ' + DIRS.map((d,i) => d+':'+perFacade[i]+'%').join(' ');
+  let sourceLabel = source === 'heuristic'
+    ? 'Archetype heuristic (era · use · EPC)'
+    : source === 'blended'
+    ? 'Blended (visual + heuristic)'
+    : source.includes('claude') ? 'Claude Vision'
+    : source.includes('gpt')   ? 'GPT-4o Vision'
+    : 'AI Vision';
+  document.getElementById('wwr-breakdown').innerHTML = 'Source: ' + sourceLabel;
+
+  const perFacadeEl = document.getElementById('wwr-per-facade');
+  const rowsEl = document.getElementById('wwr-facades-rows');
+  if (perFacade && perFacade.length === 4) {
+    rowsEl.innerHTML = DIRS.map((d, i) => {
+      const v = perFacade[i];
+      const barW = Math.min(100, v * 1.4);
+      return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">' +
+        '<span style="width:14px;font-size:11px;font-weight:600;color:var(--lime)">' + d + '</span>' +
+        '<div style="flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden">' +
+        '<div style="width:' + barW + '%;height:100%;border-radius:4px;background:linear-gradient(90deg,#7c3aed,#a78bfa)"></div></div>' +
+        '<span style="width:32px;text-align:right;font-size:11px;color:var(--text)">' + v + '%</span>' +
+        '</div>';
+    }).join('');
+    perFacadeEl.style.display = 'block';
+  } else {
+    perFacadeEl.style.display = 'none';
   }
-  document.getElementById('wwr-breakdown').innerHTML = breakdown;
 }
 
 document.getElementById('btn-exit-inspect').addEventListener('click', () => {
@@ -1444,6 +1468,17 @@ viewer.camera.changed.addEventListener(() => {
 // ─────────────────────────────────────────────────────────────────
 // AI WWR estimation via backend GPT-4o vision endpoint
 // ─────────────────────────────────────────────────────────────────
+// Crop canvas to centre region so AI only sees the target building facade
+function cropFacadeCanvas(srcCanvas) {
+  const sw = srcCanvas.width, sh = srcCanvas.height;
+  const cx = Math.round(sw * 0.15), cy = Math.round(sh * 0.20);
+  const cw = Math.round(sw * 0.70), ch = Math.round(sh * 0.60);
+  const dst = document.createElement('canvas');
+  dst.width = cw; dst.height = ch;
+  dst.getContext('2d').drawImage(srcCanvas, cx, cy, cw, ch, 0, 0, cw, ch);
+  return dst;
+}
+
 document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
   if (!facadeBuilding) return;
   const canvases = DIRS.map(d => document.getElementById('canvas-' + d));
@@ -1462,7 +1497,7 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
   try {
     const results = [];
     for (let i = 0; i < DIRS.length; i++) {
-      const imageBase64 = canvases[i].toDataURL('image/jpeg', 0.75).split(',')[1];
+      const imageBase64 = cropFacadeCanvas(canvases[i]).toDataURL('image/jpeg', 0.82).split(',')[1];
       const resp = await fetch('http://localhost:8000/api/estimate-wwr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1484,10 +1519,7 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
     }
     if (results.length > 0) {
       const avg = Math.round(results.reduce((a, b) => a + b, 0) / results.length);
-      showWWR(avg, results, 'ai');
-      document.getElementById('wwr-breakdown').innerHTML =
-        'Source: GPT-4o Vision AI &#129302;<br>' +
-        'Per facade: ' + DIRS.slice(0, results.length).map((d, i) => d + ':' + results[i] + '%').join(' ');
+      showWWR(avg, results, 'gpt');
       document.getElementById('facade-sub').textContent = 'AI estimation complete ✓';
     } else {
       document.getElementById('facade-sub').textContent = 'AI unavailable — check backend /api/estimate-wwr';
