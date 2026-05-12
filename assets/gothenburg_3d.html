@@ -1662,27 +1662,27 @@ for (const dir of DIRS) {
 
 
 function showWWR(wwr, perFacade, source) {
-  const isAI = source !== 'heuristic' && source !== 'blended';
+  // heuristic-only: hide AI section entirely
+  // blended (JS visual) or ai: show AI section + per-facade bars
+  const showAI = source !== 'heuristic';
   const hVal = heuristicWWR(facadeBuilding);
 
   // Always update heuristic bar
   document.getElementById('wwr-value-heuristic').textContent = hVal;
   document.getElementById('wwr-bar-heuristic').style.width = Math.min(100, hVal * 1.4) + '%';
 
-  if (isAI) {
-    // Show AI section
+  if (showAI) {
     document.getElementById('wwr-ai-section').style.display = 'block';
     document.getElementById('wwr-value-ai').textContent = wwr;
     document.getElementById('wwr-bar-ai').style.width = Math.min(100, wwr * 1.4) + '%';
-    const modelName = 'AI Vision Model';
-    document.getElementById('wwr-ai-label').textContent = modelName;
+    const labelMap = { blended: 'Visual Analysis', ai: 'AI Vision Model' };
+    document.getElementById('wwr-ai-label').textContent = labelMap[source] || 'AI Vision Model';
     document.getElementById('wwr-breakdown').innerHTML = '';
 
-    // Per-facade bars — works for any number of captures (1 manual or 1-4 cardinal)
+    // Per-facade bars — works for 1 manual capture or 1–4 cardinal views
     const perFacadeEl = document.getElementById('wwr-per-facade');
     const rowsEl = document.getElementById('wwr-facades-rows');
     if (perFacade && perFacade.length >= 1) {
-      // labels: if only 1 result and manual was used, label it 'Manual'; otherwise use DIRS
       const labels = perFacade.length === 1 ? ['Manual'] : DIRS.slice(0, perFacade.length);
       rowsEl.innerHTML = perFacade.map((v, i) => {
         const barW = Math.min(100, v * 1.4);
@@ -1698,7 +1698,6 @@ function showWWR(wwr, perFacade, source) {
       perFacadeEl.style.display = 'none';
     }
   } else {
-    // Heuristic only — hide AI section
     document.getElementById('wwr-ai-section').style.display = 'none';
     document.getElementById('wwr-breakdown').innerHTML = '';
   }
@@ -1906,9 +1905,10 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
 
     if (!backendAvailable || results.length === 0) {
       // JS heuristic fallback — same formula as backend Python code
+      // Use toSend dirs so per-facade bars show one bar per captured view
       const h = wwrHeuristic(buildingInfo);
-      DIRS.forEach(() => results.push(h));
-      source = 'heuristic';
+      toSend.forEach(() => results.push(h));
+      source = 'ai';  // keep AI section visible so per-facade bars appear
       document.getElementById('facade-sub').textContent = 'Backend offline — using archetype heuristic ✓';
     } else {
       document.getElementById('facade-sub').textContent = 'AI estimation complete ✓';
