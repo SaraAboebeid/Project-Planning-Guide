@@ -31,6 +31,10 @@
     .panel h2 {
       font-size:11px; font-weight:700; color:var(--lime);
       text-transform:uppercase; letter-spacing:.7px; margin-bottom:4px;
+      cursor:grab; user-select:none;
+    }
+    .panel h2::before {
+      content:'⠿ '; opacity:.35; font-size:13px; vertical-align:-1px;
     }
     .panel .sub { font-size:11px; color:var(--muted); margin-bottom:10px; }
 
@@ -1920,6 +1924,50 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
 });
 
 }
+
+// ── Draggable panels ─────────────────────────────────────────────────────────
+// Grab the h2 title bar of any .panel to move it freely around the screen.
+(function () {
+  function makeDraggable(panel) {
+    const handle = panel.querySelector('h2');
+    if (!handle) return;
+    handle.style.cursor = 'grab';
+    handle.title = 'Drag to move';
+
+    let ox = 0, oy = 0;   // offset from pointer to panel top-left
+
+    function onMouseMove(e) {
+      panel.style.left   = (e.clientX - ox) + 'px';
+      panel.style.top    = (e.clientY - oy) + 'px';
+    }
+
+    function onMouseUp() {
+      handle.style.cursor = 'grab';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup',   onMouseUp);
+    }
+
+    handle.addEventListener('mousedown', e => {
+      // Materialise current position (handles transform-based centering too)
+      const r = panel.getBoundingClientRect();
+      panel.style.position  = 'fixed';   // switch to fixed so it stays put on scroll
+      panel.style.left      = r.left + 'px';
+      panel.style.top       = r.top  + 'px';
+      panel.style.bottom    = 'auto';
+      panel.style.right     = 'auto';
+      panel.style.transform = 'none';
+      ox = e.clientX - r.left;
+      oy = e.clientY - r.top;
+      handle.style.cursor = 'grabbing';
+      e.preventDefault();
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup',   onMouseUp);
+    });
+  }
+
+  // Apply to all panels
+  document.querySelectorAll('.panel').forEach(makeDraggable);
+}());
 </script>
 </body>
 </html>
