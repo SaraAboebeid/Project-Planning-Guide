@@ -259,6 +259,13 @@
     <button class="btn" id="btn-ai-wwr" style="flex:1">&#129302; AI Estimate</button>
     <button class="btn" id="btn-exit-inspect" style="flex:1">&#x2715; Exit</button>
   </div>
+  <!-- Zoom control -->
+  <div style="display:flex;align-items:center;gap:6px;margin-top:8px;justify-content:center">
+    <button class="btn" id="btn-zoom-out" style="width:32px;height:28px;padding:0;font-size:16px;line-height:1" title="Zoom out">&#x2212;</button>
+    <span id="zoom-label" style="font-size:11px;color:var(--muted);min-width:34px;text-align:center">1×</span>
+    <button class="btn" id="btn-zoom-in"  style="width:32px;height:28px;padding:0;font-size:16px;line-height:1" title="Zoom in">+</button>
+    <span style="font-size:10px;color:var(--faint);margin-left:4px">adjust camera distance</span>
+  </div>
 </div>
 
 <!-- WWR result panel -->
@@ -1211,6 +1218,8 @@ const DIR_HEADINGS = { N:0, E:90, S:180, W:270 };
 document.getElementById('btn-inspect').addEventListener('click', () => {
   if (!selectedBuilding) return;
   facadeBuilding = selectedBuilding;
+  _facadeZoom = 1.0;
+  document.getElementById('zoom-label').textContent = '1×';
   document.getElementById('info-panel').style.display = 'none';
   document.getElementById('facade-panel').style.display = 'block';
   document.getElementById('wwr-panel').style.display = 'block';
@@ -1246,11 +1255,15 @@ function getBuildingRadius(b) {
   return Math.max(15, maxDeg * 111320 * Math.cos(c.lat * Math.PI / 180));
 }
 
+let _facadeZoom = 1.0;
+let _currentFacadeDir = 'N';
+
 function flyToFacade(dir) {
   if (!facadeBuilding) return;
   const c = getBuildingCenter(facadeBuilding);
   const r = getBuildingRadius(facadeBuilding);
-  const dist = r * 3.5;
+  _currentFacadeDir = dir;
+  const dist = r * 3.5 / _facadeZoom;
   const h = DIR_HEADINGS[dir] * Math.PI / 180;
   const offsetLon = Math.sin(h) * dist / (111320 * Math.cos(c.lat * Math.PI/180));
   const offsetLat = Math.cos(h) * dist / 111320;
@@ -1270,6 +1283,17 @@ function flyToFacade(dir) {
   for (const d of DIRS) document.getElementById('thumb-'+d).classList.remove('active');
   document.getElementById('thumb-'+dir).classList.add('active');
 }
+
+document.getElementById('btn-zoom-in').addEventListener('click', () => {
+  _facadeZoom = Math.min(5.0, parseFloat((_facadeZoom + 0.25).toFixed(2)));
+  document.getElementById('zoom-label').textContent = _facadeZoom.toFixed(2).replace(/\.?0+$/, '') + '×';
+  flyToFacade(_currentFacadeDir);
+});
+document.getElementById('btn-zoom-out').addEventListener('click', () => {
+  _facadeZoom = Math.max(0.25, parseFloat((_facadeZoom - 0.25).toFixed(2)));
+  document.getElementById('zoom-label').textContent = _facadeZoom.toFixed(2).replace(/\.?0+$/, '') + '×';
+  flyToFacade(_currentFacadeDir);
+});
 
 // Capture facade
 function captureToCanvas(dir) {
