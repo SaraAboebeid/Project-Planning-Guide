@@ -359,9 +359,9 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "ec_rpv_tilt", label: "Roof tilt (°)",
+            key: "ec_rpv_tilt", label: "Roof tilt",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "— (measure on site or from BIM/drawings)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            fallbackSource: "Gothenburg 3D (visual estimate from 3D model)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
@@ -510,9 +510,9 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             defaultHas: false,
           },
           {
-            key: "re_rpv_tilt", label: "Roof tilt (°)",
+            key: "re_rpv_tilt", label: "Roof tilt",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "— (measure on site or from BIM/drawings)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
+            fallbackSource: "Gothenburg 3D (visual estimate from 3D model)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
