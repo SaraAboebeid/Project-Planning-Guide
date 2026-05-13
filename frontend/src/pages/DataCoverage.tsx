@@ -355,7 +355,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           {
             key: "ec_rpv_tilt", label: "Roof tilt (°)",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            fallbackSource: "— (measure on site or from BIM/drawings)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
             defaultHas: false,
           },
           {
@@ -506,7 +506,7 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           {
             key: "re_rpv_tilt", label: "Roof tilt (°)",
             primarySource: "Design drawings / Digital model", primaryConfidence: "High",
-            fallbackSource: "Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            fallbackSource: "— (measure on site or from BIM/drawings)", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "User input",
             defaultHas: false,
           },
           {
@@ -601,21 +601,22 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
 ───────────────────────────────────────────── */
 type BKey = keyof BuildingLookup;
 
-// Which EUBUCCO field (non-null) proves a DataCoverage item is available
+// Which EUBUCCO field (non-null / boolean-true) proves a DataCoverage item is available
 const FIELD_MAP: Record<string, BKey> = {
   // Renovation Planning
   r_fp:    "footprint_m2",
   r_hgt:   "height",
   r_flrs:  "floors",
   r_use:   "use_cat",
-  r_mat:   "tabula_u_wall",   // if u_wall known → archetype/materials known
+  r_mat:   "tabula_period",  // TABULA matched → construction type/materials known
   // EC – Buildings
   ec_b_fp:    "footprint_m2",
   ec_b_hgt:   "height",
   ec_b_flrs:  "floors",
   ec_b_use:   "use_cat",
-  ec_b_mat:   "tabula_u_wall",
-  ec_b_hvac:  "eclass",       // eclass implies EPC → system info likely
+  ec_b_mat:   "tabula_period", // TABULA matched → construction materials known
+  ec_b_hvac:  "has_epc",      // EPC registered → HVAC type is documented
+  ec_b_hcdem: "energy",       // EPC energy value (kWh/m²·yr) → heating demand available
   ec_be_fp:   "footprint_m2",
   ec_be_hgt:  "height",
   ec_be_use:  "use_cat",
@@ -627,6 +628,13 @@ const FIELD_MAP: Record<string, BKey> = {
   re_fpv_area: "height",
 };
 
+/** Check if a BuildingLookup field is truthy (handles boolean has_epc correctly) */
+function bKeyPresent(building: BuildingLookup, bKey: BKey): boolean {
+  const val = building[bKey];
+  if (typeof val === "boolean") return val === true;
+  return val !== null && val !== undefined;
+}
+
 // Build initial hasData state from EUBUCCO building (auto-fills available fields)
 function initFromBuilding(
   defs: DataCategoryDef[],
@@ -635,7 +643,7 @@ function initFromBuilding(
   const init: Record<string, boolean> = {};
   defs.forEach(cat => cat.items.forEach(i => {
     const bKey = FIELD_MAP[i.key];
-    const fromBuilding = bKey && building && building[bKey] !== null && building[bKey] !== undefined;
+    const fromBuilding = bKey && building && bKeyPresent(building, bKey);
     init[i.key] = fromBuilding ? true : i.defaultHas;
   }));
   return init;
@@ -648,7 +656,7 @@ function initFromBuildings(
   const init: Record<string, boolean> = {};
   defs.forEach(cat => cat.items.forEach(i => {
     const bKey = FIELD_MAP[i.key];
-    const fromAny = bKey && buildings.some(b => b[bKey] !== null && b[bKey] !== undefined);
+    const fromAny = bKey && buildings.some(b => bKeyPresent(b, bKey));
     init[i.key] = fromAny ? true : i.defaultHas;
   }));
   return init;
@@ -664,7 +672,9 @@ function buildingFieldDisplay(b: BuildingLookup, bKey: BKey): string | null {
   if (bKey === "use_cat")      return String(v);
   if (bKey === "tabula_u_wall") return `U=${(v as number).toFixed(2)} W/m²K`;
   if (bKey === "tabula_u_win")  return `U-win=${(v as number).toFixed(2)} W/m²K`;
+  if (bKey === "tabula_period") return `TABULA ${String(v)}`;
   if (bKey === "eclass")       return `Class ${v}`;
+  if (bKey === "has_epc")      return v === true ? "EPC registered" : null as unknown as string;
   if (bKey === "year")         return String(v);
   if (bKey === "energy")       return `${Math.round(v as number)} kWh/m²·yr`;
   return String(v);
@@ -675,8 +685,8 @@ function buildingShortName(b: BuildingLookup, idx: number): string {
 }
 
 // Build initial hasData state from BboxStats (auto-fills fields covered by aggregate data)
-// Bbox provides: footprint, height, floors, use_cat — mark those as available
-const BBOX_COVERED_BKEYS = new Set<BKey>(["footprint_m2", "height", "floors", "use_cat"]);
+// Bbox provides: footprint, height, floors, use_cat, energy, epc coverage
+const BBOX_COVERED_BKEYS = new Set<BKey>(["footprint_m2", "height", "floors", "use_cat", "energy", "has_epc", "tabula_period"]);
 function initFromBboxStats(
   defs: DataCategoryDef[],
   _stats: BboxStats | null,
@@ -701,20 +711,28 @@ function bboxSourceText(key: string, bboxStats: BboxStats | null): string | null
 
 // Format actual EUBUCCO value for display in source column
 const EUBUCCO_LABELS: Partial<Record<BKey, { label: string; unit?: string }>> = {
-  footprint_m2:  { label: "footprint",   unit: "m²" },
-  height:        { label: "height",      unit: "m" },
+  footprint_m2:  { label: "footprint",        unit: "m²" },
+  height:        { label: "height",           unit: "m" },
   floors:        { label: "floors" },
   use_cat:       { label: "use" },
-  tabula_u_wall: { label: "U-wall",      unit: "W/m²K" },
-  tabula_u_win:  { label: "U-win",       unit: "W/m²K" },
+  tabula_u_wall: { label: "U-wall",           unit: "W/m²K" },
+  tabula_u_win:  { label: "U-win",            unit: "W/m²K" },
+  tabula_period: { label: "TABULA archetype" },
   eclass:        { label: "energy class" },
-  energy:        { label: "energy use",  unit: "kWh/m²" },
+  has_epc:       { label: "EPC" },
+  energy:        { label: "energy use",       unit: "kWh/m²" },
 };
 
 function eubuccoSourceText(key: string, building: BuildingLookup | null): string | null {
   if (!building) return null;
   const bKey = FIELD_MAP[key] as BKey | undefined;
   if (!bKey) return null;
+  // Boolean fields: only truthy value is meaningful
+  if (typeof building[bKey] === "boolean") {
+    if (!bKeyPresent(building, bKey)) return null;
+    const meta = EUBUCCO_LABELS[bKey];
+    return `EUBUCCO — ${meta?.label ?? String(bKey)}`;
+  }
   const val = building[bKey];
   if (val === null || val === undefined) return null;
   const meta = EUBUCCO_LABELS[bKey];
