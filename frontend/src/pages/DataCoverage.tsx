@@ -294,18 +294,24 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             fallbackSource: "TABULA archetype model (by construction year & type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
-          {
+          ...(ecEnergyFocus.includes("Heating") || ecEnergyFocus.includes("Cooling") ? [{
             key: "ec_b_hvac",  label: "HVAC system type",
-            primarySource: "Building energy declaration / inspection", primaryConfidence: "High",
-            fallbackSource: "Boverket building stock statistics (dominant system by era & type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            primarySource: "Building energy declaration / inspection", primaryConfidence: "High" as Confidence,
+            fallbackSource: "Boverket building stock statistics (dominant system by era & type)", fallbackStatus: "Estimated" as const, fallbackConfidence: "Medium" as Confidence, fallbackAction: "Review" as Action,
             defaultHas: false,
-          },
-          {
-            key: "ec_b_hcdem", label: "Heating / cooling demand",
-            primarySource: "Smart meter / district heating metering data", primaryConfidence: "High",
-            fallbackSource: "EPC national average heat demand by building type (Boverket)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+          }] : []),
+          ...(ecEnergyFocus.includes("Heating") ? [{
+            key: "ec_b_hdem",  label: "Heating demand",
+            primarySource: "Smart meter / district heating metering data", primaryConfidence: "High" as Confidence,
+            fallbackSource: "EPC national average heat demand by building type (Boverket)", fallbackStatus: "Estimated" as const, fallbackConfidence: "Medium" as Confidence, fallbackAction: "Review" as Action,
             defaultHas: false,
-          },
+          }] : []),
+          ...(ecEnergyFocus.includes("Cooling") ? [{
+            key: "ec_b_cdem",  label: "Cooling demand",
+            primarySource: "Smart meter / cooling meter data", primaryConfidence: "High" as Confidence,
+            fallbackSource: "— (cooling demand not in EPC; requires measurement or simulation)", fallbackStatus: "Missing" as const, fallbackConfidence: "—" as Confidence, fallbackAction: "User input" as Action,
+            defaultHas: false,
+          }] : []),
         ],
       });
     }
@@ -616,7 +622,9 @@ const FIELD_MAP: Record<string, BKey> = {
   ec_b_use:   "use_cat",
   ec_b_mat:   "tabula_period", // TABULA matched → construction materials known
   ec_b_hvac:  "has_epc",      // EPC registered → HVAC type is documented
-  ec_b_hcdem: "energy",       // EPC energy value (kWh/m²·yr) → heating demand available
+  ec_b_hcdem: "energy",       // legacy key (kept for safety)
+  ec_b_hdem:  "energy",       // heating demand → from EPC energy value
+  // ec_b_cdem has no EUBUCCO fallback (cooling not in EPC)
   ec_be_fp:   "footprint_m2",
   ec_be_hgt:  "height",
   ec_be_use:  "use_cat",
