@@ -1169,6 +1169,27 @@ function setLoading(msg) {
     return;
   }
 
+  // Multi-address mode: ?points=lat,lon|lat,lon|… — fly to centroid
+  const pointsParam = p.get('points');
+  if (pointsParam) {
+    const pts = pointsParam.split('|').map(s => s.split(',').map(Number)).filter(p => p.length === 2 && !isNaN(p[0]) && !isNaN(p[1]));
+    if (pts.length > 0) {
+      const cLat = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+      const cLon = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+      // Altitude: closer for single point, further for spread-out multi
+      const spread = pts.length > 1
+        ? Math.max(...pts.map(p => Math.abs(p[0]-cLat) + Math.abs(p[1]-cLon))) * 111000
+        : 0;
+      const alt = Math.max(200, Math.min(2000, spread * 3 + 300));
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(cLon, cLat, alt),
+        orientation: { heading:0, pitch: Cesium.Math.toRadians(-45), roll:0 },
+        duration: 0,
+      });
+      return;
+    }
+  }
+
   // Address/point mode: ?lat=&lon=&zoom= (zoom optional, default 17 → ~200m altitude)
   const lat  = parseFloat(p.get('lat')  || '');
   const lon  = parseFloat(p.get('lon')  || '');
@@ -2015,7 +2036,7 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image_base64: imageBase64, direction: dir, building_info: buildingInfo }),
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(60000),
         });
         if (resp.ok) {
           const data = await resp.json();
