@@ -1,0 +1,22 @@
+[
+  {
+    "lat": 0.0,
+    "lon": 0.0,
+    "address": "Fagottgatan 4",
+    "average_wwr": 35,
+    "per_facade": [
+      35
+    ],
+    "directions": [
+      "Manual"
+    ],
+    "source": "gpt-4.1-vision",
+    "building_info": {
+      "address": "Fagottgatan 4",
+      "year": 1962,
+      "use": "bostad_flerfamilj",
+      "eclass": "E"
+    },
+    "saved_at": "2026-05-13T11:37:48.872433Z"
+  }
+]

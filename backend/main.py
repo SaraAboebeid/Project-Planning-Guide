@@ -36,11 +36,22 @@ app.add_middleware(
 _BUILDINGS_GZ: bytes | None = None
 _BUILDINGS_LIST: list | None = None
 
+def _sanitize(obj):
+    """Recursively replace NaN/Inf floats with None so JSON serialization never fails."""
+    if isinstance(obj, float) and (obj != obj or obj == float("inf") or obj == float("-inf")):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    return obj
+
 def _get_buildings_list() -> list:
     global _BUILDINGS_LIST
     if _BUILDINGS_LIST is None:
         data_path = PROJECT_ROOT / "frontend" / "public" / "buildings.json"
-        _BUILDINGS_LIST = json.loads(data_path.read_bytes())
+        raw = json.loads(data_path.read_text(encoding="utf-8-sig"))
+        _BUILDINGS_LIST = _sanitize(raw)
     return _BUILDINGS_LIST
 
 def _load_buildings() -> bytes:
@@ -231,6 +242,12 @@ def _polygon_centroid(coords: list) -> tuple[float, float]:
     c_lat = sum(c[1] for c in ring) / len(ring)
     return (c_lat, c_lon)
 
+def _clean(v):
+    """Convert NaN/Inf floats to None so FastAPI can JSON-serialize them."""
+    if isinstance(v, float) and (v != v or v == float("inf") or v == float("-inf")):
+        return None
+    return v
+
 def _shoelace_m2(coords: list) -> float | None:
     ring = coords[0] if coords else []
     if len(ring) < 3:
@@ -281,15 +298,14 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
     candidates.sort(key=_rank)
     best_dist, best = candidates[0]
 
-    # Compute footprint
-    area_atemp = best.get("area")
-    floors = best.get("floors")
+    # Compute footprint — EUBUCCO polygon area only (Atemp is unreliable: one EPC may
+    # cover multiple buildings and sums their areas, so Atemp/floors is not a valid proxy)
     footprint: float | None = None
-    if area_atemp and floors and floors > 0:
-        footprint = round(area_atemp / floors, 1)
+    if best.get("footprint_m2") and best["footprint_m2"] > 0:
+        footprint = round(float(best["footprint_m2"]), 1)
     else:
         fp = _shoelace_m2(best.get("coordinates") or [])
-        if fp:
+        if fp and fp > 0:
             footprint = round(fp, 1)
 
     # Centroid
@@ -309,17 +325,17 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
 
     return {
         "address":       best.get("address"),
-        "height":        best.get("height"),
-        "floors":        best.get("floors"),
-        "area_atemp":    best.get("area"),      # total GFA / Atemp from EPC
-        "footprint_m2":  footprint,
+        "height":        _clean(best.get("height")),
+        "floors":        _clean(best.get("floors")),
+        "area_atemp":    _clean(best.get("area")),      # total GFA / Atemp from EPC
+        "footprint_m2":  _clean(footprint),
         "use_cat":       best.get("use_cat"),
-        "year":          best.get("year"),
-        "energy":        best.get("energy"),    # kWh/m²/yr
+        "year":          _clean(best.get("year")),
+        "energy":        _clean(best.get("energy")),    # kWh/m²/yr
         "eclass":        best.get("eclass"),
         "tabula_period": best.get("tabula_period"),
-        "tabula_u_wall": u_wall,
-        "tabula_u_win":  u_win,
+        "tabula_u_wall": _clean(u_wall),
+        "tabula_u_win":  _clean(u_win),
         "has_epc":       bool(best.get("has_epc")),
         "lat":           round(c_lat, 6),
         "lon":           round(c_lon, 6),
@@ -365,10 +381,11 @@ def buildings_bbox_stats(
         return Counter(vals).most_common(1)[0][0]
 
     footprints = [
-        b["area"] / b["floors"]
+        float(b["footprint_m2"]) if b.get("footprint_m2") and b["footprint_m2"] > 0
+        else (b["area"] / b["floors"] if b.get("area") and b.get("floors") and b["floors"] > 0 else None)
         for b in matched
-        if b.get("area") and b.get("floors") and b["floors"] > 0
     ]
+    footprints = [f for f in footprints if f is not None]
     yr_count = cnt("year")
 
     return {

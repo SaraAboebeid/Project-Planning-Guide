@@ -20,7 +20,7 @@ from pathlib import Path
 # Config
 # ---------------------------------------------------------------------------
 PARQUET_PATH = "data/eubucco/SE23.parquet"
-GPKG_PATH    = "data/eubucco/SE23.gpkg"
+GPKG_PATH    = r"C:\Users\saraabo\Desktop\Project Planning Guide\data\eubucco\SE23.gpkg"
 OUTPUT_HTML  = "assets/gothenburg_3d.html"
 
 # Central Gothenburg bounding box (EPSG:4326)
@@ -337,6 +337,15 @@ print(f"  Top andamal1 values:")
 print(joined["andamal1"].value_counts().head(10).to_string())
 
 # ---------------------------------------------------------------------------
+# Compute footprint area from the ORIGINAL (un-simplified) polygon
+# Must happen before simplification so the area is accurate
+# ---------------------------------------------------------------------------
+print("  Computing footprint areas from original EUBUCCO polygons …")
+gdf_3006_fp = gdf.to_crs("EPSG:3006")
+gdf["footprint_m2"] = gdf_3006_fp.geometry.area.round(1)
+print(f"  Footprint area stats: mean={gdf['footprint_m2'].mean():.0f} m²  median={gdf['footprint_m2'].median():.0f} m²  max={gdf['footprint_m2'].max():.0f} m²")
+
+# ---------------------------------------------------------------------------
 # Simplify geometries to reduce HTML file size (AFTER EPC + TABULA join)
 # ---------------------------------------------------------------------------
 print("  Simplifying geometries …")
@@ -435,6 +444,7 @@ for _, row in gdf.iterrows():
         "floors":      _safe_f1(fl_epc),
         "year":        _safe_int(yr_epc),
         "area":        _safe_int(area),
+        "footprint_m2": _safe_f1(row.get("footprint_m2", None)),
         "energy":      _safe_f1(enrg),
         "eclass":      str(eklass) if eklass and eklass == eklass else None,
         "eclass_color": ECLASS_COLORS.get(str(eklass).strip().upper(), None) if eklass and eklass == eklass else None,
@@ -443,7 +453,7 @@ for _, row in gdf.iterrows():
         "use_cat":     use,
         "address":     display_addr,
         "all_addresses": all_addr,
-        "tabula_period":  row.get("tabula_period", None),
+        "tabula_period":  str(row["tabula_period"]) if row.get("tabula_period") is not None and row.get("tabula_period") == row.get("tabula_period") and str(row.get("tabula_period")) not in ('nan','None','') else None,
         "tabula_u_wall":  round(float(row["tabula_u_wall"]),  2) if row.get("tabula_u_wall")  is not None and row.get("tabula_u_wall")  == row.get("tabula_u_wall")  else None,
         "tabula_u_roof":  round(float(row["tabula_u_roof"]),  2) if row.get("tabula_u_roof")  is not None and row.get("tabula_u_roof")  == row.get("tabula_u_roof")  else None,
         "tabula_u_win":   round(float(row["tabula_u_win"]),   2) if row.get("tabula_u_win")   is not None and row.get("tabula_u_win")   == row.get("tabula_u_win")   else None,
@@ -453,6 +463,17 @@ for _, row in gdf.iterrows():
         "perf_pct":       round(float(row["perf_pct"]), 3) if row.get("perf_pct") is not None and row.get("perf_pct") == row.get("perf_pct") else None,
     })
 
+# Sanitize NaN/Inf → None before embedding in HTML (json.dumps allows NaN by default which breaks JS)
+def _sanitize_for_html(obj):
+    if isinstance(obj, float) and (obj != obj or obj == float("inf") or obj == float("-inf")):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_html(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_html(v) for v in obj]
+    return obj
+
+records = _sanitize_for_html(records)
 data_json = json.dumps(records)
 
 # ---------------------------------------------------------------------------
@@ -883,6 +904,10 @@ html = f"""<!DOCTYPE html>
   <button class="btn" style="width:100%;margin-top:10px;font-size:12px" id="btn-inspect">
     &#128247; Inspect Facades + WWR
   </button>
+  <button class="btn" style="width:100%;margin-top:6px;font-size:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#1a1a2e" id="btn-pvgis">
+    &#9728; Rooftop PV Estimate
+  </button>
+  <div id="pvgis-result" style="display:none;margin-top:8px;padding:8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:6px;font-size:11px;line-height:1.6"></div>
 </div>
 
 <!-- Hover tooltip card -->
@@ -1123,7 +1148,7 @@ function renderPerfList() {{
 
   // ---- sort tabs ----
   const tabs = [['energy','⚡ Energy'],['year','📅 Year built'],['eclass','🏷 Class']].map(([m,lbl]) =>
-    '<button onclick="_sortMode=\''+m+'\';renderPerfList()" style="flex:1;padding:5px 0;font-size:11px;border:none;border-radius:6px;cursor:pointer;font-family:inherit;'
+    '<button onclick="_sortMode=\\''+m+'\\';renderPerfList()" style="flex:1;padding:5px 0;font-size:11px;border:none;border-radius:6px;cursor:pointer;font-family:inherit;'
     +(_sortMode===m?'background:#7c3aed;color:#fff;font-weight:600':'background:rgba(255,255,255,0.07);color:var(--muted)')
     +'">'+lbl+'</button>'
   ).join('');
@@ -1167,12 +1192,10 @@ function renderPerfList() {{
       ? '<span style="background:rgba(255,255,255,0.08);border-radius:3px;padding:1px 4px;font-size:9px;color:var(--muted)">'+(PERIOD_SHORT[b.period]||b.period)+'</span>'
       : '';
     const meta = [b.year?'Built '+b.year:'', b.area?b.area+' m²':''].filter(Boolean).join(' · ');
-    const safeAddr = b.addr.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    rows += '<div onclick="toggleCompare(\''+safeAddr+'\')"'
+    const safeAddrHtml = (b.addr||'').replace(/"/g,"&quot;");
+    rows += '<div data-addr="'+safeAddrHtml+'" class="pr"'
       + ' style="background:'+(inCmp?'rgba(124,58,237,0.18)':'rgba(255,255,255,0.04)')+';border-radius:8px;padding:8px 10px;margin:4px 0;cursor:pointer;'
-      + 'border:1px solid '+(inCmp?'#7c3aed':'transparent')+';transition:all .15s"'
-      + ' onmouseenter="this.style.background=\'rgba(255,255,255,0.08)\'"'
-      + ' onmouseleave="this.style.background=\''+(inCmp?'rgba(124,58,237,0.18)':'rgba(255,255,255,0.04)')+'\'">';
+      + 'border:1px solid '+(inCmp?'#7c3aed':'transparent')+';transition:all .15s">';
     rows +=   '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
             + '<span style="flex:1;font-size:11px;font-weight:600;line-height:1.3">'+b.addr+'</span>'
             + badge + ' ' + perBadge
@@ -1192,6 +1215,12 @@ function renderPerfList() {{
     + cmpHtml
     + rows
     + hint;
+  document.querySelectorAll('#perf-content .pr').forEach(el => {{
+    const addr = el.getAttribute('data-addr');
+    el.addEventListener('click', () => toggleCompare(addr));
+    el.addEventListener('mouseenter', () => {{ el.style.background = 'rgba(255,255,255,0.08)'; }});
+    el.addEventListener('mouseleave', () => {{ el.style.background = _compareSet.has(addr) ? 'rgba(124,58,237,0.18)' : 'rgba(255,255,255,0.04)'; }});
+  }});
 }}
 
 function toggleCompare(addr) {{
@@ -1558,7 +1587,7 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {{
     if (b.eclass) html += row('Energy class','<span style="background:'+eclassColor+';color:#000;border-radius:3px;padding:1px 6px;font-weight:700">'+b.eclass+'</span>',null);
     if (b.energy) html += row('Energy use', b.energy+' kWh/m&#178;yr', b.energy>150?'#fb923c':'#4ade80');
     if (b.year)   html += row('Year built', b.year, null);
-    if (b.area)   html += row('Floor area', b.area+' m&#178;', null);
+    if (b.footprint_m2) html += row('Footprint', Math.round(b.footprint_m2)+' m&#178;', null);
     if (b.height) html += row('Height', Math.round(b.height)+' m', null);
     if (b.floors) html += row('Floors', b.floors, null);
     if (isResidential && tabulaLabel) {{
@@ -1585,7 +1614,7 @@ function showInfoPanel(b, idx) {{
   row('Energy class', b.eclass);
   row('Energy',   b.energy ? b.energy + ' kWh/m²' : null);
   row('Year',     b.year);
-  row('Area',     b.area  ? b.area  + ' m²' : null);
+  row('Footprint', b.footprint_m2 ? Math.round(b.footprint_m2) + ' m²' : null);
   row('Height',   b.height ? Math.round(b.height) + ' m' : null);
   row('Floors',   b.floors);
   row('Period',   b.tabula_period);
@@ -1628,6 +1657,48 @@ document.getElementById('info-close').addEventListener('click', hideInfoPanel);
 let facadeBuilding = null;
 const DIRS = ['N','E','S','W'];
 const DIR_HEADINGS = {{ N:0, E:90, S:180, W:270 }};
+
+document.getElementById('btn-pvgis').addEventListener('click', () => {{
+  if (!selectedBuilding) return;
+  fetchPVGIS(selectedBuilding);
+}});
+
+async function fetchPVGIS(b) {{
+  const el = document.getElementById('pvgis-result');
+  if (!b.footprint_m2 || !b.coordinates) {{
+    el.style.display = 'block';
+    el.innerHTML = '<span style="color:#f87171">No footprint data available</span>';
+    return;
+  }}
+  const ring = b.coordinates[0];
+  let sumLon = 0, sumLat = 0;
+  for (const [lo, la] of ring) {{ sumLon += lo; sumLat += la; }}
+  const lat = (sumLat / ring.length).toFixed(5);
+  const lon = (sumLon / ring.length).toFixed(5);
+  const kWp = Math.round(b.footprint_m2 * 0.7 * 0.2 * 10) / 10;
+  el.style.display = 'block';
+  el.innerHTML = '<span style="color:#94a3b8">Fetching PVGIS\u2026</span>';
+  try {{
+    const url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${{lat}}&lon=${{lon}}&peakpower=${{kWp}}&loss=14&angle=35&aspect=0&outputformat=json&pvtechchoice=crystSi`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const Ey = data.outputs && data.outputs.totals && data.outputs.totals.fixed && data.outputs.totals.fixed.E_y;
+    if (!Ey) throw new Error('No yield data in response');
+    const totalKwh = Math.round(Ey * kWp);
+    const mwh = (totalKwh / 1000).toFixed(1);
+    el.innerHTML =
+      '<div style="color:#fbbf24;font-weight:700;margin-bottom:4px">&#9728; Rooftop PV (PVGIS)</div>' +
+      '<div style="display:grid;grid-template-columns:1fr auto;gap:2px 8px;color:#e2e8f0">' +
+      '<span style="color:#94a3b8">System size</span><span>' + kWp + ' kWp</span>' +
+      '<span style="color:#94a3b8">Annual yield</span><span style="color:#4ade80;font-weight:700">' + mwh + ' MWh/yr</span>' +
+      '<span style="color:#94a3b8">Specific yield</span><span>' + Math.round(Ey) + ' kWh/kWp</span>' +
+      '<span style="color:#94a3b8">Usable roof</span><span>' + Math.round(b.footprint_m2 * 0.7) + ' m\u00b2</span>' +
+      '</div>';
+  }} catch(e) {{
+    el.innerHTML = '<span style="color:#f87171">PVGIS error: ' + e.message + '</span>';
+  }}
+}}
 
 document.getElementById('btn-inspect').addEventListener('click', () => {{
   if (!selectedBuilding) return;
@@ -1861,6 +1932,25 @@ document.addEventListener('click', e => {{
 os.makedirs("assets", exist_ok=True)
 with open(OUTPUT_HTML, "w", encoding="utf-8", errors="replace") as f:
     f.write(html)
+
+# Also write buildings.json (used by backend API and frontend public folder)
+# Sanitize NaN/Inf → None before serializing so JSON is strictly valid
+def _sanitize_records(obj):
+    if isinstance(obj, float) and (obj != obj or obj == float("inf") or obj == float("-inf")):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_records(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_records(v) for v in obj]
+    return obj
+
+_clean_records = _sanitize_records(records)
+_buildings_json_str = json.dumps(_clean_records, ensure_ascii=False)
+for _bj_path in ["assets/buildings.json", "frontend/public/buildings.json"]:
+    os.makedirs(os.path.dirname(_bj_path) if os.path.dirname(_bj_path) else ".", exist_ok=True)
+    with open(_bj_path, "w", encoding="utf-8") as _f:
+        _f.write(_buildings_json_str)
+print(f"Updated: assets/buildings.json + frontend/public/buildings.json  (footprint_m2 included)")
 
 file_size_mb = os.path.getsize(OUTPUT_HTML) / 1e6
 print(f"\nSaved: {OUTPUT_HTML}  ({file_size_mb:.1f} MB)")

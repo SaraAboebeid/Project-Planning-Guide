@@ -94,7 +94,7 @@ export interface BuildingLookup {
   height: number | null;
   floors: number | null;
   area_atemp: number | null;    // total Atemp (GFA) from EPC
-  footprint_m2: number | null; // Atemp/floors or polygon shoelace
+  footprint_m2: number | null; // EUBUCCO polygon area (single building footprint)
   use_cat: string | null;
   year: number | null;
   energy: number | null;        // kWh/m²/yr
