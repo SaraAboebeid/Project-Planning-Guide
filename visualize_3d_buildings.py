@@ -1737,7 +1737,7 @@ async function fetchPVGIS(b) {{
   el.style.display = 'block';
   el.innerHTML = '<span style="color:#94a3b8">Fetching PVGIS\u2026</span>';
   try {{
-    const url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${{lat}}&lon=${{lon}}&peakpower=${{kWp}}&loss=14&angle=35&aspect=0&outputformat=json&pvtechchoice=crystSi`;
+    const url = `http://localhost:8000/api/pvgis?lat=${{lat}}&lon=${{lon}}&peakpower=${{kWp}}&loss=14&angle=35&aspect=0`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -1747,11 +1747,11 @@ async function fetchPVGIS(b) {{
     const mwh = (totalKwh / 1000).toFixed(1);
     el.innerHTML =
       '<div style="color:#fbbf24;font-weight:700;margin-bottom:4px">&#9728; Rooftop PV (PVGIS)</div>' +
-      '<div style="display:grid;grid-template-columns:1fr auto;gap:2px 8px;color:#e2e8f0">' +
-      '<span style="color:#94a3b8">System size</span><span>' + kWp + ' kWp</span>' +
-      '<span style="color:#94a3b8">Annual yield</span><span style="color:#4ade80;font-weight:700">' + mwh + ' MWh/yr</span>' +
-      '<span style="color:#94a3b8">Specific yield</span><span>' + Math.round(Ey) + ' kWh/kWp</span>' +
-      '<span style="color:#94a3b8">Usable roof</span><span>' + Math.round(b.footprint_m2 * 0.7) + ' m\u00b2</span>' +
+      '<div style="display:grid;grid-template-columns:1fr auto;gap:2px 8px;color:#f1f5f9">' +
+      '<span style="color:#cbd5e1">System size</span><span>' + kWp + ' kWp</span>' +
+      '<span style="color:#cbd5e1">Annual yield</span><span style="color:#4ade80;font-weight:700">' + mwh + ' MWh/yr</span>' +
+      '<span style="color:#cbd5e1">Specific yield</span><span>' + Math.round(Ey) + ' kWh/kWp</span>' +
+      '<span style="color:#cbd5e1">Usable roof</span><span>' + Math.round(b.footprint_m2 * 0.7) + ' m\u00b2</span>' +
       '</div>';
   }} catch(e) {{
     el.innerHTML = '<span style="color:#f87171">PVGIS error: ' + e.message + '</span>';

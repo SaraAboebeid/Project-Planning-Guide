@@ -672,3 +672,37 @@ async def lookup_wwr(lat: float = Query(...), lon: float = Query(...), radius_m:
 async def get_wwr_database():
     """Return all saved WWR records."""
     return {"records": _load_wwr_db()}
+
+
+# ── PVGIS proxy (avoids browser CORS restriction) ───────────────────────────
+@app.get("/api/pvgis")
+async def pvgis_proxy(
+    lat: float = Query(...),
+    lon: float = Query(...),
+    peakpower: float = Query(...),
+    loss: float = Query(14),
+    angle: float = Query(35),
+    aspect: float = Query(0),
+    pvtechchoice: str = Query("crystSi"),
+):
+    """Server-side proxy to the PVGIS API (re.jrc.ec.europa.eu).
+    Required because browsers are blocked by CORS from calling the API directly.
+    """
+    import httpx
+
+    pvgis_url = "https://re.jrc.ec.europa.eu/api/v5_2/PVcalc"
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "peakpower": peakpower,
+        "loss": loss,
+        "angle": angle,
+        "aspect": aspect,
+        "outputformat": "json",
+        "pvtechchoice": pvtechchoice,
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(pvgis_url, params=params)
+        if not r.is_success:
+            raise HTTPException(r.status_code, f"PVGIS returned {r.status_code}")
+        return r.json()
