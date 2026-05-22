@@ -729,19 +729,76 @@ html = f"""<!DOCTYPE html>
     }}
     .panel .sub {{ font-size:11px; color:var(--muted); margin-bottom:10px; }}
 
-    /* left info panel */
-    #left-panel {{ top:16px; left:16px; width:236px; }}
-
-    /* controls bar */
-    #controls {{
-      position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
-      z-index:20; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+    /* ─── Left sidebar ─── */
+    #left-panel {{
+      position:absolute; top:16px; left:16px; bottom:16px; width:256px;
+      z-index:20; background:var(--surface); backdrop-filter:blur(16px);
+      border:1px solid var(--border); border-radius:var(--radius);
+      box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:hidden;
     }}
+    #lp-header {{
+      background:linear-gradient(135deg,#421869 0%,#721CB8 100%);
+      padding:14px 14px 12px; flex-shrink:0;
+    }}
+    .lp-title {{ display:block; font-size:15px; font-weight:700; color:#fff; letter-spacing:.2px; }}
+    .lp-sub   {{ display:block; font-size:10px; color:rgba(255,255,255,0.6); margin-top:3px; }}
+    #lp-stats {{
+      display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:10px 10px 0; flex-shrink:0;
+    }}
+    .stat-box {{
+      background:rgba(255,255,255,0.05); border-radius:8px; padding:8px 6px; text-align:center;
+    }}
+    .stat-num   {{ font-size:17px; font-weight:700; color:#a78bfa; }}
+    .stat-num-2 {{ color:#22c55e; }}
+    .stat-lbl   {{ font-size:9px; color:var(--muted); margin-top:2px; line-height:1.3; }}
+    #lp-tabs {{ display:flex; gap:4px; padding:10px 10px 0; flex-shrink:0; }}
+    .lp-tab {{
+      flex:1; padding:5px 3px; border-radius:7px; border:1px solid var(--border);
+      background:transparent; color:var(--muted); font-size:10px; font-weight:500;
+      cursor:pointer; transition:all .15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }}
+    .lp-tab:hover  {{ background:rgba(114,28,184,0.2); color:var(--text); }}
+    .lp-tab.active {{ background:rgba(114,28,184,0.5); border-color:#a78bfa; color:#a78bfa; }}
+    #legend-container {{
+      flex:1; overflow-y:auto; padding:10px 10px 0; min-height:0;
+    }}
+    #legend-container::-webkit-scrollbar {{ width:4px; }}
+    #legend-container::-webkit-scrollbar-track {{ background:transparent; }}
+    #legend-container::-webkit-scrollbar-thumb {{ background:rgba(114,28,184,0.3); border-radius:2px; }}
+    .lp-hint {{ padding:5px 10px 0; font-size:10px; color:var(--faint); flex-shrink:0; }}
+    .lp-divider {{ height:1px; background:var(--border); margin:10px 10px 0; flex-shrink:0; }}
+    .lp-section-title {{
+      padding:7px 10px 3px; font-size:9px; font-weight:700;
+      color:var(--faint); text-transform:uppercase; letter-spacing:.7px; flex-shrink:0;
+    }}
+    #lp-options {{ padding:0 10px 12px; display:flex; flex-direction:column; gap:5px; flex-shrink:0; }}
+    .opt-btn {{ width:100%; text-align:left; font-size:11px !important; padding:6px 10px !important; }}
+    .tool-btn {{
+      width:100%; text-align:left; font-size:11px; padding:6px 10px;
+      border-radius:8px; border:1px solid var(--border);
+      background:var(--surface); color:var(--text); cursor:pointer; transition:all .15s;
+      font-weight:500; font-family:inherit;
+    }}
+    .tool-btn:hover:not(:disabled) {{ background:rgba(114,28,184,0.35); border-color:#7c3aed; }}
+    .tool-btn:disabled {{ opacity:0.38; cursor:not-allowed; }}
+    .tool-btn.pvgis-btn {{
+      background:rgba(245,158,11,0.1);
+      border-color:rgba(245,158,11,0.35); color:#fbbf24;
+    }}
+    .tool-btn.pvgis-btn:hover:not(:disabled) {{ background:rgba(245,158,11,0.25); border-color:#f59e0b; }}
+    #pvgis-result {{
+      margin-top:4px; padding:8px;
+      background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25);
+      border-radius:6px; font-size:11px; line-height:1.6; display:none;
+    }}
+    #lp-no-selection {{
+      font-size:10px; color:var(--faint); display:none; padding:2px 0;
+    }}
+    /* buttons */
     .btn {{
       padding:7px 14px; border-radius:10px; border:1px solid var(--border);
       background:var(--surface); color:var(--text); font-size:12px; font-weight:500;
-      cursor:pointer; backdrop-filter:blur(12px); transition:all .15s;
-      white-space:nowrap;
+      cursor:pointer; backdrop-filter:blur(12px); transition:all .15s; white-space:nowrap;
     }}
     .btn:hover {{ background:rgba(114,28,184,0.35); border-color:#7c3aed; }}
     .btn.active {{ background:rgba(114,28,184,0.5); border-color:#a78bfa; color:#a78bfa; }}
@@ -810,23 +867,21 @@ html = f"""<!DOCTYPE html>
     .legend-dot {{ width:10px; height:10px; border-radius:3px; flex-shrink:0; }}
     .legend-cnt {{ margin-left:auto; color:var(--faint); }}
 
-    /* search */
-    #search-box {{
-      position:absolute; top:16px; left:50%; transform:translateX(-50%);
-      z-index:20; display:flex; gap:6px;
-    }}
+    /* search (inside left sidebar) */
+    #search-wrap {{ padding:10px 10px 0; flex-shrink:0; position:relative; }}
+    #search-row  {{ display:flex; gap:5px; }}
     #search-input {{
-      width:260px; padding:8px 12px; border-radius:10px;
-      border:1px solid var(--border); background:var(--surface);
-      color:var(--text); font-size:13px; backdrop-filter:blur(12px);
-      outline:none;
+      flex:1; padding:7px 10px; border-radius:8px;
+      border:1px solid var(--border); background:rgba(255,255,255,0.06);
+      color:var(--text); font-size:12px; outline:none;
     }}
     #search-input:focus {{ border-color:#7c3aed; }}
+    #search-btn {{ padding:6px 10px; border-radius:8px; flex-shrink:0; }}
     #search-results {{
-      position:absolute; top:calc(100% + 6px); left:0; right:0;
-      background:var(--surface); border:1px solid var(--border);
-      border-radius:10px; backdrop-filter:blur(16px); display:none;
-      max-height:240px; overflow-y:auto;
+      position:absolute; top:calc(100% + 4px); left:10px; right:10px;
+      background:rgba(10,10,20,0.96); border:1px solid var(--border);
+      border-radius:8px; backdrop-filter:blur(16px); display:none;
+      max-height:200px; overflow-y:auto; z-index:30;
     }}
     .result-item {{ padding:8px 12px; cursor:pointer; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.05); }}
     .result-item:hover {{ background:rgba(114,28,184,0.2); }}
@@ -856,43 +911,50 @@ html = f"""<!DOCTYPE html>
 <!-- Cesium main viewer -->
 <div id="cesium-container"></div>
 
-<!-- Search bar -->
-<div id="search-box">
-  <input id="search-input" type="text" placeholder="Search address…" autocomplete="off">
-  <button class="btn" id="search-btn">&#128269; Search</button>
-  <div id="search-results"></div>
-</div>
-
-<!-- Left info panel -->
-<div class="panel" id="left-panel">
-  <h2>&#127963; Gothenburg 3D</h2>
-  <div class="sub">EUBUCCO v0.2 + EPC · {n_total:,} buildings</div>
-
-  <!-- Stats bar -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0 12px">
-    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;text-align:center">
-      <div style="font-size:18px;font-weight:700;color:#a78bfa">{n_epc_matched:,}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:2px">EPC matched</div>
+<!-- Left sidebar: search + summary + legend + view options -->
+<div id="left-panel">
+  <div id="lp-header">
+    <span class="lp-title">&#127963; Gothenburg 3D</span>
+    <span class="lp-sub">EUBUCCO v0.2 + EPC &middot; {n_total:,} buildings</span>
+  </div>
+  <div id="search-wrap">
+    <div id="search-row">
+      <input id="search-input" type="text" placeholder="Search address&hellip;" autocomplete="off">
+      <button class="btn" id="search-btn">&#128269;</button>
     </div>
-    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;text-align:center">
-      <div style="font-size:18px;font-weight:700;color:#64748b">{n_no_epc:,}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:2px">No EPC</div>
+    <div id="search-results"></div>
+  </div>
+  <div id="lp-stats">
+    <div class="stat-box">
+      <div class="stat-num">{n_epc_matched:,}</div>
+      <div class="stat-lbl">EPC matched</div>
     </div>
-    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;text-align:center">
-      <div style="font-size:18px;font-weight:700;color:#22c55e">{n_with_eclass:,}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:2px">Energy class</div>
-    </div>
-    <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;text-align:center">
-      <div style="font-size:18px;font-weight:700;color:#f59e0b">{n_eclass_total:,}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:2px">TABULA matched</div>
+    <div class="stat-box">
+      <div class="stat-num stat-num-2">{n_eclass_total:,}</div>
+      <div class="stat-lbl">TABULA matched</div>
     </div>
   </div>
-
-  <div id="legend-container">
-    <!-- Filled dynamically by updateLegend() -->
+  <div id="lp-tabs">
+    <button class="lp-tab active" id="btn-use">&#127968; Use type</button>
+    <button class="lp-tab" id="btn-eclass">&#9889; Energy</button>
+    <button class="lp-tab" id="btn-year">&#128197; Year era</button>
   </div>
-  <div style="font-size:10px;color:var(--faint);margin-top:10px;line-height:1.5">
-    Click a row to see best &amp; worst performers
+  <div id="legend-container"></div>
+  <div class="lp-hint">Click a row to see best &amp; worst performers</div>
+  <div class="lp-divider"></div>
+  <div class="lp-section-title">View Options</div>
+  <div id="lp-options">
+    <button class="btn opt-btn" id="btn-tiles">&#127759; Photorealistic Tiles</button>
+    <button class="btn opt-btn" id="btn-eubucco">&#127963; EUBUCCO Overlay</button>
+    <button class="btn opt-btn" id="btn-reset">&#8962; Reset View</button>
+  </div>
+  <div class="lp-divider"></div>
+  <div class="lp-section-title">Analysis Tools</div>
+  <div style="padding:0 10px 6px;display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+    <button class="tool-btn" id="btn-inspect" disabled>&#128247; Inspect Facades + WWR</button>
+    <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>&#9728; Rooftop PV Estimate</button>
+    <div id="pvgis-result"></div>
+    <div id="lp-no-selection">&#8592; Click a building to enable</div>
   </div>
 </div>
 
@@ -901,13 +963,6 @@ html = f"""<!DOCTYPE html>
   <button class="close-btn" id="info-close">&#x2715;</button>
   <h2>&#127963; Building</h2>
   <div id="info-content"></div>
-  <button class="btn" style="width:100%;margin-top:10px;font-size:12px" id="btn-inspect">
-    &#128247; Inspect Facades + WWR
-  </button>
-  <button class="btn" style="width:100%;margin-top:6px;font-size:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#1a1a2e" id="btn-pvgis">
-    &#9728; Rooftop PV Estimate
-  </button>
-  <div id="pvgis-result" style="display:none;margin-top:8px;padding:8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:6px;font-size:11px;line-height:1.6"></div>
 </div>
 
 <!-- Hover tooltip card -->
@@ -974,15 +1029,7 @@ html = f"""<!DOCTYPE html>
   <div id="perf-content" style="margin-top:10px;overflow-y:auto;flex:1"></div>
 </div>
 
-<!-- Controls -->
-<div id="controls">
-  <button class="btn active" id="btn-use">&#127968; Use type</button>
-  <button class="btn" id="btn-eclass">&#9889; Energy class</button>
-  <button class="btn" id="btn-year">&#128197; Year era</button>
-  <button class="btn" id="btn-tiles">&#127759; Photorealistic Tiles</button>
-  <button class="btn" id="btn-eubucco">&#127963; EUBUCCO Overlay</button>
-  <button class="btn" id="btn-reset">&#8962; Reset view</button>
-</div>
+<!-- Controls moved into left sidebar -->
 
 <div id="ppg-brand">PPG · Chalmers / Boverket</div>
 <div id="controls-hint">&#128205; Scroll to zoom &nbsp;·&nbsp; Drag to pan &nbsp;·&nbsp; Right-drag or Ctrl+drag to tilt/rotate &nbsp;·&nbsp; Hover buildings for details</div>
@@ -1607,6 +1654,13 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {{
 
 function showInfoPanel(b, idx) {{
   selectedBuilding = {{ ...b, _idx: idx }};
+  // Enable analysis tool buttons
+  document.getElementById('btn-inspect').disabled = false;
+  document.getElementById('btn-pvgis').disabled   = false;
+  document.getElementById('lp-no-selection').style.display = 'none';
+  // Reset PVGIS result when switching buildings
+  const pvr = document.getElementById('pvgis-result');
+  pvr.style.display = 'none'; pvr.innerHTML = '';
   const rows = [];
   const row = (l,v) => v != null && v !== '' ? rows.push('<div class="tt-row"><span class="tt-lbl">'+l+'</span><span class="tt-val">'+v+'</span></div>') : null;
   row('Address',  b.address);
@@ -1647,6 +1701,10 @@ function hideInfoPanel() {{
   document.getElementById('info-panel').style.display = 'none';
   if (highlightEntity) {{ viewer.entities.remove(highlightEntity); highlightEntity = null; }}
   selectedBuilding = null;
+  // Disable analysis tool buttons
+  document.getElementById('btn-inspect').disabled = true;
+  document.getElementById('btn-pvgis').disabled   = true;
+  document.getElementById('lp-no-selection').style.display = 'block';
 }}
 
 document.getElementById('info-close').addEventListener('click', hideInfoPanel);
@@ -1921,7 +1979,7 @@ searchResults.addEventListener('click', e => {{
   searchResults.style.display = 'none';
 }});
 document.addEventListener('click', e => {{
-  if (!document.getElementById('search-box').contains(e.target))
+  if (!document.getElementById('search-wrap').contains(e.target))
     searchResults.style.display = 'none';
 }});
 </script>
