@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gothenburg 3D – Facade Inspector</title>
+  <meta charset="utf-8"/>
+  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/';</script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Widgets/widgets.css">
+  <style>/* INJECT:CSS */</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="spinner"></div>
+  <h1>&#127963; Gothenburg 3D</h1>
+  <p id="loading-status">Initialising Cesium…</p>
+</div>
+
+<!-- Cesium main viewer -->
+<div id="cesium-container"></div>
+
+<!-- Left sidebar: search + summary + legend + view options -->
+<div id="left-panel">
+  <div id="lp-header">
+    <span class="lp-title">&#127963; Gothenburg 3D</span>
+    <span class="lp-sub">EUBUCCO v0.2 + EPC &middot; {{TOTAL_BUILDINGS}} buildings</span>
+  </div>
+  <div id="search-wrap">
+    <div id="search-row">
+      <input id="search-input" type="text" placeholder="Search address&hellip;" autocomplete="off">
+      <button class="btn" id="search-btn">&#128269;</button>
+    </div>
+    <div id="search-results"></div>
+  </div>
+  <div id="lp-stats">
+    <div class="stat-box">
+      <div class="stat-num">{{N_EPC_MATCHED}}</div>
+      <div class="stat-lbl">EPC matched</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num stat-num-2">{{N_ECLASS_TOTAL}}</div>
+      <div class="stat-lbl">TABULA matched</div>
+    </div>
+  </div>
+  <div id="lp-tabs">
+    <button class="lp-tab active" id="btn-use">&#127968; Use type</button>
+    <button class="lp-tab" id="btn-eclass">&#9889; Energy</button>
+    <button class="lp-tab" id="btn-year">&#128197; Year era</button>
+  </div>
+  <div id="legend-container"></div>
+  <div class="lp-hint">Click a row to see best &amp; worst performers</div>
+  <div class="lp-divider"></div>
+  <div class="lp-section-title">View Options</div>
+  <div id="lp-options">
+    <button class="btn opt-btn" id="btn-tiles">&#127759; Photorealistic Tiles</button>
+    <button class="btn opt-btn" id="btn-eubucco">&#127963; EUBUCCO Overlay</button>
+    <button class="btn opt-btn" id="btn-reset">&#8962; Reset View</button>
+  </div>
+  <div class="lp-divider"></div>
+  <div class="lp-section-title">Analysis Tools</div>
+  <div style="padding:0 10px 6px;display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+    <button class="tool-btn" id="btn-inspect" disabled>&#128247; Inspect Facades + WWR</button>
+    <div id="inspect-saved-badge" style="display:none;font-size:10px;color:var(--muted);padding-left:2px;margin-top:-3px"></div>
+    <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>&#9728; Rooftop PV Estimate</button>
+    <div id="pvgis-saved-badge" style="display:none;font-size:10px;color:var(--muted);padding-left:2px;margin-top:-3px"></div>
+    <div id="pvgis-result"></div>
+    <div id="lp-no-selection">&#8592; Click a building to enable</div>
+  </div>
+</div>
+
+<!-- Building info panel -->
+<div class="panel" id="info-panel">
+  <button class="close-btn" id="info-close">&#x2715;</button>
+  <h2>&#127963; Building</h2>
+  <div id="info-content"></div>
+</div>
+
+<!-- Hover tooltip card (kept dark — floats over the 3D map) -->
+<div id="hover-card" style="
+  display:none; position:fixed; pointer-events:none; z-index:9999;
+  background:rgba(10,10,20,0.92); border:1px solid rgba(114,28,184,0.5);
+  border-radius:10px; padding:10px 13px; min-width:200px; max-width:280px;
+  font-family:Inter,sans-serif; font-size:12px; color:#e2e8f0;
+  box-shadow:0 4px 20px rgba(0,0,0,0.6); backdrop-filter:blur(6px);
+"></div>
+
+<!-- Facade inspector -->
+<div class="panel" id="facade-panel">
+  <h2>&#128247; Facade Inspector</h2>
+  <div class="sub" id="facade-sub">Click a facade view to capture screenshot and estimate WWR</div>
+  <div id="facade-views">
+    <div class="facade-thumb" id="thumb-N"><canvas id="canvas-N" width="200" height="150"></canvas><div class="dir-label">N</div></div>
+    <div class="facade-thumb" id="thumb-E"><canvas id="canvas-E" width="200" height="150"></canvas><div class="dir-label">E</div></div>
+    <div class="facade-thumb" id="thumb-S"><canvas id="canvas-S" width="200" height="150"></canvas><div class="dir-label">S</div></div>
+    <div class="facade-thumb" id="thumb-W"><canvas id="canvas-W" width="200" height="150"></canvas><div class="dir-label">W</div></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <button class="btn" id="btn-capture-all" style="flex:1">&#128247; Capture All Facades</button>
+    <button class="btn" id="btn-exit-inspect" style="flex:1">&#x2715; Exit Inspector</button>
+  </div>
+</div>
+
+<!-- WWR result panel -->
+<div class="panel" id="wwr-panel">
+  <h2>&#128438; WWR Estimate</h2>
+  <div class="sub">Window-to-Wall Ratio</div>
+  <div class="wwr-value" id="wwr-value">–</div>
+  <span class="wwr-unit">% average across facades</span>
+  <div class="wwr-bar-wrap"><div class="wwr-bar" id="wwr-bar" style="width:0%"></div></div>
+  <div id="wwr-tabula-row" style="margin-top:8px;font-size:11px;display:none">
+    <span style="color:var(--muted)">TABULA reference:</span>
+    <span id="wwr-tabula-val" style="color:var(--lime);font-weight:700"></span>
+    <span style="color:var(--muted)"> % (</span><span id="wwr-tabula-period" style="color:var(--muted)"></span><span style="color:var(--muted)">)</span>
+  </div>
+  <div id="wwr-breakdown" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
+  <div id="wwr-ai-status" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
+  <div style="margin-top:8px;font-size:10px;color:var(--faint)">
+    TABULA archetype reference &middot; GPT-4 vision per facade.
+  </div>
+</div>
+
+<!-- Cesium Ion Token panel -->
+<div class="panel" id="token-panel" style="top:16px;right:16px;width:320px;display:none">
+  <h2>&#128273; Cesium Ion Token Required</h2>
+  <div class="sub">Google Photorealistic 3D Tiles stream real building facade &amp; roof textures directly from Google Maps.</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+    1. Sign up free at <a href="https://ion.cesium.com" target="_blank" style="color:#a78bfa">ion.cesium.com</a><br>
+    2. Go to <b>Access Tokens</b> &rarr; create a token<br>
+    3. Enable <b>Google Photorealistic 3D Tiles</b> asset (2275207)<br>
+    4. Paste your token below and click Apply
+  </div>
+  <input id="token-input" type="text" placeholder="Paste your Cesium ion token&hellip;"
+    style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);
+           background:rgba(0,0,0,0.04);color:var(--text);font-size:12px;margin-bottom:8px;outline:none">
+  <button class="btn" id="token-apply" style="width:100%;margin-bottom:6px">&#128640; Apply &amp; Load 3D Tiles</button>
+  <div id="token-error" style="font-size:11px;color:#f87171;min-height:14px"></div>
+</div>
+
+<!-- Performance card panel -->
+<div class="panel" id="perf-panel" style="display:none;top:16px;right:16px;width:320px;max-height:82vh;flex-direction:column;overflow:hidden">
+  <button class="close-btn" id="perf-close">&#x2715;</button>
+  <h2 id="perf-title">Performance</h2>
+  <div class="sub" id="perf-sub"></div>
+  <div id="perf-content" style="margin-top:10px;overflow-y:auto;flex:1"></div>
+</div>
+
+<div id="ppg-brand">PPG &middot; Chalmers / Boverket</div>
+<div id="controls-hint">&#128205; Scroll to zoom &nbsp;&middot;&nbsp; Drag to pan &nbsp;&middot;&nbsp; Right-drag or Ctrl+drag to tilt/rotate &nbsp;&middot;&nbsp; Hover buildings for details</div>
+
+<!-- INJECT:DATA -->
+<!-- INJECT:JS -->
+
+</body>
+</html>

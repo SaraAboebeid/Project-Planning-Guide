@@ -1,0 +1,590 @@
+"""
+data_pipeline.py — all Python data processing for the Gothenburg 3D viewer.
+Loads EUBUCCO + EPC + TABULA, processes ~92k buildings, returns a dict
+with JSON strings and statistics that build.py injects into the HTML.
+
+Usage:
+    from data_pipeline import process_data
+    data = process_data()
+"""
+
+import geopandas as gpd
+import pandas as pd
+import numpy as np
+import json
+import os
+import re
+import unicodedata
+from pathlib import Path
+
+import duckdb
+from shapely import wkb as shapely_wkb
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+PARQUET_PATH = "data/eubucco/SE23.parquet"
+GPKG_PATH    = r"C:\Users\saraabo\Desktop\Project Planning Guide\data\eubucco\SE23.gpkg"
+
+# Central Gothenburg bounding box (EPSG:4326)
+LON_MIN, LON_MAX = 11.85, 12.10
+LAT_MIN, LAT_MAX = 57.62, 57.80
+
+USE_COLORS = {
+    "bostad_enfamilj":   [255, 165,  50, 210],
+    "bostad_flerfamilj": [255, 210,  60, 210],
+    "verksamhet":        [ 70, 180, 255, 210],
+    "industri":          [200,  80,  60, 210],
+    "samhalle":          [ 70, 210, 140, 210],
+    "komplement":        [140, 140, 160, 180],
+    "ovrigt":            [160, 120, 200, 180],
+}
+USE_LABELS = {
+    "bostad_enfamilj":   "Residential - single family",
+    "bostad_flerfamilj": "Residential - multi-family",
+    "verksamhet":        "Commercial / office",
+    "industri":          "Industrial",
+    "samhalle":          "Public / civic",
+    "komplement":        "Outbuilding / garage",
+    "ovrigt":            "Other / unknown",
+}
+ECLASS_COLORS = {
+    "A": [ 22, 163,  74, 230],
+    "B": [ 74, 222, 128, 220],
+    "C": [190, 242,  60, 210],
+    "D": [250, 204,  21, 215],
+    "E": [251, 146,  60, 220],
+    "F": [239,  68,  68, 225],
+    "G": [153,  27,  27, 230],
+}
+ECLASS_LABELS = {
+    "A": "A - Very efficient",
+    "B": "B - Efficient",
+    "C": "C - Above average",
+    "D": "D - Average",
+    "E": "E - Below average",
+    "F": "F - Poor",
+    "G": "G - Very poor",
+}
+TABULA_PERIODS = ["...1960", "1961-1975", "1976-1985", "1986-1995", "1996-2005"]
+PERIOD_KEYS    = ['...1960', '1961-1975', '1976-1985', '1986-1995', '1996-2005', 'post-2005']
+
+_TABULA_DIR = Path("data/sensitivity/FW_ Map selection in notebook")
+
+
+# ---------------------------------------------------------------------------
+# Utility functions
+# ---------------------------------------------------------------------------
+def _norm(s: str) -> str:
+    """Fold Swedish å/ä/ö -> a/a/o so plain ASCII substrings match."""
+    return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii").lower()
+
+
+def andamal_to_use(andamal: str) -> str:
+    """Map EPC andamal1 string to a colour category key."""
+    if not isinstance(andamal, str):
+        return "ovrigt"
+    a = _norm(andamal)
+    if "komplement" in a or "ekonomi" in a:
+        return "komplement"
+    if "flerfamilj" in a or "flerbostad" in a or "hyreshus" in a:
+        return "bostad_flerfamilj"
+    if "bostad" in a or "smahus" in a or "radhus" in a or "kedjehus" in a:
+        return "bostad_enfamilj"
+    if "verksamhet" in a or "handel" in a or "kontor" in a or "hotell" in a or "restaurang" in a:
+        return "verksamhet"
+    if "industri" in a or "tillverkning" in a or "lager" in a:
+        return "industri"
+    if ("samhall" in a or "skola" in a or "vard" in a
+            or "samfund" in a or "offentlig" in a or "special" in a
+            or "idrott" in a or "bad" in a or "kultur" in a):
+        return "samhalle"
+    return "ovrigt"
+
+
+def _load_tabula_lookup():
+    with open(_TABULA_DIR / "tabula_swedish_data.json", encoding="utf-8") as f:
+        envelope = json.load(f)
+    with open(_TABULA_DIR / "tabula_webtool_scraped.json", encoding="utf-8") as f:
+        energy = json.load(f)
+    buildings_energy = energy.get("buildings", {})
+    lookup = {}
+    for code, env in envelope.items():
+        btype  = env["building_type"]
+        period = env["period"]
+        eng    = buildings_energy.get(code, {})
+        zones  = eng.get("zones", {})
+        lookup[(btype, period)] = {
+            "period":       period,
+            "u_wall":       env["u_values"].get("wall"),
+            "u_roof":       env["u_values"].get("roof"),
+            "u_window":     env["u_values"].get("window"),
+            "u_floor":      env["u_values"].get("floor"),
+            "heat_z3":      zones.get("3", {}).get("net_energy_demand"),
+            "heat_z2":      zones.get("2", {}).get("net_energy_demand"),
+            "heat_z1":      zones.get("1", {}).get("net_energy_demand"),
+            "constr_wall":  env.get("construction_types", {}).get("wall"),
+            "constr_roof":  env.get("construction_types", {}).get("roof"),
+            "constr_floor": env.get("construction_types", {}).get("floor"),
+        }
+    return lookup
+
+
+def _year_to_period(year):
+    if year is None or pd.isna(year):
+        return None
+    y = int(year)
+    if y <= 1960:   return "...1960"
+    elif y <= 1975: return "1961-1975"
+    elif y <= 1985: return "1976-1985"
+    elif y <= 1995: return "1986-1995"
+    elif y <= 2005: return "1996-2005"
+    return "post-2005"
+
+
+def _use_to_btype(use_cat):
+    if use_cat == "bostad_enfamilj":   return "SFH"
+    if use_cat == "bostad_flerfamilj": return "MFH"
+    return None
+
+
+def geom_to_coords(geom):
+    if geom is None or geom.is_empty:
+        return None
+    if geom.geom_type == "Polygon":
+        return [[[round(x, 6), round(y, 6)] for x, y in geom.exterior.coords]]
+    elif geom.geom_type == "MultiPolygon":
+        biggest = max(geom.geoms, key=lambda p: p.area)
+        return [[[round(x, 6), round(y, 6)] for x, y in biggest.exterior.coords]]
+    return None
+
+
+def _sanitize(obj):
+    """Replace NaN/Inf with None so json.dumps produces strictly valid JSON."""
+    if isinstance(obj, float) and (obj != obj or obj == float("inf") or obj == float("-inf")):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    return obj
+
+
+# ---------------------------------------------------------------------------
+# Main pipeline
+# ---------------------------------------------------------------------------
+def process_data() -> dict:
+    """Run the full data pipeline and return all data needed by build.py."""
+
+    # ── Load ──────────────────────────────────────────────────────────────
+    print("Loading building data ...")
+    src = PARQUET_PATH if os.path.exists(PARQUET_PATH) else GPKG_PATH
+    gdf = gpd.read_parquet(src) if src.endswith(".parquet") else gpd.read_file(src)
+    print(f"  Loaded {len(gdf):,} buildings  CRS={gdf.crs}")
+
+    if gdf.crs and gdf.crs.to_epsg() != 4326:
+        print("  Reprojecting to EPSG:4326 ...")
+        gdf = gdf.to_crs("EPSG:4326")
+
+    print("  Filtering to central Gothenburg bbox ...")
+    gdf = gdf.cx[LON_MIN:LON_MAX, LAT_MIN:LAT_MAX].copy()
+    print(f"  {len(gdf):,} buildings in crop area")
+
+    # ── EPC join ──────────────────────────────────────────────────────────
+    print("Loading EPC footprints ...")
+    con = duckdb.connect("data/sensitivity/epc_sweden.duckdb", read_only=True)
+    epc_raw = con.execute("""
+        SELECT
+            f.FormularId,
+            f.geom,
+            f.andamal1,
+            f.fastighetsbeteckning,
+            e_agg.year_built,
+            e_agg.floors_epc,
+            e_agg.area_atemp,
+            e_agg.energy_kwh_m2,
+            e_agg.energy_class,
+            COALESCE(
+                MIN(CASE WHEN TRY_CAST(f.husnummer AS BIGINT) = e.IdHusnr
+                              THEN TRIM(e.IdAdr) END),
+                e_agg.address
+            ) AS address
+        FROM footprints f
+        LEFT JOIN epc e ON f.FormularId = e.FormularId
+                        AND e.IdAdr IS NOT NULL
+                        AND TRIM(e.IdAdr) != ''
+        LEFT JOIN (
+            SELECT
+                FormularId,
+                MIN(EgenNybyggAr)                   AS year_built,
+                MIN(EgenAntalPlan)                  AS floors_epc,
+                MIN(EgenAtemp)                      AS area_atemp,
+                MIN(EgiSpecifikEnergianvandning)     AS energy_kwh_m2,
+                MIN(EgiEnergiklass)                 AS energy_class,
+                MIN(IdAdr)                          AS address
+            FROM epc
+            WHERE IdAdr IS NOT NULL AND TRIM(IdAdr) != ''
+            GROUP BY FormularId
+        ) e_agg ON f.FormularId = e_agg.FormularId
+        WHERE f.geom IS NOT NULL
+        GROUP BY f.FormularId, f.objektidentitet, f.geom,
+                 f.andamal1, f.fastighetsbeteckning, f.husnummer,
+                 e_agg.year_built, e_agg.floors_epc, e_agg.area_atemp,
+                 e_agg.energy_kwh_m2, e_agg.energy_class, e_agg.address
+    """).fetchdf()
+    con.close()
+
+    epc_raw["geometry"] = epc_raw["geom"].apply(lambda b: shapely_wkb.loads(bytes(b)))
+    epc_cols = ["FormularId", "andamal1", "fastighetsbeteckning", "year_built", "floors_epc",
+                "area_atemp", "energy_kwh_m2", "energy_class", "address", "geometry"]
+    epc_gdf = gpd.GeoDataFrame(epc_raw[epc_cols], crs="EPSG:4326")
+
+    epc_3006 = epc_gdf.to_crs("EPSG:3006")
+    gdf_3006 = gdf.to_crs("EPSG:3006")
+
+    bbox_poly = gpd.GeoDataFrame(
+        geometry=gpd.GeoSeries.from_wkt(
+            [f"POLYGON(({LON_MIN} {LAT_MIN},{LON_MAX} {LAT_MIN},{LON_MAX} {LAT_MAX},{LON_MIN} {LAT_MAX},{LON_MIN} {LAT_MIN}))"]
+        ), crs="EPSG:4326"
+    ).to_crs("EPSG:3006").geometry.iloc[0]
+    epc_polys = epc_3006[epc_3006.geometry.intersects(bbox_poly.buffer(200))].copy()
+    print(f"  EPC footprints in bbox: {len(epc_polys):,}")
+
+    epc_cents = epc_polys.copy()
+    epc_cents["geometry"] = epc_polys.geometry.centroid
+
+    gdf_3006_pts = gdf_3006.copy()
+    gdf_3006_pts = gdf_3006_pts.reset_index().rename(columns={"index": "eubucco_idx"})
+    gdf_3006_pts["geometry"] = gdf_3006_pts["geometry"].centroid
+    gdf_3006_pts = gdf_3006_pts[["eubucco_idx", "geometry"]]
+
+    MAX_DIST_M = 30
+    joined_nearest = gpd.sjoin_nearest(
+        gdf_3006_pts, epc_cents,
+        how="left", max_distance=MAX_DIST_M, distance_col="dist_m"
+    )
+    joined = joined_nearest.sort_values("dist_m").drop_duplicates("eubucco_idx")
+
+    def _mode(x):
+        vc = x.dropna().value_counts()
+        return vc.index[0] if len(vc) else None
+    def _med(x):
+        v = pd.to_numeric(x, errors="coerce").dropna()
+        return round(float(v.median()), 1) if len(v) else None
+
+    agg = joined.groupby("eubucco_idx").agg(
+        andamal1_epc   =("andamal1",             _mode),
+        fastighet_epc  =("fastighetsbeteckning", _mode),
+        year_built_epc =("year_built",           _med),
+        floors_epc     =("floors_epc",           _med),
+        area_atemp_epc =("area_atemp",           _med),
+        energy_kwh_m2  =("energy_kwh_m2",        _med),
+        energy_class   =("energy_class",         _mode),
+        address_epc    =("address",              _mode),
+        formular_id    =("FormularId",           _mode),
+    )
+    gdf = gdf.join(agg)
+    matched = gdf["andamal1_epc"].notna().sum()
+    gdf["use_cat"] = gdf["andamal1_epc"].apply(andamal_to_use)
+
+    # ── TABULA matching ────────────────────────────────────────────────────
+    print("Loading TABULA archetypes ...")
+    _tabula_lookup = _load_tabula_lookup()
+    print(f"  {len(_tabula_lookup)} TABULA archetypes loaded")
+
+    def _tabula_match(year, use_cat):
+        period = _year_to_period(year)
+        btype  = _use_to_btype(use_cat)
+        if not period or not btype or period == "post-2005":
+            return None, period
+        return _tabula_lookup.get((btype, period)), period
+
+    print("  Matching buildings to TABULA archetypes ...")
+    _tabula_rows = []
+    for _, _row in gdf.iterrows():
+        _arch, _period = _tabula_match(_row.get("year_built_epc"), _row.get("use_cat"))
+        _tabula_rows.append({
+            "tabula_period":  _period,
+            "tabula_u_wall":  _arch["u_wall"]      if _arch else None,
+            "tabula_u_roof":  _arch["u_roof"]      if _arch else None,
+            "tabula_u_win":   _arch["u_window"]    if _arch else None,
+            "tabula_heat_z3": _arch["heat_z3"]     if _arch else None,
+            "tabula_wall":    _arch["constr_wall"] if _arch else None,
+            "tabula_roof":    _arch["constr_roof"] if _arch else None,
+        })
+    _tabula_df = pd.DataFrame(_tabula_rows, index=gdf.index)
+    gdf = pd.concat([gdf, _tabula_df], axis=1)
+    n_tab = gdf["tabula_period"].notna().sum()
+    print(f"  TABULA matched: {n_tab:,} of {len(gdf):,} buildings ({n_tab/len(gdf)*100:.1f}%)")
+
+    # Within-period energy percentile
+    print("  Computing within-period energy performance percentiles ...")
+    gdf["perf_pct"] = np.nan
+    for _p in TABULA_PERIODS + ["post-2005"]:
+        _mask = (gdf["tabula_period"] == _p) & pd.to_numeric(gdf["energy_kwh_m2"], errors="coerce").notna()
+        if _mask.sum() < 2:
+            continue
+        _vals = pd.to_numeric(gdf.loc[_mask, "energy_kwh_m2"], errors="coerce")
+        _min, _max = _vals.quantile(0.02), _vals.quantile(0.98)
+        if _max > _min:
+            gdf.loc[_mask, "perf_pct"] = ((_vals - _min) / (_max - _min)).clip(0, 1)
+        else:
+            gdf.loc[_mask, "perf_pct"] = 0.5
+
+    # ── Footprint area ─────────────────────────────────────────────────────
+    print("  Computing footprint areas ...")
+    gdf_3006_fp = gdf.to_crs("EPSG:3006")
+    gdf["footprint_m2"] = gdf_3006_fp.geometry.area.round(1)
+
+    # ── Simplify geometries ────────────────────────────────────────────────
+    print("  Simplifying geometries ...")
+    gdf["geometry"] = gdf["geometry"].simplify(tolerance=0.00005, preserve_topology=True)
+
+    # ── Heights ────────────────────────────────────────────────────────────
+    print("  Processing heights ...")
+    gdf["elev"] = pd.to_numeric(gdf["height"], errors="coerce").clip(lower=0)
+    fl = pd.to_numeric(gdf["floors"], errors="coerce")
+    null_mask = gdf["elev"].isna() | (gdf["elev"] == 0)
+    gdf.loc[null_mask, "elev"] = fl[null_mask] * 3.2
+    gdf["elev"] = gdf["elev"].fillna(3.2)
+    outliers = (gdf["elev"] > 100).sum()
+    if outliers:
+        print(f"  Capping {outliers} height outlier(s) >100m")
+    gdf["elev"] = gdf["elev"].clip(upper=100)
+
+    # ── Use colours ────────────────────────────────────────────────────────
+    gdf["color"] = gdf["use_cat"].apply(lambda c: USE_COLORS.get(c, USE_COLORS["ovrigt"]))
+
+    # ── Convert geometries ─────────────────────────────────────────────────
+    print("  Converting geometries to coordinate rings ...")
+    gdf["coordinates"] = gdf["geometry"].apply(geom_to_coords)
+    gdf = gdf[gdf["coordinates"].notna()].copy()
+    print(f"  {len(gdf):,} valid buildings after geometry conversion")
+
+    # ── Build records ──────────────────────────────────────────────────────
+    print("  Building JSON payload ...")
+    records = []
+    for _, row in gdf.iterrows():
+        andamal  = row.get("andamal1_epc", None)
+        use      = row.get("use_cat", "ovrigt")
+        yr_epc   = row.get("year_built_epc", None)
+        fl_epc   = row.get("floors_epc", None)
+        area     = row.get("area_atemp_epc", None)
+        enrg     = row.get("energy_kwh_m2", None)
+        eklass   = row.get("energy_class", None)
+        addr     = row.get("address_epc", None)
+        all_addr = row.get("all_addresses", None)
+        fastbet  = row.get("fastighet_epc", None)
+
+        if addr and addr == addr:
+            addr = re.sub(r'\s+(LGH|lgh|ANL|LOKAL|KONTOR|GAR|P-PLATS).*$', '', str(addr)).strip()
+        else:
+            addr = None
+        if all_addr and all_addr == all_addr and str(all_addr).strip() not in ('', 'nan', 'None'):
+            all_addr = re.sub(r'\s+(LGH|lgh|ANL|LOKAL|KONTOR|GAR|P-PLATS)[^,]*', '', str(all_addr)).strip(', ')
+        else:
+            all_addr = None
+
+        display_addr = addr if addr else (
+            str(fastbet).strip() if fastbet and not pd.isna(fastbet) and str(fastbet).strip() else None
+        )
+
+        def _safe_int(v):  return int(v)   if v is not None and not pd.isna(v) else None
+        def _safe_f1(v):   return round(float(v), 1) if v is not None and not pd.isna(v) else None
+
+        def _safe_str(v):
+            s = str(v).strip() if v is not None else ""
+            return s if s not in ("", "nan", "None", "<NA>") else None
+
+        records.append({
+            "coordinates":    row["coordinates"],
+            "height":         round(float(row["elev"]), 1),
+            "color":          row["color"],
+            "floors":         _safe_f1(fl_epc),
+            "year":           _safe_int(yr_epc),
+            "area":           _safe_int(area),
+            "footprint_m2":   _safe_f1(row.get("footprint_m2", None)),
+            "energy":         _safe_f1(enrg),
+            "eclass":         _safe_str(eklass),
+            "eclass_color":   ECLASS_COLORS.get(_safe_str(eklass) or "", None),
+            "has_epc":        bool(andamal and andamal == andamal),
+            "andamal":        _safe_str(andamal),
+            "use_cat":        use,
+            "address":        display_addr,
+            "all_addresses":  all_addr,
+            "tabula_period":  _safe_str(row.get("tabula_period")),
+            "tabula_u_wall":  round(float(row["tabula_u_wall"]),  2) if row.get("tabula_u_wall")  is not None and row.get("tabula_u_wall")  == row.get("tabula_u_wall")  else None,
+            "tabula_u_roof":  round(float(row["tabula_u_roof"]),  2) if row.get("tabula_u_roof")  is not None and row.get("tabula_u_roof")  == row.get("tabula_u_roof")  else None,
+            "tabula_u_win":   round(float(row["tabula_u_win"]),   2) if row.get("tabula_u_win")   is not None and row.get("tabula_u_win")   == row.get("tabula_u_win")   else None,
+            "tabula_heat_z3": round(float(row["tabula_heat_z3"]), 1) if row.get("tabula_heat_z3") is not None and row.get("tabula_heat_z3") == row.get("tabula_heat_z3") else None,
+            "tabula_wall":    _safe_str(row.get("tabula_wall")),
+            "tabula_roof":    _safe_str(row.get("tabula_roof")),
+            "perf_pct":       round(float(row["perf_pct"]), 3) if row.get("perf_pct") is not None and row.get("perf_pct") == row.get("perf_pct") else None,
+        })
+
+    records    = _sanitize(records)
+    data_json  = json.dumps(records)
+
+    # ── EPC footprint layer ────────────────────────────────────────────────
+    print("  Building EPC footprint JSON ...")
+    _epc_bbox = epc_gdf.cx[LON_MIN:LON_MAX, LAT_MIN:LAT_MAX].copy()
+    _epc_bbox["geometry"] = _epc_bbox.geometry.simplify(0.00003, preserve_topology=False)
+    epc_records = []
+    for _, _r in _epc_bbox.iterrows():
+        _g = _r.geometry
+        if _g is None or _g.is_empty:
+            continue
+        if _g.geom_type == "MultiPolygon":
+            _g = max(_g.geoms, key=lambda x: x.area)
+        if _g.geom_type != "Polygon" or _g.exterior is None:
+            continue
+        _coords = [[round(c[0], 6), round(c[1], 6)] for c in _g.exterior.coords]
+        _ek = str(_r.get("energy_class", "") or "").strip().upper()
+        _ek = _ek if _ek in ("A","B","C","D","E","F","G") else None
+
+        def _s(v):
+            s = str(v).strip() if v is not None else ""
+            return s if s not in ("", "nan", "None", "<NA>") else None
+        def _sf(v, d=1):
+            s = str(v).strip() if v is not None else ""
+            if s in ("", "nan", "None", "<NA>"): return None
+            try: return round(float(s), d)
+            except: return None
+        def _si(v):
+            s = str(v).strip() if v is not None else ""
+            if s in ("", "nan", "None", "<NA>"): return None
+            try: return int(float(s))
+            except: return None
+
+        epc_records.append({
+            "coordinates": _coords,
+            "andamal":     _s(_r.get("andamal1")),
+            "eclass":      _ek,
+            "address":     _s(_r.get("address")),
+            "energy":      _sf(_r.get("energy_kwh_m2")),
+            "area":        _si(_r.get("area_atemp")),
+            "year":        _si(_r.get("year_built")),
+            "floors":      _sf(_r.get("floors_epc")),
+            "prop_id":     _s(_r.get("fastighetsbeteckning")),
+        })
+    print(f"  EPC footprints for layer: {len(epc_records):,}")
+    epc_json = json.dumps(epc_records)
+
+    # ── Map centre ────────────────────────────────────────────────────────
+    _gdf_proj = gdf.to_crs("EPSG:3006")
+    cx = float(_gdf_proj.geometry.centroid.to_crs("EPSG:4326").x.median())
+    cy = float(_gdf_proj.geometry.centroid.to_crs("EPSG:4326").y.median())
+
+    # ── Statistics ────────────────────────────────────────────────────────
+    n_total       = len(gdf)
+    n_epc_matched = int(gdf["andamal1_epc"].notna().sum())
+    eclass_counts = {}
+    for _cls in ["A","B","C","D","E","F","G"]:
+        eclass_counts[_cls] = int((gdf["energy_class"].astype(str).str.strip().str.upper() == _cls).sum())
+    n_eclass_total = sum(eclass_counts.values())
+
+    # ── Performance cards ─────────────────────────────────────────────────
+    _ef = gdf[
+        gdf["tabula_period"].notna() &
+        gdf["energy_kwh_m2"].notna() &
+        (pd.to_numeric(gdf["energy_kwh_m2"], errors="coerce") > 0)
+    ].copy()
+    _ef["_energy"] = pd.to_numeric(_ef["energy_kwh_m2"], errors="coerce")
+
+    def _fmt_addr(row):
+        a = row.get("address_epc", None)
+        f = row.get("fastighet_epc", None)
+        if a and str(a).strip() not in ("", "nan", "None"):
+            return re.sub(r'\s+(LGH|lgh|ANL|LOKAL|KONTOR|GAR|P-PLATS).*$', '', str(a)).strip()
+        if f and str(f).strip() not in ("", "nan", "None"):
+            return str(f).strip()
+        return "Unknown address"
+
+    _ef["_addr"] = _ef.apply(_fmt_addr, axis=1)
+
+    def _row_to_card(r):
+        eklass = str(r.get("energy_class","")).strip().upper()
+        if eklass in ("","NAN","NONE"): eklass = None
+        yr = r.get("year_built_epc", None)
+        try: yr = int(yr) if yr and not pd.isna(yr) else None
+        except: yr = None
+        return {
+            "addr":   r["_addr"],
+            "energy": round(float(r["_energy"]), 0),
+            "eclass": eklass,
+            "use":    r.get("use_cat","ovrigt"),
+            "period": r.get("tabula_period", None),
+            "year":   yr,
+            "area":   int(r["area_atemp_epc"]) if r.get("area_atemp_epc") and str(r.get("area_atemp_epc")) not in ("nan","None") else None,
+        }
+
+    # Per-period cards
+    period_cards_json = {}
+    for _p in PERIOD_KEYS:
+        _sub = _ef[_ef["tabula_period"] == _p].copy()
+        if _sub.empty:
+            period_cards_json[_p] = {"best": [], "worst": []}
+            continue
+        _sub_sorted = _sub.sort_values("_energy")
+        period_cards_json[_p] = {
+            "best":  [_row_to_card(r) for _, r in _sub_sorted.head(3).iterrows()],
+            "worst": [_row_to_card(r) for _, r in _sub_sorted.tail(3).iloc[::-1].iterrows()],
+        }
+    period_cards_js = json.dumps(period_cards_json)
+
+    # Per-energy-class cards
+    eclass_cards_json = {}
+    for _cls in ["A","B","C","D","E","F","G"]:
+        _sub = _ef[_ef["energy_class"].astype(str).str.strip().str.upper() == _cls].copy()
+        if _sub.empty:
+            eclass_cards_json[_cls] = {"best": [], "worst": []}
+            continue
+        _sub_sorted = _sub.sort_values("_energy")
+        eclass_cards_json[_cls] = {
+            "best":  [_row_to_card(r) for _, r in _sub_sorted.head(3).iterrows()],
+            "worst": [_row_to_card(r) for _, r in _sub_sorted.tail(3).iloc[::-1].iterrows()],
+        }
+    eclass_cards_js = json.dumps(eclass_cards_json)
+
+    # Per-use-category cards
+    use_cards_json = {}
+    for _use in ["bostad_enfamilj","bostad_flerfamilj","verksamhet","industri","samhalle","komplement","ovrigt"]:
+        _sub = _ef[_ef["use_cat"] == _use].copy()
+        if _sub.empty:
+            use_cards_json[_use] = {"buildings": []}
+            continue
+        _sub_sorted = _sub.sort_values("_energy")
+        _best    = list(_sub_sorted.head(50).index)
+        _worst   = list(_sub_sorted.tail(50).index)
+        _combined = {i for i in _best + _worst}
+        _rows = _sub_sorted.loc[_sub_sorted.index.isin(_combined)]
+        use_cards_json[_use] = {"buildings": [_row_to_card(r) for _, r in _rows.iterrows()]}
+    use_cards_js = json.dumps(use_cards_json)
+
+    # Per-period energy summary stats
+    period_stats = {}
+    for _p in PERIOD_KEYS:
+        _sub = gdf[gdf["tabula_period"] == _p]
+        _energies = pd.to_numeric(_sub["energy_kwh_m2"], errors="coerce").dropna()
+        period_stats[_p] = {
+            "count":      int(len(_sub)),
+            "median_kwh": round(float(_energies.median()), 0) if len(_energies) else None,
+        }
+    period_stats_js = json.dumps(period_stats)
+
+    print(f"  Done: {n_total:,} buildings, {n_epc_matched:,} EPC-matched, {n_eclass_total:,} energy-classified")
+
+    return {
+        "records":         records,          # Python list — for buildings.json
+        "records_json":    data_json,        # JSON string — for DATA const in HTML
+        "epc_json":        epc_json,         # JSON string — EPC footprint layer
+        "period_cards_js": period_cards_js,
+        "eclass_cards_js": eclass_cards_js,
+        "use_cards_js":    use_cards_js,
+        "period_stats_js": period_stats_js,
+        "cx":              cx,
+        "cy":              cy,
+        "n_total":         n_total,
+        "n_epc_matched":   n_epc_matched,
+        "n_eclass_total":  n_eclass_total,
+    }

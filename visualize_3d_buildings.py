@@ -1,13 +1,30 @@
 """
-3D Building Extrusion Map – Gothenburg (SE23)
-Uses pydeck PolygonLayer with extruded=True, height driven by EUBUCCO 'height' field.
-Outputs a standalone HTML file you can open in any browser.
+visualize_3d_buildings.py — backward-compatibility wrapper.
+The build logic has been split into:
+    data_pipeline.py   — all Python data processing
+    build.py           — assembler: reads viewer/ source files → assets/gothenburg_3d.html
+    viewer/styles/main.css
+    viewer/index.html
+    viewer/js/legend.js
+    viewer/js/cesium.js
+    viewer/js/ui.js
+    viewer/js/pvgis.js
+    viewer/js/facade_inspector.js
+    viewer/js/search.js
 
-Usage:
-    python visualize_3d_buildings.py
-Output:
-    assets/gothenburg_3d.html
+To regenerate the HTML, run either:
+    python build.py              (new entry point)
+    python visualize_3d_buildings.py  (this file — same result)
 """
+# ruff: noqa
+from build import main
+if __name__ == "__main__":
+    main()
+
+# ── Legacy code kept below for reference only. Do NOT edit here. ──────────
+# Edit viewer/styles/main.css, viewer/index.html, viewer/js/*.js instead.
+# The data pipeline lives in data_pipeline.py.
+# ─────────────────────────────────────────────────────────────────────────
 
 import geopandas as gpd
 import pandas as pd
