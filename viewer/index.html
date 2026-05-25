@@ -26,6 +26,12 @@
     <span class="lp-title">&#127963; Gothenburg 3D</span>
     <span class="lp-sub">EUBUCCO v0.2 + EPC &middot; {{TOTAL_BUILDINGS}} buildings</span>
   </div>
+  <!-- Building info (shown inline in sidebar when building is selected) -->
+  <div class="panel" id="info-panel">
+    <button class="close-btn" id="info-close">&#x2715;</button>
+    <h2>&#127963; Building</h2>
+    <div id="info-content"></div>
+  </div>
   <div id="search-wrap">
     <div id="search-row">
       <input id="search-input" type="text" placeholder="Search address&hellip;" autocomplete="off">
@@ -69,20 +75,13 @@
   </div>
 </div>
 
-<!-- Building info panel -->
-<div class="panel" id="info-panel">
-  <button class="close-btn" id="info-close">&#x2715;</button>
-  <h2>&#127963; Building</h2>
-  <div id="info-content"></div>
-</div>
-
-<!-- Hover tooltip card (kept dark — floats over the 3D map) -->
+<!-- Hover tooltip card -->
 <div id="hover-card" style="
   display:none; position:fixed; pointer-events:none; z-index:9999;
-  background:rgba(10,10,20,0.92); border:1px solid rgba(114,28,184,0.5);
+  background:#ffffff; border:1px solid rgba(114,28,184,0.25);
   border-radius:10px; padding:10px 13px; min-width:200px; max-width:280px;
-  font-family:Inter,sans-serif; font-size:12px; color:#e2e8f0;
-  box-shadow:0 4px 20px rgba(0,0,0,0.6); backdrop-filter:blur(6px);
+  font-family:Inter,sans-serif; font-size:12px; color:#1e293b;
+  box-shadow:0 4px 20px rgba(0,0,0,0.15); backdrop-filter:blur(6px);
 "></div>
 
 <!-- Facade inspector -->

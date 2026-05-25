@@ -70,27 +70,27 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
     const eclassColor = b.eclass ? (ECLASS_COLORS_CSS[b.eclass] || '#94a3b8') : '#94a3b8';
     const tabulaLabel = b.tabula_period ? (TABULA_LABELS[b.tabula_period] || b.tabula_period) : null;
 
-    let html = '<div style="font-weight:600;font-size:13px;margin-bottom:4px;color:#c4b5fd">' +
+    let html = '<div style="font-weight:600;font-size:13px;margin-bottom:4px;color:#6d28d9">' +
       (b.address || b.all_addresses || 'Building') + '</div>';
     // Show all addresses if multiple units share this EPC
     if (b.all_addresses && b.all_addresses !== b.address && b.all_addresses.includes(',')) {
-      html += '<div style="font-size:10px;color:#94a3b8;margin-bottom:5px">' + b.all_addresses + '</div>';
+      html += '<div style="font-size:10px;color:#64748b;margin-bottom:5px">' + b.all_addresses + '</div>';
     }
     const useLabel = b.use_cat ? b.use_cat.replace(/_/g,' ') : 'Unknown';
-    html += '<div style="margin-bottom:6px"><span style="background:rgba(114,28,184,0.4);border-radius:4px;padding:2px 7px;font-size:11px">' + useLabel + '</span></div>';
+    html += '<div style="margin-bottom:6px"><span style="background:rgba(114,28,184,0.12);color:#4c1d95;border-radius:4px;padding:2px 7px;font-size:11px">' + useLabel + '</span></div>';
     html += '<table style="width:100%;border-collapse:collapse">';
     const row = (lbl, val, color) => (val != null && val !== '') ?
-      '<tr><td style="color:#94a3b8;padding:2px 0;white-space:nowrap">' + lbl + '</td>' +
+      '<tr><td style="color:#64748b;padding:2px 0;white-space:nowrap">' + lbl + '</td>' +
       '<td style="text-align:right;padding:2px 0;font-weight:500' + (color?';color:'+color:'') + '">' + val + '</td></tr>' : '';
     if (b.eclass) html += row('Energy class','<span style="background:'+eclassColor+';color:#000;border-radius:3px;padding:1px 6px;font-weight:700">'+b.eclass+'</span>',null);
-    if (b.energy) html += row('Energy use', b.energy+' kWh/m&#178;yr', b.energy>150?'#fb923c':'#4ade80');
+    if (b.energy) html += row('Energy use', b.energy+' kWh/m&#178;yr', b.energy>150?'#ea580c':'#16a34a');
     if (b.year)   html += row('Year built', b.year, null);
     if (b.footprint_m2) html += row('Footprint', Math.round(b.footprint_m2)+' m&#178;', null);
     if (b.height) html += row('Height', Math.round(b.height)+' m', null);
     if (b.floors) html += row('Floors', b.floors, null);
     if (isResidential && tabulaLabel) {
-      html += '<tr><td colspan="2" style="padding-top:6px;padding-bottom:2px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:.5px">TABULA Archetype</td></tr>';
-      html += row('Era', tabulaLabel, '#a78bfa');
+      html += '<tr><td colspan="2" style="padding-top:6px;padding-bottom:2px;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.5px">TABULA Archetype</td></tr>';
+      html += row('Era', tabulaLabel, '#7c3aed');
       if (b.tabula_u_wall) html += row('U-wall', b.tabula_u_wall+' W/m&#178;K', null);
       if (b.tabula_u_win)  html += row('U-window', b.tabula_u_win+' W/m&#178;K', null);
     }

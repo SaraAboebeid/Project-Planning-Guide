@@ -102,8 +102,13 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
 .btn:hover  { background:rgba(114,28,184,0.35); border-color:#7c3aed; }
 .btn.active { background:rgba(114,28,184,0.5); border-color:#a78bfa; color:#a78bfa; }
 
-/* building info panel */
-#info-panel { top:16px; right:16px; width:270px; display:none; }
+/* building info panel — inline in left sidebar */
+#info-panel {
+  position:relative; top:auto; right:auto; width:auto;
+  display:none; border-radius:0; border:none;
+  border-bottom:1px solid var(--border); box-shadow:none;
+  padding:14px 14px 12px; flex-shrink:0; overflow-y:auto; max-height:55vh;
+}
 #info-panel .close-btn {
   position:absolute; top:10px; right:12px; background:none; border:none;
   color:var(--muted); cursor:pointer; font-size:16px; line-height:1;
