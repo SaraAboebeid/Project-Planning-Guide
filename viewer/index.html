@@ -63,6 +63,8 @@
     <button class="btn opt-btn" id="btn-eubucco">&#127963; EUBUCCO Overlay</button>
     <button class="btn opt-btn" id="btn-reset">&#8962; Reset View</button>
     <button class="btn opt-btn" id="btn-transit">&#x1F68C; Transit Layer</button>
+    <button class="btn opt-btn" id="btn-disruptions">&#x26A0; Störning</button>
+    <button class="btn opt-btn" id="btn-parking">&#x1F17F; Pendelparkering</button>
   </div>
   <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:4px 10px 0"></div>
   <div class="lp-divider"></div>
@@ -125,6 +127,26 @@
   </div>
   <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px" id="vt-panel-title"></div>
   <div id="vt-departures"></div>
+</div>
+
+<!-- Västtrafik disruptions panel -->
+<div class="panel" id="vt-disr-panel" style="display:none;top:16px;left:260px;width:320px;max-height:480px;overflow-y:auto">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <h2 style="margin:0">&#x26A0; Störning</h2>
+    <button class="btn" id="btn-disr-close" style="padding:2px 8px">&#x2715;</button>
+  </div>
+  <div id="vt-disr-count" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+  <div id="vt-disr-list"></div>
+</div>
+
+<!-- Västtrafik parking detail panel -->
+<div class="panel" id="vt-park-panel" style="display:none;top:16px;left:260px;width:260px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <h2 style="margin:0">&#x1F17F; Parkering</h2>
+    <button class="btn" id="btn-park-close" style="padding:2px 8px">&#x2715;</button>
+  </div>
+  <div id="vt-park-title" style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px"></div>
+  <div id="vt-park-detail"></div>
 </div>
 
 <!-- Cesium Ion Token panel -->

@@ -619,7 +619,7 @@ async def estimate_wwr(req: WWRRequest):
 _VT_CLIENT_ID     = "D016LXgep9AJv4z3k0EPmiOXfYka"   # ← paste Västtrafik client ID
 _VT_CLIENT_SECRET = "kaEb3XDR0jqZEG80WJndC7DEyXMa"   # ← paste Västtrafik client secret
 
-_VT_AUTH_URL  = "https://ext-api.vasttrafik.se/auth/connect/token"
+_VT_AUTH_URL  = "https://ext-api.vasttrafik.se/token"
 _VT_GEO_URL   = "https://ext-api.vasttrafik.se/geo/v3"
 _VT_PR_URL    = "https://ext-api.vasttrafik.se/pr/v4"
 
@@ -641,16 +641,16 @@ async def _vt_get_token() -> str:
     if cached.get("access_token") and cached.get("expires_at", 0) > now + 30:
         return cached["access_token"]
 
-    import httpx
+    import httpx, base64 as _b64
+    _creds_b64 = _b64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     async with httpx.AsyncClient(timeout=10) as client:
         r = await client.post(
             _VT_AUTH_URL,
-            data={
-                "grant_type":    "client_credentials",
-                "client_id":     client_id,
-                "client_secret": client_secret,
+            data={"grant_type": "client_credentials"},
+            headers={
+                "Content-Type":  "application/x-www-form-urlencoded",
+                "Authorization": f"Basic {_creds_b64}",
             },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
     if r.status_code != 200:
         raise HTTPException(502, f"Västtrafik auth failed: {r.status_code} {r.text[:200]}")
@@ -674,48 +674,26 @@ async def vt_stops(
 ):
     """
     Return Västtrafik stop areas within the given bbox.
-
-    Uses Geografi v3 GET /StopAreas — returns all stop areas, filtered client-side
-    to the requested bbox.  Results are cached for 24 h (stop positions rarely change).
+    Uses Planera Resa v4 GET /stop-areas  (flat array: gid, name, lat, long).
     """
     import httpx
     token = await _vt_get_token()
     async with httpx.AsyncClient(timeout=20) as client:
         r = await client.get(
-            f"{_VT_GEO_URL}/StopAreas",
+            f"{_VT_PR_URL}/stop-areas",
             headers={"Authorization": f"Bearer {token}"},
-            params={"limit": 1000, "offset": 0},
         )
     if r.status_code != 200:
-        raise HTTPException(502, f"Västtrafik /StopAreas failed: {r.status_code}")
+        raise HTTPException(502, f"Västtrafik /stop-areas failed: {r.status_code}")
 
-    data = r.json()
-    # The Geografi v3 response structure:
-    #   { "stopAreas": [ { "gid": "...", "name": "...",
-    #                       "geometry": { "wgs84": { "lat": 57.7, "lng": 11.97 } },
-    #                       ... } ] }
-    all_stops = data.get("stopAreas", data.get("results", []))
-
-    def _stop_coords(s: dict) -> tuple[float, float] | None:
-        geo = s.get("geometry") or {}
-        wgs = geo.get("wgs84") or {}
-        lat = wgs.get("lat") or wgs.get("latitude")
-        lon = wgs.get("lng") or wgs.get("longitude") or wgs.get("lon")
-        if lat is not None and lon is not None:
-            return float(lat), float(lon)
-        # fallback: flat fields
-        lat = s.get("lat") or s.get("latitude")
-        lon = s.get("lon") or s.get("lng") or s.get("longitude")
-        if lat is not None and lon is not None:
-            return float(lat), float(lon)
-        return None
-
+    all_stops = r.json()   # flat list: [{gid, name, lat, long}, ...]
     filtered = []
     for s in all_stops:
-        coords = _stop_coords(s)
-        if coords is None:
+        lat = s.get("lat") or s.get("latitude")
+        lon = s.get("long") or s.get("lon") or s.get("longitude")
+        if lat is None or lon is None:
             continue
-        lat, lon = coords
+        lat, lon = float(lat), float(lon)
         if south <= lat <= north and west <= lon <= east:
             filtered.append({
                 "gid":  s.get("gid"),
@@ -759,7 +737,8 @@ async def vt_positions(
     data = r.json()
     # Response: { "serviceJourneys": [ { "line": { "shortName": "16", "transportMode": "tram" },
     #                                     "lat": 57.7, "long": 11.97, "bearing": 90, ... } ] }
-    vehicles = data.get("serviceJourneys", data.get("results", []))
+    # /positions returns a flat list directly
+    vehicles = data if isinstance(data, list) else data.get("serviceJourneys", data.get("results", []))
 
     result = []
     for v in vehicles:
@@ -827,6 +806,117 @@ async def vt_departures(
         departures.append(dep)
 
     return {"gid": gid, "departures": departures}
+
+
+@app.get("/api/vasttrafik/disruptions")
+async def vt_disruptions():
+    """
+    Return current traffic disruptions from Störning v1.
+    Uses GET /ts/v1/traffic-situations.
+    """
+    import httpx
+    token = await _vt_get_token()
+    _VT_TS_URL = "https://ext-api.vasttrafik.se/ts/v1"
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{_VT_TS_URL}/traffic-situations",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    if r.status_code != 200:
+        raise HTTPException(502, f"Västtrafik /traffic-situations failed: {r.status_code}")
+
+    raw = r.json()   # list of TrafficSituationApiModel
+    result = []
+    for d in raw:
+        affected_lines = []
+        for ln in (d.get("affectedLines") or []):
+            affected_lines.append({
+                "designation": ln.get("designation", ""),
+                "transportMode": ln.get("defaultTransportModeCode", "bus"),
+                "bgColor": ln.get("backgroundColor", "1d4ed8"),
+                "fgColor": ln.get("textColor", "ffffff"),
+            })
+        # gather unique stop-area gids that may be affected
+        stop_gids = list({sp.get("stopAreaGid") for sp in (d.get("affectedStopPoints") or []) if sp.get("stopAreaGid")})
+        result.append({
+            "id":          d.get("situationNumber", ""),
+            "severity":    d.get("severity", "slight"),
+            "title":       d.get("title", ""),
+            "description": d.get("description", ""),
+            "startTime":   d.get("startTime", ""),
+            "endTime":     d.get("endTime", ""),
+            "lines":       affected_lines,
+            "stopGids":    stop_gids,
+        })
+    return {"disruptions": result, "count": len(result)}
+
+
+@app.get("/api/vasttrafik/parking")
+async def vt_parking():
+    """
+    Return all park-and-ride lots from SPP v3.
+    Each ParkingArea may contain multiple ParkingLots (each with lat/lon).
+    """
+    import httpx
+    token = await _vt_get_token()
+    _VT_SPP_URL = "https://ext-api.vasttrafik.se/spp/v3"
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.get(
+            f"{_VT_SPP_URL}/parkings",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    if r.status_code != 200:
+        raise HTTPException(502, f"Västtrafik /parkings failed: {r.status_code}")
+
+    raw = r.json()   # list of ParkingArea {Id, Name, StopAreas, ParkingLots}
+    lots = []
+    for area in raw:
+        area_id   = area.get("Id")
+        area_name = area.get("Name", "")
+        for lot in (area.get("ParkingLots") or []):
+            lat = lot.get("Lat")
+            lon = lot.get("Lon")
+            if lat is None or lon is None:
+                continue
+            lots.append({
+                "areaId":    area_id,
+                "areaName":  area_name,
+                "lotId":     lot.get("Id"),
+                "name":      lot.get("Name", area_name),
+                "lat":       round(float(lat), 6),
+                "lon":       round(float(lon), 6),
+                "capacity":  lot.get("TotalCapacity", 0),
+                "hasBarrier": lot.get("IsRestrictedByBarrier", False),
+                "type":      (lot.get("ParkingType") or {}).get("Name", "CARPARK"),
+            })
+    return {"lots": lots, "count": len(lots)}
+
+
+@app.get("/api/vasttrafik/parking/{lot_id}/availability")
+async def vt_parking_availability(lot_id: int):
+    """
+    Return live available spots for a parking lot from SPP v3.
+    Uses GET /spp/v3/availableCapacity/{lotId}.
+    """
+    import httpx
+    token = await _vt_get_token()
+    _VT_SPP_URL = "https://ext-api.vasttrafik.se/spp/v3"
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{_VT_SPP_URL}/availableCapacity/{lot_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    if r.status_code == 404:
+        return {"available": None, "total": None, "lotId": lot_id}
+    if r.status_code != 200:
+        raise HTTPException(502, f"Västtrafik /availableCapacity failed: {r.status_code}")
+    data = r.json()
+    return {
+        "lotId":     lot_id,
+        "available": data.get("AvailableCapacity") or data.get("available"),
+        "total":     data.get("TotalCapacity")     or data.get("total"),
+        "updated":   data.get("LastUpdated")       or data.get("updated"),
+    }
 
 
 # ── WWR database (JSON file, grows over time) ────────────────────────────────
