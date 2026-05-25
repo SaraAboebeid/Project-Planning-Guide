@@ -16,11 +16,9 @@ const VT_API = 'http://localhost:8000/api/vasttrafik';
 // ── LAYER 1: TRANSIT  ──────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════
 
-let _vtVisible         = false;
-let _vtStopEntities    = [];
-let _vtVehicleEntities = [];
-let _vtPositionTimer   = null;
-let _vtStopsLoaded     = false;
+let _vtVisible      = false;
+let _vtStopEntities = [];
+let _vtStopsLoaded  = false;
 
 const VT_MODE_COLOR = {
   tram:   Cesium.Color.fromCssColorString('#e9c24e'),
@@ -34,7 +32,7 @@ function _vtModeColor(mode) { return VT_MODE_COLOR[mode] || VT_MODE_COLOR.bus; }
 function toggleTransit() {
   _vtVisible = !_vtVisible;
   const btn = document.getElementById('btn-transit');
-  if (_vtVisible) { btn.classList.add('active'); _vtShowLayer(); }
+  if (_vtVisible) { btn.classList.add('active');    _vtShowLayer(); }
   else            { btn.classList.remove('active'); _vtHideLayer(); }
 }
 
@@ -47,15 +45,12 @@ async function _vtShowLayer() {
   } else {
     for (const e of _vtStopEntities) e.show = true;
   }
-  _vtLoadPositions();
-  _vtPositionTimer = setInterval(_vtLoadPositions, 15000);
+  if (window.trafikCanvasAnimation) window.trafikCanvasAnimation.start();
 }
 
 function _vtHideLayer() {
-  for (const e of _vtStopEntities)    { e.show = false; }
-  for (const e of _vtVehicleEntities) { viewer.entities.remove(e); }
-  _vtVehicleEntities = [];
-  if (_vtPositionTimer) { clearInterval(_vtPositionTimer); _vtPositionTimer = null; }
+  for (const e of _vtStopEntities) { e.show = false; }
+  if (window.trafikCanvasAnimation) window.trafikCanvasAnimation.stop();
   document.getElementById('vt-status').style.display = 'none';
   document.getElementById('vt-panel').style.display  = 'none';
 }
@@ -100,38 +95,8 @@ async function _vtLoadStops() {
   }
 }
 
-async function _vtLoadPositions() {
-  if (!_vtVisible) return;
-  try {
-    const cart = viewer.scene.globe.ellipsoid.cartesianToCartographic(viewer.camera.position);
-    const clat = Cesium.Math.toDegrees(cart.latitude);
-    const clon = Cesium.Math.toDegrees(cart.longitude);
-    const pad  = 0.07;
-    const params = new URLSearchParams({
-      south: (clat - pad).toFixed(5), north: (clat + pad).toFixed(5),
-      west:  (clon - pad).toFixed(5), east:  (clon + pad).toFixed(5),
-    });
-    const r = await fetch(`${VT_API}/positions?${params}`);
-    if (!r.ok) return;
-    const data = await r.json();
-    for (const e of _vtVehicleEntities) viewer.entities.remove(e);
-    _vtVehicleEntities = [];
-    for (const v of (data.vehicles || [])) {
-      const color = _vtModeColor(v.transportMode);
-      const e = viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat, 3),
-        billboard: {
-          image:  _vtVehicleSvg(color.toCssHexString(), v.line),
-          width: 28, height: 28,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          scaleByDistance: new Cesium.NearFarScalar(100, 1.2, 3000, 0.3),
-        },
-        properties: { type: 'vt-vehicle', line: v.line, mode: v.transportMode },
-      });
-      _vtVehicleEntities.push(e);
-    }
-  } catch (err) { console.warn('[vasttrafik] positions refresh', err.message); }
-}
+// Vehicle positions are now rendered by trafik_canvas.js (canvas overlay)
+// with smooth interpolation, glow, and trails — adapted from MR-Studio-Demo.
 
 async function _vtShowDepartures(gid, name) {
   const panel = document.getElementById('vt-panel');

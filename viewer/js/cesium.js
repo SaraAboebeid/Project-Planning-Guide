@@ -54,28 +54,63 @@ let ION_TOKEN = localStorage.getItem('cesium_ion_token') ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4NmE0YWM4NS1hMjI0LTRiY2YtOGFkYS0yOGNiNTA2ZGM2MGIiLCJpZCI6NDI3NDMzLCJzdWIiOiJzYXJhYWJvIiwiaXNzIjoiaHR0cHM6Ly9pb24uY2VzaXVtLmNvbSIsImF1ZCI6IkJ1aWxkaW5ncyIsImlhdCI6MTc3Nzk4NDUwMn0.YfKFn0wvu95IcXJORmvmhTMAQ44-y8_qoajP_339Y4o';
 if (ION_TOKEN) Cesium.Ion.defaultAccessToken = ION_TOKEN;
 
-// Viewer: globe:false per Cesium guide — photorealistic tiles replace the globe entirely
+// Viewer with globe — CartoDB Light as default basemap
 const viewer = new Cesium.Viewer('cesium-container', {
   timeline:false, animation:false, baseLayerPicker:false,
   geocoder:false, homeButton:false, sceneModePicker:false,
   navigationHelpButton:false, fullscreenButton:false,
   selectionIndicator:false, infoBox:false,
-  globe: false,
+  terrainProvider: new Cesium.EllipsoidTerrainProvider(),
 });
 viewer.cesiumWidget.creditContainer.style.display = 'none';
-// Fix black sky — enable atmosphere and sky box
 viewer.scene.skyAtmosphere = new Cesium.SkyAtmosphere();
-viewer.scene.skyBox = new Cesium.SkyBox({
-  sources: {
-    positiveX: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg',
-    negativeX: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg',
-    positiveY: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg',
-    negativeY: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg',
-    positiveZ: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg',
-    negativeZ: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg',
+
+// Replace default imagery with CartoDB Positron (light/subtle — ideal for data overlays)
+viewer.imageryLayers.removeAll();
+viewer.imageryLayers.addImageryProvider(
+  new Cesium.UrlTemplateImageryProvider({
+    url: 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+    credit: '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────
+// Basemap switching — called by layers.js base-map radio buttons
+// Options: 'light' | 'dark' | 'satellite' | 'photo'
+// ─────────────────────────────────────────────────────────────────
+let _currentBasemap = 'light';
+window.setBasemap = function(type) {
+  _currentBasemap = type;
+  if (type === 'photo') {
+    viewer.imageryLayers.removeAll();
+    if (!tilesEnabled) {
+      if (ION_TOKEN) loadGoogleTiles(ION_TOKEN);
+      else document.getElementById('token-panel').style.display = 'block';
+    }
+  } else {
+    if (tilesEnabled) {
+      tilesEnabled = false;
+      if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
+      document.getElementById('btn-tiles').classList.remove('active');
+    }
+    viewer.imageryLayers.removeAll();
+    const tileUrls = {
+      light:     'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+      dark:      'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+      satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    };
+    const credits = {
+      light:     '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
+      dark:      '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
+      satellite: 'Esri, DigitalGlobe, GeoEye',
+    };
+    if (tileUrls[type]) {
+      viewer.imageryLayers.addImageryProvider(
+        new Cesium.UrlTemplateImageryProvider({ url: tileUrls[type], credit: credits[type] })
+      );
+    }
   }
-});
-viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#87CEEB');  // sky blue fallback
+};
 
 // Maps-style camera controls
 // Scroll = zoom · Drag = pan · Right-drag / Ctrl+drag = tilt/rotate
@@ -108,6 +143,7 @@ async function loadGoogleTiles(token) {
     // Exactly as per https://cesium.com/learn/cesiumjs-learn/cesiumjs-photorealistic-3d-tiles/
     googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
     viewer.scene.primitives.add(googleTileset);
+    viewer.imageryLayers.removeAll(); // tiles render the ground — imagery not needed
     tilesEnabled = true;
     ION_TOKEN = token;
     document.getElementById('btn-tiles').classList.add('active');
@@ -136,7 +172,7 @@ document.getElementById('token-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('token-apply').click();
 });
 
-// Toggle tiles on/off
+// Toggle tiles on/off (internal — also driven by setBasemap)
 document.getElementById('btn-tiles').addEventListener('click', () => {
   if (!tilesEnabled) {
     if (ION_TOKEN) { loadGoogleTiles(ION_TOKEN); }
@@ -145,6 +181,18 @@ document.getElementById('btn-tiles').addEventListener('click', () => {
     tilesEnabled = false;
     if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
     document.getElementById('btn-tiles').classList.remove('active');
+    // Restore previous basemap if photo was active
+    if (_currentBasemap === 'photo') {
+      _currentBasemap = 'light';
+      viewer.imageryLayers.removeAll();
+      viewer.imageryLayers.addImageryProvider(
+        new Cesium.UrlTemplateImageryProvider({
+          url: 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+          credit: '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
+        })
+      );
+      document.dispatchEvent(new CustomEvent('basemapReset'));
+    }
   }
 });
 

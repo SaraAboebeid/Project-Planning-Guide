@@ -57,16 +57,82 @@
   <div id="legend-container"></div>
   <div class="lp-hint">Click a row to see best &amp; worst performers</div>
   <div class="lp-divider"></div>
-  <div class="lp-section-title">View Options</div>
-  <div id="lp-options">
-    <button class="btn opt-btn" id="btn-tiles">&#127759; Photorealistic Tiles</button>
-    <button class="btn opt-btn" id="btn-eubucco">&#127963; EUBUCCO Overlay</button>
-    <button class="btn opt-btn" id="btn-reset">&#8962; Reset View</button>
-    <button class="btn opt-btn" id="btn-transit">&#x1F68C; Transit Layer</button>
-    <button class="btn opt-btn" id="btn-disruptions">&#x26A0; Störning</button>
-    <button class="btn opt-btn" id="btn-parking">&#x1F17F; Pendelparkering</button>
+  <div class="lp-section-title">Layers</div>
+
+  <!-- Hidden legacy buttons that cesium.js / vasttrafik.js still wire internally -->
+  <button id="btn-tiles"       style="display:none">tiles</button>
+  <button id="btn-eubucco"     style="display:none">eubucco</button>
+  <button id="btn-transit"     style="display:none">transit</button>
+  <button id="btn-disruptions" style="display:none">disruptions</button>
+  <button id="btn-parking"     style="display:none">parking</button>
+
+  <div id="lp-layers">
+
+    <!-- Base Map selector (radio — pick one) -->
+    <div class="lp-section-label">Base Map</div>
+    <div class="basemap-group">
+      <button class="base-btn active" id="btn-base-light">
+        <span class="base-indicator"></span>
+        <span class="layer-icon">&#x1F5FA;</span>
+        <span class="base-name">Light</span>
+        <span class="layer-pill">CartoDB</span>
+      </button>
+      <button class="base-btn" id="btn-base-dark">
+        <span class="base-indicator"></span>
+        <span class="layer-icon">&#x1F311;</span>
+        <span class="base-name">Dark</span>
+        <span class="layer-pill">CartoDB</span>
+      </button>
+      <button class="base-btn" id="btn-base-satellite">
+        <span class="base-indicator"></span>
+        <span class="layer-icon">&#x1F6F0;</span>
+        <span class="base-name">Satellite</span>
+        <span class="layer-pill">Esri</span>
+      </button>
+      <button class="base-btn" id="btn-base-photo">
+        <span class="base-indicator"></span>
+        <span class="layer-icon">&#x1F30D;</span>
+        <span class="base-name">Photorealistic 3D</span>
+        <span class="layer-pill">Google</span>
+      </button>
+    </div>
+
+    <div class="lp-divider" style="margin:6px 0 4px"></div>
+
+    <!-- Overlays (checkboxes — mix freely) -->
+    <div class="lp-section-label">Overlays</div>
+    <div class="overlay-group">
+      <button class="overlay-btn active" id="btn-overlay-buildings">
+        <span class="overlay-check"></span>
+        <span class="layer-icon">&#x1F3D7;</span>
+        <span class="base-name">Buildings</span>
+        <span class="layer-pill">EUBUCCO + EPC</span>
+      </button>
+      <button class="overlay-btn" id="btn-overlay-transit">
+        <span class="overlay-check"></span>
+        <span class="layer-icon">&#x1F68C;</span>
+        <span class="base-name">Live Transit &amp; Stops</span>
+        <span class="layer-pill">V&#228;sttrafik</span>
+      </button>
+      <button class="overlay-btn" id="btn-overlay-disruptions">
+        <span class="overlay-check"></span>
+        <span class="layer-icon">&#x26A0;</span>
+        <span class="base-name">St&#246;rning</span>
+        <span class="layer-pill">Live</span>
+      </button>
+      <button class="overlay-btn" id="btn-overlay-parking">
+        <span class="overlay-check"></span>
+        <span class="layer-icon">&#x1F17F;</span>
+        <span class="base-name">Pendelparkering</span>
+        <span class="layer-pill">VT</span>
+      </button>
+    </div>
+
+    <!-- vt-status: loading feedback used by vasttrafik.js -->
+    <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:2px 8px 0"></div>
+
+    <button class="btn opt-btn" id="btn-reset" style="margin-top:8px">&#8962; Reset View</button>
   </div>
-  <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:4px 10px 0"></div>
   <div class="lp-divider"></div>
   <div class="lp-section-title">Analysis Tools</div>
   <div style="padding:0 10px 6px;display:flex;flex-direction:column;gap:5px;flex-shrink:0">

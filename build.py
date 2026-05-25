@@ -87,7 +87,9 @@ def main():
         "pvgis.js",
         "facade_inspector.js",
         "search.js",
+        "roads.js",
         "vasttrafik.js",
+        "layers.js",
     ]
     all_js = "\n\n".join(
         open(f"viewer/js/{f}", encoding="utf-8").read()
@@ -139,6 +141,8 @@ def main():
     if os.path.isdir("frontend/public"):
         shutil.copy("assets/buildings.json", fp)
         print(f"  Copied -> {fp}")
+
+    # 6. Build kepler.gl map (optional – skipped if template not downloaded yet)
 
     print("=" * 60)
     print(f"Done.  Open http://localhost:8765 after running: python launch.py")

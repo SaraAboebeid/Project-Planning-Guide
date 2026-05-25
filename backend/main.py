@@ -892,6 +892,91 @@ async def vt_parking():
     return {"lots": lots, "count": len(lots)}
 
 
+# ── OSM road network ─────────────────────────────────────────────────────────
+
+_OSM_ROAD_CACHE: dict = {}   # key: rounded bbox tuple → GeoJSON FeatureCollection
+
+@app.get("/api/osm/roads")
+async def osm_roads(
+    south: float = Query(57.68, description="Bounding box south lat"),
+    north: float = Query(57.73, description="Bounding box north lat"),
+    west:  float = Query(11.93, description="Bounding box west lon"),
+    east:  float = Query(12.00, description="Bounding box east lon"),
+):
+    """
+    Return OSM road network as GeoJSON LineString features for the given bbox.
+    Queries the public Overpass API (highway=*) and returns a minimal GeoJSON
+    FeatureCollection suitable for Cesium polyline rendering.
+    Results are cached in memory per bbox (rounded to 3 dp).
+    """
+    import httpx
+
+    # Round bbox to 3 dp for cache key
+    key = (round(south, 3), round(north, 3), round(west, 3), round(east, 3))
+    if key in _OSM_ROAD_CACHE:
+        return _OSM_ROAD_CACHE[key]
+
+    OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+    # Fetch all highway ways + their nodes
+    query = f"""
+[out:json][timeout:25];
+(
+  way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|service|pedestrian|cycleway|footway|path|living_street|unclassified)$"]
+    ({south},{west},{north},{east});
+);
+(._;>;);
+out body;
+"""
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(OVERPASS_URL, data={"data": query})
+    if r.status_code != 200:
+        raise HTTPException(502, f"Overpass query failed: {r.status_code}")
+
+    osm = r.json()
+
+    # Build node lookup
+    nodes: dict[int, tuple[float, float]] = {}
+    for elem in osm.get("elements", []):
+        if elem["type"] == "node":
+            nodes[elem["id"]] = (elem["lon"], elem["lat"])
+
+    # Road type → display priority / colour hint
+    ROAD_CLASS = {
+        "motorway": "major", "trunk": "major", "primary": "primary",
+        "secondary": "secondary", "tertiary": "secondary",
+        "residential": "local", "living_street": "local", "unclassified": "local",
+        "service": "service", "pedestrian": "pedestrian",
+        "cycleway": "cycling", "footway": "pedestrian", "path": "pedestrian",
+    }
+
+    features = []
+    for elem in osm.get("elements", []):
+        if elem["type"] != "way":
+            continue
+        coords = [nodes[n] for n in elem.get("nodes", []) if n in nodes]
+        if len(coords) < 2:
+            continue
+        tags = elem.get("tags", {})
+        hw = tags.get("highway", "unclassified")
+        road_class = ROAD_CLASS.get(hw, "local")
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "LineString", "coordinates": coords},
+            "properties": {
+                "highway":    hw,
+                "road_class": road_class,
+                "name":       tags.get("name", ""),
+                "oneway":     tags.get("oneway", "no") == "yes",
+                "maxspeed":   tags.get("maxspeed", ""),
+            },
+        })
+
+    result = {"type": "FeatureCollection", "features": features, "count": len(features)}
+    _OSM_ROAD_CACHE[key] = result
+    return result
+
+
 @app.get("/api/vasttrafik/parking/{lot_id}/availability")
 async def vt_parking_availability(lot_id: int):
     """
