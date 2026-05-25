@@ -7,6 +7,7 @@
 let facadeBuilding = null;
 let lastPvgis = null;   // set by pvgis.js; read by ui.js showInfoPanel
 let lastWWR   = null;   // set here; used by saveWWR
+let activeDir = 'N';
 
 const DIRS         = ['N','E','S','W'];
 const DIR_HEADINGS = { N:0, E:90, S:180, W:270 };
@@ -45,7 +46,7 @@ document.getElementById('btn-inspect').addEventListener('click', () => {
   document.getElementById('info-panel').style.display = 'none';
   document.getElementById('facade-panel').style.display = 'block';
   document.getElementById('wwr-panel').style.display = 'block';
-  // Clear canvases
+  // Clear canvases + any previous captures
   for (const d of DIRS) {
     const ctx = document.getElementById('canvas-'+d).getContext('2d');
     ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,200,150);
@@ -54,7 +55,7 @@ document.getElementById('btn-inspect').addEventListener('click', () => {
   }
   // Fly to first facade and show heuristic WWR immediately
   flyToFacade('N');
-  showWWR(heuristicWWR(facadeBuilding), null, 'heuristic', null);
+  showWWR(heuristicWWR(facadeBuilding), null, 'heuristic');
 });
 
 function getBuildingCenter(b) {
@@ -81,8 +82,8 @@ function flyToFacade(dir) {
   const c    = getBuildingCenter(facadeBuilding);
   const r    = getBuildingRadius(facadeBuilding);
   const dist = r * 3.5;
-  const h    = DIR_HEADINGS[dir] * Math.PI / 180;
-  const offsetLon = Math.sin(h) * dist / (111320 * Math.cos(c.lat * Math.PI/180));
+  const h         = DIR_HEADINGS[dir] * Math.PI / 180;
+  const offsetLon = Math.sin(h) * dist / (111320 * Math.cos(c.lat * Math.PI / 180));
   const offsetLat = Math.cos(h) * dist / 111320;
   const bldH = Math.max(3, facadeBuilding.height || 6);
   viewer.camera.flyTo({
@@ -100,7 +101,7 @@ function flyToFacade(dir) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Capture facade
+// Capture facade — fly to direction then auto-snapshot after delay
 // ─────────────────────────────────────────────────────────────────
 function captureToCanvas(dir) {
   flyToFacade(dir);
@@ -132,12 +133,11 @@ function analyseCanvasWWR(canvas) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Capture all facades + GPT-4 vision
+// Capture All Facades — fly + auto-capture each direction
 // ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-capture-all').addEventListener('click', async () => {
   document.getElementById('facade-sub').textContent = 'Capturing all 4 facades…';
-  document.getElementById('wwr-ai-status').textContent = '';
-  const capturedB64 = {};
+  const visualWWRs = [];
   for (const dir of DIRS) {
     await new Promise(resolve => {
       flyToFacade(dir);
@@ -146,138 +146,78 @@ document.getElementById('btn-capture-all').addEventListener('click', async () =>
         const src = viewer.canvas;
         const dst = document.getElementById('canvas-'+dir);
         const ctx = dst.getContext('2d');
-        ctx.drawImage(src,0,0,src.width,src.height,0,0,dst.width,dst.height);
-        // Convert to base64 JPEG for GPT-4 vision
-        capturedB64[dir] = dst.toDataURL('image/jpeg', 0.85).split(',')[1];
+        ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, dst.width, dst.height);
+        const w = analyseCanvasWWR(dst);
+        if (w !== null) visualWWRs.push(w);
         resolve();
       }, 1500);
     });
   }
-  document.getElementById('facade-sub').textContent = 'Captured – sending to GPT-4 vision…';
-  document.getElementById('wwr-ai-status').textContent = '⏳ Analysing with GPT-4 vision…';
-
-  const hWWR   = heuristicWWR(facadeBuilding);
-  const aiWWRs = [];
-  const aiNotes = [];
-
-  let _backendDown = false;
-  for (const dir of DIRS) {
-    try {
-      const resp = await fetch('http://localhost:8000/api/estimate-wwr', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          image_base64: capturedB64[dir],
-          direction: dir,
-          building_info: {
-            address: facadeBuilding.address,
-            year:    facadeBuilding.year,
-            use:     facadeBuilding.use_cat,
-            eclass:  facadeBuilding.eclass,
-          },
-        }),
-      });
-      const result = await resp.json();
-      aiWWRs.push(result.wwr);
-      aiNotes.push(dir + ': ' + result.wwr + '%' + (result.confidence ? ' (' + result.confidence + ')' : ''));
-    } catch(e) {
-      const _netErr = (e instanceof TypeError) || (e.message || '').toLowerCase().includes('fetch');
-      if (_netErr) _backendDown = true;
-      aiWWRs.push(hWWR);
-      aiNotes.push(dir + ': fallback');
-    }
-  }
-
-  document.getElementById('facade-sub').textContent = 'Analysis complete';
-  if (_backendDown) {
-    document.getElementById('wwr-ai-status').textContent =
-      '\u26a0 Backend not running \u2014 restart with: python launch.py';
-    showWWR(hWWR, null, 'heuristic', null);
+  document.getElementById('facade-sub').textContent = 'Capture complete';
+  const hWWR = heuristicWWR(facadeBuilding);
+  if (visualWWRs.length > 0) {
+    const visualAvg = Math.round(visualWWRs.reduce((a,b) => a+b, 0) / visualWWRs.length);
+    const blended = Math.round(0.4 * visualAvg + 0.6 * hWWR);
+    showWWR(blended, visualWWRs, 'blended');
   } else {
-    const aiAvg = Math.round(aiWWRs.reduce((a,b)=>a+b,0) / aiWWRs.length);
-    document.getElementById('wwr-ai-status').textContent = '';
-    showWWR(aiAvg, aiWWRs, 'gpt4-vision', aiNotes);
+    showWWR(hWWR, null, 'heuristic');
   }
 });
 
-// Thumb click → fly + capture
+// ─────────────────────────────────────────────────────────────────
+// Snap — capture current viewport into the active direction now
+// ─────────────────────────────────────────────────────────────────
+function snapCurrentView() {
+  viewer.render();
+  const src = viewer.canvas;
+  const dst = document.getElementById('canvas-' + activeDir);
+  const ctx = dst.getContext('2d');
+  ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, dst.width, dst.height);
+  document.getElementById('thumb-' + activeDir).classList.add('active');
+
+  // Analyse all directions that have been snapped (not placeholder grey)
+  const visualWWRs = [];
+  for (const dir of DIRS) {
+    const w = analyseCanvasWWR(document.getElementById('canvas-' + dir));
+    if (w !== null) visualWWRs.push(w);
+  }
+  const hWWR = heuristicWWR(facadeBuilding);
+  if (visualWWRs.length > 0) {
+    const visualAvg = Math.round(visualWWRs.reduce((a,b) => a+b, 0) / visualWWRs.length);
+    const blended   = Math.round(0.4 * visualAvg + 0.6 * hWWR);
+    showWWR(blended, visualWWRs, 'blended');
+  } else {
+    showWWR(hWWR, null, 'heuristic');
+  }
+  document.getElementById('facade-sub').textContent =
+    activeDir + ' captured – fly to next direction or Snap again';
+}
+
+document.getElementById('btn-snap').addEventListener('click', () => snapCurrentView());
+
+// Thumb click — fly only (no auto-capture); user snaps manually
 for (const dir of DIRS) {
-  document.getElementById('thumb-'+dir).addEventListener('click', () => captureToCanvas(dir));
+  document.getElementById('thumb-'+dir).addEventListener('click', () => {
+    activeDir = dir;
+    flyToFacade(dir);
+    document.getElementById('facade-sub').textContent =
+      'Flying to ' + dir + ' facade – position camera, then click Snap';
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Show + save WWR results
-// NOTE: All innerHTML strings use double-quotes (") for HTML attribute values.
+// Show WWR results
 // ─────────────────────────────────────────────────────────────────
-function showWWR(wwr, perFacade, source, notes) {
+function showWWR(wwr, perFacade, source) {
   document.getElementById('wwr-value').textContent = wwr;
   document.getElementById('wwr-bar').style.width = Math.min(100, wwr * 1.4) + '%';
-
-  // Always show TABULA reference
-  if (facadeBuilding) {
-    const tWWR   = heuristicWWR(facadeBuilding);
-    const period = facadeBuilding.tabula_period || '–';
-    document.getElementById('wwr-tabula-val').textContent    = tWWR;
-    document.getElementById('wwr-tabula-period').textContent = period;
-    document.getElementById('wwr-tabula-row').style.display  = 'block';
-  }
-
-  let breakdown = '';
-  if (source === 'heuristic') {
-    breakdown = 'Source: TABULA heuristic only (capture facades for AI estimate)';
-  } else if (source === 'gpt4-vision') {
-    lastWWR   = { wwr, perFacade, notes, source };
-    breakdown = '&#129302; GPT-4 vision per facade:<br>';
-    if (notes) breakdown += notes.join(' &nbsp;\xb7&nbsp; ');
-  } else {
-    breakdown = 'Source: ' + source;
-    if (perFacade) breakdown += '<br>Per facade: ' + DIRS.map((d,i) => d+':'+perFacade[i]+'%').join(' ');
+  let breakdown = source === 'heuristic'
+    ? 'Source: TABULA archetype heuristic'
+    : 'Source: blended (visual + heuristic)';
+  if (perFacade) {
+    breakdown += '<br>Per facade: ' + DIRS.map((d,i) => d+':'+perFacade[i]+'%').join(' ');
   }
   document.getElementById('wwr-breakdown').innerHTML = breakdown;
-
-  // Show save button only for AI results
-  const aiStatus = document.getElementById('wwr-ai-status');
-  if (source === 'gpt4-vision') {
-    aiStatus.innerHTML =
-      '<button onclick="saveWWR()" style="margin-top:4px;width:100%;padding:4px 8px;font-size:10px;' +
-      'border-radius:6px;border:1px solid rgba(139,92,246,0.5);background:rgba(139,92,246,0.1);' +
-      'color:#6d28d9;cursor:pointer;font-family:inherit">&#128190; Save WWR result</button>' +
-      '<div id="wwr-save-status" style="font-size:10px;color:var(--muted);margin-top:3px"></div>';
-  } else {
-    aiStatus.innerHTML = '';
-  }
-}
-
-async function saveWWR() {
-  if (!lastWWR || !facadeBuilding) return;
-  const statusEl = document.getElementById('wwr-save-status');
-  if (statusEl) statusEl.textContent = 'Saving…';
-  const ring = facadeBuilding.coordinates && facadeBuilding.coordinates[0];
-  if (!ring) return;
-  const lat = ring.reduce((s,c) => s+c[1], 0) / ring.length;
-  const lon = ring.reduce((s,c) => s+c[0], 0) / ring.length;
-  try {
-    await fetch('http://localhost:8000/api/wwr-save', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        lat, lon,
-        address:     facadeBuilding.address || null,
-        average_wwr: lastWWR.wwr,
-        per_facade:  lastWWR.perFacade || [],
-        directions:  DIRS,
-        source:      lastWWR.source,
-        building_info: { year: facadeBuilding.year, use: facadeBuilding.use_cat, eclass: facadeBuilding.eclass },
-      }),
-    });
-    if (statusEl) statusEl.textContent = '\u2713 Saved';
-    // Update sidebar badge
-    const badge = document.getElementById('inspect-saved-badge');
-    badge.innerHTML = '&#128190; Saved WWR: ' + lastWWR.wwr + '% (AI)';
-    badge.style.display = 'block';
-  } catch(e) {
-    if (statusEl) statusEl.textContent = 'Save failed: ' + e.message;
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────

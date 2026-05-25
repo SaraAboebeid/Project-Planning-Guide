@@ -62,7 +62,9 @@
     <button class="btn opt-btn" id="btn-tiles">&#127759; Photorealistic Tiles</button>
     <button class="btn opt-btn" id="btn-eubucco">&#127963; EUBUCCO Overlay</button>
     <button class="btn opt-btn" id="btn-reset">&#8962; Reset View</button>
+    <button class="btn opt-btn" id="btn-transit">&#x1F68C; Transit Layer</button>
   </div>
+  <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:4px 10px 0"></div>
   <div class="lp-divider"></div>
   <div class="lp-section-title">Analysis Tools</div>
   <div style="padding:0 10px 6px;display:flex;flex-direction:column;gap:5px;flex-shrink:0">
@@ -87,7 +89,7 @@
 <!-- Facade inspector -->
 <div class="panel" id="facade-panel">
   <h2>&#128247; Facade Inspector</h2>
-  <div class="sub" id="facade-sub">Click a facade view to capture screenshot and estimate WWR</div>
+  <div class="sub" id="facade-sub">Click a direction to fly there, then Snap — or use Capture All for automatic capture</div>
   <div id="facade-views">
     <div class="facade-thumb" id="thumb-N"><canvas id="canvas-N" width="200" height="150"></canvas><div class="dir-label">N</div></div>
     <div class="facade-thumb" id="thumb-E"><canvas id="canvas-E" width="200" height="150"></canvas><div class="dir-label">E</div></div>
@@ -95,8 +97,9 @@
     <div class="facade-thumb" id="thumb-W"><canvas id="canvas-W" width="200" height="150"></canvas><div class="dir-label">W</div></div>
   </div>
   <div style="display:flex;gap:8px;margin-top:10px">
-    <button class="btn" id="btn-capture-all" style="flex:1">&#128247; Capture All Facades</button>
-    <button class="btn" id="btn-exit-inspect" style="flex:1">&#x2715; Exit Inspector</button>
+    <button class="btn" id="btn-snap" style="flex:1">&#128247; Snap</button>
+    <button class="btn" id="btn-capture-all" style="flex:1">&#9889; Capture All</button>
+    <button class="btn" id="btn-exit-inspect">&#x2715;</button>
   </div>
 </div>
 
@@ -104,19 +107,24 @@
 <div class="panel" id="wwr-panel">
   <h2>&#128438; WWR Estimate</h2>
   <div class="sub">Window-to-Wall Ratio</div>
-  <div class="wwr-value" id="wwr-value">–</div>
+  <div class="wwr-value" id="wwr-value">?</div>
   <span class="wwr-unit">% average across facades</span>
   <div class="wwr-bar-wrap"><div class="wwr-bar" id="wwr-bar" style="width:0%"></div></div>
-  <div id="wwr-tabula-row" style="margin-top:8px;font-size:11px;display:none">
-    <span style="color:var(--muted)">TABULA reference:</span>
-    <span id="wwr-tabula-val" style="color:var(--lime);font-weight:700"></span>
-    <span style="color:var(--muted)"> % (</span><span id="wwr-tabula-period" style="color:var(--muted)"></span><span style="color:var(--muted)">)</span>
-  </div>
-  <div id="wwr-breakdown" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
-  <div id="wwr-ai-status" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
+  <div id="wwr-breakdown" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
   <div style="margin-top:8px;font-size:10px;color:var(--faint)">
-    TABULA archetype reference &middot; GPT-4 vision per facade.
+    Heuristic based on TABULA archetype &middot; era &middot; energy class.<br>
+    Visual analysis from captured facade screenshots.
   </div>
+</div>
+
+<!-- Västtrafik departures panel -->
+<div class="panel" id="vt-panel" style="display:none;top:16px;left:260px;width:280px;max-height:360px;overflow-y:auto">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <h2 style="margin:0">&#x1F68C; Departures</h2>
+    <button class="btn" id="btn-vt-close" style="padding:2px 8px">&#x2715;</button>
+  </div>
+  <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px" id="vt-panel-title"></div>
+  <div id="vt-departures"></div>
 </div>
 
 <!-- Cesium Ion Token panel -->

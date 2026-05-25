@@ -87,6 +87,7 @@ def main():
         "pvgis.js",
         "facade_inspector.js",
         "search.js",
+        "vasttrafik.js",
     ]
     all_js = "\n\n".join(
         open(f"viewer/js/{f}", encoding="utf-8").read()

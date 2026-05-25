@@ -599,6 +599,236 @@ async def estimate_wwr(req: WWRRequest):
     }
 
 
+# ── Västtrafik transit API proxy ─────────────────────────────────────────────
+#
+# Register an application at https://developer.vasttrafik.se/  and paste your
+# credentials below (or set the environment variables before starting uvicorn).
+#
+#   Uses two APIs:
+#     • Geografi v3        (open, no auth required for stop area geography)
+#     • Planera Resa v4    (requires OAuth2 client-credentials token)
+#
+# OAuth2 token endpoint:
+#   POST https://ext-api.vasttrafik.se/auth/connect/token
+#   Content-Type: application/x-www-form-urlencoded
+#   Body: grant_type=client_credentials&client_id=…&client_secret=…
+# ---------------------------------------------------------------------------
+
+# Paste your credentials here — read directly (not via os.environ.setdefault,
+# which caches an empty string across --reload restarts).
+_VT_CLIENT_ID     = "D016LXgep9AJv4z3k0EPmiOXfYka"   # ← paste Västtrafik client ID
+_VT_CLIENT_SECRET = "kaEb3XDR0jqZEG80WJndC7DEyXMa"   # ← paste Västtrafik client secret
+
+_VT_AUTH_URL  = "https://ext-api.vasttrafik.se/auth/connect/token"
+_VT_GEO_URL   = "https://ext-api.vasttrafik.se/geo/v3"
+_VT_PR_URL    = "https://ext-api.vasttrafik.se/pr/v4"
+
+# In-memory token cache  { "access_token": str, "expires_at": float }
+_vt_token_cache: dict = {}
+
+import time as _time
+
+async def _vt_get_token() -> str:
+    """Return a valid Bearer token, fetching a new one if expired."""
+    client_id     = _VT_CLIENT_ID.strip()
+    client_secret = _VT_CLIENT_SECRET.strip()
+    if not client_id or not client_secret:
+        raise HTTPException(503, "Västtrafik credentials not configured. "
+                                 "Set _VT_CLIENT_ID and _VT_CLIENT_SECRET in backend/main.py.")
+
+    now = _time.time()
+    cached = _vt_token_cache
+    if cached.get("access_token") and cached.get("expires_at", 0) > now + 30:
+        return cached["access_token"]
+
+    import httpx
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            _VT_AUTH_URL,
+            data={
+                "grant_type":    "client_credentials",
+                "client_id":     client_id,
+                "client_secret": client_secret,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+    if r.status_code != 200:
+        raise HTTPException(502, f"Västtrafik auth failed: {r.status_code} {r.text[:200]}")
+
+    body = r.json()
+    _vt_token_cache["access_token"] = body["access_token"]
+    _vt_token_cache["expires_at"]   = now + int(body.get("expires_in", 3600))
+    return _vt_token_cache["access_token"]
+
+
+# Gothenburg central bounding box (used as default filter)
+_GBG_BBOX = dict(south=57.60, north=57.80, west=11.85, east=12.10)
+
+
+@app.get("/api/vasttrafik/stops")
+async def vt_stops(
+    south: float = Query(_GBG_BBOX["south"]),
+    north: float = Query(_GBG_BBOX["north"]),
+    west:  float = Query(_GBG_BBOX["west"]),
+    east:  float = Query(_GBG_BBOX["east"]),
+):
+    """
+    Return Västtrafik stop areas within the given bbox.
+
+    Uses Geografi v3 GET /StopAreas — returns all stop areas, filtered client-side
+    to the requested bbox.  Results are cached for 24 h (stop positions rarely change).
+    """
+    import httpx
+    token = await _vt_get_token()
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.get(
+            f"{_VT_GEO_URL}/StopAreas",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"limit": 1000, "offset": 0},
+        )
+    if r.status_code != 200:
+        raise HTTPException(502, f"Västtrafik /StopAreas failed: {r.status_code}")
+
+    data = r.json()
+    # The Geografi v3 response structure:
+    #   { "stopAreas": [ { "gid": "...", "name": "...",
+    #                       "geometry": { "wgs84": { "lat": 57.7, "lng": 11.97 } },
+    #                       ... } ] }
+    all_stops = data.get("stopAreas", data.get("results", []))
+
+    def _stop_coords(s: dict) -> tuple[float, float] | None:
+        geo = s.get("geometry") or {}
+        wgs = geo.get("wgs84") or {}
+        lat = wgs.get("lat") or wgs.get("latitude")
+        lon = wgs.get("lng") or wgs.get("longitude") or wgs.get("lon")
+        if lat is not None and lon is not None:
+            return float(lat), float(lon)
+        # fallback: flat fields
+        lat = s.get("lat") or s.get("latitude")
+        lon = s.get("lon") or s.get("lng") or s.get("longitude")
+        if lat is not None and lon is not None:
+            return float(lat), float(lon)
+        return None
+
+    filtered = []
+    for s in all_stops:
+        coords = _stop_coords(s)
+        if coords is None:
+            continue
+        lat, lon = coords
+        if south <= lat <= north and west <= lon <= east:
+            filtered.append({
+                "gid":  s.get("gid"),
+                "name": s.get("name"),
+                "lat":  round(lat, 6),
+                "lon":  round(lon, 6),
+            })
+
+    return {"stops": filtered, "count": len(filtered)}
+
+
+@app.get("/api/vasttrafik/positions")
+async def vt_positions(
+    south: float = Query(_GBG_BBOX["south"]),
+    north: float = Query(_GBG_BBOX["north"]),
+    west:  float = Query(_GBG_BBOX["west"]),
+    east:  float = Query(_GBG_BBOX["east"]),
+):
+    """
+    Return real-time vehicle positions within the given bbox.
+
+    Uses Planera Resa v4 GET /positions with bounding-box query parameters.
+    Call this every ~15 s for live updates.
+    """
+    import httpx
+    token = await _vt_get_token()
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{_VT_PR_URL}/positions",
+            headers={"Authorization": f"Bearer {token}"},
+            params={
+                "lowerLeftLat":  south,
+                "lowerLeftLong": west,
+                "upperRightLat": north,
+                "upperRightLong": east,
+            },
+        )
+    if r.status_code != 200:
+        raise HTTPException(502, f"Västtrafik /positions failed: {r.status_code}")
+
+    data = r.json()
+    # Response: { "serviceJourneys": [ { "line": { "shortName": "16", "transportMode": "tram" },
+    #                                     "lat": 57.7, "long": 11.97, "bearing": 90, ... } ] }
+    vehicles = data.get("serviceJourneys", data.get("results", []))
+
+    result = []
+    for v in vehicles:
+        lat = v.get("lat") or v.get("latitude")
+        lon = v.get("long") or v.get("lon") or v.get("longitude")
+        if lat is None or lon is None:
+            continue
+        line_info = v.get("line") or {}
+        result.append({
+            "lat":           round(float(lat), 6),
+            "lon":           round(float(lon), 6),
+            "bearing":       v.get("bearing"),
+            "line":          line_info.get("shortName") or line_info.get("name", ""),
+            "transportMode": line_info.get("transportMode", "bus"),
+        })
+
+    return {"vehicles": result, "count": len(result)}
+
+
+@app.get("/api/vasttrafik/departures/{gid}")
+async def vt_departures(
+    gid: str,
+    limit: int = Query(8, ge=1, le=20),
+):
+    """
+    Return next departures from a stop area.
+
+    Uses Planera Resa v4 GET /stop-areas/{gid}/departures.
+    """
+    import httpx
+    token = await _vt_get_token()
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{_VT_PR_URL}/stop-areas/{gid}/departures",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"limit": limit, "includeOccupancy": False},
+        )
+    if r.status_code != 200:
+        raise HTTPException(502, f"Västtrafik /departures failed: {r.status_code}")
+
+    data = r.json()
+    # Response: { "departures": [ { "serviceJourney": { "line": { "shortName": "16",
+    #             "backgroundColor": "#...", "foregroundColor": "#..." } },
+    #             "stopPoint": { "name": "..." },
+    #             "plannedTime": "2026-05-25T14:30:00",
+    #             "estimatedTime": "2026-05-25T14:31:00",
+    #             "isCancelled": false } ] }
+    raw = data.get("departures", data.get("results", []))
+
+    departures = []
+    for d in raw:
+        sj   = d.get("serviceJourney") or {}
+        line = sj.get("line") or {}
+        dep  = {
+            "line":          line.get("shortName") or line.get("name", ""),
+            "destination":   (sj.get("directionDetails") or {}).get("shortDescription")
+                             or d.get("direction", ""),
+            "plannedTime":   d.get("plannedTime", ""),
+            "estimatedTime": d.get("estimatedTime") or d.get("plannedTime", ""),
+            "isCancelled":   d.get("isCancelled", False),
+            "transportMode": line.get("transportMode", "bus"),
+            "bgColor":       line.get("backgroundColor", "#1d4ed8"),
+            "fgColor":       line.get("foregroundColor", "#ffffff"),
+        }
+        departures.append(dep)
+
+    return {"gid": gid, "departures": departures}
+
+
 # ── WWR database (JSON file, grows over time) ────────────────────────────────
 import datetime
 
