@@ -707,10 +707,10 @@ html = f"""<!DOCTYPE html>
   <style>
     :root {{
       --navy:    #721CB8; --navy-dark:#421869; --teal:#995BD5;
-      --lime:    #96D74C; --green:#509724;
-      --surface: rgba(10,10,20,0.85); --border:rgba(114,28,184,0.3);
-      --text:    #e2e8f0; --muted:#94a3b8; --faint:#475569;
-      --radius:  14px;   --shadow:0 8px 40px rgba(0,0,0,0.6);
+      --lime:    #509724; --green:#509724;
+      --surface: rgba(248,250,252,0.97); --border:rgba(114,28,184,0.25);
+      --text:    #1e293b; --muted:#64748b; --faint:#94a3b8;
+      --radius:  14px;   --shadow:0 8px 40px rgba(0,0,0,0.18);
     }}
     * {{ margin:0; padding:0; box-sizing:border-box; }}
     body {{ font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(--text); overflow:hidden; }}
@@ -746,7 +746,7 @@ html = f"""<!DOCTYPE html>
       display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:10px 10px 0; flex-shrink:0;
     }}
     .stat-box {{
-      background:rgba(255,255,255,0.05); border-radius:8px; padding:8px 6px; text-align:center;
+      background:rgba(0,0,0,0.04); border-radius:8px; padding:8px 6px; text-align:center;
     }}
     .stat-num   {{ font-size:17px; font-weight:700; color:#a78bfa; }}
     .stat-num-2 {{ color:#22c55e; }}
@@ -812,9 +812,9 @@ html = f"""<!DOCTYPE html>
       color:var(--muted); cursor:pointer; font-size:16px; line-height:1;
     }}
     .tt-row {{ display:flex; justify-content:space-between; padding:3px 0;
-               border-bottom:1px solid rgba(255,255,255,0.05); font-size:12px; }}
+               border-bottom:1px solid rgba(0,0,0,0.06); font-size:12px; }}
     .tt-lbl {{ color:var(--muted); }}
-    .tt-val {{ color:#f1f5f9; font-weight:500; text-align:right; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
+    .tt-val {{ color:#0f172a; font-weight:500; text-align:right; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
 
     /* facade inspector */
     #facade-panel {{
@@ -840,7 +840,7 @@ html = f"""<!DOCTYPE html>
       bottom:80px; right:16px; width:220px; display:none;
     }}
     .wwr-bar-wrap {{ margin:8px 0 4px; height:10px; border-radius:5px;
-                     background:rgba(255,255,255,0.08); overflow:hidden; }}
+                     background:rgba(0,0,0,0.08); overflow:hidden; }}
     .wwr-bar {{ height:100%; border-radius:5px;
                 background:linear-gradient(90deg,#7c3aed,#a78bfa); transition:width .4s; }}
     .wwr-value {{ font-size:22px; font-weight:700; color:var(--lime); }}
@@ -863,7 +863,7 @@ html = f"""<!DOCTYPE html>
 
     /* legend */
     .legend-row {{ display:flex; align-items:center; gap:6px; margin:4px 0; font-size:11px; cursor:pointer; }}
-    .legend-row:hover {{ color:#fff; }}
+    .legend-row:hover {{ color:var(--text); }}
     .legend-dot {{ width:10px; height:10px; border-radius:3px; flex-shrink:0; }}
     .legend-cnt {{ margin-left:auto; color:var(--faint); }}
 
@@ -1758,6 +1758,8 @@ document.getElementById('btn-pvgis').addEventListener('click', () => {{
   fetchPVGIS(selectedBuilding);
 }});
 
+// NOTE: All innerHTML strings below use double-quotes (") for HTML attribute
+// values — never single quotes. A ' before > would terminate the JS string.
 async function fetchPVGIS(b) {{
   const el = document.getElementById('pvgis-result');
   if (!b.footprint_m2 || !b.coordinates) {{
@@ -1796,7 +1798,11 @@ async function fetchPVGIS(b) {{
       'color:#92400e;cursor:pointer;font-family:inherit">&#128190; Save PV result</button>' +
       '<div id="pvgis-save-status" style="font-size:10px;color:var(--muted);margin-top:3px"></div>';
   }} catch(e) {{
-    el.innerHTML = '<span style="color:#f87171">PVGIS error: ' + e.message + '</span>';
+    const _netErr = (e instanceof TypeError) || (e.message || '').toLowerCase().includes('fetch');
+    const _msg = _netErr
+      ? '&#9888; Backend not running — restart with: python launch.py'
+      : 'PVGIS error: ' + e.message;
+    el.innerHTML = '<span style="color:#f87171">' + _msg + '</span>';
   }}
 }}
 
@@ -1946,6 +1952,7 @@ document.getElementById('btn-capture-all').addEventListener('click', async () =>
   const aiWWRs = [];
   const aiNotes = [];
 
+  let _backendDown = false;
   for (const dir of DIRS) {{
     try {{
       const resp = await fetch('http://localhost:8000/api/estimate-wwr', {{
@@ -1966,15 +1973,23 @@ document.getElementById('btn-capture-all').addEventListener('click', async () =>
       aiWWRs.push(result.wwr);
       aiNotes.push(dir + ': ' + result.wwr + '%' + (result.confidence ? ' (' + result.confidence + ')' : ''));
     }} catch(e) {{
+      const _netErr = (e instanceof TypeError) || (e.message || '').toLowerCase().includes('fetch');
+      if (_netErr) _backendDown = true;
       aiWWRs.push(hWWR);
       aiNotes.push(dir + ': fallback');
     }}
   }}
 
-  const aiAvg = Math.round(aiWWRs.reduce((a,b)=>a+b,0) / aiWWRs.length);
   document.getElementById('facade-sub').textContent = 'Analysis complete';
-  document.getElementById('wwr-ai-status').textContent = '';
-  showWWR(aiAvg, aiWWRs, 'gpt4-vision', aiNotes);
+  if (_backendDown) {{
+    document.getElementById('wwr-ai-status').textContent =
+      '\u26a0 Backend not running \u2014 restart with: python launch.py';
+    showWWR(hWWR, null, 'heuristic', null);
+  }} else {{
+    const aiAvg = Math.round(aiWWRs.reduce((a,b)=>a+b,0) / aiWWRs.length);
+    document.getElementById('wwr-ai-status').textContent = '';
+    showWWR(aiAvg, aiWWRs, 'gpt4-vision', aiNotes);
+  }}
 }});
 
 // Thumb click → fly + capture
@@ -1982,6 +1997,8 @@ for (const dir of DIRS) {{
   document.getElementById('thumb-'+dir).addEventListener('click', () => captureToCanvas(dir));
 }}
 
+// NOTE: All innerHTML strings below use double-quotes (") for HTML attribute
+// values — never single quotes. A ' before > would terminate the JS string.
 function showWWR(wwr, perFacade, source, notes) {{
   document.getElementById('wwr-value').textContent = wwr;
   document.getElementById('wwr-bar').style.width = Math.min(100, wwr * 1.4) + '%';
