@@ -674,6 +674,76 @@ async def get_wwr_database():
     return {"records": _load_wwr_db()}
 
 
+# ── PVGIS database (JSON file, grows over time) ──────────────────────────────
+
+PVGIS_DB_PATH = PROJECT_ROOT / "data" / "pvgis_database.json"
+
+def _load_pvgis_db() -> list:
+    if PVGIS_DB_PATH.exists():
+        try:
+            return json.loads(PVGIS_DB_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    return []
+
+def _save_pvgis_db(records: list) -> None:
+    PVGIS_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PVGIS_DB_PATH.write_text(json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+class PVGISSaveRequest(BaseModel):
+    lat: float
+    lon: float
+    address: Optional[str] = None
+    kWp: float
+    annual_kwh: float
+    specific_kwh_kwp: float
+    roof_area_m2: float
+    building_info: Optional[dict[str, Any]] = None
+
+
+@app.post("/api/pvgis-save")
+async def save_pvgis(req: PVGISSaveRequest):
+    """Persist a PVGIS PV potential record to the local database."""
+    records = _load_pvgis_db()
+    records = [r for r in records if _haversine_m(r["lat"], r["lon"], req.lat, req.lon) > 20]
+    records.append({
+        "lat": req.lat,
+        "lon": req.lon,
+        "address": req.address,
+        "kWp": req.kWp,
+        "annual_kwh": req.annual_kwh,
+        "specific_kwh_kwp": req.specific_kwh_kwp,
+        "roof_area_m2": req.roof_area_m2,
+        "building_info": req.building_info or {},
+        "saved_at": datetime.datetime.utcnow().isoformat() + "Z",
+    })
+    _save_pvgis_db(records)
+    return {"ok": True, "total_records": len(records)}
+
+
+@app.get("/api/pvgis-lookup")
+async def lookup_pvgis(lat: float = Query(...), lon: float = Query(...), radius_m: float = Query(25)):
+    """Return the nearest saved PVGIS record within radius_m metres, or null."""
+    records = _load_pvgis_db()
+    best = None
+    best_dist = radius_m
+    for r in records:
+        d = _haversine_m(r["lat"], r["lon"], lat, lon)
+        if d <= best_dist:
+            best_dist = d
+            best = r
+    if best is None:
+        return {"found": False, "record": None}
+    return {"found": True, "record": best, "dist_m": round(best_dist, 1)}
+
+
+@app.get("/api/pvgis-database")
+async def get_pvgis_database():
+    """Return all saved PVGIS records."""
+    return {"records": _load_pvgis_db()}
+
+
 # ── PVGIS proxy (avoids browser CORS restriction) ───────────────────────────
 @app.get("/api/pvgis")
 async def pvgis_proxy(

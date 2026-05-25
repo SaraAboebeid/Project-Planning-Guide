@@ -952,7 +952,9 @@ html = f"""<!DOCTYPE html>
   <div class="lp-section-title">Analysis Tools</div>
   <div style="padding:0 10px 6px;display:flex;flex-direction:column;gap:5px;flex-shrink:0">
     <button class="tool-btn" id="btn-inspect" disabled>&#128247; Inspect Facades + WWR</button>
+    <div id="inspect-saved-badge" style="display:none;font-size:10px;color:var(--muted);padding-left:2px;margin-top:-3px"></div>
     <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>&#9728; Rooftop PV Estimate</button>
+    <div id="pvgis-saved-badge" style="display:none;font-size:10px;color:var(--muted);padding-left:2px;margin-top:-3px"></div>
     <div id="pvgis-result"></div>
     <div id="lp-no-selection">&#8592; Click a building to enable</div>
   </div>
@@ -997,10 +999,15 @@ html = f"""<!DOCTYPE html>
   <div class="wwr-value" id="wwr-value">–</div>
   <span class="wwr-unit">% average across facades</span>
   <div class="wwr-bar-wrap"><div class="wwr-bar" id="wwr-bar" style="width:0%"></div></div>
-  <div id="wwr-breakdown" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
+  <div id="wwr-tabula-row" style="margin-top:8px;font-size:11px;display:none">
+    <span style="color:var(--muted)">TABULA reference:</span>
+    <span id="wwr-tabula-val" style="color:var(--lime);font-weight:700"></span>
+    <span style="color:var(--muted)"> % (</span><span id="wwr-tabula-period" style="color:var(--muted)"></span><span style="color:var(--muted)">)</span>
+  </div>
+  <div id="wwr-breakdown" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
+  <div id="wwr-ai-status" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
   <div style="margin-top:8px;font-size:10px;color:var(--faint)">
-    Heuristic based on TABULA archetype · era · energy class.<br>
-    Visual analysis from captured facade screenshots.
+    TABULA archetype reference · GPT-4 vision per facade.
   </div>
 </div>
 
@@ -1652,15 +1659,43 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {{
   }}
 }}, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-function showInfoPanel(b, idx) {{
+async function showInfoPanel(b, idx) {{
   selectedBuilding = {{ ...b, _idx: idx }};
+  lastPvgis = null; lastWWR = null;
   // Enable analysis tool buttons
   document.getElementById('btn-inspect').disabled = false;
   document.getElementById('btn-pvgis').disabled   = false;
   document.getElementById('lp-no-selection').style.display = 'none';
-  // Reset PVGIS result when switching buildings
+  // Reset PVGIS result and saved badges when switching buildings
   const pvr = document.getElementById('pvgis-result');
   pvr.style.display = 'none'; pvr.innerHTML = '';
+  document.getElementById('pvgis-saved-badge').style.display = 'none';
+  document.getElementById('inspect-saved-badge').style.display = 'none';
+  // Auto-load saved results for this building
+  const bRing = b.coordinates && b.coordinates[0];
+  if (bRing && bRing.length) {{
+    const bLat = (bRing.reduce((s,c) => s+c[1], 0) / bRing.length).toFixed(5);
+    const bLon = (bRing.reduce((s,c) => s+c[0], 0) / bRing.length).toFixed(5);
+    try {{
+      const [pvRes, wwrRes] = await Promise.all([
+        fetch(`http://localhost:8000/api/pvgis-lookup?lat=${{bLat}}&lon=${{bLon}}`).then(r=>r.json()),
+        fetch(`http://localhost:8000/api/wwr-lookup?lat=${{bLat}}&lon=${{bLon}}`).then(r=>r.json()),
+      ]);
+      if (pvRes.found) {{
+        const r = pvRes.record;
+        const mwh = (r.annual_kwh / 1000).toFixed(1);
+        const badge = document.getElementById('pvgis-saved-badge');
+        badge.innerHTML = '&#128190; Saved: ' + mwh + ' MWh/yr · ' + r.kWp + ' kWp';
+        badge.style.display = 'block';
+      }}
+      if (wwrRes.found) {{
+        const r = wwrRes.record;
+        const badge = document.getElementById('inspect-saved-badge');
+        badge.innerHTML = '&#128190; Saved WWR: ' + r.average_wwr + '% (AI)';
+        badge.style.display = 'block';
+      }}
+    }} catch(e) {{ /* lookup not critical */ }}
+  }}
   const rows = [];
   const row = (l,v) => v != null && v !== '' ? rows.push('<div class="tt-row"><span class="tt-lbl">'+l+'</span><span class="tt-val">'+v+'</span></div>') : null;
   row('Address',  b.address);
@@ -1713,6 +1748,8 @@ document.getElementById('info-close').addEventListener('click', hideInfoPanel);
 // Facade Inspector
 // ─────────────────────────────────────────────────────────────────
 let facadeBuilding = null;
+let lastPvgis = null;   // last successfully computed PVGIS result
+let lastWWR   = null;   // last AI WWR result
 const DIRS = ['N','E','S','W'];
 const DIR_HEADINGS = {{ N:0, E:90, S:180, W:270 }};
 
@@ -1745,16 +1782,50 @@ async function fetchPVGIS(b) {{
     if (!Ey) throw new Error('No yield data in response');
     const totalKwh = Math.round(Ey * kWp);
     const mwh = (totalKwh / 1000).toFixed(1);
+    lastPvgis = {{ lat: parseFloat(lat), lon: parseFloat(lon), kWp, Ey, totalKwh, mwh, b }};
     el.innerHTML =
-      '<div style="color:#fbbf24;font-weight:700;margin-bottom:4px">&#9728; Rooftop PV (PVGIS)</div>' +
-      '<div style="display:grid;grid-template-columns:1fr auto;gap:2px 8px;color:#f1f5f9">' +
-      '<span style="color:#cbd5e1">System size</span><span>' + kWp + ' kWp</span>' +
-      '<span style="color:#cbd5e1">Annual yield</span><span style="color:#4ade80;font-weight:700">' + mwh + ' MWh/yr</span>' +
-      '<span style="color:#cbd5e1">Specific yield</span><span>' + Math.round(Ey) + ' kWh/kWp</span>' +
-      '<span style="color:#cbd5e1">Usable roof</span><span>' + Math.round(b.footprint_m2 * 0.7) + ' m\u00b2</span>' +
-      '</div>';
+      '<div style="color:#000000;font-weight:700;margin-bottom:4px">&#9728; Rooftop PV (PVGIS)</div>' +
+      '<div style="display:grid;grid-template-columns:1fr auto;gap:2px 8px;color:#000000">' +
+      '<span>System size</span><span style="font-weight:600">' + kWp + ' kWp</span>' +
+      '<span>Annual yield</span><span style="color:#16a34a;font-weight:700">' + mwh + ' MWh/yr</span>' +
+      '<span>Specific yield</span><span style="font-weight:600">' + Math.round(Ey) + ' kWh/kWp</span>' +
+      '<span>Usable roof</span><span style="font-weight:600">' + Math.round(b.footprint_m2 * 0.7) + ' m\u00b2</span>' +
+      '</div>' +
+      '<button onclick="savePVGIS()" style="margin-top:8px;width:100%;padding:4px 8px;font-size:10px;' +
+      'border-radius:6px;border:1px solid rgba(245,158,11,0.5);background:rgba(245,158,11,0.12);' +
+      'color:#92400e;cursor:pointer;font-family:inherit">&#128190; Save PV result</button>' +
+      '<div id="pvgis-save-status" style="font-size:10px;color:var(--muted);margin-top:3px"></div>';
   }} catch(e) {{
     el.innerHTML = '<span style="color:#f87171">PVGIS error: ' + e.message + '</span>';
+  }}
+}}
+
+async function savePVGIS() {{
+  if (!lastPvgis) return;
+  const {{ lat, lon, kWp, Ey, totalKwh, b }} = lastPvgis;
+  const statusEl = document.getElementById('pvgis-save-status');
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {{
+    await fetch('http://localhost:8000/api/pvgis-save', {{
+      method: 'POST',
+      headers: {{'Content-Type':'application/json'}},
+      body: JSON.stringify({{
+        lat, lon,
+        address: b.address || null,
+        kWp,
+        annual_kwh: Math.round(Ey * kWp),
+        specific_kwh_kwp: Math.round(Ey),
+        roof_area_m2: Math.round(b.footprint_m2 * 0.7),
+        building_info: {{ year: b.year, use: b.use_cat, eclass: b.eclass }},
+      }}),
+    }});
+    if (statusEl) statusEl.textContent = '\u2713 Saved';
+    // Update sidebar badge
+    const badge = document.getElementById('pvgis-saved-badge');
+    badge.innerHTML = '&#128190; Saved: ' + lastPvgis.mwh + ' MWh/yr · ' + kWp + ' kWp';
+    badge.style.display = 'block';
+  }} catch(e) {{
+    if (statusEl) statusEl.textContent = 'Save failed: ' + e.message;
   }}
 }}
 
@@ -1774,7 +1845,7 @@ document.getElementById('btn-inspect').addEventListener('click', () => {{
   // Fly to first facade
   flyToFacade('N');
   // Show heuristic WWR immediately
-  showWWR(heuristicWWR(facadeBuilding), null, 'heuristic');
+  showWWR(heuristicWWR(facadeBuilding), null, 'heuristic', null);
 }});
 
 function getBuildingCenter(b) {{
@@ -1851,7 +1922,8 @@ function analyseCanvasWWR(canvas) {{
 
 document.getElementById('btn-capture-all').addEventListener('click', async () => {{
   document.getElementById('facade-sub').textContent = 'Capturing all 4 facades…';
-  const visualWWRs = [];
+  document.getElementById('wwr-ai-status').textContent = '';
+  const capturedB64 = {{}};
   for (const dir of DIRS) {{
     await new Promise(resolve => {{
       flyToFacade(dir);
@@ -1861,22 +1933,48 @@ document.getElementById('btn-capture-all').addEventListener('click', async () =>
         const dst = document.getElementById('canvas-'+dir);
         const ctx = dst.getContext('2d');
         ctx.drawImage(src,0,0,src.width,src.height,0,0,dst.width,dst.height);
-        const w = analyseCanvasWWR(dst);
-        if (w !== null) visualWWRs.push(w);
+        // Convert to base64 JPEG for GPT-4 vision
+        capturedB64[dir] = dst.toDataURL('image/jpeg', 0.85).split(',')[1];
         resolve();
       }}, 1500);
     }});
   }}
-  document.getElementById('facade-sub').textContent = 'Capture complete';
+  document.getElementById('facade-sub').textContent = 'Captured – sending to GPT-4 vision…';
+  document.getElementById('wwr-ai-status').textContent = '⏳ Analysing with GPT-4 vision…';
+
   const hWWR = heuristicWWR(facadeBuilding);
-  if (visualWWRs.length > 0) {{
-    const visualAvg = Math.round(visualWWRs.reduce((a,b) => a+b,0) / visualWWRs.length);
-    // Weighted blend: 40% visual + 60% heuristic (visual is noisy from OSM tiles)
-    const blended = Math.round(0.4 * visualAvg + 0.6 * hWWR);
-    showWWR(blended, visualWWRs, 'blended');
-  }} else {{
-    showWWR(hWWR, null, 'heuristic');
+  const aiWWRs = [];
+  const aiNotes = [];
+
+  for (const dir of DIRS) {{
+    try {{
+      const resp = await fetch('http://localhost:8000/api/estimate-wwr', {{
+        method: 'POST',
+        headers: {{'Content-Type':'application/json'}},
+        body: JSON.stringify({{
+          image_base64: capturedB64[dir],
+          direction: dir,
+          building_info: {{
+            address: facadeBuilding.address,
+            year: facadeBuilding.year,
+            use: facadeBuilding.use_cat,
+            eclass: facadeBuilding.eclass,
+          }},
+        }}),
+      }});
+      const result = await resp.json();
+      aiWWRs.push(result.wwr);
+      aiNotes.push(dir + ': ' + result.wwr + '%' + (result.confidence ? ' (' + result.confidence + ')' : ''));
+    }} catch(e) {{
+      aiWWRs.push(hWWR);
+      aiNotes.push(dir + ': fallback');
+    }}
   }}
+
+  const aiAvg = Math.round(aiWWRs.reduce((a,b)=>a+b,0) / aiWWRs.length);
+  document.getElementById('facade-sub').textContent = 'Analysis complete';
+  document.getElementById('wwr-ai-status').textContent = '';
+  showWWR(aiAvg, aiWWRs, 'gpt4-vision', aiNotes);
 }});
 
 // Thumb click → fly + capture
@@ -1884,16 +1982,75 @@ for (const dir of DIRS) {{
   document.getElementById('thumb-'+dir).addEventListener('click', () => captureToCanvas(dir));
 }}
 
-function showWWR(wwr, perFacade, source) {{
+function showWWR(wwr, perFacade, source, notes) {{
   document.getElementById('wwr-value').textContent = wwr;
   document.getElementById('wwr-bar').style.width = Math.min(100, wwr * 1.4) + '%';
-  let breakdown = source === 'heuristic'
-    ? 'Source: TABULA archetype heuristic'
-    : 'Source: blended (visual + heuristic)';
-  if (perFacade) {{
-    breakdown += '<br>Per facade: ' + DIRS.map((d,i) => d+':'+perFacade[i]+'%').join(' ');
+
+  // Always show TABULA reference
+  if (facadeBuilding) {{
+    const tWWR = heuristicWWR(facadeBuilding);
+    const period = facadeBuilding.tabula_period || '–';
+    document.getElementById('wwr-tabula-val').textContent = tWWR;
+    document.getElementById('wwr-tabula-period').textContent = period;
+    document.getElementById('wwr-tabula-row').style.display = 'block';
+  }}
+
+  let breakdown = '';
+  if (source === 'heuristic') {{
+    breakdown = 'Source: TABULA heuristic only (capture facades for AI estimate)';
+  }} else if (source === 'gpt4-vision') {{
+    // Track for saving
+    lastWWR = {{ wwr, perFacade, notes, source }};
+    breakdown = '&#129302; GPT-4 vision per facade:<br>';
+    if (notes) breakdown += notes.join(' &nbsp;\xb7&nbsp; ');
+  }} else {{
+    breakdown = 'Source: ' + source;
+    if (perFacade) breakdown += '<br>Per facade: ' + DIRS.map((d,i) => d+':'+perFacade[i]+'%').join(' ');
   }}
   document.getElementById('wwr-breakdown').innerHTML = breakdown;
+  // Show save button only for AI results
+  const aiStatus = document.getElementById('wwr-ai-status');
+  if (source === 'gpt4-vision') {{
+    aiStatus.innerHTML =
+      '<button onclick="saveWWR()" style="margin-top:4px;width:100%;padding:4px 8px;font-size:10px;' +
+      'border-radius:6px;border:1px solid rgba(139,92,246,0.5);background:rgba(139,92,246,0.1);' +
+      'color:#6d28d9;cursor:pointer;font-family:inherit">&#128190; Save WWR result</button>' +
+      '<div id="wwr-save-status" style="font-size:10px;color:var(--muted);margin-top:3px"></div>';
+  }} else {{
+    aiStatus.innerHTML = '';
+  }}
+}}
+
+async function saveWWR() {{
+  if (!lastWWR || !facadeBuilding) return;
+  const statusEl = document.getElementById('wwr-save-status');
+  if (statusEl) statusEl.textContent = 'Saving…';
+  const ring = facadeBuilding.coordinates && facadeBuilding.coordinates[0];
+  if (!ring) return;
+  const lat = ring.reduce((s,c) => s+c[1], 0) / ring.length;
+  const lon = ring.reduce((s,c) => s+c[0], 0) / ring.length;
+  try {{
+    await fetch('http://localhost:8000/api/wwr-save', {{
+      method: 'POST',
+      headers: {{'Content-Type':'application/json'}},
+      body: JSON.stringify({{
+        lat, lon,
+        address: facadeBuilding.address || null,
+        average_wwr: lastWWR.wwr,
+        per_facade: lastWWR.perFacade || [],
+        directions: DIRS,
+        source: lastWWR.source,
+        building_info: {{ year: facadeBuilding.year, use: facadeBuilding.use_cat, eclass: facadeBuilding.eclass }},
+      }}),
+    }});
+    if (statusEl) statusEl.textContent = '\u2713 Saved';
+    // Update sidebar badge
+    const badge = document.getElementById('inspect-saved-badge');
+    badge.innerHTML = '&#128190; Saved WWR: ' + lastWWR.wwr + '% (AI)';
+    badge.style.display = 'block';
+  }} catch(e) {{
+    if (statusEl) statusEl.textContent = 'Save failed: ' + e.message;
+  }}
 }}
 
 document.getElementById('btn-exit-inspect').addEventListener('click', () => {{
