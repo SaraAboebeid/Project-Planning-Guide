@@ -13,7 +13,7 @@
 <!-- Loading overlay -->
 <div id="loading">
   <div class="spinner"></div>
-  <h1>&#127963; Gothenburg 3D</h1>
+  <h1>Gothenburg 3D</h1>
   <p id="loading-status">Initialising Cesium…</p>
 </div>
 
@@ -23,20 +23,20 @@
 <!-- Left sidebar: search + summary + legend + view options -->
 <div id="left-panel">
   <div id="lp-header">
-    <span class="lp-title">&#127963; Gothenburg 3D</span>
+    <span class="lp-title">Gothenburg 3D</span>
     <span class="lp-sub">EUBUCCO v0.2 + EPC &middot; {{TOTAL_BUILDINGS}} buildings</span>
   </div>
   <div id="lp-scroll">
   <!-- Building info (shown inline in sidebar when building is selected) -->
   <div class="panel" id="info-panel">
     <button class="close-btn" id="info-close">&#x2715;</button>
-    <h2>&#127963; Building</h2>
+    <h2>Building</h2>
     <div id="info-content"></div>
   </div>
   <div id="search-wrap">
     <div id="search-row">
       <input id="search-input" type="text" placeholder="Search address&hellip;" autocomplete="off">
-      <button class="btn" id="search-btn">&#128269;</button>
+      <button class="btn" id="search-btn">Search</button>
     </div>
     <div id="search-results"></div>
   </div>
@@ -50,123 +50,152 @@
       <div class="stat-lbl">TABULA matched</div>
     </div>
   </div>
-  <div id="lp-tabs">
-    <button class="lp-tab active" id="btn-use">&#127968; Use type</button>
-    <button class="lp-tab" id="btn-eclass">&#9889; Energy</button>
-    <button class="lp-tab" id="btn-year">&#128197; Year era</button>
-  </div>
-  <div id="legend-container"></div>
-  <div class="lp-hint">Click a row to see best &amp; worst performers</div>
-  <div class="lp-divider"></div>
-  <div class="lp-section-title">Layers</div>
-
-  <!-- Hidden legacy buttons that cesium.js / vasttrafik.js still wire internally -->
+  <!-- hidden legacy buttons — IDs wired by cesium.js / vasttrafik.js -->
   <button id="btn-tiles"       style="display:none">tiles</button>
   <button id="btn-eubucco"     style="display:none">eubucco</button>
   <button id="btn-transit"     style="display:none">transit</button>
   <button id="btn-disruptions" style="display:none">disruptions</button>
   <button id="btn-parking"     style="display:none">parking</button>
 
-  <div id="lp-layers">
-
-    <!-- Base Map selector (radio — pick one) -->
-    <div class="lp-section-label">Base Map</div>
-    <div class="basemap-group">
+  <!-- ══ BASE MAP ═══════════════════════════════════════════════════════ -->
+  <div class="lp-divider"></div>
+  <div class="lp-section-title">Base Map</div>
+  <div class="basemap-group" style="padding:0 0 4px">
+    <div class="base-row">
       <button class="base-btn active" id="btn-base-light">
         <span class="base-indicator"></span>
-        <span class="layer-icon">&#x1F5FA;</span>
         <span class="base-name">Light</span>
         <span class="layer-pill">CartoDB</span>
       </button>
+      <button class="info-btn" data-title="Light basemap" data-desc="Neutral light street map — ideal for daytime use and coloured data overlays." data-source="CartoDB Positron · OpenStreetMap contributors"></button>
+    </div>
+    <div class="base-row">
       <button class="base-btn" id="btn-base-dark">
         <span class="base-indicator"></span>
-        <span class="layer-icon">&#x1F311;</span>
         <span class="base-name">Dark</span>
         <span class="layer-pill">CartoDB</span>
       </button>
+      <button class="info-btn" data-title="Dark basemap" data-desc="Dark-themed street map. Provides strong contrast for bright-coloured overlays." data-source="CartoDB Dark Matter · OpenStreetMap contributors"></button>
+    </div>
+    <div class="base-row">
       <button class="base-btn" id="btn-base-satellite">
         <span class="base-indicator"></span>
-        <span class="layer-icon">&#x1F6F0;</span>
         <span class="base-name">Satellite</span>
         <span class="layer-pill">Esri</span>
       </button>
+      <button class="info-btn" data-title="Satellite imagery" data-desc="High-resolution aerial and satellite imagery of Gothenburg and surroundings." data-source="Esri World Imagery"></button>
+    </div>
+    <div class="base-row">
       <button class="base-btn" id="btn-base-photo">
         <span class="base-indicator"></span>
-        <span class="layer-icon">&#x1F30D;</span>
         <span class="base-name">Photorealistic 3D</span>
         <span class="layer-pill">Google</span>
       </button>
+      <button class="info-btn" data-title="Photorealistic 3D tiles" data-desc="Google's photorealistic 3D tiles with detailed building textures and terrain mesh. Requires a valid Cesium Ion access token." data-source="Google via Cesium Ion"></button>
     </div>
+  </div>
 
-    <div class="lp-divider" style="margin:6px 0 4px"></div>
+  <!-- ══ DATA LAYERS ════════════════════════════════════════════════════ -->
+  <div id="lp-layers">
+    <div class="lp-divider"></div>
+    <div class="lp-section-title">Data Layers</div>
 
-    <!-- Overlays (checkboxes — mix freely) -->
-    <div class="lp-section-label">Overlays</div>
+    <!-- ─ Buildings ───────────────────────────────────────────────────── -->
+    <div class="lp-section-label">Buildings</div>
     <div class="overlay-group">
-      <button class="overlay-btn active" id="btn-overlay-buildings">
-        <span class="overlay-check"></span>
-        <span class="layer-icon">&#x1F3D7;</span>
-        <span class="base-name">Buildings</span>
-        <span class="layer-pill">EUBUCCO + EPC</span>
-      </button>
-      <button class="overlay-btn" id="btn-overlay-transit">
-        <span class="overlay-check"></span>
-        <span class="layer-icon">&#x1F68C;</span>
-        <span class="base-name">Live Transit &amp; Stops</span>
-        <span class="layer-pill">V&#228;sttrafik</span>
-      </button>
-      <button class="overlay-btn" id="btn-overlay-disruptions">
-        <span class="overlay-check"></span>
-        <span class="layer-icon">&#x26A0;</span>
-        <span class="base-name">St&#246;rning</span>
-        <span class="layer-pill">Live</span>
-      </button>
-      <button class="overlay-btn" id="btn-overlay-parking">
-        <span class="overlay-check"></span>
-        <span class="layer-icon">&#x1F17F;</span>
-        <span class="base-name">Pendelparkering</span>
-        <span class="layer-pill">VT</span>
-      </button>
+      <div class="overlay-row">
+        <button class="overlay-btn active" id="btn-overlay-buildings">
+          <span class="overlay-check"></span>
+          <span class="base-name">Buildings</span>
+          <span class="layer-pill">EUBUCCO + EPC</span>
+        </button>
+        <button class="info-btn" data-title="Buildings" data-desc="92,973 building footprints with 3D volumes for Gothenburg. Coloured by use type, energy class, or construction year. EPC data linked from the Boverket register." data-source="EUBUCCO v0.2 · Boverket EPC register"></button>
+      </div>
     </div>
+    <div id="lp-tabs">
+      <button class="lp-tab active" id="btn-use">Use type</button>
+      <button class="lp-tab" id="btn-eclass">Energy</button>
+      <button class="lp-tab" id="btn-year">Year era</button>
+    </div>
+    <div id="legend-container"></div>
+    <div class="lp-hint">Click a row to see best &amp; worst performers</div>
 
-    <!-- vt-status: loading feedback used by vasttrafik.js -->
+    <!-- ─ Traffic ─────────────────────────────────────────────────────── -->
+    <div class="lp-divider" style="margin:4px 0 0"></div>
+    <div class="lp-section-label">Traffic</div>
+    <div class="overlay-group">
+      <div class="overlay-row">
+        <button class="overlay-btn" id="btn-overlay-transit">
+          <span class="overlay-check"></span>
+          <span class="base-name">Live Transit &amp; Stops</span>
+          <span class="layer-pill">V&#228;sttrafik</span>
+        </button>
+        <button class="info-btn" data-title="Live Transit &amp; Stops" data-desc="Real-time bus, tram, and ferry positions plus stop locations across Gothenburg. Requires the backend server (uvicorn) to be running." data-source="Västtrafik open API · GTFS-RT feed"></button>
+      </div>
+      <div class="overlay-row">
+        <button class="overlay-btn" id="btn-overlay-disruptions">
+          <span class="overlay-check"></span>
+          <span class="base-name">Disruptions</span>
+          <span class="layer-pill">Live</span>
+        </button>
+        <button class="info-btn" data-title="Traffic Disruptions" data-desc="Live traffic disruptions, planned maintenance works, and service alerts on the public transit network. Shown as clickable markers on the map." data-source="Västtrafik Störning API"></button>
+      </div>
+      <div class="overlay-row">
+        <button class="overlay-btn" id="btn-overlay-parking">
+          <span class="overlay-check"></span>
+          <span class="base-name">Commuter Parking</span>
+          <span class="layer-pill">VT</span>
+        </button>
+        <button class="info-btn" data-title="Commuter Parking" data-desc="Kiss-and-ride and commuter parking lots near transit stops, with live space availability where provided." data-source="Västtrafik"></button>
+      </div>
+    </div>
     <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:2px 8px 0"></div>
-    <!-- ghost-mode toggle: shown only when transit layer is active -->
-    <div id="vt-ghost-row" style="display:none;padding:5px 10px 2px;">
+    <div id="vt-ghost-row" style="padding:5px 10px 2px;">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--muted);user-select:none">
-        <span style="flex:1">&#x1F47B; Ghost buildings</span>
+        <span style="flex:1">Ghost mode</span>
         <span id="vt-ghost-toggle" style="
           display:inline-flex;align-items:center;width:32px;height:17px;
-          background:rgba(255,255,255,0.12);border-radius:9px;position:relative;
+          background:#D1D5DB;border-radius:9px;position:relative;
           transition:background .2s;flex-shrink:0"
         >
           <span id="vt-ghost-knob" style="
             position:absolute;left:2px;width:13px;height:13px;
-            background:#888;border-radius:50%;transition:left .2s,background .2s"
+            background:#9CA3AF;border-radius:50%;transition:left .2s,background .2s"
           ></span>
         </span>
       </label>
     </div>
 
-    <button class="btn opt-btn" id="btn-reset" style="margin-top:8px">&#8962; Reset View</button>
-  </div>
+    <!-- ─ Statistics (SCB) ────────────────────────────────────────────── -->
+    <div class="lp-divider" style="margin:4px 0 0"></div>
+    <div style="display:flex;align-items:center">
+      <div class="lp-section-label" style="flex:1">Statistics <span class="layer-pill" style="margin-left:2px;vertical-align:middle">SCB &middot; CC0</span></div>
+      <button class="info-btn" style="margin-right:4px" data-title="Statistics Sweden (SCB) layers" data-desc="47 statistical overlays from Statistics Sweden covering population grids, administrative zones, land use areas, and the national reference grid. All loaded on demand from the SCB WFS service." data-source="Statistics Sweden (SCB) · CC0 1.0 Universal · geodata.scb.se"></button>
+    </div>
+    <div id="scb-layers-container" style="display:flex;flex-direction:column;gap:2px;padding:0 0 4px"></div>
 
-  <div class="lp-divider" style="margin:8px 0 4px"></div>
-  <div class="lp-section-label" style="padding:4px 4px 3px">SCB Statistics</div>
-  <div id="scb-layers-container" style="display:flex;flex-direction:column;gap:2px;padding:0 0 6px"></div>
+  </div><!-- /lp-layers -->
 
+  <!-- ══ ANALYSIS TOOLS ═════════════════════════════════════════════════ -->
   <div class="lp-divider"></div>
   <div class="lp-section-title">Analysis Tools</div>
-  <div style="padding:0 10px 6px;display:flex;flex-direction:column;gap:5px;flex-shrink:0">
-    <button class="tool-btn" id="btn-inspect" disabled>&#128247; Inspect Facades + WWR</button>
+  <div style="padding:0 0 6px;display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+    <button class="tool-btn" id="btn-inspect" disabled>Inspect Facades + WWR</button>
     <div id="inspect-saved-badge" style="display:none;font-size:10px;color:var(--muted);padding-left:2px;margin-top:-3px"></div>
-    <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>&#9728; Rooftop PV Estimate</button>
+    <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>Rooftop PV Estimate</button>
     <div id="pvgis-saved-badge" style="display:none;font-size:10px;color:var(--muted);padding-left:2px;margin-top:-3px"></div>
     <div id="pvgis-result"></div>
-    <div id="lp-no-selection">&#8592; Click a building to enable</div>
+    <div id="lp-no-selection">Select a building to enable tools</div>
   </div>
+
+  <div class="lp-divider"></div>
+  <button class="btn opt-btn" id="btn-reset" style="margin:6px 0 8px;width:100%">Reset View</button>
+
   </div><!-- /lp-scroll -->
 </div>
+
+<!-- Info tooltip -->
+<div id="info-tooltip"><div class="it-title"></div><div class="it-desc"></div><div class="it-source"></div></div>
 
 <!-- Hover tooltip card -->
 <div id="hover-card" style="
@@ -179,7 +208,7 @@
 
 <!-- Facade inspector -->
 <div class="panel" id="facade-panel">
-  <h2>&#128247; Facade Inspector</h2>
+  <h2>Facade Inspector</h2>
   <div class="sub" id="facade-sub">Click a direction to fly there, then Snap — or use Capture All for automatic capture</div>
   <div id="facade-views">
     <div class="facade-thumb" id="thumb-N"><canvas id="canvas-N" width="200" height="150"></canvas><div class="dir-label">N</div></div>
@@ -188,15 +217,15 @@
     <div class="facade-thumb" id="thumb-W"><canvas id="canvas-W" width="200" height="150"></canvas><div class="dir-label">W</div></div>
   </div>
   <div style="display:flex;gap:8px;margin-top:10px">
-    <button class="btn" id="btn-snap" style="flex:1">&#128247; Snap</button>
-    <button class="btn" id="btn-capture-all" style="flex:1">&#9889; Capture All</button>
+    <button class="btn" id="btn-snap" style="flex:1">Snap</button>
+    <button class="btn" id="btn-capture-all" style="flex:1">Capture All</button>
     <button class="btn" id="btn-exit-inspect">&#x2715;</button>
   </div>
 </div>
 
 <!-- WWR result panel -->
 <div class="panel" id="wwr-panel">
-  <h2>&#128438; WWR Estimate</h2>
+  <h2>WWR Estimate</h2>
   <div class="sub">Window-to-Wall Ratio</div>
   <div class="wwr-value" id="wwr-value">?</div>
   <span class="wwr-unit">% average across facades</span>
@@ -211,7 +240,7 @@
 <!-- Västtrafik departures panel -->
 <div class="panel" id="vt-panel" style="display:none;top:16px;left:260px;width:280px;max-height:360px;overflow-y:auto">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-    <h2 style="margin:0">&#x1F68C; Departures</h2>
+    <h2 style="margin:0">Departures</h2>
     <button class="btn" id="btn-vt-close" style="padding:2px 8px">&#x2715;</button>
   </div>
   <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px" id="vt-panel-title"></div>
@@ -221,7 +250,7 @@
 <!-- Västtrafik disruptions panel -->
 <div class="panel" id="vt-disr-panel" style="display:none;top:16px;left:260px;width:320px;max-height:480px;overflow-y:auto">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-    <h2 style="margin:0">&#x26A0; Störning</h2>
+    <h2 style="margin:0">Disruptions</h2>
     <button class="btn" id="btn-disr-close" style="padding:2px 8px">&#x2715;</button>
   </div>
   <div id="vt-disr-count" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
@@ -231,7 +260,7 @@
 <!-- Västtrafik parking detail panel -->
 <div class="panel" id="vt-park-panel" style="display:none;top:16px;left:260px;width:260px">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-    <h2 style="margin:0">&#x1F17F; Parkering</h2>
+    <h2 style="margin:0">Parkering</h2>
     <button class="btn" id="btn-park-close" style="padding:2px 8px">&#x2715;</button>
   </div>
   <div id="vt-park-title" style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px"></div>

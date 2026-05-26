@@ -46,6 +46,8 @@
       label: 'Population Grid',
       icon:  '👥',
       pill:  '1 km',
+      desc:  '1×1 km grid cells showing population totals broken down by sex and five-year age bands. Covers all of Sweden.',
+      source:'SCB – Statistics Sweden · CC0 1.0',
       years: ['2025','2024','2023','2022','2021','2020','2019','2018','2017','2016','2015'],
       tn:    y => `stat:befolkning_1km_${y}`,
       style: 'heatmap',
@@ -65,6 +67,8 @@
       label:  'DeSO Zones',
       icon:   '🗺',
       pill:   'Statistical',
+      desc:   'Demographic Statistical Areas — Sweden\'s primary unit for socioeconomic statistics. ~5,900 zones nationwide, defined 2018.',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
       years:  ['2025','2018'],
       tn:     y => `stat:DeSO_${y}`,
       style:  'zone',
@@ -83,6 +87,8 @@
       label:  'RegSO Zones',
       icon:   '📐',
       pill:   'Statistical',
+      desc:   'Regional Statistical Areas — larger than DeSO, composed of aggregated DeSO zones. Used for regional comparisons.',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
       years:  ['2025','2020'],
       tn:     y => `stat:RegSO_${y}`,
       style:  'zone',
@@ -98,6 +104,8 @@
       label:  'Urban Areas',
       icon:   '🏙',
       pill:   'Tätorter',
+      desc:   'Delimited urban built-up areas (≥200 inhabitants, ≤200 m between buildings). Historical series from 1980.',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
       years:  ['2023','2020','2018','2015','2010','2005','2000','1995','1990','1980'],
       tn:     y => `stat:Tatorter_${y}`,
       style:  'zone',
@@ -116,6 +124,8 @@
       label:  'Small Settlements',
       icon:   '🏘',
       pill:   'Småorter',
+      desc:   'Smaller built-up areas (50–199 inhabitants) not meeting the tätort threshold. Historical series from 1990.',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
       years:  ['2023','2020','2015','2010','2005','2000','1995','1990'],
       tn:     y => `stat:Smaorter_${y}`,
       style:  'zone',
@@ -132,6 +142,8 @@
       label:  'Green Areas',
       icon:   '🌳',
       pill:   'Grönområden',
+      desc:   'Urban parks, forests, and recreation areas within tätort boundaries. Mapped in collaboration with municipalities.',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
       years:  ['2020','2015','2010'],
       tn:     y => `stat:Gronomraden_${y}_tatort`,
       style:  'zone',
@@ -148,6 +160,8 @@
       label:  'Workplace Zones',
       icon:   '💼',
       pill:   'Arbetsplats',
+      desc:   'Statistical zones delineated around concentrations of workplaces. Used for commuting analysis and labour market statistics.',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
       years:  ['2010','2005','2000'],
       tn:     y => `stat:Arbetsplatsomraden_${y}`,
       style:  'zone',
@@ -161,6 +175,8 @@
       label:  'Business Zones',
       icon:   '🏭',
       pill:   'Verksamhet',
+      desc:   'Areas dominated by industrial or commercial activity (verksamhetsområden). Useful for land-use and mobility analysis.',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
       years:  ['2020','2015'],
       tn:     y => `stat:Verksamhetsomraden_${y}`,
       style:  'zone',
@@ -174,6 +190,8 @@
       label:  'Retail Zones',
       icon:   '🛍',
       pill:   'Handel',
+      desc:   'Concentrated retail areas (handelsområden), including shopping centres and retail parks. Useful for accessibility studies.',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
       years:  ['2020','2015'],
       tn:     y => `stat:Handelsomraden_${y}`,
       style:  'zone',
@@ -187,6 +205,8 @@
       label:  'Holiday Cottages',
       icon:   '🏡',
       pill:   'Fritidshus',
+      desc:   'Concentrations of seasonal and holiday dwellings (fritidshusområden). Historical series from 2000.',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
       years:  ['2020','2015','2010','2005','2000'],
       tn:     y => `stat:Fritidshusomraden_${y}`,
       style:  'zone',
@@ -200,6 +220,8 @@
       label:  'Statistical Grid (1km)',
       icon:   '⊞',
       pill:   '1 km',
+      desc:   'The SWEREF99TM 1×1 km national reference grid — the spatial framework used for all SCB grid statistics.',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
       years:  [''],                          // single layer, no year suffix
       tn:     () => 'stat:Rutnat_1x1km_sweref99tm',
       style:  'grid',
@@ -247,16 +269,18 @@
         const bef = (() => {
           try { return e.properties.beftotalt.getValue(); } catch(_) { return 0; }
         })();
-        e.polygon.material     = heatColor(bef);
-        e.polygon.outline      = false;
-        e.polygon.heightReference = Cesium.HeightReference.CLAMP_TO_GROUND;
+        e.polygon.material           = heatColor(bef);
+        e.polygon.outline            = false;
+        e.polygon.heightReference    = Cesium.HeightReference.CLAMP_TO_GROUND;
+        e.polygon.classificationType = Cesium.ClassificationType.BOTH;  // drapes on photorealistic 3D tiles
 
       } else {
         if (e.polygon) {
-          e.polygon.material          = g.fill;
-          e.polygon.outline           = true;
-          e.polygon.outlineColor      = g.stroke;
-          e.polygon.heightReference   = Cesium.HeightReference.CLAMP_TO_GROUND;
+          e.polygon.material           = g.fill;
+          e.polygon.outline            = true;
+          e.polygon.outlineColor       = g.stroke;
+          e.polygon.heightReference    = Cesium.HeightReference.CLAMP_TO_GROUND;
+          e.polygon.classificationType = Cesium.ClassificationType.BOTH;  // drapes on photorealistic 3D tiles
         }
         if (e.polyline) {
           e.polyline.material = new Cesium.ColorMaterialProperty(g.stroke);
@@ -348,16 +372,27 @@
       wrap.className = 'scb-row';
 
       // ── Toggle button ──────────────────────────────────────────────────────
+      const row = document.createElement('div');
+      row.className = 'overlay-row';
+
       const btn = document.createElement('button');
       btn.className = 'overlay-btn';
       btn.id        = 'scb-btn-' + g.id;
       btn.innerHTML =
         `<span class="overlay-check"></span>`
-        + `<span class="layer-icon">${g.icon}</span>`
         + `<span class="base-name">${g.label}</span>`
         + `<span class="layer-pill">${g.pill}</span>`;
       btn.addEventListener('click', () => scbToggle(g.id));
-      wrap.appendChild(btn);
+      row.appendChild(btn);
+
+      const infoBtn = document.createElement('button');
+      infoBtn.className = 'info-btn';
+      infoBtn.dataset.title  = g.label;
+      infoBtn.dataset.desc   = g.desc   || '';
+      infoBtn.dataset.source = g.source || '';
+      row.appendChild(infoBtn);
+
+      wrap.appendChild(row);
 
       // ── Sub-row: year selector + status ───────────────────────────────────
       const sub = document.createElement('div');

@@ -3,6 +3,37 @@
 // Depends on: cesium.js (viewer), facade_inspector.js (lastPvgis, lastWWR)
 // =============================================================
 
+// ── Info-button tooltip (layer descriptions) ─────────────────────────────
+(function initInfoTooltip() {
+  const tip = document.getElementById('info-tooltip');
+  if (!tip) return;
+  const titleEl  = tip.querySelector('.it-title');
+  const descEl   = tip.querySelector('.it-desc');
+  const sourceEl = tip.querySelector('.it-source');
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.info-btn');
+    if (!btn) { tip.style.display = 'none'; return; }
+    e.stopPropagation();
+
+    titleEl.textContent  = btn.dataset.title  || '';
+    descEl.textContent   = btn.dataset.desc   || '';
+    sourceEl.textContent = btn.dataset.source ? '⊹ ' + btn.dataset.source : '';
+    sourceEl.style.display = btn.dataset.source ? '' : 'none';
+
+    tip.style.display = 'block';
+    const rect = btn.getBoundingClientRect();
+    const tipW = tip.offsetWidth  || 220;
+    const tipH = tip.offsetHeight || 80;
+    let left = rect.right + 8;
+    if (left + tipW > window.innerWidth - 8) left = rect.left - tipW - 8;
+    let top = rect.top - 4;
+    if (top + tipH > window.innerHeight - 8) top = window.innerHeight - tipH - 8;
+    tip.style.left = left + 'px';
+    tip.style.top  = top  + 'px';
+  });
+})();
+
 let selectedBuilding = null;
 let highlightEntity  = null;
 

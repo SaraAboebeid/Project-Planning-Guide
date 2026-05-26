@@ -49,9 +49,9 @@ let _vtGhostEnabled = false;  // ghost starts OFF; user can toggle on if desired
   if (!row) return;
 
   function _applyGhostUI(on) {
-    toggle.style.background = on ? 'rgba(114,28,184,0.7)' : 'rgba(255,255,255,0.12)';
+    toggle.style.background = on ? '#5B21B6' : '#CBD5E1';
     knob.style.left         = on ? '17px' : '2px';
-    knob.style.background   = on ? '#fff'  : '#888';
+    knob.style.background   = on ? '#fff'  : '#94A3B8';
   }
 
   row.addEventListener('click', () => {
@@ -73,7 +73,7 @@ async function _vtShowLayer() {
     for (const e of _vtStopEntities) e.show = true;
   }
   if (window.trafikCanvasAnimation) window.trafikCanvasAnimation.start();
-  document.getElementById('vt-ghost-row').style.display = 'block';
+  document.getElementById('vt-ghost-row').style.display = 'block'; // always visible — not dependent on transit
   if (_vtGhostEnabled && window.setBuildingGhostMode) window.setBuildingGhostMode(true);
 }
 
@@ -82,7 +82,7 @@ function _vtHideLayer() {
   if (window.trafikCanvasAnimation) window.trafikCanvasAnimation.stop();
   document.getElementById('vt-status').style.display = 'none';
   document.getElementById('vt-panel').style.display  = 'none';
-  document.getElementById('vt-ghost-row').style.display = 'none';
+  // ghost row stays visible always
   if (window.setBuildingGhostMode) window.setBuildingGhostMode(false);
 }
 
