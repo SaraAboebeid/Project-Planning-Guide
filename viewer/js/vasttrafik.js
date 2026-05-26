@@ -34,7 +34,34 @@ function toggleTransit() {
   const btn = document.getElementById('btn-transit');
   if (_vtVisible) { btn.classList.add('active');    _vtShowLayer(); }
   else            { btn.classList.remove('active'); _vtHideLayer(); }
+  // Keep visible overlay button in sync regardless of how toggleTransit was invoked
+  const overlayBtn = document.getElementById('btn-overlay-transit');
+  if (overlayBtn) overlayBtn.classList.toggle('active', _vtVisible);
 }
+
+// ── Ghost-mode toggle wiring ─────────────────────────────────────────────
+let _vtGhostEnabled = false;  // ghost starts OFF; user can toggle on if desired
+
+(function _initGhostToggle() {
+  const row    = document.getElementById('vt-ghost-row');
+  const toggle = document.getElementById('vt-ghost-toggle');
+  const knob   = document.getElementById('vt-ghost-knob');
+  if (!row) return;
+
+  function _applyGhostUI(on) {
+    toggle.style.background = on ? 'rgba(114,28,184,0.7)' : 'rgba(255,255,255,0.12)';
+    knob.style.left         = on ? '17px' : '2px';
+    knob.style.background   = on ? '#fff'  : '#888';
+  }
+
+  row.addEventListener('click', () => {
+    _vtGhostEnabled = !_vtGhostEnabled;
+    _applyGhostUI(_vtGhostEnabled);
+    if (window.setBuildingGhostMode) window.setBuildingGhostMode(_vtGhostEnabled);
+  });
+
+  _applyGhostUI(_vtGhostEnabled);
+})();
 
 async function _vtShowLayer() {
   const statusEl = document.getElementById('vt-status');
@@ -46,6 +73,8 @@ async function _vtShowLayer() {
     for (const e of _vtStopEntities) e.show = true;
   }
   if (window.trafikCanvasAnimation) window.trafikCanvasAnimation.start();
+  document.getElementById('vt-ghost-row').style.display = 'block';
+  if (_vtGhostEnabled && window.setBuildingGhostMode) window.setBuildingGhostMode(true);
 }
 
 function _vtHideLayer() {
@@ -53,6 +82,8 @@ function _vtHideLayer() {
   if (window.trafikCanvasAnimation) window.trafikCanvasAnimation.stop();
   document.getElementById('vt-status').style.display = 'none';
   document.getElementById('vt-panel').style.display  = 'none';
+  document.getElementById('vt-ghost-row').style.display = 'none';
+  if (window.setBuildingGhostMode) window.setBuildingGhostMode(false);
 }
 
 async function _vtLoadStops() {

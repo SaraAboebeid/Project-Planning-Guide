@@ -750,16 +750,67 @@ async def vt_positions(
         bg = line_info.get("backgroundColor") or line_info.get("bgColor")
         fg = line_info.get("foregroundColor") or line_info.get("fgColor")
         result.append({
-            "lat":           round(float(lat), 6),
-            "lon":           round(float(lon), 6),
-            "bearing":       v.get("bearing"),
-            "line":          line_info.get("shortName") or line_info.get("name", ""),
-            "transportMode": line_info.get("transportMode", "bus"),
-            "bgColor":       ("#" + bg.lstrip("#")) if bg else None,
-            "fgColor":       ("#" + fg.lstrip("#")) if fg else None,
+            "lat":              round(float(lat), 6),
+            "lon":              round(float(lon), 6),
+            "bearing":          v.get("bearing"),
+            "line":             line_info.get("shortName") or line_info.get("name", ""),
+            "transportMode":    line_info.get("transportMode", "bus"),
+            "bgColor":          ("#" + bg.lstrip("#")) if bg else None,
+            "fgColor":          ("#" + fg.lstrip("#")) if fg else None,
+            "direction":        v.get("directionName") or v.get("direction") or "",
+            "detailsReference": v.get("detailsReference") or v.get("journeyRef") or "",
         })
 
     return {"vehicles": result, "count": len(result)}
+
+
+@app.get("/api/vasttrafik/journey/{details_reference:path}")
+async def vt_journey_calls(details_reference: str):
+    """
+    Return the remaining stops (calls) for a live journey, using its detailsReference.
+    Used to show "next stop in X min" on vehicle hover.
+    """
+    import httpx
+    from datetime import datetime, timezone
+    token = await _vt_get_token()
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{_VT_PR_URL}/service-journeys/{details_reference}/calls",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    if r.status_code == 404:
+        return {"calls": []}
+    if r.status_code != 200:
+        raise HTTPException(502, f"Västtrafik /calls failed: {r.status_code}")
+
+    data = r.json()
+    raw_calls = data.get("calls", data) if isinstance(data, dict) else data
+    now = datetime.now(timezone.utc)
+
+    calls_out = []
+    for c in raw_calls:
+        stop = c.get("stopPoint") or c.get("stop") or {}
+        stop_name = stop.get("name") or c.get("name") or ""
+        # Try estimated arrival, fall back to planned
+        arr_time = c.get("estimatedArrivalTime") or c.get("plannedArrivalTime") or \
+                   c.get("estimatedDepartureTime") or c.get("plannedDepartureTime") or ""
+        minutes_away = None
+        if arr_time:
+            try:
+                t = datetime.fromisoformat(arr_time.replace("Z", "+00:00"))
+                minutes_away = round((t - now).total_seconds() / 60)
+            except Exception:
+                pass
+        calls_out.append({
+            "stopName":    stop_name,
+            "minutesAway": minutes_away,
+            "time":        arr_time,
+            "passed":      c.get("isCancelled", False) or (minutes_away is not None and minutes_away < -2),
+        })
+
+    # Only return upcoming stops (not yet passed)
+    upcoming = [c for c in calls_out if not c["passed"] and (c["minutesAway"] is None or c["minutesAway"] >= -1)]
+    return {"calls": upcoming[:10]}
 
 
 @app.get("/api/vasttrafik/departures/{gid}")

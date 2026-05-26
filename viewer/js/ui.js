@@ -37,6 +37,9 @@ let lastHoverId = null;
 let hoverThrottle = 0;
 
 viewer.screenSpaceEventHandler.setInputAction(movement => {
+  // Suppress building hover card while ghost/transit mode is active
+  if (window._ghostModeOn) { hoverCard.style.display = 'none'; return; }
+
   // Throttle to ~30fps
   const now = Date.now();
   if (now - hoverThrottle < 33) {
@@ -100,6 +103,8 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
   } else {
     hoverCard.style.display = 'none';
     lastHoverId = null;
+    // Delegate to SCB layer hover (shows tooltip if cursor is over an SCB polygon)
+    if (typeof window.scbOnHover === 'function') window.scbOnHover(movement);
   }
 }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 

@@ -31,7 +31,7 @@ function layersInit() {
   // ── Transit overlay ──────────────────────────────────────────────────────
   document.getElementById('btn-overlay-transit').addEventListener('click', () => {
     document.getElementById('btn-transit').click();
-    document.getElementById('btn-overlay-transit').classList.toggle('active', _vtVisible);
+    // Active class sync is handled inside toggleTransit() itself
   });
 
   // ── Störning overlay ─────────────────────────────────────────────────────

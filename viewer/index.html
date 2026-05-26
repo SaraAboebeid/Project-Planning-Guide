@@ -131,9 +131,30 @@
 
     <!-- vt-status: loading feedback used by vasttrafik.js -->
     <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:2px 8px 0"></div>
+    <!-- ghost-mode toggle: shown only when transit layer is active -->
+    <div id="vt-ghost-row" style="display:none;padding:5px 10px 2px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--muted);user-select:none">
+        <span style="flex:1">&#x1F47B; Ghost buildings</span>
+        <span id="vt-ghost-toggle" style="
+          display:inline-flex;align-items:center;width:32px;height:17px;
+          background:rgba(255,255,255,0.12);border-radius:9px;position:relative;
+          transition:background .2s;flex-shrink:0"
+        >
+          <span id="vt-ghost-knob" style="
+            position:absolute;left:2px;width:13px;height:13px;
+            background:#888;border-radius:50%;transition:left .2s,background .2s"
+          ></span>
+        </span>
+      </label>
+    </div>
 
     <button class="btn opt-btn" id="btn-reset" style="margin-top:8px">&#8962; Reset View</button>
   </div>
+
+  <div class="lp-divider" style="margin:8px 0 4px"></div>
+  <div class="lp-section-label" style="padding:4px 4px 3px">SCB Statistics</div>
+  <div id="scb-layers-container" style="display:flex;flex-direction:column;gap:2px;padding:0 0 6px"></div>
+
   <div class="lp-divider"></div>
   <div class="lp-section-title">Analysis Tools</div>
   <div style="padding:0 10px 6px;display:flex;flex-direction:column;gap:5px;flex-shrink:0">

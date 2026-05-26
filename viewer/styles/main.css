@@ -356,3 +356,21 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
   content:'\2713'; position:absolute; top:-1px; left:1px;
   font-size:9px; color:white; font-weight:700;
 }
+
+/* ── SCB Statistics layer sub-rows ──────────────────────────────────────── */
+.scb-row   { display:flex; flex-direction:column; }
+.scb-sub   {
+  display:flex; align-items:center; gap:6px;
+  padding:2px 8px 4px 30px; flex-shrink:0;
+}
+.scb-year-sel {
+  flex:0 0 auto;
+  background:var(--surface); color:var(--fg); border:1px solid var(--border);
+  border-radius:5px; font-size:11px; padding:2px 6px;
+  font-family:Inter,sans-serif; cursor:pointer; outline:none;
+}
+.scb-year-sel:hover  { border-color:rgba(114,28,184,0.4); }
+.scb-year-sel:focus  { border-color:#a78bfa; }
+.scb-status {
+  font-size:10px; color:var(--muted); flex:1;
+}

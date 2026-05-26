@@ -91,6 +91,7 @@ def main():
         "trafik_canvas.js",
         "vasttrafik.js",
         "layers.js",
+        "scb_layers.js",
     ]
     all_js = "\n\n".join(
         open(f"viewer/js/{f}", encoding="utf-8").read()

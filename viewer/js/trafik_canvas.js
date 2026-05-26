@@ -34,8 +34,7 @@
   // ── Configuration ─────────────────────────────────────────────────────────
   const CONFIG = {
     apiBase:             'http://localhost:8000/api/vasttrafik',
-    fetchIntervalMs:     3000,    // fetch new positions every 3 s
-    viewPad:             0.07,    // degrees bounding box padding from camera centre
+    fetchIntervalMs:     5000,    // fetch new positions every 5 s (city-wide)
     vehicleSize:         22,      // radius of vehicle circle
     glowRadius:          42,
     trailHistoryLength:  100,     // max stored positions per vehicle
@@ -107,27 +106,20 @@
   // ── Fetch positions from FastAPI backend ──────────────────────────────────
   async function fetchPositions() {
     try {
-      const cart = viewer.scene.globe.ellipsoid
-                       .cartesianToCartographic(viewer.camera.position);
-      const clat = Cesium.Math.toDegrees(cart.latitude);
-      const clon = Cesium.Math.toDegrees(cart.longitude);
-      const pad  = CONFIG.viewPad;
-      const params = new URLSearchParams({
-        south: (clat - pad).toFixed(5),
-        north: (clat + pad).toFixed(5),
-        west:  (clon - pad).toFixed(5),
-        east:  (clon + pad).toFixed(5),
-      });
-      const r = await fetch(`${CONFIG.apiBase}/positions?${params}`);
+      // Fetch all vehicles for the full Gothenburg region — the backend
+      // defaults to the city-wide bbox so no params are needed.
+      const r = await fetch(`${CONFIG.apiBase}/positions`);
       if (!r.ok) return [];
       const data = await r.json();
       return (data.vehicles || [])
         .filter(v => v.lat && v.lon)
         .map(v => ({
-          lat:       v.lat,
-          lng:       v.lon,
-          type:      (v.transportMode || 'BUS').toUpperCase(),
-          line:      v.line || '',
+          lat:              v.lat,
+          lng:              v.lon,
+          type:             (v.transportMode || 'BUS').toUpperCase(),
+          line:             v.line || '',
+          direction:        v.direction || '',
+          detailsReference: v.detailsReference || '',
           apiColors: v.bgColor ? {
             bg: v.bgColor.startsWith('#') ? v.bgColor : '#' + v.bgColor,
             fg: v.fgColor ? (v.fgColor.startsWith('#') ? v.fgColor : '#' + v.fgColor) : '#ffffff',
@@ -164,9 +156,12 @@
       if (bestOld && bestDist < 0.000004) {
         used.add(bestOld.i);
         const old = bestOld.old;
-        v.displayLng     = old.displayLng ?? old.lng;
-        v.displayLat     = old.displayLat ?? old.lat;
+        v.displayLng      = old.displayLng ?? old.lng;
+        v.displayLat      = old.displayLat ?? old.lat;
         v.positionHistory = old.positionHistory || [];
+        // Prefer newer metadata but keep old if missing
+        if (!v.direction)        v.direction        = old.direction        || '';
+        if (!v.detailsReference) v.detailsReference = old.detailsReference || '';
 
         // Record current interpolated position if it moved meaningfully
         const last = v.positionHistory[v.positionHistory.length - 1];
@@ -395,6 +390,168 @@
     animFrame = requestAnimationFrame(animate);
   }
 
+  // ── Hover tooltip ─────────────────────────────────────────────────────────
+  const tooltip = document.createElement('div');
+  tooltip.id = 'vt-hover-tooltip';
+  tooltip.style.cssText = [
+    'position:absolute', 'z-index:11', 'pointer-events:none', 'display:none',
+    'background:rgba(8,8,18,0.93)', 'border:1px solid rgba(255,255,255,0.13)',
+    'border-radius:10px', 'padding:11px 15px', 'min-width:180px', 'max-width:260px',
+    'font-family:"Inter",sans-serif', 'font-size:12px', 'color:#fff', 'line-height:1.55',
+    'box-shadow:0 6px 24px rgba(0,0,0,0.6)',
+  ].join(';');
+
+  let _ttVehicle     = null;   // vehicle currently shown in tooltip
+  let _ttFetchTimer  = null;   // debounce timer for next-stop fetch
+  let _ttFetchedRef  = null;   // detailsReference already fetched (avoid repeat)
+
+  const _modeLabel = { BUS: 'Bus', TRAM: 'Tram', TRAIN: 'Train', FERRY: 'Ferry', UNKNOWN: '' };
+
+  function _buildTooltipHTML(vehicle, calls) {
+    const type  = _modeLabel[vehicle.type] || vehicle.type;
+    const line  = vehicle.line  || '—';
+    const dir   = vehicle.direction || '';
+
+    // Colour swatch for the line badge
+    let lc = CONFIG.lineColors[line];
+    if (vehicle.apiColors?.bg) lc = { bg: vehicle.apiColors.bg, fg: vehicle.apiColors.fg || '#fff' };
+    const swatchBg = lc ? lc.bg  : (CONFIG.colors[vehicle.type]?.fill || '#888');
+    const swatchFg = lc ? lc.fg  : '#fff';
+
+    const badge = `<span style="display:inline-block;background:${swatchBg};color:${swatchFg};`
+                + `border-radius:5px;padding:1px 7px;font-weight:700;font-size:13px;">${line}</span>`;
+
+    let html = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+                  ${badge}
+                  <span style="color:#bbb;font-size:11px">${type}</span>
+                </div>`;
+
+    if (dir) {
+      html += `<div style="color:#e0e0e0;margin-bottom:6px">
+                 <span style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.5px">To</span><br>
+                 <strong>${dir}</strong>
+               </div>`;
+    }
+
+    if (calls === null) {
+      // Still loading
+      html += `<div style="color:#888;font-size:11px;margin-top:4px">⏳ Loading next stop…</div>`;
+    } else if (calls && calls.length > 0) {
+      const next = calls[0];
+      const mins = next.minutesAway;
+      const etaStr = mins === null     ? ''
+                   : mins <= 0         ? ' · <span style="color:#4ade80">now</span>'
+                   : mins === 1         ? ' · <span style="color:#4ade80">1 min</span>'
+                   :                     ` · <span style="color:#4ade80">${mins} min</span>`;
+      html += `<div style="margin-top:4px">
+                 <span style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Next stop</span><br>
+                 <span style="color:#fff">${next.stopName}</span>${etaStr}
+               </div>`;
+
+      // Show 1–2 more upcoming stops dimmed
+      const later = calls.slice(1, 3);
+      if (later.length) {
+        html += `<div style="margin-top:5px;color:#666;font-size:10.5px">`;
+        later.forEach(c => {
+          const m = c.minutesAway !== null ? ` ${c.minutesAway} min` : '';
+          html += `<div>${c.stopName}${m}</div>`;
+        });
+        html += `</div>`;
+      }
+    } else if (calls && calls.length === 0) {
+      html += `<div style="color:#666;font-size:11px;margin-top:4px">No upcoming stops</div>`;
+    }
+
+    return html;
+  }
+
+  function _positionTooltip(mouseX, mouseY) {
+    const container = document.getElementById('cesium-container');
+    if (!container) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const tw = tooltip.offsetWidth  || 220;
+    const th = tooltip.offsetHeight || 120;
+    const pad = 16;
+    let left = mouseX + 20;
+    let top  = mouseY - 20;
+    if (left + tw + pad > cw) left = mouseX - tw - 10;
+    if (top  + th + pad > ch) top  = ch - th - pad;
+    if (top < pad) top = pad;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top  + 'px';
+  }
+
+  function _showTooltip(vehicle, mouseX, mouseY) {
+    const sameVehicle = (_ttVehicle === vehicle);
+    _ttVehicle = vehicle;
+
+    // Render immediately with what we have (no calls data yet)
+    if (!sameVehicle || tooltip.style.display === 'none') {
+      tooltip.innerHTML = _buildTooltipHTML(vehicle, null);
+      tooltip.style.display = 'block';
+    }
+    _positionTooltip(mouseX, mouseY);
+
+    // Debounced fetch of next-stop data
+    if (!sameVehicle || _ttFetchedRef !== vehicle.detailsReference) {
+      if (_ttFetchTimer) clearTimeout(_ttFetchTimer);
+      _ttFetchTimer = setTimeout(async () => {
+        if (_ttVehicle !== vehicle) return;  // user moved away
+        let calls = [];
+        if (vehicle.detailsReference) {
+          try {
+            const url = `${CONFIG.apiBase}/journey/${encodeURIComponent(vehicle.detailsReference)}`;
+            const r   = await fetch(url);
+            if (r.ok) calls = (await r.json()).calls || [];
+          } catch { /* ignore */ }
+          _ttFetchedRef = vehicle.detailsReference;
+        }
+        if (_ttVehicle === vehicle) {
+          tooltip.innerHTML = _buildTooltipHTML(vehicle, calls);
+          _positionTooltip(mouseX, mouseY);
+        }
+      }, 350);
+    }
+  }
+
+  function _hideTooltip() {
+    tooltip.style.display = 'none';
+    _ttVehicle = null;
+    if (_ttFetchTimer) { clearTimeout(_ttFetchTimer); _ttFetchTimer = null; }
+  }
+
+  function _vehicleAtPoint(mx, my) {
+    const hit = CONFIG.vehicleSize + 8;
+    for (let i = vehicles.length - 1; i >= 0; i--) {
+      const v   = vehicles[i];
+      const pos = projectToCanvas(v.displayLng ?? v.lng, v.displayLat ?? v.lat);
+      if (!pos) continue;
+      const dx = pos.x - mx, dy = pos.y - my;
+      if (dx * dx + dy * dy <= hit * hit) return v;
+    }
+    return null;
+  }
+
+  function _onMouseMove(e) {
+    if (!isAnimating) return;
+    const container = document.getElementById('cesium-container');
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const mx   = e.clientX - rect.left;
+    const my   = e.clientY - rect.top;
+    const v    = _vehicleAtPoint(mx, my);
+    if (v) {
+      _showTooltip(v, mx, my);
+      container.style.cursor = 'pointer';
+    } else {
+      _hideTooltip();
+      container.style.cursor = '';
+    }
+  }
+
+  function _onMouseLeave() { _hideTooltip(); }
+
   // ── Public API ────────────────────────────────────────────────────────────
   function start() {
     if (isAnimating) return;
@@ -407,6 +564,9 @@
           container.style.position = 'relative';
         }
         container.appendChild(trafikCanvas);
+        container.appendChild(tooltip);
+        container.addEventListener('mousemove',  _onMouseMove);
+        container.addEventListener('mouseleave', _onMouseLeave);
       }
     }
 
@@ -420,6 +580,7 @@
 
   function stop() {
     isAnimating = false;
+    _hideTooltip();
     trafikCanvas.style.display = 'none';
     if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
     trafikCtx.clearRect(0, 0, trafikCanvas.width, trafikCanvas.height);
