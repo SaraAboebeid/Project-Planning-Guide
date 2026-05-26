@@ -129,7 +129,7 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
 /* facade inspector */
 #facade-panel {
   bottom:80px; left:50%; transform:translateX(-50%);
-  width:560px; display:none;
+  width:580px; display:none;
 }
 #facade-views { display:flex; gap:8px; margin-top:10px; }
 .facade-thumb {
