@@ -90,6 +90,137 @@ All page files live in `frontend/src/pages/`. Open any file and edit directly �
 
 ---
 
+## Gothenburg 3D Viewer + Boplats Rental Data
+
+The file `assets/gothenburg_3d.html` is an interactive 3D map of all ~93,000 Gothenburg buildings.
+It is served by a small Python HTTP server on **http://localhost:8765**.
+
+### Start the 3D viewer
+
+```powershell
+cd "C:\Users\saraabo\Desktop\Project Planning Guide\Project-Planning-Guide"
+python visualize_3d_buildings.py
+```
+
+Then open **http://localhost:8765/gothenburg_3d.html** in your browser.
+
+### Boplats rental data in the viewer
+
+When you click a building that has listings in the Boplats database, the info panel shows:
+- Average rent per m² and rent range
+- A **"More data from Boplats"** button that expands per-apartment cards with rooms, floor, rent, size, date retrieved, and the floor plan image
+
+Hovering over a matched building shows a small orange badge: `🏠 Boplats: from X kr/mo · N unit(s)`
+
+### How the data pipeline works
+
+| Step | Script | What it does |
+|------|--------|-------------|
+| 1. Scrape | `boplats_scraper.py` | Fetches all listings from boplats.se, saves to `boplats_apartments.db` |
+| 2. Export | `boplats_to_assets.py` | Copies floor plan images to `assets/boplats_images/` and writes `assets/boplats_data.json` |
+| 3. View | Open the 3D viewer | The viewer loads the JSON at startup automatically |
+
+**Important — data is always cumulative, never overwritten:**
+- Each scrape run only *adds* new apartments or updates the `last_seen` date of existing ones
+- Apartments that disappear from boplats.se are **kept** in the database with their original data and `first_seen` date
+- Running the scraper again will never delete or reset anything
+
+### Run a manual scrape + refresh the viewer data
+
+```powershell
+cd "C:\Users\saraabo\Desktop\Project Planning Guide\Project-Planning-Guide"
+python boplats_scraper.py
+python boplats_to_assets.py
+```
+
+Then reload the browser tab — the viewer picks up the new data automatically.
+
+### Scheduled daily scrape (already set up)
+
+Windows Task Scheduler runs `boplats_scraper.py` every day at **12:00 PM** (task name: *Boplats Database*).
+After the scheduled scrape completes, run `python boplats_to_assets.py` to refresh the viewer JSON.
+
+To check or edit the scheduled task:
+
+```powershell
+# See next run time
+Get-ScheduledTask -TaskName "Boplats Database" | Get-ScheduledTaskInfo | Select-Object NextRunTime, LastRunTime, LastTaskResult
+
+# Run it manually right now
+Start-ScheduledTask -TaskName "Boplats Database"
+```
+
+### Database location
+
+`boplats_apartments.db` — SQLite file in the project root.
+Query it directly with any SQLite viewer or from Python:
+
+```python
+import sqlite3
+conn = sqlite3.connect('boplats_apartments.db')
+rows = conn.execute('SELECT address, rooms, size_m2, rent_sek, first_seen, last_seen FROM apartments ORDER BY last_seen DESC').fetchall()
+for r in rows: print(r)
+```
+
+---
+
+## Trafikverket Traffic Data
+
+Fetches live traffic data for Gothenburg (cameras, vehicle counts, road incidents, parking) from Trafikverket's free Open Data API and stores it in `trafikverket.db`.
+
+### One-time setup — add your API key
+
+1. Register for a free key at https://data.trafikverket.se/oauth2/Account/register
+2. Open `trafikverket_scraper.py` and replace line 24:
+
+```python
+API_KEY = "YOUR_API_KEY_HERE"   # <── paste your key here
+```
+
+### Run a scrape
+
+```powershell
+cd "C:\Users\saraabo\Desktop\Project Planning Guide\Project-Planning-Guide"
+
+# Scrape and save to DB only
+python trafikverket_scraper.py
+
+# Scrape + export JSON for the 3D viewer in one step
+python trafikverket_scraper.py --export
+
+# Just refresh assets/ without re-scraping (uses existing DB)
+python trafikverket_scraper.py --export-only
+```
+
+### What gets collected
+
+| Data type | What it is | How often changes |
+|-----------|-----------|-------------------|
+| **Camera** | Traffic cameras + live photo URLs | Minutes |
+| **TrafficFlow** | Vehicle counts + avg speed per road | Minutes |
+| **Situation** | Roadworks, accidents, closures | Real-time |
+| **Parking** | Parking facilities + free spaces | Real-time |
+
+All data is stored in `trafikverket.db` with `first_seen` / `last_seen` columns. Records are **never deleted** — each scrape only adds new records or updates existing ones.
+
+### After scraping — view in the 3D viewer
+
+Running with `--export` copies the data to `assets/trafikverket_data.json`. Reload the browser tab and the viewer will have access to the data (integration with the building click panel can be added as a next step).
+
+### Database location
+
+`trafikverket.db` — SQLite file in the project root with four tables: `cameras`, `traffic_flow`, `situations`, `parking`.
+
+```python
+import sqlite3
+conn = sqlite3.connect('trafikverket.db')
+# Active road situations
+rows = conn.execute("SELECT type, severity, description, start_time FROM situations ORDER BY start_time DESC").fetchall()
+for r in rows: print(r)
+```
+
+---
+
 ## API / Backend
 
 `frontend/src/api/client.ts` contains all backend calls (geocoding, EPC lookup, TABULA match, sensitivity analysis).
