@@ -747,12 +747,16 @@ async def vt_positions(
         if lat is None or lon is None:
             continue
         line_info = v.get("line") or {}
+        bg = line_info.get("backgroundColor") or line_info.get("bgColor")
+        fg = line_info.get("foregroundColor") or line_info.get("fgColor")
         result.append({
             "lat":           round(float(lat), 6),
             "lon":           round(float(lon), 6),
             "bearing":       v.get("bearing"),
             "line":          line_info.get("shortName") or line_info.get("name", ""),
             "transportMode": line_info.get("transportMode", "bus"),
+            "bgColor":       ("#" + bg.lstrip("#")) if bg else None,
+            "fgColor":       ("#" + fg.lstrip("#")) if fg else None,
         })
 
     return {"vehicles": result, "count": len(result)}

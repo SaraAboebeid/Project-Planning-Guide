@@ -88,6 +88,7 @@ def main():
         "facade_inspector.js",
         "search.js",
         "roads.js",
+        "trafik_canvas.js",
         "vasttrafik.js",
         "layers.js",
     ]
@@ -141,8 +142,6 @@ def main():
     if os.path.isdir("frontend/public"):
         shutil.copy("assets/buildings.json", fp)
         print(f"  Copied -> {fp}")
-
-    # 6. Build kepler.gl map (optional – skipped if template not downloaded yet)
 
     print("=" * 60)
     print(f"Done.  Open http://localhost:8765 after running: python launch.py")

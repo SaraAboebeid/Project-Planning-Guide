@@ -65,10 +65,10 @@ async function _vtLoadStops() {
         position: Cesium.Cartesian3.fromDegrees(stop.lon, stop.lat, 2),
         billboard: {
           image:          _vtBusStopSvg(),
-          width:          22, height: 22,
+          width:          30, height: 30,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          scaleByDistance: new Cesium.NearFarScalar(200, 1.4, 2000, 0.4),
+          scaleByDistance: new Cesium.NearFarScalar(200, 1.5, 2000, 0.5),
         },
         label: {
           text: stop.name,
@@ -277,10 +277,10 @@ async function _vtShowParkingLayer() {
       position: Cesium.Cartesian3.fromDegrees(lot.lon, lot.lat, 2),
       billboard: {
         image:  _vtParkSvg('#22c55e'),
-        width:  26, height: 26,
+        width:  38, height: 38,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        scaleByDistance: new Cesium.NearFarScalar(300, 1.2, 3000, 0.4),
+        scaleByDistance: new Cesium.NearFarScalar(300, 1.4, 3000, 0.5),
       },
       label: {
         text: lot.name,
@@ -355,9 +355,10 @@ function _vtVehicleSvg(hexColor, lineLabel) {
 }
 
 function _vtParkSvg(color) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26">
-    <rect x="2" y="2" width="22" height="22" rx="5" fill="${color}" stroke="#fff" stroke-width="1.5"/>
-    <text x="13" y="18" text-anchor="middle" font-size="14" font-family="sans-serif"
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 38 38">
+    <circle cx="19" cy="19" r="17" fill="${color}" stroke="#fff" stroke-width="2"/>
+    <circle cx="19" cy="19" r="17" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="5"/>
+    <text x="19" y="26" text-anchor="middle" font-size="20" font-family="Inter,sans-serif"
           font-weight="bold" fill="#fff">P</text></svg>`;
   return 'data:image/svg+xml;base64,' + btoa(svg);
 }

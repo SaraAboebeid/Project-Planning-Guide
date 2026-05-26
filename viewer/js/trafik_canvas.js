@@ -36,20 +36,42 @@
     apiBase:             'http://localhost:8000/api/vasttrafik',
     fetchIntervalMs:     3000,    // fetch new positions every 3 s
     viewPad:             0.07,    // degrees bounding box padding from camera centre
-    vehicleSize:         16,      // radius of vehicle circle
-    glowRadius:          28,
+    vehicleSize:         22,      // radius of vehicle circle
+    glowRadius:          42,
     trailHistoryLength:  100,     // max stored positions per vehicle
     interpolationSpeed:  0.08,    // lerp factor (0-1) — lower = smoother/slower
-    trailWidth:          5,
-    trailFadeStart:      0.8,     // opacity of trail at newest point
+    trailWidth:          7,
+    trailFadeStart:      0.85,    // opacity of trail at newest point
 
     // Västtrafik brand colours + data-viz palette
     colors: {
       BUS:     { fill: '#00A5E0' },   // Västtrafik blue
-      TRAM:    { fill: '#FFD700' },   // gold / yellow
+      TRAM:    { fill: '#FFD700' },   // gold / yellow (fallback)
       TRAIN:   { fill: '#E31837' },   // red
       FERRY:   { fill: '#00B4A0' },   // teal
       UNKNOWN: { fill: '#FFFFFF' },
+    },
+
+    // Official Gothenburg tram/bus line colours (fallback when API omits them).
+    // Source: Västtrafik line map — bg / fg pairs.
+    lineColors: {
+      // Trams (Göteborgs Spårvägar)
+      '1':  { bg: '#009640', fg: '#ffffff' },  // green
+      '2':  { bg: '#e30613', fg: '#ffffff' },  // red
+      '3':  { bg: '#f39200', fg: '#ffffff' },  // orange
+      '4':  { bg: '#0068b4', fg: '#ffffff' },  // blue
+      '5':  { bg: '#e30613', fg: '#ffffff' },  // red
+      '6':  { bg: '#e30613', fg: '#ffffff' },  // red
+      '7':  { bg: '#009640', fg: '#ffffff' },  // green
+      '8':  { bg: '#0068b4', fg: '#ffffff' },  // blue
+      '9':  { bg: '#0068b4', fg: '#ffffff' },  // blue
+      '10': { bg: '#0068b4', fg: '#ffffff' },  // blue
+      '11': { bg: '#009640', fg: '#ffffff' },  // green
+      '13': { bg: '#f7d100', fg: '#000000' },  // yellow
+      // Express buses
+      '16': { bg: '#e30613', fg: '#ffffff' },
+      '55': { bg: '#e30613', fg: '#ffffff' },
+      '58': { bg: '#f39200', fg: '#ffffff' },
     },
   };
 
@@ -211,9 +233,16 @@
 
     let bgColor = CONFIG.colors[vehicle.type]?.fill || '#FFFFFF';
     let fgColor = '#FFFFFF';
+
+    // Priority 1: colours returned by the Västtrafik API
     if (vehicle.apiColors?.bg) {
       bgColor = vehicle.apiColors.bg;
       fgColor = vehicle.apiColors.fg || '#FFFFFF';
+    }
+    // Priority 2: hardcoded Gothenburg line-colour lookup
+    else {
+      const lc = CONFIG.lineColors[vehicle.line];
+      if (lc) { bgColor = lc.bg; fgColor = lc.fg; }
     }
 
     const size = CONFIG.vehicleSize;
@@ -266,9 +295,15 @@
 
     // ── Vehicle circle ─────────────────────────────────────────────────────
     ctx.globalCompositeOperation = 'source-over';
+    // White ring border
+    ctx.fillStyle   = 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, size + 4, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.fillStyle   = bgColor;
     ctx.shadowColor = bgColor;
-    ctx.shadowBlur  = 15;
+    ctx.shadowBlur  = 20;
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
     ctx.fill();
@@ -276,11 +311,16 @@
 
     // ── Line number ────────────────────────────────────────────────────────
     if (vehicle.line) {
-      ctx.font         = `bold ${Math.round(size * 0.85)}px "Inter", sans-serif`;
+      const fontSize = vehicle.line.length > 3 ? Math.round(size * 0.7) : Math.round(size * 0.85);
+      ctx.font         = `bold ${fontSize}px "Inter", sans-serif`;
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
+      // Slight text shadow for legibility
+      ctx.shadowColor  = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur   = 3;
       ctx.fillStyle    = fgColor;
       ctx.fillText(vehicle.line, pos.x, pos.y + 1);
+      ctx.shadowBlur   = 0;
     }
 
     ctx.restore();
