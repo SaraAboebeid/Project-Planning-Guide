@@ -217,8 +217,8 @@ def process_data() -> dict:
             SELECT
                 FormularId,
                 MIN(EgenNybyggAr)                   AS year_built,
-                MIN(EgenAntalPlan)                  AS floors_epc,
-                MIN(EgenAtemp)                      AS area_atemp,
+                MAX(EgenAntalPlan)                  AS floors_epc,
+                MAX(EgenAtemp)                      AS area_atemp,
                 MIN(EgiSpecifikEnergianvandning)     AS energy_kwh_m2,
                 MIN(EgiEnergiklass)                 AS energy_class,
                 MIN(IdAdr)                          AS address

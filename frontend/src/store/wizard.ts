@@ -11,12 +11,25 @@ export interface StepDef {
 }
 
 const STEPS: StepDef[] = [
-  { number: 1, label: "Define Project", path: "/step/1" },
-  { number: 2, label: "Data Requirements", path: "/step/2" },
-  { number: 3, label: "Review & Confidence", path: "/step/3" },
-  { number: 4, label: "Expected Results", path: "/step/4" },
-  { number: 5, label: "Cost Estimate", path: "/step/5" },
+  { number: 1, label: "Define Project",      path: "/step/1" },
+  { number: 2, label: "Building & Site Data", path: "/step/2" },
+  { number: 3, label: "Initial Analysis",    path: "/step/3" },
+  { number: 4, label: "Scenarios",           path: "/step/4" },
+  { number: 5, label: "Results & Budget",    path: "/step/5" },
 ];
+
+/* ── Renovation package types ── */
+export interface PackageComponent {
+  wikellsCode: string;
+  areaM2: number;
+}
+
+export interface RenovationPackage {
+  id: string;
+  name: string;
+  color: string;
+  selections: Record<string, PackageComponent>; // key = renovation component label
+}
 
 /* ── State shape ── */
 
@@ -60,6 +73,9 @@ interface ProjectState {
   savedWWR: WWRRecord | null;
   /* raw bbox coords from the map draw (north/south/east/west) */
   currentBbox: { north: number; south: number; east: number; west: number } | null;
+  /* renovation packages built in step 4 */
+  renovationPackages: RenovationPackage[];
+  selectedPackageId: string | null;
 }
 
 interface WizardState {
@@ -102,6 +118,8 @@ const DEFAULT_PROJECT: ProjectState = {
   bboxStats: null,
   currentBbox: null,
   savedWWR: null,
+  renovationPackages: [],
+  selectedPackageId: null,
 };
 
 export const useWizardStore = create<WizardState>((set) => ({
