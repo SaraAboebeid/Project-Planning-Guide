@@ -31,16 +31,8 @@ export default function LandingPage() {
               Project Planning Guide
             </h1>
             <p className="mt-2.5 text-white/75 text-[15px] leading-relaxed">
-              Data Fidelity Navigator — Early Stage decision insights
+              Data Fidelity Navigator - Early Stage decision insights
             </p>
-            <div className="mt-5 flex items-center gap-2.5 text-[11px] font-semibold">
-              <span className="px-3 py-1 rounded-full bg-[#96D74C]/20 text-[#d4f5a0] border border-[#96D74C]/30">
-                5-Step Guided Workflow
-              </span>
-              <span className="px-3 py-1 rounded-full bg-white/8 text-white/70 border border-white/12">
-                Sensitivity Analysis Included
-              </span>
-            </div>
           </div>
 
           <div className="flex items-center gap-5 shrink-0">
