@@ -4,7 +4,7 @@ import { useWizardStore } from "../store/wizard";
 import {
   CheckCircle2, AlertTriangle, XCircle,
   ChevronDown, ChevronUp, Database,
-  FileText, Layers, Zap, TrendingUp, Activity, Info, ArrowRight, MapPin,
+  FileText, Layers, Zap, TrendingUp, Activity, Info, ArrowRight, MapPin, Hammer,
 } from "lucide-react";
 import BuildingMapPanel from "../components/panels/BuildingMap";
 import SensitivityPanel from "../components/panels/SensitivityPanel";
@@ -227,6 +227,17 @@ export default function DataAssumptions() {
         : "Provides default thermal properties for community building archetypes",
       panel: <TabulaPanel />,
     }] : []),
+    ...(isRenovation ? [{
+      id: "wikells",
+      icon: <Hammer className="w-5 h-5 text-fuchsia-600" />,
+      iconBg: "bg-fuchsia-50",
+      title: "Wikells Material Catalogue",
+      subtitle: "Assemblies · cost levels · embodied carbon indicators",
+      badge: "Cost reference",
+      badgeColor: "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-700",
+      relevance: "Supports package design by comparing envelope assemblies and their cost/carbon trade-offs.",
+      panel: <WikellsPanel />,
+    }] : []),
     ...(isRenovation || isEC ? [{
       id: "epc",
       icon: <FileText className="w-5 h-5 text-amber-600" />,
@@ -318,10 +329,10 @@ export default function DataAssumptions() {
 
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-navy">Step 3 – Model Review</h2>
+        <h2 className="text-2xl font-bold text-navy">Step 3 – Data Overview</h2>
         <p className="text-sm text-slate-500 mt-1">
-          Review your model confidence profile, understand how data gaps translate to output
-          uncertainty, and explore the reference datasets that fill them.
+          Review model confidence, understand how data gaps translate to output uncertainty,
+          and explore the reference datasets that fill them.
         </p>
       </div>
 
@@ -356,7 +367,7 @@ export default function DataAssumptions() {
           <div className="flex items-start gap-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3.5 text-sm text-blue-800">
             <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <span>
-              Complete <strong>Step 2 – Data Requirements</strong> to see your personalised
+              Complete <strong>Step 2 – Building &amp; Site Data</strong> to see your personalised
               confidence profile and database breakdown here.
             </span>
           </div>

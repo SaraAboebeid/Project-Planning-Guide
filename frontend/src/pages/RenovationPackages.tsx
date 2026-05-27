@@ -1,4 +1,4 @@
-import { useState, useMemo, useId } from "react";
+import { useEffect, useState, useMemo, useId } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationPackage } from "../store/wizard";
 import { WIKELLS_CHAPTERS, type WikellsItem, type WikellsSubGroup } from "../config/wikellsData";
@@ -13,14 +13,14 @@ import {
 } from "recharts";
 
 /* ─── Constants ───────────────────────────────────────────────────── */
-const PACKAGE_COLORS = ["#33528A", "#33A9A0", "#8AB62E", "#C4E81D"];
+const PACKAGE_COLORS = ["#721CB8", "#995BD5", "#96D74C", "#509724"];
 const PACKAGE_NAMES  = ["Package A", "Package B", "Package C", "Package D"];
 
 /* ─── Fixed building elements for vertical extension ─────────────── */
 interface ElementDef {
   key:        string;
   label:      string;
-  areaType:   "wall" | "roof" | "floor";
+  areaType:   "wall" | "roof" | "floor" | "window";
   areaNote:   string;
   description: string;
   chapFilter: (chId: string, sgLabel: string) => boolean;
@@ -101,17 +101,47 @@ function fmtSEK(n: number) {
 interface BldgRow {
   address:   string;
   footprint: number;
-  wallArea:  number;
+  grossWallArea: number;
+  windowArea: number;
+  opaqueWallArea: number;
   roofArea:  number;
   floorArea: number;
 }
 
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
+function inferWwrFromArchetype(useCat: string | null, year: number | null): number {
+  let wwr = 28;
+  const u = (useCat ?? "").toLowerCase();
+
+  if (u.includes("office") || u.includes("commercial")) wwr = 40;
+  else if (u.includes("school") || u.includes("education")) wwr = 35;
+  else if (u.includes("retail")) wwr = 45;
+  else if (u.includes("residential") || u.includes("multi") || u.includes("apartment")) wwr = 25;
+
+  if (year && year < 1945) wwr -= 4;
+  else if (year && year < 1975) wwr -= 2;
+  else if (year && year >= 2000) wwr += 4;
+
+  return clamp(Math.round(wwr), 10, 65);
+}
+
 function calcBuildingAreas(footprint: number, newFloors: number, floorH: number): {
-  wallArea: number; roofArea: number; floorArea: number;
+  grossWallArea: number; windowArea: number; opaqueWallArea: number; roofArea: number; floorArea: number;
+}
+function calcBuildingAreas(footprint: number, newFloors: number, floorH: number, wwrPct: number): {
+  grossWallArea: number; windowArea: number; opaqueWallArea: number; roofArea: number; floorArea: number;
 } {
   const perimeter = 4 * Math.sqrt(footprint);   // square approximation
+  const grossWallArea = Math.round(perimeter * floorH * newFloors);
+  const windowArea = Math.round(grossWallArea * (clamp(wwrPct, 0, 90) / 100));
+  const opaqueWallArea = Math.max(0, grossWallArea - windowArea);
   return {
-    wallArea:  Math.round(perimeter * floorH * newFloors),
+    grossWallArea,
+    windowArea,
+    opaqueWallArea,
     roofArea:  Math.round(footprint),
     floorArea: Math.round(footprint * newFloors),
   };
@@ -185,11 +215,11 @@ function ElementRow({
               value={area || ""}
               placeholder={defaultArea > 0 ? String(defaultArea) : "0"}
               onChange={e => onChange(code, parseFloat(e.target.value) || 0)}
-              className="w-28 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#33528A]/30"
+              className="w-28 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#721CB8]/30"
             />
           </div>
           {defaultArea > 0 && area !== defaultArea && (
-            <button onClick={() => onChange(code, defaultArea)} className="text-[10px] text-[#33528A] hover:underline">
+            <button onClick={() => onChange(code, defaultArea)} className="text-[10px] text-[#721CB8] hover:underline">
               Reset to {fmtSEK(defaultArea)} m²
             </button>
           )}
@@ -220,7 +250,7 @@ function ElementRow({
                   autoFocus
                   type="text" placeholder={`Search ${el.label.toLowerCase()} assemblies…`}
                   value={filter} onChange={e => setFilter(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#33528A]/30"
+                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#721CB8]/30"
                 />
               </div>
               <div className="overflow-y-auto max-h-72">
@@ -326,6 +356,33 @@ export default function RenovationPackages() {
   const singleBldg = project.lookedUpBuilding;
   const bboxStats  = project.bboxStats;
 
+  const autoWwrPct = useMemo(() => {
+    const fromDb = project.savedWWR?.average_wwr;
+    if (typeof fromDb === "number" && Number.isFinite(fromDb) && fromDb > 0) {
+      return clamp(fromDb, 1, 90);
+    }
+
+    if (buildings.length > 0) {
+      const inferred = buildings.map(b => inferWwrFromArchetype(b.use_cat, b.year));
+      return Math.round(inferred.reduce((s, x) => s + x, 0) / inferred.length);
+    }
+    if (singleBldg) {
+      return inferWwrFromArchetype(singleBldg.use_cat, singleBldg.year);
+    }
+    return 28;
+  }, [project.savedWWR, buildings, singleBldg]);
+
+  const [wwrPct, setWwrPct] = useState(autoWwrPct);
+  const [wwrEdited, setWwrEdited] = useState(false);
+
+  useEffect(() => {
+    if (!wwrEdited) setWwrPct(autoWwrPct);
+  }, [autoWwrPct, wwrEdited]);
+
+  const wwrSource = project.savedWWR
+    ? `WWR database (${autoWwrPct.toFixed(0)}%)`
+    : "Archetype heuristic";
+
   /* Build a per-building area table */
   const bldgRows = useMemo((): BldgRow[] => {
     if (buildings.length > 0) {
@@ -334,7 +391,7 @@ export default function RenovationPackages() {
         .map(b => ({
           address:   b.address,
           footprint: b.footprint_m2!,
-          ...calcBuildingAreas(b.footprint_m2!, newFloors, floorH),
+              ...calcBuildingAreas(b.footprint_m2!, newFloors, floorH, wwrPct),
         }));
     }
     if (singleBldg?.footprint_m2) {
@@ -342,7 +399,7 @@ export default function RenovationPackages() {
       return [{
         address:   singleBldg.address,
         footprint: fp,
-        ...calcBuildingAreas(fp, newFloors, floorH),
+        ...calcBuildingAreas(fp, newFloors, floorH, wwrPct),
       }];
     }
     if (bboxStats?.avg_footprint && bboxStats?.count) {
@@ -350,25 +407,28 @@ export default function RenovationPackages() {
       return [{
         address:   `${bboxStats.count} buildings (avg)`,
         footprint: fp * bboxStats.count,
-        ...calcBuildingAreas(fp * bboxStats.count, newFloors, floorH),
+        ...calcBuildingAreas(fp * bboxStats.count, newFloors, floorH, wwrPct),
       }];
     }
     return [];
-  }, [buildings, singleBldg, bboxStats, newFloors, floorH]);
+  }, [buildings, singleBldg, bboxStats, newFloors, floorH, wwrPct]);
 
   const totals = useMemo(() => ({
     buildings: bldgRows.length,
     footprint: bldgRows.reduce((s, r) => s + r.footprint, 0),
-    wallArea:  bldgRows.reduce((s, r) => s + r.wallArea,  0),
+    grossWallArea:  bldgRows.reduce((s, r) => s + r.grossWallArea,  0),
+    windowArea:  bldgRows.reduce((s, r) => s + r.windowArea,  0),
+    opaqueWallArea:  bldgRows.reduce((s, r) => s + r.opaqueWallArea,  0),
     roofArea:  bldgRows.reduce((s, r) => s + r.roofArea,  0),
     floorArea: bldgRows.reduce((s, r) => s + r.floorArea, 0),
   }), [bldgRows]);
 
   /* Default area per element (total across all buildings) */
   const defaultArea = (areaType: ElementDef["areaType"]): number => {
-    if (areaType === "wall")  return totals.wallArea;
+    if (areaType === "wall")  return totals.opaqueWallArea;
     if (areaType === "roof")  return totals.roofArea;
     if (areaType === "floor") return totals.floorArea;
+    if (areaType === "window") return totals.windowArea;
     return 0;
   };
 
@@ -454,7 +514,7 @@ export default function RenovationPackages() {
       {/* ── Extension parameters ── */}
       <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 space-y-4">
         <div className="flex items-center gap-2">
-          <Settings2 className="w-4 h-4 text-[#33528A]" />
+          <Settings2 className="w-4 h-4 text-[#3A1C36]" />
           <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Extension Parameters</span>
         </div>
         <div className="flex flex-wrap gap-6">
@@ -465,7 +525,7 @@ export default function RenovationPackages() {
                 onClick={() => setNewFloors(f => Math.max(1, f - 1))}
                 className="w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 text-sm font-bold"
               >−</button>
-              <span className="w-8 text-center font-bold text-[#33528A] text-lg tabular-nums">{newFloors}</span>
+              <span className="w-8 text-center font-bold text-[#3A1C36] text-lg tabular-nums">{newFloors}</span>
               <button
                 onClick={() => setNewFloors(f => Math.min(10, f + 1))}
                 className="w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 text-sm font-bold"
@@ -477,12 +537,25 @@ export default function RenovationPackages() {
             <input
               type="number" min={2.4} max={5} step={0.1} value={floorH}
               onChange={e => setFloorH(parseFloat(e.target.value) || 3.0)}
-              className="w-20 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#33528A]/30"
+              className="w-20 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#3A1C36]/30"
             />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Window-to-wall ratio (WWR %)</label>
+            <input
+              type="number" min={5} max={80} step={1} value={wwrPct}
+              onChange={e => {
+                setWwrEdited(true);
+                setWwrPct(clamp(parseFloat(e.target.value) || 0, 5, 80));
+              }}
+              className="w-24 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#3A1C36]/30"
+            />
+            <div className="text-[10px] text-slate-400 mt-1">Source: {wwrSource}</div>
           </div>
           <div className="flex items-end">
             <div className="text-xs text-slate-400 space-y-0.5">
-              <div>Wall area / building = 4√footprint × {floorH}m × {newFloors} floor{newFloors > 1 ? "s" : ""}</div>
+              <div>Gross wall = 4√footprint × {floorH}m × {newFloors} floor{newFloors > 1 ? "s" : ""}</div>
+              <div>Window area = gross wall × {(wwrPct / 100).toFixed(2)} · Opaque wall = gross wall − windows</div>
               <div>Roof area = footprint &nbsp;·&nbsp; Floor area = footprint × {newFloors}</div>
             </div>
           </div>
@@ -496,7 +569,7 @@ export default function RenovationPackages() {
           className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition text-left"
         >
           <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-[#33528A]" />
+            <Building2 className="w-4 h-4 text-[#3A1C36]" />
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
               Buildings from Step 2
             </span>
@@ -506,7 +579,8 @@ export default function RenovationPackages() {
           </div>
           <div className="flex items-center gap-4 mr-2">
             <span className="text-xs text-slate-500 hidden sm:block">
-              Wall <strong>{fmtSEK(totals.wallArea)} m²</strong>
+              Opaque wall <strong>{fmtSEK(totals.opaqueWallArea)} m²</strong>
+              &nbsp;·&nbsp;Windows <strong>{fmtSEK(totals.windowArea)} m²</strong>
               &nbsp;·&nbsp;Roof <strong>{fmtSEK(totals.roofArea)} m²</strong>
               &nbsp;·&nbsp;Floor <strong>{fmtSEK(totals.floorArea)} m²</strong>
             </span>
@@ -526,7 +600,7 @@ export default function RenovationPackages() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">
-                      {["Building", "Footprint", "Wall area", "Roof area", "Floor slab"].map(h => (
+                      {["Building", "Footprint", "Gross wall", "Window area", "Opaque wall", "Roof area", "Floor slab"].map(h => (
                         <th key={h} className="text-left px-4 py-2 text-slate-500 font-semibold uppercase tracking-wider text-[10px] whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -536,18 +610,22 @@ export default function RenovationPackages() {
                       <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition">
                         <td className="px-4 py-2 font-medium text-slate-700 max-w-[160px] truncate">{r.address}</td>
                         <td className="px-4 py-2 tabular-nums text-slate-600">{fmtSEK(r.footprint)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#33528A] font-semibold">{fmtSEK(r.wallArea)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#33A9A0] font-semibold">{fmtSEK(r.roofArea)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#8AB62E] font-semibold">{fmtSEK(r.floorArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-slate-700 font-semibold">{fmtSEK(r.grossWallArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-sky-600 font-semibold">{fmtSEK(r.windowArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#721CB8] font-semibold">{fmtSEK(r.opaqueWallArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#995BD5] font-semibold">{fmtSEK(r.roofArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#509724] font-semibold">{fmtSEK(r.floorArea)} m²</td>
                       </tr>
                     ))}
                     {bldgRows.length > 1 && (
                       <tr className="bg-slate-50 font-bold border-t border-slate-200">
                         <td className="px-4 py-2 text-slate-700">Total ({bldgRows.length} buildings)</td>
                         <td className="px-4 py-2 tabular-nums text-slate-700">{fmtSEK(totals.footprint)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#33528A]">{fmtSEK(totals.wallArea)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#33A9A0]">{fmtSEK(totals.roofArea)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#8AB62E]">{fmtSEK(totals.floorArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-slate-700">{fmtSEK(totals.grossWallArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-sky-700">{fmtSEK(totals.windowArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#721CB8]">{fmtSEK(totals.opaqueWallArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#995BD5]">{fmtSEK(totals.roofArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#509724]">{fmtSEK(totals.floorArea)} m²</td>
                       </tr>
                     )}
                   </tbody>
@@ -568,7 +646,7 @@ export default function RenovationPackages() {
               onClick={() => setActiveTab(i)}
               className={`flex items-center gap-1.5 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-all ${
                 activeTab === i
-                  ? "border-[#33528A] text-[#33528A] bg-white"
+                  ? "border-[#3A1C36] text-[#3A1C36] bg-white"
                   : "border-transparent text-slate-400 hover:text-slate-600"
               }`}
             >
@@ -584,7 +662,7 @@ export default function RenovationPackages() {
           {packages.length < 4 && (
             <button
               onClick={addPackage}
-              className="flex items-center gap-1.5 px-4 py-3 text-xs font-semibold text-slate-400 hover:text-[#33528A] border-b-2 border-transparent whitespace-nowrap transition-all"
+              className="flex items-center gap-1.5 px-4 py-3 text-xs font-semibold text-slate-400 hover:text-[#3A1C36] border-b-2 border-transparent whitespace-nowrap transition-all"
             >
               <Plus className="w-3.5 h-3.5" /> Add package
             </button>
@@ -598,13 +676,13 @@ export default function RenovationPackages() {
               <input
                 type="text" value={activePkg.name}
                 onChange={e => updatePackages(packages.map((p, i) => i === activeTab ? { ...p, name: e.target.value } : p))}
-                className="flex-1 max-w-xs rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#33528A]/30"
+                className="flex-1 max-w-xs rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#3A1C36]/30"
               />
               <button
                 onClick={() => duplicatePackage(activeTab)}
                 disabled={packages.length >= 4}
                 title="Duplicate package"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-[#33528A] hover:bg-slate-100 disabled:opacity-30 transition"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-[#3A1C36] hover:bg-slate-100 disabled:opacity-30 transition"
               >
                 <Copy className="w-4 h-4" />
               </button>
@@ -643,7 +721,7 @@ export default function RenovationPackages() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex flex-wrap gap-6">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Material Cost</div>
-                    <div className="text-xl font-bold text-[#33528A] tabular-nums">{fmtSEK(t.totalCostSEK)} SEK</div>
+                    <div className="text-xl font-bold text-[#721CB8] tabular-nums">{fmtSEK(t.totalCostSEK)} SEK</div>
                     <div className="text-[10px] text-slate-400 tabular-nums">
                       ({(t.totalCostSEK / 1000).toFixed(0)} kSEK &nbsp;·&nbsp; {(t.totalCostSEK / 1_000_000).toFixed(2)} MSEK)
                     </div>
@@ -653,7 +731,7 @@ export default function RenovationPackages() {
                       Embodied Carbon
                       {!t.hasAllCarbon && <span className="text-amber-500 font-normal">(partly est.)</span>}
                     </div>
-                    <div className="text-xl font-bold text-[#33A9A0] tabular-nums">{t.totalCarbonKg.toFixed(0)} kg CO₂e</div>
+                    <div className="text-xl font-bold text-[#995BD5] tabular-nums">{t.totalCarbonKg.toFixed(0)} kg CO₂e</div>
                     <div className="text-[10px] text-slate-400 tabular-nums">
                       ({(t.totalCarbonKg / 1000).toFixed(1)} tonne CO₂e)
                     </div>
@@ -686,7 +764,7 @@ export default function RenovationPackages() {
               </thead>
               <tbody>
                 {packageTotals.map((t, i) => {
-                  const wallArea   = packages[i]!.selections["Exterior Wall"]?.areaM2 ?? totals.wallArea;
+                  const wallArea   = packages[i]!.selections["Exterior Wall"]?.areaM2 ?? totals.opaqueWallArea;
                   const bestCost   = Math.min(...packageTotals.filter(x => x.totalCostSEK > 0).map(x => x.totalCostSEK));
                   const bestCarbon = Math.min(...packageTotals.filter(x => x.totalCarbonKg > 0).map(x => x.totalCarbonKg));
                   const cheapest   = t.totalCostSEK > 0 && t.totalCostSEK === bestCost;
@@ -782,4 +860,6 @@ export default function RenovationPackages() {
     </div>
   );
 }
+
+
 

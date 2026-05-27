@@ -79,7 +79,7 @@ export default function Scenarios() {
     );
   }
 
-  if (project.projectType === "Renewable Energy Study") {
+  if (project.projectType === "Renewable Energy Planning") {
     return (
       <ComingSoon
         icon={<Wind className="w-6 h-6 text-emerald-500" />}
@@ -105,7 +105,7 @@ export default function Scenarios() {
       bullets={[
         "Renovation Planning → Renovation Packages calculator",
         "Energy Community Planning → Community energy scenarios",
-        "Renewable Energy Study → Generation scenario comparison",
+        "Renewable Energy Planning → Generation scenario comparison",
       ]}
     />
   );

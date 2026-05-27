@@ -1,9 +1,9 @@
 /* ── Shared TypeScript types for the wizard ── */
 
 export type ProjectType =
-  | "Embodied Carbon Assessment"
+  | "Energy Community Planning"
   | "Renovation Planning"
-  | "Renewable Energy Study";
+  | "Renewable Energy Planning";
 
 export type ProjectScale = "Building" | "Neighborhood" | "City";
 

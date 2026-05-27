@@ -13,7 +13,7 @@ export interface StepDef {
 const STEPS: StepDef[] = [
   { number: 1, label: "Define Project",      path: "/step/1" },
   { number: 2, label: "Building & Site Data", path: "/step/2" },
-  { number: 3, label: "Initial Analysis",    path: "/step/3" },
+  { number: 3, label: "Data Overview",       path: "/step/3" },
   { number: 4, label: "Scenarios",           path: "/step/4" },
   { number: 5, label: "Results & Budget",    path: "/step/5" },
 ];

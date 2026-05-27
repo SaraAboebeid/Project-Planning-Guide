@@ -8,7 +8,7 @@ export default function StepIndicator() {
   const location = useLocation();
 
   return (
-    <nav className="flex items-center justify-center gap-0.5 overflow-x-auto px-6 py-2.5 bg-white border-b border-slate-200/80">
+    <nav className="flex items-center justify-center gap-0.5 overflow-x-auto px-6 py-2.5 bg-[#f7f5fb] border-b border-[#e4d9f0]">
       {steps.map((s, i) => {
         const isActive = location.pathname === s.path;
         const isDone = s.number < currentStep;
@@ -42,3 +42,5 @@ export default function StepIndicator() {
     </nav>
   );
 }
+
+

@@ -11,7 +11,7 @@ import ResultsBudget from "./pages/ResultsBudget";
  * 5-step wizard — generic schema for all 3 project tracks:
  *  1 – Define Project        (type, KPIs, scope, systems)
  *  2 – Building & Site Data  (open data, EUBUCCO/EPC, select buildings)
- *  3 – Initial Analysis      (model confidence, sensitivity, reference DBs incl. Wikells)
+ *  3 – Data Overview         (model confidence, sensitivity, reference DBs incl. Wikells)
  *  4 – Scenarios             (Renovation: packages + cost/carbon | EC: community scenarios | RE: generation scenarios)
  *  5 – Results & Budget      (deliverables, timeline, CAPEX pre-filled from scenarios)
  */

@@ -83,7 +83,7 @@ function getDeliverableSections(
       sects.push(["PV System", DELIVERABLES["PV System"]!]);
     return sects;
   }
-  if (projectType === "Renewable Energy Study") {
+  if (projectType === "Renewable Energy Planning") {
     return [
       ["Site & Climate", DELIVERABLES["Site & Climate"]!],
       ["System Design",  DELIVERABLES["System Design"]!],
@@ -96,7 +96,7 @@ function getDeliverableSections(
 const EFFORT_BASE: Record<string, number> = {
   "Renovation Planning":        65,
   "Energy Community Planning":  60,
-  "Renewable Energy Study":     50,
+  "Renewable Energy Planning":  50,
 };
 const SCALE_MULT: Record<string, number> = { Building: 1.0, Neighborhood: 1.8, City: 2.5 };
 const PHASE_SPLIT: [string, number][] = [
@@ -106,7 +106,7 @@ const PHASE_SPLIT: [string, number][] = [
   ["Validation & QA",      0.15],
   ["Reporting",            0.10],
 ];
-const TL_COLORS = ["#33528A", "#33A9A0", "#8AB62E", "#C4E81D", "#597001"];
+const TL_COLORS = ["#721CB8", "#995BD5", "#96D74C", "#509724", "#3a6e1a"];
 
 function fmt(d: Date) { return d.toISOString().slice(0, 10); }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
@@ -115,7 +115,7 @@ function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDat
 const CONSULTANT_RATES: Record<string, number> = {
   SEK: 1400, EUR: 140, USD: 150, GBP: 130, NOK: 1500, DKK: 1050,
 };
-const PIE_COLORS = ["#33528A", "#33A9A0", "#8AB62E", "#C4E81D", "#597001"];
+const PIE_COLORS = ["#721CB8", "#995BD5", "#96D74C", "#509724", "#3a6e1a"];
 
 function fmtNum(n: number) { return n.toLocaleString(); }
 
@@ -276,10 +276,10 @@ export default function ResultsBudget() {
       {/* Summary stat strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { value: String(totalDelivs),          label: "Deliverables",  color: "text-[#33528A]", bg: "bg-[#33528A]/8" },
-          { value: `${userTotalHours} hrs`,       label: "Est. Effort",   color: "text-[#33A9A0]", bg: "bg-[#33A9A0]/8" },
-          { value: `${userWeeks} wk`,             label: "Duration",      color: "text-[#8AB62E]", bg: "bg-[#8AB62E]/8" },
-          { value: `${fmtNum(serviceCost)} ${currency}`, label: "Service Cost", color: "text-[#597001]", bg: "bg-[#597001]/8" },
+          { value: String(totalDelivs),          label: "Deliverables",  color: "text-[#721CB8]", bg: "bg-[#721CB8]/8" },
+          { value: `${userTotalHours} hrs`,       label: "Est. Effort",   color: "text-[#995BD5]", bg: "bg-[#995BD5]/10" },
+          { value: `${userWeeks} wk`,             label: "Duration",      color: "text-[#509724]", bg: "bg-[#96D74C]/20" },
+          { value: `${fmtNum(serviceCost)} ${currency}`, label: "Service Cost", color: "text-[#3a6e1a]", bg: "bg-[#509724]/10" },
         ].map(s => (
           <div key={s.label} className={`rounded-2xl border border-slate-200 px-4 py-3 text-center ${s.bg}`}>
             <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
@@ -301,7 +301,7 @@ export default function ResultsBudget() {
                 onClick={() => setSelectedPkgId(t.pkg.id)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
                   selectedPkgId === t.pkg.id
-                    ? "border-[#33528A] bg-[#33528A]/8 text-[#33528A]"
+                    ? "border-[#721CB8] bg-[#721CB8]/8 text-[#721CB8]"
                     : "border-slate-200 text-slate-500 hover:border-slate-300"
                 }`}
               >
@@ -326,12 +326,12 @@ export default function ResultsBudget() {
       )}
 
       {/* ── 2. Deliverables ── */}
-      <Section title="Expected Deliverables" icon={<FileText className="w-5 h-5 text-[#33528A]" />}>
+      <Section title="Expected Deliverables" icon={<FileText className="w-5 h-5 text-[#721CB8]" />}>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
           {[
-            { v: totalDelivs,         l: "Report Items",    c: "text-[#33528A]" },
-            { v: delivSections.length, l: "Sections",       c: "text-[#33A9A0]" },
-            { v: CROSS_CUTTING.length, l: "Cross-cutting",  c: "text-[#8AB62E]" },
+            { v: totalDelivs,         l: "Report Items",    c: "text-[#721CB8]" },
+            { v: delivSections.length, l: "Sections",       c: "text-[#995BD5]" },
+            { v: CROSS_CUTTING.length, l: "Cross-cutting",  c: "text-[#509724]" },
           ].map(s => (
             <div key={s.l} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5 text-center">
               <div className={`text-xl font-bold ${s.c}`}>{s.v}</div>
@@ -362,7 +362,7 @@ export default function ResultsBudget() {
                   {open && (
                     <div className="px-4 pb-3 space-y-1.5">
                       {items.map(([name, desc]) => (
-                        <div key={name} className="pl-3 py-1.5 rounded-lg bg-slate-50 border-l-[3px] border-[#33A9A0]">
+                        <div key={name} className="pl-3 py-1.5 rounded-lg bg-slate-50 border-l-[3px] border-[#995BD5]">
                           <div className="text-xs font-semibold text-slate-800">{name}</div>
                           <div className="text-[11px] text-slate-500">{desc}</div>
                         </div>
@@ -398,7 +398,7 @@ export default function ResultsBudget() {
       </Section>
 
       {/* ── 3. Timeline ── */}
-      <Section title="Project Timeline" icon={<Calendar className="w-5 h-5 text-[#33A9A0]" />}>
+      <Section title="Project Timeline" icon={<Calendar className="w-5 h-5 text-[#995BD5]" />}>
         <div className="flex flex-wrap gap-4 mb-4">
           <div>
             <label className="text-xs text-slate-500 block mb-1">Start date</label>
@@ -406,12 +406,12 @@ export default function ResultsBudget() {
               type="date"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
-              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#33528A]/30"
+              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#721CB8]/30"
             />
           </div>
           <button
             onClick={() => setPhaseHours(Object.fromEntries(PHASE_SPLIT.map(([p, f]) => [p, Math.round(totalHours * f)])))}
-            className="self-end text-xs text-[#33A9A0] hover:underline"
+            className="self-end text-xs text-[#995BD5] hover:underline"
           >
             Reset to estimates
           </button>
@@ -477,14 +477,14 @@ export default function ResultsBudget() {
       </Section>
 
       {/* ── 4. Budget ── */}
-      <Section title="Budget & Cost" icon={<DollarSign className="w-5 h-5 text-[#597001]" />}>
+      <Section title="Budget & Cost" icon={<DollarSign className="w-5 h-5 text-[#3a6e1a]" />}>
 
         {/* Top summary */}
         <div className="grid grid-cols-3 gap-3 mb-4">
           {[
-            { v: `${fmtNum(serviceCost)} ${currency}`, l: "Service Cost",  c: "text-[#33528A]", bg: "bg-[#33528A]/8" },
-            { v: `${fmtNum(capexTotal)} ${currency}`,  l: "CAPEX Total",   c: "text-[#33A9A0]", bg: "bg-[#33A9A0]/8" },
-            { v: `${fmtNum(opexTotal)} ${currency}`,   l: "Annual OPEX",   c: "text-[#8AB62E]", bg: "bg-[#8AB62E]/8" },
+            { v: `${fmtNum(serviceCost)} ${currency}`, l: "Service Cost",  c: "text-[#721CB8]", bg: "bg-[#721CB8]/8" },
+            { v: `${fmtNum(capexTotal)} ${currency}`,  l: "CAPEX Total",   c: "text-[#995BD5]", bg: "bg-[#995BD5]/10" },
+            { v: `${fmtNum(opexTotal)} ${currency}`,   l: "Annual OPEX",   c: "text-[#509724]", bg: "bg-[#96D74C]/20" },
           ].map(s => (
             <div key={s.l} className={`rounded-xl border border-slate-200 px-3 py-2.5 text-center ${s.bg}`}>
               <div className={`text-lg font-bold ${s.c}`}>{s.v}</div>
@@ -544,7 +544,7 @@ export default function ResultsBudget() {
             <input
               type="range" min={0} max={30} value={contingencyPct}
               onChange={e => setContingencyPct(Number(e.target.value))}
-              className="w-full accent-[#33A9A0]"
+              className="w-full accent-[#995BD5]"
             />
           </div>
         </div>
@@ -595,3 +595,5 @@ export default function ResultsBudget() {
     </div>
   );
 }
+
+

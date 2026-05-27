@@ -22,21 +22,20 @@ export default function BrandedHeader() {
           <h1 className="text-white text-[15px] font-semibold tracking-wide leading-tight">
             Data Fidelity Navigator
           </h1>
-          <p className="text-white/50 text-[10px] tracking-[0.18em] uppercase mt-0.5">
+          <p className="text-white/60 text-[10px] tracking-[0.18em] uppercase mt-0.5">
             Project Planning Guide
           </p>
         </div>
 
         {/* Right — Team */}
-        <div className="text-left text-[10px] text-white/60 leading-relaxed">
-          <p className="font-semibold text-white/80 tracking-[0.12em] uppercase text-[9px] mb-0.5">
+        <div className="text-left text-[10px] text-white/70 leading-relaxed">
+          <p className="font-semibold text-white/85 tracking-[0.12em] uppercase text-[9px] mb-0.5">
             Team
           </p>
           <p>Sara Abouebeid &nbsp;·&nbsp; Elena Malakhatka</p>
           <p>Liane Thuvander &nbsp;·&nbsp; Holger Wallbaum</p>
         </div>
       </div>
-      <div className="ppg-accent-line" />
     </header>
   );
 }

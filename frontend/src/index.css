@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
-/* ── Design tokens — Chalmers brand palette ── */
+/* ── Design tokens — custom dashboard palette ── */
 @theme {
-  /* Purple family */
+  /* Brand anchors */
   --color-navy: #721CB8;
   --color-navy-dark: #421869;
   --color-teal: #995BD5;
-  /* Green family */
+  /* Supporting scale */
   --color-lime: #96D74C;
   --color-green: #509724;
   --color-olive: #3a6e1a;
@@ -42,12 +42,12 @@ body {
   border: 1px solid #e2e8f0;
   border-radius: 1rem;
   padding: 1.25rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.02);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .ppg-card:hover {
   border-color: #cbd5e1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 14px rgba(66, 24, 105, 0.14);
 }
 
 /* ── Primary button ── */
@@ -61,14 +61,14 @@ body {
   font-weight: 600;
   color: #fff;
   background: linear-gradient(135deg, #421869 0%, #721CB8 100%);
-  box-shadow: 0 1px 3px rgba(114, 28, 184, 0.25);
+  box-shadow: 0 1px 3px rgba(66, 24, 105, 0.24);
   transition: opacity 0.15s, box-shadow 0.15s;
   cursor: pointer;
   border: none;
 }
 .ppg-btn-primary:hover {
-  opacity: 0.92;
-  box-shadow: 0 2px 8px rgba(114, 28, 184, 0.35);
+  background: #5a1490;
+  box-shadow: 0 2px 10px rgba(66, 24, 105, 0.32);
 }
 
 /* ── Secondary / back button ── */
@@ -99,9 +99,9 @@ body {
   text-align: center;
   border: 1px solid;
 }
-.ppg-stat-navy { background: rgba(114,28,184,0.06); border-color: rgba(114,28,184,0.18); }
-.ppg-stat-teal { background: rgba(153,91,213,0.06); border-color: rgba(153,91,213,0.18); }
-.ppg-stat-green { background: rgba(80,151,36,0.06); border-color: rgba(80,151,36,0.18); }
+.ppg-stat-navy { background: rgba(114, 28, 184, 0.10); border-color: rgba(114, 28, 184, 0.24); }
+.ppg-stat-teal { background: rgba(153, 91, 213, 0.10); border-color: rgba(153, 91, 213, 0.25); }
+.ppg-stat-green { background: rgba(150, 215, 76, 0.12); border-color: rgba(150, 215, 76, 0.35); }
 
 /* ── Accent line reusable ── */
 .ppg-accent-line {
@@ -131,7 +131,12 @@ body {
 }
 .ppg-input:focus {
   border-color: #721CB8;
-  box-shadow: 0 0 0 3px rgba(114, 28, 184, 0.12);
+  box-shadow: 0 0 0 3px rgba(114, 28, 184, 0.14);
+}
+
+/* Remove dashboard icons (lucide only) while keeping chart SVGs intact */
+.no-icons svg.lucide {
+  display: none !important;
 }
 
 /* ── Progressive-disclosure fade-in ── */
@@ -142,3 +147,5 @@ body {
 .animate-fadeIn {
   animation: fadeIn 0.60s ease both;
 }
+
+

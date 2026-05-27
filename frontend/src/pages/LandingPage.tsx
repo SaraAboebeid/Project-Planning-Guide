@@ -3,10 +3,10 @@ import { useWizardStore } from "../store/wizard";
 
 const STEPS_PREVIEW = [
   { label: "Define Project", desc: "Project type, scope, KPIs & location" },
-  { label: "Data Coverage", desc: "Review EPC, TABULA & data inputs" },
-  { label: "Expected Results", desc: "Review expected outcomes" },
-  { label: "Project Timeline", desc: "Plan phases and tasks" },
-  { label: "Budget / Cost", desc: "CAPEX, OPEX & estimation" },
+  { label: "Building & Site Data", desc: "Review EPC, TABULA and input coverage" },
+  { label: "Data Overview", desc: "Review model confidence, sensitivity and references" },
+  { label: "Scenarios", desc: "Build and compare scenario packages" },
+  { label: "Results & Budget", desc: "Deliverables, timeline and cost" },
 ];
 
 export default function LandingPage() {
