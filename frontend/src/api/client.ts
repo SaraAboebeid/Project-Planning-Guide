@@ -24,7 +24,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 /* ── Endpoints ── */
 
-import type { EpcSnapshot, EpcPassport, TabulaArchetype, MatchConfidence, BuildingLookup, BboxStats, WWRRecord } from "../types";
+import type { EpcSnapshot, EpcPassport, TabulaArchetype, MatchConfidence, BuildingLookup, BboxStats, BuildingRecord, WWRRecord } from "../types";
 
 export const api = {
   /** Geocode an address → { lat, lon, display_name } */
@@ -65,6 +65,13 @@ export const api = {
   /** Aggregate EUBUCCO stats for all buildings in a bounding box */
   lookupBuildingsBbox: (north: number, south: number, east: number, west: number) =>
     get<BboxStats>("/buildings/bbox/stats", {
+      north: String(north), south: String(south),
+      east:  String(east),  west:  String(west),
+    }),
+
+  /** Individual building records in a bounding box, with Boplats data merged */
+  buildingsBboxList: (north: number, south: number, east: number, west: number) =>
+    get<BuildingRecord[]>("/buildings/bbox/list", {
       north: String(north), south: String(south),
       east:  String(east),  west:  String(west),
     }),

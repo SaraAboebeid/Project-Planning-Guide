@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ProjectType } from "../config/projectConfig";
+import type { ProjectType, BuildingDevelopmentType } from "../config/projectConfig";
 import type { BuildingLookup, BboxStats, WWRRecord } from "../types";
 
 /* ── Pipeline definitions ── */
@@ -22,6 +22,7 @@ const STEPS: StepDef[] = [
 
 interface ProjectState {
   projectType: ProjectType | null;
+  buildingDevelopmentType: BuildingDevelopmentType | null;
   projectName: string;
   country: string | null;
   scale: string | null;
@@ -72,6 +73,7 @@ interface WizardState {
 
 const DEFAULT_PROJECT: ProjectState = {
   projectType: null,
+  buildingDevelopmentType: null,
   projectName: "",
   country: null,
   scale: null,

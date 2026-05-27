@@ -33,6 +33,12 @@ app.add_middleware(
 )
 
 # Pre-load and gzip the buildings data once at startup
+
+# ── Reverse geocode cache (lat/lon → street address, persists for server lifetime) ─
+import re as _re
+_REVERSE_GEOCODE_CACHE: dict[tuple[float, float], str | None] = {}
+# Detect Swedish cadastral IDs like "JÄRNBORTT 134:3" or "PIXBO 1:162"
+_CADASTRAL_RE = _re.compile(r'^\S.*\s\d+:\d+\s*$')
 _BUILDINGS_GZ: bytes | None = None
 _BUILDINGS_LIST: list | None = None
 
@@ -405,6 +411,141 @@ def buildings_bbox_stats(
         "avg_footprint":  round(sum(footprints) / len(footprints), 1) if footprints else None,
         "common_use":     common_val("use_cat"),
     }
+@app.get("/api/buildings/bbox/list")
+def buildings_bbox_list(
+    north: float = Query(...),
+    south: float = Query(...),
+    east:  float = Query(...),
+    west:  float = Query(...),
+):
+    """Return individual building records in bbox, joined with Boplats rental data where available."""
+    import re, sqlite3, httpx
+    from concurrent.futures import ThreadPoolExecutor, wait as fut_wait
+
+    # ── Match buildings in bbox ──────────────────────────────────────────────
+    all_buildings = _get_buildings_list()
+    matched: list[tuple] = []
+    for b in all_buildings:
+        coords = b.get("coordinates") or []
+        c_lat, c_lon = _polygon_centroid(coords)
+        if c_lat == 0.0 and c_lon == 0.0:
+            continue
+        if south <= c_lat <= north and west <= c_lon <= east:
+            matched.append((b, round(c_lat, 6), round(c_lon, 6)))
+
+    if not matched:
+        raise HTTPException(404, "No buildings found in bounding box")
+
+    # ── Load Boplats rental data (keyed by normalised address) ───────────────
+    def _norm(s: str) -> str:
+        s = s.strip().lower()
+        s = re.sub(r"\s+", " ", s)
+        s = re.sub(r"\s+\d{4}$", "", s)
+        return s
+
+    boplats_lookup: dict[str, list] = {}
+    boplats_path = PROJECT_ROOT / "boplats_apartments.db"
+    if boplats_path.exists():
+        try:
+            conn = sqlite3.connect(str(boplats_path))
+            rows = conn.execute(
+                "SELECT address, rooms, size_m2, rent_sek, floor_current FROM apartments WHERE address IS NOT NULL"
+            ).fetchall()
+            conn.close()
+            for addr, rooms, size_m2, rent_sek, floor_cur in rows:
+                key = _norm(addr)
+                boplats_lookup.setdefault(key, []).append({
+                    "rooms": rooms,
+                    "size_m2": size_m2,
+                    "rent_sek": rent_sek,
+                    "floor": floor_cur,
+                    "rent_per_m2": round(rent_sek / size_m2, 1) if rent_sek and size_m2 else None,
+                })
+        except Exception:
+            pass
+
+    # ── Build result rows ────────────────────────────────────────────────────
+    result = []
+    for b, lat, lon in matched:
+        addr = b.get("address") or ""
+        bp = boplats_lookup.get(_norm(addr), [])
+
+        def _avg(vals: list) -> float | None:
+            clean = [v for v in vals if v is not None]
+            return round(sum(clean) / len(clean), 1) if clean else None
+
+        result.append({
+            "address":              addr,
+            "cadastral_id":         addr if addr and _CADASTRAL_RE.match(addr.strip()) else None,
+            "lat":                  lat,
+            "lon":                  lon,
+            "building_use":         b.get("use_cat"),
+            "year_built":           b.get("year"),
+            "height_m":             b.get("height"),
+            "floors":               b.get("floors"),
+            "footprint_m2":         b.get("footprint_m2"),
+            "energy_kwh_m2":        b.get("energy"),
+            "epc_class":            b.get("eclass"),
+            "has_epc":              b.get("has_epc"),
+            "tabula_period":        b.get("tabula_period"),
+            "u_wall":               b.get("tabula_u_wall"),
+            "u_roof":               b.get("tabula_u_roof"),
+            "u_window":             b.get("tabula_u_win"),
+            "boplats_listings":     len(bp) if bp else None,
+            "boplats_avg_rent_sek": _avg([r["rent_sek"] for r in bp]),
+            "boplats_avg_rent_per_m2_sek": _avg([r["rent_per_m2"] for r in bp]),
+        })
+
+    # ── Reverse geocode cadastral / missing addresses via Nominatim ──────────
+    def _needs_geocode(addr: str) -> bool:
+        if not addr:
+            return True
+        return bool(_CADASTRAL_RE.match(addr.strip()))
+
+    needs = [(i, row["lat"], row["lon"]) for i, row in enumerate(result) if _needs_geocode(row["address"])]
+    needs = needs[:40]  # cap to keep response time bounded
+
+    if needs:
+        def _geocode_one(lat: float, lon: float) -> str | None:
+            key = (round(lat, 4), round(lon, 4))
+            if key in _REVERSE_GEOCODE_CACHE:
+                return _REVERSE_GEOCODE_CACHE[key]
+            try:
+                r = httpx.get(
+                    "https://nominatim.openstreetmap.org/reverse",
+                    params={"lat": lat, "lon": lon, "format": "json"},
+                    headers={"User-Agent": "ProjectPlanningGuide/0.1"},
+                    timeout=4.0,
+                )
+                if r.status_code == 200:
+                    a = r.json().get("address", {})
+                    road  = (a.get("road") or a.get("pedestrian") or a.get("footway")
+                             or a.get("path") or a.get("cycleway")
+                             or a.get("neighbourhood") or a.get("suburb")
+                             or a.get("quarter") or a.get("hamlet"))
+                    house = a.get("house_number")
+                    if road:
+                        resolved = f"{road} {house}".strip() if house else road
+                        _REVERSE_GEOCODE_CACHE[key] = resolved
+                        return resolved
+            except Exception:
+                pass
+            _REVERSE_GEOCODE_CACHE[key] = None
+            return None
+
+        with ThreadPoolExecutor(max_workers=5) as ex:
+            futures = {ex.submit(_geocode_one, lat, lon): i for i, lat, lon in needs}
+            done, _ = fut_wait(list(futures.keys()), timeout=15)
+        for f in done:
+            idx = futures[f]
+            try:
+                geo_addr = f.result()
+                if geo_addr:
+                    result[idx]["address"] = geo_addr
+            except Exception:
+                pass
+
+    return result
 
 
 # ── Boverket materials ───────────────────────────────────────────────────────

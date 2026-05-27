@@ -31,7 +31,7 @@ export const SYSTEMS_BY_PROJECT_TYPE: Record<ProjectType, string[]> = {
     "Facade PV",
     "Battery System",
     "EV Charging",
-    "Vehicle to Grid (V2G)",
+    "Vehicle to Grid",
     "Grid",
   ],
   "Renovation Planning": [
@@ -271,3 +271,25 @@ export const RE_ELECTRICITY_THRESHOLDS = [
   "Surplus",
   "Partial coverage",
 ];
+
+// ── Building Development Type ──────────────────────────────────────────────
+
+export const BUILDING_DEVELOPMENT_OPTIONS = [
+  {
+    value: "existing",
+    label: "Existing buildings",
+    description: "Buildings already in use — renovation or system integration.",
+  },
+  {
+    value: "new",
+    label: "New development",
+    description: "Buildings under design or construction.",
+  },
+  {
+    value: "mix",
+    label: "Mix of both",
+    description: "Project includes both existing and newly developed buildings.",
+  },
+] as const;
+
+export type BuildingDevelopmentType = (typeof BUILDING_DEVELOPMENT_OPTIONS)[number]["value"];

@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
-import type { BuildingLookup, BboxStats } from "../types";
-import BuildingMapPanel from "../components/panels/BuildingMap";
+import { api } from "../api/client";
+import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import {
   CheckCircle2, AlertTriangle, XCircle,
   ChevronDown, ChevronUp, MapPin, Layers, Database, Check, X,
+  Building2, Globe2, Download,
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 /* ─────────────────────────────────────────────
    Types
@@ -688,7 +690,7 @@ function buildingFieldDisplay(b: BuildingLookup, bKey: BKey): string | null {
   return String(v);
 }
 function buildingShortName(b: BuildingLookup, idx: number): string {
-  if (b.address) return b.address.split(",")[0] ?? b.address;
+  if (b.address) return formatAddress(b.address.split(",")[0] ?? b.address);
   return `Building ${idx + 1}`;
 }
 
@@ -754,39 +756,556 @@ function eubuccoSourceText(key: string, building: BuildingLookup | null): string
 /* ─────────────────────────────────────────────
    Bbox data summary banner (multi-building mode)
 ───────────────────────────────────────────── */
-function BboxDataBanner({ bboxStats }: { bboxStats: BboxStats }) {
+const BBOX_CSV_COLS: { key: keyof BuildingRecord; label: string }[] = [
+  { key: "address",                     label: "Address" },
+  { key: "cadastral_id",                label: "Cadastral ID" },
+  { key: "building_use",                label: "Use" },
+  { key: "year_built",                  label: "Year" },
+  { key: "height_m",                    label: "Height (m)" },
+  { key: "floors",                      label: "Floors" },
+  { key: "footprint_m2",                label: "Footprint (m²)" },
+  { key: "energy_kwh_m2",               label: "Energy (kWh/m²)" },
+  { key: "epc_class",                   label: "EPC" },
+  { key: "tabula_period",               label: "TABULA Period" },
+  { key: "u_wall",                      label: "U-Wall" },
+  { key: "u_window",                    label: "U-Window" },
+  { key: "boplats_listings",            label: "Boplats #" },
+  { key: "boplats_avg_rent_per_m2_sek", label: "Rent/m² (SEK)" },
+];
+
+const EPC_ORDER: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6, G: 7 };
+
+const COMPARE_COLS: {
+  key: keyof BuildingRecord;
+  label: string;
+  unit?: string;
+  asc: boolean;
+  betterLabel: string;
+}[] = [
+  { key: "energy_kwh_m2",               label: "Heat Energy",  unit: "kWh/m²·yr", asc: true,  betterLabel: "lower = better" },
+  { key: "epc_class",                   label: "EPC Class",                        asc: true,  betterLabel: "A is best (A→G)" },
+  { key: "year_built",                  label: "Year Built",                        asc: false, betterLabel: "newer = better" },
+  { key: "u_wall",                      label: "U-Wall",       unit: "W/m²K",      asc: true,  betterLabel: "lower = better" },
+  { key: "u_roof",                      label: "U-Roof",       unit: "W/m²K",      asc: true,  betterLabel: "lower = better" },
+  { key: "u_window",                    label: "U-Window",     unit: "W/m²K",      asc: true,  betterLabel: "lower = better" },
+  { key: "floors",                      label: "Floors",                            asc: false, betterLabel: "more floors"    },
+  { key: "footprint_m2",                label: "Footprint",    unit: "m²",          asc: false, betterLabel: "larger = more"  },
+  { key: "boplats_avg_rent_per_m2_sek", label: "Rent/m²",     unit: "SEK",         asc: true,  betterLabel: "lower = cheaper"},
+];
+
+function barFill(rank: number, total: number): string {
+  if (total <= 1) return "#8b5cf6";
+  const pos = rank / (total - 1);
+  if (pos <= 0.20) return "#10b981";
+  if (pos <= 0.45) return "#86efac";
+  if (pos >= 0.80) return "#ef4444";
+  if (pos >= 0.55) return "#fbbf24";
+  return "#c4b5fd";
+}
+
+/** Convert Swedish cadastral IDs like "JÄRNBROTT 134:3" → "Järnbrott 134:3" */
+function formatAddress(addr: string | null | undefined): string {
+  if (!addr) return "—";
+  const m = addr.trim().match(/^(.+)\s+(\d+:\d+)$/);
+  if (m) {
+    const district = (m[1] ?? "").trim();
+    if (district === district.toUpperCase() && /[A-ZÅÄÖ]/.test(district)) {
+      const titleCase = district.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
+      return `${titleCase} ${m[2]}`;
+    }
+  }
+  return addr;
+}
+
+function sortByCol(a: BuildingRecord, b: BuildingRecord, colKey: keyof BuildingRecord, asc: boolean): number {
+  const av = a[colKey];
+  const bv = b[colKey];
+  if (av == null && bv == null) return 0;
+  if (av == null) return 1;
+  if (bv == null) return -1;
+  const diff = colKey === "epc_class"
+    ? (EPC_ORDER[String(av).toUpperCase()] ?? 99) - (EPC_ORDER[String(bv).toUpperCase()] ?? 99)
+    : (Number(av) || 0) - (Number(bv) || 0);
+  return asc ? diff : -diff;
+}
+
+function rankBgColor(rank: number, total: number): string {
+  if (total <= 1) return "";
+  const pos = rank / (total - 1);
+  if (pos <= 0.15) return "bg-emerald-100";
+  if (pos <= 0.40) return "bg-emerald-50";
+  if (pos >= 0.85) return "bg-red-100";
+  if (pos >= 0.60) return "bg-amber-50";
+  return "";
+}
+
+function BboxDataBanner({
+  bboxStats,
+  bbox,
+}: {
+  bboxStats: BboxStats;
+  bbox: { north: number; south: number; east: number; west: number } | null;
+}) {
   const epcPct = Math.round((bboxStats.with_epc / bboxStats.count) * 100);
+  const [loading, setLoading]         = useState(false);
+  const [rows, setRows]               = useState<BuildingRecord[] | null>(null);
+  const [viewOpen, setViewOpen]       = useState(false);
+  const [page, setPage]               = useState(0);
+  const [selected, setSelected]       = useState<Set<number>>(new Set());
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [sortCol, setSortCol]         = useState<keyof BuildingRecord>("energy_kwh_m2");
+  const PAGE_SIZE = 50;
+
+  async function loadRows() {
+    if (!bbox) return;
+    setLoading(true);
+    try {
+      const data = await api.buildingsBboxList(bbox.north, bbox.south, bbox.east, bbox.west);
+      setRows(data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleView() {
+    if (!rows) await loadRows();
+    setViewOpen(v => !v);
+    setPage(0);
+  }
+
+  function handleDownload() {
+    if (!rows) return;
+    const escape = (v: unknown) => {
+      if (v === null || v === undefined) return "";
+      const s = String(v);
+      return s.includes(",") || s.includes('"') || s.includes("\n")
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    };
+    const allCols: { key: keyof BuildingRecord; label: string }[] = [
+      ...BBOX_CSV_COLS,
+      { key: "lat",                        label: "Latitude" },
+      { key: "lon",                        label: "Longitude" },
+      { key: "has_epc",                    label: "Has EPC" },
+      { key: "u_roof",                     label: "U-Roof" },
+      { key: "boplats_avg_rent_sek",       label: "Avg Rent (SEK)" },
+    ];
+    const header = allCols.map(c => c.label).join(",");
+    const body   = rows.map(r => allCols.map(c => escape(r[c.key])).join(",")).join("\n");
+    const blob   = new Blob([`${header}\n${body}`], { type: "text/csv;charset=utf-8;" });
+    const url    = URL.createObjectURL(blob);
+    const a      = document.createElement("a");
+    a.href = url; a.download = `buildings_${bboxStats.count}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleLoadAndDownload() {
+    if (!rows) await loadRows();
+    handleDownload();
+  }
+
+  function saveSelectedCsv() {
+    if (!rows || selected.size === 0) return;
+    const escape = (v: unknown) => {
+      if (v === null || v === undefined) return "";
+      const s = String(v);
+      return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const cols: { key: keyof BuildingRecord; label: string }[] = [
+      ...BBOX_CSV_COLS,
+      { key: "lat",                  label: "Latitude" },
+      { key: "lon",                  label: "Longitude" },
+      { key: "has_epc",              label: "Has EPC" },
+      { key: "u_roof",               label: "U-Roof (W/m²K)" },
+      { key: "boplats_avg_rent_sek", label: "Avg Rent (SEK)" },
+    ];
+    const header = cols.map(c => c.label).join(",");
+    const body   = rankedRows.map(({ r }) => cols.map(c => escape(r[c.key])).join(",")).join("\n");
+    const blob   = new Blob([`${header}\n${body}`], { type: "text/csv;charset=utf-8;" });
+    const url    = URL.createObjectURL(blob);
+    const a      = document.createElement("a");
+    a.href = url; a.download = `selected_${selected.size}_buildings.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function toggleRow(idx: number) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(idx) ? next.delete(idx) : next.add(idx);
+      return next;
+    });
+  }
+
+  const pagedRows      = rows ? rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : [];
+  const totalPages     = rows ? Math.ceil(rows.length / PAGE_SIZE) : 0;
+  const pageIdxs       = pagedRows.map((_, i) => page * PAGE_SIZE + i);
+  const pageAllChecked = pageIdxs.length > 0 && pageIdxs.every(i => selected.has(i));
+  const pagePartial    = !pageAllChecked && pageIdxs.some(i => selected.has(i));
+
+  function togglePageAll() {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (pageAllChecked) { pageIdxs.forEach(i => next.delete(i)); }
+      else                { pageIdxs.forEach(i => next.add(i)); }
+      return next;
+    });
+  }
+
+  // Build ranked compare list
+  const cfg         = COMPARE_COLS.find(c => c.key === sortCol) ?? COMPARE_COLS[0];
+  const selectedRows = rows ? [...selected].map(i => ({ i, r: rows[i] })).filter(x => x.r) : [];
+  const rankedRows   = [...selectedRows].sort((a, b) => sortByCol(a.r, b.r, sortCol, cfg.asc));
+
   return (
-    <div className="rounded-xl border border-blue-200 bg-blue-50 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-blue-100">
-        <div className="flex items-center gap-2">
-          <span>🏙️</span>
-          <span className="text-xs font-semibold text-blue-900">
-            {bboxStats.count.toLocaleString()} buildings in bounding box — EUBUCCO aggregate data loaded
-          </span>
-          <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">
-            {epcPct}% have EPC
+    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
+        <div className="flex items-center gap-3 min-w-0">
+          <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
+          <div>
+            <span className="text-sm font-bold text-gray-900">{bboxStats.count.toLocaleString()} buildings</span>
+            <span className="text-xs text-gray-400 ml-2">Bounding box · EUBUCCO</span>
+          </div>
+          <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-semibold border border-emerald-200 shrink-0">
+            {epcPct}% EPC
           </span>
         </div>
-        <a
-          href="http://127.0.0.1:8765/gothenburg_3d.html"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[11px] font-medium text-blue-700 hover:text-blue-900 underline underline-offset-2 whitespace-nowrap"
-        >
-          📷 Gothenburg 3D →
-        </a>
+        <div className="flex items-center gap-1 shrink-0 ml-3">
+          <button
+            onClick={handleView}
+            disabled={loading || !bbox}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-40 whitespace-nowrap transition"
+          >
+            {loading ? "Loading…" : viewOpen ? <><ChevronUp className="w-3 h-3" /> Hide</> : "Buildings"}
+          </button>
+          <button
+            onClick={rows ? handleDownload : handleLoadAndDownload}
+            disabled={loading || !bbox}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-40 whitespace-nowrap transition"
+          >
+            <Download className="w-3 h-3" /> Export
+          </button>
+          <a
+            href={`http://127.0.0.1:8765/gothenburg_3d.html?bbox=${bbox ? [bbox.north,bbox.south,bbox.east,bbox.west].join(',') : ''}`}
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-violet-600 hover:bg-violet-50 whitespace-nowrap transition"
+          >
+            <Globe2 className="w-3 h-3" /> 3D view
+          </a>
+        </div>
       </div>
-      <div className="flex flex-wrap gap-x-5 gap-y-1 px-4 py-2.5 text-xs text-blue-800">
-        {bboxStats.common_use  && <span>🏢 Most common: {bboxStats.common_use}</span>}
-        {bboxStats.avg_year    && <span>📅 Avg built: {bboxStats.avg_year}</span>}
-        {bboxStats.avg_floors  && <span>⬆ Avg {bboxStats.avg_floors} floors</span>}
-        {bboxStats.avg_footprint && <span>📐 Avg footprint: {Math.round(bboxStats.avg_footprint)} m\u00b2</span>}
-        {bboxStats.avg_height  && <span>📏 Avg height: {bboxStats.avg_height} m</span>}
-        {bboxStats.avg_energy  && <span>🔥 Avg energy: {bboxStats.avg_energy} kWh/m\u00b2</span>}
-        <span>📊 Height data: {bboxStats.with_height}/{bboxStats.count} ({Math.round(bboxStats.with_height/bboxStats.count*100)}%)</span>
-        <span>📊 Floor data: {bboxStats.with_floors}/{bboxStats.count} ({Math.round(bboxStats.with_floors/bboxStats.count*100)}%)</span>
+
+      {/* Metrics bar */}
+      <div className="flex flex-wrap divide-x divide-slate-100 border-t border-slate-100">
+        {bboxStats.common_use && (
+          <div className="px-4 py-2.5">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Primary use</div>
+            <div className="text-xs font-bold text-gray-800 mt-0.5">{bboxStats.common_use}</div>
+          </div>
+        )}
+        {bboxStats.avg_year && (
+          <div className="px-4 py-2.5">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Avg year built</div>
+            <div className="text-xs font-bold text-gray-800 mt-0.5">{bboxStats.avg_year}</div>
+          </div>
+        )}
+        {bboxStats.avg_floors && (
+          <div className="px-4 py-2.5">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Avg floors</div>
+            <div className="text-xs font-bold text-gray-800 mt-0.5">{bboxStats.avg_floors}</div>
+          </div>
+        )}
+        {bboxStats.avg_footprint && (
+          <div className="px-4 py-2.5">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Avg footprint</div>
+            <div className="text-xs font-bold text-gray-800 mt-0.5">{Math.round(bboxStats.avg_footprint)} m²</div>
+          </div>
+        )}
+        {bboxStats.avg_height && (
+          <div className="px-4 py-2.5">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Avg height</div>
+            <div className="text-xs font-bold text-gray-800 mt-0.5">{bboxStats.avg_height} m</div>
+          </div>
+        )}
+        {bboxStats.avg_energy && (
+          <div className="px-4 py-2.5">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Avg energy use</div>
+            <div className="text-xs font-bold text-gray-800 mt-0.5">{bboxStats.avg_energy} kWh/m²</div>
+          </div>
+        )}
+        <div className="px-4 py-2.5">
+          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Height data</div>
+          <div className="text-xs font-bold text-gray-800 mt-0.5">{Math.round(bboxStats.with_height/bboxStats.count*100)}% <span className="font-normal text-slate-400">({bboxStats.with_height}/{bboxStats.count})</span></div>
+        </div>
+        <div className="px-4 py-2.5">
+          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Floor data</div>
+          <div className="text-xs font-bold text-gray-800 mt-0.5">{Math.round(bboxStats.with_floors/bboxStats.count*100)}% <span className="font-normal text-slate-400">({bboxStats.with_floors}/{bboxStats.count})</span></div>
+        </div>
       </div>
+
+      {/* Inline table */}
+      {viewOpen && rows && (
+        <div className="border-t border-blue-100">
+          {/* Legend + selection controls */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 pb-1 text-[10px] text-gray-500">
+            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-300" /> Data available</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-50 border border-red-200" /> Missing</span>
+            {rows.some(r => r.boplats_listings) && (
+              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-50 border border-amber-200" /> Boplats data</span>
+            )}
+            <span className="ml-auto text-gray-400">
+              Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)} of {rows.length}
+            </span>
+            {selected.size > 0 && (
+              <>
+                <button
+                  onClick={() => { setCompareOpen(v => !v); }}
+                  className="px-2.5 py-0.5 rounded-full bg-violet-600 text-white text-[10px] font-semibold hover:bg-violet-700 transition"
+                >
+                  Compare {selected.size}
+                </button>
+                <button
+                  onClick={() => { setSelected(new Set()); setCompareOpen(false); }}
+                  className="text-gray-400 hover:text-red-500 transition text-[10px]"
+                  title="Clear selection"
+                >
+                  ✕ Clear
+                </button>
+              </>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[10px] border-collapse">
+              <thead>
+                <tr className="bg-blue-100/60">
+                  {/* Select-all checkbox */}
+                  <th className="px-2 py-1 border-b border-blue-200 w-6">
+                    <input
+                      type="checkbox"
+                      checked={pageAllChecked}
+                      ref={(el: HTMLInputElement | null) => { if (el) el.indeterminate = pagePartial; }}
+                      onChange={togglePageAll}
+                      className="w-3 h-3 cursor-pointer accent-violet-600"
+                      title="Select / deselect all on this page"
+                    />
+                  </th>
+                  {BBOX_CSV_COLS.map(c => (
+                    <th key={c.key} className="px-2 py-1 text-left font-semibold text-blue-900 border-b border-blue-200 whitespace-nowrap">
+                      {c.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pagedRows.map((r, i) => {
+                  const globalIdx  = page * PAGE_SIZE + i;
+                  const isSelected = selected.has(globalIdx);
+                  return (
+                    <tr
+                      key={i}
+                      onClick={() => toggleRow(globalIdx)}
+                      className={`cursor-pointer border-b border-blue-100/50 transition-colors ${
+                        isSelected ? "bg-violet-50 hover:bg-violet-100/60" : "hover:bg-blue-50/60"
+                      }`}
+                    >
+                      <td className="px-2 py-1 text-center" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleRow(globalIdx)}
+                          className="w-3 h-3 cursor-pointer accent-violet-600"
+                        />
+                      </td>
+                      {BBOX_CSV_COLS.map(c => {
+                        const val     = r[c.key];
+                        const present = val !== null && val !== undefined;
+                        const isBoplats = (c.key as string).startsWith("boplats_");
+                        const cell = isSelected
+                          ? ""
+                          : present
+                            ? isBoplats ? "bg-amber-50 text-amber-900" : "bg-emerald-50/60 text-gray-800"
+                            : "bg-red-50/40 text-gray-400";
+                        const display = c.key === "address"
+                          ? formatAddress(val as string)
+                          : present ? String(val) : "—";
+                        return (
+                          <td key={c.key} className={`px-2 py-1 ${cell} whitespace-nowrap`}>
+                            {display}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 py-2 border-t border-blue-100 text-[11px]">
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="px-2 py-0.5 rounded border border-blue-200 disabled:opacity-30 hover:bg-blue-100"
+              >← Prev</button>
+              <span className="text-gray-500">Page {page + 1} / {totalPages}</span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page === totalPages - 1}
+                className="px-2 py-0.5 rounded border border-blue-200 disabled:opacity-30 hover:bg-blue-100"
+              >Next →</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Compare panel ── */}
+      {compareOpen && selectedRows.length > 0 && (
+        <div className="border-t-2 border-violet-300 bg-white">
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-4 py-2.5 bg-violet-50 border-b border-violet-200">
+            <span className="text-xs font-bold text-violet-900">
+              Comparing {selectedRows.length} buildings — ranked best to worst
+            </span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={saveSelectedCsv}
+                className="flex items-center gap-1.5 text-[11px] font-medium text-violet-700 hover:text-violet-900"
+                title="Download selected buildings as CSV"
+              >
+                <Download className="w-3 h-3" /> Export
+              </button>
+              <button
+                onClick={() => setCompareOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-sm leading-none"
+              >✕</button>
+            </div>
+          </div>
+
+          {/* Sort-by category pills */}
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-violet-100 bg-violet-50/50">
+            <span className="text-[10px] text-gray-500 mr-1">Sort by:</span>
+            {COMPARE_COLS.map(c => (
+              <button
+                key={c.key}
+                onClick={() => setSortCol(c.key)}
+                title={c.betterLabel}
+                className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition ${
+                  sortCol === c.key
+                    ? "bg-violet-600 text-white border-violet-600 shadow-sm"
+                    : "bg-white text-gray-600 border-gray-300 hover:border-violet-400 hover:text-violet-700"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+            <span className="ml-1 text-[10px] text-gray-400 italic">({cfg.betterLabel})</span>
+          </div>
+
+          {/* Ranked table */}
+          <div className="overflow-x-auto px-4 py-3">
+            <table className="w-full text-[11px] border-collapse rounded-lg overflow-hidden border border-violet-200">
+              <thead>
+                <tr className="bg-violet-100/70">
+                  <th className="px-2 py-1.5 text-left font-semibold text-violet-900 border-b border-violet-200 whitespace-nowrap">Address</th>
+                  {COMPARE_COLS.map(c => (
+                    <th
+                      key={c.key}
+                      onClick={() => setSortCol(c.key)}
+                      title={c.betterLabel}
+                      className={`px-2 py-1.5 text-left font-semibold border-b border-violet-200 whitespace-nowrap cursor-pointer select-none transition ${
+                        sortCol === c.key
+                          ? "text-violet-700 bg-violet-200/60"
+                          : "text-violet-800 hover:text-violet-600 hover:bg-violet-50"
+                      }`}
+                    >
+                      <div className="leading-tight">{c.label}{sortCol === c.key ? " ▲" : ""}</div>
+                      {c.unit && <div className="text-[8px] font-normal text-gray-400">{c.unit}</div>}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rankedRows.map(({ i, r }, rank) => {
+                  const medal  = rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : `${rank + 1}`;
+                  const rowBg  = rankBgColor(rank, rankedRows.length);
+                  return (
+                    <tr key={i} className={`border-b border-violet-100/60 ${rowBg}`}>
+                      <td className="px-2 py-1.5 font-medium whitespace-nowrap max-w-[220px]" title={formatAddress(r.address)}>
+                        <span className="mr-1 text-sm">{medal}</span>
+                        <span className="truncate">{formatAddress(r.address)}</span>
+                      </td>
+                      {COMPARE_COLS.map(c => {
+                        const val      = r[c.key];
+                        const present  = val !== null && val !== undefined;
+                        const isActive = c.key === sortCol;
+                        return (
+                          <td
+                            key={c.key}
+                            className={`px-2 py-1.5 whitespace-nowrap ${isActive ? "font-semibold" : ""} ${!present ? "text-gray-400" : ""}`}
+                          >
+                            {present ? String(val) : "—"}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Charts */}
+          <div className="px-4 pt-3 pb-1 border-t border-violet-100 bg-violet-50/30">
+            <div className="text-[11px] font-semibold text-violet-900 mb-2">Category charts <span className="font-normal text-gray-400 ml-1">(green = best, red = worst)</span></div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              {COMPARE_COLS.map(c => {
+                const colData = [...selectedRows]
+                  .map(({ r }) => ({
+                    name: formatAddress((r.address ?? "?").split(/[, ]/)[0]),
+                    rawVal: c.key === "epc_class"
+                      ? (r.epc_class ? (EPC_ORDER[r.epc_class.toUpperCase()] ?? null) : null)
+                      : (r[c.key] as number | null),
+                    display: r[c.key] != null ? String(r[c.key]) : null,
+                    address: formatAddress(r.address) ?? "",
+                  }))
+                  .filter(d => d.rawVal != null)
+                  .sort((a, b) => c.asc ? a.rawVal! - b.rawVal! : b.rawVal! - a.rawVal!);
+                if (!colData.length) return null;
+                const chartData = colData.map((d, rank) => ({ ...d, rank, total: colData.length }));
+                const xDomain: [number | string, number | string] =
+                  c.key === "year_built" ? [1800, "auto"] : [0, "auto"];
+                return (
+                  <div key={c.key} className="bg-white rounded-lg border border-violet-100 p-2.5">
+                    <div className="text-[10px] font-semibold text-violet-700">
+                      {c.label}{c.unit ? ` (${c.unit})` : ""}
+                    </div>
+                    <div className="text-[9px] text-gray-400 italic mb-1">{c.betterLabel}</div>
+                    <ResponsiveContainer width="100%" height={Math.max(52, chartData.length * 22)}>
+                      <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                        <XAxis type="number" domain={xDomain} tick={{ fontSize: 8 }} tickCount={4} />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 8 }} width={68} />
+                        <Tooltip
+                          formatter={(_v: unknown, _n: unknown, props: { payload?: { display?: string } }) =>
+                            [props.payload?.display ?? "—", `${c.label}${c.unit ? ` (${c.unit})` : ""}`]
+                          }
+                          contentStyle={{ fontSize: 10, padding: "2px 8px" }}
+                          labelFormatter={(label: string) => label}
+                        />
+                        <Bar dataKey="rawVal" radius={[0, 3, 3, 0]}>
+                          {chartData.map((d, idx) => (
+                            <Cell key={idx} fill={barFill(d.rank, d.total)} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -857,7 +1376,7 @@ function BuildingDataBanner({
             <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span>
           )}
         </div>
-        {building.address && <span className="text-[10px] text-purple-700 truncate max-w-[200px]">{building.address}</span>}
+        {building.address && <span className="text-[10px] text-purple-700 truncate max-w-[200px]">{formatAddress(building.address)}</span>}
       </div>
 
       {/* Fields grid */}
@@ -934,7 +1453,7 @@ function MultiBuildingDataBanner({
           <div key={i} className="flex items-start gap-2 px-3 py-2">
             <span className="text-[10px] text-slate-400 font-mono mt-0.5 w-4 flex-shrink-0">{i + 1}</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-slate-700 truncate">{b.address ?? "EUBUCCO building"}</div>
+              <div className="text-xs font-medium text-slate-700 truncate">{formatAddress(b.address) ?? "EUBUCCO building"}</div>
               <div className="flex flex-wrap gap-x-3 mt-0.5 text-[10px] text-slate-500">
                 {b.use_cat    && <span>{b.use_cat}</span>}
                 {b.year       && <span>Built {b.year}</span>}
@@ -1019,6 +1538,22 @@ export default function DataCoverage() {
     setExpandedCats(new Set(defs.map(c => c.category)));
   }, [defs]);
 
+  /* ── 2-way bridge: receive building selection from Cesium viewer ── */
+  const [viewerSelection, setViewerSelection] = useState<{
+    address?: string; lat?: number; lon?: number;
+    use_cat?: string; year?: number; height?: number;
+    floors?: number; footprint_m2?: number; energy?: number; eclass?: string;
+  } | null>(null);
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'ppg_selected_building' && e.newValue) {
+        try { setViewerSelection(JSON.parse(e.newValue)); } catch { /* ignore */ }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const toggleCat = (cat: string) =>
     setExpandedCats(prev => {
       const next = new Set(prev);
@@ -1086,10 +1621,9 @@ export default function DataCoverage() {
 
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-navy">Step 2 – Data Coverage</h2>
+        <h2 className="text-2xl font-bold text-navy">Data Requirements</h2>
         <p className="text-sm text-slate-500 mt-1">
-          For each parameter, indicate whether you have the data. If not, the system will
-          use the best available reference database (TABULA, Boverket, EPC, PVGIS…) as a fallback.
+          Review the inputs available for your project scope. Confirm which data you have direct access to — gaps are automatically filled from reference databases (TABULA, EPC, Boverket, PVGIS).
         </p>
       </div>
 
@@ -1112,9 +1646,6 @@ export default function DataCoverage() {
         )}
       </div>
 
-      {/* 3D Building Map */}
-      <BuildingMapPanel />
-
       {/* EUBUCCO building data banner (single building) */}
       {!isMulti && building && !bboxStats && (
         <BuildingDataBanner
@@ -1132,7 +1663,32 @@ export default function DataCoverage() {
       )}
 
       {/* EUBUCCO bbox aggregate banner (bbox draw mode) */}
-      {bboxStats && <BboxDataBanner bboxStats={bboxStats} />}
+      {bboxStats && <BboxDataBanner bboxStats={bboxStats} bbox={project.currentBbox ?? null} />}
+
+      {/* 🔗 Viewer selection — building highlighted in the 3D viewer */}
+      {viewerSelection && (
+        <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+          <Globe2 className="w-4 h-4 text-violet-400 shrink-0" />
+          <div className="flex-1 min-w-0 text-xs">
+            <span className="font-semibold text-gray-800">{formatAddress(viewerSelection.address) || "Unknown address"}</span>
+            <span className="text-gray-300 mx-2">|</span>
+            <span className="text-gray-500 space-x-3">
+              {viewerSelection.use_cat && <span>{viewerSelection.use_cat}</span>}
+              {viewerSelection.year    && <span>Built {viewerSelection.year}</span>}
+              {viewerSelection.height  && <span>{viewerSelection.height} m</span>}
+              {viewerSelection.floors  && <span>{viewerSelection.floors} fl</span>}
+              {viewerSelection.energy  && <span>{viewerSelection.energy} kWh/m²</span>}
+              {viewerSelection.eclass  && <span>EPC {viewerSelection.eclass}</span>}
+            </span>
+          </div>
+          <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-2 py-0.5 rounded shrink-0">3D Viewer</span>
+          <button
+            onClick={() => { setViewerSelection(null); try { localStorage.removeItem('ppg_selected_building'); } catch { /**/ } }}
+            className="text-gray-300 hover:text-gray-500 shrink-0 text-sm leading-none ml-1"
+            title="Dismiss"
+          >×</button>
+        </div>
+      )}
 
       {/* Coverage summary bar */}
       {totalCount > 0 && (

@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, Database,
   FileText, Layers, Zap, TrendingUp, Activity, Info, ArrowRight, MapPin,
 } from "lucide-react";
+import BuildingMapPanel from "../components/panels/BuildingMap";
 import SensitivityPanel from "../components/panels/SensitivityPanel";
 import EubuccoValidationPanel from "../components/panels/EubuccoValidationPanel";
 import EpcPanel from "../components/panels/EpcPanel";
@@ -348,6 +349,9 @@ export default function DataAssumptions() {
           </span>
         )}
       </div>
+
+      {/* 3D Building Explorer */}
+      <BuildingMapPanel />
 
       {/* ══════════════════════════════════════════
           SECTION 1 – Confidence & Data Gaps

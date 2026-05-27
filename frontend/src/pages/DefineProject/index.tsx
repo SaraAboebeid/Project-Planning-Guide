@@ -18,6 +18,7 @@ import {
   COUNTRY_OPTIONS,
   BUILDING_USES,
   RE_ELECTRICITY_THRESHOLDS,
+  BUILDING_DEVELOPMENT_OPTIONS,
   type ProjectType,
 } from "../../config/projectConfig";
 
@@ -73,6 +74,8 @@ export default function DefineProject() {
     try {
       const stats = await api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west);
       setProject({ bboxStats: stats, lookedUpBuilding: null, currentBbox: bbox });
+      // Sync bbox to 3D viewer via localStorage
+      try { localStorage.setItem('ppg_bbox', JSON.stringify(bbox)); } catch { /* ignore */ }
     } catch {
       setProject({ bboxStats: null });
     } finally {
@@ -130,6 +133,7 @@ export default function DefineProject() {
     // Reset dependent fields when project type changes
     setProject({
       projectType: newType,
+      buildingDevelopmentType: null,
       systemsInScope: [],
       selectedKpis: [],
       explorationApproaches: [],
@@ -211,7 +215,9 @@ export default function DefineProject() {
   if (pt === "Renovation Planning" && !systemsSet.has("Building Envelope (Windows, Roof, Walls, Floors)")) {
     setProject({ systemsInScope: ["Building Envelope (Windows, Roof, Walls, Floors)"] });
   }
-  const showSystems        = !!pt && pt !== "Renovation Planning";
+  const needsBuildingDevType = pt === "Energy Community Planning" || pt === "Renewable Energy Planning";
+  const showBuildingDevType  = needsBuildingDevType;
+  const showSystems          = !!pt && pt !== "Renovation Planning" && !!project.buildingDevelopmentType;
   const showEcFocus        = pt === "Energy Community Planning" && project.systemsInScope.length > 0;
   const showExploration    = !!pt && project.systemsInScope.length > 0
                               && (pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0);
@@ -226,6 +232,9 @@ export default function DefineProject() {
   // Each entry: [label, isDone]
   const progressSteps: [string, boolean][] = [
     ["Project type",       !!pt],
+    ...(needsBuildingDevType
+      ? [["Building type", !!project.buildingDevelopmentType] as [string, boolean]]
+      : []),
     ["Systems in scope",   project.systemsInScope.length > 0],
     ...(pt === "Energy Community Planning"
       ? [["Energy focus", project.ecEnergyFocus.length > 0] as [string, boolean]]
@@ -300,6 +309,28 @@ export default function DefineProject() {
           ))}
         </div>
       </Card>
+
+      {/* ── BUILDING DEVELOPMENT TYPE (EC + RE only) ── */}
+      {showBuildingDevType && (
+        <Card className="animate-fadeIn">
+          <Label required>Are the buildings existing or new development?</Label>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {BUILDING_DEVELOPMENT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setProject({ buildingDevelopmentType: opt.value })}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
+                  project.buildingDevelopmentType === opt.value
+                    ? "bg-navy text-white border-navy"
+                    : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* ── RENOVATION ENVELOPE COMPONENTS (shown directly, no systems toggle needed) ── */}
       {pt === "Renovation Planning" && (

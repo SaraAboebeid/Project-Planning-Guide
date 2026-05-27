@@ -75,6 +75,29 @@ export interface BboxStats {
   common_use: string | null;
 }
 
+/** Individual building record returned by /api/buildings/bbox/list */
+export interface BuildingRecord {
+  address: string;
+  cadastral_id: string | null;
+  lat: number;
+  lon: number;
+  building_use: string | null;
+  year_built: number | null;
+  height_m: number | null;
+  floors: number | null;
+  footprint_m2: number | null;
+  energy_kwh_m2: number | null;
+  epc_class: string | null;
+  has_epc: boolean | null;
+  tabula_period: string | null;
+  u_wall: number | null;
+  u_roof: number | null;
+  u_window: number | null;
+  boplats_listings: number | null;
+  boplats_avg_rent_sek: number | null;
+  boplats_avg_rent_per_m2_sek: number | null;
+}
+
 /** Saved AI WWR record from the local database */
 export interface WWRRecord {
   lat: number;
