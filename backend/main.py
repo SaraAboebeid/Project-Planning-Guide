@@ -304,6 +304,27 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
     candidates.sort(key=_rank)
     best_dist, best = candidates[0]
 
+    # If the nearest building has no EPC but a sibling at the same street address
+    # (e.g. main residential vs. komplement/annex) does, prefer the EPC-bearing one.
+    # EUBUCCO often splits a single property into several geometries; only one of
+    # them carries the EPC record.
+    if not best.get("has_epc") and best.get("address"):
+        import re as _re
+        _cad = _re.compile(r"^[A-ZÅÄÖa-zåäö ]+\s+\d+:\d+$")
+        anchor_addr = (best.get("address") or "").strip()
+        anchor_is_cad = bool(_cad.match(anchor_addr))
+        for d, b in candidates:
+            if not b.get("has_epc"):
+                continue
+            a = (b.get("address") or "").strip()
+            if not a:
+                continue
+            # Match by exact address (street name + number) OR, if anchor is a
+            # cadastral id, accept the closest EPC building within 50 m.
+            if a == anchor_addr or (anchor_is_cad and d <= 50):
+                best_dist, best = d, b
+                break
+
     # Compute footprint — EUBUCCO polygon area only (Atemp is unreliable: one EPC may
     # cover multiple buildings and sums their areas, so Atemp/floors is not a valid proxy)
     footprint: float | None = None
@@ -545,7 +566,58 @@ def buildings_bbox_list(
             except Exception:
                 pass
 
-    return result
+    # ── Deduplicate by street address ─────────────────────────────────────────
+    # EUBUCCO can include multiple geometries per address (main + komplement/annex).
+    # Collapse them into a single row per address so EPC/year/energy aren't hidden
+    # on a "secondary" annex row. Cadastral-only rows are kept as-is (each parcel
+    # is distinct). For each address group we keep the richest row (EPC > most
+    # populated fields > largest footprint) and sum the footprint across siblings.
+    def _addr_key(row: dict) -> str | None:
+        a = (row.get("address") or "").strip()
+        if not a or _CADASTRAL_RE.match(a):
+            return None
+        return re.sub(r"\s+", " ", a.lower())
+
+    def _score(row: dict) -> tuple:
+        rich = sum(1 for k in (
+            "year_built", "energy_kwh_m2", "epc_class", "tabula_period",
+            "u_wall", "u_roof", "u_window",
+        ) if row.get(k) is not None)
+        return (1 if row.get("has_epc") else 0, rich, row.get("footprint_m2") or 0)
+
+    groups: dict[str, list[dict]] = {}
+    deduped: list[dict] = []
+    for row in result:
+        key = _addr_key(row)
+        if key is None:
+            deduped.append(row)
+        else:
+            groups.setdefault(key, []).append(row)
+    for key, rows in groups.items():
+        rows.sort(key=_score, reverse=True)
+        primary = rows[0]
+        if len(rows) > 1:
+            total_fp = sum((r.get("footprint_m2") or 0) for r in rows)
+            if total_fp:
+                primary["footprint_m2"] = round(total_fp, 1)
+            # Inherit any missing data field from siblings — EPC is often only
+            # attached to one geometry of a multi-part property; if any sibling
+            # has it, surface it on the kept row.
+            for field in (
+                "year_built", "energy_kwh_m2", "epc_class", "has_epc",
+                "tabula_period", "u_wall", "u_roof", "u_window",
+                "boplats_listings", "boplats_avg_rent_sek",
+                "boplats_avg_rent_per_m2_sek",
+            ):
+                if primary.get(field) in (None, False):
+                    for sib in rows[1:]:
+                        v = sib.get(field)
+                        if v not in (None, False):
+                            primary[field] = v
+                            break
+        deduped.append(primary)
+
+    return deduped
 
 
 # ── Boverket materials ───────────────────────────────────────────────────────

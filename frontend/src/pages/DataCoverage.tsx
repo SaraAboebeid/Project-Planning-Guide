@@ -717,7 +717,7 @@ function buildingShortName(b: BuildingLookup, idx: number): string {
 
 // Build initial hasData state from BboxStats (auto-fills fields covered by aggregate data)
 // Bbox provides: footprint, height, floors, use_cat, energy, epc coverage
-const BBOX_COVERED_BKEYS = new Set<BKey>(["footprint_m2", "height", "floors", "use_cat", "energy", "has_epc", "tabula_period"]);
+const BBOX_COVERED_BKEYS = new Set<BKey>(["footprint_m2", "height", "floors", "use_cat", "energy", "has_epc", "eclass", "tabula_period"]);
 function initFromBboxStats(
   defs: DataCategoryDef[],
   _stats: BboxStats | null,
@@ -1540,6 +1540,24 @@ export default function DataCoverage() {
     }));
     return map;
   }, [activeCovRows, defs]);
+
+  /* Auto-promote hasData=true whenever the active bbox rows actually provide a value
+     (e.g. EPC class/energy showing up once buildings are loaded or selected). */
+  useEffect(() => {
+    const entries = Object.entries(coverageMap);
+    if (!entries.length) return;
+    setHasData(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const [k, info] of entries) {
+        if (info && info.count > 0 && !next[k]) {
+          next[k] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [coverageMap]);
 
   /* Per-item "user has this data" state — keyed by item.key */
   const [hasData, setHasData] = useState<Record<string, boolean>>(() => {
