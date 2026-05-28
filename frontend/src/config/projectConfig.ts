@@ -16,9 +16,9 @@ export const PROJECT_TYPE_DESCRIPTIONS: Record<ProjectType, string> = {
   "Energy Community Planning":
     "Plan shared energy systems across multiple entities.",
   "Renovation Planning":
-    "Assess and prioritise retrofit measures for existing buildings — envelope, systems, comfort, and EPC improvement.",
+    "Assess and prioritize renovation strategies for existing buildings.",
   "Renewable Energy Planning":
-    "Evaluate renewable energy potential — solar, wind, geothermal, biomass, and storage.",
+    "Evaluate renewable energy potential.",
 };
 
 // ── Systems in Scope ───────────────────────────────────────────────────────

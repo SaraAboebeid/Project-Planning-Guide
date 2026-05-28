@@ -4,6 +4,7 @@ Location and spatial data helpers for project-location selection and EPC coverag
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from math import cos, radians
 from typing import Any
@@ -13,6 +14,68 @@ import streamlit as st
 
 
 DB_PATH = Path(__file__).resolve().parents[1] / "data" / "sensitivity" / "epc_sweden.duckdb"
+
+# Pattern: optional words then digits:digits — matches Swedish cadastral designations like "JÄRNBROTT 758:68"
+_CADASTRAL_RE = re.compile(r'^.+\s+\d+:\d+\s*$')
+
+
+def _is_cadastral_id(addr: str | None, fastbet: str | None = None) -> bool:
+    """Return True when addr is a Swedish cadastral property designation, not a street address."""
+    if not addr:
+        return False
+    addr_s = str(addr).strip()
+    if fastbet and addr_s == str(fastbet).strip():
+        return True
+    return bool(_CADASTRAL_RE.match(addr_s))
+
+
+@st.cache_data(ttl=60 * 60 * 24, show_spinner=False)
+def _reverse_geocode_nominatim(lat: float, lon: float) -> str | None:
+    """Attempt Nominatim reverse geocode; return 'Road HouseNumber' or None on failure."""
+    try:
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={"lat": lat, "lon": lon, "format": "json"},
+            headers={"User-Agent": "project-planning-guide/1.0"},
+            timeout=8,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        parts = data.get("address", {})
+        road = (
+            parts.get("road")
+            or parts.get("pedestrian")
+            or parts.get("footway")
+            or parts.get("path")
+            or ""
+        )
+        house = parts.get("house_number", "")
+        if road:
+            return f"{road} {house}".strip() if house else road
+    except Exception:
+        pass
+    return None
+
+
+def _resolve_sample_addresses(df: Any) -> Any:
+    """Post-process a sample DataFrame: replace cadastral IDs with reverse-geocoded addresses."""
+    if df is None or df.empty:
+        return df
+    if "address" not in df.columns:
+        return df
+    for idx, row in df.iterrows():
+        addr = row.get("address")
+        fastbet = row.get("cadastral_id")
+        if not _is_cadastral_id(addr, fastbet):
+            continue
+        lat = row.get("lat")
+        lon = row.get("lon")
+        if lat is not None and lon is not None:
+            resolved = _reverse_geocode_nominatim(float(lat), float(lon))
+            df.at[idx, "address"] = resolved if resolved else f"(property in {row.get('post_town', '?')})"
+        else:
+            df.at[idx, "address"] = f"(property in {row.get('post_town', '?')})"
+    return df
 
 
 def _connect_duckdb():
@@ -113,6 +176,7 @@ def get_nearby_epc_snapshot(
                 n.lon,
                 n.distance_m,
                 e.IdAdr AS address,
+                e.IdFastBet AS cadastral_id,
                 e.IdPostort AS post_town,
                 e.IdKommun AS municipality,
                 e.EgiEnergiklass AS energy_class,
@@ -166,7 +230,10 @@ def get_nearby_epc_snapshot(
             query_nearby_cte
             + """
             SELECT
+                n.lat,
+                n.lon,
                 e.IdAdr AS address,
+                e.IdFastBet AS cadastral_id,
                 e.IdPostort AS post_town,
                 e.IdKommun AS municipality,
                 e.EgiEnergiklass AS energy_class,
@@ -195,6 +262,9 @@ def get_nearby_epc_snapshot(
         "has_atemp": int(summary[7] or 0),
         "radius_m": int(radius_m),
     }
+
+    _resolve_sample_addresses(sample_df)
+    sample_df.drop(columns=[c for c in ("lat", "lon", "cadastral_id") if c in sample_df.columns], inplace=True)
 
     return {
         "summary": summary_dict,
@@ -240,6 +310,7 @@ def get_epc_snapshot_for_bbox(
                 b.lat,
                 b.lon,
                 e.IdAdr AS address,
+                e.IdFastBet AS cadastral_id,
                 e.IdPostort AS post_town,
                 e.IdKommun AS municipality,
                 e.EgiEnergiklass AS energy_class,
@@ -290,7 +361,10 @@ def get_epc_snapshot_for_bbox(
             query_bbox_cte
             + """
             SELECT
+                b.lat,
+                b.lon,
                 e.IdAdr AS address,
+                e.IdFastBet AS cadastral_id,
                 e.IdPostort AS post_town,
                 e.IdKommun AS municipality,
                 e.EgiEnergiklass AS energy_class,
@@ -321,6 +395,9 @@ def get_epc_snapshot_for_bbox(
             "max_lon": float(hi_lon),
         },
     }
+
+    _resolve_sample_addresses(sample_df)
+    sample_df.drop(columns=[c for c in ("lat", "lon", "cadastral_id") if c in sample_df.columns], inplace=True)
 
     return {
         "summary": summary_dict,

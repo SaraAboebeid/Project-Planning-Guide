@@ -31,7 +31,7 @@ export default function LandingPage() {
               Project Planning Guide
             </h1>
             <p className="mt-2.5 text-white/75 text-[15px] leading-relaxed">
-              Data Fidelity Navigator - Early Stage decision insights
+              Data Fidelity Navigator - Early Stage Decision Insights
             </p>
           </div>
 

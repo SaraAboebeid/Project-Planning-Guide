@@ -55,6 +55,18 @@ def _is_missing(value):
     return value is None or text in {"", "<na>", "nan", "none"}
 
 
+import re as _re
+_CADASTRAL_RE = _re.compile(r'^.+\s+\d+:\d+\s*$')
+
+def _is_cadastral_label(addr, cadastral_id=None):
+    """Return True when addr is a Swedish cadastral designation, not a street address."""
+    if not addr:
+        return False
+    addr_s = str(addr).strip()
+    if cadastral_id and addr_s == str(cadastral_id).strip():
+        return True
+    return bool(_CADASTRAL_RE.match(addr_s))
+
 def _display_value(value, suffix: str = ""):
     if _is_missing(value):
         return "—"
@@ -1612,7 +1624,13 @@ if project_type == "Renovation Planning":
                 points_with_id = linked_points_df.copy()
                 points_with_id["_label"] = points_with_id.apply(
                     lambda r: (
-                        (r["address"] if isinstance(r.get("address"), str) and r.get("address") else "Address unavailable")
+                        (
+                            r["address"]
+                            if isinstance(r.get("address"), str)
+                            and r.get("address")
+                            and not _is_cadastral_label(r.get("address"), r.get("cadastral_id"))
+                            else "Address unavailable"
+                        )
                         + (f" · EPC {_display_value(r.get('energy_class'))}" if not _is_missing(r.get("energy_class")) else "")
                     ),
                     axis=1,
@@ -2284,7 +2302,13 @@ if not _is_reno_mode:
                 if not points_with_id.empty:
                     points_with_id["_label"] = points_with_id.apply(
                         lambda r: (
-                            (r["address"] if isinstance(r.get("address"), str) and r.get("address") else "Address unavailable")
+                            (
+                                r["address"]
+                                if isinstance(r.get("address"), str)
+                                and r.get("address")
+                                and not _is_cadastral_label(r.get("address"), r.get("cadastral_id"))
+                                else "Address unavailable"
+                            )
                             + (f" · {r['municipality']}" if isinstance(r.get("municipality"), str) and r.get("municipality") else "")
                             + (f" · EPC {_display_value(r.get('energy_class'))}" if not _is_missing(r.get("energy_class")) else "")
                         ),

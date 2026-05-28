@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronUp, MapPin, Layers, Database, Check, X,
   Building2, Globe2, Download,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+
 
 /* ─────────────────────────────────────────────
    Types
@@ -690,7 +690,7 @@ function buildingFieldDisplay(b: BuildingLookup, bKey: BKey): string | null {
   return String(v);
 }
 function buildingShortName(b: BuildingLookup, idx: number): string {
-  if (b.address) return formatAddress(b.address.split(",")[0] ?? b.address);
+  if (b.address && !isCadastralId(b.address)) return formatAddress(b.address.split(",")[0] ?? b.address);
   return `Building ${idx + 1}`;
 }
 
@@ -732,6 +732,47 @@ const EUBUCCO_LABELS: Partial<Record<BKey, { label: string; unit?: string }>> = 
   has_epc:       { label: "EPC" },
   energy:        { label: "energy use",       unit: "kWh/m²" },
 };
+
+/** Maps BuildingLookup (BKey) field names → BuildingRecord field names for coverage checks */
+const BKEY_TO_RECORD_FIELD: Partial<Record<string, keyof BuildingRecord>> = {
+  footprint_m2:  "footprint_m2",
+  height:        "height_m",
+  floors:        "floors",
+  use_cat:       "building_use",
+  tabula_period: "tabula_period",
+  has_epc:       "has_epc",
+  energy:        "energy_kwh_m2",
+  eclass:        "epc_class",
+  tabula_u_wall: "u_wall",
+  tabula_u_win:  "u_window",
+  year:          "year_built",
+};
+
+/** Compute coverage for a parameter key over a set of BuildingRecord rows */
+function coverageFor(
+  itemKey: string,
+  rows: BuildingRecord[],
+): { count: number; total: number } | null {
+  if (!rows.length) return null;
+  const bKey = FIELD_MAP[itemKey] as string | undefined;
+  if (!bKey) return null;
+  const recKey = BKEY_TO_RECORD_FIELD[bKey];
+  if (!recKey) return null;
+  const count = rows.filter(r => {
+    const v = r[recKey];
+    return v !== null && v !== undefined && v !== false;
+  }).length;
+  return { count, total: rows.length };
+}
+
+/** Derive Status from coverage percentage */
+function statusFromCoverage(count: number, total: number): Status {
+  if (total === 0) return "Missing";
+  const pct = count / total;
+  if (pct >= 0.75) return "Available";
+  if (pct > 0)     return "Estimated";
+  return "Missing";
+}
 
 function eubuccoSourceText(key: string, building: BuildingLookup | null): string | null {
   if (!building) return null;
@@ -793,16 +834,6 @@ const COMPARE_COLS: {
   { key: "boplats_avg_rent_per_m2_sek", label: "Rent/m²",     unit: "SEK",         asc: true,  betterLabel: "lower = cheaper"},
 ];
 
-function barFill(rank: number, total: number): string {
-  if (total <= 1) return "#8b5cf6";
-  const pos = rank / (total - 1);
-  if (pos <= 0.20) return "#10b981";
-  if (pos <= 0.45) return "#86efac";
-  if (pos >= 0.80) return "#ef4444";
-  if (pos >= 0.55) return "#fbbf24";
-  return "#c4b5fd";
-}
-
 /** Convert Swedish cadastral IDs like "JÄRNBROTT 134:3" → "Järnbrott 134:3" */
 function formatAddress(addr: string | null | undefined): string {
   if (!addr) return "—";
@@ -815,6 +846,14 @@ function formatAddress(addr: string | null | undefined): string {
     }
   }
   return addr;
+}
+
+/** Return true when addr is a Swedish cadastral property designation, not a street address. */
+function isCadastralId(addr: string | null | undefined, cadastralId?: string | null): boolean {
+  if (!addr) return false;
+  const s = addr.trim();
+  if (cadastralId && s === cadastralId.trim()) return true;
+  return /^.+\s+\d+:\d+\s*$/.test(s);
 }
 
 function sortByCol(a: BuildingRecord, b: BuildingRecord, colKey: keyof BuildingRecord, asc: boolean): number {
@@ -842,9 +881,13 @@ function rankBgColor(rank: number, total: number): string {
 function BboxDataBanner({
   bboxStats,
   bbox,
+  onRowsChange,
+  onSelectionChange,
 }: {
   bboxStats: BboxStats;
   bbox: { north: number; south: number; east: number; west: number } | null;
+  onRowsChange?: (rows: BuildingRecord[]) => void;
+  onSelectionChange?: (selected: Set<number>) => void;
 }) {
   const epcPct = Math.round((bboxStats.with_epc / bboxStats.count) * 100);
   const [loading, setLoading]         = useState(false);
@@ -855,6 +898,10 @@ function BboxDataBanner({
   const [compareOpen, setCompareOpen] = useState(false);
   const [sortCol, setSortCol]         = useState<keyof BuildingRecord>("energy_kwh_m2");
   const PAGE_SIZE = 50;
+
+  // Notify parent whenever rows or selection changes
+  useEffect(() => { onRowsChange?.(rows ?? []); }, [rows, onRowsChange]);
+  useEffect(() => { onSelectionChange?.(selected); }, [selected, onSelectionChange]);
 
   async function loadRows() {
     if (!bbox) return;
@@ -1056,23 +1103,6 @@ function BboxDataBanner({
             <span className="ml-auto text-gray-400">
               Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)} of {rows.length}
             </span>
-            {selected.size > 0 && (
-              <>
-                <button
-                  onClick={() => { setCompareOpen(v => !v); }}
-                  className="px-2.5 py-0.5 rounded-full bg-violet-600 text-white text-[10px] font-semibold hover:bg-violet-700 transition"
-                >
-                  Compare {selected.size}
-                </button>
-                <button
-                  onClick={() => { setSelected(new Set()); setCompareOpen(false); }}
-                  className="text-gray-400 hover:text-red-500 transition text-[10px]"
-                  title="Clear selection"
-                >
-                  ✕ Clear
-                </button>
-              </>
-            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-[10px] border-collapse">
@@ -1126,7 +1156,7 @@ function BboxDataBanner({
                             ? isBoplats ? "bg-amber-50 text-amber-900" : "bg-emerald-50/60 text-gray-800"
                             : "bg-red-50/40 text-gray-400";
                         const display = c.key === "address"
-                          ? formatAddress(val as string)
+                          ? (isCadastralId(val as string, r.cadastral_id) ? "—" : formatAddress(val as string))
                           : present ? String(val) : "—";
                         return (
                           <td key={c.key} className={`px-2 py-1 ${cell} whitespace-nowrap`}>
@@ -1154,6 +1184,24 @@ function BboxDataBanner({
                 disabled={page === totalPages - 1}
                 className="px-2 py-0.5 rounded border border-blue-200 disabled:opacity-30 hover:bg-blue-100"
               >Next →</button>
+            </div>
+          )}
+          {/* Compare / Clear — shown after table rows */}
+          {selected.size > 0 && (
+            <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-blue-100">
+              <button
+                onClick={() => { setCompareOpen(v => !v); }}
+                className="px-2.5 py-0.5 rounded-full bg-violet-600 text-white text-[10px] font-semibold hover:bg-violet-700 transition"
+              >
+                Compare {selected.size}
+              </button>
+              <button
+                onClick={() => { setSelected(new Set()); setCompareOpen(false); }}
+                className="text-gray-400 hover:text-red-500 transition text-[10px]"
+                title="Clear selection"
+              >
+                ✕ Clear
+              </button>
             </div>
           )}
         </div>
@@ -1231,9 +1279,9 @@ function BboxDataBanner({
                   const rowBg  = rankBgColor(rank, rankedRows.length);
                   return (
                     <tr key={i} className={`border-b border-violet-100/60 ${rowBg}`}>
-                      <td className="px-2 py-1.5 font-medium whitespace-nowrap max-w-[220px]" title={formatAddress(r.address)}>
+                      <td className="px-2 py-1.5 font-medium whitespace-nowrap max-w-[220px]" title={isCadastralId(r.address, r.cadastral_id) ? (r.cadastral_id ?? "—") : formatAddress(r.address)}>
                         <span className="mr-1 text-sm">{medal}</span>
-                        <span className="truncate">{formatAddress(r.address)}</span>
+                        <span className="truncate">{isCadastralId(r.address, r.cadastral_id) ? "—" : formatAddress(r.address)}</span>
                       </td>
                       {COMPARE_COLS.map(c => {
                         const val      = r[c.key];
@@ -1255,55 +1303,6 @@ function BboxDataBanner({
             </table>
           </div>
 
-          {/* Charts */}
-          <div className="px-4 pt-3 pb-1 border-t border-violet-100 bg-violet-50/30">
-            <div className="text-[11px] font-semibold text-violet-900 mb-2">Category charts <span className="font-normal text-gray-400 ml-1">(green = best, red = worst)</span></div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              {COMPARE_COLS.map(c => {
-                const colData = [...selectedRows]
-                  .map(({ r }) => ({
-                    name: formatAddress((r.address ?? "?").split(/[, ]/)[0]),
-                    rawVal: c.key === "epc_class"
-                      ? (r.epc_class ? (EPC_ORDER[r.epc_class.toUpperCase()] ?? null) : null)
-                      : (r[c.key] as number | null),
-                    display: r[c.key] != null ? String(r[c.key]) : null,
-                    address: formatAddress(r.address) ?? "",
-                  }))
-                  .filter(d => d.rawVal != null)
-                  .sort((a, b) => c.asc ? a.rawVal! - b.rawVal! : b.rawVal! - a.rawVal!);
-                if (!colData.length) return null;
-                const chartData = colData.map((d, rank) => ({ ...d, rank, total: colData.length }));
-                const xDomain: [number | string, number | string] =
-                  c.key === "year_built" ? [1800, "auto"] : [0, "auto"];
-                return (
-                  <div key={c.key} className="bg-white rounded-lg border border-violet-100 p-2.5">
-                    <div className="text-[10px] font-semibold text-violet-700">
-                      {c.label}{c.unit ? ` (${c.unit})` : ""}
-                    </div>
-                    <div className="text-[9px] text-gray-400 italic mb-1">{c.betterLabel}</div>
-                    <ResponsiveContainer width="100%" height={Math.max(52, chartData.length * 22)}>
-                      <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                        <XAxis type="number" domain={xDomain} tick={{ fontSize: 8 }} tickCount={4} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 8 }} width={68} />
-                        <Tooltip
-                          formatter={(_v: unknown, _n: unknown, props: { payload?: { display?: string } }) =>
-                            [props.payload?.display ?? "—", `${c.label}${c.unit ? ` (${c.unit})` : ""}`]
-                          }
-                          contentStyle={{ fontSize: 10, padding: "2px 8px" }}
-                          labelFormatter={(label: string) => label}
-                        />
-                        <Bar dataKey="rawVal" radius={[0, 3, 3, 0]}>
-                          {chartData.map((d, idx) => (
-                            <Cell key={idx} fill={barFill(d.rank, d.total)} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </div>
       )}
     </div>
@@ -1376,7 +1375,7 @@ function BuildingDataBanner({
             <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span>
           )}
         </div>
-        {building.address && <span className="text-[10px] text-purple-700 truncate max-w-[200px]">{formatAddress(building.address)}</span>}
+        {building.address && !isCadastralId(building.address) && <span className="text-[10px] text-purple-700 truncate max-w-[200px]">{formatAddress(building.address)}</span>}
       </div>
 
       {/* Fields grid */}
@@ -1453,7 +1452,7 @@ function MultiBuildingDataBanner({
           <div key={i} className="flex items-start gap-2 px-3 py-2">
             <span className="text-[10px] text-slate-400 font-mono mt-0.5 w-4 flex-shrink-0">{i + 1}</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-slate-700 truncate">{formatAddress(b.address) ?? "EUBUCCO building"}</div>
+              <div className="text-xs font-medium text-slate-700 truncate">{isCadastralId(b.address) ? "EUBUCCO building" : (formatAddress(b.address) ?? "EUBUCCO building")}</div>
               <div className="flex flex-wrap gap-x-3 mt-0.5 text-[10px] text-slate-500">
                 {b.use_cat    && <span>{b.use_cat}</span>}
                 {b.year       && <span>Built {b.year}</span>}
@@ -1499,6 +1498,27 @@ export default function DataCoverage() {
     () => buildDefs(project.projectType, project.systemsInScope, project.ecEnergyFocus ?? []),
     [project.projectType, project.systemsInScope, project.ecEnergyFocus],
   );
+
+  // Bbox table rows + selection (lifted from BboxDataBanner)
+  const [bboxRows, setBboxRows]               = useState<BuildingRecord[]>([]);
+  const [bboxSelectedIdx, setBboxSelectedIdx] = useState<Set<number>>(new Set());
+
+  // Active rows for coverage: selected ones if any, otherwise all bbox rows
+  const activeCovRows = useMemo<BuildingRecord[]>(() => {
+    if (!bboxRows.length) return [];
+    if (bboxSelectedIdx.size > 0) return bboxRows.filter((_, i) => bboxSelectedIdx.has(i));
+    return bboxRows;
+  }, [bboxRows, bboxSelectedIdx]);
+
+  // Per-parameter coverage from activeCovRows
+  const coverageMap = useMemo<Record<string, { count: number; total: number } | null>>(() => {
+    if (!activeCovRows.length) return {};
+    const map: Record<string, { count: number; total: number } | null> = {};
+    defs.forEach(cat => cat.items.forEach(item => {
+      map[item.key] = coverageFor(item.key, activeCovRows);
+    }));
+    return map;
+  }, [activeCovRows, defs]);
 
   /* Per-item "user has this data" state — keyed by item.key */
   const [hasData, setHasData] = useState<Record<string, boolean>>(() => {
@@ -1663,14 +1683,21 @@ export default function DataCoverage() {
       )}
 
       {/* EUBUCCO bbox aggregate banner (bbox draw mode) */}
-      {bboxStats && <BboxDataBanner bboxStats={bboxStats} bbox={project.currentBbox ?? null} />}
+      {bboxStats && (
+        <BboxDataBanner
+          bboxStats={bboxStats}
+          bbox={project.currentBbox ?? null}
+          onRowsChange={setBboxRows}
+          onSelectionChange={setBboxSelectedIdx}
+        />
+      )}
 
       {/* 🔗 Viewer selection — building highlighted in the 3D viewer */}
       {viewerSelection && (
         <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
           <Globe2 className="w-4 h-4 text-violet-400 shrink-0" />
           <div className="flex-1 min-w-0 text-xs">
-            <span className="font-semibold text-gray-800">{formatAddress(viewerSelection.address) || "Unknown address"}</span>
+            <span className="font-semibold text-gray-800">{isCadastralId(viewerSelection.address) ? "No street address" : (formatAddress(viewerSelection.address) || "Unknown address")}</span>
             <span className="text-gray-300 mx-2">|</span>
             <span className="text-gray-500 space-x-3">
               {viewerSelection.use_cat && <span>{viewerSelection.use_cat}</span>}
@@ -1790,11 +1817,18 @@ export default function DataCoverage() {
               {isExpanded && (
                 <div className="border-t border-slate-100">
                   {/* Column headers */}
-                  <div className="grid grid-cols-[36px_1fr_140px_180px_110px_130px] gap-x-3 px-5 py-2 bg-slate-50 border-b border-slate-100">
+                  <div className="grid grid-cols-[36px_1fr_140px_180px_90px_110px_110px] gap-x-3 px-5 py-2 bg-slate-50 border-b border-slate-100">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Have?</span>
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Parameter</span>
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Status</span>
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Source</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      {activeCovRows.length > 0
+                        ? bboxSelectedIdx.size > 0
+                          ? `Coverage (${bboxSelectedIdx.size} sel.)`
+                          : `Coverage (${activeCovRows.length})`
+                        : "Coverage"}
+                    </span>
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Confidence</span>
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Action Required</span>
                   </div>
@@ -1822,11 +1856,18 @@ export default function DataCoverage() {
                     const isBreakdownOpen = expandedBreakdownRows.has(item.key);
                     const epcFields = ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year"];
 
+                    /* Coverage from active bbox rows */
+                    const covInfo = coverageMap[item.key] ?? null;
+                    const covStatus: Status | null = covInfo
+                      ? statusFromCoverage(covInfo.count, covInfo.total)
+                      : null;
+                    const effectiveSc = covStatus ? STATUS_CFG[covStatus] : sc;
+
                     return (
                       <div key={item.key}>
                         {/* Main grid row */}
                         <div
-                          className={`grid grid-cols-[36px_1fr_140px_180px_110px_130px] gap-x-3 items-center px-5 py-3 transition-colors ${sc.rowAccent} ${
+                          className={`grid grid-cols-[36px_1fr_140px_180px_90px_110px_110px] gap-x-3 items-center px-5 py-3 transition-colors ${effectiveSc.rowAccent} ${
                             idx < visibleItems.length - 1 && !isBreakdownOpen ? "border-b border-slate-100" : ""
                           } ${!item.hasData ? "opacity-80" : ""}`}
                         >
@@ -1862,7 +1903,7 @@ export default function DataCoverage() {
                                         return <span className="text-sky-600 font-medium">🏛 WWR database — avg {savedWWR.average_wwr}% · saved {saved}</span>;
                                       }
                                       const bbText = bboxSourceText(item.key, bboxStats);
-                                      if (bbText) return <span className="text-blue-600 font-medium">🗃 {bbText}</span>;
+                                      if (bbText && cat.category !== "Building Information") return <span className="text-blue-600 font-medium">🗃 {bbText}</span>;
                                       if (isMulti && rowBKey) {
                                         if (isPartial) return (
                                           <button
@@ -1907,9 +1948,9 @@ export default function DataCoverage() {
                           </div>
 
                           {/* Status pill */}
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold w-fit ${sc.pillBg} ${sc.pillBorder} ${sc.pillText}`}>
-                            {sc.icon}
-                            {item.status}
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold w-fit ${effectiveSc.pillBg} ${effectiveSc.pillBorder} ${effectiveSc.pillText}`}>
+                            {effectiveSc.icon}
+                            {covStatus ?? item.status}
                           </span>
 
                           {/* Source (short) */}
@@ -1919,7 +1960,7 @@ export default function DataCoverage() {
                                   if (item.key === "r_matlist") return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
                                   if (savedWWR && WWR_KEYS.includes(item.key))
                                     return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">WWR DB</span>;
-                                  if (bboxSourceText(item.key, bboxStats))
+                                  if (bboxSourceText(item.key, bboxStats) && cat.category !== "Building Information")
                                     return <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold border border-blue-200">EUBUCCO</span>;
                                   if (isMulti && rowBKey) {
                                     if (isPartial) return (
@@ -1965,6 +2006,38 @@ export default function DataCoverage() {
                                 })()
                             }
                           </span>
+
+                          {/* Coverage cell */}
+                          <div className="flex flex-col gap-0.5">
+                            {covInfo ? (
+                              <>
+                                <div className="flex items-center gap-1">
+                                  <div className="w-14 h-1.5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+                                    <div
+                                      className={`h-full rounded-full ${
+                                        covStatus === "Available" ? "bg-emerald-500"
+                                        : covStatus === "Estimated" ? "bg-amber-400"
+                                        : "bg-red-400"
+                                      }`}
+                                      style={{ width: `${Math.round((covInfo.count / covInfo.total) * 100)}%` }}
+                                    />
+                                  </div>
+                                  <span className={`text-[10px] font-bold ${
+                                    covStatus === "Available" ? "text-emerald-700"
+                                    : covStatus === "Estimated" ? "text-amber-700"
+                                    : "text-red-600"
+                                  }`}>
+                                    {Math.round((covInfo.count / covInfo.total) * 100)}%
+                                  </span>
+                                </div>
+                                <span className="text-[9px] text-slate-400">
+                                  {covInfo.count}/{covInfo.total} bldgs
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-slate-300">—</span>
+                            )}
+                          </div>
 
                           {/* Confidence mini-bar */}
                           <div className="flex items-center gap-1.5">

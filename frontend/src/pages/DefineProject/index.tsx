@@ -223,7 +223,6 @@ export default function DefineProject() {
                               && (pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0);
   const showKpis           = showExploration && project.explorationApproaches.length > 0;
   const showScale          = showKpis && project.selectedKpis.length > 0;
-  const showBuildingUses   = project.scale === "Neighborhood";
   const showCountry        = showScale && !!project.scale;
   const showProjectName    = showCountry && !!project.country;
   const showLocation       = showProjectName;
@@ -242,9 +241,6 @@ export default function DefineProject() {
     ["Exploration",        project.explorationApproaches.length > 0],
     ["KPIs",              project.selectedKpis.length > 0],
     ["Scale",             !!project.scale],
-    ...(project.scale === "Neighborhood"
-      ? [["Building uses", project.buildingUses.length > 0] as [string, boolean]]
-      : []),
     ["Country",           !!project.country],
     ["Project name",      !!project.projectName.trim()],
     ["Location",          !!project.address.trim()],
@@ -618,50 +614,6 @@ export default function DefineProject() {
           ))}
         </div>
       </Card>}
-
-      {/* ── BUILDING USES (Neighborhood) ── */}
-      {showBuildingUses && (
-        <Card className="animate-fadeIn">
-          <div className="flex items-center justify-between mb-2">
-            <Label>Building Uses Included</Label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setProject({ buildingUses: [...BUILDING_USES] })}
-                className="text-xs text-teal hover:underline"
-              >
-                Select all
-              </button>
-              <button
-                onClick={() => setProject({ buildingUses: [] })}
-                className="text-xs text-gray-400 hover:underline"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {BUILDING_USES.map((use) => (
-              <label
-                key={use}
-                className="flex items-center gap-2 text-sm cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={project.buildingUses.includes(use)}
-                  onChange={() => toggleBuildingUse(use)}
-                  className="rounded border-gray-300 text-teal focus:ring-teal"
-                />
-                {use}
-              </label>
-            ))}
-          </div>
-          {project.buildingUses.length > 0 && (
-            <p className="text-xs text-teal mt-2">
-              {project.buildingUses.length} building type(s) selected
-            </p>
-          )}
-        </Card>
-      )}
 
       {/* ── COUNTRY ── */}
       {showCountry && <Card className="animate-fadeIn">
