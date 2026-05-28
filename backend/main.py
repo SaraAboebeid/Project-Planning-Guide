@@ -240,6 +240,20 @@ def _derive_u_values(use_cat: str | None, period: str | None) -> tuple[float | N
     return pair
 
 
+def _period_from_year(year) -> str | None:
+    """Map a construction year to a TABULA period bucket."""
+    try:
+        y = int(year)
+    except (TypeError, ValueError):
+        return None
+    if y <= 1960:    return "...1960"
+    if y <= 1975:    return "1961-1975"
+    if y <= 1985:    return "1976-1985"
+    if y <= 1995:    return "1986-1995"
+    if y <= 2005:    return "1996-2005"
+    return "post-2005"
+
+
 def _polygon_centroid(coords: list) -> tuple[float, float]:
     ring = coords[0] if coords else []
     if not ring:
@@ -341,9 +355,10 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
     # U-values: use stored value if available, otherwise derive from TABULA/BBR table
     u_wall = best.get("tabula_u_wall")
     u_win  = best.get("tabula_u_win")
+    period = best.get("tabula_period") or _period_from_year(best.get("year"))
     if u_wall is None or u_win is None:
         derived_u_wall, derived_u_win = _derive_u_values(
-            best.get("use_cat"), best.get("tabula_period")
+            best.get("use_cat"), period
         )
         if u_wall is None:
             u_wall = derived_u_wall
@@ -360,7 +375,7 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
         "year":          _clean(best.get("year")),
         "energy":        _clean(best.get("energy")),    # kWh/m²/yr
         "eclass":        best.get("eclass"),
-        "tabula_period": best.get("tabula_period"),
+        "tabula_period": period,
         "tabula_u_wall": _clean(u_wall),
         "tabula_u_win":  _clean(u_win),
         "has_epc":       bool(best.get("has_epc")),
@@ -495,6 +510,17 @@ def buildings_bbox_list(
             clean = [v for v in vals if v is not None]
             return round(sum(clean) / len(clean), 1) if clean else None
 
+        # Derive TABULA period from year when missing, then derive U-values
+        period = b.get("tabula_period") or _period_from_year(b.get("year"))
+        u_wall = b.get("tabula_u_wall")
+        u_win  = b.get("tabula_u_win")
+        if u_wall is None or u_win is None:
+            d_w, d_v = _derive_u_values(b.get("use_cat"), period)
+            if u_wall is None:
+                u_wall = d_w
+            if u_win is None:
+                u_win = d_v
+
         result.append({
             "address":              addr,
             "cadastral_id":         addr if addr and _CADASTRAL_RE.match(addr.strip()) else None,
@@ -508,10 +534,10 @@ def buildings_bbox_list(
             "energy_kwh_m2":        b.get("energy"),
             "epc_class":            b.get("eclass"),
             "has_epc":              b.get("has_epc"),
-            "tabula_period":        b.get("tabula_period"),
-            "u_wall":               b.get("tabula_u_wall"),
+            "tabula_period":        period,
+            "u_wall":               u_wall,
             "u_roof":               b.get("tabula_u_roof"),
-            "u_window":             b.get("tabula_u_win"),
+            "u_window":             u_win,
             "boplats_listings":     len(bp) if bp else None,
             "boplats_avg_rent_sek": _avg([r["rent_sek"] for r in bp]),
             "boplats_avg_rent_per_m2_sek": _avg([r["rent_per_m2"] for r in bp]),
@@ -524,7 +550,7 @@ def buildings_bbox_list(
         return bool(_CADASTRAL_RE.match(addr.strip()))
 
     needs = [(i, row["lat"], row["lon"]) for i, row in enumerate(result) if _needs_geocode(row["address"])]
-    needs = needs[:40]  # cap to keep response time bounded
+    needs = needs[:120]  # cap to keep response time bounded
 
     if needs:
         def _geocode_one(lat: float, lon: float) -> str | None:
@@ -606,6 +632,7 @@ def buildings_bbox_list(
             for field in (
                 "year_built", "energy_kwh_m2", "epc_class", "has_epc",
                 "tabula_period", "u_wall", "u_roof", "u_window",
+                "building_use",
                 "boplats_listings", "boplats_avg_rent_sek",
                 "boplats_avg_rent_per_m2_sek",
             ):
@@ -615,7 +642,80 @@ def buildings_bbox_list(
                         if v not in (None, False):
                             primary[field] = v
                             break
+        # Re-derive period + U-values on the merged row in case the primary's
+        # raw EUBUCCO record had use_cat=komplement (which yields None U-values)
+        # but a sibling provides the real residential use.
+        if not primary.get("tabula_period"):
+            primary["tabula_period"] = _period_from_year(primary.get("year_built"))
+        if primary.get("u_wall") is None or primary.get("u_window") is None:
+            d_w, d_v = _derive_u_values(primary.get("building_use"), primary.get("tabula_period"))
+            if primary.get("u_wall") is None:
+                primary["u_wall"] = d_w
+            if primary.get("u_window") is None:
+                primary["u_window"] = d_v
         deduped.append(primary)
+
+    # ── Spatial sibling pass ────────────────────────────────────────────────
+    # Some EUBUCCO geometries have no address and no per-geometry year/EPC even
+    # though a building <40 m away (same property complex) is fully populated.
+    # For each row missing data, find the nearest fully-populated residential
+    # neighbor and inherit address (if blank), year, period, U-values and EPC.
+    _RESIDENTIAL = {"bostad_enfamilj", "bostad_flerfamilj"}
+    rich_neighbors = [
+        r for r in deduped
+        if r.get("year_built") is not None
+        and r.get("building_use") in _RESIDENTIAL
+        and r.get("address")
+        and not _CADASTRAL_RE.match((r.get("address") or "").strip())
+    ]
+    def _street_key(addr: str | None) -> str | None:
+        if not addr: return None
+        s = addr.strip().lower()
+        if _CADASTRAL_RE.match(s): return None
+        # strip trailing house number (e.g. "Mandolingatan 80" -> "mandolingatan")
+        m = re.match(r"^([^0-9,]+)", s)
+        return m.group(1).strip() if m else None
+
+    for row in deduped:
+        # skip if already complete
+        if row.get("year_built") is not None and row.get("address") and not _CADASTRAL_RE.match(row["address"].strip()):
+            continue
+        my_street = _street_key(row.get("address"))
+        nearest = None
+        nearest_d = 9e9
+        for n in rich_neighbors:
+            if n is row:
+                continue
+            d = _haversine_m(row["lat"], row["lon"], n["lat"], n["lon"])
+            # accept up to 40 m for any neighbor, or up to 120 m if same street
+            n_street = _street_key(n.get("address"))
+            limit = 120 if (my_street and n_street and my_street == n_street) else 40
+            if d <= limit and d < nearest_d:
+                nearest_d, nearest = d, n
+        if nearest is None:
+            continue
+        # Always inherit address if ours is empty/cadastral
+        if not row.get("address") or _CADASTRAL_RE.match((row.get("address") or "").strip()):
+            row["address"] = nearest["address"]
+            row["cadastral_id"] = None
+        # Only inherit data fields when the row itself is residential — we don't
+        # want to claim a komplement/samhalle has the neighbor's EPC.
+        if row.get("building_use") in _RESIDENTIAL:
+            # Year, TABULA period and derived U-values: safe to inherit from a
+            # nearby/same-street neighbor (same construction era). EPC and
+            # energy are property-specific and are NOT inherited spatially.
+            for field in ("year_built", "tabula_period", "u_wall", "u_roof", "u_window"):
+                if row.get(field) in (None, False) and nearest.get(field) not in (None, False):
+                    row[field] = nearest[field]
+            # Re-derive period + U-values if still missing
+            if not row.get("tabula_period"):
+                row["tabula_period"] = _period_from_year(row.get("year_built"))
+            if row.get("u_wall") is None or row.get("u_window") is None:
+                d_w, d_v = _derive_u_values(row.get("building_use"), row.get("tabula_period"))
+                if row.get("u_wall") is None:
+                    row["u_wall"] = d_w
+                if row.get("u_window") is None:
+                    row["u_window"] = d_v
 
     return deduped
 
