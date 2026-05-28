@@ -8,11 +8,10 @@ import { generateReport } from "../utils/reportGenerator";
 import type { ReportComputedValues } from "../utils/reportGenerator";
 import {
   Calendar, DollarSign,
-  ChevronDown, ChevronUp, Package, Leaf, Info, Download,
+  ChevronDown, ChevronUp, Leaf, Info, Download,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
 } from "recharts";
 
 import { getDeliverableSections, CROSS_CUTTING } from "../config/deliverables";
@@ -154,36 +153,6 @@ export default function ResultsBudget() {
   const overheadCost   = Math.round(baseLaborCost * 0.30);
   const serviceCost    = baseLaborCost + lkpCost + overheadCost;
 
-  const [capex, setCapex] = useState({
-    construction: Math.round(packageCostSEK),
-    design: 0,
-    permits: 0,
-    equipment: 0,
-  });
-  /* Keep construction in sync when package selection changes */
-  useMemo(() => {
-    setCapex(prev => ({ ...prev, construction: Math.round(packageCostSEK) }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [packageCostSEK]);
-
-  const [contingencyPct, setContingencyPct] = useState(10);
-  const capexBase  = Object.values(capex).reduce((a, b) => a + b, 0);
-  const capexTotal = Math.round(capexBase * (1 + contingencyPct / 100));
-
-  const [opex, setOpex] = useState({ energy: 0, maintenance: 0, staffing: 0, other: 0 });
-  const opexTotal = Object.values(opex).reduce((a, b) => a + b, 0);
-
-  const pieData = useMemo(() => {
-    const contingencyAmt = capexTotal - capexBase;
-    return [
-      { name: "Construction",  value: capex.construction },
-      { name: "Design",        value: capex.design },
-      { name: "Permits",       value: capex.permits },
-      { name: "Equipment",     value: capex.equipment },
-      { name: "Contingency",   value: contingencyAmt },
-    ].filter(d => d.value > 0);
-  }, [capex, capexTotal, capexBase]);
-
   /* ─── Create Report ─── */
   function handleCreateReport() {
     const computed: ReportComputedValues = {
@@ -194,11 +163,6 @@ export default function ResultsBudget() {
       lkpCost,
       overheadCost,
       serviceCost,
-      capex,
-      contingencyPct,
-      capexBase,
-      capexTotal,
-      opex,
       timelineRows,
       delivSections,
       packageTotals: packageTotals.map(t => ({
@@ -387,11 +351,9 @@ export default function ResultsBudget() {
       <Section title="Budget & Cost" icon={<DollarSign className="w-5 h-5 text-[#3a6e1a]" />}>
 
         {/* Top summary */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-1 gap-3 mb-4">
           {[
             { v: `${fmtNum(serviceCost)} ${currency}`, l: "Service Cost",  c: "text-[#721CB8]", bg: "bg-[#721CB8]/8" },
-            { v: `${fmtNum(capexTotal)} ${currency}`,  l: "CAPEX Total",   c: "text-[#995BD5]", bg: "bg-[#995BD5]/10" },
-            { v: `${fmtNum(opexTotal)} ${currency}`,   l: "Annual OPEX",   c: "text-[#509724]", bg: "bg-[#96D74C]/20" },
           ].map(s => (
             <div key={s.l} className={`rounded-xl border border-slate-200 px-3 py-2.5 text-center ${s.bg}`}>
               <div className={`text-lg font-bold ${s.c}`}>{s.v}</div>
@@ -448,72 +410,6 @@ export default function ResultsBudget() {
             </tbody>
           </table>
         </div>
-
-        {/* CAPEX */}
-        <div className="space-y-3 mb-4">
-          <h4 className="font-semibold text-xs text-slate-700 uppercase tracking-wider">CAPEX</h4>
-          {isRenovation && packageCostSEK > 0 && (
-            <div className="rounded-xl bg-violet-50 border border-violet-200 px-3 py-2 text-xs text-violet-800 flex items-center gap-2">
-              <Package className="w-3.5 h-3.5 flex-shrink-0" />
-              Construction pre-filled from <strong>{selectedPkg?.pkg.name}</strong>
-              ({(packageCostSEK / 1000).toFixed(0)} kSEK material cost)
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            {([ ["construction", "Construction"], ["design", "Design & Engineering"],
-                 ["permits", "Permits & Approvals"], ["equipment", "Equipment & Materials"],
-              ] as const).map(([key, label]) => (
-              <div key={key}>
-                <label className="block text-xs text-slate-600 mb-1">{label}</label>
-                <input
-                  type="number" min={0} value={capex[key]}
-                  onChange={e => setCapex(prev => ({ ...prev, [key]: Number(e.target.value) }))}
-                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm"
-                />
-              </div>
-            ))}
-          </div>
-          <div>
-            <label className="block text-xs text-slate-600 mb-1">Contingency: {contingencyPct}%</label>
-            <input
-              type="range" min={0} max={30} value={contingencyPct}
-              onChange={e => setContingencyPct(Number(e.target.value))}
-              className="w-full accent-[#995BD5]"
-            />
-          </div>
-        </div>
-
-        {/* OPEX */}
-        <div className="space-y-3 mb-4">
-          <h4 className="font-semibold text-xs text-slate-700 uppercase tracking-wider">Annual OPEX</h4>
-          <div className="grid grid-cols-2 gap-3">
-            {([ ["energy", "Energy & Utilities"], ["maintenance", "Maintenance"],
-                 ["staffing", "Staffing"], ["other", "Other"],
-              ] as const).map(([key, label]) => (
-              <div key={key}>
-                <label className="block text-xs text-slate-600 mb-1">{label}</label>
-                <input
-                  type="number" min={0} value={opex[key]}
-                  onChange={e => setOpex(prev => ({ ...prev, [key]: Number(e.target.value) }))}
-                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Pie chart */}
-        {pieData.length > 0 && (
-          <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label>
-                {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-              </Pie>
-              <Tooltip formatter={(v: number) => [`${fmtNum(v)} ${currency}`, ""]} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        )}
       </Section>
 
       {/* Navigation */}

@@ -5,14 +5,14 @@ export type Deliverable = [string, string];
 export const DELIVERABLES: Record<string, Deliverable[]> = {
   "Building Condition": [
     ["Building Condition Assessment", "Current state of fabric, systems, and services"],
-    ["Energy Performance Baseline",   "Current EUI and carbon intensity"],
+    ["Energy Performance Baseline",   "Calibrated UBEM of heating demand and carbon intensity"],
     ["EPC / Certification Impact",    "Predicted rating improvement"],
   ],
   "Retrofit Measures": [
     ["Retrofit Measure Catalog",    "Prioritized list of improvement interventions"],
     ["Energy Savings Potential",    "kWh and % reduction per measure"],
     ["Carbon Reduction Pathway",    "kgCO₂e savings per intervention"],
-    ["Cost-Benefit Analysis",       "CAPEX, payback, NPV per measure"],
+    ["Cost-Benefit Analysis",       "Capex and return on investment"],
     ["Embodied Carbon of Retrofit", "kgCO₂e from new materials and works"],
   ],
   "Building Geometry": [
@@ -44,7 +44,7 @@ export const DELIVERABLES: Record<string, Deliverable[]> = {
 };
 
 export const CROSS_CUTTING: Deliverable[] = [
-  ["Executive Summary",         "High-level findings and recommendations for decision-makers"],
+  ["Executive Summary",        "Findings and recommendations"],
   ["Limitations & Assumptions", "Methodology caveats, data gaps, and proxy impacts"],
   ["Methodology Statement",     "Tools, standards, and data sources used"],
 ];
@@ -56,7 +56,6 @@ export function getDeliverableSections(
   const sys = new Set(systems);
   if (projectType === "Renovation Planning") {
     return [
-      ["Building Condition", DELIVERABLES["Building Condition"]!],
       ["Retrofit Measures",  DELIVERABLES["Retrofit Measures"]!],
     ];
   }

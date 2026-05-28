@@ -518,6 +518,12 @@ export default function RenovationPackages() {
         systemsInScope={project.systemsInScope}
       />
 
+      {/* Navigation */}
+      <div className="flex justify-between pt-2">
+        <button onClick={() => navigate("/step/3")} className="ppg-btn-secondary">← Back</button>
+        <button onClick={() => navigate("/step/5")} className="ppg-btn-primary">Continue →</button>
+      </div>
+
       {/* ── Extension parameters ── */}
       <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 space-y-4">
         <div className="flex items-center gap-2">
@@ -858,12 +864,6 @@ export default function RenovationPackages() {
           Add a second package to enable side-by-side comparison.
         </div>
       )}
-
-      {/* Navigation */}
-      <div className="flex justify-between pt-2 pb-8">
-        <button onClick={() => navigate("/step/3")} className="ppg-btn-secondary">← Back</button>
-        <button onClick={() => navigate("/step/5")} className="ppg-btn-primary">Continue →</button>
-      </div>
     </div>
   );
 }

@@ -1020,8 +1020,8 @@ function BboxDataBanner({
   }
 
   // Build ranked compare list
-  const cfg         = COMPARE_COLS.find(c => c.key === sortCol) ?? COMPARE_COLS[0];
-  const selectedRows = rows ? [...selected].map(i => ({ i, r: rows[i] })).filter(x => x.r) : [];
+  const cfg         = (COMPARE_COLS.find(c => c.key === sortCol) ?? COMPARE_COLS[0])!;
+  const selectedRows = rows ? [...selected].map(i => ({ i, r: rows[i] })).filter((x): x is { i: number; r: BuildingRecord } => x.r !== undefined) : [];
   const rankedRows   = [...selectedRows].sort((a, b) => sortByCol(a.r, b.r, sortCol, cfg.asc));
 
   return (

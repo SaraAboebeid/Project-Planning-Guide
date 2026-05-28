@@ -24,7 +24,7 @@ export default function BuildingMapPanel() {
           </span>
           <div>
             <p className="text-sm font-semibold text-navy leading-tight">
-              Gothenburg Building Stock &mdash; 3D Explorer
+              Gothenburg 3D Explorer
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
               {buildingPoints.length > 0

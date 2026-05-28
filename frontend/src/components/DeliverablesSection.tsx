@@ -82,14 +82,14 @@ export default function DeliverablesSection({ projectType, systemsInScope }: Pro
           );
         })}
 
-        {/* Cross-cutting */}
+        {/* Report */}
         <div className="rounded-xl border border-slate-200 overflow-hidden">
           <button
             onClick={() => setCrossOpen(o => !o)}
             className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition text-left"
           >
             <span className="font-semibold text-xs text-slate-700">
-              Cross-Cutting{" "}
+              Report{" "}
               <span className="text-slate-400 font-normal">({CROSS_CUTTING.length})</span>
             </span>
             {crossOpen

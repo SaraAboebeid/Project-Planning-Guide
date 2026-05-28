@@ -1,4 +1,5 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import WizardLayout from "./components/WizardLayout";
 import LandingPage from "./pages/LandingPage";
 import DefineProject from "./pages/DefineProject";
@@ -6,6 +7,12 @@ import DataCoverage from "./pages/DataCoverage";
 import DataAssumptions from "./pages/DataAssumptions";
 import Scenarios from "./pages/Scenarios";
 import ResultsBudget from "./pages/ResultsBudget";
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
 
 /**
  * 5-step wizard — generic schema for all 3 project tracks:
@@ -17,7 +24,9 @@ import ResultsBudget from "./pages/ResultsBudget";
  */
 export default function App() {
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route element={<WizardLayout />}>
         <Route path="/step/1" element={<DefineProject />} />
@@ -26,6 +35,7 @@ export default function App() {
         <Route path="/step/4" element={<Scenarios />} />
         <Route path="/step/5" element={<ResultsBudget />} />
       </Route>
-    </Routes>
+      </Routes>
+    </>
   );
 }
