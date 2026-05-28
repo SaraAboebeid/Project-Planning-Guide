@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import RenovationPackages from "./RenovationPackages";
+import DeliverablesSection from "../components/DeliverablesSection";
 import { Layers, Zap, Wind } from "lucide-react";
 
 /* ── Placeholder card for tracks not yet built ── */
@@ -9,20 +10,28 @@ function ComingSoon({
   title,
   description,
   bullets,
+  projectType,
+  systemsInScope,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   bullets: string[];
+  projectType: string | null;
+  systemsInScope: string[];
 }) {
   const navigate = useNavigate();
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-800">Step 4 – Scenarios</h2>
+        <h2 className="text-xl font-bold text-slate-800">Step 4 – Deliverables</h2>
         <p className="text-sm text-slate-500 mt-1">{description}</p>
       </div>
 
+      {/* Expected deliverables */}
+      <DeliverablesSection projectType={projectType} systemsInScope={systemsInScope} />
+
+      {/* Coming-soon calculator placeholder */}
       <div className="rounded-2xl border-2 border-dashed border-slate-200 p-10 text-center space-y-4">
         <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
           {icon}
@@ -68,6 +77,8 @@ export default function Scenarios() {
         icon={<Zap className="w-6 h-6 text-sky-500" />}
         title="Community Energy Scenarios"
         description="Model and compare shared energy community configurations."
+        projectType={project.projectType}
+        systemsInScope={project.systemsInScope}
         bullets={[
           "PV + battery system sizing for the community",
           "Self-consumption ratio and grid export profiles",
@@ -85,6 +96,8 @@ export default function Scenarios() {
         icon={<Wind className="w-6 h-6 text-emerald-500" />}
         title="Generation Scenarios"
         description="Size and compare renewable generation configurations."
+        projectType={project.projectType}
+        systemsInScope={project.systemsInScope}
         bullets={[
           "System sizing options (kWp / kW)",
           "Annual energy yield per scenario",

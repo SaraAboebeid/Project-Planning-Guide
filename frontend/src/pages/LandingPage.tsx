@@ -5,8 +5,8 @@ const STEPS_PREVIEW = [
   { label: "Define Project", desc: "Project type, scope, KPIs & location" },
   { label: "Building & Site Data", desc: "Review EPC, TABULA and input coverage" },
   { label: "Data Overview", desc: "Review model confidence, sensitivity and references" },
-  { label: "Scenarios", desc: "Build and compare scenario packages" },
-  { label: "Results & Budget", desc: "Deliverables, timeline and cost" },
+  { label: "Deliverables", desc: "Review expected deliverables" },
+  { label: "Timeline & Cost", desc: "Timeline and cost estimate" },
 ];
 
 export default function LandingPage() {

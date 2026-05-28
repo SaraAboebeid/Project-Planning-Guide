@@ -106,7 +106,6 @@ export const ENVELOPE_COMPONENTS = [
   "Floor",
   "Roof",
   "Balcony",
-  "Insulation",
   "Vertical Extension (New Floor)",
 ];
 

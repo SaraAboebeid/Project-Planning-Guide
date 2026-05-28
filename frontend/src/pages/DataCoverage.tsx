@@ -1296,12 +1296,11 @@ function BboxDataBanner({
               </thead>
               <tbody>
                 {rankedRows.map(({ i, r }, rank) => {
-                  const medal  = rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : `${rank + 1}`;
                   const rowBg  = rankBgColor(rank, rankedRows.length);
                   return (
                     <tr key={i} className={`border-b border-violet-100/60 ${rowBg}`}>
                       <td className="px-2 py-1.5 font-medium whitespace-nowrap max-w-[220px]" title={isCadastralId(r.address, r.cadastral_id) ? (r.cadastral_id ?? "—") : formatAddress(r.address)}>
-                        <span className="mr-1 text-sm">{medal}</span>
+                        <span className="mr-1.5 text-xs text-slate-400">{rank + 1}</span>
                         <span className="truncate">{isCadastralId(r.address, r.cadastral_id) ? "—" : formatAddress(r.address)}</span>
                       </td>
                       {COMPARE_COLS.map(c => {
@@ -1523,6 +1522,9 @@ export default function DataCoverage() {
   // Bbox table rows + selection (lifted from BboxDataBanner)
   const [bboxRows, setBboxRows]               = useState<BuildingRecord[]>([]);
   const [bboxSelectedIdx, setBboxSelectedIdx] = useState<Set<number>>(new Set());
+
+  // Persist bbox rows to wizard store so the report can access them
+  useEffect(() => { setProject({ bboxRows }); }, [bboxRows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Active rows for coverage: selected ones if any, otherwise all bbox rows
   const activeCovRows = useMemo<BuildingRecord[]>(() => {

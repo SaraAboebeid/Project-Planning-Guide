@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { ProjectType, BuildingDevelopmentType } from "../config/projectConfig";
-import type { BuildingLookup, BboxStats, WWRRecord } from "../types";
+import type { BuildingLookup, BboxStats, WWRRecord, BuildingRecord } from "../types";
 
 /* ── Pipeline definitions ── */
 
@@ -14,8 +14,8 @@ const STEPS: StepDef[] = [
   { number: 1, label: "Define Project",      path: "/step/1" },
   { number: 2, label: "Building & Site Data", path: "/step/2" },
   { number: 3, label: "Data Overview",       path: "/step/3" },
-  { number: 4, label: "Scenarios",           path: "/step/4" },
-  { number: 5, label: "Results & Budget",    path: "/step/5" },
+  { number: 4, label: "Deliverables", path: "/step/4" },
+  { number: 5, label: "Timeline & Cost",    path: "/step/5" },
 ];
 
 /* ── Renovation package types ── */
@@ -73,6 +73,8 @@ interface ProjectState {
   savedWWR: WWRRecord | null;
   /* raw bbox coords from the map draw (north/south/east/west) */
   currentBbox: { north: number; south: number; east: number; west: number } | null;
+  /* all bbox building rows loaded in step 2 */
+  bboxRows: BuildingRecord[];
   /* renovation packages built in step 4 */
   renovationPackages: RenovationPackage[];
   selectedPackageId: string | null;
@@ -117,6 +119,7 @@ const DEFAULT_PROJECT: ProjectState = {
   lookedUpBuildings: [],
   bboxStats: null,
   currentBbox: null,
+  bboxRows: [],
   savedWWR: null,
   renovationPackages: [],
   selectedPackageId: null,

@@ -4,93 +4,18 @@ import { useWizardStore } from "../store/wizard";
 import { WIKELLS_CARBON_MAP } from "../config/wikellsCarbonMapping";
 import { WIKELLS_CHAPTERS } from "../config/wikellsData";
 import type { WikellsItem } from "../config/wikellsData";
+import { generateReport } from "../utils/reportGenerator";
+import type { ReportComputedValues } from "../utils/reportGenerator";
 import {
-  FileText, Layers, ShieldCheck, Calendar, DollarSign,
-  ChevronDown, ChevronUp, Package, Leaf, Info,
+  Calendar, DollarSign,
+  ChevronDown, ChevronUp, Package, Leaf, Info, Download,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 
-/* ─── deliverables catalog ─────────────────────────────────────── */
-type Deliverable = [string, string];
-
-const DELIVERABLES: Record<string, Deliverable[]> = {
-  "Building Condition": [
-    ["Building Condition Assessment", "Current state of fabric, systems, and services"],
-    ["Energy Performance Baseline", "Current EUI and carbon intensity"],
-    ["EPC / Certification Impact", "Predicted rating improvement"],
-  ],
-  "Retrofit Measures": [
-    ["Retrofit Measure Catalog", "Prioritized list of improvement interventions"],
-    ["Energy Savings Potential", "kWh and % reduction per measure"],
-    ["Carbon Reduction Pathway", "kgCO₂e savings per intervention"],
-    ["Cost-Benefit Analysis", "CAPEX, payback, NPV per measure"],
-    ["Embodied Carbon of Retrofit", "kgCO₂e from new materials and works"],
-  ],
-  "Building Geometry": [
-    ["Building Footprint & Orientation", "Floor area, height, cardinal orientation"],
-    ["Roof / Façade Area Assessment", "Available surface area for solar installations"],
-  ],
-  "Energy Demand": [
-    ["Annual Electricity Consumption", "Total kWh per year per building"],
-    ["Annual Heating Demand", "Thermal energy demand (kWh)"],
-    ["Monthly / Hourly Load Profiles", "Demand curves for sizing and simulation"],
-  ],
-  "PV System": [
-    ["Incident Radiation Analysis", "Annual & seasonal solar irradiance maps (kWh/m²)"],
-    ["Optimal PV Panel Placement & Coverage %", "Best tilt, azimuth, and usable area"],
-    ["Energy Yield Estimate", "Annual PV production (kWh/yr)"],
-    ["Self-Consumption Ratio", "Share of PV output consumed on-site"],
-    ["ROI / Payback Period", "Return on investment and simple payback (years)"],
-    ["LCOE", "Levelized cost of energy over system lifetime"],
-  ],
-  "Site & Climate": [
-    ["Wind & Solar Resource Assessment", "Irradiance / wind speed characterization"],
-    ["Shading Analysis", "Impact of obstacles on energy yield"],
-  ],
-  "System Design": [
-    ["Capacity & Layout Optimization", "Sizing and placement of generation assets"],
-    ["Annual Energy Production", "Expected kWh/yr from the designed system"],
-    ["Financial Analysis", "ROI, payback period, LCOE over system lifetime"],
-  ],
-};
-
-const CROSS_CUTTING: Deliverable[] = [
-  ["Executive Summary", "High-level findings and recommendations for decision-makers"],
-  ["Limitations & Assumptions", "Methodology caveats, data gaps, and proxy impacts"],
-  ["Methodology Statement", "Tools, standards, and data sources used"],
-];
-
-function getDeliverableSections(
-  projectType: string | null,
-  systems: string[]
-): [string, Deliverable[]][] {
-  const sys = new Set(systems);
-  if (projectType === "Renovation Planning") {
-    return [
-      ["Building Condition", DELIVERABLES["Building Condition"]!],
-      ["Retrofit Measures",  DELIVERABLES["Retrofit Measures"]!],
-    ];
-  }
-  if (projectType === "Energy Community Planning") {
-    const sects: [string, Deliverable[]][] = [
-      ["Building Geometry", DELIVERABLES["Building Geometry"]!],
-      ["Energy Demand",     DELIVERABLES["Energy Demand"]!],
-    ];
-    if (sys.has("Rooftop PV") || sys.has("Community PV") || sys.has("Facade PV"))
-      sects.push(["PV System", DELIVERABLES["PV System"]!]);
-    return sects;
-  }
-  if (projectType === "Renewable Energy Planning") {
-    return [
-      ["Site & Climate", DELIVERABLES["Site & Climate"]!],
-      ["System Design",  DELIVERABLES["System Design"]!],
-    ];
-  }
-  return [];
-}
+import { getDeliverableSections, CROSS_CUTTING } from "../config/deliverables";
 
 /* ─── timeline constants ────────────────────────────────────────── */
 const EFFORT_BASE: Record<string, number> = {
@@ -190,18 +115,12 @@ export default function ResultsBudget() {
   const selectedPkg   = packageTotals.find(t => t.pkg.id === selectedPkgId);
   const packageCostSEK = selectedPkg?.costSEK ?? 0;
 
-  /* ─── Deliverables ─── */
+  /* ─── Deliverables count (for stat strip + report) ─── */
   const delivSections = useMemo(
     () => getDeliverableSections(project.projectType, project.systemsInScope),
     [project.projectType, project.systemsInScope]
   );
   const totalDelivs = delivSections.reduce((s, [, items]) => s + items.length, 0) + CROSS_CUTTING.length;
-  const [openSects, setOpenSects] = useState<Set<string>>(
-    () => new Set(delivSections.map(([t]) => t))
-  );
-  const toggleSect = (k: string) =>
-    setOpenSects(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; });
-  const [crossOpen, setCrossOpen] = useState(false);
 
   /* ─── Timeline ─── */
   const baseHours  = EFFORT_BASE[project.projectType ?? ""] ?? 60;
@@ -230,7 +149,10 @@ export default function ResultsBudget() {
   /* ─── Budget ─── */
   const [currency, setCurrency]   = useState("SEK");
   const [rate, setRate]           = useState<number>(CONSULTANT_RATES.SEK!);
-  const serviceCost = Math.round(userTotalHours * rate * 1.1);
+  const baseLaborCost  = Math.round(userTotalHours * rate);
+  const lkpCost        = Math.round(baseLaborCost * 0.575);
+  const overheadCost   = Math.round(baseLaborCost * 0.30);
+  const serviceCost    = baseLaborCost + lkpCost + overheadCost;
 
   const [capex, setCapex] = useState({
     construction: Math.round(packageCostSEK),
@@ -262,12 +184,69 @@ export default function ResultsBudget() {
     ].filter(d => d.value > 0);
   }, [capex, capexTotal, capexBase]);
 
+  /* ─── Create Report ─── */
+  function handleCreateReport() {
+    const computed: ReportComputedValues = {
+      totalHours: userTotalHours,
+      userWeeks,
+      currency,
+      baseLaborCost,
+      lkpCost,
+      overheadCost,
+      serviceCost,
+      capex,
+      contingencyPct,
+      capexBase,
+      capexTotal,
+      opex,
+      timelineRows,
+      delivSections,
+      packageTotals: packageTotals.map(t => ({
+        name: t.pkg.name,
+        color: t.pkg.color,
+        costSEK: t.costSEK,
+        carbonKg: t.carbonKg,
+        carbonEstimated: t.carbonEstimated,
+        selections: t.pkg.selections,
+      })),
+      selectedPackageId: selectedPkgId,
+    };
+    const html = generateReport({
+      projectName:                   project.projectName,
+      projectType:                   project.projectType,
+      buildingDevelopmentType:       project.buildingDevelopmentType,
+      country:                       project.country,
+      scale:                         project.scale,
+      systemsInScope:                project.systemsInScope,
+      selectedKpis:                  project.selectedKpis,
+      explorationApproaches:         project.explorationApproaches,
+      buildingUses:                  project.buildingUses,
+      renovationEnvelopeComponents:  project.renovationEnvelopeComponents,
+      address:                       project.address,
+      locationLabel:                 project.locationLabel,
+      lat:                           project.lat,
+      lon:                           project.lon,
+      radiusM:                       project.radiusM,
+      lookedUpBuilding:              project.lookedUpBuilding,
+      bboxStats:                     project.bboxStats,
+      dataInputs:                    project.dataInputs,
+      savedWWR:                      project.savedWWR,
+      bboxRows:                      project.bboxRows ?? [],
+    }, computed);
+
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    }
+  }
+
   /* ═══════════════════ RENDER ═══════════════════ */
   return (
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-slate-800">Step 5 – Results & Budget</h2>
+        <h2 className="text-xl font-bold text-slate-800">Step 5 – Timeline & Cost</h2>
         <p className="text-sm text-slate-500 mt-1">
           Review your expected deliverables, project timeline, and cost estimate.
         </p>
@@ -288,7 +267,7 @@ export default function ResultsBudget() {
         ))}
       </div>
 
-      {/* ── 1. Package selector (Renovation only) ── */}
+      {/* ── Package selector (Renovation only) ── */}
       {isRenovation && packages.length > 0 && (
         <Section title="Selected Renovation Package" icon={<Package className="w-5 h-5 text-violet-600" />}>
           <p className="text-xs text-slate-500 mb-3">
@@ -325,79 +304,7 @@ export default function ResultsBudget() {
         </Section>
       )}
 
-      {/* ── 2. Deliverables ── */}
-      <Section title="Expected Deliverables" icon={<FileText className="w-5 h-5 text-[#721CB8]" />}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-          {[
-            { v: totalDelivs,         l: "Report Items",    c: "text-[#721CB8]" },
-            { v: delivSections.length, l: "Sections",       c: "text-[#995BD5]" },
-            { v: CROSS_CUTTING.length, l: "Cross-cutting",  c: "text-[#509724]" },
-          ].map(s => (
-            <div key={s.l} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5 text-center">
-              <div className={`text-xl font-bold ${s.c}`}>{s.v}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider">{s.l}</div>
-            </div>
-          ))}
-        </div>
-
-        {delivSections.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-slate-400 text-sm">
-            No deliverables mapped yet — complete Step 1 to see your report scope.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {delivSections.map(([title, items]) => {
-              const open = openSects.has(title);
-              return (
-                <div key={title} className="rounded-xl border border-slate-200 overflow-hidden">
-                  <button
-                    onClick={() => toggleSect(title)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition text-left"
-                  >
-                    <span className="font-semibold text-xs text-slate-700">
-                      {title} <span className="text-slate-400 font-normal">({items.length})</span>
-                    </span>
-                    {open ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-                  </button>
-                  {open && (
-                    <div className="px-4 pb-3 space-y-1.5">
-                      {items.map(([name, desc]) => (
-                        <div key={name} className="pl-3 py-1.5 rounded-lg bg-slate-50 border-l-[3px] border-[#995BD5]">
-                          <div className="text-xs font-semibold text-slate-800">{name}</div>
-                          <div className="text-[11px] text-slate-500">{desc}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            <div className="rounded-xl border border-slate-200 overflow-hidden">
-              <button
-                onClick={() => setCrossOpen(o => !o)}
-                className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition text-left"
-              >
-                <span className="font-semibold text-xs text-slate-700">
-                  Cross-Cutting <span className="text-slate-400 font-normal">({CROSS_CUTTING.length})</span>
-                </span>
-                {crossOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-              </button>
-              {crossOpen && (
-                <div className="px-4 pb-3 space-y-1.5">
-                  {CROSS_CUTTING.map(([name, desc]) => (
-                    <div key={name} className="pl-3 py-1.5 rounded-lg bg-slate-50 border-l-[3px] border-slate-300">
-                      <div className="text-xs font-semibold text-slate-800">{name}</div>
-                      <div className="text-[11px] text-slate-500">{desc}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </Section>
-
-      {/* ── 3. Timeline ── */}
+      {/* ── Timeline ── */}
       <Section title="Project Timeline" icon={<Calendar className="w-5 h-5 text-[#995BD5]" />}>
         <div className="flex flex-wrap gap-4 mb-4">
           <div>
@@ -476,7 +383,7 @@ export default function ResultsBudget() {
         </div>
       </Section>
 
-      {/* ── 4. Budget ── */}
+      {/* ── Budget ── */}
       <Section title="Budget & Cost" icon={<DollarSign className="w-5 h-5 text-[#3a6e1a]" />}>
 
         {/* Top summary */}
@@ -513,6 +420,33 @@ export default function ResultsBudget() {
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
             />
           </div>
+        </div>
+
+        {/* Service cost breakdown */}
+        <div className="rounded-xl border border-slate-200 overflow-hidden mb-4">
+          <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+            <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Service Cost Breakdown</span>
+          </div>
+          <table className="w-full text-xs">
+            <tbody>
+              <tr className="border-b border-slate-100">
+                <td className="px-4 py-2 text-slate-600">Base Labour ({fmtNum(userTotalHours)} hrs × {fmtNum(rate)} {currency})</td>
+                <td className="px-4 py-2 text-right tabular-nums font-medium text-slate-800">{fmtNum(baseLaborCost)} {currency}</td>
+              </tr>
+              <tr className="border-b border-slate-100">
+                <td className="px-4 py-2 text-slate-600">LKP — Employer Social Charges (57.5%)</td>
+                <td className="px-4 py-2 text-right tabular-nums font-medium text-slate-800">{fmtNum(lkpCost)} {currency}</td>
+              </tr>
+              <tr className="border-b border-slate-100">
+                <td className="px-4 py-2 text-slate-600">Overhead (30%)</td>
+                <td className="px-4 py-2 text-right tabular-nums font-medium text-slate-800">{fmtNum(overheadCost)} {currency}</td>
+              </tr>
+              <tr className="bg-slate-50">
+                <td className="px-4 py-2.5 font-semibold text-slate-800">Total Service Cost</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-bold text-[#721CB8]">{fmtNum(serviceCost)} {currency}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         {/* CAPEX */}
@@ -585,12 +519,21 @@ export default function ResultsBudget() {
       {/* Navigation */}
       <div className="flex justify-between pt-2 pb-8">
         <button onClick={() => navigate("/step/4")} className="ppg-btn-secondary">← Back</button>
-        <button
-          onClick={() => window.print()}
-          className="ppg-btn-primary"
-        >
-          Export / Print
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={handleCreateReport}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#721CB8] text-white font-semibold text-sm shadow hover:bg-[#5c16a0] transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Create Report
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="ppg-btn-secondary"
+          >
+            Export / Print
+          </button>
+        </div>
       </div>
     </div>
   );

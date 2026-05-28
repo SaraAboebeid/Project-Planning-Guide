@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationPackage } from "../store/wizard";
 import { WIKELLS_CHAPTERS, type WikellsItem, type WikellsSubGroup } from "../config/wikellsData";
 import { WIKELLS_CARBON_MAP } from "../config/wikellsCarbonMapping";
+import DeliverablesSection from "../components/DeliverablesSection";
 import {
   Plus, Trash2, Copy, Package, Leaf, DollarSign,
   ChevronDown, ChevronUp, Building2, Info, CheckCircle2,
@@ -505,11 +506,17 @@ export default function RenovationPackages() {
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-slate-800">Step 4 – Renovation Packages</h2>
+        <h2 className="text-xl font-bold text-slate-800">Step 4 – Deliverables</h2>
         <p className="text-sm text-slate-500 mt-1">
-          Configure the vertical extension, review areas per building, then assemble and compare up to 4 renovation packages.
+          Review the expected deliverables for your project, then configure renovation packages with cost and carbon estimates.
         </p>
       </div>
+
+      {/* Deliverables */}
+      <DeliverablesSection
+        projectType={project.projectType}
+        systemsInScope={project.systemsInScope}
+      />
 
       {/* ── Extension parameters ── */}
       <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 space-y-4">
