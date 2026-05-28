@@ -30,9 +30,6 @@ export default function LandingPage() {
             <h1 className="text-[2.4rem] font-extrabold leading-[1.15] tracking-tight">
               Project Planning Guide
             </h1>
-            <p className="mt-2.5 text-white/75 text-[15px] leading-relaxed">
-              Data Fidelity Navigator - Early Stage Decision Insights
-            </p>
           </div>
 
           <div className="flex items-center gap-5 shrink-0">

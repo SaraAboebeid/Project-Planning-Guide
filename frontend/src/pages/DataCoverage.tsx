@@ -140,6 +140,25 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
   if (projectType === "Renovation Planning") {
     const cats: DataCategoryDef[] = [];
 
+    // Energy Performance (EPC) — always shown for Renovation Planning
+    cats.push({
+      category: "Energy Performance (EPC)",
+      items: [
+        {
+          key: "r_epc",  label: "Baseline energy class (EPC)",
+          primarySource: "Energy Performance Certificate (EPC)", primaryConfidence: "High",
+          fallbackSource: "TABULA energy archetype by construction year & type", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+          defaultHas: false,
+        },
+        {
+          key: "r_edem", label: "Specific energy demand (kWh/m²·yr)",
+          primarySource: "Energy Performance Certificate (EPC)", primaryConfidence: "High",
+          fallbackSource: "Boverket average by building type & construction era", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+          defaultHas: false,
+        },
+      ],
+    });
+
     if (sys.has("Building Envelope (Windows, Roof, Walls, Floors)")) {
       cats.push({
         category: "Building Information",
@@ -617,6 +636,8 @@ const FIELD_MAP: Record<string, BKey> = {
   r_flrs:  "floors",
   r_use:   "use_cat",
   r_mat:   "tabula_period",  // TABULA matched → construction type/materials known
+  r_epc:   "eclass",         // EPC energy class (A–G)
+  r_edem:  "energy",         // EPC specific energy demand (kWh/m²·yr)
   // EC – Buildings
   ec_b_fp:    "footprint_m2",
   ec_b_hgt:   "height",

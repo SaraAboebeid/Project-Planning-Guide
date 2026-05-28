@@ -16,7 +16,7 @@ export const PROJECT_TYPE_DESCRIPTIONS: Record<ProjectType, string> = {
   "Energy Community Planning":
     "Plan shared energy systems across multiple entities.",
   "Renovation Planning":
-    "Assess and prioritize renovation strategies for existing buildings.",
+    "Assess and prioritize retrofit strategies for existing buildings across envelope, systems, comfort, and energy performance.",
   "Renewable Energy Planning":
     "Evaluate renewable energy potential.",
 };
