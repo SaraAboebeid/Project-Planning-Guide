@@ -1,0 +1,51 @@
+# Build artifacts & deps
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+**/.venv
+**/venv
+**/env
+
+# VCS / IDE
+.git
+.gitignore
+.vscode
+.idea
+
+# Local env / secrets
+.env
+.env.local
+*.local
+
+# Large data — mounted via docker-compose volumes instead of baked in
+data/eubucco
+data/sensitivity/archive
+data/sensitivity/*.duckdb
+boplats_images
+assets/boplats_images
+assets/Cesium.js
+assets/cesium-widgets.css
+assets/deck.gl.min.js
+assets/globe.gl.min.js
+
+# Streamlit app (not part of the FastAPI image)
+pages
+planning_guide.py
+launch.py
+
+# Repo docs / scratch
+*.md
+!backend/README.md
+_*.py
+_*.js
+tv_test.js
+*.log
+*.bak
+*.tmp
+*.csv
+*.xlsx
+
+# OS
+.DS_Store
+Thumbs.db

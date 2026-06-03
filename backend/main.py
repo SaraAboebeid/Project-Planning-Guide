@@ -1345,6 +1345,182 @@ out body;
     return result
 
 
+# ── Urban Analysis: green areas + streets ────────────────────────────────────
+
+_GREEN_AREA_CACHE: dict = {}
+_UA_STREETS_CACHE: dict = {}
+
+# Full Gothenburg bounding box covering all 92,973 EUBUCCO buildings
+_GBG_FULL = dict(south=57.60, north=57.83, west=11.79, east=12.15)
+
+@app.get("/api/urban/green-areas")
+async def urban_green_areas(
+    south: float = Query(_GBG_FULL["south"]),
+    north: float = Query(_GBG_FULL["north"]),
+    west:  float = Query(_GBG_FULL["west"]),
+    east:  float = Query(_GBG_FULL["east"]),
+):
+    """
+    Return OSM green areas (parks, forests, gardens, meadows) as GeoJSON polygons
+    with pre-computed centroids.  Used by the Urban Analysis overlay layers.
+    Results are cached in memory for the session.
+    """
+    import httpx, math
+
+    key = (round(south, 3), round(north, 3), round(west, 3), round(east, 3))
+    if key in _GREEN_AREA_CACHE:
+        return _GREEN_AREA_CACHE[key]
+
+    OVERPASS_MIRRORS = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://lz4.overpass-api.de/api/interpreter",
+    ]
+    query = f"""
+[out:json][timeout:40];
+(
+  way["leisure"~"^(park|garden|playground|recreation_ground|nature_reserve|sports_centre)$"]
+    ({south},{west},{north},{east});
+  way["landuse"~"^(forest|grass|meadow|allotments|village_green|farmland|orchard|vineyard|greenfield)$"]
+    ({south},{west},{north},{east});
+  way["natural"~"^(wood|scrub|grassland|heath)$"]
+    ({south},{west},{north},{east});
+);
+(._;>;);
+out body;
+"""
+    r = None
+    async with httpx.AsyncClient(timeout=45) as client:
+        for mirror in OVERPASS_MIRRORS:
+            try:
+                r = await client.post(mirror, data={"data": query})
+                if r.status_code == 200:
+                    break
+            except Exception:
+                continue
+    if r is None or r.status_code != 200:
+        raise HTTPException(502, f"Overpass green-areas query failed: {getattr(r, 'status_code', 'no response')}")
+
+    osm = r.json()
+    nodes: dict = {}
+    for elem in osm.get("elements", []):
+        if elem["type"] == "node":
+            nodes[elem["id"]] = [elem["lon"], elem["lat"]]
+
+    features = []
+    for elem in osm.get("elements", []):
+        if elem["type"] != "way":
+            continue
+        coords = [nodes[n] for n in elem.get("nodes", []) if n in nodes]
+        if len(coords) < 4:
+            continue
+        if coords[0] != coords[-1]:
+            coords.append(coords[0])
+        tags = elem.get("tags", {})
+        lons = [c[0] for c in coords]
+        lats = [c[1] for c in coords]
+        cx = sum(lons) / len(lons)
+        cy = sum(lats) / len(lats)
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Polygon", "coordinates": [coords]},
+            "properties": {
+                "name":         tags.get("name", ""),
+                "green_type":   tags.get("leisure") or tags.get("landuse") or tags.get("natural", "green"),
+                "centroid_lon": cx,
+                "centroid_lat": cy,
+            },
+        })
+
+    result = {"type": "FeatureCollection", "features": features, "count": len(features)}
+    _GREEN_AREA_CACHE[key] = result
+    return result
+
+
+@app.get("/api/urban/streets")
+async def urban_streets(
+    south: float = Query(_GBG_FULL["south"]),
+    north: float = Query(_GBG_FULL["north"]),
+    west:  float = Query(_GBG_FULL["west"]),
+    east:  float = Query(_GBG_FULL["east"]),
+):
+    """
+    Return OSM road network (major types only) as GeoJSON LineStrings for the
+    full Gothenburg area.  Used by the Green Index urban analysis layer.
+    """
+    import httpx
+
+    key = (round(south, 3), round(north, 3), round(west, 3), round(east, 3))
+    if key in _UA_STREETS_CACHE:
+        return _UA_STREETS_CACHE[key]
+
+    OVERPASS_MIRRORS = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://lz4.overpass-api.de/api/interpreter",
+    ]
+    query = f"""
+[out:json][timeout:40];
+(
+  way["highway"~"^(primary|secondary|tertiary|residential|living_street|pedestrian|unclassified)$"]
+    ({south},{west},{north},{east});
+);
+(._;>;);
+out body;
+"""
+    r = None
+    async with httpx.AsyncClient(timeout=45) as client:
+        for mirror in OVERPASS_MIRRORS:
+            try:
+                r = await client.post(mirror, data={"data": query})
+                if r.status_code == 200:
+                    break
+            except Exception:
+                continue
+    if r is None or r.status_code != 200:
+        raise HTTPException(502, f"Overpass streets query failed: {getattr(r, 'status_code', 'no response')}")
+
+    osm = r.json()
+    nodes: dict = {}
+    for elem in osm.get("elements", []):
+        if elem["type"] == "node":
+            nodes[elem["id"]] = (elem["lon"], elem["lat"])
+
+    ROAD_CLASS = {
+        "primary": "primary", "secondary": "secondary", "tertiary": "secondary",
+        "residential": "local", "living_street": "local", "unclassified": "local",
+        "pedestrian": "pedestrian",
+    }
+
+    features = []
+    for elem in osm.get("elements", []):
+        if elem["type"] != "way":
+            continue
+        coords = [list(nodes[n]) for n in elem.get("nodes", []) if n in nodes]
+        if len(coords) < 2:
+            continue
+        tags = elem.get("tags", {})
+        hw = tags.get("highway", "unclassified")
+        # Compute midpoint for distance calculations
+        mlon = sum(c[0] for c in coords) / len(coords)
+        mlat = sum(c[1] for c in coords) / len(coords)
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "LineString", "coordinates": coords},
+            "properties": {
+                "highway":    hw,
+                "road_class": ROAD_CLASS.get(hw, "local"),
+                "name":       tags.get("name", ""),
+                "mid_lon":    mlon,
+                "mid_lat":    mlat,
+            },
+        })
+
+    result = {"type": "FeatureCollection", "features": features, "count": len(features)}
+    _UA_STREETS_CACHE[key] = result
+    return result
+
+
 @app.get("/api/vasttrafik/parking/{lot_id}/availability")
 async def vt_parking_availability(lot_id: int):
     """

@@ -1,0 +1,69 @@
+
+<!-- Facade Quality result panel -->
+<div class="panel" id="quality-panel" style="display:none;top:16px;right:16px;width:500px">
+  <button class="close-btn" id="quality-close">&#x2715;</button>
+  <h2>&#127963; FACADE INSPECTOR</h2>
+  
+  <!-- Building header -->
+  <div id="quality-building-header" style="margin-bottom:12px">
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px" id="quality-building-name">Building Name</div>
+    <div style="font-size:10px;color:var(--muted)" id="quality-building-info">Year - Use - Class</div>
+  </div>
+
+  <!-- Facade view boxes (N/E/S/W) -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px" id="quality-facade-boxes">
+    <div style="aspect-ratio:4/3;background:#1a1a2e;border-radius:6px;border:1px solid var(--border);position:relative">
+      <canvas id="quality-canvas-N" width="200" height="150" style="width:100%;height:100%;border-radius:6px"></canvas>
+      <div style="position:absolute;bottom:4px;right:4px;font-size:11px;font-weight:700;color:var(--muted);background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:3px">N</div>
+    </div>
+    <div style="aspect-ratio:4/3;background:#1a1a2e;border-radius:6px;border:1px solid var(--border);position:relative">
+      <canvas id="quality-canvas-E" width="200" height="150" style="width:100%;height:100%;border-radius:6px"></canvas>
+      <div style="position:absolute;bottom:4px;right:4px;font-size:11px;font-weight:700;color:var(--muted);background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:3px">E</div>
+    </div>
+    <div style="aspect-ratio:4/3;background:#1a1a2e;border-radius:6px;border:1px solid var(--border);position:relative">
+      <canvas id="quality-canvas-S" width="200" height="150" style="width:100%;height:100%;border-radius:6px"></canvas>
+      <div style="position:absolute;bottom:4px;right:4px;font-size:11px;font-weight:700;color:var(--muted);background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:3px">S</div>
+    </div>
+    <div style="aspect-ratio:4/3;background:#1a1a2e;border-radius:6px;border:1px solid var(--border);position:relative">
+      <canvas id="quality-canvas-W" width="200" height="150" style="width:100%;height:100%;border-radius:6px"></canvas>
+      <div style="position:absolute;bottom:4px;right:4px;font-size:11px;font-weight:700;color:var(--muted);background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:3px">W</div>
+    </div>
+  </div>
+
+  <!-- Score, Priority, Cost row -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px">
+    <div style="text-align:center">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Avg Score</div>
+      <div style="font-size:20px;font-weight:700;color:#721CB8;line-height:1" id="quality-avg-score">--</div>
+      <div style="font-size:18px;font-weight:700;color:#721CB8;line-height:1">/100</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:9px;color:var--(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Priority</div>
+      <div id="quality-priority-badge" style="font-size:14px;font-weight:700;margin-top:4px">--</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Est. Cost</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-top:4px" id="quality-est-cost">--</div>
+    </div>
+  </div>
+
+  <!-- Per-facade breakdown -->
+  <div id="quality-facades" style="display:none;margin-top:12px">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Per-Facade Scores</div>
+    <div id="quality-facades-rows"></div>
+  </div>
+
+  <!-- Factors breakdown -->
+  <div id="quality-factors" style="margin-top:12px;font-size:10px;display:none">
+    <div style="color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Assessment Factors</div>
+    <div id="quality-factors-list"></div>
+  </div>
+
+  <!-- Compare mode -->
+  <div id="quality-compare" style="margin-top:12px">
+    <button id="btn-compare-buildings" class="btn" style="width:100%;font-size:11px;background:rgba(114,28,184,0.1);border-color:rgba(114,28,184,0.3);color:#721CB8;font-weight:600">
+      &#128202; Compare Buildings
+    </button>
+    <div id="quality-compare-results" style="margin-top:8px;display:none;max-height:240px;overflow-y:auto"></div>
+  </div>
+</div>
