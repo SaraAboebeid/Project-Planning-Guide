@@ -195,7 +195,7 @@ export default function LandingPage() {
              style={{ background: "#0a0d14", borderRight: "1px solid rgba(255,255,255,0.07)" }}>
         {/* Logo mark */}
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#721CB8] to-[#421869] flex items-center justify-center mb-3 shadow-lg">
-          <span className="text-white font-black text-[13px]">P</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         </div>
 
         <NavItem iconPath={IC.home}        label="Home"        active onClick={() => navigate("/")} />
