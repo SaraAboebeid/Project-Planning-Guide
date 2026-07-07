@@ -7,6 +7,7 @@ import DataCoverage from "./pages/DataCoverage";
 import DataAssumptions from "./pages/DataAssumptions";
 import Scenarios from "./pages/Scenarios";
 import ResultsBudget from "./pages/ResultsBudget";
+import DataExplorer from "./pages/DataExplorer";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -28,6 +29,9 @@ export default function App() {
       <ScrollToTop />
       <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/data" element={<WizardLayout />}>
+        <Route index element={<DataExplorer />} />
+      </Route>
       <Route element={<WizardLayout />}>
         <Route path="/step/1" element={<DefineProject />} />
         <Route path="/step/2" element={<DataCoverage />} />

@@ -50,6 +50,108 @@ body {
   box-shadow: 0 4px 14px rgba(66, 24, 105, 0.14);
 }
 
+/* ── Dark shell overrides (wizard-shell context) ── */
+.wizard-shell {
+  color-scheme: dark;
+}
+
+/* Cards */
+.wizard-shell .ppg-card {
+  background: rgba(13, 17, 23, 0.80);
+  border-color: rgba(255, 255, 255, 0.10);
+  color: rgba(255,255,255,0.88);
+  box-shadow: none;
+}
+.wizard-shell .ppg-card:hover {
+  border-color: rgba(114, 28, 184, 0.45);
+  box-shadow: 0 4px 14px rgba(114, 28, 184, 0.15);
+}
+
+/* Backgrounds */
+.wizard-shell .bg-bg,
+.wizard-shell .bg-white,
+.wizard-shell .bg-slate-50,
+.wizard-shell .bg-gray-50 { background: transparent !important; }
+.wizard-shell .bg-slate-100,
+.wizard-shell .bg-gray-100 { background: rgba(255,255,255,0.08) !important; }
+
+/* ── Text colours — all shades made white/light ── */
+.wizard-shell .text-dark,
+.wizard-shell .text-slate-900,
+.wizard-shell .text-slate-800,
+.wizard-shell .text-slate-700,
+.wizard-shell .text-gray-700,
+.wizard-shell .text-gray-800,
+.wizard-shell .text-gray-900 { color: rgba(255,255,255,0.90) !important; }
+
+.wizard-shell .text-slate-600,
+.wizard-shell .text-gray-600 { color: rgba(255,255,255,0.78) !important; }
+
+.wizard-shell .text-slate-500,
+.wizard-shell .text-gray-500,
+.wizard-shell .text-muted    { color: rgba(255,255,255,0.60) !important; }
+
+.wizard-shell .text-slate-400,
+.wizard-shell .text-gray-400,
+.wizard-shell .text-slate-300,
+.wizard-shell .text-gray-300  { color: rgba(255,255,255,0.50) !important; }
+
+/* Badges that use light backgrounds */
+.wizard-shell .bg-slate-100.text-slate-600,
+.wizard-shell span.bg-slate-100 {
+  background: rgba(255,255,255,0.10) !important;
+  color: rgba(255,255,255,0.80) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+}
+.wizard-shell .bg-orange-100 {
+  background: rgba(251,146,60,0.15) !important;
+}
+.wizard-shell .bg-orange-100.text-orange-700,
+.wizard-shell span.bg-orange-100 { color: #fb923c !important; }
+
+/* Borders */
+.wizard-shell .border-gray-200,
+.wizard-shell .border-gray-300,
+.wizard-shell .border-slate-100,
+.wizard-shell .border-slate-200,
+.wizard-shell .border-slate-300 { border-color: rgba(255,255,255,0.12) !important; }
+.wizard-shell hr { border-color: rgba(255,255,255,0.08) !important; }
+
+/* Table cells */
+.wizard-shell td, .wizard-shell th { color: rgba(255,255,255,0.80) !important; }
+.wizard-shell th { color: rgba(255,255,255,0.50) !important; }
+.wizard-shell table { border-color: rgba(255,255,255,0.08) !important; }
+.wizard-shell tr { border-color: rgba(255,255,255,0.06) !important; }
+
+/* Forms */
+.wizard-shell input,
+.wizard-shell select,
+.wizard-shell textarea {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+  color: #fff !important;
+}
+.wizard-shell input::placeholder,
+.wizard-shell textarea::placeholder { color: rgba(255,255,255,0.30) !important; }
+.wizard-shell label { color: rgba(255,255,255,0.82) !important; }
+
+/* Buttons that use light styles */
+.wizard-shell .bg-white.text-gray-600,
+.wizard-shell button.bg-white {
+  background: rgba(255,255,255,0.07) !important;
+  color: rgba(255,255,255,0.82) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+}
+.wizard-shell .ppg-btn-secondary {
+  background: rgba(255,255,255,0.07) !important;
+  color: rgba(255,255,255,0.80) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+}
+
+/* Chevron / icon components */
+.wizard-shell svg.text-slate-400,
+.wizard-shell svg.text-gray-400 { color: rgba(255,255,255,0.40) !important; }
+
 /* ── Primary button ── */
 .ppg-btn-primary {
   display: inline-flex;

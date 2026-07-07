@@ -286,23 +286,103 @@ export default function DefineProject() {
         </div>
 
         <Label required>Project Type</Label>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
-          {PROJECT_TYPES.map((t) => (
-            <button
-              key={t}
-              onClick={() => handleTypeChange(t)}
-              className={`rounded-xl border-2 p-4 text-left transition ${
-                pt === t
-                  ? "border-teal bg-teal/10"
-                  : "border-gray-200 hover:border-gray-300"
-              }`}
-            >
-              <span className="font-semibold text-dark text-sm">{t}</span>
-              <p className="text-xs text-gray-500 mt-1">
-                {PROJECT_TYPE_DESCRIPTIONS[t]}
-              </p>
-            </button>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+          {PROJECT_TYPES.map((t) => {
+            const selected = pt === t;
+            const ICONS: Record<string, React.ReactNode> = {
+              "Energy Community Planning": (
+                <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+                  <rect x="6" y="28" width="10" height="16" rx="1" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
+                  <rect x="21" y="20" width="10" height="24" rx="1" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
+                  <rect x="36" y="24" width="10" height="20" rx="1" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
+                  <path d="M2 44h48" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round"/>
+                  <circle cx="26" cy="10" r="5" stroke="#96D74C" strokeWidth="1.5" fill="none"/>
+                  <path d="M26 5v-3M26 18v-3M17 10h-3M38 10h-3" stroke="#96D74C" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M19.5 7.5l-2-2M34.5 12.5l-2-2M19.5 12.5l-2 2M34.5 7.5l-2 2" stroke="#96D74C" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              ),
+              "Renovation Planning": (
+                <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+                  <rect x="10" y="18" width="32" height="26" rx="1" stroke="#721CB8" strokeWidth="1.5" fill="none"/>
+                  <path d="M6 20L26 6l20 14" stroke="#721CB8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <rect x="20" y="30" width="12" height="14" rx="1" stroke="#721CB8" strokeWidth="1.5" fill="none"/>
+                  <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
+                  <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
+                </svg>
+              ),
+              "Renewable Energy Planning": (
+                <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+                  <path d="M26 8v6M26 38v6M8 26H2M50 26h-6" stroke="#96D74C" strokeWidth="1.5" strokeLinecap="round"/>
+                  <circle cx="26" cy="26" r="10" stroke="#96D74C" strokeWidth="1.5" fill="none"/>
+                  <path d="M32 14c2-4 6-6 8-4s0 6-4 8" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                  <path d="M38 32c4 2 6 6 4 8s-6 0-8-4" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                  <path d="M14 32c-4 2-6 6-4 8s6 0 8-4" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                </svg>
+              ),
+            };
+            return (
+              <button
+                key={t}
+                onClick={() => handleTypeChange(t)}
+                style={{
+                  background: selected ? "rgba(114,28,184,0.12)" : "rgba(13,17,40,0.85)",
+                  border: `2px solid ${selected ? "#721CB8" : "rgba(255,255,255,0.10)"}`,
+                  borderRadius: 16,
+                  padding: "24px 20px",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  position: "relative",
+                  transition: "all 0.18s",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 12,
+                  boxShadow: selected ? "0 0 0 1px #721CB8, 0 4px 20px rgba(114,28,184,0.25)" : "none",
+                }}
+                onMouseEnter={e => {
+                  if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(114,28,184,0.40)";
+                }}
+                onMouseLeave={e => {
+                  if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.10)";
+                }}
+              >
+                {/* Indicator top-right */}
+                <div style={{
+                  position: "absolute", top: 12, right: 12,
+                  width: 22, height: 22, borderRadius: "50%",
+                  border: `2px solid ${selected ? "#721CB8" : "rgba(255,255,255,0.25)"}`,
+                  background: selected ? "#721CB8" : "transparent",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {selected && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                  )}
+                </div>
+
+                {/* Icon */}
+                {ICONS[t]}
+
+                {/* Label + desc */}
+                <div>
+                  <div style={{
+                    fontSize: 14, fontWeight: 700,
+                    color: selected ? "#fff" : "rgba(255,255,255,0.85)",
+                    marginBottom: 8, lineHeight: 1.3,
+                  }}>
+                    {t}
+                  </div>
+                  <p style={{
+                    fontSize: 12, color: "rgba(255,255,255,0.45)",
+                    lineHeight: 1.55, margin: 0,
+                  }}>
+                    {PROJECT_TYPE_DESCRIPTIONS[t]}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </Card>
 
@@ -328,22 +408,105 @@ export default function DefineProject() {
         </Card>
       )}
 
-      {/* ── RENOVATION ENVELOPE COMPONENTS (shown directly, no systems toggle needed) ── */}
+      {/* ── RENOVATION ENVELOPE COMPONENTS ── */}
       {pt === "Renovation Planning" && (
         <Card className="animate-fadeIn">
-          <Label required>Which components are included in the renovation?</Label>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            {ENVELOPE_COMPONENTS.map((comp) => (
-              <label key={comp} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={project.renovationEnvelopeComponents.includes(comp)}
-                  onChange={() => toggleEnvelopeComponent(comp)}
-                  className="rounded border-gray-300 text-teal focus:ring-teal"
-                />
-                {comp}
-              </label>
-            ))}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.90)", marginBottom: 4 }}>
+              Renovation components
+            </div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.40)" }}>
+              Select the building elements included in your assessment.
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+            {(() => {
+              const COMP_META: Record<string, { subtitle?: string; icon: React.ReactNode }> = {
+                "Walls": {
+                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="5" width="22" height="18" rx="1" stroke="currentColor" strokeWidth="1.5"/><line x1="3" y1="11" x2="25" y2="11" stroke="currentColor" strokeWidth="1.5"/><line x1="3" y1="17" x2="25" y2="17" stroke="currentColor" strokeWidth="1.5"/><line x1="10" y1="5" x2="10" y2="11" stroke="currentColor" strokeWidth="1.5"/><line x1="18" y1="11" x2="18" y2="17" stroke="currentColor" strokeWidth="1.5"/><line x1="10" y1="17" x2="10" y2="23" stroke="currentColor" strokeWidth="1.5"/></svg>
+                },
+                "Windows": {
+                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="4" width="20" height="20" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><line x1="14" y1="4" x2="14" y2="24" stroke="currentColor" strokeWidth="1.5"/><line x1="4" y1="14" x2="24" y2="14" stroke="currentColor" strokeWidth="1.5"/></svg>
+                },
+                "Roof": {
+                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M4 14L14 4l10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><rect x="7" y="14" width="14" height="10" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><line x1="14" y1="14" x2="14" y2="24" stroke="currentColor" strokeWidth="1.5"/></svg>
+                },
+                "Floor": {
+                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="8" width="20" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="4" y="14" width="20" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="4" y="20" width="20" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>
+                },
+                "Doors": {
+                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="7" y="4" width="14" height="20" rx="1" stroke="currentColor" strokeWidth="1.5"/><circle cx="18" cy="14" r="1.2" fill="currentColor"/><line x1="7" y1="24" x2="3" y2="24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="21" y1="24" x2="25" y2="24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                },
+                "Structure (Columns & Beams)": {
+                  subtitle: "Columns & Beams",
+                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="5" y="4" width="5" height="20" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="18" y="4" width="5" height="20" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="3" y="6" width="22" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="3" y="19" width="22" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>
+                },
+                "Balcony": {
+                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="12" width="20" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><line x1="8" y1="15" x2="8" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="14" y1="15" x2="14" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="20" y1="15" x2="20" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="4" y1="22" x2="24" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><rect x="8" y="6" width="12" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>
+                },
+                "Vertical Extension (New Floor)": {
+                  subtitle: "New Floor",
+                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="5" y="14" width="18" height="9" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><path d="M5 14l4-5h10l4 5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M14 5v4M11 7l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                },
+              };
+              return ENVELOPE_COMPONENTS.map((comp) => {
+                const meta = COMP_META[comp] ?? { icon: null };
+                const selected = project.renovationEnvelopeComponents.includes(comp);
+                const displayName = meta.subtitle
+                  ? comp.replace(/ \(.*\)/, "")
+                  : comp;
+                return (
+                  <button
+                    key={comp}
+                    onClick={() => toggleEnvelopeComponent(comp)}
+                    style={{
+                      background: selected ? "rgba(78,205,196,0.10)" : "rgba(13,17,40,0.80)",
+                      border: `1.5px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.10)"}`,
+                      borderRadius: 10,
+                      padding: "12px 12px",
+                      cursor: "pointer",
+                      position: "relative",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      textAlign: "left",
+                      transition: "all 0.15s",
+                      color: selected ? "#4ECDC4" : "rgba(255,255,255,0.55)",
+                    }}
+                    onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(78,205,196,0.35)"; }}
+                    onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.10)"; }}
+                  >
+                    {/* Icon */}
+                    <span style={{ flexShrink: 0 }}>{meta.icon}</span>
+                    {/* Text */}
+                    <span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: selected ? "#fff" : "rgba(255,255,255,0.80)", lineHeight: 1.2 }}>
+                        {displayName}
+                      </div>
+                      {meta.subtitle && (
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                          {meta.subtitle}
+                        </div>
+                      )}
+                    </span>
+                    {/* Indicator */}
+                    <div style={{
+                      position: "absolute", top: 8, right: 8,
+                      width: 20, height: 20, borderRadius: "50%",
+                      border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.25)"}`,
+                      background: selected ? "#4ECDC4" : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    }}>
+                      {selected && (
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="#0a0d14">
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                );
+              });
+            })()}
           </div>
         </Card>
       )}
@@ -582,6 +745,7 @@ export default function DefineProject() {
                     ? "bg-green text-white border-green"
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
                 }`}
+                style={{ color: project.selectedKpis.includes(kpi) ? "#fff" : "rgba(255,255,255,0.80)" }}
               >
                 {kpi}
               </button>
