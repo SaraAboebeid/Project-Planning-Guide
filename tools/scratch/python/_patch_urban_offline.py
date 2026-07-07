@@ -133,7 +133,8 @@ JS = """\
     for (const g of proxies) {
       const d = distM(lon, lat, g.lon, g.lat);
       // subtract effective radius so points *inside* the polygon score as 0
-      const r = g.area ? Math.sqrt(g.area / Math.PI) : 0;
+      // cap radius at 400m so large parks don't swallow the whole city
+      const r = g.area ? Math.min(Math.sqrt(g.area / Math.PI), 400) : 0;
       best = Math.min(best, Math.max(0, d - r));
     }
     return best;

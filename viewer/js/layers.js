@@ -18,7 +18,7 @@ function layersInit() {
   // Sync when Google tiles fail / get disabled internally
   document.addEventListener('basemapReset', () => {
     document.querySelectorAll('.base-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn-base-light').classList.add('active');
+    document.getElementById('btn-base-photo').classList.add('active');
   });
 
   // ── Buildings overlay ────────────────────────────────────────────────────

@@ -63,12 +63,12 @@ def poly_area_m2(nodes_map, nd_refs):
 
 
 def fetch_tile(s, w, n, e):
-    """Fetch green area ways for a bbox tile via Overpass."""
+    """Fetch green area ways AND relations for a bbox tile via Overpass."""
     tag_filters = ''.join(
-        f'way["{k}"="{v}"]({s},{w},{n},{e});'
+        f'way["{k}"="{v}"]({s},{w},{n},{e});rel["{k}"="{v}"]({s},{w},{n},{e});'
         for k, v in GREEN_TAGS
     )
-    query = f'[out:xml][timeout:30][maxsize:50000000];({tag_filters});out body;>;out skel qt;'
+    query = f'[out:xml][timeout:45][maxsize:100000000];({tag_filters});out body;>;out skel qt;'
     
     for mirror in OVERPASS_MIRRORS:
         try:
@@ -84,9 +84,10 @@ def fetch_tile(s, w, n, e):
 
 
 def parse_ways(xml_text):
-    """Parse Overpass XML into list of {lat, lon, type, area_m2, name}."""
+    """Parse Overpass XML into list of {lat, lon, type, area_m2, name}.
+    Handles both simple ways and multipolygon relations."""
     root = ET.fromstring(xml_text)
-    
+
     # Build node map: id → (lon, lat)
     nodes = {}
     for node in root.findall('node'):
@@ -94,13 +95,29 @@ def parse_ways(xml_text):
         lat = float(node.get('lat', 0))
         lon = float(node.get('lon', 0))
         nodes[nid] = (lon, lat)
-    
-    results = []
+
+    # Build way map: id → nd_refs  (needed for relation parsing)
+    ways_map = {}
     for way in root.findall('way'):
+        wid = way.get('id')
+        ways_map[wid] = [nd.get('ref') for nd in way.findall('nd')]
+
+    results = []
+
+    # ── Simple ways ──────────────────────────────────────────────────────────
+    # Only include ways that are NOT members of a relation (to avoid double-counting)
+    rel_way_ids = set()
+    for rel in root.findall('relation'):
+        for member in rel.findall('member'):
+            if member.get('type') == 'way':
+                rel_way_ids.add(member.get('ref'))
+
+    for way in root.findall('way'):
+        wid = way.get('id')
+        if wid in rel_way_ids:
+            continue  # will be covered by the relation
         tags = {t.get('k'): t.get('v') for t in way.findall('tag')}
-        nd_refs = [nd.get('ref') for nd in way.findall('nd')]
-        
-        # Determine green type
+        nd_refs = ways_map.get(wid, [])
         gtype = None
         for k, v in GREEN_TAGS:
             if tags.get(k) == v:
@@ -108,22 +125,52 @@ def parse_ways(xml_text):
                 break
         if gtype is None:
             continue
-        
         ctr = poly_centroid(nodes, nd_refs)
         if ctr is None:
             continue
-        
         area = poly_area_m2(nodes, nd_refs)
-        name = tags.get('name', '')
-        
         results.append({
             'lon': round(ctr[0], 6),
             'lat': round(ctr[1], 6),
             'type': gtype,
             'area': round(area),
-            'name': name,
+            'name': tags.get('name', ''),
         })
-    
+
+    # ── Relations (multipolygons) ─────────────────────────────────────────────
+    for rel in root.findall('relation'):
+        tags = {t.get('k'): t.get('v') for t in rel.findall('tag')}
+        gtype = None
+        for k, v in GREEN_TAGS:
+            if tags.get(k) == v:
+                gtype = f'{k}={v}'
+                break
+        if gtype is None:
+            continue
+        # Collect outer member ways; compute area per ring (not concatenated)
+        outer_rings = []
+        for member in rel.findall('member'):
+            if member.get('type') == 'way' and member.get('role') in ('outer', ''):
+                nds = ways_map.get(member.get('ref'), [])
+                if nds:
+                    outer_rings.append(nds)
+        if not outer_rings:
+            continue
+        # Centroid from all outer-ring nodes
+        all_nd_refs = [nd for ring in outer_rings for nd in ring]
+        ctr = poly_centroid(nodes, all_nd_refs)
+        if ctr is None:
+            continue
+        # Area: sum each ring separately (correct Shoelace), cap at 10 km²
+        area = min(sum(poly_area_m2(nodes, ring) for ring in outer_rings), 10_000_000)
+        results.append({
+            'lon': round(ctr[0], 6),
+            'lat': round(ctr[1], 6),
+            'type': gtype,
+            'area': round(area),
+            'name': tags.get('name', ''),
+        })
+
     return results
 
 
@@ -159,7 +206,7 @@ def main():
                     all_greens.append(f)
                     new += 1
             
-            print(f"OK via {mirror.split('/')[2]} — {len(features)} ways, {new} new")
+            print(f"OK via {mirror.split('/')[2]} — {len(features)} features, {new} new")
             time.sleep(2)  # be polite
     
     print(f"\nTotal green features: {len(all_greens)}")

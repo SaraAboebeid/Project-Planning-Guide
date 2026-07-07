@@ -968,7 +968,7 @@ html = f"""<!DOCTYPE html>
   <div class="lp-divider"></div>
   <div class="lp-section-title">Analysis Tools</div>
   <div style="padding:0 10px 6px;display:flex;flex-direction:column;gap:5px;flex-shrink:0">
-    <button class="tool-btn" id="btn-inspect" disabled>&#128247; Inspect Facades + WWR</button>
+    <button class="tool-btn" id="btn-inspect" disabled>WWR Estimation</button>
     <div id="inspect-saved-badge" style="display:none;font-size:10px;color:var(--muted);padding-left:2px;margin-top:-3px"></div>
     <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>&#9728; Rooftop PV Estimate</button>
     <div id="pvgis-saved-badge" style="display:none;font-size:10px;color:var(--muted);padding-left:2px;margin-top:-3px"></div>
@@ -995,7 +995,7 @@ html = f"""<!DOCTYPE html>
 
 <!-- Facade inspector -->
 <div class="panel" id="facade-panel">
-  <h2>&#128247; Facade Inspector</h2>
+  <h2>Facade Inspector</h2>
   <div class="sub" id="facade-sub">Click a facade view to capture screenshot and estimate WWR</div>
   <div id="facade-views">
     <div class="facade-thumb" id="thumb-N"><canvas id="canvas-N" width="200" height="150"></canvas><div class="dir-label">N</div></div>

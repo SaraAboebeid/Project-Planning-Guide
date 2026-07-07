@@ -60,7 +60,7 @@ def main():
         lookup.setdefault(key, []).append(apt)
 
     OUT_JSON.write_text(json.dumps(lookup, ensure_ascii=False, indent=None), encoding='utf-8')
-    print(f'JSON: {len(lookup)} unique addresses → {OUT_JSON}  ({OUT_JSON.stat().st_size//1024} KB)')
+    print(f'JSON: {len(lookup)} unique addresses -> {OUT_JSON}  ({OUT_JSON.stat().st_size//1024} KB)')
 
 if __name__ == '__main__':
     main()
