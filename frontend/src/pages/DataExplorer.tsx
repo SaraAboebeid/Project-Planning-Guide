@@ -201,22 +201,6 @@ const SOURCES: DataSource[] = [
       }
     },
   },
-  {
-    id: "wwr",
-    name: "WWR Database",
-    description: "Window-to-Wall Ratio measurements collected from the Facade Inspector tool. User-contributed field data.",
-    iconD: IC.wwr,
-    accent: "#EF4444",
-    count: "Varies",
-    countLabel: "records",
-    status: "live",
-    fields: ["address", "lat", "lon", "wwr_north", "wwr_south", "wwr_east", "wwr_west", "timestamp"],
-    sampleFn: async () => {
-      const r = await fetch("/api/wwr-database");
-      const data = await r.json() as { records: Record<string, unknown>[] };
-      return (data.records ?? []).slice(0, 5);
-    },
-  },
 ];
 
 // ── Status badge ─────────────────────────────────────────────────────────────

@@ -120,7 +120,7 @@ export default function WizardLayout() {
         <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 shadow-lg shrink-0 cursor-pointer"
              style={{ background: "linear-gradient(135deg,#721CB8,#421869)" }}
              onClick={() => navigate("/")}>
-          <span style={{ color: "#fff", fontWeight: 900, fontSize: 13 }}>P</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         </div>
 
         {steps.map((s, i) => {
@@ -175,12 +175,14 @@ export default function WizardLayout() {
         <header className="shrink-0 flex items-center gap-4 px-6 z-20"
                 style={{ background: "#0d1117", borderBottom: "1px solid rgba(255,255,255,0.07)",
                          minHeight: 56 }}>
-          <span style={{
-            padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: "#fff",
-            background: "rgba(114,28,184,0.35)", border: "1px solid rgba(114,28,184,0.5)",
-          }}>
-            Step {safeIndex + 1} of {steps.length}
-          </span>
+          {safeIndex !== 3 && (
+            <span style={{
+              padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: "#fff",
+              background: "rgba(114,28,184,0.35)", border: "1px solid rgba(114,28,184,0.5)",
+            }}>
+              Step {safeIndex + 1} of {steps.length}
+            </span>
+          )}
           <h1 style={{ fontSize: 17, fontWeight: 700, color: "#fff", margin: 0 }}>
             {activeStep.label}
           </h1>

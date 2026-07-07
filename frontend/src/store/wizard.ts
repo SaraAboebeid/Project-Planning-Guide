@@ -14,7 +14,7 @@ const STEPS: StepDef[] = [
   { number: 1, label: "Define Project",      path: "/step/1" },
   { number: 2, label: "Building & Site Data", path: "/step/2" },
   { number: 3, label: "Data Overview",       path: "/step/3" },
-  { number: 4, label: "Deliverables", path: "/step/4" },
+  { number: 4, label: "Scenarios",     path: "/step/4" },
   { number: 5, label: "Timeline & Cost",    path: "/step/5" },
 ];
 

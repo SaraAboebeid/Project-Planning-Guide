@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import WizardLayout from "./components/WizardLayout";
+import DataLayout from "./components/DataLayout";
 import LandingPage from "./pages/LandingPage";
 import DefineProject from "./pages/DefineProject";
 import DataCoverage from "./pages/DataCoverage";
@@ -29,14 +30,12 @@ export default function App() {
       <ScrollToTop />
       <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/data" element={<WizardLayout />}>
-        <Route index element={<DataExplorer />} />
-      </Route>
+      <Route path="/data" element={<DataLayout><DataExplorer /></DataLayout>} />
+      <Route path="/step/4" element={<DataLayout title="Scenarios" accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
       <Route element={<WizardLayout />}>
         <Route path="/step/1" element={<DefineProject />} />
         <Route path="/step/2" element={<DataCoverage />} />
         <Route path="/step/3" element={<DataAssumptions />} />
-        <Route path="/step/4" element={<Scenarios />} />
         <Route path="/step/5" element={<ResultsBudget />} />
       </Route>
       </Routes>

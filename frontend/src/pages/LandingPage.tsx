@@ -170,7 +170,7 @@ const WORKFLOW_STEPS = [
   { n: 1, label: "Define Project",       desc: "Set project type, KPIs, systems and scope.",   status: "not-started" as StepStatus, path: "/step/1", icon: IC.deliverable },
   { n: 2, label: "Building & Site Data", desc: "Import geometry, climate and context data.",   status: "in-progress"  as StepStatus, path: "/step/2", icon: IC.layers },
   { n: 3, label: "Data Overview",        desc: "Review confidence, gaps and sensitivity.",      status: "review"       as StepStatus, path: "/step/3", icon: IC.database },
-  { n: 4, label: "Deliverables",         desc: "Select outputs, scenarios and comparisons.",    status: "not-started" as StepStatus, path: "/step/4", icon: IC.report },
+  { n: 4, label: "Scenarios",            desc: "Tool overview, pathways and sensitivity analysis.", status: "not-started" as StepStatus, path: "/step/4", icon: IC.report },
   { n: 5, label: "Timeline & Cost",      desc: "Plan schedule, resources and CAPEX budget.",   status: "not-started" as StepStatus, path: "/step/5", icon: IC.timeline },
 ];
 
@@ -202,7 +202,6 @@ export default function LandingPage() {
         <NavItem iconPath={IC.map}         label="Map"         onClick={() => window.open("http://localhost:8765/gothenburg_3d.html", "_blank")} />
         <NavItem iconPath={IC.database}    label="Data"        onClick={() => navigate("/data")} />
         <NavItem iconPath={IC.layers}      label="Scenarios"   onClick={() => { reset(); navigate("/step/4"); }} />
-        <NavItem iconPath={IC.deliverable} label="Deliverables" onClick={() => { reset(); navigate("/step/4"); }} />
         <NavItem iconPath={IC.timeline}    label="Timeline"    onClick={() => { reset(); navigate("/step/5"); }} />
         <NavItem iconPath={IC.budget}      label="Budget"      onClick={() => { reset(); navigate("/step/5"); }} />
         <NavItem iconPath={IC.report}      label="Reports"     onClick={() => { reset(); navigate("/step/5"); }} />
