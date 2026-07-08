@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { iconD: IC.home,     label: "Home",      path: "/"       },
   { iconD: IC.map,      label: "Map",       path: "__3d"    },
   { iconD: IC.database, label: "Data",      path: "/data"   },
-  { iconD: "M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z", label: "Scenarios", path: "/step/4"  },
+  { iconD: "M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z", label: "Pathways",  path: "/pathways"  },
 ];
 
 export default function DataLayout({

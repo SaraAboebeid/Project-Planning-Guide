@@ -213,6 +213,7 @@ const SOURCES: DataSource[] = [
     count: String(wikellsStats().totalItems),
     countLabel: "line items",
     status: "live",
+    fields: ["code", "description", "costSEK", "unit", "uValue", "fireClass", "soundRw", "weightKgM2"],
     sampleFn: async () => [], // not used — renderPreview takes over
     renderPreview: () => <WikellsPreview />,
   },

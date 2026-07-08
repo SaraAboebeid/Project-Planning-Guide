@@ -21,7 +21,7 @@ function ScrollToTop() {
  *  1 – Define Project        (type, KPIs, scope, systems)
  *  2 – Building & Site Data  (open data, EUBUCCO/EPC, select buildings)
  *  3 – Data Overview         (model confidence, sensitivity, reference DBs incl. Wikells)
- *  4 – Scenarios             (Renovation: packages + cost/carbon | EC: community scenarios | RE: generation scenarios)
+ *  4 – Pathways              (Renovation: packages + cost/carbon | EC: community scenarios | RE: generation scenarios)
  *  5 – Results & Budget      (deliverables, timeline, CAPEX pre-filled from scenarios)
  */
 export default function App() {
@@ -31,11 +31,12 @@ export default function App() {
       <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/data" element={<DataLayout><DataExplorer /></DataLayout>} />
-      <Route path="/step/4" element={<DataLayout title="Scenarios" accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
+      <Route path="/pathways" element={<DataLayout title="Pathways" accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
       <Route element={<WizardLayout />}>
         <Route path="/step/1" element={<DefineProject />} />
         <Route path="/step/2" element={<DataCoverage />} />
         <Route path="/step/3" element={<DataAssumptions />} />
+        <Route path="/step/4" element={<Scenarios />} />
         <Route path="/step/5" element={<ResultsBudget />} />
       </Route>
       </Routes>

@@ -1,7 +1,425 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import RenovationPackages from "./RenovationPackages";
 import { Hammer, Zap, Sun, Cpu, Users, BarChart2, Layers, TrendingUp } from "lucide-react";
+
+/* ─── Project flow diagram ─────────────────────────────────────────── */
+
+type SubNodeType = "input" | "db" | "estimate" | "engine" | "scenario" | "output";
+
+const FLOW_DATA: Record<string, {
+  color: string;
+  steps: Array<{
+    n: number; label: string; color: string; isHere?: boolean;
+    subNodes: Array<{ label: string; type: SubNodeType }>;
+  }>;
+}> = {
+  "Energy Community Planning": {
+    color: "#4ECDC4",
+    steps: [
+      {
+        n: 1, label: "Define Project", color: "#721CB8",
+        subNodes: [
+          { label: "Project type: Energy Community", type: "input" },
+          { label: "Systems: PV, Battery, Grid", type: "input" },
+          { label: "KPIs: self-consumption, cost saving", type: "input" },
+          { label: "Location: site drawn on map", type: "input" },
+        ],
+      },
+      {
+        n: 2, label: "Building & Site Data", color: "#4A90E2",
+        subNodes: [
+          { label: "EUBUCCO 3D geometry", type: "db" },
+          { label: "Smart meter data (proxy)", type: "estimate" },
+          { label: "PVGIS solar irradiance", type: "db" },
+          { label: "DSO grid capacity (proxy)", type: "estimate" },
+        ],
+      },
+      {
+        n: 3, label: "Data Overview", color: "#4ECDC4",
+        subNodes: [
+          { label: "OAT Sensitivity analysis", type: "engine" },
+          { label: "Data readiness: 68%", type: "output" },
+          { label: "Model confidence: 61%", type: "output" },
+        ],
+      },
+      {
+        n: 4, label: "Scenarios", color: "#F59E0B", isHere: true,
+        subNodes: [
+          { label: "A — Minimal PV (rooftop only)", type: "scenario" },
+          { label: "B — PV + Battery storage", type: "scenario" },
+          { label: "C — Full Energy Community", type: "scenario" },
+        ],
+      },
+      {
+        n: 5, label: "Timeline & Cost", color: "#96D74C",
+        subNodes: [
+          { label: "12-month project schedule", type: "output" },
+          { label: "CAPEX estimate: 2.1M SEK", type: "output" },
+          { label: "EC Feasibility Report (PDF)", type: "output" },
+        ],
+      },
+    ],
+  },
+  "Renovation Planning": {
+    color: "#721CB8",
+    steps: [
+      {
+        n: 1, label: "Define Project", color: "#721CB8",
+        subNodes: [
+          { label: "Project type: Renovation", type: "input" },
+          { label: "Systems: Envelope, HVAC, Windows", type: "input" },
+          { label: "KPIs: EPC class, payback period", type: "input" },
+          { label: "Location: address or bbox", type: "input" },
+        ],
+      },
+      {
+        n: 2, label: "Building & Site Data", color: "#4A90E2",
+        subNodes: [
+          { label: "EUBUCCO footprint + floors", type: "db" },
+          { label: "TABULA archetype match", type: "db" },
+          { label: "EPC energy class (register)", type: "db" },
+          { label: "WWR estimate (proxy)", type: "estimate" },
+        ],
+      },
+      {
+        n: 3, label: "Data Overview", color: "#4ECDC4",
+        subNodes: [
+          { label: "OAT Sensitivity analysis", type: "engine" },
+          { label: "Data readiness: 74%", type: "output" },
+          { label: "Model confidence: 69%", type: "output" },
+        ],
+      },
+      {
+        n: 4, label: "Scenarios", color: "#F59E0B", isHere: true,
+        subNodes: [
+          { label: "A — Light refurbishment", type: "scenario" },
+          { label: "B — Medium package (EPC D\u2192B)", type: "scenario" },
+          { label: "C — Deep renovation + PV", type: "scenario" },
+        ],
+      },
+      {
+        n: 5, label: "Timeline & Cost", color: "#96D74C",
+        subNodes: [
+          { label: "18-month phased plan", type: "output" },
+          { label: "CAPEX: 3,200\u20138,500 SEK/m\u00b2", type: "output" },
+          { label: "Renovation Report (PDF)", type: "output" },
+        ],
+      },
+    ],
+  },
+  "Renewable Energy Planning": {
+    color: "#96D74C",
+    steps: [
+      {
+        n: 1, label: "Define Project", color: "#721CB8",
+        subNodes: [
+          { label: "Project type: Renewable Energy", type: "input" },
+          { label: "Systems: PV, Wind, Storage", type: "input" },
+          { label: "KPIs: annual yield, LCOE, payback", type: "input" },
+          { label: "Location: roof or site drawn", type: "input" },
+        ],
+      },
+      {
+        n: 2, label: "Building & Site Data", color: "#4A90E2",
+        subNodes: [
+          { label: "EUBUCCO roof geometry", type: "db" },
+          { label: "PVGIS annual irradiation", type: "db" },
+          { label: "Shading analysis (proxy)", type: "estimate" },
+          { label: "Grid connection point (proxy)", type: "estimate" },
+        ],
+      },
+      {
+        n: 3, label: "Data Overview", color: "#4ECDC4",
+        subNodes: [
+          { label: "OAT Sensitivity analysis", type: "engine" },
+          { label: "Data readiness: 71%", type: "output" },
+          { label: "Model confidence: 65%", type: "output" },
+        ],
+      },
+      {
+        n: 4, label: "Scenarios", color: "#F59E0B", isHere: true,
+        subNodes: [
+          { label: "A — Rooftop PV (standard)", type: "scenario" },
+          { label: "B — PV + battery storage", type: "scenario" },
+          { label: "C — Max yield + export", type: "scenario" },
+        ],
+      },
+      {
+        n: 5, label: "Timeline & Cost", color: "#96D74C",
+        subNodes: [
+          { label: "9-month installation plan", type: "output" },
+          { label: "CAPEX: 180K\u2013420K SEK", type: "output" },
+          { label: "RE Feasibility Report (PDF)", type: "output" },
+        ],
+      },
+    ],
+  },
+};
+
+const SUB_COLORS: Record<SubNodeType, string> = {
+  input:    "#721CB8",
+  db:       "#4A90E2",
+  estimate: "#F59E0B",
+  engine:   "#4ECDC4",
+  scenario: "#F59E0B",
+  output:   "#96D74C",
+};
+
+const SUB_LABELS: Record<SubNodeType, string> = {
+  input:    "USER INPUT",
+  db:       "DATABASE",
+  estimate: "ESTIMATED",
+  engine:   "ENGINE",
+  scenario: "SCENARIO",
+  output:   "OUTPUT",
+};
+
+const PHASE_LABELS = [
+  "1. DEFINE", "2. COLLECT DATA", "3. ANALYSE", "4. SCENARIOS", "5. PLAN & DELIVER",
+];
+
+const GRID9 = "1fr 28px 1fr 28px 1fr 28px 1fr 28px 1fr";
+
+const TAB_COLORS: Record<string, string> = {
+  "Energy Community Planning": "#4ECDC4",
+  "Renovation Planning":       "#721CB8",
+  "Renewable Energy Planning": "#96D74C",
+};
+
+/* ─── Flow Diagram component ──────────────────────────────────────────── */
+function ProjectFlowDiagram({ activeType, onTypeChange }: {
+  activeType: string;
+  onTypeChange: (t: string) => void;
+}) {
+  const navigate = useNavigate();
+  const flow = FLOW_DATA[activeType];
+  const tabs = Object.keys(FLOW_DATA);
+
+  return (
+    <div style={{
+      borderRadius: 14,
+      background: "rgba(255,255,255,0.015)",
+      border: "1px solid rgba(255,255,255,0.07)",
+      marginBottom: 20, overflow: "hidden",
+    }}>
+      {/* ── Header + Tabs ── */}
+      <div style={{ padding: "14px 18px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{
+          fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.28)",
+          letterSpacing: 1.5, marginBottom: 10,
+        }}>
+          STEP-BY-STEP WORKFLOW
+        </div>
+        <div style={{ display: "flex", gap: 6, paddingBottom: 14 }}>
+          {tabs.map(t => {
+            const col = TAB_COLORS[t];
+            const on = t === activeType;
+            return (
+              <button key={t} onClick={() => onTypeChange(t)} style={{
+                padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                cursor: "pointer",
+                border: `1px solid ${on ? col : "rgba(255,255,255,0.10)"}`,
+                background: on ? `${col}22` : "transparent",
+                color: on ? col : "rgba(255,255,255,0.38)",
+                transition: "all 0.15s",
+              }}>
+                {t.replace(" Planning", "")}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Diagram ── */}
+      <div style={{ overflowX: "auto", padding: "18px 20px 22px" }}>
+        <div style={{ minWidth: 800 }}>
+
+          {/* Phase labels */}
+          <div style={{ display: "grid", gridTemplateColumns: GRID9, marginBottom: 6 }}>
+            {flow.steps.flatMap((step, idx) => {
+              const ph = (
+                <div key={`ph-${step.n}`} style={{
+                  fontSize: 9, fontWeight: 800, letterSpacing: 1.3,
+                  color: step.color + "cc", textAlign: "center",
+                  paddingBottom: 6, borderBottom: `2px solid ${step.color}30`,
+                }}>
+                  {PHASE_LABELS[idx]}
+                </div>
+              );
+              return idx < flow.steps.length - 1
+                ? [ph, <div key={`ph-sp-${idx}`} />]
+                : [ph];
+            })}
+          </div>
+
+          {/* Step nodes + arrows */}
+          <div style={{ display: "grid", gridTemplateColumns: GRID9, alignItems: "center", marginTop: 12 }}>
+            {flow.steps.flatMap((step, idx) => {
+              const isHere = !!step.isHere;
+              const node = (
+                <div
+                  key={`node-${step.n}`}
+                  onClick={() => !isHere && navigate(`/step/${step.n}`)}
+                  style={{
+                    borderRadius: 10, padding: "12px 10px", position: "relative",
+                    background: isHere ? `${step.color}18` : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${isHere ? step.color + "60" : step.color + "32"}`,
+                    cursor: isHere ? "default" : "pointer",
+                    boxShadow: isHere ? `0 0 24px ${step.color}20` : "none",
+                    transition: "border-color 0.15s",
+                  }}
+                >
+                  <div style={{
+                    width: 24, height: 24, borderRadius: 7,
+                    background: `${step.color}22`, border: `1px solid ${step.color}44`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 12, fontWeight: 800, color: step.color, marginBottom: 8,
+                  }}>{step.n}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>
+                    {step.label}
+                  </div>
+
+                </div>
+              );
+              const arrow = idx < flow.steps.length - 1 ? (
+                <div key={`arr-${idx}`} style={{ display: "flex", alignItems: "center" }}>
+                  <div style={{
+                    flex: 1, height: 1,
+                    background: `linear-gradient(to right, ${step.color}50, ${flow.steps[idx + 1].color}50)`,
+                  }} />
+                  <div style={{
+                    width: 0, height: 0,
+                    borderTop: "4px solid transparent",
+                    borderBottom: "4px solid transparent",
+                    borderLeft: `5px solid ${flow.steps[idx + 1].color}70`,
+                  }} />
+                </div>
+              ) : null;
+              return arrow ? [node, arrow] : [node];
+            })}
+          </div>
+
+          {/* Vertical dashed connectors */}
+          <div style={{ display: "grid", gridTemplateColumns: GRID9 }}>
+            {flow.steps.flatMap((step, idx) => {
+              const conn = (
+                <div key={`vc-${step.n}`} style={{ display: "flex", justifyContent: "center" }}>
+                  <div style={{ width: 0, height: 14, borderLeft: `1px dashed ${step.color}40` }} />
+                </div>
+              );
+              return idx < flow.steps.length - 1
+                ? [conn, <div key={`vc-sp-${idx}`} />]
+                : [conn];
+            })}
+          </div>
+
+          {/* Sub-nodes */}
+          <div style={{ display: "grid", gridTemplateColumns: GRID9, gap: "0 6px" }}>
+            {flow.steps.flatMap((step, idx) => {
+              const stack = (
+                <div key={`sub-${step.n}`} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {step.subNodes.map((node, i) => {
+                    const col = SUB_COLORS[node.type];
+                    return (
+                      <div key={i} style={{
+                        borderRadius: 7, padding: "5px 8px",
+                        background: `${col}0d`, border: `1px solid ${col}28`,
+                      }}>
+                        <div style={{
+                          fontSize: 8, fontWeight: 700, color: col + "99",
+                          letterSpacing: 0.8, marginBottom: 2,
+                        }}>
+                          {SUB_LABELS[node.type]}
+                        </div>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.62)", lineHeight: 1.35 }}>
+                          {node.label}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+              return idx < flow.steps.length - 1
+                ? [stack, <div key={`sub-sp-${idx}`} />]
+                : [stack];
+            })}
+          </div>
+
+          {/* ── Pathway deliverables row ── */}
+          {(() => {
+            const pw = PATHWAYS.find(p => p.key === activeType);
+            if (!pw) return null;
+            const Ic = pw.Icon;
+            return (
+              <div style={{
+                marginTop: 14, paddingTop: 14,
+                borderTop: `1px solid ${pw.color}25`,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                    background: `${pw.color}20`, border: `1px solid ${pw.color}45`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Ic size={12} color={pw.color} />
+                  </div>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: `${pw.color}cc`, letterSpacing: 1.3 }}>
+                    PATHWAY DELIVERABLES
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 7 }}>
+                  {pw.outputs.map((o) => (
+                    <div key={o.n} style={{
+                      borderRadius: 8, padding: "8px 10px",
+                      background: `${pw.color}0d`, border: `1px solid ${pw.color}30`,
+                    }}>
+                      <div style={{
+                        fontSize: 8, fontWeight: 800, color: pw.color,
+                        letterSpacing: 0.8, marginBottom: 4,
+                      }}>OUTPUT {o.n}</div>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.68)", lineHeight: 1.4 }}>
+                        {o.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Legend */}
+          <div style={{
+            display: "flex", gap: 14, marginTop: 14, flexWrap: "wrap",
+            borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 12, alignItems: "center",
+          }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.22)", letterSpacing: 1 }}>
+              LEGEND
+            </div>
+            {(Object.entries(SUB_LABELS) as [SubNodeType, string][]).map(([type, label]) => (
+              <div key={type} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: 2,
+                  background: SUB_COLORS[type] + "80", border: `1px solid ${SUB_COLORS[type]}60`,
+                }} />
+                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.32)" }}>{label}</span>
+              </div>
+            ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 8 }}>
+              <div style={{ width: 18, height: 1, background: "rgba(255,255,255,0.28)" }} />
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.32)" }}>Data Flow</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{ width: 18, height: 0, borderTop: "1px dashed rgba(255,255,255,0.28)" }} />
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.32)" }}>Tool Connection</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ─── Data ─────────────────────────────────────────────────────────── */
 
@@ -65,34 +483,74 @@ const ENGINE_TAGS = [
   { label: "Wikells Cost DB",    color: "#721CB8" },
 ];
 
-/* OAT sensitivity data — from config/sensitivity_config.py OAT_PARAMETERS */
-const OAT_PARAMS = [
-  { key: "roof_shape_angle",    label: "Roof Shape & Angle",   rangeKwh: 211553, dataKey: "roof_shape_angle",    status: "missing"   as const },
-  { key: "infiltration",        label: "Infiltration Rate",    rangeKwh: 139434, dataKey: "infiltration_rate",   status: "proxy"     as const },
-  { key: "heating_setpoint",    label: "Heating Setpoint",     rangeKwh: 120565, dataKey: "setpoint",           status: "assumed"   as const },
-  { key: "construction_package",label: "Construction Quality", rangeKwh: 78284,  dataKey: "construction_materials", status: "partial" as const },
-  { key: "floors_total",        label: "Number of Floors",     rangeKwh: 72158,  dataKey: "num_floors",         status: "available" as const },
-  { key: "footprint_length",    label: "Building Length",      rangeKwh: 63753,  dataKey: "footprint",          status: "available" as const },
-  { key: "footprint_width",     label: "Building Width",       rangeKwh: 52824,  dataKey: "footprint",          status: "available" as const },
-  { key: "window_to_wall_ratio",label: "Window-to-Wall Ratio", rangeKwh: 30601,  dataKey: "wwr",               status: "partial"   as const },
-  { key: "glazing_package",     label: "Glazing Quality",      rangeKwh: 23350,  dataKey: "window_properties",  status: "partial"   as const },
-];
-const TOTAL_RANGE = OAT_PARAMS.reduce((s, p) => s + p.rangeKwh, 0);
+/* ─── Per-project-type OAT sensitivity data ─────────────────────────── */
+type OatStatus = "available" | "partial" | "proxy" | "assumed" | "missing";
+interface OatParam {
+  key: string; label: string; category: string;
+  rangeKwh: number; status: OatStatus; insight: string;
+}
 
-const STATUS_COLOR: Record<string, string> = {
+const OAT_BY_TYPE: Record<string, { metric: string; unit: string; params: OatParam[] }> = {
+  "Renovation Planning": {
+    metric: "Heating demand spread", unit: "kWh/yr",
+    params: [
+      { key: "roof_shape_angle",     label: "Roof Shape & Angle",    category: "Geometry",    rangeKwh: 211553, status: "missing",   insight: "Roof geometry absent from cadastral — pitch and shape create the widest uncertainty window in the thermal model." },
+      { key: "infiltration",         label: "Infiltration Rate",     category: "Envelope",    rangeKwh: 139434, status: "proxy",     insight: "No blower-door test data; TABULA proxy assumed — actual airtightness can deviate ±30% from archetype." },
+      { key: "heating_setpoint",     label: "Heating Setpoint",      category: "Systems",     rangeKwh: 120565, status: "assumed",   insight: "21 °C assumed per Swedish norm BBR — measured setpoints in older stock often run 22–24 °C." },
+      { key: "construction_package", label: "Construction Quality",  category: "Envelope",    rangeKwh: 78284,  status: "partial",   insight: "TABULA archetype matched but renovation history unknown — actual U-values may differ significantly." },
+      { key: "floors_total",         label: "Number of Floors",      category: "Geometry",    rangeKwh: 72158,  status: "available", insight: "Floor count confirmed via EUBUCCO 3D model. Low residual uncertainty." },
+      { key: "footprint_length",     label: "Building Length",       category: "Geometry",    rangeKwh: 63753,  status: "available", insight: "Footprint from EUBUCCO polygon — length measured automatically." },
+      { key: "footprint_width",      label: "Building Width",        category: "Geometry",    rangeKwh: 52824,  status: "available", insight: "Footprint from EUBUCCO polygon — width measured automatically." },
+      { key: "window_to_wall_ratio", label: "Window-to-Wall Ratio",  category: "Envelope",    rangeKwh: 30601,  status: "partial",   insight: "WWR estimated from street-level imagery analysis — facade survey would reduce this uncertainty." },
+      { key: "glazing_package",      label: "Glazing Quality",       category: "Envelope",    rangeKwh: 23350,  status: "partial",   insight: "Double-glazed assumed for pre-1990 stock; triple-glazing present in some post-renovation units." },
+    ],
+  },
+  "Energy Community Planning": {
+    metric: "Annual self-consumption spread", unit: "kWh/yr",
+    params: [
+      { key: "load_profile",        label: "Load Profile Accuracy", category: "Demand",      rangeKwh: 185000, status: "missing",   insight: "Hourly smart meter data unavailable — synthetic profiles from Nordpool proxies add the largest spread to self-consumption modelling." },
+      { key: "pv_roof_area",        label: "Usable PV Roof Area",   category: "Supply",      rangeKwh: 162000, status: "partial",   insight: "Roof polygon from EUBUCCO available but usable area after obstructions (vents, lift shafts) needs on-site survey." },
+      { key: "battery_capacity",    label: "Battery Capacity",      category: "Storage",     rangeKwh: 98000,  status: "partial",   insight: "Battery sizing strongly affects self-consumption ratio — optimal sizing requires measured load shape." },
+      { key: "grid_connection",     label: "Grid Connection Limit", category: "Grid",        rangeKwh: 76000,  status: "proxy",     insight: "DSO connection capacity assumed from national average — actual fuse rating from DSO inquiry needed." },
+      { key: "building_mix",        label: "Building Use Mix",      category: "Demand",      rangeKwh: 61000,  status: "available", insight: "Residential/commercial split available from EUBUCCO building use classification." },
+      { key: "ev_demand",           label: "EV Charging Demand",    category: "Demand",      rangeKwh: 43000,  status: "assumed",   insight: "EV penetration assumed at 30% per Trafikverket 2025 forecast — actual uptake in this block unknown." },
+      { key: "tariff_structure",    label: "Tariff & Net Metering", category: "Grid",        rangeKwh: 28000,  status: "assumed",   insight: "Swedish net-metering rules applied; local DSO tariff may differ — verify with Göteborg Energi." },
+      { key: "meter_resolution",    label: "Smart Meter Resolution",category: "Data",        rangeKwh: 19000,  status: "missing",   insight: "15-min resolution ideal; only monthly billing data available for this block — degrades load-matching accuracy." },
+    ],
+  },
+  "Renewable Energy Planning": {
+    metric: "Annual yield spread", unit: "kWh/yr",
+    params: [
+      { key: "solar_irradiance",    label: "Solar Irradiance",      category: "Climate",     rangeKwh: 198000, status: "available", insight: "PVGIS TMY data used — carries ±8% inter-annual variability for Gothenburg latitude 57.7°N. High quality but not zero uncertainty." },
+      { key: "roof_area_tilt",      label: "Roof Area & Tilt",      category: "Geometry",    rangeKwh: 175000, status: "partial",   insight: "Roof polygon available from EUBUCCO but exact usable area after penetrations and optimal tilt angle needs field survey." },
+      { key: "shading",             label: "Shading Obstructions",  category: "Environment", rangeKwh: 142000, status: "missing",   insight: "Nearby building and tree shading not yet quantified — shadow analysis requires LiDAR or detailed 3D model of surroundings." },
+      { key: "panel_efficiency",    label: "Panel Efficiency",      category: "Technology",  rangeKwh: 88000,  status: "partial",   insight: "Generic 20% efficiency assumed; actual module choice (mono/poly/bifacial) can shift yield ±10%." },
+      { key: "inverter_efficiency", label: "Inverter Efficiency",   category: "Technology",  rangeKwh: 52000,  status: "assumed",   insight: "97% European efficiency assumed from IEC 61683 typical values — product selection not yet made." },
+      { key: "temp_coefficient",    label: "Temperature Coefficient",category: "Technology", rangeKwh: 38000,  status: "assumed",   insight: "–0.35%/°C assumed from standard crystalline silicon — thin-film or bifacial modules differ." },
+      { key: "grid_export",         label: "Grid Export Limit",     category: "Grid",        rangeKwh: 24000,  status: "proxy",     insight: "DSO export cap assumed at 100% of installed capacity — local constraint may curtail yield." },
+      { key: "install_cost",        label: "Installation Cost",     category: "Cost",        rangeKwh: 17000,  status: "assumed",   insight: "2,800 SEK/kWp assumed from Wikells 2024 — actual quotes may vary ±15%." },
+    ],
+  },
+};
+
+const STATUS_COLOR: Record<OatStatus, string> = {
   available: "#96D74C",
   partial:   "#F59E0B",
   proxy:     "#4A90E2",
-  assumed:   "#F59E0B",
-  missing:   "rgba(255,80,80,0.85)",
+  assumed:   "#a78bfa",
+  missing:   "rgba(255,80,80,0.90)",
 };
-const STATUS_LABEL: Record<string, string> = {
+const STATUS_LABEL: Record<OatStatus, string> = {
   available: "Available",
   partial:   "Partial",
   proxy:     "Proxy",
   assumed:   "Assumed",
   missing:   "Missing",
 };
+const TIER_LABEL = (rank: number) =>
+  rank <= 2 ? "CRITICAL" : rank <= 4 ? "HIGH" : rank <= 6 ? "MODERATE" : "LOWER";
+const TIER_COLOR = (rank: number) =>
+  rank <= 2 ? "rgba(255,80,80,0.85)" : rank <= 4 ? "#F59E0B" : rank <= 6 ? "#4A90E2" : "#96D74C";
 
 /* ─── EC pathway detail ─────────────────────────────────────────────── */
 function ECPathwayDetail() {
@@ -243,118 +701,225 @@ function REPathwayDetail() {
 }
 
 /* ─── Sensitivity Analysis Panel ───────────────────────────────────── */
-function SensitivityPanel() {
+/* ─── Sensitivity Analysis Panel — per project type ────────────────── */
+function SensitivityPanel({ activeType }: { activeType: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const data = OAT_BY_TYPE[activeType] ?? OAT_BY_TYPE["Renovation Planning"];
+  const params = data.params;
+  const total = params.reduce((s, p) => s + p.rangeKwh, 0);
+  const top3 = params.slice(0, 3);
+  const rest = params.slice(3);
+  const typeColor = activeType === "Renovation Planning" ? "#721CB8"
+    : activeType === "Energy Community Planning" ? "#4ECDC4" : "#96D74C";
+
   return (
     <div style={{
-      borderRadius: 14, padding: "16px 18px",
-      background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
+      borderRadius: 14, overflow: "hidden",
+      background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.07)",
     }}>
-      {/* Header row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      {/* ── Header ── */}
+      <div style={{
+        padding: "14px 18px 12px",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-            background: "rgba(74,144,226,0.14)", border: "1px solid rgba(74,144,226,0.30)",
+            background: `${typeColor}18`, border: `1px solid ${typeColor}40`,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <TrendingUp size={16} color="#4A90E2" />
+            <TrendingUp size={16} color={typeColor} />
           </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", letterSpacing: 0.3 }}>
-              SENSITIVITY ANALYSIS — OAT
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", letterSpacing: 0.4 }}>
+              SENSITIVITY IMPACT MAP
             </div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.30)", marginTop: 1 }}>
-              One-At-a-Time · heating demand (kWh/yr) · reference building
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.28)", marginTop: 1 }}>
+              One-At-a-Time (OAT) · {data.metric} · {params.length} parameters ranked
             </div>
           </div>
         </div>
-        {/* Legend */}
-        <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
-          {[
-            { s: "available", l: "Available" },
-            { s: "partial",   l: "Partial" },
-            { s: "proxy",     l: "Proxy" },
-            { s: "missing",   l: "Missing" },
-          ].map(({ s, l }) => (
-            <div key={s} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <div style={{ width: 7, height: 7, borderRadius: 2, background: STATUS_COLOR[s] }} />
-              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>{l}</span>
+        {/* Status legend */}
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          {(["available","partial","proxy","assumed","missing"] as OatStatus[]).map(s => (
+            <div key={s} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+              <div style={{ width: 6, height: 6, borderRadius: 2, background: STATUS_COLOR[s] }} />
+              <span style={{ fontSize: 8, color: "rgba(255,255,255,0.30)" }}>{STATUS_LABEL[s]}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Bar rows */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-        {OAT_PARAMS.map((p, i) => {
-          const pct = (p.rangeKwh / TOTAL_RANGE) * 100;
-          const barColor = STATUS_COLOR[p.status];
-          const rank = i + 1;
-          return (
-            <div key={p.key} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {/* Rank */}
-              <span style={{
-                width: 18, flexShrink: 0, textAlign: "right",
-                fontSize: 9, fontWeight: 800, color: rank <= 3 ? "#F59E0B" : "rgba(255,255,255,0.20)",
-              }}>#{rank}</span>
-
-              {/* Label */}
-              <span style={{
-                width: 148, flexShrink: 0, fontSize: 11, fontWeight: 500,
-                color: "rgba(255,255,255,0.70)", whiteSpace: "nowrap",
-                overflow: "hidden", textOverflow: "ellipsis",
-              }}>{p.label}</span>
-
-              {/* Bar track */}
-              <div style={{
-                flex: 1, height: 8, borderRadius: 4,
-                background: "rgba(255,255,255,0.05)", position: "relative", overflow: "hidden",
+      {/* ── Heatmap impact strip ── */}
+      <div style={{ padding: "12px 18px 0" }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.22)", letterSpacing: 1, marginBottom: 6 }}>
+          IMPACT DISTRIBUTION — {data.unit.toUpperCase()}
+        </div>
+        <div style={{ display: "flex", height: 22, borderRadius: 8, overflow: "hidden", gap: 1 }}>
+          {params.map((p) => {
+            const pct = (p.rangeKwh / total) * 100;
+            const col = STATUS_COLOR[p.status];
+            return (
+              <div key={p.key} title={`${p.label}: ${pct.toFixed(1)}%`} style={{
+                width: `${pct}%`, background: col,
+                opacity: 0.85, flexShrink: 0,
+                position: "relative", cursor: "default",
               }}>
-                <div style={{
-                  position: "absolute", top: 0, left: 0, bottom: 0,
-                  width: `${pct}%`, borderRadius: 4,
-                  background: barColor,
-                  boxShadow: `0 0 8px ${barColor}55`,
-                  transition: "width 0.6s ease",
-                }} />
+                {pct > 9 && (
+                  <span style={{
+                    position: "absolute", inset: 0, display: "flex", alignItems: "center",
+                    justifyContent: "center", fontSize: 8, fontWeight: 800,
+                    color: "rgba(0,0,0,0.55)",
+                  }}>{pct.toFixed(0)}%</span>
+                )}
               </div>
+            );
+          })}
+        </div>
+        {/* strip labels */}
+        <div style={{ display: "flex", height: 16, gap: 1, marginTop: 2 }}>
+          {params.map((p) => {
+            const pct = (p.rangeKwh / total) * 100;
+            return (
+              <div key={p.key} style={{
+                width: `${pct}%`, flexShrink: 0, overflow: "hidden",
+                fontSize: 7, color: "rgba(255,255,255,0.28)", textAlign: "center",
+                whiteSpace: "nowrap", textOverflow: "clip",
+              }}>{pct > 6 ? p.label.split(" ")[0] : ""}</div>
+            );
+          })}
+        </div>
+      </div>
 
-              {/* Pct */}
-              <span style={{
-                width: 36, flexShrink: 0, textAlign: "right",
-                fontSize: 11, fontWeight: 700, color: barColor,
-              }}>{pct.toFixed(1)}%</span>
-
-              {/* Range */}
-              <span style={{
-                width: 88, flexShrink: 0, textAlign: "right",
-                fontSize: 10, color: "rgba(255,255,255,0.25)", fontVariantNumeric: "tabular-nums",
-              }}>±{(p.rangeKwh / 1000).toFixed(0)} MWh</span>
-
-              {/* Status pill */}
-              <span style={{
-                width: 60, flexShrink: 0, textAlign: "center",
-                padding: "1px 0", borderRadius: 4, fontSize: 9, fontWeight: 700,
-                background: `${STATUS_COLOR[p.status]}18`,
-                color: STATUS_COLOR[p.status],
-                border: `1px solid ${STATUS_COLOR[p.status]}30`,
-              }}>{STATUS_LABEL[p.status]}</span>
+      {/* ── Top-3 impact cards ── */}
+      <div style={{ padding: "14px 18px 0", display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+        {top3.map((p, i) => {
+          const pct = (p.rangeKwh / total) * 100;
+          const col = STATUS_COLOR[p.status];
+          const tierCol = TIER_COLOR(i + 1);
+          return (
+            <div key={p.key} style={{
+              borderRadius: 12, padding: "12px 13px", position: "relative", overflow: "hidden",
+              background: `${tierCol}08`,
+              border: `1px solid ${tierCol}30`,
+              boxShadow: i === 0 ? `0 0 20px ${tierCol}18` : "none",
+            }}>
+              {/* glowing left edge */}
+              <div style={{
+                position: "absolute", top: 0, left: 0, bottom: 0, width: 3,
+                background: tierCol, borderRadius: "12px 0 0 12px",
+                boxShadow: `0 0 10px ${tierCol}88`,
+              }} />
+              <div style={{ marginLeft: 6 }}>
+                {/* tier badge + rank */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+                  <span style={{
+                    fontSize: 8, fontWeight: 800, letterSpacing: 0.8, padding: "1px 6px",
+                    borderRadius: 4, background: `${tierCol}22`, color: tierCol,
+                    border: `1px solid ${tierCol}40`,
+                  }}>{TIER_LABEL(i + 1)}</span>
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.22)" }}>#{i + 1}</span>
+                </div>
+                {/* label */}
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.2, marginBottom: 4 }}>
+                  {p.label}
+                </div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.30)", marginBottom: 8 }}>
+                  {p.category}
+                </div>
+                {/* big % */}
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
+                  <span style={{ fontSize: 24, fontWeight: 900, color: tierCol, lineHeight: 1 }}>
+                    {pct.toFixed(1)}
+                  </span>
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.30)" }}>% of spread</span>
+                </div>
+                {/* mini bar */}
+                <div style={{
+                  height: 4, borderRadius: 2, background: "rgba(255,255,255,0.07)", marginBottom: 10,
+                }}>
+                  <div style={{
+                    height: "100%", width: `${pct}%`, borderRadius: 2,
+                    background: col, boxShadow: `0 0 6px ${col}66`,
+                    transition: "width 0.6s ease",
+                  }} />
+                </div>
+                {/* status + mwh */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: "1px 7px", borderRadius: 4,
+                    background: `${col}18`, color: col, border: `1px solid ${col}35`,
+                  }}>{STATUS_LABEL[p.status]}</span>
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>
+                    ±{(p.rangeKwh / 1000).toFixed(0)} MWh
+                  </span>
+                </div>
+                {/* insight */}
+                <p style={{
+                  fontSize: 10, color: "rgba(255,255,255,0.38)", margin: 0, lineHeight: 1.5,
+                  borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8,
+                }}>{p.insight}</p>
+              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Footer note */}
-      <div style={{
-        marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)",
-        display: "flex", alignItems: "flex-start", gap: 8,
-      }}>
-        <span style={{ fontSize: 18, lineHeight: 1.1 }}>💡</span>
-        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.30)", margin: 0, lineHeight: 1.6 }}>
-          Bar width = % share of total model output range.
-          Bar colour = data availability in your project.
-          <strong style={{ color: "rgba(255,255,255,0.45)" }}> Missing or proxy parameters at the top create the largest confidence penalty.</strong>
-        </p>
+      {/* ── Collapsible full list ── */}
+      <div style={{ padding: "12px 18px 16px" }}>
+        <button onClick={() => setExpanded(!expanded)} style={{
+          width: "100%", padding: "7px 12px", borderRadius: 8, cursor: "pointer",
+          background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
+          color: "rgba(255,255,255,0.40)", fontSize: 10, fontWeight: 600, textAlign: "left",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span>All {params.length} parameters ranked</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"
+            style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+            <path d="M7 10l5 5 5-5z" />
+          </svg>
+        </button>
+        {expanded && (
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
+            {params.map((p, i) => {
+              const pct = (p.rangeKwh / total) * 100;
+              const col = STATUS_COLOR[p.status];
+              return (
+                <div key={p.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{
+                    width: 20, flexShrink: 0, textAlign: "right", fontSize: 9, fontWeight: 800,
+                    color: i < 2 ? TIER_COLOR(i + 1) : "rgba(255,255,255,0.18)",
+                  }}>#{i + 1}</span>
+                  <span style={{
+                    width: 160, flexShrink: 0, fontSize: 10, fontWeight: 500,
+                    color: "rgba(255,255,255,0.65)", whiteSpace: "nowrap",
+                    overflow: "hidden", textOverflow: "ellipsis",
+                  }}>{p.label}</span>
+                  <div style={{
+                    flex: 1, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.04)",
+                    position: "relative", overflow: "hidden",
+                  }}>
+                    <div style={{
+                      position: "absolute", inset: 0, width: `${pct}%`,
+                      background: col, borderRadius: 3, boxShadow: `0 0 6px ${col}44`,
+                      transition: "width 0.5s ease",
+                    }} />
+                  </div>
+                  <span style={{ width: 34, flexShrink: 0, textAlign: "right", fontSize: 10, fontWeight: 700, color: col }}>
+                    {pct.toFixed(1)}%
+                  </span>
+                  <span style={{
+                    width: 54, flexShrink: 0, textAlign: "right", fontSize: 9,
+                    padding: "1px 6px", borderRadius: 4,
+                    background: `${col}14`, color: col, border: `1px solid ${col}28`,
+                    fontWeight: 600,
+                  }}>{STATUS_LABEL[p.status]}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -402,6 +967,10 @@ function DownArrow() {
 /* ─── Roadmap ───────────────────────────────────────────────────────── */
 function ToolRoadmap({ activeType }: { activeType: string | null }) {
   const navigate = useNavigate();
+  const { project } = useWizardStore();
+  const [activeFlowType, setActiveFlowType] = useState<string>(
+    project.projectType ?? "Energy Community Planning"
+  );
 
   return (
     <div style={{ paddingBottom: 32 }}>
@@ -422,70 +991,8 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
         </p>
       </div>
 
-      {/* ── LAYER 1: Pathway cards ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-        {PATHWAYS.map((pw) => {
-          const isActive = activeType === pw.key;
-          const Ic = pw.Icon;
-          return (
-            <div key={pw.key} style={{
-              borderRadius: 16, padding: "16px 14px",
-              background: isActive ? pw.bgActive : "rgba(255,255,255,0.02)",
-              border: `2px solid ${isActive ? pw.borderActive : "rgba(255,255,255,0.06)"}`,
-              transition: "all 0.2s", position: "relative",
-              boxShadow: isActive ? `0 0 28px ${pw.color}22` : "none",
-            }}>
-              {isActive && (
-                <div style={{
-                  position: "absolute", top: 10, right: 10,
-                  padding: "2px 7px", borderRadius: 5, fontSize: 9, fontWeight: 700,
-                  background: pw.color, color: "#fff", letterSpacing: 1, textTransform: "uppercase",
-                }}>Active</div>
-              )}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                <div style={{
-                  width: 38, height: 38, borderRadius: 11, flexShrink: 0,
-                  background: isActive ? pw.color : "rgba(255,255,255,0.05)",
-                  border: isActive ? "none" : "1px solid rgba(255,255,255,0.08)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: isActive ? `0 4px 14px ${pw.color}44` : "none",
-                }}>
-                  <Ic size={18} color={isActive ? "#fff" : "rgba(255,255,255,0.28)"} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.2,
-                                color: isActive ? "#fff" : "rgba(255,255,255,0.40)" }}>{pw.label}</div>
-                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", marginTop: 1 }}>{pw.sub}</div>
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                {pw.outputs.map((o) => (
-                  <div key={o.n} style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
-                    <span style={{
-                      fontSize: 8, fontWeight: 800, flexShrink: 0, marginTop: 1.5, letterSpacing: 0.5,
-                      color: isActive ? pw.color : "rgba(255,255,255,0.18)",
-                    }}>{o.n}</span>
-                    <span style={{
-                      fontSize: 11, lineHeight: 1.4,
-                      color: isActive ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.28)",
-                    }}>{o.text}</span>
-                  </div>
-                ))}
-              </div>
-              {!isActive && (
-                <button onClick={() => navigate("/step/1")} style={{
-                  marginTop: 12, width: "100%", padding: "5px 0", borderRadius: 7,
-                  border: "1px solid rgba(255,255,255,0.07)", background: "transparent",
-                  color: "rgba(255,255,255,0.25)", fontSize: 9, fontWeight: 600,
-                  cursor: "pointer", letterSpacing: 0.5,
-                }}>SELECT IN STEP 1 ↗</button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <FlowConnector />
+      {/* ── STEP WORKFLOW ── */}
+      <ProjectFlowDiagram activeType={activeFlowType} onTypeChange={setActiveFlowType} />
 
       {/* ── LAYER 2: Analysis Engine ── */}
       <div style={{
@@ -520,7 +1027,7 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
       <DownArrow />
 
       {/* ── LAYER 3: Sensitivity Analysis ── */}
-      <SensitivityPanel />
+      <SensitivityPanel activeType={activeFlowType} />
 
       {/* Pathway-specific content */}
       {activeType === "Energy Community Planning" && <ECPathwayDetail />}
