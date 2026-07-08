@@ -545,28 +545,7 @@ export default function BaselineSetup() {
         </button>
       </div>
 
-      {/* ── Actions ── */}
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <button
-          onClick={() => navigate("/step/2")}
-          style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.65)", fontSize: 13, cursor: "pointer" }}
-        >
-          ← Back
-        </button>
-        <button
-          onClick={() => navigate("/step/4")}
-          style={{
-            marginLeft: "auto",
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "10px 24px", borderRadius: 10, border: 0,
-            background: "linear-gradient(135deg,#721CB8,#421869)",
-            color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer",
-            boxShadow: "0 4px 14px rgba(114,28,184,0.35)",
-          }}
-        >
-          Continue →
-        </button>
-      </div>
+
 
     </div>
   );

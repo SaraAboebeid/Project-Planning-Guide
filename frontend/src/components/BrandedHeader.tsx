@@ -23,7 +23,7 @@ export default function BrandedHeader() {
             Data Fidelity Navigator
           </h1>
           <p className="text-white/60 text-[10px] tracking-[0.18em] uppercase mt-0.5">
-            Project Planning Guide
+            Digital ToolBox
           </p>
         </div>
 

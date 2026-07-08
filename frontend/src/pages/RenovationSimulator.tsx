@@ -841,33 +841,7 @@ export default function RenovationSimulator() {
         </div>
       )}
 
-      {/* Action buttons */}
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <button
-          onClick={() => navigate("/step/3")}
-          style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.65)", fontSize: 13, cursor: "pointer" }}
-        >
-          ← Back
-        </button>
-        {combinations.length > 0 && (
-          <button
-            disabled={simRunning}
-            onClick={runSimulation}
-            style={{
-              marginLeft: "auto",
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "10px 20px", borderRadius: 10,
-              border: `1px solid ${simRunning ? "rgba(255,255,255,0.08)" : "rgba(150,215,76,0.4)"}`,
-              background: simRunning ? "rgba(255,255,255,0.04)" : "rgba(150,215,76,0.12)",
-              color: simRunning ? "rgba(255,255,255,0.25)" : "#96D74C",
-              fontSize: 13, fontWeight: 700, cursor: simRunning ? "not-allowed" : "pointer",
-            }}
-          >
-            {simRunning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Play size={14} />}
-            {simRunning ? "Simulating…" : simResults ? "Re-run Simulation" : "Send to Simulation"}
-          </button>
-        )}
-      </div>
+
 
     </div>
   );

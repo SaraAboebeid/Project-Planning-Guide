@@ -452,29 +452,7 @@ export default function RenovationReport() {
         </Card>
       )}
 
-      {/* ── Navigation ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 32 }}>
-        <button
-          onClick={() => navigate("/step/4")}
-          style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.65)", fontSize: 13, cursor: "pointer" }}
-        >
-          ← Back
-        </button>
-        <div style={{ display: "flex", gap: 12 }}>
-          <button
-            onClick={downloadReport}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderRadius: 10, border: "1px solid rgba(78,205,196,0.35)", background: "rgba(78,205,196,0.1)", color: "#4ECDC4", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
-          >
-            <Download size={14} /> Download Report
-          </button>
-          <button
-            onClick={() => window.print()}
-            style={{ padding: "10px 18px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)", fontSize: 13, cursor: "pointer" }}
-          >
-            Print
-          </button>
-        </div>
-      </div>
+
 
     </div>
   );

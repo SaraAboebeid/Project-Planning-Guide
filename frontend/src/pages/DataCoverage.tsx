@@ -918,6 +918,11 @@ function BboxDataBanner({
   useEffect(() => { onRowsChange?.(rows ?? []); }, [rows, onRowsChange]);
   useEffect(() => { onSelectionChange?.(selected); }, [selected, onSelectionChange]);
 
+  // Auto-fetch rows on mount so downstream steps always have building data
+  useEffect(() => {
+    if (bbox && !rows) loadRows();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function loadRows() {
     if (!bbox) return;
     setLoading(true);

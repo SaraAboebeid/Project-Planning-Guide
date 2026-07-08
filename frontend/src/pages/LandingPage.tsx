@@ -340,7 +340,7 @@ export default function LandingPage() {
 
               {/* Main heading */}
               <h1 className="text-[2.6rem] font-black text-white leading-[1.08] tracking-tight mb-3">
-                Project Planning Guide
+                Digital ToolBox
               </h1>
               <p className="text-[13px] text-white/50 leading-relaxed mb-7 max-w-[380px]">
                 Explore site data, uncertainty, scenarios, deliverables,

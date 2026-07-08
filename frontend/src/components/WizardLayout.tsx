@@ -23,7 +23,19 @@ const IC = {
   arrowL:   "M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z",
   arrowR:   "M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z",
   chevronR: "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z",
+  budget:   "M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z",
+  report:   "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z",
 };
+
+function SideNavItem({ iconD, label, onClick }: { iconD: string; label: string; onClick?: () => void }) {
+  return (
+    <button onClick={onClick} title={label}
+            className="group flex flex-col items-center gap-1 w-full py-2.5 rounded-lg transition-all cursor-pointer border-0 text-white/40 hover:text-white/80 hover:bg-white/8">
+      <Icon d={iconD} size={19} />
+      <span className="text-[9px] tracking-wide font-medium leading-none">{label}</span>
+    </button>
+  );
+}
 
 const STEP_ICONS = [IC.project, IC.map, IC.database, IC.layers, IC.timeline];
 
@@ -120,8 +132,8 @@ export default function WizardLayout() {
          style={{ background: "#0a0d14", fontFamily: "'Inter', system-ui, sans-serif", color: "#fff" }}>
 
       {/* ── LEFT SIDEBAR ────────────────────────────────────────────────── */}
-      <aside className="w-[60px] shrink-0 flex flex-col items-center py-4 gap-0.5 z-30"
-             style={{ background: "#0d1117", borderRight: "1px solid rgba(255,255,255,0.07)" }}>
+      <aside className="w-[62px] shrink-0 flex flex-col items-center py-3 gap-0.5 z-30"
+             style={{ background: "#0a0d14", borderRight: "1px solid rgba(255,255,255,0.07)" }}>
         {/* Logo */}
         <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 shadow-lg shrink-0 cursor-pointer"
              style={{ background: "linear-gradient(135deg,#721CB8,#421869)" }}
@@ -129,79 +141,74 @@ export default function WizardLayout() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         </div>
 
-        {steps.map((s, i) => {
-          const isActive = s.path === location.pathname;
-          const isDone   = i < safeIndex;
-          return (
-            <button key={s.number} title={s.label} onClick={() => navigate(s.path)}
-                    style={{
-                      background: isActive ? "rgba(114,28,184,0.28)" : "transparent",
-                      color: isActive ? "#fff" : isDone ? "#96D74C" : "rgba(255,255,255,0.32)",
-                      border: 0, width: "100%", padding: "8px 0", borderRadius: 8,
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-                      cursor: "pointer", transition: "all 0.15s",
-                    }}>
-              <Icon d={isDone ? IC.check : STEP_ICONS[i]!} size={18} />
-              <span style={{ fontSize: 8, fontWeight: 600, lineHeight: 1 }}>{i + 1}</span>
-            </button>
-          );
-        })}
+        {/* Same nav items as home page */}
+        <SideNavItem iconD={IC.layers}   label="Pathways" onClick={() => navigate("/pathways")} />
+        <SideNavItem iconD={IC.database} label="Data"     onClick={() => navigate("/data")} />
+        <SideNavItem iconD={IC.timeline} label="Analysis" onClick={() => navigate("/analysis")} />
+        <SideNavItem iconD={IC.map}      label="Map"      onClick={() => window.open("http://localhost:8765/gothenburg_3d.html", "_blank")} />
+        <SideNavItem iconD={IC.budget}   label="Budget"   onClick={() => navigate("/budget")} />
+        <SideNavItem iconD={IC.report}   label="Reports"  onClick={() => navigate("/reports")} />
 
-        <div style={{ flex: 1 }} />
-
-        <button title="Data Explorer"
-                onClick={() => navigate("/data")}
-                style={{ border: 0, background: "transparent", color: "rgba(255,255,255,0.28)",
-                         width: "100%", padding: "8px 0", borderRadius: 8, cursor: "pointer",
-                         display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-          <Icon d="M12 3C7.58 3 4 4.79 4 7s3.58 4 8 4 8-1.79 8-4-3.58-4-8-4zM4 9v3c0 2.21 3.58 4 8 4s8-1.79 8-4V9c0 2.21-3.58 4-8 4S4 11.21 4 9zm0 5v3c0 2.21 3.58 4 8 4s8-1.79 8-4v-3c0 2.21-3.58 4-8 4s-8-1.79-8-4z" size={18} />
-          <span style={{ fontSize: 8 }}>Data</span>
-        </button>
-        <button title="Open 3D Viewer"
-                onClick={() => window.open("http://localhost:8765/gothenburg_3d.html", "_blank")}
-                style={{ border: 0, background: "transparent", color: "rgba(255,255,255,0.28)",
-                         width: "100%", padding: "8px 0", borderRadius: 8, cursor: "pointer",
-                         display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-          <Icon d={IC.globe} size={18} />
-          <span style={{ fontSize: 8 }}>3D</span>
-        </button>
-        <button title="Settings"
-                style={{ border: 0, background: "transparent", color: "rgba(255,255,255,0.28)",
-                         width: "100%", padding: "8px 0", borderRadius: 8, cursor: "pointer",
-                         display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-          <Icon d={IC.settings} size={18} />
-          <span style={{ fontSize: 8 }}>Settings</span>
-        </button>
+        <div className="flex-1" />
+        <SideNavItem iconD={IC.settings} label="Settings" />
       </aside>
 
       {/* ── MAIN COLUMN ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* ── TOP BAR ─────────────────────────────────────────────────── */}
-        <header className="shrink-0 flex items-center gap-4 px-6 z-20"
-                style={{ background: "#0d1117", borderBottom: "1px solid rgba(255,255,255,0.07)",
-                         minHeight: 56 }}>
-          {safeIndex !== 3 && (
-            <span style={{
-              padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: "#fff",
-              background: "rgba(114,28,184,0.35)", border: "1px solid rgba(114,28,184,0.5)",
-            }}>
-              Step {safeIndex + 1} of {steps.length}
-            </span>
-          )}
-          <h1 style={{ fontSize: 17, fontWeight: 700, color: "#fff", margin: 0 }}>
-            {activeStep.label}
-          </h1>
-          <div style={{ flex: 1 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{progress}% complete</span>
-            <div style={{ width: 140, height: 6, borderRadius: 999, background: "rgba(255,255,255,0.08)" }}>
-              <div style={{
-                width: `${progress}%`, height: "100%", borderRadius: 999,
-                background: "linear-gradient(to right,#721CB8,#96D74C)", transition: "width 0.5s",
-              }} />
+        <header className="shrink-0 flex flex-col z-20"
+                style={{ background: "#0d1117", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+
+          {/* Step breadcrumb strip */}
+          <div className="flex items-center gap-0 px-6 pt-3 pb-2">
+            {steps.map((s, i) => {
+              const isActive = s.path === location.pathname;
+              const isDone   = i < safeIndex;
+              return (
+                <div key={s.number} className="flex items-center">
+                  <button
+                    onClick={() => navigate(s.path)}
+                    title={s.label}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      padding: "4px 10px", borderRadius: 20, border: 0,
+                      background: isActive ? "rgba(114,28,184,0.30)" : "transparent",
+                      color: isActive ? "#fff" : isDone ? "#96D74C" : "rgba(255,255,255,0.30)",
+                      fontSize: 11, fontWeight: isActive ? 700 : 500,
+                      cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap",
+                    }}
+                  >
+                    <span style={{
+                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 9, fontWeight: 800,
+                      background: isActive ? "#721CB8" : isDone ? "rgba(150,215,76,0.2)" : "rgba(255,255,255,0.08)",
+                      color: isActive ? "#fff" : isDone ? "#96D74C" : "rgba(255,255,255,0.35)",
+                      border: isActive ? "1px solid rgba(114,28,184,0.6)" : isDone ? "1px solid rgba(150,215,76,0.4)" : "1px solid rgba(255,255,255,0.10)",
+                    }}>
+                      {isDone ? "✓" : i + 1}
+                    </span>
+                    {s.label}
+                  </button>
+                  {i < steps.length - 1 && (
+                    <span style={{ color: "rgba(255,255,255,0.12)", fontSize: 12, margin: "0 2px" }}>›</span>
+                  )}
+                </div>
+              );
+            })}
+            <div style={{ flex: 1 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{progress}%</span>
+              <div style={{ width: 100, height: 4, borderRadius: 999, background: "rgba(255,255,255,0.08)" }}>
+                <div style={{
+                  width: `${progress}%`, height: "100%", borderRadius: 999,
+                  background: "linear-gradient(to right,#721CB8,#96D74C)", transition: "width 0.5s",
+                }} />
+              </div>
             </div>
           </div>
+
         </header>
 
         {/* ── CONTENT + RIGHT PANEL ───────────────────────────────────── */}
