@@ -198,11 +198,10 @@ export default function LandingPage() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         </div>
 
-        <NavItem iconPath={IC.home}        label="Home"        active onClick={() => navigate("/")} />
-        <NavItem iconPath={IC.map}         label="Map"         onClick={() => window.open("http://localhost:8765/gothenburg_3d.html", "_blank")} />
-        <NavItem iconPath={IC.database}    label="Data"        onClick={() => navigate("/data")} />
         <NavItem iconPath={IC.layers}      label="Pathways"    onClick={() => { reset(); navigate("/pathways"); }} />
+        <NavItem iconPath={IC.database}    label="Data"        onClick={() => navigate("/data")} />
         <NavItem iconPath={IC.timeline}    label="Analysis"    onClick={() => { reset(); navigate("/analysis"); }} />
+        <NavItem iconPath={IC.map}         label="Map"         onClick={() => window.open("http://localhost:8765/gothenburg_3d.html", "_blank")} />
         <NavItem iconPath={IC.budget}      label="Budget"      onClick={() => { reset(); navigate("/budget"); }} />
         <NavItem iconPath={IC.report}      label="Reports"     onClick={() => { reset(); navigate("/reports"); }} />
 
