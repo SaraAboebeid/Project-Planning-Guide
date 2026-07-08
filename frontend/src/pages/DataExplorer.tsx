@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { WIKELLS_CHAPTERS, wikellsStats } from "../config/wikellsData";
 
 // ── Icon helper ──────────────────────────────────────────────────────────────
 function Icon({ d, size = 16 }: { d: string; size?: number }) {
@@ -24,6 +25,7 @@ const IC = {
   refresh:   "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z",
   filter:    "M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z",
   camera:    "M12 15.2c-1.77 0-3.2-1.43-3.2-3.2s1.43-3.2 3.2-3.2 3.2 1.43 3.2 3.2-1.43 3.2-3.2 3.2zM20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z",
+  hammer:    "M13.78 6.22 11.22 3.66c-.39-.39-1.02-.39-1.41 0l-7.07 7.07c-.39.39-.39 1.02 0 1.41l2.56 2.56 2.12-2.12 1.41 1.41-9.19 9.19 1.41 1.41 9.19-9.19 1.41 1.41-2.12 2.12 2.56 2.56c.39.39 1.02.39 1.41 0l7.07-7.07c.39-.39.39-1.02 0-1.41l-2.56-2.56-2.12 2.12-1.41-1.41 2.12-2.12-1.41-1.41-2.12 2.12-1.41-1.41 2.12-2.12z",
 };
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -38,6 +40,7 @@ interface DataSource {
   status: "live" | "cached" | "static";
   fields: string[];
   sampleFn: () => Promise<Record<string, unknown>[]>;
+  renderPreview?: () => React.ReactNode;
 }
 
 // ── Data sources definition ──────────────────────────────────────────────────
@@ -201,7 +204,139 @@ const SOURCES: DataSource[] = [
       }
     },
   },
+  {
+    id: "wikells",
+    name: "Wikells Sektionsfakta",
+    description: "Swedish renovation material cost database — installed section costs in SEK/m² with fire class, U-values and sound ratings. Used directly in the Renovation Packages calculator.",
+    iconD: IC.hammer,
+    accent: "#F59E0B",
+    count: String(wikellsStats().totalItems),
+    countLabel: "line items",
+    status: "live",
+    sampleFn: async () => [], // not used — renderPreview takes over
+    renderPreview: () => <WikellsPreview />,
+  },
 ];
+
+// ── Wikells category browser ─────────────────────────────────────────────────
+function WikellsPreview() {
+  const [openCh, setOpenCh] = useState<string | null>(null);
+  const accent = "#F59E0B";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {WIKELLS_CHAPTERS.map((ch) => {
+        const allItems = ch.subGroups.flatMap(sg => sg.items);
+        const isOpen   = openCh === ch.id;
+        const costs    = allItems.map(i => i.costSEK);
+        const minC     = Math.min(...costs);
+        const maxC     = Math.max(...costs);
+        return (
+          <div key={ch.id} style={{
+            borderRadius: 10,
+            border: `1px solid ${isOpen ? accent + "55" : "rgba(255,255,255,0.08)"}`,
+            background: isOpen ? `${accent}08` : "rgba(255,255,255,0.02)",
+            overflow: "hidden", transition: "all 0.18s",
+          }}>
+            {/* Chapter header */}
+            <button
+              onClick={() => setOpenCh(isOpen ? null : ch.id)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center",
+                gap: 12, padding: "12px 14px", background: "transparent",
+                border: 0, cursor: "pointer", textAlign: "left",
+              }}
+            >
+              {/* Chapter badge */}
+              <div style={{
+                width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                background: isOpen ? `${accent}22` : "rgba(255,255,255,0.06)",
+                border: `1px solid ${isOpen ? accent + "50" : "rgba(255,255,255,0.10)"}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, fontWeight: 800,
+                color: isOpen ? accent : "rgba(255,255,255,0.40)",
+              }}>{ch.chapter}</div>
+
+              {/* Title */}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: isOpen ? "#fff" : "rgba(255,255,255,0.75)" }}>
+                  {ch.titleEN}
+                </div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.30)", marginTop: 2 }}>
+                  {ch.subGroups.length} subgroup{ch.subGroups.length !== 1 ? "s" : ""} · {allItems.length} items
+                </div>
+              </div>
+
+              {/* Cost range */}
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: accent }}>
+                  {minC.toLocaleString("sv-SE")}–{maxC.toLocaleString("sv-SE")}
+                </div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.28)" }}>SEK/m²</div>
+              </div>
+
+              {/* Chevron */}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,255,255,0.35)"
+                style={{ flexShrink: 0, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.18s" }}>
+                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+              </svg>
+            </button>
+
+            {/* Expanded detail: one sample card per subgroup */}
+            {isOpen && (
+              <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+                {ch.subGroups.map((sg) => {
+                  const s = sg.items[0];
+                  if (!s) return null;
+                  return (
+                    <div key={sg.label} style={{
+                      borderRadius: 8, overflow: "hidden",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                    }}>
+                      {/* Subgroup label bar */}
+                      <div style={{
+                        padding: "6px 12px",
+                        background: `${accent}12`,
+                        borderBottom: "1px solid rgba(255,255,255,0.07)",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                      }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: accent }}>{sg.label}</span>
+                        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.30)" }}>{sg.items.length} items</span>
+                      </div>
+                      {/* Sample item fields */}
+                      <div style={{
+                        padding: "8px 12px",
+                        background: "rgba(255,255,255,0.02)",
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                        gap: "6px 16px",
+                      }}>
+                        {([
+                          { k: "Code",        v: s.code,          c: accent },
+                          { k: "Description", v: s.description,   c: "rgba(255,255,255,0.80)" },
+                          { k: "Cost",        v: `${s.costSEK.toLocaleString("sv-SE")} SEK/m²`, c: accent },
+                          ...(s.uValue     != null ? [{ k: "U-value",   v: `${s.uValue} W/(m²·K)`, c: "#4A90E2" }] : []),
+                          ...(s.fireClass         ? [{ k: "Fire class", v: s.fireClass,             c: "#96D74C" }] : []),
+                          ...(s.soundRw    != null ? [{ k: "Sound Rw",  v: `${s.soundRw} dB`,       c: "#4ECDC4" }] : []),
+                          ...(s.weightKgM2 != null ? [{ k: "Weight",    v: `${s.weightKgM2} kg/m²`, c: "rgba(255,255,255,0.50)" }] : []),
+                        ] as { k: string; v: string; c: string }[]).map(({ k, v, c }) => (
+                          <div key={k}>
+                            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.28)", marginBottom: 1 }}>{k}</div>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: c,
+                                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: DataSource["status"] }) {
@@ -273,6 +408,7 @@ function SourceCard({
   const [imgModal, setImgModal] = useState<string | null>(null);
 
   async function loadSample() {
+    if (source.renderPreview) { setExpanded(e => !e); return; }
     if (rows) { setExpanded(e => !e); return; }
     setLoading(true);
     setExpanded(true);
@@ -383,7 +519,11 @@ function SourceCard({
         {/* Sample data panel */}
         {expanded && (
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "14px 18px" }}>
-            {/* Toolbar */}
+            {/* Custom renderer (e.g. Wikells) */}
+            {source.renderPreview ? (
+              source.renderPreview()
+            ) : (
+              <>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.40)", flex: 1 }}>
                 {loading ? "Fetching sample…" : `Showing ${(displayRows ?? []).length} record(s)`}
@@ -475,6 +615,8 @@ function SourceCard({
                 </div>
               );
             })()}
+            </>
+            )}
           </div>
         )}
       </div>
