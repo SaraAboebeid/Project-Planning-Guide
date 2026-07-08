@@ -198,12 +198,6 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
             fallbackSource: "Archetype model", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
-          {
-            key: "r_matlist", label: "List of materials to test",
-            primarySource: "User-provided material list", primaryConfidence: "High",
-            fallbackSource: "Boverket & Wikells material library (provided — no action needed)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "None",
-            defaultHas: false,
-          },
         ],
       });
     }

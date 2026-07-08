@@ -75,6 +75,8 @@ interface ProjectState {
   currentBbox: { north: number; south: number; east: number; west: number } | null;
   /* all bbox building rows loaded in step 2 */
   bboxRows: BuildingRecord[];
+  /* simulation material selections (Step 3, Renovation) */
+  simulationMaterials: Record<string, string[]>; // component label → selected wikells codes
   /* renovation packages built in step 4 */
   renovationPackages: RenovationPackage[];
   selectedPackageId: string | null;
@@ -121,6 +123,7 @@ const DEFAULT_PROJECT: ProjectState = {
   currentBbox: null,
   bboxRows: [],
   savedWWR: null,
+  simulationMaterials: {},
   renovationPackages: [],
   selectedPackageId: null,
 };
