@@ -1,8 +1,30 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
-import type { BuildingLookup } from "../types";
+import type { BuildingLookup, BuildingRecord } from "../types";
 import { Building2, FileJson, Upload, Zap, X, Loader2, BarChart2, Thermometer, Droplets, Wind, Download } from "lucide-react";
+
+/** Normalise a bbox BuildingRecord into the same shape as BuildingLookup */
+function recordToLookup(r: BuildingRecord, idx: number): BuildingLookup {
+  return {
+    address:       r.address || null,
+    height:        r.height_m,
+    floors:        r.floors,
+    area_atemp:    null,
+    footprint_m2:  r.footprint_m2,
+    use_cat:       r.building_use,
+    year:          r.year_built,
+    energy:        r.energy_kwh_m2,
+    eclass:        r.epc_class,
+    tabula_period: r.tabula_period,
+    tabula_u_wall: r.u_wall,
+    tabula_u_win:  r.u_window,
+    has_epc:       r.has_epc ?? false,
+    lat:           r.lat,
+    lon:           r.lon,
+    dist_m:        0,
+  };
+}
 
 /* ─── Fields required for baseline EPSM simulation ───────────────────────── */
 const REQUIRED_FIELDS: {
@@ -43,8 +65,9 @@ export default function BaselineSetup() {
   const buildings = useMemo<BuildingLookup[]>(() => {
     if (project.lookedUpBuildings.length > 0) return project.lookedUpBuildings;
     if (project.lookedUpBuilding) return [project.lookedUpBuilding];
+    if (project.bboxRows.length > 0) return project.bboxRows.map(recordToLookup);
     return [];
-  }, [project.lookedUpBuildings, project.lookedUpBuilding]);
+  }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows]);
 
   const supplementary = project.supplementaryData ?? {};
 
@@ -107,7 +130,16 @@ export default function BaselineSetup() {
         clearInterval(iv);
         setSimProgress(100);
         setSimRunning(false);
-        setProject({ baselineStatus: "done" });
+        setProject({ baselineStatus: "done", renovationBaselineResults: dummyResults.map(r => ({
+          address: r.address,
+          energyUse: r.energyUse,
+          heating: r.heating,
+          cooling: r.cooling,
+          dhw: r.dhw,
+          airLeakage: r.airLeakage,
+          eClass: r.eClass,
+          eClassFromEpc: r.eClassFromEpc,
+        })) });
       } else {
         setSimProgress(p);
       }
@@ -130,7 +162,7 @@ export default function BaselineSetup() {
     [buildings, supplementary],
   );
 
-  const allComplete = buildingStatus.every(s => s.complete);
+  const allComplete = uploadSuccess || buildingStatus.every(s => s.complete);
   const totalMissing = buildingStatus.reduce((acc, s) => acc + s.missing.length, 0);
 
   /* ── JSON upload handler ── */

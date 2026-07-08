@@ -18,6 +18,27 @@ const STEPS: StepDef[] = [
   { number: 5, label: "Timeline & Cost",    path: "/step/5" },
 ];
 
+/* ── Renovation simulation result types ── */
+export interface RenovationBaselineResult {
+  address: string;
+  energyUse: number;
+  heating: number;
+  cooling: number;
+  dhw: number;
+  airLeakage: number;
+  eClass: string | null;
+  eClassFromEpc: boolean;
+}
+
+export interface RenovationPackageResult {
+  packageIndex: number;
+  components: Record<string, { code: string; description: string; costSEK: number; uValue?: number }>;
+  energyUse: number;
+  saving: number;
+  carbonSaving: number;
+  cost: number;
+}
+
 /* ── Renovation package types ── */
 export interface PackageComponent {
   wikellsCode: string;
@@ -84,6 +105,10 @@ interface ProjectState {
   supplementaryData: Record<string, Record<string, unknown>>; // building address → field overrides
   /* Step 3 Renovation — baseline EPSM simulation status */
   baselineStatus: "idle" | "done";
+  /* Step 3 Renovation — saved baseline results per building */
+  renovationBaselineResults: RenovationBaselineResult[];
+  /* Step 4 Renovation — saved package simulation results */
+  renovationSimResults: RenovationPackageResult[];
 }
 
 interface WizardState {
@@ -132,6 +157,8 @@ const DEFAULT_PROJECT: ProjectState = {
   selectedPackageId: null,
   supplementaryData: {},
   baselineStatus: "idle",
+  renovationBaselineResults: [],
+  renovationSimResults: [],
 };
 
 export const useWizardStore = create<WizardState>((set) => ({

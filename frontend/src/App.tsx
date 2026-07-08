@@ -11,6 +11,7 @@ import RenovationSimulator from "./pages/RenovationSimulator";
 import Scenarios from "./pages/Scenarios";
 import StepScenarios from "./pages/StepScenarios";
 import ResultsBudget from "./pages/ResultsBudget";
+import RenovationReport from "./pages/RenovationReport";
 import DataExplorer from "./pages/DataExplorer";
 import Timeline from "./pages/Timeline";
 import Budget from "./pages/Budget";
@@ -38,6 +39,13 @@ function Step4Router() {
     : <StepScenarios />;
 }
 
+function Step5Router() {
+  const projectType = useWizardStore(s => s.project.projectType);
+  return projectType === "Renovation Planning"
+    ? <RenovationReport />
+    : <ResultsBudget />;
+}
+
 /**
  * 5-step wizard — generic schema for all 3 project tracks:
  *  1 – Define Project        (type, KPIs, scope, systems)
@@ -62,7 +70,7 @@ export default function App() {
         <Route path="/step/2" element={<DataCoverage />} />
         <Route path="/step/3" element={<Step3Router />} />
         <Route path="/step/4" element={<Step4Router />} />
-        <Route path="/step/5" element={<ResultsBudget />} />
+        <Route path="/step/5" element={<Step5Router />} />
       </Route>
       </Routes>
     </>

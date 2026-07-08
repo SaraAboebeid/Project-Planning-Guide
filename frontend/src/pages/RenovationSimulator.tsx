@@ -2,7 +2,12 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import { WIKELLS_CHAPTERS, type WikellsItem } from "../config/wikellsData";
+import type { BuildingRecord } from "../types";
 import { Search, ChevronDown, ChevronUp, FlaskConical, LayoutGrid, Eye, Play, Building2, Users, CheckSquare, Loader2, BarChart2, Leaf, Download, TrendingDown } from "lucide-react";
+
+function bboxLabel(r: BuildingRecord, i: number): string {
+  return r.address || `Building ${i + 1}`;
+}
 
 /* ─── Component → Wikells chapter mapping ─────────────────────────────────── */
 // Keys match the exact labels used in Step 1 (ENVELOPE_COMPONENTS in projectConfig.ts)
@@ -356,9 +361,13 @@ export default function RenovationSimulator() {
       });
     } else if (project.lookedUpBuilding) {
       result.push({ id: "b_0", label: project.lookedUpBuilding.address ?? "Building" });
+    } else if (project.bboxRows.length > 0) {
+      project.bboxRows.forEach((r, i) => {
+        result.push({ id: `br_${i}`, label: bboxLabel(r, i) });
+      });
     }
     return result;
-  }, [project.lookedUpBuildings, project.lookedUpBuilding]);
+  }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows]);
 
   // "all" = apply same combinations to all buildings; otherwise array of selected building IDs
   const [buildingScope, setBuildingScope] = useState<"all" | string[]>("all");
@@ -415,10 +424,12 @@ export default function RenovationSimulator() {
   // Baseline energy use from Step 3 dummy results (average across buildings, or fallback)
   const baselineEnergyUse = useMemo(() => {
     const b = project.lookedUpBuilding ?? project.lookedUpBuildings[0];
+    const bboxB = project.bboxRows[0];
     if (b?.energy) return b.energy;
-    const year = b?.year ?? 1970;
-    return Math.round(90 + (year % 80) + (b?.tabula_u_wall ?? 0.5) * 60);
-  }, [project.lookedUpBuilding, project.lookedUpBuildings]);
+    if (bboxB?.energy_kwh_m2) return bboxB.energy_kwh_m2;
+    const year = b?.year ?? bboxB?.year_built ?? 1970;
+    return Math.round(90 + (year % 80) + (b?.tabula_u_wall ?? bboxB?.u_wall ?? 0.5) * 60);
+  }, [project.lookedUpBuilding, project.lookedUpBuildings, project.bboxRows]);
 
   function runSimulation() {
     setProject({ simulationMaterials: materials });
@@ -453,6 +464,24 @@ export default function RenovationSimulator() {
         // Sort best saving first
         results.sort((a, b) => b.saving - a.saving);
         setSimResults(results);
+        setProject({
+          simulationMaterials: materials,
+          renovationSimResults: results.map(r => ({
+            packageIndex: r.packageIndex,
+            components: Object.fromEntries(
+              Object.entries(r.components).map(([comp, item]) => [comp, {
+                code: item.code,
+                description: item.description,
+                costSEK: item.costSEK,
+                uValue: item.uValue,
+              }])
+            ),
+            energyUse: r.energyUse,
+            saving: r.saving,
+            carbonSaving: r.carbonSaving,
+            cost: r.cost,
+          })),
+        });
       } else {
         setSimProgress(p);
       }

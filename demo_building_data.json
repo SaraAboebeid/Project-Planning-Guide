@@ -1,0 +1,60 @@
+{
+  "buildings": [
+    {
+      "address": "Fabriksgatan 26, Göteborg",
+      "height": 14.5,
+      "floors": 5,
+      "area_atemp": 1250,
+      "footprint_m2": 265,
+      "use_cat": "Residential",
+      "year": 1962,
+      "tabula_period": "1961-1980",
+      "tabula_u_wall": 0.47,
+      "tabula_u_win": 2.8,
+      "energy_kwh_m2": 148,
+      "eclass": "D"
+    },
+    {
+      "address": "Fabriksgatan 28, Göteborg",
+      "height": 14.5,
+      "floors": 5,
+      "area_atemp": 1240,
+      "footprint_m2": 260,
+      "use_cat": "Residential",
+      "year": 1963,
+      "tabula_period": "1961-1980",
+      "tabula_u_wall": 0.49,
+      "tabula_u_win": 2.9,
+      "energy_kwh_m2": 152,
+      "eclass": "D"
+    },
+    {
+      "address": "Fabriksgatan 30, Göteborg",
+      "height": 11.2,
+      "floors": 4,
+      "area_atemp": 940,
+      "footprint_m2": 245,
+      "use_cat": "Residential",
+      "year": 1958,
+      "tabula_period": "1946-1960",
+      "tabula_u_wall": 0.55,
+      "tabula_u_win": 3.0,
+      "energy_kwh_m2": 168,
+      "eclass": "E"
+    },
+    {
+      "address": "Fabriksgatan 32, Göteborg",
+      "height": 11.2,
+      "floors": 4,
+      "area_atemp": 920,
+      "footprint_m2": 238,
+      "use_cat": "Residential",
+      "year": 1959,
+      "tabula_period": "1946-1960",
+      "tabula_u_wall": 0.54,
+      "tabula_u_win": 3.1,
+      "energy_kwh_m2": 161,
+      "eclass": "E"
+    }
+  ]
+}
