@@ -38,7 +38,7 @@ export default function App() {
       <Route path="/data"      element={<DataLayout><DataExplorer /></DataLayout>} />
       <Route path="/pathways"  element={<DataLayout title="Pathways"       accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
       <Route path="/analysis"  element={<DataLayout title="Analysis" accentColor="#4ECDC4" accentBadge="Tools"><AnalysisTools /></DataLayout>} />
-      <Route path="/budget"    element={<DataLayout title="Budget"          accentColor="#F59E0B" accentBadge="CAPEX Estimate"><Budget /></DataLayout>} />
+      <Route path="/budget"    element={<DataLayout title="Planning & Cost" accentColor="#F59E0B" accentBadge="Cost Estimate"><Budget /></DataLayout>} />
       <Route path="/reports" element={<DataLayout title="Reports" accentColor="#96D74C" accentBadge="Examples"><SampleReports /></DataLayout>} />
       <Route element={<WizardLayout />}>
         <Route path="/step/1" element={<DefineProject />} />

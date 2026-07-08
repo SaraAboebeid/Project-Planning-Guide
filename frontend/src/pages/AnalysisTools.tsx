@@ -1,4 +1,4 @@
-import { ExternalLink, Sun, Eye, Layers, Zap, ChevronRight } from "lucide-react";
+import { ExternalLink, Sun, Eye, Layers, Zap, Wrench, Leaf, ChevronRight } from "lucide-react";
 
 /* ── Tool definitions ─────────────────────────────────────────────── */
 
@@ -87,6 +87,46 @@ const TOOLS = [
       institution: "Chalmers University of Technology",
       contact: "sanjay.somanath@chalmers.se",
     },
+    usedIn: ["Renovation Planning", "Energy Community Planning", "Renewable Energy Planning"],
+  },
+  {
+    id: "retrofit",
+    title: "Retrofit Scenario Analyser",
+    subtitle: "Renovation Measure Comparison & Optimisation",
+    color: "#F97316",
+    status: "integrated",
+    icon: Wrench,
+    description:
+      "Compare renovation measure packages side-by-side to identify the most cost-effective path to your energy target. The tool evaluates individual and combined retrofit interventions — insulation, windows, HVAC, ventilation — and ranks them by energy savings, payback period, and CO₂ reduction.",
+    features: [
+      "Measure library: wall insulation, roof, windows, HVAC, ventilation",
+      "Before/after energy use intensity (kWh/m²/yr) comparison",
+      "Simple payback period and net present value (NPV)",
+      "Package optimisation toward EPC target class",
+      "Sensitivity to energy price and discount rate assumptions",
+    ],
+    link: null,
+    linkLabel: null,
+    usedIn: ["Renovation Planning", "Energy Community Planning"],
+  },
+  {
+    id: "lca",
+    title: "Life Cycle Assessment",
+    subtitle: "Whole-Life Carbon & Environmental Impact",
+    color: "#22C55E",
+    status: "integrated",
+    icon: Leaf,
+    description:
+      "Quantifies the environmental impact of a building or renovation project across its full life cycle — from material extraction and construction (embodied carbon) through operational energy use to end-of-life demolition and recycling. Follows EN 15978 and aligns with the Level(s) framework.",
+    features: [
+      "Embodied carbon (A1–A5, B4, C modules) per renovation package",
+      "Operational carbon (B6) over 50-year reference study period",
+      "Material quantity take-off linked to renovation packages",
+      "Global Warming Potential (GWP) in kg CO₂-eq per m²",
+      "EN 15978 compliant life cycle boundary reporting",
+    ],
+    link: null,
+    linkLabel: null,
     usedIn: ["Renovation Planning", "Energy Community Planning", "Renewable Energy Planning"],
   },
 ];
@@ -276,8 +316,8 @@ export default function AnalysisTools() {
         {/* Summary pill row */}
         <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
           {[
-            { label: "4 tools", sub: "total", color: "#4ECDC4" },
-            { label: "3", sub: "integrated", color: "#96D74C" },
+            { label: "6 tools", sub: "total", color: "#4ECDC4" },
+            { label: "5", sub: "integrated", color: "#96D74C" },
             { label: "1", sub: "external", color: "#721CB8" },
           ].map(p => (
             <div key={p.label} style={{
@@ -296,7 +336,7 @@ export default function AnalysisTools() {
       {/* 2-column grid */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(460px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
         gap: 20,
       }}>
         {TOOLS.map(tool => (
