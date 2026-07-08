@@ -202,9 +202,9 @@ export default function LandingPage() {
         <NavItem iconPath={IC.map}         label="Map"         onClick={() => window.open("http://localhost:8765/gothenburg_3d.html", "_blank")} />
         <NavItem iconPath={IC.database}    label="Data"        onClick={() => navigate("/data")} />
         <NavItem iconPath={IC.layers}      label="Pathways"    onClick={() => { reset(); navigate("/pathways"); }} />
-        <NavItem iconPath={IC.timeline}    label="Timeline"    onClick={() => { reset(); navigate("/step/5"); }} />
-        <NavItem iconPath={IC.budget}      label="Budget"      onClick={() => { reset(); navigate("/step/5"); }} />
-        <NavItem iconPath={IC.report}      label="Reports"     onClick={() => { reset(); navigate("/step/5"); }} />
+        <NavItem iconPath={IC.timeline}    label="Analysis"    onClick={() => { reset(); navigate("/analysis"); }} />
+        <NavItem iconPath={IC.budget}      label="Budget"      onClick={() => { reset(); navigate("/budget"); }} />
+        <NavItem iconPath={IC.report}      label="Reports"     onClick={() => { reset(); navigate("/reports"); }} />
 
         {/* Push settings to bottom */}
         <div className="flex-1" />
@@ -398,7 +398,7 @@ export default function LandingPage() {
             <div className="flex gap-2">
               <Shortcut iconPath={IC.import}   label="Import Data"        onClick={() => { reset(); navigate("/step/2"); }} />
               <Shortcut iconPath={IC.compare}  label="Compare Scenarios"  onClick={() => { reset(); navigate("/pathways"); }} />
-              <Shortcut iconPath={IC.generate} label="Generate Report"    onClick={() => { reset(); navigate("/step/5"); }} />
+              <Shortcut iconPath={IC.generate} label="Generate Report"    onClick={() => { reset(); navigate("/analysis"); }} />
             </div>
           </div>
 

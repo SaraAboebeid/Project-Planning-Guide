@@ -41,6 +41,49 @@ export interface ReportComputedValues {
   selectedPackageId: string | null;
 }
 
+/** Renovation-specific: executive summary KPIs */
+export interface ReportExecutiveSummary {
+  energyBefore_kwhM2: number;
+  energyAfter_kwhM2: number;
+  energySavingsPct: number;
+  carbonReductionPct: number;
+  targetEpcClass: string;
+  investmentRange: string;         // e.g. "4.8 – 5.5 MSEK"
+  keyMessage: string;              // one-sentence headline
+}
+
+/** Renovation-specific: what is / is not in scope */
+export interface ReportRenovationFramework {
+  inScope: string[];
+  outOfScope: string[];
+  tenantImpact: string;            // short statement
+  leadIndicator: string;           // e.g. "Primary energy use (kWh/m²/yr)"
+}
+
+/** Renovation-specific: per-package impact comparison */
+export interface ReportImpactPackage {
+  name: string;
+  color: string;
+  energyBefore_kwhM2: number;
+  energyAfter_kwhM2: number;
+  savingsPct: number;
+  carbonBefore_tCO2: number;
+  carbonAfter_tCO2: number;
+  carbonReductionPct: number;
+  materialCostSEK: number;
+  annualEnergySavingsSEK: number;
+  simplePaybackYears: number;
+  targetEpcClass: string;
+}
+
+/** Renovation-specific: conclusions section */
+export interface ReportConclusions {
+  general: string[];
+  portfolioSpecific: string[];
+  recommendedPackage?: string;
+  nextSteps: string[];
+}
+
 export interface ReportProject {
   projectName: string;
   projectType: string | null;
@@ -52,6 +95,11 @@ export interface ReportProject {
   explorationApproaches: string[];
   buildingUses: string[];
   renovationEnvelopeComponents: string[];
+  /* optional renovation-specific sections */
+  executiveSummary?: ReportExecutiveSummary;
+  renovationFramework?: ReportRenovationFramework;
+  impactPackages?: ReportImpactPackage[];
+  conclusions?: ReportConclusions;
   address: string;
   locationLabel: string;
   lat: number | null;
@@ -418,6 +466,164 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
   /* ── Assemble HTML ── */
   const isRenovation = project.projectType === "Renovation Planning";
 
+  /* ── Executive Summary (renovation only) ── */
+  let execSummaryContent = "";
+  if (isRenovation && project.executiveSummary) {
+    const es = project.executiveSummary;
+    execSummaryContent = `
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+      <p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#92400e;">${esc(es.keyMessage)}</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:#166534;">${es.energySavingsPct}%</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#4ade80;margin-top:2px;">Energy Saving</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px;">${es.energyBefore_kwhM2} → ${es.energyAfter_kwhM2} kWh/m²/yr</div>
+      </div>
+      <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:#6b21a8;">${es.carbonReductionPct}%</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#a855f7;margin-top:2px;">Carbon Reduction</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px;">Target EPC class: <strong>${esc(es.targetEpcClass)}</strong></div>
+      </div>
+      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:#9a3412;">${esc(es.investmentRange)}</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#fb923c;margin-top:2px;">Investment Range</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px;">CAPEX estimate</div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:#64748b;line-height:1.7;margin:0;">
+      This report summarises the findings of the building performance assessment and renovation scenario analysis.
+      The results represent estimates based on available building data, archetype assumptions, and standard cost databases.
+      Actual energy savings and costs will depend on construction quality, occupant behaviour, and final supplier agreements.
+      A more detailed assessment is recommended prior to any procurement decision.
+    </p>`;
+  }
+
+  /* ── Renovation Framework & Scope ── */
+  let frameworkContent = "";
+  if (isRenovation && project.renovationFramework) {
+    const rf = project.renovationFramework;
+    frameworkContent = `
+    <table class="kv-table" style="margin-bottom:14px;">
+      ${kv("Lead Indicator", rf.leadIndicator)}
+      ${kv("Tenant Impact Policy", rf.tenantImpact)}
+    </table>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <p class="sub-label" style="color:#509724;">✔ In Scope</p>
+        <ul style="margin:0;padding-left:16px;font-size:12.5px;color:#334155;line-height:1.9;">
+          ${rf.inScope.map(i => `<li>${esc(i)}</li>`).join("")}
+        </ul>
+      </div>
+      <div>
+        <p class="sub-label" style="color:#dc2626;">✘ Out of Scope</p>
+        <ul style="margin:0;padding-left:16px;font-size:12.5px;color:#334155;line-height:1.9;">
+          ${rf.outOfScope.map(i => `<li>${esc(i)}</li>`).join("")}
+        </ul>
+      </div>
+    </div>`;
+  }
+
+  /* ── Impact Assessment ── */
+  let impactContent = "";
+  if (isRenovation && project.impactPackages && project.impactPackages.length > 0) {
+    const pkgs = project.impactPackages;
+    impactContent = `
+    <p class="sub-label">Energy & Carbon Performance — Before vs. After</p>
+    <table class="full-table" style="margin-bottom:20px;">
+      <thead>
+        <tr>
+          <th>Package</th>
+          <th>Energy Before<br>kWh/m²/yr</th>
+          <th>Energy After<br>kWh/m²/yr</th>
+          <th>Energy Saving</th>
+          <th>Carbon Reduction</th>
+          <th>Target EPC</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${pkgs.map(p => `
+        <tr>
+          <td><span class="dot" style="background:${esc(p.color)};display:inline-block;"></span> <strong>${esc(p.name)}</strong></td>
+          <td>${p.energyBefore_kwhM2}</td>
+          <td style="color:#166534;font-weight:700;">${p.energyAfter_kwhM2}</td>
+          <td><span style="color:#166534;font-weight:700;">${p.savingsPct}%</span></td>
+          <td><span style="color:#6b21a8;font-weight:700;">${p.carbonReductionPct}%</span></td>
+          <td><strong>${esc(p.targetEpcClass)}</strong></td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+    <p class="sub-label">Economic Analysis</p>
+    <table class="full-table">
+      <thead>
+        <tr>
+          <th>Package</th>
+          <th>Material Cost (SEK)</th>
+          <th>Annual Energy Savings (SEK)</th>
+          <th>Simple Payback</th>
+          <th>Carbon Before (t CO₂e)</th>
+          <th>Carbon After (t CO₂e)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${pkgs.map(p => `
+        <tr>
+          <td><span class="dot" style="background:${esc(p.color)};display:inline-block;"></span> <strong>${esc(p.name)}</strong></td>
+          <td>${fmtNum(Math.round(p.materialCostSEK))}</td>
+          <td style="color:#166534;">${fmtNum(Math.round(p.annualEnergySavingsSEK))}</td>
+          <td><strong>${p.simplePaybackYears} years</strong></td>
+          <td>${p.carbonBefore_tCO2.toFixed(1)}</td>
+          <td style="color:#6b21a8;font-weight:700;">${p.carbonAfter_tCO2.toFixed(1)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+    <p style="font-size:11px;color:#94a3b8;margin-top:8px;">
+      ⚠ Carbon values include embodied carbon of renovation materials only (construction phase). Operational carbon reduction is estimated from energy savings assuming Swedish district heating emission factor (0.06 kg CO₂e/kWh).
+    </p>`;
+  }
+
+  /* ── Conclusions & Recommendations ── */
+  let conclusionsContent = "";
+  if (isRenovation && project.conclusions) {
+    const c = project.conclusions;
+    conclusionsContent = `
+    ${c.recommendedPackage ? `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px;margin-bottom:16px;">
+      <p style="margin:0;font-size:13px;color:#166534;"><strong>Recommended package:</strong> ${esc(c.recommendedPackage)}</p>
+    </div>` : ""}
+    ${c.general.length ? `
+    <p class="sub-label">General Findings</p>
+    <ul style="margin:0 0 14px;padding-left:18px;font-size:13px;color:#334155;line-height:1.9;">
+      ${c.general.map(g => `<li>${esc(g)}</li>`).join("")}
+    </ul>` : ""}
+    ${c.portfolioSpecific.length ? `
+    <p class="sub-label">Building-Specific Observations</p>
+    <ul style="margin:0 0 14px;padding-left:18px;font-size:13px;color:#334155;line-height:1.9;">
+      ${c.portfolioSpecific.map(g => `<li>${esc(g)}</li>`).join("")}
+    </ul>` : ""}
+    ${c.nextSteps.length ? `
+    <p class="sub-label">Recommended Next Steps</p>
+    <ol style="margin:0;padding-left:18px;font-size:13px;color:#334155;line-height:1.9;">
+      ${c.nextSteps.map(g => `<li>${esc(g)}</li>`).join("")}
+    </ol>` : ""}`;
+  }
+
+  /* ── Disclaimer ── */
+  const disclaimerContent = `
+    <p style="font-size:13px;color:#475569;line-height:1.8;margin:0 0 12px;">
+      The results of this assessment provide an overview of possible measures to improve the energy and carbon performance of the building(s) in scope.
+      This is carried out at a strategic level, using assumptions and average price data from standard cost databases (Wikells Sektionsfakta).
+    </p>
+    <p style="font-size:13px;color:#475569;line-height:1.8;margin:0 0 12px;">
+      This assessment <strong>cannot</strong> provide the exact energy savings you will measure after renovation, nor the precise costs that will arise.
+      Factors including variations in labour and material markets, pre-agreed supplier contracts, and unforeseen site conditions may all affect final outcomes.
+    </p>
+    <p style="font-size:13px;color:#475569;line-height:1.8;margin:0;">
+      Furthermore, the accuracy of construction work and the energy-consumption habits of occupants will influence the achieved performance.
+      Real costs can only be confirmed by your service providers and contracted agreements.
+      The reported energy and carbon figures should be validated by on-site measurements following completion of renovation works.
+    </p>`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -564,10 +770,15 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
     ${section("1. Project Definition", defContent, "#721CB8")}
     ${section("2. Location & Building Data", locContent, "#995BD5")}
     ${section("3. Data Coverage", dataContent, "#509724")}
-    ${isRenovation ? section("4. Renovation Packages", packagesContent, "#d97706") : ""}
-    ${section(isRenovation ? "5. Expected Deliverables" : "4. Expected Deliverables", delivContent, "#721CB8")}
-    ${section(isRenovation ? "6. Project Timeline" : "5. Project Timeline", tlContent, "#995BD5")}
-    ${section(isRenovation ? "7. Budget & Cost" : "6. Budget & Cost", budgetContent, "#3a6e1a")}
+    ${isRenovation && execSummaryContent ? section("Executive Summary", execSummaryContent, "#d97706") : ""}
+    ${isRenovation && frameworkContent ? section("4. Renovation Scope & Framework", frameworkContent, "#0369a1") : ""}
+    ${isRenovation ? section(frameworkContent ? "5. Renovation Packages" : "4. Renovation Packages", packagesContent, "#d97706") : ""}
+    ${isRenovation && impactContent ? section("6. Impact Assessment", impactContent, "#166534") : ""}
+    ${section(isRenovation ? (impactContent ? "7. Expected Deliverables" : "5. Expected Deliverables") : "4. Expected Deliverables", delivContent, "#721CB8")}
+    ${section(isRenovation ? (impactContent ? "8. Project Timeline" : "6. Project Timeline") : "5. Project Timeline", tlContent, "#995BD5")}
+    ${section(isRenovation ? (impactContent ? "9. Budget & Cost" : "7. Budget & Cost") : "6. Budget & Cost", budgetContent, "#3a6e1a")}
+    ${isRenovation && conclusionsContent ? section(impactContent ? "10. Conclusions & Recommendations" : "8. Conclusions & Recommendations", conclusionsContent, "#0f766e") : ""}
+    ${isRenovation ? section("Disclaimer", disclaimerContent, "#94a3b8") : ""}
 
     <div class="footer">
       Generated by Project Planning Guide &nbsp;·&nbsp; ${now}

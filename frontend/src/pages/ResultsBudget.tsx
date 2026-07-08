@@ -209,11 +209,19 @@ export default function ResultsBudget() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold text-slate-800">Step 5 – Timeline & Cost</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Review your expected deliverables, project timeline, and cost estimate.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Step 5 – Timeline & Cost</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Review your expected deliverables, project timeline, and cost estimate.
+          </p>
+        </div>
+        <a
+          href="/reports"
+          className="flex items-center gap-1.5 text-xs font-semibold text-[#96D74C] hover:underline mt-1 whitespace-nowrap"
+        >
+          View sample reports →
+        </a>
       </div>
 
       {/* Summary stat strip */}

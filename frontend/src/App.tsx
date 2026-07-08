@@ -7,8 +7,13 @@ import DefineProject from "./pages/DefineProject";
 import DataCoverage from "./pages/DataCoverage";
 import DataAssumptions from "./pages/DataAssumptions";
 import Scenarios from "./pages/Scenarios";
+import StepScenarios from "./pages/StepScenarios";
 import ResultsBudget from "./pages/ResultsBudget";
 import DataExplorer from "./pages/DataExplorer";
+import Timeline from "./pages/Timeline";
+import Budget from "./pages/Budget";
+import AnalysisTools from "./pages/AnalysisTools";
+import SampleReports from "./pages/SampleReports";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -30,13 +35,16 @@ export default function App() {
       <ScrollToTop />
       <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/data" element={<DataLayout><DataExplorer /></DataLayout>} />
-      <Route path="/pathways" element={<DataLayout title="Pathways" accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
+      <Route path="/data"      element={<DataLayout><DataExplorer /></DataLayout>} />
+      <Route path="/pathways"  element={<DataLayout title="Pathways"       accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
+      <Route path="/analysis"  element={<DataLayout title="Analysis" accentColor="#4ECDC4" accentBadge="Tools"><AnalysisTools /></DataLayout>} />
+      <Route path="/budget"    element={<DataLayout title="Budget"          accentColor="#F59E0B" accentBadge="CAPEX Estimate"><Budget /></DataLayout>} />
+      <Route path="/reports" element={<DataLayout title="Reports" accentColor="#96D74C" accentBadge="Examples"><SampleReports /></DataLayout>} />
       <Route element={<WizardLayout />}>
         <Route path="/step/1" element={<DefineProject />} />
         <Route path="/step/2" element={<DataCoverage />} />
         <Route path="/step/3" element={<DataAssumptions />} />
-        <Route path="/step/4" element={<Scenarios />} />
+        <Route path="/step/4" element={<StepScenarios />} />
         <Route path="/step/5" element={<ResultsBudget />} />
       </Route>
       </Routes>
