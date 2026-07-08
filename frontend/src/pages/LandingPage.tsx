@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 
@@ -45,25 +46,21 @@ function NavItem({
   );
 }
 
-// ── Stat card (top-right overlay) ──────────────────────────────────────────
-function StatCard({ label, value, unit, bar, barColor }: {
+// ── Stat pill (top-right overlay) ────────────────────────────────────────────
+function StatCard({ label, value, unit, barColor }: {
   label: string; value: string; unit?: string; bar?: number; barColor?: string;
 }) {
   return (
-    <div className="bg-[#0d1117]/70 backdrop-blur-md border border-white/12 rounded-xl px-3.5 py-2.5 min-w-[105px]">
-      <div className="text-[9px] text-white/45 uppercase tracking-widest mb-1">{label}</div>
-      <div className="flex items-baseline gap-1">
-        <span className="text-[22px] font-bold text-white leading-none">{value}</span>
-        {unit && <span className="text-[10px] text-white/40">{unit}</span>}
-      </div>
-      {bar !== undefined && (
-        <div className="mt-2 h-1 rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full transition-all"
-            style={{ width: `${bar}%`, background: barColor ?? "#96D74C" }}
-          />
-        </div>
-      )}
+    <div style={{
+      display: "flex", alignItems: "center", gap: 6,
+      background: "rgba(13,17,23,0.55)",
+      backdropFilter: "blur(8px)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: 8, padding: "5px 10px",
+    }}>
+      <div style={{ width: 5, height: 5, borderRadius: "50%", background: barColor ?? "#96D74C", flexShrink: 0 }} />
+      <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{value}</span>
+      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{label}{unit ? ` ${unit}` : ""}</span>
     </div>
   );
 }
@@ -180,10 +177,23 @@ const RECENT_ACTIVITY = [
   { icon: "🚌", text: "Mobility data refreshed",        time: "1d ago" },
 ];
 
+// ── Country / city data ───────────────────────────────────────────────────
+const COUNTRIES = [
+  { id: "se", name: "Sweden",         cities: ["Stockholm", "Gothenburg", "Malmö"] },
+  { id: "gb", name: "United Kingdom", cities: [] },
+  { id: "be", name: "Belgium",        cities: [] },
+  { id: "ie", name: "Ireland",        cities: [] },
+];
+
 // ── Main component ─────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
   const reset = useWizardStore((s) => s.reset);
+
+  const [selectedCountry, setSelectedCountry] = useState("se");
+  const [selectedCity, setSelectedCity]       = useState("Gothenburg");
+
+  const country = COUNTRIES.find(c => c.id === selectedCountry)!;
 
   const handleStart = () => { reset(); navigate("/step/1"); };
 
@@ -221,17 +231,55 @@ export default function LandingPage() {
             <img src="/CTH_new_logo_white.png" alt="Chalmers" className="h-7 opacity-80" />
             <span className="w-px h-4 bg-white/15" />
             <img src="/CNL_new_logo_white.png"  alt="Chalmers Next Labs" className="h-7 opacity-80" />
-            <span className="text-white/20 text-[10px] mx-1">×</span>
-            <span className="text-[10px] text-white/35 tracking-wide hidden lg:block">
-              CHALMERS UNIVERSITY OF TECHNOLOGY
-            </span>
           </div>
 
-          {/* Title + badge */}
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold text-white/90">Project Planning Guide</span>
-            <span className="text-[9px] font-bold text-[#96D74C] bg-[#96D74C]/15 border border-[#96D74C]/30
-                             px-1.5 py-0.5 rounded-md tracking-widest uppercase">Beta</span>
+          {/* Country + city selector */}
+          <div className="flex items-center gap-1" style={{ marginLeft: "auto" }}>
+            {/* Countries */}
+            <div className="flex items-center gap-0.5 rounded-xl p-0.5"
+                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              {COUNTRIES.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => { setSelectedCountry(c.id); if (c.cities.length) setSelectedCity(c.cities[0]); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "4px 10px", borderRadius: 10, border: 0, cursor: "pointer",
+                    fontSize: 11, fontWeight: selectedCountry === c.id ? 700 : 500,
+                    background: selectedCountry === c.id ? "rgba(114,28,184,0.35)" : "transparent",
+                    color: selectedCountry === c.id ? "#fff" : "rgba(255,255,255,0.38)",
+                    transition: "all .15s",
+                  }}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+
+            {/* City pills — only when country has cities */}
+            {country.cities.length > 0 && (
+              <>
+                <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 12, margin: "0 2px" }}>›</span>
+                <div className="flex items-center gap-0.5 rounded-xl p-0.5"
+                     style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {country.cities.map(city => (
+                    <button
+                      key={city}
+                      onClick={() => setSelectedCity(city)}
+                      style={{
+                        padding: "4px 10px", borderRadius: 10, border: 0, cursor: "pointer",
+                        fontSize: 11, fontWeight: selectedCity === city ? 700 : 500,
+                        background: selectedCity === city ? "rgba(78,205,196,0.2)" : "transparent",
+                        color: selectedCity === city ? "#4ECDC4" : "rgba(255,255,255,0.38)",
+                        transition: "all .15s",
+                      }}
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
           {/* User avatar */}
@@ -264,11 +312,11 @@ export default function LandingPage() {
                style={{ background: "linear-gradient(to top, rgba(10,13,20,0.75) 0%, transparent 100%)" }} />
 
           {/* ── Stats overlay (top right) ────────────────────────────── */}
-          <div className="absolute top-5 right-5 flex gap-2 pointer-events-none z-10">
-            <StatCard label="3D buildings"     value="92,973"  unit="in model"   bar={95} barColor="#4A90E2" />
-            <StatCard label="EPC matched"      value="87,712"  unit="buildings"  bar={88} barColor="#96D74C" />
-            <StatCard label="TABULA matched"   value="18,744"  unit="buildings"  bar={62} barColor="#4ECDC4" />
-            <StatCard label="Boplats listings" value="297"     unit="active"     bar={42} barColor="#721CB8" />
+          <div className="absolute top-4 right-4 flex gap-1.5 pointer-events-none z-10">
+            <StatCard label="3D buildings"     value="92,973"  barColor="#4A90E2" />
+            <StatCard label="EPC matched"      value="87,712"  barColor="#96D74C" />
+            <StatCard label="TABULA matched"   value="18,744"  barColor="#4ECDC4" />
+            <StatCard label="Boplats listings" value="297"     barColor="#721CB8" />
           </div>
 
 
@@ -321,14 +369,12 @@ export default function LandingPage() {
                 </button>
               </div>
 
-              {/* Location card */}
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl w-fit"
-                   style={{ background: "rgba(10,13,20,0.65)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(12px)" }}>
-                <span className="text-base">📍</span>
-                <div>
-                  <div className="text-[11px] font-semibold text-white/90">Lindholmen District</div>
-                  <div className="text-[10px] text-white/40">Mixed-use redevelopment</div>
-                </div>
+              {/* Location pill */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg w-fit"
+                   style={{ background: "rgba(10,13,20,0.45)", border: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(8px)" }}>
+                <span style={{ fontSize: 10 }}>📍</span>
+                <span className="text-[10px] text-white/45">Lindholmen District</span>
+                <span className="text-[10px] text-white/25">· Mixed-use redevelopment</span>
               </div>
 
             </div>

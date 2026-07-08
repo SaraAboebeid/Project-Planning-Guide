@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 
@@ -109,6 +110,11 @@ export default function WizardLayout() {
     if (safeIndex < steps.length - 1) navigate(steps[safeIndex + 1]!.path);
   };
 
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
+  }, [location.pathname]);
+
   return (
     <div className="wizard-shell flex h-screen overflow-hidden"
          style={{ background: "#0a0d14", fontFamily: "'Inter', system-ui, sans-serif", color: "#fff" }}>
@@ -202,7 +208,7 @@ export default function WizardLayout() {
         <div className="flex flex-1 overflow-hidden">
 
           {/* Scrollable main content */}
-          <main className="flex-1 overflow-y-auto px-6 py-5">
+          <main ref={mainRef} className="flex-1 overflow-y-auto px-6 py-5">
             <Outlet />
           </main>
 
@@ -210,25 +216,6 @@ export default function WizardLayout() {
           <aside className="shrink-0 flex flex-col gap-3 p-4 overflow-y-auto"
                  style={{ width: 280, background: "#0d1117",
                           borderLeft: "1px solid rgba(255,255,255,0.07)" }}>
-
-            {/* Site preview */}
-            <div style={{ height: 160, borderRadius: 12, overflow: "hidden",
-                          background: "#0a0d14", border: "1px solid rgba(255,255,255,0.08)",
-                          position: "relative", flexShrink: 0 }}>
-              <iframe src="/lindholmen_bg.html" title="Site preview"
-                      style={{ width: "100%", height: "100%", border: 0, pointerEvents: "none" }} />
-              <div style={{ position: "absolute", top: 8, left: 8, padding: "3px 8px",
-                            borderRadius: 6, fontSize: 10, fontWeight: 600, color: "#fff",
-                            background: "rgba(10,13,20,0.75)", backdropFilter: "blur(4px)" }}>
-                Site preview
-              </div>
-              <div style={{ position: "absolute", bottom: 8, right: 8, padding: "2px 7px",
-                            borderRadius: 5, fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.75)",
-                            background: "rgba(10,13,20,0.75)", cursor: "pointer" }}
-                   onClick={() => window.open("http://localhost:8765/gothenburg_3d.html", "_blank")}>
-                3D ↗
-              </div>
-            </div>
 
             {/* Project Context */}
             <div style={{ borderRadius: 12, padding: "14px", flexShrink: 0,

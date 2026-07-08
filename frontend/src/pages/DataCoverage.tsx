@@ -84,33 +84,33 @@ const STATUS_CFG: Record<Status, {
   pillBg: string; pillBorder: string; pillText: string; rowAccent: string;
 }> = {
   Available: {
-    icon:       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />,
-    pillBg:     "bg-emerald-50",  pillBorder: "border-emerald-200", pillText: "text-emerald-700",
-    rowAccent:  "hover:bg-emerald-50/40",
+    icon:       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />,
+    pillBg:     "bg-emerald-900/30",  pillBorder: "border-emerald-700/50", pillText: "text-emerald-400",
+    rowAccent:  "hover:bg-emerald-900/20",
   },
   Estimated: {
-    icon:       <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />,
-    pillBg:     "bg-amber-50",    pillBorder: "border-amber-200",   pillText: "text-amber-700",
-    rowAccent:  "hover:bg-amber-50/40",
+    icon:       <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />,
+    pillBg:     "bg-amber-900/30",    pillBorder: "border-amber-700/50",   pillText: "text-amber-400",
+    rowAccent:  "hover:bg-amber-900/20",
   },
   Missing: {
-    icon:       <XCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />,
-    pillBg:     "bg-red-50",      pillBorder: "border-red-200",     pillText: "text-red-700",
-    rowAccent:  "hover:bg-red-50/30",
+    icon:       <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />,
+    pillBg:     "bg-red-900/30",      pillBorder: "border-red-700/50",     pillText: "text-red-400",
+    rowAccent:  "hover:bg-red-900/20",
   },
 };
 
 const CONFIDENCE_CFG: Record<Confidence, { bar: string; pct: number; text: string }> = {
-  High:   { bar: "bg-emerald-500", pct: 90, text: "text-emerald-700" },
-  Medium: { bar: "bg-amber-400",   pct: 55, text: "text-amber-700"   },
-  Low:    { bar: "bg-red-400",     pct: 25, text: "text-red-600"     },
-  "—":    { bar: "bg-slate-300",   pct: 0,  text: "text-slate-400"   },
+  High:   { bar: "bg-emerald-500", pct: 90, text: "text-emerald-400" },
+  Medium: { bar: "bg-amber-400",   pct: 55, text: "text-amber-400"   },
+  Low:    { bar: "bg-red-400",     pct: 25, text: "text-red-400"     },
+  "—":    { bar: "bg-white/20",    pct: 0,  text: "text-white/30"    },
 };
 
 const ACTION_CFG: Record<Action, { bg: string; border: string; text: string }> = {
-  "None":       { bg: "bg-slate-50",  border: "border-slate-200", text: "text-slate-500" },
-  "Review":     { bg: "bg-amber-50",  border: "border-amber-200", text: "text-amber-700" },
-  "User input": { bg: "bg-red-50",    border: "border-red-200",   text: "text-red-700"   },
+  "None":       { bg: "bg-white/5",    border: "border-white/10",   text: "text-white/40" },
+  "Review":     { bg: "bg-amber-900/30",  border: "border-amber-700/40", text: "text-amber-400" },
+  "User input": { bg: "bg-red-900/30",    border: "border-red-700/40",   text: "text-red-400"   },
 };
 
 /* ─────────────────────────────────────────────
@@ -892,10 +892,10 @@ function sortByCol(a: BuildingRecord, b: BuildingRecord, colKey: keyof BuildingR
 function rankBgColor(rank: number, total: number): string {
   if (total <= 1) return "";
   const pos = rank / (total - 1);
-  if (pos <= 0.15) return "bg-emerald-100";
-  if (pos <= 0.40) return "bg-emerald-50";
-  if (pos >= 0.85) return "bg-red-100";
-  if (pos >= 0.60) return "bg-amber-50";
+  if (pos <= 0.15) return "bg-emerald-900/30";
+  if (pos <= 0.40) return "bg-emerald-900/15";
+  if (pos >= 0.85) return "bg-red-900/30";
+  if (pos >= 0.60) return "bg-amber-900/15";
   return "";
 }
 
@@ -1025,16 +1025,16 @@ function BboxDataBanner({
   const rankedRows   = [...selectedRows].sort((a, b) => sortByCol(a.r, b.r, sortCol, cfg.asc));
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+    <div className="rounded-xl border border-white/10 bg-[#0d1117] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-white/8 bg-white/5">
         <div className="flex items-center gap-3 min-w-0">
           <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
           <div>
-            <span className="text-sm font-bold text-gray-900">{bboxStats.count.toLocaleString()} buildings</span>
-            <span className="text-xs text-gray-400 ml-2">Bounding box · EUBUCCO</span>
+            <span className="text-sm font-bold text-white/85">{bboxStats.count.toLocaleString()} buildings</span>
+            <span className="text-xs text-white/35 ml-2">Bounding box · EUBUCCO</span>
           </div>
-          <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-semibold border border-emerald-200 shrink-0">
+          <span className="px-2 py-0.5 rounded-md bg-emerald-900/40 text-emerald-400 text-[10px] font-semibold border border-emerald-700/50 shrink-0">
             {epcPct}% EPC
           </span>
         </div>
@@ -1042,21 +1042,21 @@ function BboxDataBanner({
           <button
             onClick={handleView}
             disabled={loading || !bbox}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-40 whitespace-nowrap transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
             {loading ? "Loading…" : viewOpen ? <><ChevronUp className="w-3 h-3" /> Hide</> : "Buildings"}
           </button>
           <button
             onClick={rows ? handleDownload : handleLoadAndDownload}
             disabled={loading || !bbox}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-40 whitespace-nowrap transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
             <Download className="w-3 h-3" /> Export
           </button>
           <a
             href={`http://127.0.0.1:8765/gothenburg_3d.html?bbox=${bbox ? [bbox.north,bbox.south,bbox.east,bbox.west].join(',') : ''}`}
             target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-violet-600 hover:bg-violet-50 whitespace-nowrap transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-purple-400 hover:bg-purple-900/30 whitespace-nowrap transition"
           >
             <Globe2 className="w-3 h-3" /> 3D view
           </a>
@@ -1064,62 +1064,62 @@ function BboxDataBanner({
       </div>
 
       {/* Metrics bar */}
-      <div className="flex flex-wrap divide-x divide-slate-100 border-t border-slate-100">
+      <div className="flex flex-wrap divide-x divide-white/8 border-t border-white/8">
         {bboxStats.common_use && (
           <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Primary use</div>
-            <div className="text-xs font-bold text-gray-800 mt-0.5">{bboxStats.common_use}</div>
+            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Primary use</div>
+            <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.common_use}</div>
           </div>
         )}
         {bboxStats.avg_year && (
           <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Avg year built</div>
-            <div className="text-xs font-bold text-gray-800 mt-0.5">{bboxStats.avg_year}</div>
+            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Avg year built</div>
+            <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.avg_year}</div>
           </div>
         )}
         {bboxStats.avg_floors && (
           <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Avg floors</div>
-            <div className="text-xs font-bold text-gray-800 mt-0.5">{bboxStats.avg_floors}</div>
+            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Avg floors</div>
+            <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.avg_floors}</div>
           </div>
         )}
         {bboxStats.avg_footprint && (
           <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Avg footprint</div>
-            <div className="text-xs font-bold text-gray-800 mt-0.5">{Math.round(bboxStats.avg_footprint)} m²</div>
+            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Avg footprint</div>
+            <div className="text-xs font-bold text-white/75 mt-0.5">{Math.round(bboxStats.avg_footprint)} m²</div>
           </div>
         )}
         {bboxStats.avg_height && (
           <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Avg height</div>
-            <div className="text-xs font-bold text-gray-800 mt-0.5">{bboxStats.avg_height} m</div>
+            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Avg height</div>
+            <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.avg_height} m</div>
           </div>
         )}
         {bboxStats.avg_energy && (
           <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Avg energy use</div>
-            <div className="text-xs font-bold text-gray-800 mt-0.5">{bboxStats.avg_energy} kWh/m²</div>
+            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Avg energy use</div>
+            <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.avg_energy} kWh/m²</div>
           </div>
         )}
         <div className="px-4 py-2.5">
-          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Height data</div>
-          <div className="text-xs font-bold text-gray-800 mt-0.5">{Math.round(bboxStats.with_height/bboxStats.count*100)}% <span className="font-normal text-slate-400">({bboxStats.with_height}/{bboxStats.count})</span></div>
+          <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Height data</div>
+          <div className="text-xs font-bold text-white/75 mt-0.5">{Math.round(bboxStats.with_height/bboxStats.count*100)}% <span className="font-normal text-white/30">({bboxStats.with_height}/{bboxStats.count})</span></div>
         </div>
         <div className="px-4 py-2.5">
-          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Floor data</div>
-          <div className="text-xs font-bold text-gray-800 mt-0.5">{Math.round(bboxStats.with_floors/bboxStats.count*100)}% <span className="font-normal text-slate-400">({bboxStats.with_floors}/{bboxStats.count})</span></div>
+          <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Floor data</div>
+          <div className="text-xs font-bold text-white/75 mt-0.5">{Math.round(bboxStats.with_floors/bboxStats.count*100)}% <span className="font-normal text-white/30">({bboxStats.with_floors}/{bboxStats.count})</span></div>
         </div>
       </div>
 
       {/* Inline table */}
       {viewOpen && rows && (
-        <div className="border-t border-blue-100">
+        <div className="border-t border-white/10">
           {/* Legend + selection controls */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 pb-1 text-[10px] text-gray-500">
-            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-300" /> Data available</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-50 border border-red-200" /> Missing</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 pb-1 text-[10px] text-white/40">
+            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-900/50 border border-emerald-700/50" /> Data available</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-900/40 border border-red-700/40" /> Missing</span>
             {rows.some(r => r.boplats_listings) && (
-              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-50 border border-amber-200" /> Boplats data</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-900/40 border border-amber-700/40" /> Boplats data</span>
             )}
             <span className="ml-auto text-gray-400">
               Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)} of {rows.length}
@@ -1128,9 +1128,9 @@ function BboxDataBanner({
           <div className="overflow-x-auto">
             <table className="w-full text-[10px] border-collapse">
               <thead>
-                <tr className="bg-blue-100/60">
+                <tr className="bg-white/8">
                   {/* Select-all checkbox */}
-                  <th className="px-2 py-1 border-b border-blue-200 w-6">
+                  <th className="px-2 py-1 border-b border-white/10 w-6">
                     <input
                       type="checkbox"
                       checked={pageAllChecked}
@@ -1141,7 +1141,7 @@ function BboxDataBanner({
                     />
                   </th>
                   {BBOX_CSV_COLS.map(c => (
-                    <th key={c.key} className="px-2 py-1 text-left font-semibold text-blue-900 border-b border-blue-200 whitespace-nowrap">
+                    <th key={c.key} className="px-2 py-1 text-left font-semibold text-white/60 border-b border-white/10 whitespace-nowrap">
                       {c.label}
                     </th>
                   ))}
@@ -1155,8 +1155,8 @@ function BboxDataBanner({
                     <tr
                       key={i}
                       onClick={() => toggleRow(globalIdx)}
-                      className={`cursor-pointer border-b border-blue-100/50 transition-colors ${
-                        isSelected ? "bg-violet-50 hover:bg-violet-100/60" : "hover:bg-blue-50/60"
+                      className={`cursor-pointer border-b border-white/8 transition-colors ${
+                        isSelected ? "bg-purple-900/30 hover:bg-purple-900/40" : "hover:bg-white/5"
                       }`}
                     >
                       <td className="px-2 py-1 text-center" onClick={e => e.stopPropagation()}>
@@ -1174,8 +1174,8 @@ function BboxDataBanner({
                         const cell = isSelected
                           ? ""
                           : present
-                            ? isBoplats ? "bg-amber-50 text-amber-900" : "bg-emerald-50/60 text-gray-800"
-                            : "bg-red-50/40 text-gray-400";
+                            ? isBoplats ? "bg-amber-900/20 text-amber-300" : "bg-emerald-900/15 text-white/70"
+                            : "bg-red-900/15 text-white/25";
                         const display = c.key === "address"
                           ? (isCadastralId(val as string, r.cadastral_id) ? "—" : formatAddress(val as string))
                           : present ? String(val) : "—";
@@ -1193,17 +1193,17 @@ function BboxDataBanner({
           </div>
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 py-2 border-t border-blue-100 text-[11px]">
+            <div className="flex items-center justify-center gap-2 py-2 border-t border-white/8 text-[11px]">
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="px-2 py-0.5 rounded border border-blue-200 disabled:opacity-30 hover:bg-blue-100"
+                className="px-2 py-0.5 rounded border border-white/15 text-white/50 disabled:opacity-30 hover:bg-white/8"
               >← Prev</button>
-              <span className="text-gray-500">Page {page + 1} / {totalPages}</span>
+              <span className="text-white/35">Page {page + 1} / {totalPages}</span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                 disabled={page === totalPages - 1}
-                className="px-2 py-0.5 rounded border border-blue-200 disabled:opacity-30 hover:bg-blue-100"
+                className="px-2 py-0.5 rounded border border-white/15 text-white/50 disabled:opacity-30 hover:bg-white/8"
               >Next →</button>
             </div>
           )}
@@ -1230,16 +1230,16 @@ function BboxDataBanner({
 
       {/* ── Compare panel ── */}
       {compareOpen && selectedRows.length > 0 && (
-        <div className="border-t-2 border-violet-300 bg-white">
+        <div className="border-t-2 border-violet-700/50 bg-[#0d1117]">
           {/* Panel header */}
-          <div className="flex items-center justify-between px-4 py-2.5 bg-violet-50 border-b border-violet-200">
-            <span className="text-xs font-bold text-violet-900">
+          <div className="flex items-center justify-between px-4 py-2.5 bg-purple-900/20 border-b border-purple-700/30">
+            <span className="text-xs font-bold text-purple-300">
               Comparing {selectedRows.length} buildings — ranked best to worst
             </span>
             <div className="flex items-center gap-3">
               <button
                 onClick={saveSelectedCsv}
-                className="flex items-center gap-1.5 text-[11px] font-medium text-violet-700 hover:text-violet-900"
+                className="flex items-center gap-1.5 text-[11px] font-medium text-purple-400 hover:text-purple-300"
                 title="Download selected buildings as CSV"
               >
                 <Download className="w-3 h-3" /> Export
@@ -1252,8 +1252,8 @@ function BboxDataBanner({
           </div>
 
           {/* Sort-by category pills */}
-          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-violet-100 bg-violet-50/50">
-            <span className="text-[10px] text-gray-500 mr-1">Sort by:</span>
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-purple-700/20 bg-purple-900/10">
+            <span className="text-[10px] text-white/40 mr-1">Sort by:</span>
             {COMPARE_COLS.map(c => (
               <button
                 key={c.key}
@@ -1262,7 +1262,7 @@ function BboxDataBanner({
                 className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition ${
                   sortCol === c.key
                     ? "bg-violet-600 text-white border-violet-600 shadow-sm"
-                    : "bg-white text-gray-600 border-gray-300 hover:border-violet-400 hover:text-violet-700"
+                    : "bg-white/5 text-white/50 border-white/15 hover:border-purple-500 hover:text-purple-300"
                 }`}
               >
                 {c.label}
@@ -1273,19 +1273,19 @@ function BboxDataBanner({
 
           {/* Ranked table */}
           <div className="overflow-x-auto px-4 py-3">
-            <table className="w-full text-[11px] border-collapse rounded-lg overflow-hidden border border-violet-200">
+            <table className="w-full text-[11px] border-collapse rounded-lg overflow-hidden border border-purple-700/30">
               <thead>
-                <tr className="bg-violet-100/70">
-                  <th className="px-2 py-1.5 text-left font-semibold text-violet-900 border-b border-violet-200 whitespace-nowrap">Address</th>
+                <tr className="bg-purple-900/30">
+                  <th className="px-2 py-1.5 text-left font-semibold text-purple-300 border-b border-purple-700/30 whitespace-nowrap">Address</th>
                   {COMPARE_COLS.map(c => (
                     <th
                       key={c.key}
                       onClick={() => setSortCol(c.key)}
                       title={c.betterLabel}
-                      className={`px-2 py-1.5 text-left font-semibold border-b border-violet-200 whitespace-nowrap cursor-pointer select-none transition ${
+                      className={`px-2 py-1.5 text-left font-semibold border-b border-purple-700/30 whitespace-nowrap cursor-pointer select-none transition ${
                         sortCol === c.key
-                          ? "text-violet-700 bg-violet-200/60"
-                          : "text-violet-800 hover:text-violet-600 hover:bg-violet-50"
+                          ? "text-purple-300 bg-purple-900/40"
+                          : "text-purple-400/70 hover:text-purple-300 hover:bg-purple-900/20"
                       }`}
                     >
                       <div className="leading-tight">{c.label}{sortCol === c.key ? " ▲" : ""}</div>
@@ -1298,9 +1298,9 @@ function BboxDataBanner({
                 {rankedRows.map(({ i, r }, rank) => {
                   const rowBg  = rankBgColor(rank, rankedRows.length);
                   return (
-                    <tr key={i} className={`border-b border-violet-100/60 ${rowBg}`}>
-                      <td className="px-2 py-1.5 font-medium whitespace-nowrap max-w-[220px]" title={isCadastralId(r.address, r.cadastral_id) ? (r.cadastral_id ?? "—") : formatAddress(r.address)}>
-                        <span className="mr-1.5 text-xs text-slate-400">{rank + 1}</span>
+                    <tr key={i} className={`border-b border-white/6 ${rowBg}`}>
+                      <td className="px-2 py-1.5 font-medium whitespace-nowrap max-w-[220px] text-white/75" title={isCadastralId(r.address, r.cadastral_id) ? (r.cadastral_id ?? "—") : formatAddress(r.address)}>
+                        <span className="mr-1.5 text-xs text-white/30">{rank + 1}</span>
                         <span className="truncate">{isCadastralId(r.address, r.cadastral_id) ? "—" : formatAddress(r.address)}</span>
                       </td>
                       {COMPARE_COLS.map(c => {
@@ -1310,7 +1310,7 @@ function BboxDataBanner({
                         return (
                           <td
                             key={c.key}
-                            className={`px-2 py-1.5 whitespace-nowrap ${isActive ? "font-semibold" : ""} ${!present ? "text-gray-400" : ""}`}
+                            className={`px-2 py-1.5 whitespace-nowrap ${isActive ? "font-semibold text-white/90" : "text-white/65"} ${!present ? "text-white/25" : ""}`}
                           >
                             {present ? String(val) : "—"}
                           </td>
@@ -1345,10 +1345,10 @@ function FieldChip({
   const hasVal = value !== null && value !== undefined;
   const base = "flex flex-col px-2.5 py-2 rounded-lg border text-[11px]";
   const colors = hasVal
-    ? critical ? "bg-purple-50 border-purple-200 text-purple-900"
-               : "bg-emerald-50 border-emerald-200 text-emerald-800"
-    : critical ? "bg-red-50 border-red-200 text-red-700"
-               : "bg-slate-50 border-slate-200 text-slate-500";
+    ? critical ? "bg-purple-900/30 border-purple-700/50 text-purple-300"
+               : "bg-emerald-900/30 border-emerald-700/50 text-emerald-300"
+    : critical ? "bg-red-900/30 border-red-700/50 text-red-400"
+               : "bg-white/5 border-white/10 text-white/30";
   return (
     <div className={`${base} ${colors}`}>
       <span className="font-semibold leading-tight">{hasVal ? String(value) : "—"}</span>
@@ -1384,18 +1384,18 @@ function BuildingDataBanner({
   );
 
   return (
-    <div className="rounded-xl border border-purple-200 bg-white overflow-hidden">
+    <div className="rounded-xl border border-purple-700/40 bg-[#0d1117] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-purple-50 border-b border-purple-100">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-purple-900/25 border-b border-purple-700/30">
         <div className="flex items-center gap-2">
           <span className="text-base">🏗️</span>
-          <span className="text-xs font-semibold text-purple-900">Data Available</span>
-          <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-300">EUBUCCO</span>
+          <span className="text-xs font-semibold text-purple-300">Data Available</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-purple-900/50 text-purple-300 text-[9px] font-bold border border-purple-600/50">EUBUCCO</span>
           {building.has_epc && (
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span>
           )}
         </div>
-        {building.address && !isCadastralId(building.address) && <span className="text-[10px] text-purple-700 truncate max-w-[200px]">{formatAddress(building.address)}</span>}
+        {building.address && !isCadastralId(building.address) && <span className="text-[10px] text-purple-400/70 truncate max-w-[200px]">{formatAddress(building.address)}</span>}
       </div>
 
       {/* Fields grid */}
@@ -1412,7 +1412,7 @@ function BuildingDataBanner({
 
       {/* Missing critical data warning */}
       {missingCritical.length > 0 && (
-        <div className="mx-3 mb-3 flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+        <div className="mx-3 mb-3 flex items-start gap-2 rounded-lg bg-red-900/30 border border-red-700/40 px-3 py-2 text-xs text-red-400">
           <span className="text-sm mt-0.5">⚠️</span>
           <span>
             <span className="font-semibold">Missing critical data for {projectType}:</span>{" "}
@@ -1425,7 +1425,7 @@ function BuildingDataBanner({
       {/* 3D Inspector link */}
       <div className="px-3 pb-3">
         <a href={viewerUrl} target="_blank" rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-700 hover:text-purple-900 underline underline-offset-2">
+          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-400 hover:text-purple-300 underline underline-offset-2">
           📷 Open Gothenburg 3D →
         </a>
       </div>
@@ -1448,32 +1448,32 @@ function MultiBuildingDataBanner({
   const shownBuildings = expanded ? buildings : buildings.slice(0, 3);
 
   return (
-    <div className="rounded-xl border border-purple-200 bg-white overflow-hidden">
+    <div className="rounded-xl border border-purple-700/40 bg-[#0d1117] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-purple-50 border-b border-purple-100">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-purple-900/25 border-b border-purple-700/30">
         <div className="flex items-center gap-2">
           <span className="text-base">🏗️</span>
-          <span className="text-xs font-semibold text-purple-900">
+          <span className="text-xs font-semibold text-purple-300">
             Data Available — {buildings.length} buildings
           </span>
-          <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-300">EUBUCCO</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-purple-900/50 text-purple-300 text-[9px] font-bold border border-purple-600/50">EUBUCCO</span>
           {withEpc > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">
               EPC ({withEpc}/{buildings.length})
             </span>
           )}
         </div>
-        <span className="text-[10px] text-purple-600">{projectType}</span>
+        <span className="text-[10px] text-purple-400/70">{projectType}</span>
       </div>
 
       {/* Building list */}
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-white/6">
         {shownBuildings.map((b, i) => (
           <div key={i} className="flex items-start gap-2 px-3 py-2">
-            <span className="text-[10px] text-slate-400 font-mono mt-0.5 w-4 flex-shrink-0">{i + 1}</span>
+            <span className="text-[10px] text-white/25 font-mono mt-0.5 w-4 flex-shrink-0">{i + 1}</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-slate-700 truncate">{isCadastralId(b.address) ? "EUBUCCO building" : (formatAddress(b.address) ?? "EUBUCCO building")}</div>
-              <div className="flex flex-wrap gap-x-3 mt-0.5 text-[10px] text-slate-500">
+              <div className="text-xs font-medium text-white/75 truncate">{isCadastralId(b.address) ? "EUBUCCO building" : (formatAddress(b.address) ?? "EUBUCCO building")}</div>
+              <div className="flex flex-wrap gap-x-3 mt-0.5 text-[10px] text-white/40">
                 {b.use_cat    && <span>{b.use_cat}</span>}
                 {b.year       && <span>Built {b.year}</span>}
                 {b.floors     && <span>{b.floors} floors</span>}
@@ -1482,7 +1482,7 @@ function MultiBuildingDataBanner({
               </div>
             </div>
             {b.has_epc && (
-              <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200 mt-0.5 flex-shrink-0">EPC</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50 mt-0.5 flex-shrink-0">EPC</span>
             )}
           </div>
         ))}
@@ -1491,7 +1491,7 @@ function MultiBuildingDataBanner({
       {buildings.length > 3 && (
         <button
           onClick={() => setExpanded(e => !e)}
-          className="w-full text-[11px] font-medium text-purple-700 hover:text-purple-900 py-2 border-t border-purple-100 hover:bg-purple-50/50 transition-colors"
+          className="w-full text-[11px] font-medium text-purple-400 hover:text-purple-300 py-2 border-t border-purple-700/30 hover:bg-purple-900/20 transition-colors"
         >
           {expanded ? `Show less ▲` : `Show all ${buildings.length} buildings ▼`}
         </button>
@@ -1682,8 +1682,8 @@ export default function DataCoverage() {
 
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-navy">Data Requirements</h2>
-        <p className="text-sm text-slate-500 mt-1">
+        <h2 className="text-2xl font-bold text-white">Data Requirements</h2>
+        <p className="text-sm text-white/45 mt-1">
           Review the inputs available for your project scope. Confirm which data you have direct access to — gaps are automatically filled from reference databases (TABULA, EPC, Boverket, PVGIS).
         </p>
       </div>
@@ -1691,17 +1691,17 @@ export default function DataCoverage() {
       {/* Context chips */}
       <div className="flex flex-wrap gap-2">
         {project.projectType && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy/10 text-navy text-xs font-semibold">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-900/30 text-purple-300 text-xs font-semibold border border-purple-700/40">
             <Layers className="w-3 h-3" /> {project.projectType}
           </span>
         )}
         {project.scale && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-lime/10 text-olive text-xs font-semibold">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-900/30 text-emerald-400 text-xs font-semibold border border-emerald-700/40">
             <Database className="w-3 h-3" /> {project.scale} scale
           </span>
         )}
         {project.country && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 text-white/50 text-xs font-semibold border border-white/10">
             <MapPin className="w-3 h-3" /> {project.country}
           </span>
         )}
@@ -1735,12 +1735,12 @@ export default function DataCoverage() {
 
       {/* 🔗 Viewer selection — building highlighted in the 3D viewer */}
       {viewerSelection && (
-        <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+        <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#0d1117] px-4 py-2.5">
           <Globe2 className="w-4 h-4 text-violet-400 shrink-0" />
           <div className="flex-1 min-w-0 text-xs">
-            <span className="font-semibold text-gray-800">{isCadastralId(viewerSelection.address) ? "No street address" : (formatAddress(viewerSelection.address) || "Unknown address")}</span>
-            <span className="text-gray-300 mx-2">|</span>
-            <span className="text-gray-500 space-x-3">
+            <span className="font-semibold text-white/80">{isCadastralId(viewerSelection.address) ? "No street address" : (formatAddress(viewerSelection.address) || "Unknown address")}</span>
+            <span className="text-white/20 mx-2">|</span>
+            <span className="text-white/40 space-x-3">
               {viewerSelection.use_cat && <span>{viewerSelection.use_cat}</span>}
               {viewerSelection.year    && <span>Built {viewerSelection.year}</span>}
               {viewerSelection.height  && <span>{viewerSelection.height} m</span>}
@@ -1749,10 +1749,10 @@ export default function DataCoverage() {
               {viewerSelection.eclass  && <span>EPC {viewerSelection.eclass}</span>}
             </span>
           </div>
-          <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-2 py-0.5 rounded shrink-0">3D Viewer</span>
+          <span className="text-[10px] font-medium text-violet-400 bg-purple-900/30 px-2 py-0.5 rounded shrink-0">3D Viewer</span>
           <button
             onClick={() => { setViewerSelection(null); try { localStorage.removeItem('ppg_selected_building'); } catch { /**/ } }}
-            className="text-gray-300 hover:text-gray-500 shrink-0 text-sm leading-none ml-1"
+            className="text-white/25 hover:text-white/60 shrink-0 text-sm leading-none ml-1"
             title="Dismiss"
           >×</button>
         </div>
@@ -1760,12 +1760,12 @@ export default function DataCoverage() {
 
       {/* Coverage summary bar */}
       {totalCount > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3 shadow-sm">
+        <div className="bg-[#0d1117] rounded-2xl border border-white/10 p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-700">Overall Data Coverage</span>
-            <span className="text-xl font-bold text-navy">{confPct}%</span>
+            <span className="text-sm font-semibold text-white/70">Overall Data Coverage</span>
+            <span className="text-xl font-bold text-[#721CB8]">{confPct}%</span>
           </div>
-          <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden flex">
+          <div className="w-full h-3 rounded-full bg-white/8 overflow-hidden flex">
             <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(availableCount / totalCount) * 100}%` }} />
             <div className="h-full bg-amber-400  transition-all" style={{ width: `${(estimatedCount / totalCount) * 100}%` }} />
             <div className="h-full bg-red-400    transition-all" style={{ width: `${(missingCount   / totalCount) * 100}%` }} />
@@ -1779,8 +1779,8 @@ export default function DataCoverage() {
             ].map(({ dot, label, count }) => (
               <div key={label} className="flex items-center gap-1.5">
                 <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
-                <span className="text-xs text-slate-500">{label}</span>
-                <span className="text-xs font-bold text-slate-700">{count}</span>
+                <span className="text-xs text-white/40">{label}</span>
+                <span className="text-xs font-bold text-white/70">{count}</span>
               </div>
             ))}
           </div>
@@ -1788,21 +1788,21 @@ export default function DataCoverage() {
       )}
 
       {/* Filter tabs */}
-      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+      <div className="flex flex-wrap gap-1 bg-white/5 p-1 rounded-xl w-fit">
         {FILTERS.map(({ id, dot, count }) => (
           <button
             key={id}
             onClick={() => setActiveFilter(id)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeFilter === id
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
+                ? "bg-white/10 text-white/90 shadow-sm"
+                : "text-white/40 hover:text-white/60"
             }`}
           >
             {dot && <span className={`w-2 h-2 rounded-full ${dot}`} />}
             {id}
             <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-              activeFilter === id ? "bg-slate-100 text-slate-600" : "text-slate-400"
+              activeFilter === id ? "bg-white/10 text-white/60" : "text-white/25"
             }`}>{count}</span>
           </button>
         ))}
@@ -1822,28 +1822,28 @@ export default function DataCoverage() {
           };
 
           return (
-            <div key={cat.category} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+            <div key={cat.category} className="bg-[#0d1117] rounded-2xl border border-white/8 overflow-hidden">
 
               {/* Category header */}
               <button
                 onClick={() => toggleCat(cat.category)}
-                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition"
+                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/4 transition"
               >
                 <div className="flex items-center gap-3">
-                  <span className="font-bold text-sm text-slate-800">{cat.category}</span>
+                  <span className="font-bold text-sm text-white/85">{cat.category}</span>
                   <div className="flex items-center gap-1.5">
                     {counts.available > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-900/30 border border-emerald-700/50 text-emerald-400 text-[10px] font-bold">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{counts.available}
                       </span>
                     )}
                     {counts.estimated > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-900/30 border border-amber-700/50 text-amber-400 text-[10px] font-bold">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />{counts.estimated}
                       </span>
                     )}
                     {counts.missing > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-700 text-[10px] font-bold">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-900/30 border border-red-700/50 text-red-400 text-[10px] font-bold">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-500" />{counts.missing}
                       </span>
                     )}
@@ -1909,7 +1909,7 @@ export default function DataCoverage() {
                         {/* Main grid row */}
                         <div
                           className={`grid grid-cols-[36px_1fr_140px_180px_90px_110px_110px] gap-x-3 items-center px-5 py-3 transition-colors ${effectiveSc.rowAccent} ${
-                            idx < visibleItems.length - 1 && !isBreakdownOpen ? "border-b border-slate-100" : ""
+                            idx < visibleItems.length - 1 && !isBreakdownOpen ? "border-b border-white/6" : ""
                           } ${!item.hasData ? "opacity-80" : ""}`}
                         >
                           {/* Toggle */}
@@ -1919,7 +1919,7 @@ export default function DataCoverage() {
                             className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all flex-shrink-0 ${
                               item.hasData
                                 ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
-                                : "bg-white border-slate-300 text-slate-300 hover:border-slate-400"
+                                : "bg-white/5 border-white/20 text-white/25 hover:border-white/40"
                             }`}
                           >
                             {item.hasData
@@ -1929,7 +1929,7 @@ export default function DataCoverage() {
 
                           {/* Parameter */}
                           <div>
-                            <span className="text-sm text-slate-800 font-medium leading-tight">{item.label}</span>
+                            <span className="text-sm text-white/80 font-medium leading-tight">{item.label}</span>
                             {def && (
                               <div className="text-[10px] text-slate-400 mt-0.5">
                                 {item.key === "r_matlist" ? (
@@ -1995,14 +1995,14 @@ export default function DataCoverage() {
                           </span>
 
                           {/* Source (short) */}
-                          <span className="text-xs text-slate-500 leading-tight">
+                          <span className="text-xs text-white/40 leading-tight">
                             {item.hasData
                               ? (() => {
-                                  if (item.key === "r_matlist") return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
+                                  if (item.key === "r_matlist") return <span className="px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">User</span>;
                                   if (savedWWR && WWR_KEYS.includes(item.key))
-                                    return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">WWR DB</span>;
+                                    return <span className="px-1.5 py-0.5 rounded-full bg-sky-900/40 text-sky-400 text-[9px] font-bold border border-sky-700/50">WWR DB</span>;
                                   if (bboxSourceText(item.key, bboxStats) && cat.category !== "Building Information")
-                                    return <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold border border-blue-200">EUBUCCO</span>;
+                                    return <span className="px-1.5 py-0.5 rounded-full bg-blue-900/40 text-blue-400 text-[9px] font-bold border border-blue-700/50">EUBUCCO</span>;
                                   if (isMulti && rowBKey) {
                                     if (isPartial) return (
                                       <button
@@ -2016,34 +2016,34 @@ export default function DataCoverage() {
                                     if (haveBuildings.length === buildings.length) {
                                       const isEpc = buildings.some(b => b.has_epc) && epcFields.includes(FIELD_MAP[item.key] ?? "");
                                       return isEpc
-                                        ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span></>
-                                        : <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
+                                        ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span></>
+                                        : <span className="px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50">EUBUCCO</span>;
                                     }
                                     if (def?.primarySource?.toLowerCase().includes("cesium"))
-                                      return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">Cesium</span>;
-                                    return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
+                                      return <span className="px-1.5 py-0.5 rounded-full bg-sky-900/40 text-sky-400 text-[9px] font-bold border border-sky-700/50">Cesium</span>;
+                                    return <span className="px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">User</span>;
                                   }
                                   if (def?.primarySource?.toLowerCase().includes("cesium"))
-                                    return <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold border border-sky-200">Cesium</span>;
+                                    return <span className="px-1.5 py-0.5 rounded-full bg-sky-900/40 text-sky-400 text-[9px] font-bold border border-sky-700/50">Cesium</span>;
                                   const eubText = eubuccoSourceText(item.key, building);
                                   if (eubText) {
                                     const isEpc = building?.has_epc && epcFields.includes(FIELD_MAP[item.key] ?? "");
                                     return isEpc
-                                      ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span></>
-                                      : <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
+                                      ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span></>
+                                      : <span className="px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50">EUBUCCO</span>;
                                   }
-                                  return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">User</span>;
+                                  return <span className="px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">User</span>;
                                 })()
                               : (() => {
-                                  if (item.key === "r_matlist") return <><span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-orange-200">Boverket</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">Wikells</span></>;
+                                  if (item.key === "r_matlist") return <><span className="px-1.5 py-0.5 rounded-full bg-orange-900/40 text-orange-400 text-[9px] font-bold border border-orange-700/50">Boverket</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">Wikells</span></>;
                                   const src = item.source.toLowerCase();
-                                  if (src.includes("tabula"))  return <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold border border-amber-200">TABULA</span>;
-                                  if (src.includes("boverket")) return <span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold border border-orange-200">Boverket</span>;
-                                  if (src.includes("epc") || src.includes("energy performance")) return <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold border border-emerald-200">EPC</span>;
-                                  if (src.includes("pvgis")) return <span className="px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-[9px] font-bold border border-yellow-200">PVGIS</span>;
-                                  if (src.includes("eubucco")) return <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold border border-purple-200">EUBUCCO</span>;
-                                  if (src.includes("—") || src.includes("no ") || src.includes("must")) return <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[9px] font-bold border border-red-200">Missing</span>;
-                                  return <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200">Estimated</span>;
+                                  if (src.includes("tabula"))  return <span className="px-1.5 py-0.5 rounded-full bg-amber-900/40 text-amber-400 text-[9px] font-bold border border-amber-700/50">TABULA</span>;
+                                  if (src.includes("boverket")) return <span className="px-1.5 py-0.5 rounded-full bg-orange-900/40 text-orange-400 text-[9px] font-bold border border-orange-700/50">Boverket</span>;
+                                  if (src.includes("epc") || src.includes("energy performance")) return <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span>;
+                                  if (src.includes("pvgis")) return <span className="px-1.5 py-0.5 rounded-full bg-yellow-900/40 text-yellow-400 text-[9px] font-bold border border-yellow-700/50">PVGIS</span>;
+                                  if (src.includes("eubucco")) return <span className="px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50">EUBUCCO</span>;
+                                  if (src.includes("—") || src.includes("no ") || src.includes("must")) return <span className="px-1.5 py-0.5 rounded-full bg-red-900/40 text-red-400 text-[9px] font-bold border border-red-700/50">Missing</span>;
+                                  return <span className="px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">Estimated</span>;
                                 })()
                             }
                           </span>
@@ -2164,7 +2164,7 @@ export default function DataCoverage() {
       <div className="flex justify-between pt-4 pb-8">
         <button
           onClick={() => navigate("/step/1")}
-          className="px-5 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
+          className="px-5 py-2 rounded-lg border border-white/15 text-sm font-medium text-white/60 hover:bg-white/8"
         >
           &#x2190; Back
         </button>
