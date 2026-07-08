@@ -6,6 +6,7 @@ import LandingPage from "./pages/LandingPage";
 import DefineProject from "./pages/DefineProject";
 import DataCoverage from "./pages/DataCoverage";
 import DataAssumptions from "./pages/DataAssumptions";
+import BaselineSetup from "./pages/BaselineSetup";
 import RenovationSimulator from "./pages/RenovationSimulator";
 import Scenarios from "./pages/Scenarios";
 import StepScenarios from "./pages/StepScenarios";
@@ -26,8 +27,15 @@ function ScrollToTop() {
 function Step3Router() {
   const projectType = useWizardStore(s => s.project.projectType);
   return projectType === "Renovation Planning"
-    ? <RenovationSimulator />
+    ? <BaselineSetup />
     : <DataAssumptions />;
+}
+
+function Step4Router() {
+  const projectType = useWizardStore(s => s.project.projectType);
+  return projectType === "Renovation Planning"
+    ? <RenovationSimulator />
+    : <StepScenarios />;
 }
 
 /**
@@ -53,7 +61,7 @@ export default function App() {
         <Route path="/step/1" element={<DefineProject />} />
         <Route path="/step/2" element={<DataCoverage />} />
         <Route path="/step/3" element={<Step3Router />} />
-        <Route path="/step/4" element={<StepScenarios />} />
+        <Route path="/step/4" element={<Step4Router />} />
         <Route path="/step/5" element={<ResultsBudget />} />
       </Route>
       </Routes>

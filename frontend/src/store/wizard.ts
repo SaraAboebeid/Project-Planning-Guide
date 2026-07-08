@@ -75,11 +75,15 @@ interface ProjectState {
   currentBbox: { north: number; south: number; east: number; west: number } | null;
   /* all bbox building rows loaded in step 2 */
   bboxRows: BuildingRecord[];
-  /* simulation material selections (Step 3, Renovation) */
+  /* simulation material selections (Step 4, Renovation) */
   simulationMaterials: Record<string, string[]>; // component label → selected wikells codes
   /* renovation packages built in step 4 */
   renovationPackages: RenovationPackage[];
   selectedPackageId: string | null;
+  /* Step 3 Renovation — supplementary data uploaded by user to fill data gaps */
+  supplementaryData: Record<string, Record<string, unknown>>; // building address → field overrides
+  /* Step 3 Renovation — baseline EPSM simulation status */
+  baselineStatus: "idle" | "done";
 }
 
 interface WizardState {
@@ -126,6 +130,8 @@ const DEFAULT_PROJECT: ProjectState = {
   simulationMaterials: {},
   renovationPackages: [],
   selectedPackageId: null,
+  supplementaryData: {},
+  baselineStatus: "idle",
 };
 
 export const useWizardStore = create<WizardState>((set) => ({

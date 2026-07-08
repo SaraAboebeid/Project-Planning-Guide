@@ -212,46 +212,6 @@ export default function WizardLayout() {
             <Outlet />
           </main>
 
-          {/* ── RIGHT PANEL ─────────────────────────────────────────── */}
-          <aside className="shrink-0 flex flex-col gap-3 p-4 overflow-y-auto"
-                 style={{ width: 280, background: "#0d1117",
-                          borderLeft: "1px solid rgba(255,255,255,0.07)" }}>
-
-            {/* Project Context */}
-            <div style={{ borderRadius: 12, padding: "14px", flexShrink: 0,
-                          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", marginBottom: 12 }}>
-                Project Context
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <ContextRow icon={IC.project} label="Selected mode"
-                  value={project.projectType ? (PT_LABEL[project.projectType] ?? project.projectType) : "—"}
-                  valueColor="#721CB8" />
-                <ContextRow icon={IC.layers}  label="Components selected"
-                  value={componentsCount > 0 ? String(componentsCount) : "—"} />
-                <ProgressRow label="Data readiness"   pct={dataReadiness}   color="#96D74C" />
-                <ProgressRow label="Model confidence" pct={modelConfidence} color="#F59E0B" />
-                <ContextRow icon={IC.chevronR} label="Next step" value={nextStepLabel}
-                  valueColor="rgba(255,255,255,0.45)" />
-              </div>
-            </div>
-
-            {/* Data needed */}
-            <div style={{ borderRadius: 12, padding: "14px",
-                          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
-                Data needed
-              </div>
-              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 10, lineHeight: 1.5 }}>
-                To improve model accuracy, the following data is recommended.
-              </p>
-              <DataNeededRow label="Building geometry"     status={hasBuilding ? "available" : "partial"} />
-              <DataNeededRow label="Envelope materials"    status="partial" />
-              <DataNeededRow label="Window specifications" status="missing" />
-              <DataNeededRow label="Energy use data"       status="partial" />
-            </div>
-
-          </aside>
         </div>
 
         {/* ── BOTTOM NAV BAR ──────────────────────────────────────────── */}
