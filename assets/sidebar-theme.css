@@ -99,6 +99,26 @@
   border-radius: 10px !important;
 }
 
+#lp-stats {
+  gap: 4px !important;
+  padding: 8px 10px 0 !important;
+}
+
+.stat-box {
+  padding: 8px 5px !important;
+}
+
+.stat-num {
+  font-size: 15px !important;
+  line-height: 1.1 !important;
+}
+
+.stat-lbl {
+  margin-top: 1px !important;
+  font-size: 9px !important;
+  line-height: 1.2 !important;
+}
+
 .stat-num {
   color: var(--sb-accent-light) !important;
 }
@@ -368,4 +388,54 @@
 
 #vt-ghost-knob {
   background: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Collapsible section headers: arrow-only cue */
+.collapse-toggle {
+  padding: 6px 9px !important;
+  min-height: 28px !important;
+  justify-content: space-between !important;
+}
+
+.collapse-sub {
+  display: none !important;
+}
+
+.collapse-chevron {
+  font-size: 10px !important;
+  opacity: 0.9;
+}
+
+/* Legend density: avoid nested scrolling and fit more rows */
+#legend-container {
+  overflow: visible !important;
+  max-height: none !important;
+  padding: 4px 10px 0 !important;
+}
+
+.legend-row {
+  gap: 5px !important;
+  margin: 1px 0 !important;
+  padding: 2px 3px !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+}
+
+.legend-row > span:first-of-type {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.legend-row > span:nth-of-type(2) {
+  min-width: 40px !important;
+  text-align: right !important;
+  font-size: 9px !important;
+}
+
+.legend-row > span:last-of-type {
+  margin-left: 2px !important;
+  font-size: 9px !important;
 }

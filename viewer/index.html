@@ -194,7 +194,6 @@
     <div class="collapse-head" style="margin-top:4px">
       <button class="collapse-toggle" id="traffic-toggle" type="button" aria-expanded="false">
         <span>Traffic</span>
-        <span class="collapse-sub">tap to view layers</span>
         <span class="collapse-chevron">▾</span>
       </button>
     </div>
@@ -248,7 +247,6 @@
     <div class="collapse-head" style="margin-top:4px">
       <button class="collapse-toggle" id="stats-toggle" type="button" aria-expanded="false">
         <span>Statistics</span>
-        <span class="collapse-sub">47 datasets</span>
         <span class="collapse-chevron">▾</span>
       </button>
       <button class="info-btn" style="margin-right:4px" data-title="Statistics Sweden (SCB) layers" data-desc="47 statistical overlays from Statistics Sweden covering population grids, administrative zones, land use areas, and the national reference grid. All loaded on demand from the SCB WFS service." data-source="Statistics Sweden (SCB) · CC0 1.0 Universal · geodata.scb.se"></button>
@@ -419,11 +417,90 @@
   <div id="perf-content" style="margin-top:10px;overflow-y:auto;flex:1"></div>
 </div>
 
+  <!-- ══ URBAN ANALYSIS ════════════════════════════════════════════════ -->
+  <div class="lp-divider"></div>
+  <div class="collapse-head" style="margin-top:4px">
+    <button class="collapse-toggle" id="urban-toggle" type="button" aria-expanded="false">
+      <span>Urban Analysis</span>
+      <span class="collapse-chevron">▾</span>
+    </button>
+    <button class="info-btn" style="margin-right:4px" data-title="Urban Analysis layers" data-desc="City-wide analytical overlays computed from OSM and EUBUCCO data. Green Index scores street segments by park proximity. Heat Island Proxy estimates thermal stress per grid cell from building energy class, age and use. Green Accessibility maps walking distance to the nearest green space." data-source="OSM · Overpass API · EUBUCCO v0.2"></button>
+  </div>
+  <div id="urban-content" class="collapse-content collapsed" style="padding-top:4px">
+    <div id="urban-analysis-section">
+      <div class="overlay-group">
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-urban-green">
+            <span class="overlay-check"></span>
+            <span class="base-name">🌿 Green Index</span>
+            <span class="layer-pill">OSM</span>
+          </button>
+          <button class="info-btn" data-title="Street Green Index" data-desc="Greenness score 0–1 for every street segment based on proximity to parks, forests and gardens (OSM). Colour: green = well-served, red = low green coverage. Distance-decay model with 200 m half-life." data-source="OpenStreetMap · Overpass API"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-urban-uhi">
+            <span class="overlay-check"></span>
+            <span class="base-name">🌡️ Heat Island Proxy</span>
+            <span class="layer-pill">EUBUCCO</span>
+          </button>
+          <button class="info-btn" data-title="Urban Heat Island Proxy" data-desc="Grid-based heat island proxy (667 m cells) scored from energy class (50%), construction year (30%), and building use (20%). Green areas provide a cooling correction. Red = high thermal stress, blue = cooler areas." data-source="EUBUCCO v0.2 · Boverket EPC · OSM"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-urban-access">
+            <span class="overlay-check"></span>
+            <span class="base-name">🚶 Green Accessibility</span>
+            <span class="layer-pill">OSM</span>
+          </button>
+          <button class="info-btn" data-title="Green Space Accessibility" data-desc="Straight-line distance from a 280 m grid to the nearest OSM green space. Green = within 400 m, amber = 400–800 m, red = over 800 m (WHO guideline threshold). Identifies underserved neighbourhoods." data-source="OpenStreetMap · Overpass API"></button>
+        </div>
+      </div>
+      <div id="urban-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
+      <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:11px;color:var(--text)"></div>
+    </div>
+  </div>
+
 <div id="ppg-brand">PPG &middot; Chalmers / Boverket</div>
 <div id="controls-hint">&#128205; Scroll to zoom &nbsp;&middot;&nbsp; Drag to pan &nbsp;&middot;&nbsp; Right-drag or Ctrl+drag to tilt/rotate &nbsp;&middot;&nbsp; Hover buildings for details</div>
 
 <script>
   (function () {
+    function ensureUrbanCollapse() {
+      if (document.getElementById('urban-toggle') && document.getElementById('urban-content')) return;
+
+      var urbanSection = document.getElementById('urban-analysis-section');
+      if (!urbanSection) return;
+
+      var infoBtn = null;
+      var prev = urbanSection.previousElementSibling;
+      if (prev && prev.querySelector) infoBtn = prev.querySelector('.info-btn');
+
+      var head = document.createElement('div');
+      head.className = 'collapse-head';
+      head.style.marginTop = '4px';
+
+      var toggle = document.createElement('button');
+      toggle.className = 'collapse-toggle';
+      toggle.id = 'urban-toggle';
+      toggle.type = 'button';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.innerHTML = '<span>Urban Analysis</span><span class="collapse-chevron">▾</span>';
+      head.appendChild(toggle);
+
+      if (infoBtn) {
+        infoBtn.remove();
+        infoBtn.style.marginRight = '4px';
+        head.appendChild(infoBtn);
+      }
+
+      var content = document.createElement('div');
+      content.id = 'urban-content';
+      content.className = 'collapse-content collapsed';
+      content.style.paddingTop = '4px';
+      urbanSection.parentNode.insertBefore(head, urbanSection);
+      urbanSection.parentNode.insertBefore(content, urbanSection);
+      content.appendChild(urbanSection);
+    }
+
     function bindCollapse(toggleId, contentId) {
       var toggle = document.getElementById(toggleId);
       var content = document.getElementById(contentId);
@@ -436,8 +513,10 @@
       });
     }
 
+    ensureUrbanCollapse();
     bindCollapse('traffic-toggle', 'traffic-content');
     bindCollapse('stats-toggle', 'stats-content');
+    bindCollapse('urban-toggle', 'urban-content');
   })();
 </script>
 
