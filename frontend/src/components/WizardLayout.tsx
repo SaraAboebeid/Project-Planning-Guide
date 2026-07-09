@@ -27,10 +27,24 @@ const IC = {
   report:   "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z",
 };
 
-function SideNavItem({ iconD, label, onClick }: { iconD: string; label: string; onClick?: () => void }) {
+function SideNavItem({
+  iconD,
+  label,
+  active = false,
+  onClick,
+}: {
+  iconD: string;
+  label: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
   return (
     <button onClick={onClick} title={label}
-            className="group flex flex-col items-center gap-1 w-full py-2.5 rounded-lg transition-all cursor-pointer border-0 text-white/40 hover:text-white/80 hover:bg-white/8">
+            className={`group flex flex-col items-center gap-1 w-full py-2.5 rounded-lg transition-all cursor-pointer border-0 ${
+              active
+                ? "bg-white/12 text-white"
+                : "text-white/40 hover:text-white/80 hover:bg-white/8"
+            }`}>
       <Icon d={iconD} size={19} />
       <span className="text-[9px] tracking-wide font-medium leading-none">{label}</span>
     </button>
@@ -38,6 +52,14 @@ function SideNavItem({ iconD, label, onClick }: { iconD: string; label: string; 
 }
 
 const STEP_ICONS = [IC.project, IC.map, IC.database, IC.layers, IC.timeline];
+
+const LIBRARY_TABS = [
+  { label: "Pathways", path: "/pathways" },
+  { label: "Data Explorer", path: "/data" },
+  { label: "Analysis Tools", path: "/analysis" },
+  { label: "Map", path: "__3d" },
+  { label: "Sample Reports", path: "/reports" },
+];
 
 const PT_LABEL: Record<string, string> = {
   renovation:       "Renovation Planning",
@@ -141,13 +163,15 @@ export default function WizardLayout() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         </div>
 
-        {/* Same nav items as home page */}
-        <SideNavItem iconD={IC.layers}   label="Pathways" onClick={() => navigate("/pathways")} />
-        <SideNavItem iconD={IC.database} label="Data"     onClick={() => navigate("/data")} />
-        <SideNavItem iconD={IC.timeline} label="Analysis" onClick={() => navigate("/analysis")} />
-        <SideNavItem iconD={IC.map}      label="Map"      onClick={() => window.open("http://localhost:8765/gothenburg_3d.html", "_blank")} />
-        <SideNavItem iconD={IC.budget}   label="Budget"   onClick={() => navigate("/budget")} />
-        <SideNavItem iconD={IC.report}   label="Reports"  onClick={() => navigate("/reports")} />
+        {steps.map((step, i) => (
+          <SideNavItem
+            key={step.path}
+            iconD={STEP_ICONS[i] ?? IC.project}
+            label={`Step ${step.number}`}
+            active={location.pathname === step.path}
+            onClick={() => navigate(step.path)}
+          />
+        ))}
 
         <div className="flex-1" />
         <SideNavItem iconD={IC.settings} label="Settings" />
@@ -160,43 +184,65 @@ export default function WizardLayout() {
         <header className="shrink-0 flex flex-col z-20"
                 style={{ background: "#0d1117", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
 
-          {/* Step breadcrumb strip */}
-          <div className="flex items-center gap-0 px-6 pt-3 pb-2">
-            {steps.map((s, i) => {
-              const isActive = s.path === location.pathname;
-              const isDone   = i < safeIndex;
-              return (
-                <div key={s.number} className="flex items-center">
+          <div className="flex items-center gap-3 px-6 py-3">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{
+                width: 22,
+                height: 22,
+                borderRadius: "50%",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 10,
+                fontWeight: 800,
+                background: "rgba(114,28,184,0.25)",
+                border: "1px solid rgba(114,28,184,0.55)",
+                color: "#fff",
+              }}>
+                {activeStep.number}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>
+                {activeStep.label}
+              </span>
+            </div>
+
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: 4,
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}>
+              {LIBRARY_TABS.map((tab) => {
+                const isActive = tab.path !== "__3d" && location.pathname === tab.path;
+                return (
                   <button
-                    onClick={() => navigate(s.path)}
-                    title={s.label}
+                    key={tab.label}
+                    onClick={() => (tab.path === "__3d"
+                      ? window.open("http://localhost:8765/gothenburg_3d.html", "_blank")
+                      : navigate(tab.path))}
                     style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      padding: "4px 10px", borderRadius: 20, border: 0,
-                      background: isActive ? "rgba(114,28,184,0.30)" : "transparent",
-                      color: isActive ? "#fff" : isDone ? "#96D74C" : "rgba(255,255,255,0.30)",
-                      fontSize: 11, fontWeight: isActive ? 700 : 500,
-                      cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap",
+                      border: 0,
+                      borderRadius: 8,
+                      padding: "6px 10px",
+                      cursor: "pointer",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                      color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
+                      background: isActive ? "rgba(114,28,184,0.35)" : "transparent",
+                      transition: "all 0.15s",
                     }}
                   >
-                    <span style={{
-                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 9, fontWeight: 800,
-                      background: isActive ? "#721CB8" : isDone ? "rgba(150,215,76,0.2)" : "rgba(255,255,255,0.08)",
-                      color: isActive ? "#fff" : isDone ? "#96D74C" : "rgba(255,255,255,0.35)",
-                      border: isActive ? "1px solid rgba(114,28,184,0.6)" : isDone ? "1px solid rgba(150,215,76,0.4)" : "1px solid rgba(255,255,255,0.10)",
-                    }}>
-                      {isDone ? "✓" : i + 1}
-                    </span>
-                    {s.label}
+                    {tab.label}
                   </button>
-                  {i < steps.length - 1 && (
-                    <span style={{ color: "rgba(255,255,255,0.12)", fontSize: 12, margin: "0 2px" }}>›</span>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+
             <div style={{ flex: 1 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{progress}%</span>

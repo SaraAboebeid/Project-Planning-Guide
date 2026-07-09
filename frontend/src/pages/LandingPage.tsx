@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 
 // ── Inline SVG icon set ────────────────────────────────────────────────────
@@ -65,88 +65,6 @@ function StatCard({ label, value, unit, barColor }: {
   );
 }
 
-// ── Workflow step card (bottom strip) ──────────────────────────────────────
-type StepStatus = "not-started" | "in-progress" | "review" | "done";
-const STATUS_DOT: Record<StepStatus, string> = {
-  "not-started": "bg-white/25",
-  "in-progress":  "bg-[#96D74C]",
-  "review":        "bg-amber-400",
-  "done":          "bg-emerald-400",
-};
-const STATUS_LABEL: Record<StepStatus, string> = {
-  "not-started": "Not started",
-  "in-progress":  "In progress",
-  "review":        "Review",
-  "done":          "Done",
-};
-
-const STEP_ACCENTS = ["#721CB8", "#4ECDC4", "#4A90E2", "#F59E0B", "#6B7280"];
-const STATUS_TEXT: Record<StepStatus, string> = {
-  "not-started": "text-white/35",
-  "in-progress":  "text-[#96D74C]",
-  "review":        "text-[#4A90E2]",
-  "done":          "text-emerald-400",
-};
-
-function StepCard({
-  n, label, desc, status, accent, iconD, isFirst, isLast, onClick,
-}: { n: number; label: string; desc: string; status: StepStatus; accent: string; iconD: string; isFirst: boolean; isLast: boolean; onClick: () => void }) {
-  return (
-    <div className="flex-1 flex flex-col items-center relative">
-      {/* Left connector */}
-      {!isFirst && (
-        <div className="absolute left-0 right-1/2 pointer-events-none"
-             style={{ top: 22, height: 2, borderTop: "2px dashed rgba(255,255,255,0.15)" }} />
-      )}
-      {/* Right connector */}
-      {!isLast && (
-        <div className="absolute left-1/2 right-0 pointer-events-none"
-             style={{ top: 22, height: 2, borderTop: "2px dashed rgba(255,255,255,0.15)" }} />
-      )}
-      {/* Number circle */}
-      <div
-        className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-[15px] shrink-0 relative z-10"
-        style={{ background: accent, boxShadow: `0 0 18px ${accent}66` }}
-      >
-        {n}
-      </div>
-      {/* Card */}
-      <button
-        onClick={onClick}
-        className="w-full mt-2 flex-1 text-left rounded-2xl p-4 transition-all cursor-pointer"
-        style={{
-          background: "rgba(13,17,40,0.88)",
-          border: `1.5px solid ${accent}45`,
-          backdropFilter: "blur(14px)",
-          boxShadow: `0 2px 12px ${accent}20, inset 0 1px 0 rgba(255,255,255,0.05)`,
-        }}
-        onMouseEnter={e => {
-          const b = e.currentTarget as HTMLButtonElement;
-          b.style.borderColor = `${accent}90`;
-          b.style.background = `${accent}20`;
-          b.style.boxShadow = `0 4px 20px ${accent}40, inset 0 1px 0 rgba(255,255,255,0.07)`;
-        }}
-        onMouseLeave={e => {
-          const b = e.currentTarget as HTMLButtonElement;
-          b.style.borderColor = `${accent}45`;
-          b.style.background = "rgba(13,17,40,0.88)";
-          b.style.boxShadow = `0 2px 12px ${accent}20, inset 0 1px 0 rgba(255,255,255,0.05)`;
-        }}
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <span style={{ color: accent }}><Icon d={iconD} size={15} /></span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>{label}</span>
-        </div>
-        <p style={{ fontSize: 10, lineHeight: 1.55, marginBottom: 10, color: "rgba(255,255,255,0.55)" }}>{desc}</p>
-        <div className="flex items-center gap-1.5">
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status]}`} />
-          <span className={`text-[9px] font-medium ${STATUS_TEXT[status]}`}>{STATUS_LABEL[status]}</span>
-        </div>
-      </button>
-    </div>
-  );
-}
-
 // ── Shortcut button ────────────────────────────────────────────────────────
 function Shortcut({ iconPath, label, onClick }: { iconPath: string; label: string; onClick?: () => void }) {
   return (
@@ -162,13 +80,61 @@ function Shortcut({ iconPath, label, onClick }: { iconPath: string; label: strin
   );
 }
 
+type StepStatus = "not-started" | "in-progress" | "review";
+
+const STEP_STATUS_STYLE: Record<StepStatus, { dot: string; text: string }> = {
+  "not-started": { dot: "rgba(255,255,255,0.45)", text: "rgba(255,255,255,0.68)" },
+  "in-progress": { dot: "#37D39A", text: "#37D39A" },
+  "review": { dot: "#5FA5FF", text: "#5FA5FF" },
+};
+
 // ── Data ───────────────────────────────────────────────────────────────────
 const WORKFLOW_STEPS = [
-  { n: 1, label: "Define Project",       desc: "Set project type, KPIs, systems and scope.",   status: "not-started" as StepStatus, path: "/step/1", icon: IC.deliverable },
-  { n: 2, label: "Building & Site Data", desc: "Import geometry, climate and context data.",   status: "in-progress"  as StepStatus, path: "/step/2", icon: IC.layers },
-  { n: 3, label: "Data Overview",        desc: "Review confidence, gaps and sensitivity.",      status: "review"       as StepStatus, path: "/step/3", icon: IC.database },
-  { n: 4, label: "Scenarios",            desc: "Choose your intervention pathway and compare scenarios.", status: "not-started" as StepStatus, path: "/step/4", icon: IC.report },
-  { n: 5, label: "Timeline & Cost",      desc: "Plan schedule, resources and CAPEX budget.",   status: "not-started" as StepStatus, path: "/step/5", icon: IC.timeline },
+  {
+    n: 1,
+    shortLabel: "Step 1",
+    name: "Project Brief",
+    desc: "Define goals, scope, KPIs and location.",
+    status: "not-started" as StepStatus,
+    path: "/step/1",
+    icon: IC.deliverable,
+  },
+  {
+    n: 2,
+    shortLabel: "Step 2",
+    name: "Site Intelligence",
+    desc: "Explore context, constraints and opportunities.",
+    status: "in-progress" as StepStatus,
+    path: "/step/2",
+    icon: IC.layers,
+  },
+  {
+    n: 3,
+    shortLabel: "Step 3",
+    name: "Data Confidence",
+    desc: "Assess data quality, gaps and uncertainty.",
+    status: "review" as StepStatus,
+    path: "/step/3",
+    icon: IC.database,
+  },
+  {
+    n: 4,
+    shortLabel: "Step 4",
+    name: "Scenario Outputs",
+    desc: "Compare alternatives and expected outcomes.",
+    status: "not-started" as StepStatus,
+    path: "/step/4",
+    icon: IC.report,
+  },
+  {
+    n: 5,
+    shortLabel: "Step 5",
+    name: "Roadmap and Budget",
+    desc: "Plan timeline, resources and estimated cost.",
+    status: "not-started" as StepStatus,
+    path: "/step/5",
+    icon: IC.timeline,
+  },
 ];
 
 const RECENT_ACTIVITY = [
@@ -185,9 +151,18 @@ const COUNTRIES = [
   { id: "ie", name: "Ireland",        cities: [] },
 ];
 
+const LIBRARY_TABS = [
+  { label: "Pathways", path: "/pathways" },
+  { label: "Data Explorer", path: "/data" },
+  { label: "Analysis Tools", path: "/analysis" },
+  { label: "Map", path: "map" },
+  { label: "Sample Reports", path: "/reports" },
+];
+
 // ── Main component ─────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const reset = useWizardStore((s) => s.reset);
 
   const [selectedCountry, setSelectedCountry] = useState("se");
@@ -208,12 +183,17 @@ export default function LandingPage() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         </div>
 
-        <NavItem iconPath={IC.layers}      label="Pathways"    onClick={() => { reset(); navigate("/pathways"); }} />
-        <NavItem iconPath={IC.database}    label="Data"        onClick={() => navigate("/data")} />
-        <NavItem iconPath={IC.timeline}    label="Analysis"    onClick={() => { reset(); navigate("/analysis"); }} />
-        <NavItem iconPath={IC.map}         label="Map"         onClick={() => window.open("http://localhost:8765/gothenburg_3d.html", "_blank")} />
-        <NavItem iconPath={IC.budget}      label="Budget"      onClick={() => { reset(); navigate("/budget"); }} />
-        <NavItem iconPath={IC.report}      label="Reports"     onClick={() => { reset(); navigate("/reports"); }} />
+        {WORKFLOW_STEPS.map((step) => (
+          <NavItem
+            key={step.n}
+            iconPath={step.icon}
+            label={step.shortLabel}
+            onClick={() => {
+              reset();
+              navigate(step.path);
+            }}
+          />
+        ))}
 
         {/* Push settings to bottom */}
         <div className="flex-1" />
@@ -224,13 +204,40 @@ export default function LandingPage() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* ── Top header bar ─────────────────────────────────────────── */}
-        <header className="h-11 shrink-0 flex items-center justify-between px-5 z-30"
+        <header className="h-11 shrink-0 flex items-center gap-3 px-5 z-30"
                 style={{ background: "rgba(10,13,20,0.95)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
           {/* Branding */}
           <div className="flex items-center gap-3">
             <img src="/CTH_new_logo_white.png" alt="Chalmers" className="h-7 opacity-80" />
             <span className="w-px h-4 bg-white/15" />
             <img src="/CNL_new_logo_white.png"  alt="Chalmers Next Labs" className="h-7 opacity-80" />
+          </div>
+
+          {/* Library tabs */}
+          <div className="hidden lg:flex items-center gap-1 rounded-xl p-1"
+               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            {LIBRARY_TABS.map(tab => {
+              const isActive = tab.path !== "map" && location.pathname === tab.path;
+              return (
+                <button
+                  key={tab.label}
+                  onClick={() => {
+                    if (tab.path === "map") {
+                      window.open("http://localhost:8765/gothenburg_3d.html", "_blank");
+                      return;
+                    }
+                    navigate(tab.path);
+                  }}
+                  className="px-2.5 py-1 rounded-lg border-0 cursor-pointer text-[10px] font-semibold whitespace-nowrap transition-all"
+                  style={{
+                    background: isActive ? "rgba(114,28,184,0.35)" : "transparent",
+                    color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Country + city selector */}
@@ -380,22 +387,43 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* ── Workflow step cards (bottom strip) ───────────────────── */}
-          <div className="absolute bottom-4 left-0 right-0 flex gap-2.5 px-5 z-10">
-            {WORKFLOW_STEPS.map((s, i) => (
-              <StepCard
-                key={s.n}
-                n={s.n}
-                label={s.label}
-                desc={s.desc}
-                status={s.status}
-                accent={STEP_ACCENTS[i]}
-                iconD={s.icon}
-                isFirst={i === 0}
-                isLast={i === WORKFLOW_STEPS.length - 1}
-                onClick={() => { reset(); navigate(s.path); }}
-              />
-            ))}
+          {/* ── Step overview strip (desktop) ────────────────────────── */}
+          <div className="absolute bottom-4 left-4 right-4 z-10 hidden xl:flex gap-2.5">
+            {WORKFLOW_STEPS.map((step) => {
+              const statusStyle = STEP_STATUS_STYLE[step.status];
+              return (
+                <button
+                  key={step.n}
+                  onClick={() => {
+                    reset();
+                    navigate(step.path);
+                  }}
+                  className="flex-1 rounded-2xl p-3 text-left border transition-all cursor-pointer"
+                  style={{
+                    background: "rgba(13,17,40,0.82)",
+                    borderColor: "rgba(114,28,184,0.34)",
+                    boxShadow: "0 2px 14px rgba(0,0,0,0.35)",
+                    backdropFilter: "blur(12px)",
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold"
+                          style={{ background: "rgba(114,28,184,0.38)", border: "1px solid rgba(114,28,184,0.7)", color: "#fff" }}>
+                      {step.n}
+                    </span>
+                    <span style={{ color: "#8FF0E8" }}><Icon d={step.icon} size={15} /></span>
+                    <span className="text-[11px] font-semibold text-white">{step.name}</span>
+                  </div>
+                  <p className="text-[10px] leading-relaxed text-white/60 mb-2.5">{step.desc}</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ background: statusStyle.dot }} />
+                    <span className="text-[10px] font-medium" style={{ color: statusStyle.text }}>
+                      {step.status === "not-started" ? "Not started" : step.status === "in-progress" ? "In progress" : "Review"}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
         </div>{/* end hero */}

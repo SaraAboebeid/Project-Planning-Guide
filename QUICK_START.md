@@ -4,18 +4,32 @@
 
 ### Installation Steps
 
-1. **Install Dependencies**
+1. **Install Backend Dependencies**
 ```bash
 pip install -r requirements.txt
 ```
 
-2. **Run the Application**
+2. **Install Frontend Dependencies**
 ```bash
-streamlit run planning_guide.py
+cd frontend
+npm install
 ```
 
-3. **Access the Dashboard**
-Open your browser to: http://localhost:8501
+3. **Run the Application**
+
+**Terminal 1: Start FastAPI Backend**
+```bash
+python backend/main.py
+```
+
+**Terminal 2: Start Vite Frontend**
+```bash
+cd frontend
+npm run dev
+```
+
+4. **Access the Dashboard**
+Open your browser to: http://localhost:5173
 
 ## 📖 Basic Usage
 

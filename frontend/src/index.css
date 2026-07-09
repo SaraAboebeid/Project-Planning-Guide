@@ -250,4 +250,21 @@ body {
   animation: fadeIn 0.60s ease both;
 }
 
+/* ── Global interactive hover shadow ── */
+button:not(.no-hover-shadow),
+[role="button"]:not(.no-hover-shadow) {
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+button:not(:disabled):not(.no-hover-shadow):hover,
+button:not(:disabled):not(.no-hover-shadow):focus-visible,
+[role="button"]:not(.no-hover-shadow):hover,
+[role="button"]:not(.no-hover-shadow):focus-visible {
+  filter: drop-shadow(0 6px 14px rgba(114, 28, 184, 0.22));
+}
+
+button:disabled {
+  filter: none;
+}
+
 

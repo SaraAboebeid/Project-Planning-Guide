@@ -42,9 +42,6 @@ ENV/
 .ipynb_checkpoints
 *.ipynb_checkpoints/
 
-# Streamlit
-.streamlit/secrets.toml
-
 # Project specific
 *.csv
 *.xlsx

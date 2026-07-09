@@ -1,10 +1,10 @@
-# Project Planning Guide Dashboard - Requirements
+# Project Planning Guide Backend - Requirements
 # Python 3.13+ (tested with Python 3.13.9)
 
 # Core Dependencies
-streamlit==1.53.1
+fastapi==0.109.2
+uvicorn==0.29.0
 pandas==2.2.3
-plotly==6.5.2
 openpyxl==3.1.5
 
 # Data Processing & Utilities
@@ -13,17 +13,8 @@ pytz==2025.2
 numpy==2.4.1
 duckdb==1.5.2
 
-# Streamlit Dependencies (auto-installed)
-altair==6.0.0
-pillow==12.1.0
-pyarrow==23.0.0
-pydeck==0.9.1
-folium==0.20.0
-streamlit-folium==0.27.1
-
-# Additional Libraries
+# Web & Utilities
 requests==2.32.5
-click==8.3.1
 Jinja2==3.1.6
 
 # Note: Install all dependencies with:

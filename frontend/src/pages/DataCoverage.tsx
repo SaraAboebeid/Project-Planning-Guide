@@ -1513,6 +1513,43 @@ export default function DataCoverage() {
 
   const WWR_KEYS = ["ec_b_wwr", "ec_fpv_wwr", "re_fpv_wwr"];
 
+  /* ── Auto-retry: if building lookups are missing (backend was down when step 1
+     ran) re-run them as soon as DataCoverage mounts. ── */
+  useEffect(() => {
+    const pts = project.buildingPoints ?? [];
+    const bbox = project.currentBbox ?? null;
+
+    // Re-run point lookups when points exist but results are empty
+    if (pts.length > 0 && buildings.length === 0 && !bboxStats) {
+      (async () => {
+        try {
+          const results = await Promise.all(pts.map(p => api.lookupBuilding(p.lat, p.lon)));
+          let savedWWRNew = null;
+          try {
+            const first = pts[0];
+            if (first) {
+              const wwrRes = await api.lookupWWR(first.lat, first.lon);
+              if (wwrRes.found) savedWWRNew = wwrRes.record;
+            }
+          } catch { /* ignore */ }
+          setProject({ lookedUpBuilding: results[0] ?? null, lookedUpBuildings: results, savedWWR: savedWWRNew });
+        } catch { /* backend still not ready — silent */ }
+      })();
+      return;
+    }
+
+    // Re-run bbox stats when bbox exists but stats are empty
+    if (bbox && !bboxStats && pts.length === 0) {
+      (async () => {
+        try {
+          const stats = await api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west);
+          setProject({ bboxStats: stats });
+        } catch { /* backend still not ready — silent */ }
+      })();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const defs = useMemo(
     () => buildDefs(project.projectType, project.systemsInScope, project.ecEnergyFocus ?? []),
     [project.projectType, project.systemsInScope, project.ecEnergyFocus],
