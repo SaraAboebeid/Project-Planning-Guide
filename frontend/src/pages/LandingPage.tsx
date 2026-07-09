@@ -155,7 +155,7 @@ const LIBRARY_TABS = [
   { label: "Pathways", path: "/pathways" },
   { label: "Data Explorer", path: "/data" },
   { label: "Analysis Tools", path: "/analysis" },
-  { label: "Map", path: "map" },
+  { label: "Map", path: "/map" },
   { label: "Sample Reports", path: "/reports" },
 ];
 
@@ -222,10 +222,6 @@ export default function LandingPage() {
                 <button
                   key={tab.label}
                   onClick={() => {
-                    if (tab.path === "map") {
-                      window.open("http://localhost:8765/gothenburg_3d.html", "_blank");
-                      return;
-                    }
                     navigate(tab.path);
                   }}
                   className="px-2.5 py-1 rounded-lg border-0 cursor-pointer text-[10px] font-semibold whitespace-nowrap transition-all"
@@ -366,7 +362,7 @@ export default function LandingPage() {
                   Start Planning
                 </button>
                 <button
-                  onClick={() => window.open("http://localhost:8765/gothenburg_3d.html", "_blank")}
+                  onClick={() => navigate("/map")}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold
                              text-white/80 cursor-pointer transition-all hover:text-white hover:border-white/30"
                   style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}

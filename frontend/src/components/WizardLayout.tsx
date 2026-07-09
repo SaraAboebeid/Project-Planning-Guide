@@ -57,7 +57,7 @@ const LIBRARY_TABS = [
   { label: "Pathways", path: "/pathways" },
   { label: "Data Explorer", path: "/data" },
   { label: "Analysis Tools", path: "/analysis" },
-  { label: "Map", path: "__3d" },
+  { label: "Map", path: "/map" },
   { label: "Sample Reports", path: "/reports" },
 ];
 
@@ -217,13 +217,11 @@ export default function WizardLayout() {
               border: "1px solid rgba(255,255,255,0.08)",
             }}>
               {LIBRARY_TABS.map((tab) => {
-                const isActive = tab.path !== "__3d" && location.pathname === tab.path;
+                const isActive = location.pathname === tab.path;
                 return (
                   <button
                     key={tab.label}
-                    onClick={() => (tab.path === "__3d"
-                      ? window.open("http://localhost:8765/gothenburg_3d.html", "_blank")
-                      : navigate(tab.path))}
+                    onClick={() => navigate(tab.path)}
                     style={{
                       border: 0,
                       borderRadius: 8,

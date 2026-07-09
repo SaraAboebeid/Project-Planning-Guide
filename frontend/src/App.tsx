@@ -17,6 +17,7 @@ import Timeline from "./pages/Timeline";
 import Budget from "./pages/Budget";
 import AnalysisTools from "./pages/AnalysisTools";
 import SampleReports from "./pages/SampleReports";
+import MapViewer from "./pages/MapViewer";
 import { useWizardStore } from "./store/wizard";
 
 function ScrollToTop() {
@@ -63,6 +64,7 @@ export default function App() {
       <Route path="/data"      element={<DataLayout><DataExplorer /></DataLayout>} />
       <Route path="/pathways"  element={<DataLayout title="Pathways"       accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
       <Route path="/analysis"  element={<DataLayout title="Analysis" accentColor="#4ECDC4" accentBadge="Tools"><AnalysisTools /></DataLayout>} />
+      <Route path="/map"       element={<DataLayout title="3D Map" accentColor="#5FA5FF" accentBadge="Digital Twin"><MapViewer /></DataLayout>} />
       <Route path="/budget"    element={<DataLayout title="Planning & Cost" accentColor="#F59E0B" accentBadge="Cost Estimate"><Budget /></DataLayout>} />
       <Route path="/reports" element={<DataLayout title="Reports" accentColor="#96D74C" accentBadge="Examples"><SampleReports /></DataLayout>} />
       <Route element={<WizardLayout />}>

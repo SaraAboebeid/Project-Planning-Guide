@@ -7,6 +7,75 @@
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Widgets/widgets.css">
   <style>/* INJECT:CSS */</style>
+  <!-- Sidebar theme — edit assets/sidebar-theme.css directly; no rebuild needed -->
+  <link rel="stylesheet" href="sidebar-theme.css?v=20260709-v5">
+  <script>
+    (function(){
+      var l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = 'sidebar-theme.css?t=' + Date.now();
+      document.head.appendChild(l);
+    })();
+  </script>
+  <style>
+    .collapse-head {
+      display:flex;
+      align-items:center;
+      gap:6px;
+      padding:0 4px;
+    }
+    .collapse-toggle {
+      flex:1;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      border:1px solid rgba(255,255,255,0.08);
+      background:rgba(255,255,255,0.03);
+      color:var(--text);
+      border-radius:8px;
+      padding:7px 10px;
+      cursor:pointer;
+      font:inherit;
+      font-size:10px;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+      font-weight:700;
+      transition:all .15s ease;
+    }
+    .collapse-toggle:hover {
+      background:rgba(114,28,184,0.16);
+      border-color:rgba(114,28,184,0.34);
+      color:#fff;
+    }
+    .collapse-sub {
+      margin-left:auto;
+      font-size:9px;
+      font-weight:500;
+      letter-spacing:0.04em;
+      text-transform:none;
+      color:var(--muted);
+    }
+    .collapse-chevron {
+      font-size:12px;
+      line-height:1;
+      color:var(--muted);
+      transition:transform .2s ease;
+    }
+    .collapse-toggle[aria-expanded="true"] .collapse-chevron {
+      transform:rotate(180deg);
+    }
+    .collapse-content {
+      overflow:hidden;
+      max-height:1200px;
+      opacity:1;
+      transition:max-height .24s ease, opacity .18s ease;
+    }
+    .collapse-content.collapsed {
+      max-height:0;
+      opacity:0;
+      pointer-events:none;
+    }
+  </style>
 </head>
 <body>
 
@@ -122,7 +191,14 @@
 
     <!-- ─ Traffic ─────────────────────────────────────────────────────── -->
     <div class="lp-divider" style="margin:4px 0 0"></div>
-    <div class="lp-section-label">Traffic</div>
+    <div class="collapse-head" style="margin-top:4px">
+      <button class="collapse-toggle" id="traffic-toggle" type="button" aria-expanded="false">
+        <span>Traffic</span>
+        <span class="collapse-sub">tap to view layers</span>
+        <span class="collapse-chevron">▾</span>
+      </button>
+    </div>
+    <div id="traffic-content" class="collapse-content collapsed" style="padding-top:4px">
     <div class="overlay-group">
       <div class="overlay-row">
         <button class="overlay-btn" id="btn-overlay-transit">
@@ -165,14 +241,21 @@
         </span>
       </label>
     </div>
+    </div>
 
     <!-- ─ Statistics (SCB) ────────────────────────────────────────────── -->
     <div class="lp-divider" style="margin:4px 0 0"></div>
-    <div style="display:flex;align-items:center">
-      <div class="lp-section-label" style="flex:1">Statistics <span class="layer-pill" style="margin-left:2px;vertical-align:middle">SCB &middot; CC0</span></div>
+    <div class="collapse-head" style="margin-top:4px">
+      <button class="collapse-toggle" id="stats-toggle" type="button" aria-expanded="false">
+        <span>Statistics</span>
+        <span class="collapse-sub">47 datasets</span>
+        <span class="collapse-chevron">▾</span>
+      </button>
       <button class="info-btn" style="margin-right:4px" data-title="Statistics Sweden (SCB) layers" data-desc="47 statistical overlays from Statistics Sweden covering population grids, administrative zones, land use areas, and the national reference grid. All loaded on demand from the SCB WFS service." data-source="Statistics Sweden (SCB) · CC0 1.0 Universal · geodata.scb.se"></button>
     </div>
-    <div id="scb-layers-container" style="display:flex;flex-direction:column;gap:2px;padding:0 0 4px"></div>
+    <div id="stats-content" class="collapse-content collapsed">
+      <div id="scb-layers-container" style="display:flex;flex-direction:column;gap:2px;padding:4px 0 4px"></div>
+    </div>
 
   </div><!-- /lp-layers -->
 
@@ -338,6 +421,25 @@
 
 <div id="ppg-brand">PPG &middot; Chalmers / Boverket</div>
 <div id="controls-hint">&#128205; Scroll to zoom &nbsp;&middot;&nbsp; Drag to pan &nbsp;&middot;&nbsp; Right-drag or Ctrl+drag to tilt/rotate &nbsp;&middot;&nbsp; Hover buildings for details</div>
+
+<script>
+  (function () {
+    function bindCollapse(toggleId, contentId) {
+      var toggle = document.getElementById(toggleId);
+      var content = document.getElementById(contentId);
+      if (!toggle || !content) return;
+
+      toggle.addEventListener('click', function () {
+        var isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+        content.classList.toggle('collapsed', isExpanded);
+      });
+    }
+
+    bindCollapse('traffic-toggle', 'traffic-content');
+    bindCollapse('stats-toggle', 'stats-content');
+  })();
+</script>
 
 <!-- INJECT:DATA -->
 <!-- INJECT:JS -->

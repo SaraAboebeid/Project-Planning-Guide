@@ -20,6 +20,7 @@ To regenerate the HTML, run either:
 from build import main
 if __name__ == "__main__":
     main()
+  raise SystemExit(0)
 
 # ── Legacy code kept below for reference only. Do NOT edit here. ──────────
 # Edit viewer/styles/main.css, viewer/index.html, viewer/js/*.js instead.

@@ -6,6 +6,7 @@ import path from "path";
 
 // Absolute path to the standalone map HTML (lives outside the frontend folder)
 const MAP_FILE = path.resolve(__dirname, "../assets/gothenburg_3d.html");
+const SIDEBAR_CSS = path.resolve(__dirname, "../assets/sidebar-theme.css");
 
 export default defineConfig({
   plugins: [
@@ -24,6 +25,17 @@ export default defineConfig({
           res.setHeader("Content-Type", "text/html; charset=utf-8");
           res.setHeader("Cache-Control", "no-cache");
           fs.createReadStream(MAP_FILE).pipe(res);
+        });
+        // Serve sidebar theme CSS alongside the map — edit assets/sidebar-theme.css directly
+        server.middlewares.use("/sidebar-theme.css", (_req, res) => {
+          if (!fs.existsSync(SIDEBAR_CSS)) {
+            res.statusCode = 404;
+            res.end("sidebar-theme.css not found");
+            return;
+          }
+          res.setHeader("Content-Type", "text/css; charset=utf-8");
+          res.setHeader("Cache-Control", "no-cache");
+          fs.createReadStream(SIDEBAR_CSS).pipe(res);
         });
       },
     },

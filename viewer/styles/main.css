@@ -410,3 +410,171 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
 .scb-status {
   font-size:10px; color:var(--muted); flex:1;
 }
+
+/* =============================================================
+   MAP SIDEBAR THEME OVERRIDES — EDIT HERE
+   Keep all left-panel visual tweaks in this block while the map
+   viewer is still a work in progress.
+   ============================================================= */
+:root {
+  --map-sidebar-bg: rgba(13,17,23,0.94);
+  --map-sidebar-surface: rgba(255,255,255,0.05);
+  --map-sidebar-surface-strong: rgba(255,255,255,0.08);
+  --map-sidebar-border: rgba(255,255,255,0.10);
+  --map-sidebar-border-strong: rgba(114,28,184,0.34);
+  --map-sidebar-text: rgba(255,255,255,0.92);
+  --map-sidebar-muted: rgba(255,255,255,0.58);
+  --map-sidebar-faint: rgba(255,255,255,0.36);
+  --map-sidebar-accent: #721CB8;
+  --map-sidebar-accent-2: #995BD5;
+  --map-sidebar-success: #37D39A;
+}
+
+#left-panel {
+  background: var(--map-sidebar-bg) !important;
+  border-color: var(--map-sidebar-border) !important;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.34) !important;
+}
+
+#lp-header {
+  background: linear-gradient(160deg, #421869 0%, #721CB8 100%) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+.lp-title,
+.base-name,
+.layer-name,
+.tt-val,
+.tool-btn,
+.btn,
+.sub-btn {
+  color: var(--map-sidebar-text) !important;
+}
+
+.lp-sub,
+.stat-lbl,
+.lp-hint,
+.legend-cnt,
+.scb-status,
+.tt-lbl,
+#lp-no-selection {
+  color: var(--map-sidebar-muted) !important;
+}
+
+.lp-section-title,
+.lp-section-label {
+  color: var(--map-sidebar-faint) !important;
+}
+
+#search-input,
+.tool-btn,
+.btn,
+.lp-tab,
+.layer-card,
+.stat-box,
+#search-results,
+#info-tooltip,
+.scb-year-sel {
+  background: var(--map-sidebar-surface) !important;
+  border-color: var(--map-sidebar-border) !important;
+  color: var(--map-sidebar-text) !important;
+}
+
+#search-input::placeholder {
+  color: rgba(255,255,255,0.34) !important;
+}
+
+.lp-tab:hover,
+.btn:hover,
+.tool-btn:hover:not(:disabled),
+.sub-btn:hover,
+.layer-toggle:hover,
+.result-item:hover,
+.base-btn:hover,
+.overlay-btn:hover {
+  background: rgba(114,28,184,0.16) !important;
+  border-color: var(--map-sidebar-border-strong) !important;
+  color: #fff !important;
+}
+
+.lp-tab.active {
+  background: var(--map-sidebar-accent) !important;
+  border-color: var(--map-sidebar-accent) !important;
+  color: #fff !important;
+}
+
+.layer-pill {
+  background: rgba(255,255,255,0.08) !important;
+  border-color: rgba(255,255,255,0.10) !important;
+  color: rgba(255,255,255,0.70) !important;
+}
+
+.stat-num {
+  color: #8c6cff !important;
+}
+
+.stat-num-2 {
+  color: var(--map-sidebar-success) !important;
+}
+
+.base-indicator {
+  border-color: rgba(255,255,255,0.35) !important;
+}
+
+.base-btn.active .base-indicator {
+  background: var(--map-sidebar-accent-2) !important;
+  border-color: var(--map-sidebar-accent-2) !important;
+  box-shadow: 0 0 0 2px rgba(114,28,184,0.16) !important;
+}
+
+.overlay-check {
+  border-color: rgba(255,255,255,0.35) !important;
+}
+
+.overlay-btn.active .overlay-check {
+  background: var(--map-sidebar-accent) !important;
+  border-color: var(--map-sidebar-accent) !important;
+}
+
+.info-btn {
+  color: rgba(255,255,255,0.34) !important;
+}
+
+.info-btn:hover {
+  color: #d7b8ff !important;
+}
+
+#info-tooltip {
+  background: rgba(13,17,23,0.98) !important;
+  border-color: var(--map-sidebar-border) !important;
+  color: rgba(255,255,255,0.82) !important;
+  box-shadow: 0 18px 32px rgba(0,0,0,0.35) !important;
+}
+
+#info-tooltip .it-title {
+  color: #fff !important;
+}
+
+#info-tooltip .it-source {
+  color: rgba(255,255,255,0.42) !important;
+  border-top-color: rgba(255,255,255,0.08) !important;
+}
+
+#search-input:focus,
+.scb-year-sel:focus {
+  background: var(--map-sidebar-surface-strong) !important;
+  border-color: var(--map-sidebar-accent-2) !important;
+  box-shadow: 0 0 0 3px rgba(114,28,184,0.18) !important;
+}
+
+#lp-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.18) !important;
+}
+
+#vt-ghost-toggle {
+  background: rgba(255,255,255,0.14) !important;
+}
+
+#vt-ghost-knob {
+  background: rgba(255,255,255,0.55) !important;
+}

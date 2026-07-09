@@ -1,0 +1,371 @@
+/* =============================================================
+   3D VIEWER THEME OVERRIDES
+   Keeps the left sidebar and all floating side windows visually
+   aligned with the dashboard theme.
+   ============================================================= */
+
+:root {
+  --sb-bg: #0d1117;
+  --sb-surface: rgba(255, 255, 255, 0.05);
+  --sb-surface-2: rgba(255, 255, 255, 0.09);
+  --sb-border: rgba(255, 255, 255, 0.08);
+  --sb-border-strong: rgba(114, 28, 184, 0.44);
+  --sb-text: rgba(255, 255, 255, 0.9);
+  --sb-muted: rgba(255, 255, 255, 0.56);
+  --sb-faint: rgba(255, 255, 255, 0.35);
+  --sb-accent: #721cb8;
+  --sb-accent-dark: #421869;
+  --sb-accent-light: #995bd5;
+  --sb-success: #96d74c;
+  --sb-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+}
+
+/* Left sidebar shell */
+#left-panel {
+  background: var(--sb-bg) !important;
+  border: 1px solid var(--sb-border) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--sb-shadow) !important;
+}
+
+#lp-scroll,
+#search-wrap,
+#lp-layers,
+.basemap-group,
+.overlay-group,
+.layer-sub-panel {
+  background: transparent !important;
+}
+
+#lp-header {
+  background: linear-gradient(135deg, var(--sb-accent-dark) 0%, var(--sb-accent) 100%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 18px 16px 14px !important;
+}
+
+.lp-title {
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+
+.lp-sub {
+  color: rgba(255, 255, 255, 0.62) !important;
+}
+
+/* Shared text colors */
+.base-name,
+.layer-name,
+.tt-val,
+.result-item,
+.tool-btn,
+.btn,
+.sub-btn,
+.layer-toggle {
+  color: var(--sb-text) !important;
+}
+
+.lp-sub,
+.stat-lbl,
+.lp-hint,
+.legend-cnt,
+.scb-status,
+.tt-lbl,
+#lp-no-selection {
+  color: var(--sb-muted) !important;
+}
+
+.lp-section-title,
+.lp-section-label {
+  color: var(--sb-faint) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.1em !important;
+}
+
+.lp-divider {
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+/* Cards and tabs */
+.stat-box,
+.layer-card,
+#search-results,
+#info-tooltip,
+.scb-year-sel {
+  background: var(--sb-surface) !important;
+  border: 1px solid var(--sb-border) !important;
+}
+
+.stat-box {
+  border-radius: 10px !important;
+}
+
+.stat-num {
+  color: var(--sb-accent-light) !important;
+}
+
+.stat-num-2 {
+  color: var(--sb-success) !important;
+}
+
+.lp-tab {
+  background: var(--sb-surface) !important;
+  border: 1px solid var(--sb-border) !important;
+  color: var(--sb-muted) !important;
+  font-weight: 500 !important;
+}
+
+.lp-tab:hover {
+  background: rgba(114, 28, 184, 0.2) !important;
+  border-color: var(--sb-border-strong) !important;
+  color: #fff !important;
+}
+
+.lp-tab.active {
+  background: var(--sb-accent) !important;
+  border-color: var(--sb-accent) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 14px rgba(114, 28, 184, 0.3) !important;
+}
+
+/* Buttons */
+.btn,
+.tool-btn,
+.sub-btn {
+  background: var(--sb-surface) !important;
+  border: 1px solid var(--sb-border) !important;
+  color: var(--sb-text) !important;
+  border-radius: 8px !important;
+}
+
+.btn:hover,
+.tool-btn:hover:not(:disabled),
+.sub-btn:hover {
+  background: rgba(114, 28, 184, 0.2) !important;
+  border-color: var(--sb-border-strong) !important;
+  color: #fff !important;
+}
+
+.btn.active,
+.sub-btn.active {
+  background: rgba(114, 28, 184, 0.28) !important;
+  border-color: var(--sb-accent-light) !important;
+  color: #fff !important;
+}
+
+.tool-btn:disabled {
+  opacity: 0.35 !important;
+}
+
+.tool-btn.pvgis-btn {
+  background: rgba(251, 191, 36, 0.08) !important;
+  border-color: rgba(251, 191, 36, 0.25) !important;
+  color: #fbbf24 !important;
+}
+
+.tool-btn.pvgis-btn:hover:not(:disabled) {
+  background: rgba(251, 191, 36, 0.16) !important;
+  border-color: rgba(251, 191, 36, 0.45) !important;
+}
+
+/* Layer rows */
+.base-btn,
+.overlay-btn {
+  background: transparent !important;
+  color: var(--sb-text) !important;
+}
+
+.base-btn:hover,
+.overlay-btn:hover {
+  background: rgba(114, 28, 184, 0.2) !important;
+  color: #fff !important;
+}
+
+.base-btn.active,
+.overlay-btn.active {
+  background: rgba(114, 28, 184, 0.28) !important;
+  color: #fff !important;
+}
+
+.base-indicator,
+.overlay-check {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.base-btn.active .base-indicator {
+  background: var(--sb-accent-light) !important;
+  border-color: var(--sb-accent-light) !important;
+  box-shadow: 0 0 0 3px rgba(114, 28, 184, 0.18) !important;
+}
+
+.overlay-btn.active .overlay-check {
+  background: var(--sb-accent) !important;
+  border-color: var(--sb-accent) !important;
+}
+
+.layer-pill {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+/* Search */
+#search-input {
+  background: var(--sb-surface) !important;
+  border: 1px solid var(--sb-border) !important;
+  color: var(--sb-text) !important;
+  border-radius: 8px !important;
+}
+
+#search-input::placeholder {
+  color: rgba(255, 255, 255, 0.28) !important;
+}
+
+#search-input:focus,
+.scb-year-sel:focus {
+  background: var(--sb-surface-2) !important;
+  border-color: var(--sb-accent-light) !important;
+  box-shadow: 0 0 0 3px rgba(114, 28, 184, 0.18) !important;
+  outline: none !important;
+}
+
+#search-results {
+  background: rgba(13, 17, 23, 0.98) !important;
+}
+
+.result-item {
+  color: var(--sb-text) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.result-item:hover {
+  background: rgba(114, 28, 184, 0.2) !important;
+}
+
+/* Tooltip and hover card */
+.info-btn {
+  color: rgba(255, 255, 255, 0.28) !important;
+}
+
+.info-btn:hover {
+  color: var(--sb-accent-light) !important;
+}
+
+#info-tooltip {
+  background: rgba(13, 17, 23, 0.98) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45) !important;
+}
+
+#info-tooltip .it-title {
+  color: #fff !important;
+}
+
+#info-tooltip .it-source {
+  color: rgba(255, 255, 255, 0.38) !important;
+  border-top-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+#hover-card {
+  background: rgba(13, 17, 23, 0.96) !important;
+  border: 1px solid rgba(114, 28, 184, 0.3) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Side windows and floating panels */
+#vt-panel,
+#vt-disr-panel,
+#vt-park-panel,
+#token-panel,
+#perf-panel,
+#wwr-panel,
+#facade-panel {
+  background: rgba(13, 17, 23, 0.96) !important;
+  border: 1px solid var(--sb-border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.42) !important;
+  color: var(--sb-text) !important;
+}
+
+#vt-panel h2,
+#vt-disr-panel h2,
+#vt-park-panel h2,
+#token-panel h2,
+#perf-panel h2,
+#wwr-panel h2,
+#facade-panel h2 {
+  color: #fff !important;
+}
+
+#vt-panel .sub,
+#vt-disr-panel .sub,
+#vt-park-panel .sub,
+#token-panel .sub,
+#perf-panel .sub,
+#wwr-panel .sub,
+#facade-panel .sub,
+#vt-panel-title,
+#vt-disr-count,
+#vt-park-title,
+#wwr-breakdown,
+#zoom-label,
+#token-panel div {
+  color: var(--sb-muted) !important;
+}
+
+#token-panel a {
+  color: var(--sb-accent-light) !important;
+}
+
+#token-input {
+  background: var(--sb-surface) !important;
+  border: 1px solid var(--sb-border) !important;
+  color: var(--sb-text) !important;
+}
+
+#token-input:focus {
+  border-color: var(--sb-accent-light) !important;
+  box-shadow: 0 0 0 3px rgba(114, 28, 184, 0.18) !important;
+  outline: none !important;
+}
+
+#btn-wwr-save,
+#btn-manual-capture {
+  background: rgba(114, 28, 184, 0.26) !important;
+  border-color: var(--sb-accent-light) !important;
+  color: #ecd9ff !important;
+}
+
+/* Transit rows and panel details */
+.vt-dep-row,
+.vt-disr-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+
+.vt-disr-row:hover {
+  background: rgba(114, 28, 184, 0.14) !important;
+}
+
+.vt-dest,
+.vt-disr-title {
+  color: var(--sb-text) !important;
+}
+
+.vt-time,
+.vt-disr-sev {
+  color: var(--sb-muted) !important;
+}
+
+/* Scrollbar and small toggles */
+#lp-scroll::-webkit-scrollbar-thumb {
+  background: rgba(114, 28, 184, 0.35) !important;
+}
+
+#vt-ghost-toggle {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+#vt-ghost-knob {
+  background: rgba(255, 255, 255, 0.5) !important;
+}
