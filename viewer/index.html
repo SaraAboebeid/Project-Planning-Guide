@@ -83,19 +83,19 @@
 <div id="loading">
   <div class="spinner"></div>
   <h1>Gothenburg 3D</h1>
-  <p id="loading-status">Initialising Cesium…</p>
+  <p id="loading-status">Initialising Cesium...</p>
 </div>
 
 <!-- Cesium main viewer -->
 <div id="cesium-container"></div>
 
 <!-- Left sidebar: search + summary + legend + view options -->
-<div id="left-panel">
+<aside id="left-panel" role="complementary" aria-label="Map controls and analysis layers">
   <div id="lp-header">
     <span class="lp-title">Gothenburg 3D</span>
     <span class="lp-sub">EUBUCCO v0.2 + EPC &middot; {{TOTAL_BUILDINGS}} buildings</span>
   </div>
-  <div id="lp-scroll">
+  <div id="lp-scroll" role="region" aria-label="Viewer controls">
   <!-- Building info (shown inline in sidebar when building is selected) -->
   <div class="panel" id="info-panel">
     <button class="close-btn" id="info-close">&#x2715;</button>
@@ -104,7 +104,7 @@
   </div>
   <div id="search-wrap">
     <div id="search-row">
-      <input id="search-input" type="text" placeholder="Search address&hellip;" autocomplete="off">
+      <input id="search-input" type="text" placeholder="Search address&hellip;" autocomplete="off" aria-label="Search building address">
       <button class="btn" id="search-btn">Search</button>
     </div>
     <div id="search-results"></div>
@@ -118,6 +118,19 @@
       <div class="stat-num stat-num-2">{{N_ECLASS_TOTAL}}</div>
       <div class="stat-lbl">TABULA matched</div>
     </div>
+  </div>
+  <div class="lp-divider" style="margin:8px 0 0"></div>
+  <div class="lp-section-title">Country Profile</div>
+  <div id="country-profile" style="padding:0 10px 6px;display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+    <div id="country-tabs" style="display:flex;gap:4px;flex-wrap:wrap;">
+      <button class="lp-tab active" id="country-tab-se" data-country="se" style="flex:0 0 auto;padding:5px 9px;">Sweden</button>
+      <button class="lp-tab" id="country-tab-gb" data-country="gb" style="flex:0 0 auto;padding:5px 9px;">UK</button>
+      <button class="lp-tab" id="country-tab-be" data-country="be" style="flex:0 0 auto;padding:5px 9px;">Belgium</button>
+      <button class="lp-tab" id="country-tab-ie" data-country="ie" style="flex:0 0 auto;padding:5px 9px;">Ireland</button>
+    </div>
+    <div id="country-summary" style="font-size:10px;color:var(--muted);line-height:1.4;"></div>
+    <div id="country-kpis" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;"></div>
+    <div id="country-energy-bars" style="display:flex;flex-direction:column;gap:4px;"></div>
   </div>
   <!-- hidden legacy buttons — IDs wired by cesium.js / vasttrafik.js -->
   <button id="btn-tiles"       style="display:none">tiles</button>
@@ -255,6 +268,48 @@
       <div id="scb-layers-container" style="display:flex;flex-direction:column;gap:2px;padding:4px 0 4px"></div>
     </div>
 
+  <!-- ══ URBAN ANALYSIS ════════════════════════════════════════════════ -->
+  <div class="lp-divider"></div>
+  <div class="collapse-head" style="margin-top:4px">
+    <button class="collapse-toggle" id="urban-toggle" type="button" aria-expanded="false">
+      <span>Urban Analysis</span>
+      <span class="collapse-chevron">▾</span>
+    </button>
+    <button class="info-btn" style="margin-right:4px" data-title="Urban Analysis layers" data-desc="City-wide analytical overlays computed from OSM and EUBUCCO data. Green Index scores street segments by park proximity. Heat Island Proxy estimates thermal stress per grid cell from building energy class, age and use. Green Accessibility maps walking distance to the nearest green space." data-source="OSM · Overpass API · EUBUCCO v0.2"></button>
+  </div>
+  <div id="urban-content" class="collapse-content collapsed" style="padding-top:4px">
+    <div id="urban-analysis-section">
+      <div class="overlay-group">
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-urban-green">
+            <span class="overlay-check"></span>
+            <span class="base-name">🌿 Green Index</span>
+            <span class="layer-pill">OSM</span>
+          </button>
+          <button class="info-btn" data-title="Street Green Index" data-desc="Greenness score 0–1 for every street segment based on proximity to parks, forests and gardens (OSM). Colour: green = well-served, red = low green coverage. Distance-decay model with 200 m half-life." data-source="OpenStreetMap · Overpass API"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-urban-uhi">
+            <span class="overlay-check"></span>
+            <span class="base-name">🌡️ Heat Island Proxy</span>
+            <span class="layer-pill">EUBUCCO</span>
+          </button>
+          <button class="info-btn" data-title="Urban Heat Island Proxy" data-desc="Grid-based heat island proxy (667 m cells) scored from energy class (50%), construction year (30%), and building use (20%). Green areas provide a cooling correction. Red = high thermal stress, blue = cooler areas." data-source="EUBUCCO v0.2 · Boverket EPC · OSM"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-urban-access">
+            <span class="overlay-check"></span>
+            <span class="base-name">🚶 Green Accessibility</span>
+            <span class="layer-pill">OSM</span>
+          </button>
+          <button class="info-btn" data-title="Green Space Accessibility" data-desc="Straight-line distance from a 280 m grid to the nearest OSM green space. Green = within 400 m, amber = 400–800 m, red = over 800 m (WHO guideline threshold). Identifies underserved neighbourhoods." data-source="OpenStreetMap · Overpass API"></button>
+        </div>
+      </div>
+      <div id="urban-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
+      <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:11px;color:var(--text)"></div>
+    </div>
+  </div>
+
   </div><!-- /lp-layers -->
 
   <!-- ══ ANALYSIS TOOLS ═════════════════════════════════════════════════ -->
@@ -273,7 +328,7 @@
   <button class="btn opt-btn" id="btn-reset" style="margin:6px 0 8px;width:100%">Reset View</button>
 
   </div><!-- /lp-scroll -->
-</div>
+</aside>
 
 <!-- Info tooltip -->
 <div id="info-tooltip"><div class="it-title"></div><div class="it-desc"></div><div class="it-source"></div></div>
@@ -417,108 +472,8 @@
   <div id="perf-content" style="margin-top:10px;overflow-y:auto;flex:1"></div>
 </div>
 
-  <!-- ══ URBAN ANALYSIS ════════════════════════════════════════════════ -->
-  <div class="lp-divider"></div>
-  <div class="collapse-head" style="margin-top:4px">
-    <button class="collapse-toggle" id="urban-toggle" type="button" aria-expanded="false">
-      <span>Urban Analysis</span>
-      <span class="collapse-chevron">▾</span>
-    </button>
-    <button class="info-btn" style="margin-right:4px" data-title="Urban Analysis layers" data-desc="City-wide analytical overlays computed from OSM and EUBUCCO data. Green Index scores street segments by park proximity. Heat Island Proxy estimates thermal stress per grid cell from building energy class, age and use. Green Accessibility maps walking distance to the nearest green space." data-source="OSM · Overpass API · EUBUCCO v0.2"></button>
-  </div>
-  <div id="urban-content" class="collapse-content collapsed" style="padding-top:4px">
-    <div id="urban-analysis-section">
-      <div class="overlay-group">
-        <div class="overlay-row">
-          <button class="overlay-btn" id="btn-urban-green">
-            <span class="overlay-check"></span>
-            <span class="base-name">🌿 Green Index</span>
-            <span class="layer-pill">OSM</span>
-          </button>
-          <button class="info-btn" data-title="Street Green Index" data-desc="Greenness score 0–1 for every street segment based on proximity to parks, forests and gardens (OSM). Colour: green = well-served, red = low green coverage. Distance-decay model with 200 m half-life." data-source="OpenStreetMap · Overpass API"></button>
-        </div>
-        <div class="overlay-row">
-          <button class="overlay-btn" id="btn-urban-uhi">
-            <span class="overlay-check"></span>
-            <span class="base-name">🌡️ Heat Island Proxy</span>
-            <span class="layer-pill">EUBUCCO</span>
-          </button>
-          <button class="info-btn" data-title="Urban Heat Island Proxy" data-desc="Grid-based heat island proxy (667 m cells) scored from energy class (50%), construction year (30%), and building use (20%). Green areas provide a cooling correction. Red = high thermal stress, blue = cooler areas." data-source="EUBUCCO v0.2 · Boverket EPC · OSM"></button>
-        </div>
-        <div class="overlay-row">
-          <button class="overlay-btn" id="btn-urban-access">
-            <span class="overlay-check"></span>
-            <span class="base-name">🚶 Green Accessibility</span>
-            <span class="layer-pill">OSM</span>
-          </button>
-          <button class="info-btn" data-title="Green Space Accessibility" data-desc="Straight-line distance from a 280 m grid to the nearest OSM green space. Green = within 400 m, amber = 400–800 m, red = over 800 m (WHO guideline threshold). Identifies underserved neighbourhoods." data-source="OpenStreetMap · Overpass API"></button>
-        </div>
-      </div>
-      <div id="urban-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
-      <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:11px;color:var(--text)"></div>
-    </div>
-  </div>
-
 <div id="ppg-brand">PPG &middot; Chalmers / Boverket</div>
 <div id="controls-hint">&#128205; Scroll to zoom &nbsp;&middot;&nbsp; Drag to pan &nbsp;&middot;&nbsp; Right-drag or Ctrl+drag to tilt/rotate &nbsp;&middot;&nbsp; Hover buildings for details</div>
-
-<script>
-  (function () {
-    function ensureUrbanCollapse() {
-      if (document.getElementById('urban-toggle') && document.getElementById('urban-content')) return;
-
-      var urbanSection = document.getElementById('urban-analysis-section');
-      if (!urbanSection) return;
-
-      var infoBtn = null;
-      var prev = urbanSection.previousElementSibling;
-      if (prev && prev.querySelector) infoBtn = prev.querySelector('.info-btn');
-
-      var head = document.createElement('div');
-      head.className = 'collapse-head';
-      head.style.marginTop = '4px';
-
-      var toggle = document.createElement('button');
-      toggle.className = 'collapse-toggle';
-      toggle.id = 'urban-toggle';
-      toggle.type = 'button';
-      toggle.setAttribute('aria-expanded', 'false');
-      toggle.innerHTML = '<span>Urban Analysis</span><span class="collapse-chevron">▾</span>';
-      head.appendChild(toggle);
-
-      if (infoBtn) {
-        infoBtn.remove();
-        infoBtn.style.marginRight = '4px';
-        head.appendChild(infoBtn);
-      }
-
-      var content = document.createElement('div');
-      content.id = 'urban-content';
-      content.className = 'collapse-content collapsed';
-      content.style.paddingTop = '4px';
-      urbanSection.parentNode.insertBefore(head, urbanSection);
-      urbanSection.parentNode.insertBefore(content, urbanSection);
-      content.appendChild(urbanSection);
-    }
-
-    function bindCollapse(toggleId, contentId) {
-      var toggle = document.getElementById(toggleId);
-      var content = document.getElementById(contentId);
-      if (!toggle || !content) return;
-
-      toggle.addEventListener('click', function () {
-        var isExpanded = toggle.getAttribute('aria-expanded') === 'true';
-        toggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
-        content.classList.toggle('collapsed', isExpanded);
-      });
-    }
-
-    ensureUrbanCollapse();
-    bindCollapse('traffic-toggle', 'traffic-content');
-    bindCollapse('stats-toggle', 'stats-content');
-    bindCollapse('urban-toggle', 'urban-content');
-  })();
-</script>
 
 <!-- INJECT:DATA -->
 <!-- INJECT:JS -->

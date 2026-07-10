@@ -1,0 +1,18 @@
+{
+  "country": "se",
+  "name": "Sweden",
+  "viewer": {
+    "summary": "Current active country profile for Gothenburg digital twin baseline.",
+    "kpis": [
+      { "key": "buildings", "label": "3D Buildings", "value": 92973, "unit": "count" },
+      { "key": "epc_match", "label": "EPC Matched", "value": 87712, "unit": "count" },
+      { "key": "tabula_match", "label": "TABULA Matched", "value": 18744, "unit": "count" },
+      { "key": "boplats_listings", "label": "Boplats Listings", "value": 379, "unit": "count" }
+    ],
+    "energy_class_share": {
+      "A_B": 16,
+      "C_D": 43,
+      "E_G": 41
+    }
+  }
+}

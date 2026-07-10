@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 
@@ -155,7 +155,7 @@ const LIBRARY_TABS = [
   { label: "Pathways", path: "/pathways" },
   { label: "Data Explorer", path: "/data" },
   { label: "Analysis Tools", path: "/analysis" },
-  { label: "Map", path: "/map" },
+  { label: "3D Viewer", path: "/viewer" },
   { label: "Sample Reports", path: "/reports" },
 ];
 
@@ -167,8 +167,36 @@ export default function LandingPage() {
 
   const [selectedCountry, setSelectedCountry] = useState("se");
   const [selectedCity, setSelectedCity]       = useState("Gothenburg");
+  const [boplatsListings, setBoplatsListings] = useState<string>("-");
 
   const country = COUNTRIES.find(c => c.id === selectedCountry)!;
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBoplatsCount() {
+      try {
+        const res = await fetch(`/boplats_data.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json() as Record<string, unknown[]>;
+        const total = Object.values(data).reduce((sum, listings) => {
+          return sum + (Array.isArray(listings) ? listings.length : 0);
+        }, 0);
+
+        if (active) {
+          setBoplatsListings(total.toLocaleString("en-US"));
+        }
+      } catch {
+        if (active) {
+          setBoplatsListings("-");
+        }
+      }
+    }
+
+    loadBoplatsCount();
+    return () => { active = false; };
+  }, []);
 
   const handleStart = () => { reset(); navigate("/step/1"); };
 
@@ -217,7 +245,7 @@ export default function LandingPage() {
           <div className="hidden lg:flex items-center gap-1 rounded-xl p-1"
                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
             {LIBRARY_TABS.map(tab => {
-              const isActive = tab.path !== "map" && location.pathname === tab.path;
+              const isActive = location.pathname === tab.path;
               return (
                 <button
                   key={tab.label}
@@ -250,7 +278,7 @@ export default function LandingPage() {
                     padding: "4px 10px", borderRadius: 10, border: 0, cursor: "pointer",
                     fontSize: 11, fontWeight: selectedCountry === c.id ? 700 : 500,
                     background: selectedCountry === c.id ? "rgba(114,28,184,0.35)" : "transparent",
-                    color: selectedCountry === c.id ? "#fff" : "rgba(255,255,255,0.38)",
+                    color: selectedCountry === c.id ? "#fff" : "rgba(255,255,255,0.72)",
                     transition: "all .15s",
                   }}
                 >
@@ -273,7 +301,7 @@ export default function LandingPage() {
                         padding: "4px 10px", borderRadius: 10, border: 0, cursor: "pointer",
                         fontSize: 11, fontWeight: selectedCity === city ? 700 : 500,
                         background: selectedCity === city ? "rgba(78,205,196,0.2)" : "transparent",
-                        color: selectedCity === city ? "#4ECDC4" : "rgba(255,255,255,0.38)",
+                        color: selectedCity === city ? "#4ECDC4" : "rgba(255,255,255,0.72)",
                         transition: "all .15s",
                       }}
                     >
@@ -319,7 +347,7 @@ export default function LandingPage() {
             <StatCard label="3D buildings"     value="92,973"  barColor="#4A90E2" />
             <StatCard label="EPC matched"      value="87,712"  barColor="#96D74C" />
             <StatCard label="TABULA matched"   value="18,744"  barColor="#4ECDC4" />
-            <StatCard label="Boplats listings" value="297"     barColor="#721CB8" />
+            <StatCard label="Boplats listings" value={boplatsListings} barColor="#721CB8" />
           </div>
 
 
@@ -362,7 +390,7 @@ export default function LandingPage() {
                   Start Planning
                 </button>
                 <button
-                  onClick={() => navigate("/map")}
+                  onClick={() => navigate("/viewer")}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold
                              text-white/80 cursor-pointer transition-all hover:text-white hover:border-white/30"
                   style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}

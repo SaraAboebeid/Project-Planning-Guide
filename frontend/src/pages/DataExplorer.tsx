@@ -407,6 +407,31 @@ function SourceCard({
   const [rows, setRows]         = useState<Record<string, unknown>[] | null>(null);
   const [copied, setCopied]     = useState(false);
   const [imgModal, setImgModal] = useState<string | null>(null);
+  const [liveCount, setLiveCount] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBoplatsCount() {
+      if (source.id !== "boplats") return;
+      try {
+        const res = await fetch(`/boplats_data.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json() as Record<string, unknown[]>;
+        const total = Object.values(data).reduce((sum, listings) => {
+          return sum + (Array.isArray(listings) ? listings.length : 0);
+        }, 0);
+
+        if (active) setLiveCount(total.toLocaleString("en-US"));
+      } catch {
+        if (active) setLiveCount(null);
+      }
+    }
+
+    loadBoplatsCount();
+    return () => { active = false; };
+  }, [source.id]);
 
   async function loadSample() {
     if (source.renderPreview) { setExpanded(e => !e); return; }
@@ -423,7 +448,23 @@ function SourceCard({
     }
   }
 
-  function downloadSample() {
+  async function downloadSample() {
+    if (source.id === "boplats") {
+      try {
+        const res = await fetch(`/boplats_data.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = "boplats_data.json"; a.click();
+        URL.revokeObjectURL(url);
+        return;
+      } catch {
+        // Fall through to sample export if full dataset fetch fails.
+      }
+    }
+
     if (!rows) return;
     const blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -487,7 +528,7 @@ function SourceCard({
           {/* Count badge */}
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: source.accent, lineHeight: 1 }}>
-              {source.count}
+              {liveCount ?? source.count}
             </div>
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.40)", marginTop: 2 }}>
               {source.countLabel}

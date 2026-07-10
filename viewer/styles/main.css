@@ -90,6 +90,42 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
   border-color:#FDE68A; color:#92400E;
 }
 .tool-btn.pvgis-btn:hover:not(:disabled) { background:#FEF3C7; border-color:#F59E0B; }
+#country-kpis .country-kpi {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 7px 8px;
+}
+#country-kpis .country-kpi .k-label {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+#country-kpis .country-kpi .k-value {
+  margin-top: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+#country-energy-bars .bar-row {
+  display: grid;
+  grid-template-columns: 54px 1fr 28px;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+#country-energy-bars .bar-track {
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+#country-energy-bars .bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg,#7c3aed,#a78bfa);
+}
 #pvgis-result {
   margin-top:4px; padding:8px;
   background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25);
@@ -465,6 +501,15 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
 .scb-status,
 .tt-lbl,
 #lp-no-selection {
+  color: var(--map-sidebar-muted) !important;
+}
+
+.legend-row,
+.legend-row > span {
+  color: var(--map-sidebar-text) !important;
+}
+
+.legend-row > span:nth-of-type(2) {
   color: var(--map-sidebar-muted) !important;
 }
 

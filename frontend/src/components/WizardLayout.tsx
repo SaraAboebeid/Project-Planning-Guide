@@ -57,7 +57,7 @@ const LIBRARY_TABS = [
   { label: "Pathways", path: "/pathways" },
   { label: "Data Explorer", path: "/data" },
   { label: "Analysis Tools", path: "/analysis" },
-  { label: "Map", path: "/map" },
+  { label: "3D Viewer", path: "/viewer" },
   { label: "Sample Reports", path: "/reports" },
 ];
 

@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import WizardLayout from "./components/WizardLayout";
 import DataLayout from "./components/DataLayout";
@@ -64,7 +64,8 @@ export default function App() {
       <Route path="/data"      element={<DataLayout><DataExplorer /></DataLayout>} />
       <Route path="/pathways"  element={<DataLayout title="Pathways"       accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
       <Route path="/analysis"  element={<DataLayout title="Analysis" accentColor="#4ECDC4" accentBadge="Tools"><AnalysisTools /></DataLayout>} />
-      <Route path="/map"       element={<DataLayout title="3D Map" accentColor="#5FA5FF" accentBadge="Digital Twin"><MapViewer /></DataLayout>} />
+      <Route path="/viewer"    element={<DataLayout title="3D Viewer" accentColor="#5FA5FF" accentBadge="Digital Twin"><MapViewer /></DataLayout>} />
+      <Route path="/map"       element={<Navigate to="/viewer" replace />} />
       <Route path="/budget"    element={<DataLayout title="Planning & Cost" accentColor="#F59E0B" accentBadge="Cost Estimate"><Budget /></DataLayout>} />
       <Route path="/reports" element={<DataLayout title="Reports" accentColor="#96D74C" accentBadge="Examples"><SampleReports /></DataLayout>} />
       <Route element={<WizardLayout />}>

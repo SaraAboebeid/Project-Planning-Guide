@@ -69,6 +69,19 @@ def _sanitize_records(obj):
     return obj
 
 
+def _normalize_encoding_artifacts(text: str) -> str:
+    """Normalize common mojibake artifacts and prefer ASCII-safe punctuation."""
+    replacements = {
+        "\u2026": "...",
+        "â€¦": "...",
+        "â€”": "-",
+        "â€“": "-",
+    }
+    for bad, good in replacements.items():
+        text = text.replace(bad, good)
+    return text
+
+
 def main():
     # 1. Data pipeline ──────────────────────────────────────────────────────
     print("=" * 60)
@@ -92,6 +105,7 @@ def main():
         "vasttrafik.js",
         "layers.js",
         "scb_layers.js",
+        "country_profile.js",
     ]
     all_js = "\n\n".join(
         open(f"viewer/js/{f}", encoding="utf-8").read()
@@ -121,6 +135,7 @@ def main():
     html = html.replace("{{TOTAL_BUILDINGS}}", f"{data['n_total']:,}")
     html = html.replace("{{N_EPC_MATCHED}}",   f"{data['n_epc_matched']:,}")
     html = html.replace("{{N_ECLASS_TOTAL}}",  f"{data['n_eclass_total']:,}")
+    html = _normalize_encoding_artifacts(html)
 
     # 5. Write assets/ ──────────────────────────────────────────────────────
     os.makedirs("assets", exist_ok=True)

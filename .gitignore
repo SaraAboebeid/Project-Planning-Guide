@@ -68,3 +68,12 @@ data/sensitivity/archive/
 # EUBUCCO local datasets and generated maps (too large for normal Git)
 data/eubucco/
 !data/eubucco/.gitkeep
+
+# EU Building Stock Observatory (BSO)
+# Keep raw downloads out of Git, keep curated country extracts in Git.
+data/bso/raw/
+data/bso/tmp/
+data/bso/cache/
+!data/bso/countries/
+!data/bso/countries/.gitkeep
+!data/bso/countries/*.json

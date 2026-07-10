@@ -1,0 +1,9 @@
+{
+  "country": "be",
+  "name": "Belgium",
+  "viewer": {
+    "summary": "Profile scaffold ready. Add Belgium source metrics to activate viewer KPIs.",
+    "kpis": [],
+    "energy_class_share": {}
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "country": "ie",
+  "name": "Ireland",
+  "viewer": {
+    "summary": "Profile scaffold ready. Add Ireland source metrics to activate viewer KPIs.",
+    "kpis": [],
+    "energy_class_share": {}
+  }
+}

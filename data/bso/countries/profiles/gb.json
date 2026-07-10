@@ -1,0 +1,9 @@
+{
+  "country": "gb",
+  "name": "United Kingdom",
+  "viewer": {
+    "summary": "Profile scaffold ready. Add UK source metrics to activate viewer KPIs.",
+    "kpis": [],
+    "energy_class_share": {}
+  }
+}

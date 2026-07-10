@@ -82,6 +82,28 @@ def health():
     return {"status": "ok"}
 
 
+# ── Country profiles (modular per-country dashboard/viewer data) ───────────
+@app.get("/api/country-profile")
+def country_profile(
+    country: str = Query("se", description="Country code: se|gb|be|ie"),
+):
+    code = (country or "se").strip().lower()
+    allowed = {"se", "gb", "be", "ie"}
+    if code not in allowed:
+        raise HTTPException(400, f"Unsupported country '{code}'. Use one of: {', '.join(sorted(allowed))}.")
+
+    path = PROJECT_ROOT / "data" / "bso" / "countries" / "profiles" / f"{code}.json"
+    if not path.exists():
+        raise HTTPException(404, f"Country profile not found for '{code}'.")
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise HTTPException(500, f"Could not read country profile '{code}': {exc}")
+
+    return payload
+
+
 # ── Buildings (gzip-compressed for fast transfer) ────────────────────────────
 @app.get("/api/buildings")
 def buildings():

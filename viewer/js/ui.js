@@ -34,6 +34,37 @@
   });
 })();
 
+// Accessibility + collapsible panel wiring
+(function initSidebarA11yAndCollapses() {
+  const infoButtons = document.querySelectorAll('.info-btn');
+  infoButtons.forEach(btn => {
+    if (!btn.getAttribute('aria-label')) {
+      const title = btn.dataset.title || 'Layer information';
+      btn.setAttribute('aria-label', 'More info: ' + title);
+      btn.setAttribute('title', 'More info: ' + title);
+    }
+  });
+
+  function bindCollapse(toggleId, contentId) {
+    const toggle = document.getElementById(toggleId);
+    const content = document.getElementById(contentId);
+    if (!toggle || !content) return;
+
+    const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+    content.classList.toggle('collapsed', !isExpanded);
+
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      content.classList.toggle('collapsed', expanded);
+    });
+  }
+
+  bindCollapse('traffic-toggle', 'traffic-content');
+  bindCollapse('stats-toggle', 'stats-content');
+  bindCollapse('urban-toggle', 'urban-content');
+})();
+
 let selectedBuilding = null;
 let highlightEntity  = null;
 
@@ -201,11 +232,19 @@ async function showInfoPanel(b, idx) {
   if (ring && ring.length >= 3) {
     const flat = [];
     for (const [lo, la] of ring) { flat.push(lo, la); }
+    let centerLon = 0, centerLat = 0;
+    for (const [lo, la] of ring) { centerLon += lo; centerLat += la; }
+    centerLon /= ring.length;
+    centerLat /= ring.length;
+    const baseH = (typeof window.getBuildingBaseOffset === 'function')
+      ? window.getBuildingBaseOffset(centerLon, centerLat)
+      : 0;
+    const roofH = baseH + Math.max(3, b.height || 6) + 0.5;
     highlightEntity = viewer.entities.add({
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
-        extrudedHeight: Math.max(3, b.height || 6) + 0.5,
-        height: 0,
+        extrudedHeight: roofH,
+        height: baseH,
         material: Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.0),
         outline: true,
         outlineColor: Cesium.Color.fromCssColorString('#a78bfa'),

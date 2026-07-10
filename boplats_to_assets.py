@@ -10,8 +10,11 @@ from pathlib import Path
 DB_PATH     = Path('boplats_apartments.db')
 IMG_SRC_DIR = Path('boplats_images')
 ASSETS_DIR  = Path('assets')
-OUT_JSON    = ASSETS_DIR / 'boplats_data.json'
-OUT_IMG_DIR = ASSETS_DIR / 'boplats_images'
+FRONTEND_PUBLIC_DIR = Path('frontend/public')
+OUT_JSON_ASSETS = ASSETS_DIR / 'boplats_data.json'
+OUT_JSON_FRONTEND = FRONTEND_PUBLIC_DIR / 'boplats_data.json'
+OUT_IMG_DIR_ASSETS = ASSETS_DIR / 'boplats_images'
+OUT_IMG_DIR_FRONTEND = FRONTEND_PUBLIC_DIR / 'boplats_images'
 
 def norm(s: str) -> str:
     """Normalise address for matching against 3-D building addresses."""
@@ -23,14 +26,17 @@ def norm(s: str) -> str:
 
 def main():
     # ── Copy images ──────────────────────────────────────────────────────────
-    OUT_IMG_DIR.mkdir(parents=True, exist_ok=True)
+    OUT_IMG_DIR_ASSETS.mkdir(parents=True, exist_ok=True)
+    OUT_IMG_DIR_FRONTEND.mkdir(parents=True, exist_ok=True)
     copied = 0
     for src in IMG_SRC_DIR.glob('*.jpg'):
-        dst = OUT_IMG_DIR / src.name
-        if not dst.exists():
-            shutil.copy2(src, dst)
+        dst_assets = OUT_IMG_DIR_ASSETS / src.name
+        dst_frontend = OUT_IMG_DIR_FRONTEND / src.name
+        if not dst_assets.exists() or not dst_frontend.exists():
+            shutil.copy2(src, dst_assets)
+            shutil.copy2(src, dst_frontend)
             copied += 1
-    print(f'Images: {copied} copied to {OUT_IMG_DIR}  ({len(list(OUT_IMG_DIR.glob("*.jpg")))} total)')
+    print(f'Images: {copied} synced to {OUT_IMG_DIR_ASSETS} and {OUT_IMG_DIR_FRONTEND}  ({len(list(OUT_IMG_DIR_ASSETS.glob("*.jpg")))} total)')
 
     # ── Read DB ──────────────────────────────────────────────────────────────
     conn = sqlite3.connect(DB_PATH)
@@ -59,8 +65,13 @@ def main():
         }
         lookup.setdefault(key, []).append(apt)
 
-    OUT_JSON.write_text(json.dumps(lookup, ensure_ascii=False, indent=None), encoding='utf-8')
-    print(f'JSON: {len(lookup)} unique addresses -> {OUT_JSON}  ({OUT_JSON.stat().st_size//1024} KB)')
+    payload = json.dumps(lookup, ensure_ascii=False, indent=None)
+    OUT_JSON_ASSETS.write_text(payload, encoding='utf-8')
+    OUT_JSON_FRONTEND.write_text(payload, encoding='utf-8')
+    print(
+        f'JSON: {len(lookup)} unique addresses -> {OUT_JSON_ASSETS} and {OUT_JSON_FRONTEND} '
+        f'({OUT_JSON_ASSETS.stat().st_size//1024} KB)'
+    )
 
 if __name__ == '__main__':
     main()
