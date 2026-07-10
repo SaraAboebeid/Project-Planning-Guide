@@ -36,19 +36,53 @@
 
 // Accessibility + collapsible panel wiring
 (function initSidebarA11yAndCollapses() {
-  const infoButtons = document.querySelectorAll('.info-btn');
-  infoButtons.forEach(btn => {
-    if (!btn.getAttribute('aria-label')) {
-      const title = btn.dataset.title || 'Layer information';
-      btn.setAttribute('aria-label', 'More info: ' + title);
-      btn.setAttribute('title', 'More info: ' + title);
-    }
+  function applyInfoButtonA11y() {
+    const infoButtons = document.querySelectorAll('.info-btn');
+    infoButtons.forEach(btn => {
+      if (!btn.getAttribute('aria-label')) {
+        const title = btn.dataset.title || 'Layer information';
+        btn.setAttribute('aria-label', 'More info: ' + title);
+        btn.setAttribute('title', 'More info: ' + title);
+      }
+    });
+  }
+
+  function ensureSectionInfoButton(toggleId, data) {
+    const toggle = document.getElementById(toggleId);
+    if (!toggle) return;
+    const head = toggle.closest('.collapse-head');
+    if (!head) return;
+    if (head.querySelector('.info-btn')) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'info-btn';
+    btn.style.marginRight = '4px';
+    btn.dataset.title = data.title;
+    btn.dataset.desc = data.desc;
+    btn.dataset.source = data.source;
+    head.appendChild(btn);
+  }
+
+  ensureSectionInfoButton('traffic-toggle', {
+    title: 'Traffic layers',
+    desc: 'Operational mobility layers including live transit vehicles and stops, disruption notices, and commuter parking availability from Vasttrafik.',
+    source: 'Vasttrafik · GTFS-RT · Storning API',
   });
+
+  ensureSectionInfoButton('analysis-tools-toggle', {
+    title: 'Analysis tools',
+    desc: 'Building-level diagnostics for facade window-to-wall ratio and rooftop PV potential. Tools are enabled when a building is selected.',
+    source: 'PPG analysis pipeline',
+  });
+
+  applyInfoButtonA11y();
 
   function bindCollapse(toggleId, contentId) {
     const toggle = document.getElementById(toggleId);
     const content = document.getElementById(contentId);
     if (!toggle || !content) return;
+    if (toggle.dataset.collapseBound === '1') return;
+    toggle.dataset.collapseBound = '1';
 
     const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
     content.classList.toggle('collapsed', !isExpanded);

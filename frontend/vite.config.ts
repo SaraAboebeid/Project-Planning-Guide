@@ -4,13 +4,14 @@ import tailwindcss from "@tailwindcss/vite";
 import fs from "fs";
 import path from "path";
 
-// Absolute path to the standalone map HTML (lives outside the frontend folder)
-const MAP_FILE = path.resolve(__dirname, "../assets/gothenburg_3d.html");
-const MAP_CSS = path.resolve(__dirname, "../assets/gothenburg_3d.css");
-const SIDEBAR_CSS = path.resolve(__dirname, "../assets/sidebar-theme.css");
-const MAP_META_JS = path.resolve(__dirname, "../assets/gothenburg_3d.meta.js");
-const BUILDINGS_JSON = path.resolve(__dirname, "../assets/buildings.json");
-const VIEWER_JS_ROOT = path.resolve(__dirname, "../assets/viewer/js");
+// Resolve from frontend/ working directory to avoid stale temp-bundle __dirname paths.
+const PROJECT_ROOT = path.resolve(process.cwd(), "..");
+const MAP_FILE = path.join(PROJECT_ROOT, "assets", "gothenburg_3d.html");
+const MAP_CSS = path.join(PROJECT_ROOT, "assets", "gothenburg_3d.css");
+const SIDEBAR_CSS = path.join(PROJECT_ROOT, "assets", "sidebar-theme.css");
+const MAP_META_JS = path.join(PROJECT_ROOT, "assets", "gothenburg_3d.meta.js");
+const BUILDINGS_JSON = path.join(PROJECT_ROOT, "assets", "buildings.json");
+const VIEWER_JS_ROOT = path.join(PROJECT_ROOT, "assets", "viewer", "js");
 
 function serveStaticFile(filePath: string, contentType: string) {
   return (_req: any, res: any) => {

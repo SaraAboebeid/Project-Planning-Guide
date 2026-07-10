@@ -459,6 +459,7 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
 .basemap-group, .overlay-group {
   display:flex; flex-direction:column; gap:2px; flex-shrink:0;
 }
+.basemap-group { gap:0; }
 /* ── Row wrappers so info-btn sits outside but adjacent to the layer btn ── */
 .base-row, .overlay-row {
   display:flex; align-items:stretch; position:relative;
@@ -472,6 +473,7 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
   color:var(--text); font-family:Inter,sans-serif; font-size:12px; font-weight:500;
   cursor:pointer; transition:all .12s; text-align:left;
 }
+.basemap-group .base-btn { padding:5px 10px; }
 .base-btn:hover, .overlay-btn:hover   { background:#F8FAFC; }
 .base-btn.active, .overlay-btn.active { background:#EDE9FE; color:#3B0764; }
 
