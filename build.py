@@ -8,9 +8,9 @@ Steps:
     1. Runs data_pipeline.process_data()  (~2 min)
     2. Reads  viewer/styles/main.css
     3. Reads  viewer/index.html
-    4. Reads  viewer/js/*.js  (in order)
-    5. Injects CSS + data constants + JS into HTML template
-    6. Writes assets/gothenburg_3d.html   (~58 MB)
+        4. Copies viewer/js/*.js -> assets/viewer/js/
+        5. Writes a small metadata script for shared constants
+        6. Writes a thin assets/gothenburg_3d.html shell
     7. Writes assets/buildings.json
     8. Copies buildings.json -> frontend/public/buildings.json
 """
@@ -18,6 +18,7 @@ Steps:
 import os
 import json
 import shutil
+from datetime import datetime
 from data_pipeline import process_data
 
 # ---------------------------------------------------------------------------
@@ -83,6 +84,8 @@ def _normalize_encoding_artifacts(text: str) -> str:
 
 
 def main():
+    build_version = datetime.now().strftime("%Y%m%d-%H%M%S")
+
     # 1. Data pipeline ──────────────────────────────────────────────────────
     print("=" * 60)
     print("build.py: running data pipeline ...")
@@ -90,10 +93,11 @@ def main():
 
     # 2. Read viewer source files ───────────────────────────────────────────
     print("Reading viewer/ source files ...")
-    css  = open("viewer/styles/main.css",  encoding="utf-8").read()
-    html = open("viewer/index.html",       encoding="utf-8").read()
+    css = open("viewer/styles/main.css", encoding="utf-8").read()
+    html = open("viewer/index.html", encoding="utf-8").read()
 
     js_files = [
+        "bootstrap.js",
         "legend.js",
         "cesium.js",
         "ui.js",
@@ -107,15 +111,10 @@ def main():
         "scb_layers.js",
         "country_profile.js",
     ]
-    all_js = "\n\n".join(
-        open(f"viewer/js/{f}", encoding="utf-8").read()
-        for f in js_files
-    )
 
-    # 3. Build data script ─────────────────────────────────────────────────
-    # Note: double braces {{ }} in the f-string below are literal { } in the output JS
-    data_script = (
-        f"const DATA = {data['records_json']};\n"
+    # 3. Build metadata script ─────────────────────────────────────────────
+    meta_script = (
+        f"const VIEWER_BUILD_VERSION = {json.dumps(build_version)};\n"
         f"const PERIOD_CARDS  = {data['period_cards_js']};\n"
         f"const ECLASS_CARDS  = {data['eclass_cards_js']};\n"
         f"const USE_CARDS     = {data['use_cards_js']};\n"
@@ -125,26 +124,40 @@ def main():
 
     # 4. Assemble HTML ──────────────────────────────────────────────────────
     print("Assembling HTML ...")
-    html = html.replace("/* INJECT:CSS */",    css)
-    html = html.replace("<!-- INJECT:DATA -->",
-                        f"<script>\n{data_script}\n</script>")
-    html = html.replace("<!-- INJECT:JS -->",
-                        f"<script>\n{all_js}\n</script>")
-
-    # Replace template placeholders (double braces in viewer/index.html)
     html = html.replace("{{TOTAL_BUILDINGS}}", f"{data['n_total']:,}")
     html = html.replace("{{N_EPC_MATCHED}}",   f"{data['n_epc_matched']:,}")
     html = html.replace("{{N_ECLASS_TOTAL}}",  f"{data['n_eclass_total']:,}")
+    html = html.replace("{{BUILD_VERSION}}", build_version)
     html = _normalize_encoding_artifacts(html)
 
     # 5. Write assets/ ──────────────────────────────────────────────────────
     os.makedirs("assets", exist_ok=True)
+    os.makedirs("assets/viewer/js", exist_ok=True)
+
+    out_css = "assets/gothenburg_3d.css"
+    print(f"Writing {out_css} ...")
+    with open(out_css, "w", encoding="utf-8", errors="replace") as f:
+        f.write(css)
+    print(f"  {out_css}: {os.path.getsize(out_css) / 1e6:.2f} MB")
+
+    out_meta = "assets/gothenburg_3d.meta.js"
+    print(f"Writing {out_meta} ...")
+    with open(out_meta, "w", encoding="utf-8", errors="replace") as f:
+        f.write(meta_script)
+    print(f"  {out_meta}: {os.path.getsize(out_meta) / 1e6:.2f} MB")
+
+    for js_file in js_files:
+        src = f"viewer/js/{js_file}"
+        dst = f"assets/viewer/js/{js_file}"
+        shutil.copy(src, dst)
+    print(f"  Copied {len(js_files)} viewer scripts -> assets/viewer/js/")
+
     out_html = "assets/gothenburg_3d.html"
     print(f"Writing {out_html} ...")
     with open(out_html, "w", encoding="utf-8", errors="replace") as f:
         f.write(html)
     size_mb = os.path.getsize(out_html) / 1e6
-    print(f"  {out_html}: {size_mb:.1f} MB")
+    print(f"  {out_html}: {size_mb:.2f} MB")
 
     # Write buildings.json (used by backend /api/buildings and frontend)
     clean_records = _sanitize_records(data["records"])

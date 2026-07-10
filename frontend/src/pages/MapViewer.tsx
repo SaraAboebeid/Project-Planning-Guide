@@ -1,5 +1,5 @@
 export default function MapViewer() {
-  const viewerUrl = `http://localhost:8765/gothenburg_3d.html?v=20260709-v8&t=${Date.now()}`;
+  const viewerUrl = `/gothenburg_3d.html?v=20260710-v11&t=${Date.now()}`;
 
   return (
     <div style={{ height: "calc(100vh - 128px)", minHeight: 520 }}>

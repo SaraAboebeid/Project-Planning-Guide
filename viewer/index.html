@@ -6,76 +6,10 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Widgets/widgets.css">
-  <style>/* INJECT:CSS */</style>
-  <!-- Sidebar theme — edit assets/sidebar-theme.css directly; no rebuild needed -->
-  <link rel="stylesheet" href="sidebar-theme.css?v=20260709-v5">
-  <script>
-    (function(){
-      var l = document.createElement('link');
-      l.rel = 'stylesheet';
-      l.href = 'sidebar-theme.css?t=' + Date.now();
-      document.head.appendChild(l);
-    })();
-  </script>
-  <style>
-    .collapse-head {
-      display:flex;
-      align-items:center;
-      gap:6px;
-      padding:0 4px;
-    }
-    .collapse-toggle {
-      flex:1;
-      display:flex;
-      align-items:center;
-      gap:8px;
-      border:1px solid rgba(255,255,255,0.08);
-      background:rgba(255,255,255,0.03);
-      color:var(--text);
-      border-radius:8px;
-      padding:7px 10px;
-      cursor:pointer;
-      font:inherit;
-      font-size:10px;
-      letter-spacing:0.08em;
-      text-transform:uppercase;
-      font-weight:700;
-      transition:all .15s ease;
-    }
-    .collapse-toggle:hover {
-      background:rgba(114,28,184,0.16);
-      border-color:rgba(114,28,184,0.34);
-      color:#fff;
-    }
-    .collapse-sub {
-      margin-left:auto;
-      font-size:9px;
-      font-weight:500;
-      letter-spacing:0.04em;
-      text-transform:none;
-      color:var(--muted);
-    }
-    .collapse-chevron {
-      font-size:12px;
-      line-height:1;
-      color:var(--muted);
-      transition:transform .2s ease;
-    }
-    .collapse-toggle[aria-expanded="true"] .collapse-chevron {
-      transform:rotate(180deg);
-    }
-    .collapse-content {
-      overflow:hidden;
-      max-height:1200px;
-      opacity:1;
-      transition:max-height .24s ease, opacity .18s ease;
-    }
-    .collapse-content.collapsed {
-      max-height:0;
-      opacity:0;
-      pointer-events:none;
-    }
-  </style>
+  <link rel="stylesheet" href="gothenburg_3d.css?v={{BUILD_VERSION}}">
+  <link rel="stylesheet" href="sidebar-theme.css?v={{BUILD_VERSION}}">
+  <script src="gothenburg_3d.meta.js?v={{BUILD_VERSION}}" defer></script>
+  <script src="viewer/js/bootstrap.js?v={{BUILD_VERSION}}" defer></script>
 </head>
 <body>
 
@@ -207,7 +141,7 @@
     <div class="collapse-head" style="margin-top:4px">
       <button class="collapse-toggle" id="traffic-toggle" type="button" aria-expanded="false">
         <span>Traffic</span>
-        <span class="collapse-chevron">▾</span>
+        <span class="collapse-chevron">&#9662;</span>
       </button>
     </div>
     <div id="traffic-content" class="collapse-content collapsed" style="padding-top:4px">
@@ -260,7 +194,7 @@
     <div class="collapse-head" style="margin-top:4px">
       <button class="collapse-toggle" id="stats-toggle" type="button" aria-expanded="false">
         <span>Statistics</span>
-        <span class="collapse-chevron">▾</span>
+        <span class="collapse-chevron">&#9662;</span>
       </button>
       <button class="info-btn" style="margin-right:4px" data-title="Statistics Sweden (SCB) layers" data-desc="47 statistical overlays from Statistics Sweden covering population grids, administrative zones, land use areas, and the national reference grid. All loaded on demand from the SCB WFS service." data-source="Statistics Sweden (SCB) · CC0 1.0 Universal · geodata.scb.se"></button>
     </div>
@@ -273,7 +207,7 @@
   <div class="collapse-head" style="margin-top:4px">
     <button class="collapse-toggle" id="urban-toggle" type="button" aria-expanded="false">
       <span>Urban Analysis</span>
-      <span class="collapse-chevron">▾</span>
+      <span class="collapse-chevron">&#9662;</span>
     </button>
     <button class="info-btn" style="margin-right:4px" data-title="Urban Analysis layers" data-desc="City-wide analytical overlays computed from OSM and EUBUCCO data. Green Index scores street segments by park proximity. Heat Island Proxy estimates thermal stress per grid cell from building energy class, age and use. Green Accessibility maps walking distance to the nearest green space." data-source="OSM · Overpass API · EUBUCCO v0.2"></button>
   </div>
@@ -314,14 +248,21 @@
 
   <!-- ══ ANALYSIS TOOLS ═════════════════════════════════════════════════ -->
   <div class="lp-divider"></div>
-  <div class="lp-section-title">Analysis Tools</div>
-  <div style="padding:0 0 6px;display:flex;flex-direction:column;gap:5px;flex-shrink:0">
-    <button class="tool-btn" id="btn-inspect" disabled>WWR Estimation</button>
-    <div id="inspect-saved-badge" style="display:none;font-size:10px;color:var(--muted);padding-left:2px;margin-top:-3px"></div>
-    <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>Rooftop PV Estimate</button>
-    <div id="pvgis-saved-badge" style="display:none;font-size:10px;color:var(--muted);padding-left:2px;margin-top:-3px"></div>
-    <div id="pvgis-result"></div>
-    <div id="lp-no-selection">Select a building to enable tools</div>
+  <div class="collapse-head" style="margin-top:4px">
+    <button class="collapse-toggle" id="analysis-tools-toggle" type="button" aria-expanded="true">
+      <span>Analysis Tools</span>
+      <span class="collapse-chevron">&#9662;</span>
+    </button>
+  </div>
+  <div id="analysis-tools-content" class="collapse-content" style="padding-top:4px">
+    <div class="analysis-tools-group">
+      <button class="tool-btn" id="btn-inspect" disabled>WWR Estimation</button>
+      <div class="analysis-note" id="inspect-saved-badge" style="display:none"></div>
+      <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>Rooftop PV Estimate</button>
+      <div class="analysis-note" id="pvgis-saved-badge" style="display:none"></div>
+      <div id="pvgis-result"></div>
+      <div id="lp-no-selection">Select a building to enable tools</div>
+    </div>
   </div>
 
   <div class="lp-divider"></div>

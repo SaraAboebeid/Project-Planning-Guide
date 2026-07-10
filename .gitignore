@@ -77,3 +77,8 @@ data/bso/cache/
 !data/bso/countries/
 !data/bso/countries/.gitkeep
 !data/bso/countries/*.json
+
+# Generated Boplats media (keep out of Git)
+assets/boplats_images/
+boplats_images/
+frontend/public/boplats_images/
