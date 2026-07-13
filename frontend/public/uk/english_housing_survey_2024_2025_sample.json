@@ -1,0 +1,26 @@
+[
+  {
+    "region": "London",
+    "tenure": "Private rented",
+    "mean_floor_area_m2": 73.4,
+    "median_sap": 66,
+    "fuel_poverty_share": 0.152,
+    "survey_year": "2024-2025"
+  },
+  {
+    "region": "North West",
+    "tenure": "Owner occupied",
+    "mean_floor_area_m2": 96.2,
+    "median_sap": 69,
+    "fuel_poverty_share": 0.137,
+    "survey_year": "2024-2025"
+  },
+  {
+    "region": "South East",
+    "tenure": "Social rented",
+    "mean_floor_area_m2": 81.7,
+    "median_sap": 71,
+    "fuel_poverty_share": 0.119,
+    "survey_year": "2024-2025"
+  }
+]

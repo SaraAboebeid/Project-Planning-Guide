@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>United Kingdom 3D Viewer</title>
+  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css" />
+  <style>
+    :root {
+      --bg: #0a0d14;
+      --panel: rgba(13, 17, 23, 0.9);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: rgba(255, 255, 255, 0.92);
+      --muted: rgba(255, 255, 255, 0.58);
+      --accent: #5fa5ff;
+      --good: #96d74c;
+    }
+
+    * { box-sizing: border-box; }
+    html, body, #cesium-container {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: Inter, system-ui, sans-serif;
+      color: var(--text);
+    }
+
+    .panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 30;
+      width: min(360px, calc(100vw - 32px));
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      padding: 14px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    .title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .subtitle {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .chip {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(95, 165, 255, 0.35);
+      background: rgba(95, 165, 255, 0.14);
+      color: #b7d6ff;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 12px;
+    }
+
+    .row:first-of-type { border-top: 0; }
+
+    .key { color: var(--muted); }
+    .val { color: var(--good); font-weight: 600; }
+
+    @media (max-width: 720px) {
+      .panel { top: 10px; left: 10px; right: 10px; width: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div id="cesium-container"></div>
+
+  <section class="panel">
+    <div class="title">United Kingdom 3D Digital Twin</div>
+    <div class="subtitle">Cesium base map + OSM 3D tiles focused on UK. This page is isolated from the Sweden page and ready for UK-only data integrations.</div>
+    <div class="chip-row">
+      <span class="chip">EUBUCCO UK</span>
+      <span class="chip">EPC UK</span>
+      <span class="chip">TABULA UK</span>
+      <span class="chip">EHS 2024-2025</span>
+    </div>
+    <div class="row"><span class="key">3D Tiles</span><span class="val">OSM Buildings</span></div>
+    <div class="row"><span class="key">Imagery</span><span class="val">OpenStreetMap</span></div>
+    <div class="row"><span class="key">Camera Start</span><span class="val">United Kingdom</span></div>
+  </section>
+
+  <script>
+    const viewer = new Cesium.Viewer('cesium-container', {
+      animation: false,
+      timeline: false,
+      baseLayerPicker: true,
+      geocoder: true,
+      homeButton: true,
+      sceneModePicker: true,
+      navigationHelpButton: false,
+      infoBox: false,
+      selectionIndicator: false,
+      terrain: Cesium.Terrain.fromWorldTerrain(),
+    });
+
+    viewer.scene.globe.depthTestAgainstTerrain = true;
+    viewer.scene.primitives.add(Cesium.createOsmBuildings());
+
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(-2.5, 54.3, 1700000),
+      duration: 1.8,
+      orientation: {
+        heading: Cesium.Math.toRadians(0),
+        pitch: Cesium.Math.toRadians(-65),
+        roll: 0,
+      },
+    });
+  </script>
+</body>
+</html>

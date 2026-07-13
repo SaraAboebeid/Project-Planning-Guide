@@ -1,0 +1,26 @@
+[
+  {
+    "uprn": "100021543219",
+    "address": "12 Bridge Street, London",
+    "epc_band": "C",
+    "energy_use_kwh_m2": 94,
+    "inspection_date": "2025-06-03",
+    "property_type": "Flat"
+  },
+  {
+    "uprn": "100031100442",
+    "address": "44 Oxford Road, Manchester",
+    "epc_band": "D",
+    "energy_use_kwh_m2": 126,
+    "inspection_date": "2024-11-18",
+    "property_type": "Terraced"
+  },
+  {
+    "uprn": "100060090771",
+    "address": "8 Leith Walk, Edinburgh",
+    "epc_band": "B",
+    "energy_use_kwh_m2": 71,
+    "inspection_date": "2025-02-09",
+    "property_type": "Flat"
+  }
+]

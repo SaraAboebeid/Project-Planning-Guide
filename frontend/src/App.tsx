@@ -18,6 +18,8 @@ import Budget from "./pages/Budget";
 import AnalysisTools from "./pages/AnalysisTools";
 import SampleReports from "./pages/SampleReports";
 import MapViewer from "./pages/MapViewer";
+import UKMapViewer from "./pages/UKMapViewer";
+import UKDataExplorer from "./pages/UKDataExplorer";
 import { useWizardStore } from "./store/wizard";
 
 function ScrollToTop() {
@@ -62,9 +64,11 @@ export default function App() {
       <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/data"      element={<DataLayout><DataExplorer /></DataLayout>} />
+      <Route path="/data/uk"   element={<DataLayout title="Data Explorer" accentColor="#4A90E2" accentBadge="United Kingdom Data"><UKDataExplorer /></DataLayout>} />
       <Route path="/pathways"  element={<DataLayout title="Pathways"       accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
       <Route path="/analysis"  element={<DataLayout title="Analysis" accentColor="#4ECDC4" accentBadge="Tools"><AnalysisTools /></DataLayout>} />
       <Route path="/viewer"    element={<DataLayout title="3D Viewer" accentColor="#5FA5FF" accentBadge="Digital Twin"><MapViewer /></DataLayout>} />
+      <Route path="/viewer/uk" element={<DataLayout title="3D Viewer" accentColor="#5FA5FF" accentBadge="United Kingdom Digital Twin"><UKMapViewer /></DataLayout>} />
       <Route path="/map"       element={<Navigate to="/viewer" replace />} />
       <Route path="/budget"    element={<DataLayout title="Planning & Cost" accentColor="#F59E0B" accentBadge="Cost Estimate"><Budget /></DataLayout>} />
       <Route path="/reports" element={<DataLayout title="Reports" accentColor="#96D74C" accentBadge="Examples"><SampleReports /></DataLayout>} />

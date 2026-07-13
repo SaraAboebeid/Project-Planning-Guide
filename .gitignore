@@ -42,6 +42,15 @@ ENV/
 .ipynb_checkpoints
 *.ipynb_checkpoints/
 
+# Streamlit
+.streamlit/secrets.toml
+
+# Secrets / API keys
+.env
+.env.local
+*.env
+!.env.example
+
 # Project specific
 *.csv
 *.xlsx
@@ -68,17 +77,3 @@ data/sensitivity/archive/
 # EUBUCCO local datasets and generated maps (too large for normal Git)
 data/eubucco/
 !data/eubucco/.gitkeep
-
-# EU Building Stock Observatory (BSO)
-# Keep raw downloads out of Git, keep curated country extracts in Git.
-data/bso/raw/
-data/bso/tmp/
-data/bso/cache/
-!data/bso/countries/
-!data/bso/countries/.gitkeep
-!data/bso/countries/*.json
-
-# Generated Boplats media (keep out of Git)
-assets/boplats_images/
-boplats_images/
-frontend/public/boplats_images/

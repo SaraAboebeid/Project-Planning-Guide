@@ -83,8 +83,10 @@ function _roadsRender(geojson) {
 
     // Skip very minor pedestrian paths to reduce clutter
     if (cls === 'pedestrian' || cls === 'cycling') {
-      // Only render if zoomed in (altitude < 1500m)
-      const alt = viewer.camera.positionCartographic.height;
+      // Only render if zoomed in (altitude < 1500m).
+      // Guard null camera cartographic state to avoid render-loop crashes.
+      const carto = viewer?.camera?.positionCartographic;
+      const alt = carto && Number.isFinite(carto.height) ? carto.height : Number.POSITIVE_INFINITY;
       if (alt > 1500) continue;
     }
 

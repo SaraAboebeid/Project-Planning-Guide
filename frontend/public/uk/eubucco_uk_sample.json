@@ -1,0 +1,29 @@
+[
+  {
+    "building_id": "UK-100001",
+    "lat": 51.50798,
+    "lon": -0.12766,
+    "height_m": 18.4,
+    "floors": 6,
+    "use_cat": "residential",
+    "build_year": 1982
+  },
+  {
+    "building_id": "UK-100002",
+    "lat": 53.48074,
+    "lon": -2.24263,
+    "height_m": 22.1,
+    "floors": 7,
+    "use_cat": "mixed-use",
+    "build_year": 2004
+  },
+  {
+    "building_id": "UK-100003",
+    "lat": 55.95339,
+    "lon": -3.18837,
+    "height_m": 14.8,
+    "floors": 5,
+    "use_cat": "residential",
+    "build_year": 1967
+  }
+]

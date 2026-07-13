@@ -11,13 +11,18 @@ import os
 import sys
 from pathlib import Path
 
-# ── API keys — paste your keys here if not using environment variables ───────
-os.environ.setdefault("OPENAI_API_KEY", "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")      # ← paste OpenAI key
-# os.environ.setdefault("ANTHROPIC_API_KEY", "sk-ant-...") # ← paste Anthropic key
+# ── API keys — supplied via environment variables (see .env.example) ─────────
+# Optional: load a local .env file when running outside Docker.
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+except ImportError:
+    pass
 # ────────────────────────────────────────────────────────────────────────────
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 # Allow imports from the project root so existing modules work unchanged
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -80,28 +85,6 @@ def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
-
-
-# ── Country profiles (modular per-country dashboard/viewer data) ───────────
-@app.get("/api/country-profile")
-def country_profile(
-    country: str = Query("se", description="Country code: se|gb|be|ie"),
-):
-    code = (country or "se").strip().lower()
-    allowed = {"se", "gb", "be", "ie"}
-    if code not in allowed:
-        raise HTTPException(400, f"Unsupported country '{code}'. Use one of: {', '.join(sorted(allowed))}.")
-
-    path = PROJECT_ROOT / "data" / "bso" / "countries" / "profiles" / f"{code}.json"
-    if not path.exists():
-        raise HTTPException(404, f"Country profile not found for '{code}'.")
-
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise HTTPException(500, f"Could not read country profile '{code}': {exc}")
-
-    return payload
 
 
 # ── Buildings (gzip-compressed for fast transfer) ────────────────────────────
@@ -951,8 +934,8 @@ async def estimate_wwr(req: WWRRequest):
 
 # Paste your credentials here — read directly (not via os.environ.setdefault,
 # which caches an empty string across --reload restarts).
-_VT_CLIENT_ID     = "D016LXgep9AJv4z3k0EPmiOXfYka"   # ← paste Västtrafik client ID
-_VT_CLIENT_SECRET = "kaEb3XDR0jqZEG80WJndC7DEyXMa"   # ← paste Västtrafik client secret
+_VT_CLIENT_ID     = os.environ.get("VASTTRAFIK_CLIENT_ID", "")
+_VT_CLIENT_SECRET = os.environ.get("VASTTRAFIK_CLIENT_SECRET", "")
 
 _VT_AUTH_URL  = "https://ext-api.vasttrafik.se/token"
 _VT_GEO_URL   = "https://ext-api.vasttrafik.se/geo/v3"
@@ -1367,182 +1350,6 @@ out body;
     return result
 
 
-# ── Urban Analysis: green areas + streets ────────────────────────────────────
-
-_GREEN_AREA_CACHE: dict = {}
-_UA_STREETS_CACHE: dict = {}
-
-# Full Gothenburg bounding box covering all 92,973 EUBUCCO buildings
-_GBG_FULL = dict(south=57.60, north=57.83, west=11.79, east=12.15)
-
-@app.get("/api/urban/green-areas")
-async def urban_green_areas(
-    south: float = Query(_GBG_FULL["south"]),
-    north: float = Query(_GBG_FULL["north"]),
-    west:  float = Query(_GBG_FULL["west"]),
-    east:  float = Query(_GBG_FULL["east"]),
-):
-    """
-    Return OSM green areas (parks, forests, gardens, meadows) as GeoJSON polygons
-    with pre-computed centroids.  Used by the Urban Analysis overlay layers.
-    Results are cached in memory for the session.
-    """
-    import httpx, math
-
-    key = (round(south, 3), round(north, 3), round(west, 3), round(east, 3))
-    if key in _GREEN_AREA_CACHE:
-        return _GREEN_AREA_CACHE[key]
-
-    OVERPASS_MIRRORS = [
-        "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://lz4.overpass-api.de/api/interpreter",
-    ]
-    query = f"""
-[out:json][timeout:40];
-(
-  way["leisure"~"^(park|garden|playground|recreation_ground|nature_reserve|sports_centre)$"]
-    ({south},{west},{north},{east});
-  way["landuse"~"^(forest|grass|meadow|allotments|village_green|farmland|orchard|vineyard|greenfield)$"]
-    ({south},{west},{north},{east});
-  way["natural"~"^(wood|scrub|grassland|heath)$"]
-    ({south},{west},{north},{east});
-);
-(._;>;);
-out body;
-"""
-    r = None
-    async with httpx.AsyncClient(timeout=45) as client:
-        for mirror in OVERPASS_MIRRORS:
-            try:
-                r = await client.post(mirror, data={"data": query})
-                if r.status_code == 200:
-                    break
-            except Exception:
-                continue
-    if r is None or r.status_code != 200:
-        raise HTTPException(502, f"Overpass green-areas query failed: {getattr(r, 'status_code', 'no response')}")
-
-    osm = r.json()
-    nodes: dict = {}
-    for elem in osm.get("elements", []):
-        if elem["type"] == "node":
-            nodes[elem["id"]] = [elem["lon"], elem["lat"]]
-
-    features = []
-    for elem in osm.get("elements", []):
-        if elem["type"] != "way":
-            continue
-        coords = [nodes[n] for n in elem.get("nodes", []) if n in nodes]
-        if len(coords) < 4:
-            continue
-        if coords[0] != coords[-1]:
-            coords.append(coords[0])
-        tags = elem.get("tags", {})
-        lons = [c[0] for c in coords]
-        lats = [c[1] for c in coords]
-        cx = sum(lons) / len(lons)
-        cy = sum(lats) / len(lats)
-        features.append({
-            "type": "Feature",
-            "geometry": {"type": "Polygon", "coordinates": [coords]},
-            "properties": {
-                "name":         tags.get("name", ""),
-                "green_type":   tags.get("leisure") or tags.get("landuse") or tags.get("natural", "green"),
-                "centroid_lon": cx,
-                "centroid_lat": cy,
-            },
-        })
-
-    result = {"type": "FeatureCollection", "features": features, "count": len(features)}
-    _GREEN_AREA_CACHE[key] = result
-    return result
-
-
-@app.get("/api/urban/streets")
-async def urban_streets(
-    south: float = Query(_GBG_FULL["south"]),
-    north: float = Query(_GBG_FULL["north"]),
-    west:  float = Query(_GBG_FULL["west"]),
-    east:  float = Query(_GBG_FULL["east"]),
-):
-    """
-    Return OSM road network (major types only) as GeoJSON LineStrings for the
-    full Gothenburg area.  Used by the Green Index urban analysis layer.
-    """
-    import httpx
-
-    key = (round(south, 3), round(north, 3), round(west, 3), round(east, 3))
-    if key in _UA_STREETS_CACHE:
-        return _UA_STREETS_CACHE[key]
-
-    OVERPASS_MIRRORS = [
-        "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://lz4.overpass-api.de/api/interpreter",
-    ]
-    query = f"""
-[out:json][timeout:40];
-(
-  way["highway"~"^(primary|secondary|tertiary|residential|living_street|pedestrian|unclassified)$"]
-    ({south},{west},{north},{east});
-);
-(._;>;);
-out body;
-"""
-    r = None
-    async with httpx.AsyncClient(timeout=45) as client:
-        for mirror in OVERPASS_MIRRORS:
-            try:
-                r = await client.post(mirror, data={"data": query})
-                if r.status_code == 200:
-                    break
-            except Exception:
-                continue
-    if r is None or r.status_code != 200:
-        raise HTTPException(502, f"Overpass streets query failed: {getattr(r, 'status_code', 'no response')}")
-
-    osm = r.json()
-    nodes: dict = {}
-    for elem in osm.get("elements", []):
-        if elem["type"] == "node":
-            nodes[elem["id"]] = (elem["lon"], elem["lat"])
-
-    ROAD_CLASS = {
-        "primary": "primary", "secondary": "secondary", "tertiary": "secondary",
-        "residential": "local", "living_street": "local", "unclassified": "local",
-        "pedestrian": "pedestrian",
-    }
-
-    features = []
-    for elem in osm.get("elements", []):
-        if elem["type"] != "way":
-            continue
-        coords = [list(nodes[n]) for n in elem.get("nodes", []) if n in nodes]
-        if len(coords) < 2:
-            continue
-        tags = elem.get("tags", {})
-        hw = tags.get("highway", "unclassified")
-        # Compute midpoint for distance calculations
-        mlon = sum(c[0] for c in coords) / len(coords)
-        mlat = sum(c[1] for c in coords) / len(coords)
-        features.append({
-            "type": "Feature",
-            "geometry": {"type": "LineString", "coordinates": coords},
-            "properties": {
-                "highway":    hw,
-                "road_class": ROAD_CLASS.get(hw, "local"),
-                "name":       tags.get("name", ""),
-                "mid_lon":    mlon,
-                "mid_lat":    mlat,
-            },
-        })
-
-    result = {"type": "FeatureCollection", "features": features, "count": len(features)}
-    _UA_STREETS_CACHE[key] = result
-    return result
-
-
 @app.get("/api/vasttrafik/parking/{lot_id}/availability")
 async def vt_parking_availability(lot_id: int):
     """
@@ -1747,3 +1554,41 @@ async def pvgis_proxy(
         if not r.is_success:
             raise HTTPException(r.status_code, f"PVGIS returned {r.status_code}")
         return r.json()
+
+
+# -- Static frontend (built React SPA + standalone 3D map) ------------------
+# Only mounted when the build output exists; harmless during local API-only dev.
+_FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
+_MAP_FILE      = PROJECT_ROOT / "assets" / "gothenburg_3d.html"
+
+@app.get("/gothenburg_3d.html", include_in_schema=False)
+def _serve_map():
+    if not _MAP_FILE.exists():
+        raise HTTPException(404, "Map file not built into image")
+    return FileResponse(_MAP_FILE, media_type="text/html")
+
+# -- Static frontend (built React SPA + standalone 3D map) ------------------
+# Only mounted when the build output exists; harmless during local API-only dev.
+_FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
+_MAP_FILE      = PROJECT_ROOT / "assets" / "gothenburg_3d.html"
+
+@app.get("/gothenburg_3d.html", include_in_schema=False)
+def _serve_map():
+    if not _MAP_FILE.exists():
+        raise HTTPException(404, "Map file not built into image")
+    return FileResponse(_MAP_FILE, media_type="text/html")
+
+if _FRONTEND_DIST.exists():
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    class _SPAStaticFiles(StaticFiles):
+        """Serve real static files, fall back to index.html for client-side routes."""
+        async def get_response(self, path, scope):
+            try:
+                return await super().get_response(path, scope)
+            except StarletteHTTPException as exc:
+                if exc.status_code == 404:
+                    return await super().get_response("index.html", scope)
+                raise
+
+    app.mount("/", _SPAStaticFiles(directory=str(_FRONTEND_DIST), html=True), name="spa")

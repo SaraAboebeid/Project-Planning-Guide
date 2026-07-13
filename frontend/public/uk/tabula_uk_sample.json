@@ -1,0 +1,29 @@
+[
+  {
+    "archetype_id": "UK_MFH_1965_1982",
+    "dwelling_type": "Multi-family housing",
+    "construction_period": "1965-1982",
+    "u_wall": 1.22,
+    "u_roof": 0.74,
+    "u_window": 2.8,
+    "heating_demand_kwh_m2": 163
+  },
+  {
+    "archetype_id": "UK_SFH_1983_2002",
+    "dwelling_type": "Single-family housing",
+    "construction_period": "1983-2002",
+    "u_wall": 0.58,
+    "u_roof": 0.34,
+    "u_window": 2.0,
+    "heating_demand_kwh_m2": 118
+  },
+  {
+    "archetype_id": "UK_MFH_2003_2012",
+    "dwelling_type": "Multi-family housing",
+    "construction_period": "2003-2012",
+    "u_wall": 0.31,
+    "u_roof": 0.19,
+    "u_window": 1.6,
+    "heating_demand_kwh_m2": 79
+  }
+]

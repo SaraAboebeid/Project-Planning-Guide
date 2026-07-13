@@ -31,9 +31,8 @@
   }
 
   const records = await response.json();
-  const dataScript = document.createElement('script');
-  dataScript.textContent = `const DATA = ${JSON.stringify(records)};`;
-  document.head.appendChild(dataScript);
+  // Keep a single in-memory copy; avoid re-serializing a very large payload.
+  window.DATA = records;
 
   const scripts = [
     'viewer/js/legend.js',

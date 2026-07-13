@@ -719,9 +719,9 @@ html = f"""<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Widgets/widgets.css">
-  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/';</script>
-  <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
+  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <style>
     :root {{
       --navy:    #721CB8; --navy-dark:#421869; --teal:#995BD5;
@@ -1394,12 +1394,12 @@ viewer.cesiumWidget.creditContainer.style.display = 'none';
 viewer.scene.skyAtmosphere = new Cesium.SkyAtmosphere();
 viewer.scene.skyBox = new Cesium.SkyBox({{
   sources: {{
-    positiveX: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg',
-    negativeX: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg',
-    positiveY: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg',
-    negativeY: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg',
-    positiveZ: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg',
-    negativeZ: 'https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg',
+    positiveX: 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg',
+    negativeX: 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg',
+    positiveY: 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg',
+    negativeY: 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg',
+    positiveZ: 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg',
+    negativeZ: 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg',
   }}
 }});
 viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#87CEEB');  // sky blue fallback
