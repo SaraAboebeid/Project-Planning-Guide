@@ -13,6 +13,12 @@ const MAP_META_JS = path.join(PROJECT_ROOT, "assets", "gothenburg_3d.meta.js");
 const BUILDINGS_JSON = path.join(PROJECT_ROOT, "assets", "buildings.json");
 const VIEWER_JS_ROOT = path.join(PROJECT_ROOT, "assets", "viewer", "js");
 
+// UK viewer — same shared assets/ output as Gothenburg, built by `build.py --uk`.
+const UK_MAP_FILE = path.join(PROJECT_ROOT, "assets", "uk_3d.html");
+const UK_MAP_CSS = path.join(PROJECT_ROOT, "assets", "uk_3d.css");
+const UK_MAP_META_JS = path.join(PROJECT_ROOT, "assets", "uk_3d.meta.js");
+const UK_DATA_ROOT = path.join(PROJECT_ROOT, "assets", "uk");
+
 function serveStaticFile(filePath: string, contentType: string) {
   return (_req: any, res: any) => {
     if (!fs.existsSync(filePath)) {
@@ -67,6 +73,32 @@ export default defineConfig({
             return;
           }
           res.setHeader("Content-Type", "text/javascript; charset=utf-8");
+          res.setHeader("Cache-Control", "no-cache");
+          fs.createReadStream(filePath).pipe(res);
+        });
+
+        // UK viewer — mirrors the Gothenburg middleware above so local dev needs
+        // only `vite`, not the separate `python launch.py` static server.
+        server.middlewares.use("/uk_3d.html", (_req, res) => {
+          if (!fs.existsSync(UK_MAP_FILE)) {
+            res.statusCode = 404;
+            res.end("UK map not built - run tools/uk/uk_data_pipeline.py then build.py --uk");
+            return;
+          }
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.setHeader("Cache-Control", "no-cache");
+          fs.createReadStream(UK_MAP_FILE).pipe(res);
+        });
+        server.middlewares.use("/uk_3d.css", serveStaticFile(UK_MAP_CSS, "text/css; charset=utf-8"));
+        server.middlewares.use("/uk_3d.meta.js", serveStaticFile(UK_MAP_META_JS, "text/javascript; charset=utf-8"));
+        server.middlewares.use("/uk", (_req, res, next) => {
+          const requestPath = (_req.url || "").split("?")[0].replace(/^\/+/, "");
+          const filePath = path.join(UK_DATA_ROOT, requestPath);
+          if (!filePath.startsWith(UK_DATA_ROOT) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+            next();
+            return;
+          }
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
           res.setHeader("Cache-Control", "no-cache");
           fs.createReadStream(filePath).pipe(res);
         });

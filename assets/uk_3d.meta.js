@@ -1,0 +1,7 @@
+const VIEWER_BUILD_VERSION = "20260713-154613";
+const PERIOD_CARDS = {};
+const ECLASS_CARDS = {};
+const USE_CARDS = {};
+const PERIOD_STATS = {};
+const MAP_CENTER = {lon: -0.123500, lat: 51.529000};
+const VIEWER_PROFILE = {"country": "gb", "country_name": "United Kingdom", "cities": [{"id": "london_kings_cross", "name": "London", "district": "King's Cross / Bloomsbury", "lat": 51.529, "lon": -0.1235, "camera_height": 800, "data_file": "uk/buildings_london_kings_cross.json"}, {"id": "london_westminster", "name": "London", "district": "Westminster", "lat": 51.4995, "lon": -0.1341, "camera_height": 800, "data_file": "uk/buildings_london_westminster.json"}, {"id": "london_canary_wharf", "name": "London", "district": "Tower Hamlets / Canary Wharf", "lat": 51.5054, "lon": -0.0235, "camera_height": 800, "data_file": "uk/buildings_london_canary_wharf.json"}, {"id": "london_southwark", "name": "London", "district": "Southwark / London Bridge", "lat": 51.5055, "lon": -0.0904, "camera_height": 800, "data_file": "uk/buildings_london_southwark.json"}], "period_labels": {"pre-1919": "Pre-1919", "1919-44": "1919-44", "1945-64": "1945-64", "1965-80": "1965-80", "1981-90": "1981-90", "1991-2002": "1991-2002", "2003-2013": "2003-2013", "post-2013": "Post-2013"}, "period_colors": {"pre-1919": "rgb(100,149,237)", "1919-44": "rgb(255,165,50)", "1945-64": "rgb(154,205,50)", "1965-80": "rgb(218,165,32)", "1981-90": "rgb(255,99,71)", "1991-2002": "rgb(147,112,219)", "2003-2013": "rgb(70,210,140)", "post-2013": "rgb(59,130,246)"}};

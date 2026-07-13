@@ -87,6 +87,139 @@ def health():
     return {"status": "ok"}
 
 
+# ── UK data (English Housing Survey 2024-25 + OSM/EPC city buildings) ───────
+_UK_DIR = PROJECT_ROOT / "frontend" / "public" / "uk"
+
+
+def _read_uk_json(name: str):
+    path = _UK_DIR / name
+    if not path.exists():
+        raise HTTPException(
+            404,
+            f"{name} not built yet - run: python tools/uk/ingest_ehs.py "
+            "&& python tools/uk/uk_data_pipeline.py",
+        )
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@app.get("/api/uk/cities")
+def uk_cities():
+    """Registry of built UK focus cities (London, Birmingham, Nottingham, ...)."""
+    return _read_uk_json("cities.json")
+
+
+@app.get("/api/uk/ehs")
+def uk_ehs():
+    """English Housing Survey 2024-25 headline KPIs + annex tables."""
+    return _read_uk_json("ehs_2024_25.json")
+
+
+@app.get("/api/uk/epc-band-priors")
+def uk_epc_band_priors():
+    """P(EPC band | dwelling age/type/tenure/region), derived from EHS 2024-25."""
+    return _read_uk_json("epc_band_priors.json")
+
+
+@app.get("/api/uk/retrofit-cost")
+def uk_retrofit_cost():
+    """Mean/median cost to reach EPC band C, by dwelling age/type/tenure/region."""
+    return _read_uk_json("retrofit_cost_band_c.json")
+
+
+@app.get("/api/uk/buildings/{city_id}")
+def uk_buildings(city_id: str):
+    """Extruded building payload for one UK focus city, same schema as /api/buildings."""
+    registry = _read_uk_json("cities.json")
+    city = next((c for c in registry["cities"] if c["id"] == city_id), None)
+    if city is None:
+        known = ", ".join(c["id"] for c in registry["cities"]) or "none built yet"
+        raise HTTPException(404, f"Unknown city '{city_id}'. Built cities: {known}")
+    return _read_uk_json(Path(city["data_file"]).name)
+
+
+# ── Country profile (summary KPIs for the 3D viewer sidebar) ────────────────
+@app.get("/api/country-profile")
+def country_profile(country: str = Query(...)):
+    country = country.lower()
+
+    if country == "se":
+        records = _get_buildings_list()
+        eclass = [r.get("eclass") for r in records if r.get("eclass")]
+        total = len(eclass) or 1
+        share = {
+            "A_B": round(sum(1 for e in eclass if e in ("A", "B")) / total * 100),
+            "C_D": round(sum(1 for e in eclass if e in ("C", "D")) / total * 100),
+            "E_G": round(sum(1 for e in eclass if e in ("E", "F", "G")) / total * 100),
+        }
+        return {
+            "country": "se",
+            "name": "Sweden",
+            "viewer": {
+                "summary": "Current active country profile for Gothenburg digital twin baseline.",
+                "kpis": [
+                    {"key": "buildings", "label": "3D Buildings", "value": len(records), "unit": "count"},
+                    {"key": "epc_match", "label": "EPC Matched", "value": sum(1 for r in records if r.get("has_epc")), "unit": "count"},
+                    {"key": "tabula_match", "label": "TABULA Matched", "value": sum(1 for r in records if r.get("tabula_period")), "unit": "count"},
+                ],
+                "energy_class_share": share,
+            },
+        }
+
+    if country == "gb":
+        try:
+            registry = _read_uk_json("cities.json")
+            ehs = _read_uk_json("ehs_2024_25.json")
+        except HTTPException:
+            return {
+                "country": "gb",
+                "name": "United Kingdom",
+                "viewer": {"summary": "UK data not built yet.", "kpis": [], "energy_class_share": {}},
+            }
+
+        cities = registry["cities"]
+        total = sum(c["buildings"] for c in cities)
+        with_epc = sum(c["with_epc"] for c in cities)
+        estimated = sum(c["estimated_from_ehs"] for c in cities)
+        bands = {"A": 0, "B": 0, "C": 0, "D": 0, "E": 0, "F": 0, "G": 0}
+        for c in cities:
+            for b, n in c.get("band_distribution", {}).items():
+                bands[b] = bands.get(b, 0) + n
+        band_total = sum(bands.values()) or 1
+
+        sap_kpi = next((k for k in ehs.get("kpis", []) if k["label"] == "Mean SAP rating"), None)
+
+        return {
+            "country": "gb",
+            "name": "United Kingdom",
+            "viewer": {
+                "summary": f"{len(cities)} focus city(ies): {', '.join(c['name'] for c in cities)}. "
+                           "Bands from the EPC register where matched, otherwise estimated from "
+                           "English Housing Survey 2024-25.",
+                "kpis": [
+                    {"key": "buildings", "label": "3D Buildings", "value": total, "unit": "count"},
+                    {"key": "epc_match", "label": "EPC Matched", "value": with_epc, "unit": "count"},
+                    {"key": "ehs_estimated", "label": "EHS Estimated", "value": estimated, "unit": "count"},
+                    *([{"key": "sap_england", "label": "Mean SAP (England)", "value": sap_kpi["value"], "unit": "count"}] if sap_kpi else []),
+                ],
+                "energy_class_share": {
+                    "A_B": round((bands["A"] + bands["B"]) / band_total * 100),
+                    "C_D": round((bands["C"] + bands["D"]) / band_total * 100),
+                    "E_G": round((bands["E"] + bands["F"] + bands["G"]) / band_total * 100),
+                },
+            },
+        }
+
+    return {
+        "country": country,
+        "name": {"be": "Belgium", "ie": "Ireland"}.get(country, country.upper()),
+        "viewer": {
+            "summary": f"Profile scaffold ready. Connect {country.upper()} source metrics to activate KPIs.",
+            "kpis": [],
+            "energy_class_share": {},
+        },
+    }
+
+
 # ── Buildings (gzip-compressed for fast transfer) ────────────────────────────
 @app.get("/api/buildings")
 def buildings():
@@ -1556,10 +1689,11 @@ async def pvgis_proxy(
         return r.json()
 
 
-# -- Static frontend (built React SPA + standalone 3D map) ------------------
+# -- Static frontend (built React SPA + standalone 3D maps) -----------------
 # Only mounted when the build output exists; harmless during local API-only dev.
 _FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 _MAP_FILE      = PROJECT_ROOT / "assets" / "gothenburg_3d.html"
+_UK_MAP_FILE   = PROJECT_ROOT / "assets" / "uk_3d.html"
 
 @app.get("/gothenburg_3d.html", include_in_schema=False)
 def _serve_map():
@@ -1567,16 +1701,11 @@ def _serve_map():
         raise HTTPException(404, "Map file not built into image")
     return FileResponse(_MAP_FILE, media_type="text/html")
 
-# -- Static frontend (built React SPA + standalone 3D map) ------------------
-# Only mounted when the build output exists; harmless during local API-only dev.
-_FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
-_MAP_FILE      = PROJECT_ROOT / "assets" / "gothenburg_3d.html"
-
-@app.get("/gothenburg_3d.html", include_in_schema=False)
-def _serve_map():
-    if not _MAP_FILE.exists():
-        raise HTTPException(404, "Map file not built into image")
-    return FileResponse(_MAP_FILE, media_type="text/html")
+@app.get("/uk_3d.html", include_in_schema=False)
+def _serve_uk_map():
+    if not _UK_MAP_FILE.exists():
+        raise HTTPException(404, "UK map not built - run tools/uk/uk_data_pipeline.py then build.py")
+    return FileResponse(_UK_MAP_FILE, media_type="text/html")
 
 if _FRONTEND_DIST.exists():
     from starlette.exceptions import HTTPException as StarletteHTTPException

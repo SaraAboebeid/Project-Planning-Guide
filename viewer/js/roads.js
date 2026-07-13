@@ -43,18 +43,33 @@ function roadsIsVisible() { return _roadsVisible; }
 
 // ── Internal ──────────────────────────────────────────────────────────────────
 
+// Clamp the Overpass query to a box around the active city, so a zoomed-out
+// camera cannot ask for roads across half a continent. Derived from the loaded
+// city rather than hardcoded, so this works for Gothenburg and the UK alike.
+const _ROADS_MAX_DEG = 0.18;
+
+function _roadsClampBox() {
+  const c = window.VIEW_CENTER || (typeof MAP_CENTER !== 'undefined' ? MAP_CENTER : { lat: 57.70, lon: 11.96 });
+  const dLat = _ROADS_MAX_DEG;
+  const dLon = _ROADS_MAX_DEG / Math.max(0.2, Math.cos(c.lat * Math.PI / 180));
+  return { south: c.lat - dLat, north: c.lat + dLat, west: c.lon - dLon, east: c.lon + dLon };
+}
+
 async function _roadsFetch() {
-  // Use current camera view bbox (clamped to Gothenburg metro area)
+  // Current camera view bbox, clamped to the active city's area.
   const cam = viewer.camera;
   const rect = cam.computeViewRectangle(viewer.scene.globe.ellipsoid, new Cesium.Rectangle());
+  const box = _roadsClampBox();
   let south, north, west, east;
   if (rect) {
-    south = Math.max(Cesium.Math.toDegrees(rect.south), 57.55);
-    north = Math.min(Cesium.Math.toDegrees(rect.north), 57.90);
-    west  = Math.max(Cesium.Math.toDegrees(rect.west),  11.70);
-    east  = Math.min(Cesium.Math.toDegrees(rect.east),  12.20);
+    south = Math.max(Cesium.Math.toDegrees(rect.south), box.south);
+    north = Math.min(Cesium.Math.toDegrees(rect.north), box.north);
+    west  = Math.max(Cesium.Math.toDegrees(rect.west),  box.west);
+    east  = Math.min(Cesium.Math.toDegrees(rect.east),  box.east);
   } else {
-    south = 57.68; north = 57.74; west = 11.93; east = 12.00;
+    const c = window.VIEW_CENTER || MAP_CENTER;
+    south = c.lat - 0.03; north = c.lat + 0.03;
+    west  = c.lon - 0.05; east  = c.lon + 0.05;
   }
 
   try {

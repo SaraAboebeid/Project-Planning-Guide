@@ -392,7 +392,11 @@ document.getElementById('btn-exit-inspect').addEventListener('click', () => {
   document.getElementById('wwr-panel').style.display    = 'none';
   facadeBuilding = null;
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(MAP_CENTER.lon, MAP_CENTER.lat, 1800),
+    destination: Cesium.Cartesian3.fromDegrees(
+      (window.VIEW_CENTER || MAP_CENTER).lon,
+      (window.VIEW_CENTER || MAP_CENTER).lat,
+      1800
+    ),
     orientation: { heading:0, pitch:Cesium.Math.toRadians(-50), roll:0 },
     duration: 1.5,
   });

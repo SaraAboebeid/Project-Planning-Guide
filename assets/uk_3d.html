@@ -1,144 +1,440 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>United Kingdom 3D Viewer</title>
+  <title>United Kingdom 3D – Facade Inspector</title>
+  <meta charset="utf-8"/>
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
+  <link rel="stylesheet" href="uk_3d.css?v=20260713-154613">
+  <link rel="stylesheet" href="sidebar-theme.css?v=20260713-154613">
   <style>
-    :root {
-      --bg: #0a0d14;
-      --panel: rgba(13, 17, 23, 0.9);
-      --border: rgba(255, 255, 255, 0.12);
-      --text: rgba(255, 255, 255, 0.92);
-      --muted: rgba(255, 255, 255, 0.58);
-      --accent: #5fa5ff;
-      --good: #96d74c;
-    }
-
-    * { box-sizing: border-box; }
-    html, body, #cesium-container {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: var(--bg);
-      font-family: Inter, system-ui, sans-serif;
-      color: var(--text);
-    }
-
-    .panel {
-      position: absolute;
-      top: 16px;
-      left: 16px;
-      z-index: 30;
-      width: min(360px, calc(100vw - 32px));
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: var(--panel);
-      backdrop-filter: blur(12px);
-      padding: 14px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
-    }
-
-    .title {
-      font-size: 15px;
-      font-weight: 700;
-      margin-bottom: 2px;
-    }
-
-    .subtitle {
-      font-size: 11px;
-      color: var(--muted);
-      margin-bottom: 10px;
-      line-height: 1.5;
-    }
-
-    .chip-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 10px;
-    }
-
-    .chip {
-      font-size: 10px;
-      padding: 3px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(95, 165, 255, 0.35);
-      background: rgba(95, 165, 255, 0.14);
-      color: #b7d6ff;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    .row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 7px 0;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      font-size: 12px;
-    }
-
-    .row:first-of-type { border-top: 0; }
-
-    .key { color: var(--muted); }
-    .val { color: var(--good); font-weight: 600; }
-
-    @media (max-width: 720px) {
-      .panel { top: 10px; left: 10px; right: 10px; width: auto; }
-    }
+    /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
+       is stamped on <body> by bootstrap.js. */
+    body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
   </style>
+  <script src="uk_3d.meta.js?v=20260713-154613" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260713-154613" defer></script>
 </head>
 <body>
-  <div id="cesium-container"></div>
 
-  <section class="panel">
-    <div class="title">United Kingdom 3D Digital Twin</div>
-    <div class="subtitle">Cesium base map + OSM 3D tiles focused on UK. This page is isolated from the Sweden page and ready for UK-only data integrations.</div>
-    <div class="chip-row">
-      <span class="chip">EUBUCCO UK</span>
-      <span class="chip">EPC UK</span>
-      <span class="chip">TABULA UK</span>
-      <span class="chip">EHS 2024-2025</span>
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="spinner"></div>
+  <h1>United Kingdom 3D</h1>
+  <p id="loading-status">Initialising Cesium...</p>
+</div>
+
+<!-- Cesium main viewer -->
+<div id="cesium-container"></div>
+
+<!-- Left sidebar: search + summary + legend + view options -->
+<aside id="left-panel" role="complementary" aria-label="Map controls and analysis layers">
+  <div id="lp-header">
+    <span class="lp-title">United Kingdom 3D</span>
+    <span class="lp-sub" id="city-subtitle">London &mdash; King's Cross / Bloomsbury</span>
+  </div>
+  <div id="lp-scroll" role="region" aria-label="Viewer controls">
+  <!-- City switcher — populated by city_switcher.js, hidden for single-city countries -->
+  <div id="city-switcher" style="display:flex;gap:4px;flex-wrap:wrap;padding:8px 10px 2px;"></div>
+  <!-- Building info (shown inline in sidebar when building is selected) -->
+  <div class="panel" id="info-panel">
+    <button class="close-btn" id="info-close">&#x2715;</button>
+    <h2>Building</h2>
+    <div id="info-content"></div>
+  </div>
+  <div id="search-wrap">
+    <div id="search-row">
+      <input id="search-input" type="text" placeholder="Search address&hellip;" autocomplete="off" aria-label="Search building address">
+      <button class="btn" id="search-btn">Search</button>
     </div>
-    <div class="row"><span class="key">3D Tiles</span><span class="val">OSM Buildings</span></div>
-    <div class="row"><span class="key">Imagery</span><span class="val">OpenStreetMap</span></div>
-    <div class="row"><span class="key">Camera Start</span><span class="val">United Kingdom</span></div>
-  </section>
+    <div id="search-results"></div>
+  </div>
+  <div id="lp-stats">
+    <div class="stat-box">
+      <div class="stat-num">0</div>
+      <div class="stat-lbl">EPC matched</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num stat-num-2">2,877</div>
+      <div class="stat-lbl">EHS estimated</div>
+    </div>
+  </div>
+  <div class="lp-divider" style="margin:8px 0 0"></div>
+  <div class="lp-section-title">Country Profile</div>
+  <div id="country-profile" style="padding:0 10px 6px;display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+    <div id="country-tabs" style="display:flex;gap:4px;flex-wrap:wrap;">
+      <button class="lp-tab active" id="country-tab-se" data-country="se" style="flex:0 0 auto;padding:5px 9px;">Sweden</button>
+      <button class="lp-tab" id="country-tab-gb" data-country="gb" style="flex:0 0 auto;padding:5px 9px;">UK</button>
+      <button class="lp-tab" id="country-tab-be" data-country="be" style="flex:0 0 auto;padding:5px 9px;">Belgium</button>
+      <button class="lp-tab" id="country-tab-ie" data-country="ie" style="flex:0 0 auto;padding:5px 9px;">Ireland</button>
+    </div>
+    <div id="country-summary" style="font-size:10px;color:var(--muted);line-height:1.4;"></div>
+    <div id="country-kpis" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;"></div>
+    <div id="country-energy-bars" style="display:flex;flex-direction:column;gap:4px;"></div>
+  </div>
+  <!-- hidden legacy buttons — IDs wired by cesium.js / vasttrafik.js -->
+  <button id="btn-tiles"       style="display:none">tiles</button>
+  <button id="btn-eubucco"     style="display:none">eubucco</button>
+  <button id="btn-transit"     style="display:none">transit</button>
+  <button id="btn-disruptions" style="display:none">disruptions</button>
+  <button id="btn-parking"     style="display:none">parking</button>
 
-  <script>
-    const viewer = new Cesium.Viewer('cesium-container', {
-      animation: false,
-      timeline: false,
-      baseLayerPicker: true,
-      geocoder: true,
-      homeButton: true,
-      sceneModePicker: true,
-      navigationHelpButton: false,
-      infoBox: false,
-      selectionIndicator: false,
-      terrain: Cesium.Terrain.fromWorldTerrain(),
-    });
+  <!-- ══ BASE MAP ═══════════════════════════════════════════════════════ -->
+  <div class="lp-divider"></div>
+  <div class="lp-section-title">Base Map</div>
+  <div class="basemap-group" style="padding:0 0 4px">
+    <div class="base-row">
+      <button class="base-btn" id="btn-base-light">
+        <span class="base-indicator"></span>
+        <span class="base-name">Light</span>
+        <span class="layer-pill">CartoDB</span>
+      </button>
+      <button class="info-btn" data-title="Light basemap" data-desc="Neutral light street map — ideal for daytime use and coloured data overlays." data-source="CartoDB Positron · OpenStreetMap contributors"></button>
+    </div>
+    <div class="base-row">
+      <button class="base-btn" id="btn-base-dark">
+        <span class="base-indicator"></span>
+        <span class="base-name">Dark</span>
+        <span class="layer-pill">CartoDB</span>
+      </button>
+      <button class="info-btn" data-title="Dark basemap" data-desc="Dark-themed street map. Provides strong contrast for bright-coloured overlays." data-source="CartoDB Dark Matter · OpenStreetMap contributors"></button>
+    </div>
+    <div class="base-row">
+      <button class="base-btn" id="btn-base-satellite">
+        <span class="base-indicator"></span>
+        <span class="base-name">Satellite</span>
+        <span class="layer-pill">Esri</span>
+      </button>
+      <button class="info-btn" data-title="Satellite imagery" data-desc="High-resolution aerial and satellite imagery of Gothenburg and surroundings." data-source="Esri World Imagery"></button>
+    </div>
+    <div class="base-row">
+      <button class="base-btn active" id="btn-base-photo">
+        <span class="base-indicator"></span>
+        <span class="base-name">Photorealistic 3D</span>
+        <span class="layer-pill">Google</span>
+      </button>
+      <button class="info-btn" data-title="Photorealistic 3D tiles" data-desc="Google's photorealistic 3D tiles with detailed building textures and terrain mesh. Requires a valid Cesium Ion access token." data-source="Google via Cesium Ion"></button>
+    </div>
+  </div>
 
-    viewer.scene.globe.depthTestAgainstTerrain = true;
-    viewer.scene.primitives.add(Cesium.createOsmBuildings());
+  <!-- ══ DATA LAYERS ════════════════════════════════════════════════════ -->
+  <div id="lp-layers">
+    <div class="lp-divider"></div>
+    <div class="lp-section-title">Data Layers</div>
 
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(-2.5, 54.3, 1700000),
-      duration: 1.8,
-      orientation: {
-        heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-65),
-        roll: 0,
-      },
-    });
-  </script>
+    <!-- ─ Buildings ───────────────────────────────────────────────────── -->
+    <div class="lp-section-label">Buildings</div>
+    <div class="overlay-group">
+      <div class="overlay-row">
+        <button class="overlay-btn active" id="btn-overlay-buildings">
+          <span class="overlay-check"></span>
+          <span class="base-name">Buildings</span>
+          <span class="layer-pill">OSM + EPC</span>
+        </button>
+        <button class="info-btn" data-title="Buildings" data-desc="7,720 building footprints across 4 UK focus area(s). Coloured by use type, EPC band, or construction era. Bands come from the Energy Performance of Buildings Register where a certificate matches, otherwise they are estimated from English Housing Survey 2024-25 distributions and marked as estimates." data-source="OpenStreetMap · EPB Register (MHCLG) · English Housing Survey 2024-25"></button>
+      </div>
+      <div class="overlay-row">
+        <button class="overlay-btn" id="btn-osm-buildings">
+          <span class="overlay-check"></span>
+          <span class="base-name">OSM Buildings</span>
+          <span class="layer-pill">Cesium</span>
+        </button>
+        <button class="info-btn" data-title="Cesium OSM Buildings" data-desc="Global 3D building massing from OpenStreetMap. Adds context around the analysis area, which only covers the focus district. Combine with photorealistic tiles or use on its own." data-source="Cesium OSM Buildings · OpenStreetMap contributors"></button>
+      </div>
+    </div>
+    <div id="lp-tabs">
+      <button class="lp-tab active" id="btn-use">Use type</button>
+      <button class="lp-tab" id="btn-eclass">Energy</button>
+      <button class="lp-tab" id="btn-year">Year era</button>
+    </div>
+    <div id="legend-container"></div>
+    <div class="lp-hint">Click a row to see best &amp; worst performers</div>
+
+    <!-- ─ Traffic (Västtrafik — Sweden only) ──────────────────────────── -->
+    <div class="lp-divider se-only" style="margin:4px 0 0"></div>
+    <div class="collapse-head se-only" style="margin-top:4px">
+      <button class="collapse-toggle" id="traffic-toggle" type="button" aria-expanded="false">
+        <span>Traffic</span>
+        <span class="collapse-chevron">&#9662;</span>
+      </button>
+      <button class="info-btn" style="margin-right:4px" data-title="Traffic layers" data-desc="Operational mobility layers including live transit vehicles and stops, disruption notices, and commuter parking availability from Västtrafik." data-source="Västtrafik · GTFS-RT · Störning API"></button>
+    </div>
+    <div id="traffic-content" class="collapse-content collapsed se-only" style="padding-top:4px">
+    <div class="overlay-group">
+      <div class="overlay-row">
+        <button class="overlay-btn" id="btn-overlay-transit">
+          <span class="overlay-check"></span>
+          <span class="base-name">Live Transit &amp; Stops</span>
+          <span class="layer-pill">V&#228;sttrafik</span>
+        </button>
+        <button class="info-btn" data-title="Live Transit &amp; Stops" data-desc="Real-time bus, tram, and ferry positions plus stop locations across Gothenburg. Requires the backend server (uvicorn) to be running." data-source="Västtrafik open API · GTFS-RT feed"></button>
+      </div>
+      <div class="overlay-row">
+        <button class="overlay-btn" id="btn-overlay-disruptions">
+          <span class="overlay-check"></span>
+          <span class="base-name">Disruptions</span>
+          <span class="layer-pill">Live</span>
+        </button>
+        <button class="info-btn" data-title="Traffic Disruptions" data-desc="Live traffic disruptions, planned maintenance works, and service alerts on the public transit network. Shown as clickable markers on the map." data-source="Västtrafik Störning API"></button>
+      </div>
+      <div class="overlay-row">
+        <button class="overlay-btn" id="btn-overlay-parking">
+          <span class="overlay-check"></span>
+          <span class="base-name">Commuter Parking</span>
+          <span class="layer-pill">VT</span>
+        </button>
+        <button class="info-btn" data-title="Commuter Parking" data-desc="Kiss-and-ride and commuter parking lots near transit stops, with live space availability where provided." data-source="Västtrafik"></button>
+      </div>
+    </div>
+    <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:2px 8px 0"></div>
+    <div id="vt-ghost-row" style="padding:5px 10px 2px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--muted);user-select:none">
+        <span style="flex:1">Ghost mode</span>
+        <span id="vt-ghost-toggle" style="
+          display:inline-flex;align-items:center;width:32px;height:17px;
+          background:#D1D5DB;border-radius:9px;position:relative;
+          transition:background .2s;flex-shrink:0"
+        >
+          <span id="vt-ghost-knob" style="
+            position:absolute;left:2px;width:13px;height:13px;
+            background:#9CA3AF;border-radius:50%;transition:left .2s,background .2s"
+          ></span>
+        </span>
+      </label>
+    </div>
+    </div>
+
+    <!-- ─ Statistics (SCB — Sweden only) ──────────────────────────────── -->
+    <div class="lp-divider se-only" style="margin:4px 0 0"></div>
+    <div class="collapse-head se-only" style="margin-top:4px">
+      <button class="collapse-toggle" id="stats-toggle" type="button" aria-expanded="false">
+        <span>Statistics</span>
+        <span class="collapse-chevron">&#9662;</span>
+      </button>
+      <button class="info-btn" style="margin-right:4px" data-title="Statistics Sweden (SCB) layers" data-desc="47 statistical overlays from Statistics Sweden covering population grids, administrative zones, land use areas, and the national reference grid. All loaded on demand from the SCB WFS service." data-source="Statistics Sweden (SCB) · CC0 1.0 Universal · geodata.scb.se"></button>
+    </div>
+    <div id="stats-content" class="collapse-content collapsed se-only">
+      <div id="scb-layers-container" style="display:flex;flex-direction:column;gap:2px;padding:4px 0 4px"></div>
+    </div>
+
+  <!-- ══ URBAN ANALYSIS ════════════════════════════════════════════════ -->
+  <div class="lp-divider"></div>
+  <div class="collapse-head" style="margin-top:4px">
+    <button class="collapse-toggle" id="urban-toggle" type="button" aria-expanded="false">
+      <span>Urban Analysis</span>
+      <span class="collapse-chevron">&#9662;</span>
+    </button>
+    <button class="info-btn" style="margin-right:4px" data-title="Urban Analysis layers" data-desc="City-wide analytical overlays computed from OSM and EUBUCCO data. Green Index scores street segments by park proximity. Heat Island Proxy estimates thermal stress per grid cell from building energy class, age and use. Green Accessibility maps walking distance to the nearest green space." data-source="OSM · Overpass API · EUBUCCO v0.2"></button>
+  </div>
+  <div id="urban-content" class="collapse-content collapsed" style="padding-top:4px">
+    <div id="urban-analysis-section">
+      <div class="overlay-group">
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-urban-green">
+            <span class="overlay-check"></span>
+            <span class="base-name">🌿 Green Index</span>
+            <span class="layer-pill">OSM</span>
+          </button>
+          <button class="info-btn" data-title="Street Green Index" data-desc="Greenness score 0–1 for every street segment based on proximity to parks, forests and gardens (OSM). Colour: green = well-served, red = low green coverage. Distance-decay model with 200 m half-life." data-source="OpenStreetMap · Overpass API"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-urban-uhi">
+            <span class="overlay-check"></span>
+            <span class="base-name">🌡️ Heat Island Proxy</span>
+            <span class="layer-pill">EUBUCCO</span>
+          </button>
+          <button class="info-btn" data-title="Urban Heat Island Proxy" data-desc="Grid-based heat island proxy (667 m cells) scored from energy class (50%), construction year (30%), and building use (20%). Green areas provide a cooling correction. Red = high thermal stress, blue = cooler areas." data-source="EUBUCCO v0.2 · Boverket EPC · OSM"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-urban-access">
+            <span class="overlay-check"></span>
+            <span class="base-name">🚶 Green Accessibility</span>
+            <span class="layer-pill">OSM</span>
+          </button>
+          <button class="info-btn" data-title="Green Space Accessibility" data-desc="Straight-line distance from a 280 m grid to the nearest OSM green space. Green = within 400 m, amber = 400–800 m, red = over 800 m (WHO guideline threshold). Identifies underserved neighbourhoods." data-source="OpenStreetMap · Overpass API"></button>
+        </div>
+      </div>
+      <div id="urban-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
+      <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:11px;color:var(--text)"></div>
+    </div>
+  </div>
+
+  </div><!-- /lp-layers -->
+
+  <!-- ══ ANALYSIS TOOLS ═════════════════════════════════════════════════ -->
+  <div class="lp-divider"></div>
+  <div class="collapse-head" style="margin-top:4px">
+    <button class="collapse-toggle" id="analysis-tools-toggle" type="button" aria-expanded="true">
+      <span>Analysis Tools</span>
+      <span class="collapse-chevron">&#9662;</span>
+    </button>
+    <button class="info-btn" style="margin-right:4px" data-title="Analysis tools" data-desc="Building-level diagnostics for facade window-to-wall ratio and rooftop PV potential. Tools are enabled when a building is selected." data-source="PPG analysis pipeline"></button>
+  </div>
+  <div id="analysis-tools-content" class="collapse-content" style="padding-top:4px">
+    <div class="analysis-tools-group">
+      <button class="tool-btn" id="btn-inspect" disabled>WWR Estimation</button>
+      <div class="analysis-note" id="inspect-saved-badge" style="display:none"></div>
+      <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>Rooftop PV Estimate</button>
+      <div class="analysis-note" id="pvgis-saved-badge" style="display:none"></div>
+      <div id="pvgis-result"></div>
+      <div id="lp-no-selection">Select a building to enable tools</div>
+    </div>
+  </div>
+
+  <div class="lp-divider"></div>
+  <button class="btn opt-btn" id="btn-reset" style="margin:6px 0 8px;width:100%">Reset View</button>
+
+  </div><!-- /lp-scroll -->
+</aside>
+
+<!-- Info tooltip -->
+<div id="info-tooltip"><div class="it-title"></div><div class="it-desc"></div><div class="it-source"></div></div>
+
+<!-- Hover tooltip card -->
+<div id="hover-card" style="
+  display:none; position:fixed; pointer-events:none; z-index:9999;
+  background:#ffffff; border:1px solid rgba(114,28,184,0.25);
+  border-radius:10px; padding:10px 13px; min-width:200px; max-width:280px;
+  font-family:Inter,sans-serif; font-size:12px; color:#1e293b;
+  box-shadow:0 4px 20px rgba(0,0,0,0.15); backdrop-filter:blur(6px);
+"></div>
+
+<!-- Facade inspector -->
+<div class="panel" id="facade-panel">
+  <h2>Facade Inspector</h2>
+  <div class="sub" id="facade-sub">Orbit freely to the angle you want, then click <b>Draw &amp; Capture</b> — or fly to a cardinal view below</div>
+
+  <!-- Manual capture slot (full-width, prominent) -->
+  <div style="margin-top:10px;position:relative;border-radius:8px;overflow:hidden;border:2px solid #a78bfa;background:#0d0d1a" id="manual-canvas-wrap">
+    <canvas id="canvas-manual" width="520" height="300" style="width:100%;height:auto;display:block;max-height:260px;object-fit:contain"></canvas>
+    <div id="manual-label" style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;background:rgba(114,28,184,0.85);color:#fff;padding:2px 10px;border-radius:4px">Manual View</div>
+  </div>
+
+  <!-- Cardinal views row -->
+  <div style="font-size:10px;color:#64748b;margin:8px 0 4px">Cardinal views — click to fly &amp; capture:</div>
+  <div id="facade-views" style="display:flex;gap:6px">
+    <div class="facade-thumb" id="thumb-N" style="height:68px;aspect-ratio:auto"><canvas id="canvas-N" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">N</div></div>
+    <div class="facade-thumb" id="thumb-E" style="height:68px;aspect-ratio:auto"><canvas id="canvas-E" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">E</div></div>
+    <div class="facade-thumb" id="thumb-S" style="height:68px;aspect-ratio:auto"><canvas id="canvas-S" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">S</div></div>
+    <div class="facade-thumb" id="thumb-W" style="height:68px;aspect-ratio:auto"><canvas id="canvas-W" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">W</div></div>
+  </div>
+
+  <!-- Action buttons -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px">
+    <button class="btn" id="btn-manual-capture" style="background:rgba(114,28,184,0.4);border-color:#a78bfa;color:#c4b5fd;font-weight:600">Draw &amp; Capture</button>
+    <button class="btn" id="btn-capture-all">&#9654; Capture All (N/E/S/W)</button>
+    <button class="btn" id="btn-ai-wwr">&#129302; AI Estimate</button>
+    <button class="btn" id="btn-exit-inspect">&#x2715; Exit</button>
+  </div>
+
+  <!-- Zoom control -->
+  <div style="display:flex;align-items:center;gap:6px;margin-top:8px;justify-content:center">
+    <button class="btn" id="btn-zoom-out" style="width:32px;height:28px;padding:0;font-size:16px;line-height:1" title="Zoom out">&#x2212;</button>
+    <span id="zoom-label" style="font-size:11px;color:var(--muted);min-width:34px;text-align:center">1.0×</span>
+    <button class="btn" id="btn-zoom-in"  style="width:32px;height:28px;padding:0;font-size:16px;line-height:1" title="Zoom in">+</button>
+    <span style="font-size:10px;color:var(--faint);margin-left:4px">adjust camera distance</span>
+  </div>
+</div>
+
+<!-- WWR result panel -->
+<div class="panel" id="wwr-panel">
+  <h2>WWR per Facade</h2>
+  <div class="sub" id="wwr-sub">Window-to-Wall Ratio per facade</div>
+
+  <!-- AI per-facade bars (primary — shown when AI estimate exists) -->
+  <div id="wwr-ai-section" style="margin-top:10px;display:none">
+    <div id="wwr-ai-label" style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">AI Vision estimate · per facade</div>
+    <div id="wwr-facades-rows"></div>
+    <div style="margin-top:8px;display:flex;align-items:baseline;gap:5px">
+      <span style="font-size:10px;color:var(--muted)">Average:</span>
+      <span id="wwr-value-ai" style="font-size:18px;font-weight:700;color:#7c3aed">&#x2013;</span>
+      <span style="font-size:11px;color:var(--muted)">%</span>
+    </div>
+  </div>
+
+  <!-- Archetype fallback (shown only when no AI estimate yet) -->
+  <div id="wwr-heuristic-section" style="margin-top:10px">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Archetype fallback &nbsp;<span style="font-weight:400;text-transform:none;letter-spacing:0">era · use · orientation</span></div>
+    <div id="wwr-heuristic-rows"></div>
+    <div style="margin-top:8px;display:flex;align-items:baseline;gap:5px">
+      <span style="font-size:10px;color:var(--muted)">Average:</span>
+      <span id="wwr-value-heuristic" style="font-size:18px;font-weight:700;color:#7c3aed">&#x2013;</span>
+      <span style="font-size:11px;color:var(--muted)">%</span>
+    </div>
+  </div>
+
+  <div id="wwr-breakdown" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
+
+  <!-- Save to database -->
+  <div id="wwr-save-row" style="margin-top:10px;display:none">
+    <button id="btn-wwr-save" class="btn" style="width:100%;font-size:11px;background:rgba(124,58,237,0.18);border-color:#a78bfa;color:#c4b5fd;font-weight:600">
+      Save to WWR Database
+    </button>
+    <div id="wwr-save-status" style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px;min-height:14px"></div>
+  </div>
+</div>
+
+<!-- Västtrafik departures panel -->
+<div class="panel" id="vt-panel" style="display:none;top:16px;left:260px;width:280px;max-height:360px;overflow-y:auto">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <h2 style="margin:0">Departures</h2>
+    <button class="btn" id="btn-vt-close" style="padding:2px 8px">&#x2715;</button>
+  </div>
+  <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px" id="vt-panel-title"></div>
+  <div id="vt-departures"></div>
+</div>
+
+<!-- Västtrafik disruptions panel -->
+<div class="panel" id="vt-disr-panel" style="display:none;top:16px;left:260px;width:320px;max-height:480px;overflow-y:auto">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <h2 style="margin:0">Disruptions</h2>
+    <button class="btn" id="btn-disr-close" style="padding:2px 8px">&#x2715;</button>
+  </div>
+  <div id="vt-disr-count" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+  <div id="vt-disr-list"></div>
+</div>
+
+<!-- Västtrafik parking detail panel -->
+<div class="panel" id="vt-park-panel" style="display:none;top:16px;left:260px;width:260px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <h2 style="margin:0">Parkering</h2>
+    <button class="btn" id="btn-park-close" style="padding:2px 8px">&#x2715;</button>
+  </div>
+  <div id="vt-park-title" style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px"></div>
+  <div id="vt-park-detail"></div>
+</div>
+
+<!-- Cesium Ion Token panel -->
+<div class="panel" id="token-panel" style="top:16px;right:16px;width:320px;display:none">
+  <h2>&#128273; Cesium Ion Token Required</h2>
+  <div class="sub">Google Photorealistic 3D Tiles stream real building facade &amp; roof textures directly from Google Maps.</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+    1. Sign up free at <a href="https://ion.cesium.com" target="_blank" style="color:#a78bfa">ion.cesium.com</a><br>
+    2. Go to <b>Access Tokens</b> &rarr; create a token<br>
+    3. Enable <b>Google Photorealistic 3D Tiles</b> asset (2275207)<br>
+    4. Paste your token below and click Apply
+  </div>
+  <input id="token-input" type="text" placeholder="Paste your Cesium ion token&hellip;"
+    style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);
+           background:rgba(0,0,0,0.04);color:var(--text);font-size:12px;margin-bottom:8px;outline:none">
+  <button class="btn" id="token-apply" style="width:100%;margin-bottom:6px">&#128640; Apply &amp; Load 3D Tiles</button>
+  <div id="token-error" style="font-size:11px;color:#f87171;min-height:14px"></div>
+</div>
+
+<!-- Performance card panel -->
+<div class="panel" id="perf-panel" style="display:none;top:16px;right:16px;width:320px;max-height:82vh;flex-direction:column;overflow:hidden">
+  <button class="close-btn" id="perf-close">&#x2715;</button>
+  <h2 id="perf-title">Performance</h2>
+  <div class="sub" id="perf-sub"></div>
+  <div id="perf-content" style="margin-top:10px;overflow-y:auto;flex:1"></div>
+</div>
+
+<div id="ppg-brand">PPG &middot; Chalmers / Boverket</div>
+<div id="controls-hint">&#128205; Scroll to zoom &nbsp;&middot;&nbsp; Drag to pan &nbsp;&middot;&nbsp; Right-drag or Ctrl+drag to tilt/rotate &nbsp;&middot;&nbsp; Hover buildings for details</div>
+
+<!-- INJECT:DATA -->
+<!-- INJECT:JS -->
+
 </body>
 </html>

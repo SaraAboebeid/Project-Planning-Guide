@@ -23,14 +23,15 @@ const ECLASS_COLORS = {
   F: Cesium.Color.fromBytes(239, 68, 68,225),
   G: Cesium.Color.fromBytes(153, 27, 27,230),
 };
-const PERIOD_COLORS = {
-  '...1960':     Cesium.Color.fromBytes(100,149,237,220),
-  '1961-1975':   Cesium.Color.fromBytes(255,165, 50,220),
-  '1976-1985':   Cesium.Color.fromBytes(154,205, 50,220),
-  '1986-1995':   Cesium.Color.fromBytes(218,165, 32,220),
-  '1996-2005':   Cesium.Color.fromBytes(255, 99, 71,220),
-  'post-2005':   Cesium.Color.fromBytes(147,112,219,220),
-};
+// Construction eras differ by country (TABULA periods in Sweden, English Housing
+// Survey age bands in the UK), so derive the extrusion colours from the same
+// PERIOD_CSS the legend uses rather than hardcoding a second copy here.
+const PERIOD_COLORS = Object.fromEntries(
+  Object.entries(PERIOD_CSS).map(([key, css]) => {
+    const [r, g, b] = css.match(/\d+/g).map(Number);
+    return [key, Cesium.Color.fromBytes(r, g, b, 220)];
+  })
+);
 
 // ─────────────────────────────────────────────────────────────────
 if (window.location.protocol === 'file:') {
@@ -91,8 +92,11 @@ window.setBasemap = function(type) {
     if (tilesEnabled) {
       tilesEnabled = false;
       if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
-      resetGroundCalibration();
-      if (buildingDS) rebuildBuildings();
+      // Recalibrate rather than reset to 0 outright: if OSM Buildings is still
+      // on (the UK default), it's still real-world-elevation ground truth even
+      // with Google tiles gone, and blindly zeroing the offset here would
+      // un-align our buildings from it again.
+      refreshBuildingBaseOffsetFromTiles().then(() => { if (buildingDS) rebuildBuildings(); });
       document.getElementById('btn-tiles').classList.remove('active');
     }
     viewer.imageryLayers.removeAll();
@@ -140,6 +144,7 @@ let buildingBaseOffsetMeters = 0;
 let groundOffsetGrid = null;
 let calibrationInProgress = false;
 let rebuildInProgress = false;
+let rebuildPending = false;
 
 window.getBuildingBaseOffset = function getBuildingBaseOffset(lon, lat) {
   if (groundOffsetGrid && Number.isFinite(lon) && Number.isFinite(lat)) {
@@ -183,7 +188,12 @@ function sampleGroundOffsetGrid(lon, lat) {
 
 async function refreshBuildingBaseOffsetFromTiles() {
   if (calibrationInProgress) return;
-  if (!tilesEnabled || !googleTileset) {
+  // Any loaded ground-truth massing (Google's photorealistic mesh, or Cesium OSM
+  // Buildings) sits at real-world elevation, while our own extruded buildings are
+  // drawn at raw ellipsoid height (0) unless calibrated against one of them. With
+  // neither loaded there's nothing to align to - the flat ellipsoid is correct.
+  const hasGroundTruth = (tilesEnabled && googleTileset) || osmEnabled;
+  if (!hasGroundTruth) {
     resetGroundCalibration();
     return;
   }
@@ -224,10 +234,28 @@ async function refreshBuildingBaseOffsetFromTiles() {
       }
     }
 
-    const clamped = await Promise.race([
-      viewer.scene.clampToHeightMostDetailed(points),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Ground calibration timeout')), 5000)),
-    ]);
+    // clampToHeightMostDetailed needs the tileset to have actually streamed in
+    // geometry around these points to hit anything - on a fresh page load (or a
+    // slow connection/GPU) the first attempt can time out simply because nothing
+    // has rendered there yet. One timeout used to mean "give up forever, extrude
+    // at raw ellipsoid height" - retry a few times with a short pause instead, so
+    // buildings self-correct once the tileset catches up rather than staying
+    // permanently misaligned with it.
+    let clamped = null;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 3 && !clamped; attempt++) {
+      try {
+        clamped = await Promise.race([
+          viewer.scene.clampToHeightMostDetailed(points),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Ground calibration timeout')), 12000)),
+        ]);
+      } catch (err) {
+        lastErr = err;
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+    if (!clamped) throw lastErr || new Error('Ground calibration failed');
+
     const raw = clamped.map(p => {
       if (!p) return NaN;
       const carto = Cesium.Cartographic.fromCartesian(p);
@@ -256,7 +284,16 @@ async function refreshBuildingBaseOffsetFromTiles() {
   }
 }
 
-async function loadGoogleTiles(token) {
+// skipAutoRebuild: the startup sequence below calibrates and builds explicitly,
+// exactly once, in order. rebuildBuildings() always tears down and re-extrudes
+// every building from scratch (no incremental update), so on a large dataset
+// (Gothenburg's 93k buildings, ~90s per pass) letting this function's own
+// auto-rebuild ALSO fire during startup doesn't just risk a race - the
+// pending-rebuild safety net (see rebuildBuildings) turns that race into a
+// second full ~90s pass every time. Interactive callers (the tiles toggle
+// button, pasting a token) have no concurrent initial build to compete with,
+// so they keep the automatic behavior.
+async function loadGoogleTiles(token, { skipAutoRebuild = false } = {}) {
   try {
     setLoading('Loading Google Photorealistic 3D Tiles...');
     Cesium.Ion.defaultAccessToken = token;
@@ -273,11 +310,13 @@ async function loadGoogleTiles(token) {
     setLoading('');
     console.log('Google Photorealistic 3D Tiles loaded');
 
-    // Run calibration in background so the viewer is interactive immediately.
-    (async () => {
-      await refreshBuildingBaseOffsetFromTiles();
-      if (buildingDS) await rebuildBuildings();
-    })();
+    if (!skipAutoRebuild) {
+      // Run calibration in background so the viewer is interactive immediately.
+      (async () => {
+        await refreshBuildingBaseOffsetFromTiles();
+        if (buildingDS) await rebuildBuildings();
+      })();
+    }
   } catch(err) {
     setLoading('');
     tilesEnabled = false;
@@ -357,8 +396,14 @@ function ringCentroid(ring) {
 }
 
 async function rebuildBuildings() {
-  if (rebuildInProgress) return;
+  // A rebuild requested while one is already running (e.g. ground calibration
+  // finishing mid-build) must not be silently dropped - that left buildings
+  // permanently stuck at the wrong height, floating below the real tiles/OSM
+  // Buildings mesh. Queue it instead: exactly one follow-up rebuild runs once
+  // the current one finishes, picking up the latest calibration.
+  if (rebuildInProgress) { rebuildPending = true; return; }
   rebuildInProgress = true;
+  rebuildPending = false;
   setLoading('Loading ' + DATA.length.toLocaleString() + ' buildings...');
   try {
     if (buildingDS) { viewer.dataSources.remove(buildingDS, true); buildingDS = null; }
@@ -412,6 +457,10 @@ async function rebuildBuildings() {
     setLoading('');
   } finally {
     rebuildInProgress = false;
+    if (rebuildPending) {
+      rebuildPending = false;
+      rebuildBuildings();
+    }
   }
 }
 
@@ -430,20 +479,85 @@ function setLoading(msg) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Fly to Gothenburg + start building
+// Cesium OSM Buildings — context massing for the wider city, independent of the
+// analysis buildings. Useful in the UK, where the extruded EPC layer only covers
+// the focus district and the surrounding blocks would otherwise be flat.
 // ─────────────────────────────────────────────────────────────────
+let osmBuildings = null;
+let osmEnabled   = false;
+
+// skipAutoRebuild: see loadGoogleTiles - the startup sequence calibrates and
+// builds explicitly, exactly once, after this call returns.
+async function toggleOsmBuildings(on, { skipAutoRebuild = false } = {}) {
+  const btn = document.getElementById('btn-osm-buildings');
+  if (on && !osmBuildings) {
+    try {
+      setLoading('Loading OSM Buildings...');
+      osmBuildings = await Cesium.createOsmBuildingsAsync();
+      viewer.scene.primitives.add(osmBuildings);
+      setLoading('');
+    } catch (err) {
+      setLoading('');
+      console.error('OSM Buildings failed:', err.message);
+      if (btn) btn.classList.remove('active');
+      return;
+    }
+  }
+  osmEnabled = on;
+  if (osmBuildings) osmBuildings.show = on;
+  if (btn) btn.classList.toggle('active', on);
+
+  if (!skipAutoRebuild) {
+    // OSM Buildings sits at real-world elevation, same as Google's photorealistic
+    // mesh - recalibrate against whichever ground-truth layer(s) are now active so
+    // our own extruded buildings don't end up floating below/above it.
+    await refreshBuildingBaseOffsetFromTiles();
+    if (buildingDS) await rebuildBuildings();
+  }
+}
+window.toggleOsmBuildings = toggleOsmBuildings;
+
+const _osmBtn = document.getElementById('btn-osm-buildings');
+if (_osmBtn) _osmBtn.addEventListener('click', () => toggleOsmBuildings(!osmEnabled));
+
+// ─────────────────────────────────────────────────────────────────
+// Fly to the active city + start building
+// VIEW_CENTER is set by bootstrap.js from the profile + ?city=; MAP_CENTER is
+// the build-time default and only used if the profile is missing.
+// ─────────────────────────────────────────────────────────────────
+const VIEW_AT = window.VIEW_CENTER || MAP_CENTER;
+const VIEW_ALT = window.VIEW_HEIGHT || 800;
+
 viewer.camera.flyTo({
-  destination: Cesium.Cartesian3.fromDegrees(MAP_CENTER.lon, MAP_CENTER.lat, 800),
+  destination: Cesium.Cartesian3.fromDegrees(VIEW_AT.lon, VIEW_AT.lat, VIEW_ALT),
   orientation: { heading:0, pitch: Cesium.Math.toRadians(-40), roll:0 },
   duration: 0,
 });
 
-// Start: if token already saved, load tiles immediately; always load buildings
+// Start: if token already saved, load tiles immediately; always load buildings.
+// The UK's analysis districts are small city fragments (a few square km) rather
+// than the whole city, so OSM Buildings' plain grey massing is switched on by
+// default there to give the surrounding city visual continuity; Sweden's
+// dataset already covers most of Gothenburg and doesn't need it.
+//
+// Both loadGoogleTiles and toggleOsmBuildings normally recalibrate and rebuild
+// on their own - suppressed here (skipAutoRebuild) because this sequence does
+// exactly that itself, once, at the end. Without the flag both would race the
+// explicit calibrate-then-build below, and since rebuildBuildings() always
+// re-extrudes the entire dataset from scratch (no incremental update), that
+// race used to cost a second full ~90s rebuild pass on Gothenburg's 93k
+// buildings rather than a quick correction.
 (async () => {
   if (ION_TOKEN) {
     document.getElementById('token-panel').style.display = 'none';
-    await loadGoogleTiles(ION_TOKEN);
+    await loadGoogleTiles(ION_TOKEN, { skipAutoRebuild: true });
   }
+  if (window.VIEWER_COUNTRY && window.VIEWER_COUNTRY !== 'se') {
+    await toggleOsmBuildings(true, { skipAutoRebuild: true });
+  }
+  // buildingDS is still null here, so calibrating first means the very first
+  // build is already correctly aligned - no misaligned flash on first load.
+  await refreshBuildingBaseOffsetFromTiles();
   await rebuildBuildings();
 })();
 
@@ -507,7 +621,7 @@ updateLegend('use');
 // ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-reset').addEventListener('click', () => {
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(MAP_CENTER.lon, MAP_CENTER.lat, 800),
+    destination: Cesium.Cartesian3.fromDegrees(VIEW_AT.lon, VIEW_AT.lat, VIEW_ALT),
     orientation: { heading:0, pitch: Cesium.Math.toRadians(-40), roll:0 },
     duration: 1.5,
   });

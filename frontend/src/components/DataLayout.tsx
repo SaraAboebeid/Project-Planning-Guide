@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { COUNTRIES, LIBRARY_TABS, tabPathFor, countryFromPath, pathForCountry } from "../config/countryNav";
 
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
   return (
@@ -26,14 +27,6 @@ const STEP_ITEMS = [
   { iconD: IC.timeline, label: "Step 5", path: "/step/5" },
 ];
 
-const LIBRARY_TABS = [
-  { label: "Pathways", path: "/pathways" },
-  { label: "Data Explorer", path: "/data" },
-  { label: "Analysis Tools", path: "/analysis" },
-  { label: "3D Viewer", path: "/viewer" },
-  { label: "Sample Reports", path: "/reports" },
-];
-
 export default function DataLayout({
   children,
   title = "Data Explorer",
@@ -47,6 +40,11 @@ export default function DataLayout({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  // Derived from the URL rather than shared component state — each page's own
+  // path is the source of truth for which country it is displaying, so the
+  // header always matches what's on screen even after a hard refresh or a
+  // direct link to e.g. /viewer/uk.
+  const country = countryFromPath(location.pathname);
 
   return (
     <div
@@ -176,11 +174,12 @@ export default function DataLayout({
             }}
           >
             {LIBRARY_TABS.map((tab) => {
-              const isActive = location.pathname === tab.path;
+              const targetPath = tabPathFor(tab, country);
+              const isActive = location.pathname === tab.path || location.pathname === targetPath;
               return (
                 <button
                   key={tab.label}
-                  onClick={() => navigate(tab.path)}
+                  onClick={() => navigate(targetPath)}
                   style={{
                     border: 0,
                     borderRadius: 8,
@@ -201,6 +200,46 @@ export default function DataLayout({
           </div>
 
           <div style={{ flex: 1 }} />
+
+          {/* Country selector — same 4 countries as the landing page. Active
+              country is read from the URL, so it always reflects what's on
+              screen. Switching country while on a page with no per-country
+              build (Pathways, Analysis Tools, ...) is a no-op until that page
+              gets one. */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              padding: 4,
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            {COUNTRIES.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  const swap = pathForCountry(location.pathname, c.id);
+                  if (swap) navigate(swap);
+                }}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 8,
+                  border: 0,
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontWeight: country === c.id ? 700 : 500,
+                  background: country === c.id ? "rgba(114,28,184,0.35)" : "transparent",
+                  color: country === c.id ? "#fff" : "rgba(255,255,255,0.6)",
+                  transition: "all .15s",
+                }}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
         </header>
 
         <main style={{ flex: 1, overflowY: "auto", padding: "24px" }}>{children}</main>

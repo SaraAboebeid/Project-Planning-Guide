@@ -1,0 +1,191 @@
+{
+  "source": "Annex Table 2.14: The average and median cost of improving dwellings to energy efficiency band C, by dwelling characteristics, 2024",
+  "dataset": "English Housing Survey 2024-25, Chapter 2 (Energy Efficiency)",
+  "publisher": "Ministry of Housing, Communities & Local Government",
+  "licence": "Open Government Licence v3.0",
+  "currency": "GBP",
+  "costs": {
+    "tenure": {
+      "owner occupied": {
+        "mean_gbp": 7869.4646,
+        "median_gbp": 9000.0,
+        "sample_size": 3302.0
+      },
+      "private rented": {
+        "mean_gbp": 7039.8223,
+        "median_gbp": 8825.0,
+        "sample_size": 1399.0
+      },
+      "local authority": {
+        "mean_gbp": 5050.1778,
+        "median_gbp": 5000.0,
+        "sample_size": 579.0
+      },
+      "housing association": {
+        "mean_gbp": 6082.1781,
+        "median_gbp": 5225.0,
+        "sample_size": 759.0
+      },
+      "private sector": {
+        "mean_gbp": 7671.1919,
+        "median_gbp": 9000.0,
+        "sample_size": 4701.0
+      },
+      "social sector": {
+        "mean_gbp": 5655.4017,
+        "median_gbp": 5000.0,
+        "sample_size": 1338.0
+      }
+    },
+    "dwelling age": {
+      "pre-1919": {
+        "mean_gbp": 10727.5928,
+        "median_gbp": 9000.0,
+        "sample_size": 1799.0
+      },
+      "1919-44": {
+        "mean_gbp": 7142.7272,
+        "median_gbp": 9000.0,
+        "sample_size": 1145.0
+      },
+      "1945-64": {
+        "mean_gbp": 5590.8184,
+        "median_gbp": 5000.0,
+        "sample_size": 1288.0
+      },
+      "1965-80": {
+        "mean_gbp": 4945.0866,
+        "median_gbp": 5000.0,
+        "sample_size": 1099.0
+      },
+      "1981-90": {
+        "mean_gbp": 5831.6202,
+        "median_gbp": 5000.0,
+        "sample_size": 307.0
+      },
+      "1991-2002": {
+        "mean_gbp": 5533.6452,
+        "median_gbp": 5000.0,
+        "sample_size": 288.0
+      },
+      "2003-2013": {
+        "mean_gbp": 2446.5821,
+        "median_gbp": 1600.0,
+        "sample_size": 81.0
+      },
+      "post-2013": {
+        "mean_gbp": 2031.4704,
+        "median_gbp": 500.0,
+        "sample_size": 32.0
+      }
+    },
+    "dwelling type": {
+      "small terraced house": {
+        "mean_gbp": 7609.7917,
+        "median_gbp": 9000.0,
+        "sample_size": 676.0
+      },
+      "medium/large terraced house": {
+        "mean_gbp": 8074.5426,
+        "median_gbp": 9000.0,
+        "sample_size": 1026.0
+      },
+      "semi-detached house": {
+        "mean_gbp": 7316.0998,
+        "median_gbp": 7825.0,
+        "sample_size": 1638.0
+      },
+      "detached house": {
+        "mean_gbp": 9463.8834,
+        "median_gbp": 8900.0,
+        "sample_size": 951.0
+      },
+      "bungalow": {
+        "mean_gbp": 6567.8592,
+        "median_gbp": 5225.0,
+        "sample_size": 819.0
+      },
+      "converted flat": {
+        "mean_gbp": 7166.8633,
+        "median_gbp": 9000.0,
+        "sample_size": 282.0
+      },
+      "purpose built flat, low rise": {
+        "mean_gbp": 4192.6257,
+        "median_gbp": 1847.5,
+        "sample_size": 590.0
+      },
+      "purpose built flat, high rise": {
+        "mean_gbp": 2467.5634,
+        "median_gbp": 1175.0,
+        "sample_size": 57.0
+      }
+    },
+    "region": {
+      "North East": {
+        "mean_gbp": 5146.5476,
+        "median_gbp": 4525.0,
+        "sample_size": 282.0
+      },
+      "North West": {
+        "mean_gbp": 6596.6074,
+        "median_gbp": 6225.0,
+        "sample_size": 676.0
+      },
+      "Yorkshire and the Humber": {
+        "mean_gbp": 6990.1764,
+        "median_gbp": 7625.0,
+        "sample_size": 793.0
+      },
+      "East Midlands": {
+        "mean_gbp": 8298.4312,
+        "median_gbp": 9000.0,
+        "sample_size": 516.0
+      },
+      "West Midlands": {
+        "mean_gbp": 8576.4295,
+        "median_gbp": 7600.0,
+        "sample_size": 571.0
+      },
+      "East of England": {
+        "mean_gbp": 7967.0367,
+        "median_gbp": 7847.5,
+        "sample_size": 686.0
+      },
+      "London": {
+        "mean_gbp": 7350.1836,
+        "median_gbp": 9000.0,
+        "sample_size": 567.0
+      },
+      "South East": {
+        "mean_gbp": 7123.7395,
+        "median_gbp": 6000.0,
+        "sample_size": 1107.0
+      },
+      "South West": {
+        "mean_gbp": 8399.9792,
+        "median_gbp": 9000.0,
+        "sample_size": 841.0
+      }
+    },
+    "energy efficiency rating band": {},
+    "a/b": {},
+    "c": {
+      "D": {
+        "mean_gbp": 6002.3149,
+        "median_gbp": 6017.5,
+        "sample_size": 5001.0
+      },
+      "E": {
+        "mean_gbp": 12429.6274,
+        "median_gbp": 11100.0,
+        "sample_size": 755.0
+      },
+      "F/G": {
+        "mean_gbp": 17354.0383,
+        "median_gbp": 15400.0,
+        "sample_size": 283.0
+      }
+    }
+  }
+}

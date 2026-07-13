@@ -17,22 +17,27 @@ const ECLASS_LABELS_JS = {
   A:'A – Very efficient', B:'B – Efficient', C:'C – Above average',
   D:'D – Average', E:'E – Below average', F:'F – Poor', G:'G – Very poor',
 };
-const PERIOD_LABELS_JS = {
-  '...1960':'Pre-1960','1961-1975':'1961–1975','1976-1985':'1976–1985',
-  '1986-1995':'1986–1995','1996-2005':'1996–2005','post-2005':'Post-2005',
-};
 const USE_CSS = {
   bostad_enfamilj:'rgb(255,165,50)',   bostad_flerfamilj:'rgb(255,210,60)',
   verksamhet:'rgb(70,180,255)',         industri:'rgb(200,80,60)',
   samhalle:'rgb(70,210,140)',           komplement:'rgb(140,140,160)',
   ovrigt:'rgb(160,120,200)',
 };
+// EPC and Boverket both band energy A–G, so this palette is country-independent.
 const ECLASS_CSS = {
   A:'rgb(22,163,74)',   B:'rgb(74,222,128)',  C:'rgb(190,242,60)',
   D:'rgb(250,204,21)',  E:'rgb(251,146,60)',  F:'rgb(239,68,68)',
   G:'rgb(153,27,27)',
 };
-const PERIOD_CSS = {
+
+// Construction eras are the one dimension that genuinely differs by country:
+// Sweden uses TABULA periods, the UK uses English Housing Survey age bands. The
+// active set comes from the build-time profile; these are the Swedish defaults.
+const PERIOD_LABELS_JS = (window.VIEWER_PROFILE && window.VIEWER_PROFILE.period_labels) || {
+  '...1960':'Pre-1960','1961-1975':'1961–1975','1976-1985':'1976–1985',
+  '1986-1995':'1986–1995','1996-2005':'1996–2005','post-2005':'Post-2005',
+};
+const PERIOD_CSS = (window.VIEWER_PROFILE && window.VIEWER_PROFILE.period_colors) || {
   '...1960':'rgb(100,149,237)', '1961-1975':'rgb(255,165,50)',
   '1976-1985':'rgb(154,205,50)','1986-1995':'rgb(218,165,32)',
   '1996-2005':'rgb(255,99,71)', 'post-2005':'rgb(147,112,219)',

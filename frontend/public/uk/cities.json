@@ -1,0 +1,103 @@
+{
+  "country": "gb",
+  "country_name": "United Kingdom",
+  "sources": {
+    "footprints": "OpenStreetMap (ODbL)",
+    "certificates": "Energy Performance of Buildings Register, MHCLG (OGL v3.0)",
+    "priors": "English Housing Survey 2024-25, MHCLG (OGL v3.0)"
+  },
+  "cities": [
+    {
+      "id": "london_kings_cross",
+      "name": "London",
+      "district": "King's Cross / Bloomsbury",
+      "region": "London",
+      "lat": 51.529,
+      "lon": -0.1235,
+      "radius_m": 900,
+      "buildings": 3018,
+      "with_epc": 0,
+      "estimated_from_ehs": 1225,
+      "no_band": 1793,
+      "band_distribution": {
+        "A": 1,
+        "B": 62,
+        "C": 650,
+        "D": 445,
+        "E": 44,
+        "F": 19,
+        "G": 4
+      },
+      "data_file": "uk/buildings_london_kings_cross.json"
+    },
+    {
+      "id": "london_westminster",
+      "name": "London",
+      "district": "Westminster",
+      "region": "London",
+      "lat": 51.4995,
+      "lon": -0.1341,
+      "radius_m": 900,
+      "buildings": 1590,
+      "with_epc": 0,
+      "estimated_from_ehs": 418,
+      "no_band": 1172,
+      "band_distribution": {
+        "A": 0,
+        "B": 19,
+        "C": 240,
+        "D": 127,
+        "E": 24,
+        "F": 5,
+        "G": 3
+      },
+      "data_file": "uk/buildings_london_westminster.json"
+    },
+    {
+      "id": "london_canary_wharf",
+      "name": "London",
+      "district": "Tower Hamlets / Canary Wharf",
+      "region": "London",
+      "lat": 51.5054,
+      "lon": -0.0235,
+      "radius_m": 900,
+      "buildings": 1283,
+      "with_epc": 0,
+      "estimated_from_ehs": 821,
+      "no_band": 462,
+      "band_distribution": {
+        "A": 2,
+        "B": 47,
+        "C": 506,
+        "D": 222,
+        "E": 33,
+        "F": 9,
+        "G": 2
+      },
+      "data_file": "uk/buildings_london_canary_wharf.json"
+    },
+    {
+      "id": "london_southwark",
+      "name": "London",
+      "district": "Southwark / London Bridge",
+      "region": "London",
+      "lat": 51.5055,
+      "lon": -0.0904,
+      "radius_m": 900,
+      "buildings": 1829,
+      "with_epc": 0,
+      "estimated_from_ehs": 413,
+      "no_band": 1416,
+      "band_distribution": {
+        "A": 1,
+        "B": 25,
+        "C": 239,
+        "D": 123,
+        "E": 19,
+        "F": 5,
+        "G": 1
+      },
+      "data_file": "uk/buildings_london_southwark.json"
+    }
+  ]
+}

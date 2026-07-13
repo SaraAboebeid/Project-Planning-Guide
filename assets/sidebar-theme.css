@@ -117,9 +117,18 @@
 .layer-card,
 #search-results,
 #info-tooltip,
-.scb-year-sel {
+.scb-year-sel,
+#info-panel {
   background: var(--sb-surface) !important;
   border: 1px solid var(--sb-border) !important;
+}
+
+/* #info-panel sits inline in the sidebar (position:relative, not a floating
+   .panel), so it never picked up a dark background above - its --sb-text/
+   --sb-muted value colors were rendering on the light .panel default
+   (--surface: #FFFFFF from main.css), i.e. near-white text on white. */
+.tt-row {
+  border-bottom: 1px solid var(--sb-border) !important;
 }
 
 .stat-box {

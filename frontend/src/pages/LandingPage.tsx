@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
+import { COUNTRIES, LIBRARY_TABS, tabPathFor, pathForCountry, type CountryCode } from "../config/countryNav";
 
 // ── Inline SVG icon set ────────────────────────────────────────────────────
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
@@ -143,21 +144,6 @@ const RECENT_ACTIVITY = [
   { icon: "🚌", text: "Mobility data refreshed",        time: "1d ago" },
 ];
 
-// ── Country / city data ───────────────────────────────────────────────────
-const COUNTRIES = [
-  { id: "se", name: "Sweden",         cities: ["Stockholm", "Gothenburg", "Malmö"] },
-  { id: "gb", name: "United Kingdom", cities: [] },
-  { id: "be", name: "Belgium",        cities: [] },
-  { id: "ie", name: "Ireland",        cities: [] },
-];
-
-const LIBRARY_TABS = [
-  { label: "Pathways", path: "/pathways" },
-  { label: "Data Explorer", path: "/data" },
-  { label: "Analysis Tools", path: "/analysis" },
-  { label: "3D Viewer", path: "/viewer" },
-  { label: "Sample Reports", path: "/reports" },
-];
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function LandingPage() {
@@ -165,7 +151,7 @@ export default function LandingPage() {
   const location = useLocation();
   const reset = useWizardStore((s) => s.reset);
 
-  const [selectedCountry, setSelectedCountry] = useState("se");
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>("se");
   const [selectedCity, setSelectedCity]       = useState("Gothenburg");
   const [boplatsListings, setBoplatsListings] = useState<string>("-");
 
@@ -245,12 +231,13 @@ export default function LandingPage() {
           <div className="hidden lg:flex items-center gap-1 rounded-xl p-1"
                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
             {LIBRARY_TABS.map(tab => {
-              const isActive = location.pathname === tab.path;
+              const targetPath = tabPathFor(tab, selectedCountry);
+              const isActive = location.pathname === tab.path || location.pathname === targetPath;
               return (
                 <button
                   key={tab.label}
                   onClick={() => {
-                    navigate(tab.path);
+                    navigate(targetPath);
                   }}
                   className="px-2.5 py-1 rounded-lg border-0 cursor-pointer text-[10px] font-semibold whitespace-nowrap transition-all"
                   style={{
@@ -272,7 +259,15 @@ export default function LandingPage() {
               {COUNTRIES.map(c => (
                 <button
                   key={c.id}
-                  onClick={() => { setSelectedCountry(c.id); if (c.cities.length) setSelectedCity(c.cities[0]); }}
+                  onClick={() => {
+                    setSelectedCountry(c.id);
+                    if (c.cities.length) setSelectedCity(c.cities[0]);
+                    // Already viewing a page with a per-country build (Data
+                    // Explorer, 3D Viewer)? Swap straight to this country's
+                    // version instead of leaving the pill and the page out of sync.
+                    const swap = pathForCountry(location.pathname, c.id);
+                    if (swap) navigate(swap);
+                  }}
                   style={{
                     display: "flex", alignItems: "center", gap: 5,
                     padding: "4px 10px", borderRadius: 10, border: 0, cursor: "pointer",

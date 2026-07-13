@@ -1,4 +1,10 @@
-// country_profile.js — Sweden-first country insights, modular for more profiles
+// country_profile.js — country insights panel.
+//
+// The active country's KPIs are derived from what is actually loaded (window.DATA)
+// plus that country's national statistics file, so the panel always agrees with
+// the buildings on screen. Other countries fall back to a scaffold until their
+// data is wired up. A backend /api/country-profile response, when available,
+// overrides the derived values.
 (function initCountryProfilePanel() {
   const panel = document.getElementById('country-profile');
   if (!panel) return;
@@ -9,41 +15,81 @@
   const barsEl = document.getElementById('country-energy-bars');
   if (!tabsWrap || !summaryEl || !kpisEl || !barsEl) return;
 
-  const fallbackByCountry = {
-    se: {
-      country: 'se',
-      name: 'Sweden',
-      viewer: {
-        summary: 'Current active country profile for Gothenburg digital twin baseline.',
-        kpis: [
-          { key: 'buildings', label: '3D Buildings', value: 92973, unit: 'count' },
-          { key: 'epc_match', label: 'EPC Matched', value: 87712, unit: 'count' },
-          { key: 'tabula_match', label: 'TABULA Matched', value: 18744, unit: 'count' },
-          { key: 'boplats_listings', label: 'Boplats Listings', value: 379, unit: 'count' }
-        ],
-        energy_class_share: { A_B: 16, C_D: 43, E_G: 41 }
-      }
+  const ACTIVE = (window.VIEWER_COUNTRY || 'se').toLowerCase();
+
+  const scaffold = (name) => ({
+    viewer: {
+      summary: `${name} profile scaffold. Connect ${name} source metrics to activate KPIs.`,
+      kpis: [],
+      energy_class_share: {},
     },
-    gb: {
-      country: 'gb',
-      name: 'United Kingdom',
-      viewer: { summary: 'Profile scaffold ready. Connect UK source metrics to activate KPIs.', kpis: [], energy_class_share: {} }
-    },
-    be: {
-      country: 'be',
-      name: 'Belgium',
-      viewer: { summary: 'Profile scaffold ready. Connect Belgium source metrics to activate KPIs.', kpis: [], energy_class_share: {} }
-    },
-    ie: {
-      country: 'ie',
-      name: 'Ireland',
-      viewer: { summary: 'Profile scaffold ready. Connect Ireland source metrics to activate KPIs.', kpis: [], energy_class_share: {} }
+  });
+
+  const NAMES = { se: 'Sweden', gb: 'United Kingdom', be: 'Belgium', ie: 'Ireland' };
+
+  // ── Derive the active country's profile from the loaded buildings ─────────
+  function shareFromData(data) {
+    const counts = { A_B: 0, C_D: 0, E_G: 0 };
+    let total = 0;
+    for (const b of data) {
+      if (!b.eclass) continue;
+      total++;
+      if (b.eclass === 'A' || b.eclass === 'B') counts.A_B++;
+      else if (b.eclass === 'C' || b.eclass === 'D') counts.C_D++;
+      else counts.E_G++;
     }
-  };
+    if (!total) return {};
+    return {
+      A_B: Math.round((counts.A_B / total) * 100),
+      C_D: Math.round((counts.C_D / total) * 100),
+      E_G: Math.round((counts.E_G / total) * 100),
+    };
+  }
+
+  async function deriveActiveProfile() {
+    const data = window.DATA || [];
+    const city = window.VIEWER_CITY || {};
+    const kpis = [
+      { label: '3D Buildings', value: data.length, unit: 'count' },
+      { label: 'EPC Matched', value: data.filter(b => b.has_epc).length, unit: 'count' },
+    ];
+
+    let summary;
+
+    if (ACTIVE === 'gb') {
+      const estimated = data.filter(b => b.epc_source && b.epc_source.startsWith('ehs_prior')).length;
+      kpis.push({ label: 'EHS Estimated', value: estimated, unit: 'count' });
+
+      // National context from the English Housing Survey 2024-25.
+      try {
+        const res = await fetch('uk/ehs_2024_25.json', { cache: 'no-store' });
+        if (res.ok) {
+          const ehs = await res.json();
+          const sap = (ehs.kpis || []).find(k => k.label === 'Mean SAP rating');
+          const atC = (ehs.kpis || []).find(k => k.label && k.label.startsWith('Dwellings at EPC band C'));
+          if (sap) kpis.push({ label: 'Mean SAP (England)', value: sap.value, unit: 'raw' });
+          if (atC) kpis.push({ label: 'England at band C+', value: atC.value, unit: 'percent' });
+        }
+      } catch (_err) {
+        /* national context is optional; the viewer KPIs stand on their own */
+      }
+
+      summary =
+        `${city.name || 'UK'} — ${city.district || ''}. Bands from the Energy Performance of ` +
+        'Buildings Register where a certificate matches, otherwise estimated from English ' +
+        'Housing Survey 2024-25 distributions.';
+    } else {
+      kpis.push({ label: 'TABULA Matched', value: data.filter(b => b.tabula_period).length, unit: 'count' });
+      summary = 'Current active country profile for Gothenburg digital twin baseline.';
+    }
+
+    return { viewer: { summary, kpis, energy_class_share: shareFromData(data) } };
+  }
 
   function formatValue(value, unit) {
     if (typeof value !== 'number') return String(value ?? '-');
     if (unit === 'percent') return value.toFixed(0) + '%';
+    if (unit === 'raw') return String(value);
     return value.toLocaleString('en-US');
   }
 
@@ -95,28 +141,37 @@
 
   async function loadCountryProfile(countryCode) {
     setActiveCountryTab(countryCode);
-    summaryEl.textContent = 'Loading profile…';
+    summaryEl.textContent = 'Loading profile...';
     kpisEl.innerHTML = '';
     barsEl.innerHTML = '';
 
+    // The backend may serve a richer profile; if it is not running, derive the
+    // active country's figures locally rather than showing another country's.
     try {
       const res = await fetch('http://localhost:8000/api/country-profile?country=' + encodeURIComponent(countryCode), {
         cache: 'no-store'
       });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const profile = await res.json();
-      renderCountryProfile(profile);
+      if (res.ok) {
+        renderCountryProfile(await res.json());
+        return;
+      }
     } catch (_err) {
-      renderCountryProfile(fallbackByCountry[countryCode] || fallbackByCountry.se);
+      /* backend offline - fall through to locally derived figures */
+    }
+
+    if (countryCode === ACTIVE) {
+      renderCountryProfile(await deriveActiveProfile());
+    } else {
+      renderCountryProfile(scaffold(NAMES[countryCode] || countryCode.toUpperCase()));
     }
   }
 
   tabsWrap.addEventListener('click', (event) => {
     const btn = event.target.closest('button[data-country]');
     if (!btn) return;
-    const code = (btn.dataset.country || 'se').toLowerCase();
-    loadCountryProfile(code);
+    loadCountryProfile((btn.dataset.country || ACTIVE).toLowerCase());
   });
 
-  loadCountryProfile('se');
+  // Open on the country this viewer is actually showing.
+  loadCountryProfile(ACTIVE);
 })();

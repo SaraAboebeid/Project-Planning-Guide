@@ -1,0 +1,394 @@
+{
+  "source": "Annex Table 2.4: Energy efficiency rating bands, by dwelling characteristics, 2024",
+  "dataset": "English Housing Survey 2024-25, Chapter 2 (Energy Efficiency)",
+  "publisher": "Ministry of Housing, Communities & Local Government",
+  "licence": "Open Government Licence v3.0",
+  "note": "EHS publishes bands collapsed to A/B, C, D, E, F/G. A/B and F/G are split into 7-band form using AB_SPLIT={'A': 0.03, 'B': 0.97} and FG_SPLIT={'F': 0.7, 'G': 0.3}, derived from the shape of the national EPC register.",
+  "priors": {
+    "dwelling age": {
+      "pre-1919": {
+        "bands": {
+          "A": 8e-05,
+          "B": 0.00257,
+          "C": 0.26523,
+          "D": 0.49224,
+          "E": 0.1693,
+          "F": 0.0494,
+          "G": 0.02117
+        },
+        "dwellings_thousands": 5154.1,
+        "sample_size": 2521.0
+      },
+      "1919-44": {
+        "bands": {
+          "A": 0.00015,
+          "B": 0.00478,
+          "C": 0.39288,
+          "D": 0.52678,
+          "E": 0.0538,
+          "F": 0.01513,
+          "G": 0.00648
+        },
+        "dwellings_thousands": 3683.0,
+        "sample_size": 1940.0
+      },
+      "1945-64": {
+        "bands": {
+          "A": 0.00061,
+          "B": 0.0197,
+          "C": 0.52561,
+          "D": 0.38984,
+          "E": 0.04088,
+          "F": 0.01636,
+          "G": 0.00701
+        },
+        "dwellings_thousands": 4481.7,
+        "sample_size": 3110.0
+      },
+      "1965-80": {
+        "bands": {
+          "A": 0.00076,
+          "B": 0.02464,
+          "C": 0.58967,
+          "D": 0.32365,
+          "E": 0.04022,
+          "F": 0.01475,
+          "G": 0.00632
+        },
+        "dwellings_thousands": 4881.5,
+        "sample_size": 3233.0
+      },
+      "1981-90": {
+        "bands": {
+          "A": 0.00125,
+          "B": 0.04049,
+          "C": 0.67321,
+          "D": 0.22398,
+          "E": 0.03903,
+          "F": 0.01542,
+          "G": 0.00661
+        },
+        "dwellings_thousands": 1771.8,
+        "sample_size": 1168.0
+      },
+      "1991-2002": {
+        "bands": {
+          "A": 0.0012,
+          "B": 0.03891,
+          "C": 0.72153,
+          "D": 0.2032,
+          "E": 0.03516,
+          "F": 0.0,
+          "G": 0.0
+        },
+        "dwellings_thousands": 2214.7,
+        "sample_size": 1304.0
+      },
+      "2003-2013": {
+        "bands": {
+          "A": 0.00431,
+          "B": 0.13934,
+          "C": 0.75913,
+          "D": 0.08566,
+          "E": 0.01155,
+          "F": 0.0,
+          "G": 0.0
+        },
+        "dwellings_thousands": 1696.1,
+        "sample_size": 931.0
+      },
+      "post-2013": {
+        "bands": {
+          "A": 0.0073,
+          "B": 0.23596,
+          "C": 0.69472,
+          "D": 0.05589,
+          "E": 0.00613,
+          "F": 0.0,
+          "G": 0.0
+        },
+        "dwellings_thousands": 1733.2,
+        "sample_size": 712.0
+      }
+    },
+    "dwelling type": {
+      "small terraced house": {
+        "bands": {
+          "A": 0.00027,
+          "B": 0.00885,
+          "C": 0.50441,
+          "D": 0.40261,
+          "E": 0.05338,
+          "F": 0.02133,
+          "G": 0.00914
+        },
+        "dwellings_thousands": 2355.0,
+        "sample_size": 1479.0
+      },
+      "medium/large terraced house": {
+        "bands": {
+          "A": 0.00069,
+          "B": 0.02244,
+          "C": 0.53172,
+          "D": 0.36574,
+          "E": 0.05991,
+          "F": 0.01365,
+          "G": 0.00585
+        },
+        "dwellings_thousands": 4747.1,
+        "sample_size": 2558.0
+      },
+      "semi-detached house": {
+        "bands": {
+          "A": 0.0008,
+          "B": 0.026,
+          "C": 0.4883,
+          "D": 0.40933,
+          "E": 0.05187,
+          "F": 0.01659,
+          "G": 0.00711
+        },
+        "dwellings_thousands": 6300.0,
+        "sample_size": 3378.0
+      },
+      "detached house": {
+        "bands": {
+          "A": 0.00184,
+          "B": 0.05943,
+          "C": 0.48457,
+          "D": 0.31601,
+          "E": 0.09465,
+          "F": 0.03045,
+          "G": 0.01305
+        },
+        "dwellings_thousands": 4585.8,
+        "sample_size": 2158.0
+      },
+      "bungalow": {
+        "bands": {
+          "A": 0.00088,
+          "B": 0.02835,
+          "C": 0.39539,
+          "D": 0.46795,
+          "E": 0.06825,
+          "F": 0.02743,
+          "G": 0.01176
+        },
+        "dwellings_thousands": 1984.0,
+        "sample_size": 1559.0
+      },
+      "converted flat": {
+        "bands": {
+          "A": 0.00011,
+          "B": 0.00358,
+          "C": 0.44188,
+          "D": 0.35224,
+          "E": 0.14757,
+          "F": 0.03823,
+          "G": 0.01639
+        },
+        "dwellings_thousands": 1023.3,
+        "sample_size": 559.0
+      },
+      "purpose built flat, low rise": {
+        "bands": {
+          "A": 0.00259,
+          "B": 0.08371,
+          "C": 0.66826,
+          "D": 0.19967,
+          "E": 0.03572,
+          "F": 0.00703,
+          "G": 0.00301
+        },
+        "dwellings_thousands": 4051.7,
+        "sample_size": 2902.0
+      },
+      "purpose built flat, high rise": {
+        "bands": {
+          "A": 0.00436,
+          "B": 0.14083,
+          "C": 0.66317,
+          "D": 0.14667,
+          "E": 0.04498,
+          "F": 0.0,
+          "G": 0.0
+        },
+        "dwellings_thousands": 566.6,
+        "sample_size": 326.0
+      }
+    },
+    "tenure": {
+      "owner occupied": {
+        "bands": {
+          "A": 0.00129,
+          "B": 0.04164,
+          "C": 0.48989,
+          "D": 0.36748,
+          "E": 0.06756,
+          "F": 0.0225,
+          "G": 0.00964
+        },
+        "dwellings_thousands": 16499.5,
+        "sample_size": 7089.0
+      },
+      "private rented": {
+        "bands": {
+          "A": 0.00088,
+          "B": 0.02851,
+          "C": 0.4797,
+          "D": 0.37324,
+          "E": 0.08882,
+          "F": 0.0202,
+          "G": 0.00866
+        },
+        "dwellings_thousands": 4909.9,
+        "sample_size": 2913.0
+      },
+      "local authority": {
+        "bands": {
+          "A": 0.00109,
+          "B": 0.03534,
+          "C": 0.67717,
+          "D": 0.26783,
+          "E": 0.01338,
+          "F": 0.00363,
+          "G": 0.00155
+        },
+        "dwellings_thousands": 1589.3,
+        "sample_size": 2028.0
+      },
+      "housing association": {
+        "bands": {
+          "A": 0.00188,
+          "B": 0.06089,
+          "C": 0.69346,
+          "D": 0.21835,
+          "E": 0.02117,
+          "F": 0.00298,
+          "G": 0.00128
+        },
+        "dwellings_thousands": 2618.8,
+        "sample_size": 2889.0
+      }
+    },
+    "region": {
+      "North East": {
+        "bands": {
+          "A": 0.00106,
+          "B": 0.03413,
+          "C": 0.60597,
+          "D": 0.31731,
+          "E": 0.03079,
+          "F": 0.00752,
+          "G": 0.00322
+        },
+        "dwellings_thousands": 1282.2,
+        "sample_size": 872.0
+      },
+      "North West": {
+        "bands": {
+          "A": 0.00104,
+          "B": 0.03352,
+          "C": 0.52197,
+          "D": 0.35649,
+          "E": 0.05931,
+          "F": 0.01938,
+          "G": 0.0083
+        },
+        "dwellings_thousands": 3423.2,
+        "sample_size": 1694.0
+      },
+      "Yorkshire and the Humber": {
+        "bands": {
+          "A": 0.00123,
+          "B": 0.03978,
+          "C": 0.47399,
+          "D": 0.39204,
+          "E": 0.07759,
+          "F": 0.01076,
+          "G": 0.00461
+        },
+        "dwellings_thousands": 2551.3,
+        "sample_size": 1714.0
+      },
+      "East Midlands": {
+        "bands": {
+          "A": 0.00096,
+          "B": 0.03091,
+          "C": 0.50453,
+          "D": 0.37258,
+          "E": 0.0699,
+          "F": 0.01479,
+          "G": 0.00634
+        },
+        "dwellings_thousands": 2230.7,
+        "sample_size": 1148.0
+      },
+      "West Midlands": {
+        "bands": {
+          "A": 0.00148,
+          "B": 0.04778,
+          "C": 0.49785,
+          "D": 0.35335,
+          "E": 0.07266,
+          "F": 0.01882,
+          "G": 0.00806
+        },
+        "dwellings_thousands": 2605.0,
+        "sample_size": 1296.0
+      },
+      "East of England": {
+        "bands": {
+          "A": 0.00135,
+          "B": 0.04378,
+          "C": 0.53153,
+          "D": 0.33349,
+          "E": 0.05162,
+          "F": 0.02676,
+          "G": 0.01147
+        },
+        "dwellings_thousands": 2864.8,
+        "sample_size": 1818.0
+      },
+      "London": {
+        "bands": {
+          "A": 0.0013,
+          "B": 0.04208,
+          "C": 0.54904,
+          "D": 0.36371,
+          "E": 0.03808,
+          "F": 0.00405,
+          "G": 0.00174
+        },
+        "dwellings_thousands": 3795.4,
+        "sample_size": 1580.0
+      },
+      "South East": {
+        "bands": {
+          "A": 0.00127,
+          "B": 0.04098,
+          "C": 0.53544,
+          "D": 0.32203,
+          "E": 0.06013,
+          "F": 0.0281,
+          "G": 0.01204
+        },
+        "dwellings_thousands": 4173.4,
+        "sample_size": 2866.0
+      },
+      "South West": {
+        "bands": {
+          "A": 0.00153,
+          "B": 0.04942,
+          "C": 0.48075,
+          "D": 0.31005,
+          "E": 0.11092,
+          "F": 0.03313,
+          "G": 0.0142
+        },
+        "dwellings_thousands": 2691.4,
+        "sample_size": 1931.0
+      }
+    }
+  }
+}

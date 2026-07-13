@@ -1,5 +1,15 @@
-// Viewer bootstrap: loads the compact data payload and then wires the legacy
-// viewer scripts in their existing order.
+// Viewer bootstrap: resolves the active country/city, loads that location's
+// building payload, then wires the viewer scripts in their existing order.
+//
+// VIEWER_PROFILE is emitted per country by build.py (see gothenburg_3d.meta.js /
+// uk_3d.meta.js). The country decides which data layers exist; the city decides
+// where the camera starts and which payload to fetch. Both can be overridden from
+// the query string, which is how the React MapViewer pages switch cities:
+//
+//     /uk_3d.html?city=birmingham
+//
+// Everything downstream reads window.VIEW_CENTER and window.VIEWER_CITY rather
+// than a build-time constant, so one viewer serves every location.
 
 (async function bootViewer() {
   if (window.location.protocol === 'file:') {
@@ -16,6 +26,27 @@
   }
 
   const versionSuffix = typeof VIEWER_BUILD_VERSION === 'string' ? `?v=${encodeURIComponent(VIEWER_BUILD_VERSION)}` : '';
+
+  // ── Resolve the active location ────────────────────────────────────────
+  // Falls back to a single Gothenburg city so a profile-less build still boots.
+  const profile = (typeof VIEWER_PROFILE !== 'undefined' && VIEWER_PROFILE) || {
+    country: 'se',
+    cities: [{ id: 'gothenburg', name: 'Gothenburg', lat: MAP_CENTER.lat, lon: MAP_CENTER.lon, data_file: 'buildings.json' }],
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const wanted = (params.get('city') || '').toLowerCase();
+  const city = profile.cities.find(c => c.id === wanted) || profile.cities[0];
+
+  window.VIEWER_PROFILE = profile;
+  window.VIEWER_COUNTRY = profile.country;
+  window.VIEWER_CITY = city;
+  window.VIEW_CENTER = { lon: city.lon, lat: city.lat };
+  window.VIEW_HEIGHT = city.camera_height || 800;
+
+  // Country gates the Sweden-only layers (Västtrafik, SCB) via CSS.
+  document.body.setAttribute('data-country', profile.country);
+
   const loadScript = (src) => new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = `${src}${versionSuffix}`;
@@ -25,15 +56,18 @@
     document.head.appendChild(script);
   });
 
-  const response = await fetch(`buildings.json${versionSuffix}`, { cache: 'no-store' });
+  const dataUrl = city.data_file || 'buildings.json';
+  const response = await fetch(`${dataUrl}${versionSuffix}`, { cache: 'no-store' });
   if (!response.ok) {
-    throw new Error(`Could not load buildings.json (${response.status})`);
+    throw new Error(`Could not load ${dataUrl} (${response.status})`);
   }
 
   const records = await response.json();
   // Keep a single in-memory copy; avoid re-serializing a very large payload.
   window.DATA = records;
 
+  // Västtrafik and SCB are Swedish services with no UK equivalent, so they are
+  // only loaded for Sweden rather than left to fail at runtime.
   const scripts = [
     'viewer/js/legend.js',
     'viewer/js/cesium.js',
@@ -42,10 +76,12 @@
     'viewer/js/facade_inspector.js',
     'viewer/js/search.js',
     'viewer/js/roads.js',
-    'viewer/js/trafik_canvas.js',
-    'viewer/js/vasttrafik.js',
+    ...(profile.country === 'se'
+      ? ['viewer/js/trafik_canvas.js', 'viewer/js/vasttrafik.js']
+      : []),
     'viewer/js/layers.js',
-    'viewer/js/scb_layers.js',
+    ...(profile.country === 'se' ? ['viewer/js/scb_layers.js'] : []),
+    'viewer/js/city_switcher.js',
     'viewer/js/country_profile.js',
   ];
 
