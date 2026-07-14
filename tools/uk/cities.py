@@ -27,6 +27,7 @@ CITIES = [
         "lon": -0.1235,
         "radius_m": 900,
         "local_authority": "Camden",
+        "eubucco_file": "UKI3.parquet",  # Inner London - West (NUTS2)
     },
     {
         "id": "london_westminster",
@@ -37,6 +38,7 @@ CITIES = [
         "lon": -0.1341,
         "radius_m": 900,
         "local_authority": "Westminster",
+        "eubucco_file": "UKI3.parquet",  # Inner London - West (NUTS2)
     },
     {
         "id": "london_canary_wharf",
@@ -47,6 +49,7 @@ CITIES = [
         "lon": -0.0235,
         "radius_m": 900,
         "local_authority": "Tower Hamlets",
+        "eubucco_file": "UKI4.parquet",  # Inner London - East (NUTS2)
     },
     {
         "id": "london_southwark",
@@ -57,6 +60,7 @@ CITIES = [
         "lon": -0.0904,
         "radius_m": 900,
         "local_authority": "Southwark",
+        "eubucco_file": "UKI4.parquet",  # Inner London - East (NUTS2)
     },
     {
         "id": "birmingham",
@@ -67,6 +71,7 @@ CITIES = [
         "lon": -1.8904,
         "radius_m": 1200,
         "local_authority": "Birmingham",
+        "eubucco_file": "UKG3.parquet",  # West Midlands metropolitan county (NUTS2)
     },
     {
         "id": "nottingham",
@@ -77,6 +82,7 @@ CITIES = [
         "lon": -1.1500,
         "radius_m": 1200,
         "local_authority": "Nottingham",
+        "eubucco_file": "UKF1.parquet",  # Derbyshire and Nottinghamshire (NUTS2)
     },
 ]
 

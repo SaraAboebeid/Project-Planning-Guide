@@ -414,7 +414,7 @@ def build_uk(build_version, css):
         if os.path.exists(src):
             shutil.copy(src, os.path.join("assets", c["data_file"]))
     for extra in ("cities.json", "ehs_2024_25.json", "epc_band_priors.json",
-                  "retrofit_cost_band_c.json"):
+                  "retrofit_cost_band_c.json", "tabula_gb.json"):
         src = os.path.join("frontend/public/uk", extra)
         if os.path.exists(src):
             shutil.copy(src, os.path.join("assets/uk", extra))

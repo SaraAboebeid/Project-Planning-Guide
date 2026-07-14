@@ -18,6 +18,20 @@ or drop it in a .env file at the repo root as UK_EPC_API_TOKEN=...
 Without a token the certificate lookups return nothing and the buildings pipeline
 falls back to English Housing Survey band priors (see ingest_ehs.py).
 
+Endpoint contract (verified against the authoritative spec, not scraped doc prose):
+  https://github.com/communitiesuk/epb-data-warehouse/blob/main/api/api.yml
+  GET /api/domestic/search?postcode=...&current_page=1&page_size=5000
+  -> {"data": [{addressLine1..4, uprn, certificateNumber, constituency, council,
+                currentEnergyEfficiencyBand, postTown, postcode, registrationDate,
+                schemaType}], "pagination": {totalPages, nextPage, ...}}
+
+Search results carry the band but NOT floor area / property type / age band / SAP
+score - those only exist on the full certificate document, fetched separately via
+GET /api/certificate?certificate_number=... (schema is `additionalProperties: true`
+in the spec, i.e. not fixed - fetch_certificate_detail() below tries the standard
+EPC register column names but has not been verified against a live response, since
+building this required no token).
+
 Usage:
     python tools/uk/ingest_epc.py --postcodes NG1 5FS, NG1 6AA
     python tools/uk/ingest_epc.py --city nottingham
@@ -47,10 +61,12 @@ CACHE_DIR = RAW_DIR / "epc_cache"
 BASE_URL = "https://api.get-energy-performance-data.communities.gov.uk"
 SEARCH_DOMESTIC = f"{BASE_URL}/api/domestic/search"
 
-# The service throttles at 6000 requests / 5 minutes per IP and answers 429 when
-# exceeded. One request per postcode keeps us far below that, but back off anyway.
-RATE_LIMIT_SLEEP = 0.12
-MAX_RETRIES = 4
+# The docs advertise 6000 requests / 5 minutes per IP, but in practice a much
+# tighter burst limit kicks in well before that (observed 429s after ~25-175
+# requests even at a 0.5s pace, and it doesn't clear within a couple of minutes
+# of backoff - this looks like a short rolling window, not the advertised one).
+RATE_LIMIT_SLEEP = 2.0
+MAX_RETRIES = 8
 
 TOKEN_ENV = "UK_EPC_API_TOKEN"
 
@@ -75,7 +91,10 @@ def have_token() -> bool:
 
 def norm_postcode(pc: str) -> str:
     """'ng1  5fs' -> 'NG1 5FS'. UK postcodes always split 'outward inward(3)'."""
-    s = re.sub(r"\s+", "", str(pc or "")).upper()
+    # OSM's ";"-joined multi-value tags occasionally leak in here; take the
+    # first value rather than send the API a garbled combined string.
+    raw = str(pc or "").split(";")[0]
+    s = re.sub(r"\s+", "", raw).upper()
     if len(s) < 5:
         return s
     return f"{s[:-3]} {s[-3:]}"
@@ -101,11 +120,41 @@ def _num(v):
         return None
 
 
-# The API returns snake_case fields; the bulk CSV uses the same names. Keep only
-# what the viewer and the data explorer actually show.
+# GET /api/domestic/search returns EnergyCertificateSearchResult objects - band and
+# identity fields only, in camelCase. See the module docstring for where the
+# fuller fields (floor area, property type, age band, SAP score) actually live.
 def _row(rec: dict) -> dict:
+    address_lines = [rec.get(f"addressLine{i}") for i in range(1, 5)]
     return {
-        "lmk_key": rec.get("lmk-key") or rec.get("lmk_key"),
+        "certificate_number": rec.get("certificateNumber"),
+        "uprn": str(rec.get("uprn") or "").strip() or None,
+        "postcode": norm_postcode(rec.get("postcode")),
+        "address": ", ".join(p for p in address_lines if p),
+        "house": norm_house(address_lines[0]),
+        "band": _band(rec.get("currentEnergyEfficiencyBand")),
+        "council": rec.get("council"),
+        "constituency": rec.get("constituency"),
+        "post_town": rec.get("postTown"),
+        "registration_date": rec.get("registrationDate"),
+        # Populated only if fetch_certificate_detail() was called for this row.
+        "band_potential": None,
+        "sap": None,
+        "sap_potential": None,
+        "property_type": None,
+        "built_form": None,
+        "age_band": None,
+        "floor_area_m2": None,
+        "co2_t_per_yr": None,
+        "inspection_date": None,
+    }
+
+
+# The bulk CSV export uses the classic EPC register column names (lowercase,
+# hyphenated), a different convention from the JSON API - and unlike the search
+# API, the bulk file carries every field on one row.
+def _row_from_csv(rec: dict) -> dict:
+    return {
+        "certificate_number": rec.get("lmk-key"),
         "uprn": str(rec.get("uprn") or "").strip() or None,
         "postcode": norm_postcode(rec.get("postcode")),
         "address": ", ".join(
@@ -113,24 +162,58 @@ def _row(rec: dict) -> dict:
         )
         or rec.get("address"),
         "house": norm_house(rec.get("address1") or rec.get("address")),
-        "band": _band(rec.get("current-energy-rating") or rec.get("current_energy_rating")),
-        "band_potential": _band(
-            rec.get("potential-energy-rating") or rec.get("potential_energy_rating")
-        ),
-        "sap": _num(rec.get("current-energy-efficiency") or rec.get("current_energy_efficiency")),
-        "sap_potential": _num(
-            rec.get("potential-energy-efficiency") or rec.get("potential_energy_efficiency")
-        ),
-        "property_type": rec.get("property-type") or rec.get("property_type"),
-        "built_form": rec.get("built-form") or rec.get("built_form"),
-        "age_band": rec.get("construction-age-band") or rec.get("construction_age_band"),
-        "floor_area_m2": _num(
-            rec.get("total-floor-area") or rec.get("total_floor_area")
-        ),
-        "co2_t_per_yr": _num(
-            rec.get("co2-emissions-current") or rec.get("co2_emissions_current")
-        ),
-        "inspection_date": rec.get("inspection-date") or rec.get("inspection_date"),
+        "band": _band(rec.get("current-energy-rating")),
+        "band_potential": _band(rec.get("potential-energy-rating")),
+        "sap": _num(rec.get("current-energy-efficiency")),
+        "sap_potential": _num(rec.get("potential-energy-efficiency")),
+        "property_type": rec.get("property-type"),
+        "built_form": rec.get("built-form"),
+        "age_band": rec.get("construction-age-band"),
+        "floor_area_m2": _num(rec.get("total-floor-area")),
+        "co2_t_per_yr": _num(rec.get("co2-emissions-current")),
+        "inspection_date": rec.get("inspection-date"),
+        "council": None,
+        "constituency": None,
+        "post_town": None,
+        "registration_date": None,
+    }
+
+
+def fetch_certificate_detail(certificate_number: str, token: str, session: requests.Session) -> dict:
+    """
+    GET /api/certificate?certificate_number=... - the full document, for the
+    fields the search endpoint doesn't carry (floor area, property type, age
+    band, SAP score). The spec declares this schema `additionalProperties: true`
+    (i.e. unfixed), so this tries the standard EPC register column names and
+    returns {} for anything not found - not yet verified against a live response.
+    """
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    r = session.get(
+        f"{BASE_URL}/api/certificate",
+        params={"certificate_number": certificate_number},
+        headers=headers,
+        timeout=30,
+    )
+    if r.status_code != 200:
+        return {}
+    doc = (r.json() or {}).get("data") or {}
+
+    def g(*keys):
+        for k in keys:
+            if k in doc and doc[k] not in (None, ""):
+                return doc[k]
+        return None
+
+    return {
+        "band_potential": _band(g("potential-energy-rating", "potentialEnergyRating")),
+        "sap": _num(g("current-energy-efficiency", "currentEnergyEfficiency")),
+        "sap_potential": _num(g("potential-energy-efficiency", "potentialEnergyEfficiency")),
+        "property_type": g("property-type", "propertyType"),
+        "built_form": g("built-form", "builtForm"),
+        "age_band": g("construction-age-band", "constructionAgeBand"),
+        "floor_area_m2": _num(g("total-floor-area", "totalFloorArea")),
+        "co2_t_per_yr": _num(g("co2-emissions-current", "co2EmissionsCurrent")),
+        "inspection_date": g("inspection-date", "inspectionDate"),
     }
 
 
@@ -143,42 +226,68 @@ def fetch_postcode(postcode: str, token: str, session: requests.Session) -> list
         return json.loads(cache.read_text(encoding="utf-8"))
 
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-    for attempt in range(MAX_RETRIES):
-        r = session.get(
-            SEARCH_DOMESTIC, params={"postcode": pc}, headers=headers, timeout=45
-        )
-        if r.status_code == 429:
-            wait = 2 ** attempt * 5
-            print(f"    rate limited on {pc}; backing off {wait}s")
-            time.sleep(wait)
-            continue
-        if r.status_code in (401, 403):
-            raise SystemExit(
-                f"EPC API rejected the token ({r.status_code}). Check {TOKEN_ENV}; "
-                "get a bearer token from your account page at "
-                "https://get-energy-performance-data.communities.gov.uk"
+    rows: list[dict] = []
+    page = 1
+    while True:
+        for attempt in range(MAX_RETRIES):
+            r = session.get(
+                SEARCH_DOMESTIC,
+                params={"postcode": pc, "current_page": page, "page_size": 5000},
+                headers=headers,
+                timeout=45,
             )
-        if r.status_code == 404:
-            rows = []
+            if r.status_code == 429:
+                retry_after = r.headers.get("Retry-After")
+                wait = float(retry_after) if retry_after else min(2 ** attempt * 5, 60)
+                print(f"    rate limited on {pc}; backing off {wait:.0f}s (attempt {attempt + 1}/{MAX_RETRIES})")
+                time.sleep(wait)
+                continue
+            if r.status_code in (401, 403):
+                raise SystemExit(
+                    f"EPC API rejected the token ({r.status_code}). Check {TOKEN_ENV}; "
+                    "get a bearer token from your account page at "
+                    "https://get-energy-performance-data.communities.gov.uk"
+                )
+            if r.status_code == 404:
+                payload = {"data": []}
+                break
+            if r.status_code == 400 and page > 1:
+                # Seen on at least one postcode (E14 6HJ): the API returns a
+                # `nextPage` value that itself then 400s - page_size=5000 is far
+                # above any real postcode's certificate count anyway, so treat
+                # this as "no more pages" rather than losing the whole postcode.
+                print(f"    {pc} page {page} rejected (400) - stopping pagination, keeping page(s) already fetched")
+                payload = {"data": [], "pagination": {}}
+                break
+            r.raise_for_status()
+            payload = r.json()
             break
-        r.raise_for_status()
-        payload = r.json()
-        # The service wraps results; tolerate either shape.
-        raw = payload.get("rows") or payload.get("data") or payload.get("results") or []
-        if isinstance(raw, dict):
-            raw = raw.get("rows") or []
-        rows = [_row(x) for x in raw]
-        break
-    else:
-        raise SystemExit(f"EPC API kept rate limiting on {pc}; try again later")
+        else:
+            raise SystemExit(f"EPC API kept rate limiting on {pc}; try again later")
+
+        raw = payload.get("data") or []
+        rows.extend(_row(x) for x in raw)
+        pagination = payload.get("pagination") or {}
+        if not pagination.get("nextPage"):
+            break
+        page = pagination["nextPage"]
+        time.sleep(RATE_LIMIT_SLEEP)
 
     cache.write_text(json.dumps(rows), encoding="utf-8")
     time.sleep(RATE_LIMIT_SLEEP)
     return rows
 
 
-def fetch_postcodes(postcodes) -> list[dict]:
-    """Certificates for many postcodes. Returns [] (with a warning) if no token."""
+def fetch_postcodes(postcodes, with_details: bool = True) -> list[dict]:
+    """
+    Certificates for many postcodes. Returns [] (with a warning) if no token.
+
+    with_details=True makes one extra GET /api/certificate call per matched
+    certificate to fill in floor area / property type / age band / SAP score,
+    which the search endpoint doesn't carry. That's an N+1 pattern - fine at
+    city-district scale (a few thousand certificates), but set False to skip
+    it if you only need the band.
+    """
     token = _token()
     pcs = sorted({norm_postcode(p) for p in postcodes if p})
     if not token:
@@ -197,6 +306,17 @@ def fetch_postcodes(postcodes) -> list[dict]:
         out.extend(rows)
         if i % 25 == 0 or i == len(pcs):
             print(f"    EPC {i}/{len(pcs)} postcodes, {len(out):,} certificates")
+
+    if with_details and out:
+        print(f"    fetching full details for {len(out):,} certificates ...")
+        for i, row in enumerate(out, 1):
+            if not row.get("certificate_number"):
+                continue
+            row.update(fetch_certificate_detail(row["certificate_number"], token, session))
+            time.sleep(RATE_LIMIT_SLEEP)
+            if i % 100 == 0 or i == len(out):
+                print(f"      {i}/{len(out)}")
+
     return out
 
 
@@ -213,7 +333,7 @@ def load_csv(path: Path, postcodes=None) -> list[dict]:
         for rec in csv.DictReader(f):
             if want and norm_postcode(rec.get("postcode")) not in want:
                 continue
-            out.append(_row(rec))
+            out.append(_row_from_csv(rec))
     print(f"  read {len(out):,} certificates from {path.name}")
     return out
 

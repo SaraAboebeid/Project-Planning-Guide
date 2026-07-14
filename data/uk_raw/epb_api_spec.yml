@@ -1,0 +1,1615 @@
+openapi: 3.0.4
+
+info:
+  title: Energy Performance of Buildings Data API
+  description: Public API for EPB Data integrations
+  contact:
+    name: MHCLG Digital helpdesk (prefix email subject with "EPB")
+    email: mhclg.digital-services@communities.gov.uk
+  version: 0.0.1
+
+servers:
+  - url: 'https://api.get-energy-performance-data.communities.gov.uk'
+    description: Base URL for the Energy Performance of Buildings Data API
+
+tags:
+  - name: Domestic
+    description: Domestic property operations
+  - name: Delta
+    description: EPC changes between 2 dates
+  - name: Data
+    description: EPC certificate data
+  - name: Files
+    description: Bulk Certificate file downloads
+  - name: Codes
+    description: EPC data codes
+
+paths:
+  /api/certificate:
+    get:
+      tags:
+        - Data
+      summary: /api/certificate
+      description: |-
+        Fetch a certificate
+
+      operationId: fetch-certificate
+      security:
+        - bearerToken: []
+      parameters:
+        - in: query
+          name: certificate_number
+          description: The certificate number to fetch
+          required: true
+          schema:
+            type: string
+            example: "0000-1672-0000-1732-0000"
+      responses:
+        '200':
+          description: Successful response returning an EPC document in JSON format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateResponse'
+        '404':
+          description: Certificate not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Certificate not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                errors:
+                  - code: "Unexpected error message here"
+
+  /api/codes:
+    get:
+      tags:
+        - Codes
+      summary: /api/codes
+      description: |-
+       Fetch a list of codes currently available from which you can query for more info
+      operationId: look-up-codes
+      security:
+        - bearerToken: [ ]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodesResponse'
+
+  /api/codes/info:
+    get:
+      tags:
+        - Codes
+      summary: /api/codes/info
+      description: |-
+        Fetch the value(s) for a code by key and/or schema version
+      operationId: look-up-codes-values
+      security:
+        - bearerToken: [ ]
+      parameters:
+        - in: query
+          name: code
+          description: One of the codes provided by the /api/codes/ endpoint
+          required: true
+          schema:
+            type: string
+            example: 'built_form'
+        - in: query
+          name: key
+          description: the key found as a value in EPC data
+          required: false
+          schema:
+            type: string
+            example: '1'
+        - in: query
+          name: schemaVersion
+          description: the EPC schema version
+          required: false
+          schema:
+            type: string
+            example: 'RdSAP-Schema-17.0'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeInfoResponse'
+
+  /api/deltas:
+    get:
+      tags:
+        - Delta
+      summary: Search certificates that have changed between two dates
+      description: |-
+        Search EPCs changes between date_start and date_end
+      operationId: delta-certificates
+      security:
+        - bearerToken: []
+      parameters:
+        - in: query
+          name: date_start
+          description: The start date for the date range of the search (YYYY-mm-dd)
+          required: true
+          schema:
+            type: string
+            format: date
+            example: '2020-04-10'
+        - in: query
+          name: date_end
+          description: The end date for the date range of the search (YYYY-mm-dd)
+          required: true
+          schema:
+            type: string
+            format: date
+            example: '2020-5-10'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeltaResponse'
+
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_date_range:
+                  summary: Invalid or missing date range
+                  value:
+                    error: "The search query was invalid - please provide a valid date range"
+                includes_today:
+                  summary: Date range should not include today
+                  value:
+                    error: "The search query was invalid - the date cannot include today"
+
+        '404':
+          description: No data found for the query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "No audit logs could be found for that query"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                errors:
+                  - code: "Unexpected error message here"
+
+  /api/domestic/search:
+    get:
+      tags:
+        - Search
+        - Domestic
+      summary: Search for domestic certificates
+      description: |-
+        Search EPCs by
+          - date_start and date_end
+          - multiple councils
+          - multiple constituencies
+          - a postcode
+          - UPRN
+          - multiple efficiency rating bands
+          - a partial address
+      operationId: domestic-search-certificates
+      security:
+        - bearerToken: []
+      parameters:
+        - in: query
+          name: date_start
+          description: The start date for the date range of the search (YYYY-mm-dd) required if no other search option is specified
+          schema:
+            type: string
+            format: date
+            example: '2025-07-10'
+        - in: query
+          name: date_end
+          description: The end date for the date range of the search (YYYY-mm-dd) required if no other search option is specified, defaults to yesterday if not provided
+          schema:
+            type: string
+            format: date
+            example: '2025-08-10'
+        - in: query
+          name: council[]
+          description: A local authority name
+          schema:
+            type: array
+            items:
+              type: string
+            example: ['Manchester', 'Birmingham']
+        - in: query
+          name: constituency[]
+          description: A parliamentary constituency
+          schema:
+            type: array
+            items:
+              type: string
+            example: ['Aldershot', 'Banbury']
+        - in: query
+          name: postcode
+          description: The postcode
+          schema:
+            type: string
+            example: 'FL23 4JA'
+        - in: query
+          name: uprn
+          description: The UPRN (unique property reference number) for a property
+          schema:
+            type: integer
+            example: 100023336956
+        - in: query
+          name: efficiency_rating[]
+          description: An efficiency rating band
+          schema:
+            type: array
+            items:
+              type: string
+            example: ['A', 'B', 'C']
+        - in: query
+          name: address
+          description: A partial or full address
+          schema:
+            type: string
+          example: '9 new union'
+        - in: query
+          name: current_page
+          description: The page number for search result pagination
+          schema:
+            type: integer
+          example: 1
+        - in: query
+          name: page_size
+          description: The number of rows returned for each page (Max size is 5000)
+          schema:
+            type: integer
+          example: 5000
+      responses:
+        '200':
+          description: Certificate search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateSearchResult'
+              example:
+                data:
+                  - addressLine1: "1 Some Street"
+                    addressLine2: null
+                    addressLine3: null
+                    addressLine4: null
+                    uprn: 100121241798
+                    certificateNumber: "0000-0000-0000-0000-0000"
+                    constituency: "Chelsea and Fulham"
+                    council: "Hammersmith and Fulham"
+                    currentEnergyEfficiencyBand: "B"
+                    postTown: "Whitbury"
+                    postcode: "SW10 0AA"
+                    registrationDate: "2020-05-04"
+                    schemaType: "RdSAP-Schema-20.0.0"
+                pagination:
+                  totalRecords: 4
+                  currentPage: 1
+                  totalPages: 1
+                  nextPage: null
+                  prevPage: null
+                  pageSize: 5000
+        '400':
+          description: Bad request - missing or malformed parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_params:
+                  summary: Missing search parameters
+                  value:
+                    error: "The search query was invalid - please provide a valid date range or search parameter"
+                invalid_dates:
+                  summary: Start date is after end date
+                  value:
+                    error: "The search query was invalid - please provide a valid date range"
+                includes_today:
+                  summary: Date includes today
+                  value:
+                    error: "The search query was invalid - the date cannot include today"
+                invalid_postcode:
+                  summary: Invalid postcode
+                  value:
+                    error: "The search query was invalid - please provide a valid postcode"
+                invalid_uprn:
+                  summary: Invalid UPRN
+                  value:
+                    error: "The search query was invalid - the uprn should be an integer greater than 0"
+                invalid_council:
+                  summary: Invalid council
+                  value:
+                    error: "The search query was invalid - provide valid council name(s)"
+                invalid_constituency:
+                  summary: Invalid constituency
+                  value:
+                    error: "The search query was invalid - provide valid constituency name(s)"
+                page_out_of_range:
+                  summary: Page out of range
+                  value:
+                    error: "The requested page number 15 is out of range. Total pages: 12"
+                invalid_page_size:
+                  summary: Invalid page size
+                  value:
+                    error: "The search query was invalid - provide valid page_size between 1 and 5000"
+        '404':
+          description: No certificates found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "No certificates could be found for that query"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                errors:
+                  - code: "Unexpected error message here"
+
+  /api/non-domestic/search:
+    get:
+      tags:
+        - Search
+        - Non-domestic
+      summary: Search for non-domestic certificates
+      description: |-
+        Search EPCs by
+          - date_start and date_end
+          - multiple councils
+          - multiple constituencies
+          - a postcode
+          - UPRN
+          - multiple efficiency rating bands
+          - a partial address
+      operationId: non-domestic-search-certificates
+      security:
+        - bearerToken: [ ]
+      parameters:
+        - in: query
+          name: date_start
+          description: The start date for the date range of the search (YYYY-mm-dd) required if no other search option is specified
+          schema:
+            type: string
+            format: date
+            example: '2025-07-10'
+        - in: query
+          name: date_end
+          description: The end date for the date range of the search (YYYY-mm-dd) required if no other search option is specified, defaults to yesterday if not provided
+          schema:
+            type: string
+            format: date
+            example: '2025-08-10'
+        - in: query
+          name: council[]
+          description: A local authority name
+          schema:
+            type: array
+            items:
+              type: string
+            example: [ 'Manchester', 'Birmingham' ]
+        - in: query
+          name: constituency[]
+          description: A parliamentary constituency
+          schema:
+            type: array
+            items:
+              type: string
+            example: [ 'Aldershot', 'Banbury' ]
+        - in: query
+          name: postcode
+          description: The postcode
+          schema:
+            type: string
+            example: 'FL23 4JA'
+        - in: query
+          name: uprn
+          description: The UPRN (unique property reference number) for a property
+          schema:
+            type: integer
+            example: 100023336956
+        - in: query
+          name: efficiency_rating[]
+          description: An efficiency rating band
+          schema:
+            type: array
+            items:
+              type: string
+            example: [ 'A', 'B', 'C' ]
+        - in: query
+          name: address
+          description: A partial or full address
+          schema:
+            type: string
+          example: '9 new union'
+        - in: query
+          name: current_page
+          description: The page number for search result pagination
+          schema:
+            type: integer
+          example: 1
+        - in: query
+          name: page_size
+          description: The number of rows returned for each page (Max size is 5000)
+          schema:
+            type: integer
+          example: 5000
+      responses:
+        '200':
+          description: Certificate search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateSearchResult'
+              example:
+                data:
+                  - addressLine1: "1 Some Street"
+                    addressLine2: null
+                    addressLine3: null
+                    addressLine4: null
+                    uprn: 100121241798
+                    certificateNumber: "0000-0000-0000-0000-0000"
+                    constituency: "Chelsea and Fulham"
+                    council: "Hammersmith and Fulham"
+                    currentEnergyEfficiencyBand: "B"
+                    postTown: "Whitbury"
+                    postcode: "SW10 0AA"
+                    registrationDate: "2020-05-04"
+                    relatedRrn: "0000-0000-0000-0000-1111"
+                    schemaType: "CEPC-8.0.0"
+                pagination:
+                  totalRecords: 4
+                  currentPage: 1
+                  totalPages: 1
+                  nextPage: null
+                  prevPage: null
+                  pageSize: 5000
+        '400':
+          description: Bad request - missing or malformed parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_params:
+                  summary: Missing search parameters
+                  value:
+                    error: "The search query was invalid - please provide a valid date range or search parameter"
+                invalid_dates:
+                  summary: Start date is after end date
+                  value:
+                    error: "The search query was invalid - please provide a valid date range"
+                includes_today:
+                  summary: Date includes today
+                  value:
+                    error: "The search query was invalid - the date cannot include today"
+                invalid_postcode:
+                  summary: Invalid postcode
+                  value:
+                    error: "The search query was invalid - please provide a valid postcode"
+                invalid_uprn:
+                  summary: Invalid UPRN
+                  value:
+                    error: "The search query was invalid - the uprn should be an integer greater than 0"
+                invalid_council:
+                  summary: Invalid council
+                  value:
+                    error: "The search query was invalid - provide valid council name(s)"
+                invalid_constituency:
+                  summary: Invalid constituency
+                  value:
+                    error: "The search query was invalid - provide valid constituency name(s)"
+                page_out_of_range:
+                  summary: Page out of range
+                  value:
+                    error: "The requested page number 15 is out of range. Total pages: 12"
+                invalid_page_size:
+                  summary: Invalid page size
+                  value:
+                    error: "The search query was invalid - provide valid page_size between 1 and 5000"
+        '404':
+          description: No certificates found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "No certificates could be found for that query"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                errors:
+                  - code: "Unexpected error message here"
+
+  /api/display/search:
+    get:
+      tags:
+        - Search
+        - Display
+      summary: Search for display energy certificates
+      description: |-
+        Search DECs by
+          - date_start and date_end
+          - multiple councils
+          - multiple constituencies
+          - a postcode
+          - UPRN
+          - multiple efficiency rating bands
+          - a partial address
+      operationId: display-search-certificates
+      security:
+        - bearerToken: [ ]
+      parameters:
+        - in: query
+          name: date_start
+          description: The start date for the date range of the search (YYYY-mm-dd) required if no other search option is specified
+          schema:
+            type: string
+            format: date
+            example: '2025-07-10'
+        - in: query
+          name: date_end
+          description: The end date for the date range of the search (YYYY-mm-dd) required if no other search option is specified, defaults to yesterday if not provided
+          schema:
+            type: string
+            format: date
+            example: '2025-08-10'
+        - in: query
+          name: council[]
+          description: A local authority name
+          schema:
+            type: array
+            items:
+              type: string
+            example: [ 'Manchester', 'Birmingham' ]
+        - in: query
+          name: constituency[]
+          description: A parliamentary constituency
+          schema:
+            type: array
+            items:
+              type: string
+            example: [ 'Aldershot', 'Banbury' ]
+        - in: query
+          name: postcode
+          description: The postcode
+          schema:
+            type: string
+            example: 'FL23 4JA'
+        - in: query
+          name: uprn
+          description: The UPRN (unique property reference number) for a property
+          schema:
+            type: integer
+            example: 100023336956
+        - in: query
+          name: efficiency_rating[]
+          description: An efficiency rating band
+          schema:
+            type: array
+            items:
+              type: string
+            example: [ 'A', 'B', 'C' ]
+        - in: query
+          name: address
+          description: A partial or full address
+          schema:
+            type: string
+          example: '9 new union'
+        - in: query
+          name: current_page
+          description: The page number for search result pagination
+          schema:
+            type: integer
+          example: 1
+        - in: query
+          name: page_size
+          description: The number of rows returned for each page (Max size is 5000)
+          schema:
+            type: integer
+          example: 5000
+      responses:
+        '200':
+          description: Certificate search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateSearchResult'
+              example:
+                data:
+                  - addressLine1: "1 Some Street"
+                    addressLine2: null
+                    addressLine3: null
+                    addressLine4: null
+                    uprn: 100121241798
+                    certificateNumber: "0000-0000-0000-0000-0000"
+                    constituency: "Chelsea and Fulham"
+                    council: "Hammersmith and Fulham"
+                    currentEnergyEfficiencyBand: "B"
+                    postTown: "Whitbury"
+                    postcode: "SW10 0AA"
+                    registrationDate: "2020-05-04"
+                    relatedRrn: "0000-0000-0000-0000-1111"
+                    schemaType: "CEPC-8.0.0"
+                pagination:
+                  totalRecords: 4
+                  currentPage: 1
+                  totalPages: 1
+                  nextPage: null
+                  prevPage: null
+                  pageSize: 5000
+        '400':
+          description: Bad request - missing or malformed parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_params:
+                  summary: Missing search parameters
+                  value:
+                    error: "The search query was invalid - please provide a valid date range or search parameter"
+                invalid_dates:
+                  summary: Start date is after end date
+                  value:
+                    error: "The search query was invalid - please provide a valid date range"
+                includes_today:
+                  summary: Date includes today
+                  value:
+                    error: "The search query was invalid - the date cannot include today"
+                invalid_postcode:
+                  summary: Invalid postcode
+                  value:
+                    error: "The search query was invalid - please provide a valid postcode"
+                invalid_uprn:
+                  summary: Invalid UPRN
+                  value:
+                    error: "The search query was invalid - the uprn should be an integer greater than 0"
+                invalid_council:
+                  summary: Invalid council
+                  value:
+                    error: "The search query was invalid - provide valid council name(s)"
+                invalid_constituency:
+                  summary: Invalid constituency
+                  value:
+                    error: "The search query was invalid - provide valid constituency name(s)"
+                page_out_of_range:
+                  summary: Page out of range
+                  value:
+                    error: "The requested page number 15 is out of range. Total pages: 12"
+                invalid_page_size:
+                  summary: Invalid page size
+                  value:
+                    error: "The search query was invalid - provide valid page_size between 1 and 5000"
+        '404':
+          description: No certificates found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "No certificates could be found for that query"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                errors:
+                  - code: "Unexpected error message here"
+
+  /api/files/domestic/csv:
+    get:
+      tags:
+        - Files
+        - Domestic
+      summary: Download domestic full-load CSV
+      description: |
+        Redirects to a pre-signed S3 URL for the domestic full-load ZIP file.
+      operationId: download-domestic-full-load-csv
+      security:
+        - bearerToken: []
+      responses:
+        '302':
+          description: Redirect to pre-signed S3 URL
+          headers:
+            Location:
+              description: Pre-signed S3 URL
+              schema:
+                type: string
+                format: uri
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/domestic/csv/info:
+    get:
+      tags:
+        - Files
+        - Domestic
+      summary: Get info about domestic full-load CSV
+      description: |
+        Returns metadata about the domestic full-load ZIP file.
+      operationId: get-domestic-full-load-info-json
+      security:
+        - bearerToken: []
+      responses:
+        '200':
+          description: File information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfoResponse'
+
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/domestic/json:
+    get:
+      tags:
+        - Files
+        - Domestic
+      summary: Download domestic full-load JSON
+      description: |
+        Redirects to a pre-signed S3 URL for the domestic full-load ZIP file.
+      operationId: download-domestic-full-load-json
+      security:
+        - bearerToken: [ ]
+      responses:
+        '302':
+          description: Redirect to pre-signed S3 URL
+          headers:
+            Location:
+              description: Pre-signed S3 URL
+              schema:
+                type: string
+                format: uri
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/domestic/json/info:
+    get:
+      tags:
+        - Files
+        - Domestic
+      summary: Get info about domestic full-load JSON
+      description: |
+        Returns metadata about the domestic full-load ZIP file.
+      operationId: get-domestic-full-load-info
+      security:
+        - bearerToken: [ ]
+      responses:
+        '200':
+          description: File information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfoResponse'
+
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/non-domestic/csv:
+    get:
+      tags:
+        - Files
+        - Non-domestic
+      summary: Download non domestic full-load CSV
+      description: |
+        Redirects to a pre-signed S3 URL for the non domestic full-load ZIP file.
+      operationId: download-non-domestic-full-load-csv
+      security:
+        - bearerToken: [ ]
+      responses:
+        '302':
+          description: Redirect to pre-signed S3 URL
+          headers:
+            Location:
+              description: Pre-signed S3 URL
+              schema:
+                type: string
+                format: uri
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/non-domestic/csv/info:
+    get:
+      tags:
+        - Files
+        - Non-domestic
+      summary: Get info about non-domestic full-load CSV
+      description: |
+        Returns metadata about the non-domestic full-load ZIP file.
+      operationId: get-non-domestic-full-load-info-csv
+      security:
+        - bearerToken: [ ]
+      responses:
+        '200':
+          description: File information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfoResponse'
+
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/non-domestic/json:
+    get:
+      tags:
+        - Files
+        - Non-domestic
+      summary: Download non-domestic full-load JSON
+      description: |
+        Redirects to a pre-signed S3 URL for the non-domestic full-load ZIP file.
+      operationId: download-non-domestic-full-load-json
+      security:
+        - bearerToken: [ ]
+      responses:
+        '302':
+          description: Redirect to pre-signed S3 URL
+          headers:
+            Location:
+              description: Pre-signed S3 URL
+              schema:
+                type: string
+                format: uri
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/non-domestic/json/info:
+    get:
+      tags:
+        - Files
+        - Non-domestic
+      summary: Get info about non domestic full-load JSON
+      description: |
+        Returns metadata about the non domestic full-load ZIP file.
+      operationId: get-non-domestic-full-load-info
+      security:
+        - bearerToken: [ ]
+      responses:
+        '200':
+          description: File information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfoResponse'
+
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/non-domestic-recommendations/json:
+    get:
+      tags:
+        - Files
+        - Non-domestic
+      summary: Download non-domestic recommendations full-load JSON
+      description: |
+        Redirects to a pre-signed S3 URL for the non-domestic recommendations full-load ZIP file.
+      operationId: download-non-domestic-recommendations-full-load-json
+      security:
+        - bearerToken: [ ]
+      responses:
+        '302':
+          description: Redirect to pre-signed S3 URL
+          headers:
+            Location:
+              description: Pre-signed S3 URL
+              schema:
+                type: string
+                format: uri
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/non-domestic-recommendations/json/info:
+    get:
+      tags:
+        - Files
+        - Non-domestic
+      summary: Get info about non domestic full-load JSON
+      description: |
+        Returns metadata about the non domestic recommendations full-load ZIP file.
+      operationId: get-non-domestic-recommendations-full-load-info
+      security:
+        - bearerToken: [ ]
+      responses:
+        '200':
+          description: File information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfoResponse'
+
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/display/csv:
+    get:
+      tags:
+        - Files
+        - Display
+      summary: Download display full-load CSV
+      description: |
+        Redirects to a pre-signed S3 URL for the non domestic full-load ZIP file.
+      operationId: download-display-full-load-csv
+      security:
+        - bearerToken: [ ]
+      responses:
+        '302':
+          description: Redirect to pre-signed S3 URL
+          headers:
+            Location:
+              description: Pre-signed S3 URL
+              schema:
+                type: string
+                format: uri
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/display/csv/info:
+    get:
+      tags:
+        - Files
+        - Display
+      summary: Get info about non-domestic full-load CSV
+      description: |
+        Returns metadata about the display full-load ZIP file.
+      operationId: get-dispplay-full-load-info-csv
+      security:
+        - bearerToken: [ ]
+      responses:
+        '200':
+          description: File information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfoResponse'
+
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+
+  /api/files/display/json:
+    get:
+      tags:
+        - Files
+        - Display
+      summary: Download display full-load JSON
+      description: |
+        Redirects to a pre-signed S3 URL for the non-domestic full-load ZIP file.
+      operationId: download-display-full-load-json
+      security:
+        - bearerToken: [ ]
+      responses:
+        '302':
+          description: Redirect to pre-signed S3 URL
+          headers:
+            Location:
+              description: Pre-signed S3 URL
+              schema:
+                type: string
+                format: uri
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+
+  /api/files/display/json/info:
+    get:
+      tags:
+        - Files
+        - Display
+      summary: Get info about display full-load JSON
+      description: |
+        Returns metadata about the display full-load ZIP file.
+      operationId: get-non-display-full-load-info-json
+      security:
+        - bearerToken: [ ]
+      responses:
+        '200':
+          description: File information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfoResponse'
+
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/display-recommendations/json:
+    get:
+      tags:
+        - Files
+        - Display
+      summary: Download display recommendations full-load JSON
+      description: |
+        Redirects to a pre-signed S3 URL for the non-domestic recommendations full-load ZIP file.
+      operationId: download-display-recommendations-full-load-json
+      security:
+        - bearerToken: [ ]
+      responses:
+        '302':
+          description: Redirect to pre-signed S3 URL
+          headers:
+            Location:
+              description: Pre-signed S3 URL
+              schema:
+                type: string
+                format: uri
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+  /api/files/display-recommendations/json/info:
+    get:
+      tags:
+        - Files
+        - Display
+      summary: Get info about display full-load JSON
+      description: |
+        Returns metadata about the display recommendations full-load ZIP file.
+      operationId: get-display-recommendations-full-load-info
+      security:
+        - bearerToken: [ ]
+      responses:
+        '200':
+          description: File information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfoResponse'
+
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "File not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                example:
+                  error: "Internal Server Error"
+
+components:
+  securitySchemes:
+    bearerToken:
+      type: http
+      scheme: bearer
+      description: This API uses Bearer Token
+
+  schemas:
+
+    EnergyCertificateSearchResult:
+      type: object
+      properties:
+        addressLine1:
+          type: string
+        addressLine2:
+          nullable: true
+          type: string
+        addressLine3:
+          nullable: true
+          type: string
+        addressLine4:
+          nullable: true
+          type: string
+        uprn:
+          nullable: true
+          type: integer
+        certificateNumber:
+          type: string
+        constituency:
+          type: string
+        council:
+          type: string
+        currentEnergyEfficiencyBand:
+          type: string
+        postTown:
+          type: string
+        postcode:
+          type: string
+        registrationDate:
+          type: string
+          format: date-time
+        schemaType:
+          type: string
+
+    PaginationMetadata:
+      type: object
+      properties:
+        totalRecords:
+          type: integer
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
+        nextPage:
+          type: integer
+          nullable: true
+        prevPage:
+          type: integer
+          nullable: true
+        pageSize:
+          type: integer
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      oneOf:
+        - required: [error]
+          properties:
+            error:
+              type: string
+        - required: [errors]
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  code:
+                    type: string
+
+    DeltaEvent:
+      type: object
+      properties:
+        certificateNumber:
+          type: string
+          example: "0000-0000-0000-0002-1111"
+        eventType:
+          type: string
+          enum: [removed, uprn_updated]
+          example: "removed"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-02-17T16:26:08.535Z"
+      required:
+        - certificateNumber
+        - eventType
+        - timestamp
+
+    DeltaResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeltaEvent'
+      required:
+        - data
+
+    CertificateResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          description: EPC document in JSON format
+          additionalProperties: true
+      required:
+        - data
+
+    FileInfo:
+      type: object
+      properties:
+        fileSize:
+          type: integer
+          description: Size of the file in bytes
+          example: 22
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Last modified timestamp of the file
+          example: "2025-08-01T00:31:19.000+00:00"
+      required:
+        - fileSize
+        - lastUpdated
+
+    FileInfoResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/FileInfo'
+      required:
+        - data
+
+    CertificateSearchResult:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnergyCertificateSearchResult'
+        pagination:
+          $ref: '#/components/schemas/PaginationMetadata'
+      required:
+        - data
+        - pagination
+
+    CodesResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: string
+      example: {data: ["built_form","construction_age_band"]}
+
+    CodeInfoResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeValues'
+
+    CodeValues:
+      type: object
+      properties:
+        key:
+          type: string
+          example: "NR"
+        values:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeValue'
+
+    CodeValue:
+      type: object
+      properties:
+        value:
+          type: string
+          example: "Detached"
+        schemaVersion:
+          type: string
+          example: "RdSAP-Schema-21.0.0"
+        assessmentType:
+          type: string
+          example: "RdSAP"
+
+  links: {}
+  callbacks: {}

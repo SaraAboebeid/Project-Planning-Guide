@@ -126,6 +126,17 @@ def uk_retrofit_cost():
     return _read_uk_json("retrofit_cost_band_c.json")
 
 
+@app.get("/api/uk/tabula")
+def uk_tabula():
+    """
+    EPISCOPE/TABULA England envelope archetypes (BRE, Sept 2014): as-built
+    U-values (roof/wall/floor/window/door) and heating demand by dwelling type
+    and construction era, plus standard/ambitious refurbishment scenarios.
+    Mirrors _TABULA_U in this file, which is the Swedish equivalent.
+    """
+    return _read_uk_json("tabula_gb.json")
+
+
 @app.get("/api/uk/buildings/{city_id}")
 def uk_buildings(city_id: str):
     """Extruded building payload for one UK focus city, same schema as /api/buildings."""

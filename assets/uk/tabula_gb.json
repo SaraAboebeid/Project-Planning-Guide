@@ -1,0 +1,738 @@
+{
+  "dataset": "EPISCOPE/TABULA Building Typology Brochure: England",
+  "publisher": "Building Research Establishment (BRE), September 2014",
+  "url": "https://episcope.eu/building-typology/country/gb/",
+  "source_pdf": "https://episcope.eu/fileadmin/tabula/public/docs/brochure/GB_TABULA_TypologyBrochure_BRE.pdf",
+  "note": "U-values in W/(m2K); heating demand in kWh/(m2.yr). Built from English Housing Survey stock data, so periods align with ingest_ehs.py's dwelling-age bands. Some type/period combinations were noted 'small sample size - no data' in the source and are absent here, same as they are in the brochure.",
+  "archetypes": [
+    {
+      "type_label": "Single Family House",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "pre 1919",
+      "period": "pre-1919",
+      "as_built": {
+        "u_roof": 2.3,
+        "u_wall": 2.1,
+        "u_floor": 0.72,
+        "u_window": 4.8,
+        "u_door": 3.0,
+        "kwh_m2_yr": 247.3
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 2.2,
+        "kwh_m2_yr": 87.5
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 1.6,
+        "u_door": 1.8,
+        "kwh_m2_yr": 77.6
+      }
+    },
+    {
+      "type_label": "Single Family House",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "1919-1944",
+      "period": "1919-44",
+      "as_built": {
+        "u_roof": 2.3,
+        "u_wall": 2.1,
+        "u_floor": 0.72,
+        "u_window": 4.8,
+        "u_door": 3.0,
+        "kwh_m2_yr": 266.5
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 2.2,
+        "kwh_m2_yr": 94.7
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 1.6,
+        "u_door": 1.8,
+        "kwh_m2_yr": 83.8
+      }
+    },
+    {
+      "type_label": "Single Family House",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "1945-1964",
+      "period": "1945-64",
+      "as_built": {
+        "u_roof": 2.3,
+        "u_wall": 1.6,
+        "u_floor": 0.72,
+        "u_window": 4.8,
+        "u_door": 3.0,
+        "kwh_m2_yr": 259.8
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 2.2,
+        "kwh_m2_yr": 103.0
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": 1.8,
+        "kwh_m2_yr": 92.0
+      }
+    },
+    {
+      "type_label": "Single Family House",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "1965-80",
+      "period": "1965-80",
+      "as_built": {
+        "u_roof": 1.5,
+        "u_wall": 1.6,
+        "u_floor": 0.72,
+        "u_window": 4.8,
+        "u_door": 2.0,
+        "kwh_m2_yr": 228.0
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": null,
+        "kwh_m2_yr": 138.5
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 93.7
+      }
+    },
+    {
+      "type_label": "Single Family House",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "1981-1990",
+      "period": "1981-90",
+      "as_built": {
+        "u_roof": 0.4,
+        "u_wall": 1.6,
+        "u_floor": 0.72,
+        "u_window": 3.1,
+        "u_door": 2.0,
+        "kwh_m2_yr": 166.3
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": null,
+        "kwh_m2_yr": 110.5
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 90.2
+      }
+    },
+    {
+      "type_label": "Single Family House",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "1991- 2003",
+      "period": "1991-2002",
+      "as_built": {
+        "u_roof": 0.4,
+        "u_wall": 1.6,
+        "u_floor": 0.5,
+        "u_window": 3.1,
+        "u_door": 2.0,
+        "kwh_m2_yr": 143.2
+      },
+      "standard_refurbishment": {
+        "u_roof": null,
+        "u_wall": 0.6,
+        "u_window": null,
+        "kwh_m2_yr": 103.6
+      },
+      "ambitious_refurbishment": {
+        "u_roof": null,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 82.9
+      }
+    },
+    {
+      "type_label": "Single Family House",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "2004-2009",
+      "period": "2003-2013",
+      "as_built": {
+        "u_roof": 0.25,
+        "u_wall": 0.35,
+        "u_floor": 0.25,
+        "u_window": 1.85,
+        "u_door": 2.0,
+        "kwh_m2_yr": 69.6
+      },
+      "standard_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": null,
+        "kwh_m2_yr": 69.6
+      },
+      "ambitious_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 66.3
+      }
+    },
+    {
+      "type_label": "Single Family House",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "post 2010",
+      "period": "post-2013",
+      "as_built": {
+        "u_roof": 0.18,
+        "u_wall": 0.28,
+        "u_floor": 0.22,
+        "u_window": 1.85,
+        "u_door": 2.0,
+        "kwh_m2_yr": 63.7
+      },
+      "standard_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": null,
+        "kwh_m2_yr": null
+      },
+      "ambitious_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": null,
+        "u_door": null,
+        "kwh_m2_yr": null
+      }
+    },
+    {
+      "type_label": "Terraced house",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "pre 1919",
+      "period": "pre-1919",
+      "as_built": {
+        "u_roof": 2.3,
+        "u_wall": 2.1,
+        "u_floor": 0.59,
+        "u_window": 4.8,
+        "u_door": 3.0,
+        "kwh_m2_yr": 281.1
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 2.2,
+        "kwh_m2_yr": 89.9
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 1.6,
+        "u_door": 1.8,
+        "kwh_m2_yr": 79.2
+      }
+    },
+    {
+      "type_label": "Terraced house",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "1919-1944",
+      "period": "1919-44",
+      "as_built": {
+        "u_roof": 2.3,
+        "u_wall": 2.1,
+        "u_floor": 0.59,
+        "u_window": 4.8,
+        "u_door": 3.0,
+        "kwh_m2_yr": 310.0
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 2.2,
+        "kwh_m2_yr": 98.2
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 1.6,
+        "u_door": 1.8,
+        "kwh_m2_yr": 85.8
+      }
+    },
+    {
+      "type_label": "Terraced house",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "1945-1964",
+      "period": "1945-64",
+      "as_built": {
+        "u_roof": 2.3,
+        "u_wall": 1.6,
+        "u_floor": 0.59,
+        "u_window": 4.8,
+        "u_door": 3.0,
+        "kwh_m2_yr": 281.2
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 2.2,
+        "kwh_m2_yr": 107.9
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": 1.8,
+        "kwh_m2_yr": 95.9
+      }
+    },
+    {
+      "type_label": "Terraced house",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "1965-1980",
+      "period": "1965-80",
+      "as_built": {
+        "u_roof": 1.5,
+        "u_wall": 1.6,
+        "u_floor": 0.59,
+        "u_window": 3.1,
+        "u_door": 2.0,
+        "kwh_m2_yr": 221.4
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": null,
+        "kwh_m2_yr": 114.5
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 94.0
+      }
+    },
+    {
+      "type_label": "Terraced house",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "1981-1990",
+      "period": "1981-90",
+      "as_built": {
+        "u_roof": 0.4,
+        "u_wall": 1.6,
+        "u_floor": 0.59,
+        "u_window": 3.1,
+        "u_door": 2.0,
+        "kwh_m2_yr": 193.0
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": null,
+        "kwh_m2_yr": 114.2
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 95.2
+      }
+    },
+    {
+      "type_label": "Terraced house",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "1991-2003",
+      "period": "1991-2002",
+      "as_built": {
+        "u_roof": 0.4,
+        "u_wall": 1.6,
+        "u_floor": 0.5,
+        "u_window": 3.1,
+        "u_door": 2.0,
+        "kwh_m2_yr": 176.4
+      },
+      "standard_refurbishment": {
+        "u_roof": null,
+        "u_wall": 0.6,
+        "u_window": null,
+        "kwh_m2_yr": 110.7
+      },
+      "ambitious_refurbishment": {
+        "u_roof": null,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 92.2
+      }
+    },
+    {
+      "type_label": "Terraced house",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "2004 - 2009",
+      "period": "2003-2013",
+      "as_built": {
+        "u_roof": 0.25,
+        "u_wall": 0.35,
+        "u_floor": 0.25,
+        "u_window": 1.85,
+        "u_door": 2.0,
+        "kwh_m2_yr": 71.3
+      },
+      "standard_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": null,
+        "kwh_m2_yr": 71.3
+      },
+      "ambitious_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 68.6
+      }
+    },
+    {
+      "type_label": "Terraced house",
+      "use_cat": "bostad_enfamilj",
+      "period_label": "post 2010",
+      "period": "post-2013",
+      "as_built": {
+        "u_roof": 0.18,
+        "u_wall": 0.28,
+        "u_floor": 0.22,
+        "u_window": 1.85,
+        "u_door": 2.0,
+        "kwh_m2_yr": 64.9
+      },
+      "standard_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": null,
+        "kwh_m2_yr": null
+      },
+      "ambitious_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": null,
+        "u_door": null,
+        "kwh_m2_yr": null
+      }
+    },
+    {
+      "type_label": "Multi Family House",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "pre 1919",
+      "period": "pre-1919",
+      "as_built": {
+        "u_roof": 2.3,
+        "u_wall": 2.1,
+        "u_floor": 0.45,
+        "u_window": 4.8,
+        "u_door": 3.0,
+        "kwh_m2_yr": 205.5
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 2.2,
+        "kwh_m2_yr": 64.2
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 1.6,
+        "u_door": 1.8,
+        "kwh_m2_yr": 58.0
+      }
+    },
+    {
+      "type_label": "Multi Family House",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "1919-1944",
+      "period": "1919-44",
+      "as_built": {
+        "u_roof": 2.3,
+        "u_wall": 2.1,
+        "u_floor": 0.45,
+        "u_window": 4.8,
+        "u_door": 3.0,
+        "kwh_m2_yr": 222.4
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 2.2,
+        "kwh_m2_yr": 69.5
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 1.6,
+        "u_door": 1.8,
+        "kwh_m2_yr": 61.8
+      }
+    },
+    {
+      "type_label": "Multi Family House",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "1945-1964",
+      "period": "1945-64",
+      "as_built": {
+        "u_roof": 2.3,
+        "u_wall": 1.6,
+        "u_floor": 0.45,
+        "u_window": 4.8,
+        "u_door": 3.0,
+        "kwh_m2_yr": 219.1
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 2.2,
+        "kwh_m2_yr": 82.4
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": 1.8,
+        "kwh_m2_yr": 72.9
+      }
+    },
+    {
+      "type_label": "Multi Family House",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "1965-1980",
+      "period": "1965-80",
+      "as_built": {
+        "u_roof": 1.5,
+        "u_wall": 1.6,
+        "u_floor": 0.45,
+        "u_window": 3.1,
+        "u_door": 2.0,
+        "kwh_m2_yr": 166.5
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": null,
+        "kwh_m2_yr": 85.2
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 67.1
+      }
+    },
+    {
+      "type_label": "Multi Family House",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "1981-1990",
+      "period": "1981-90",
+      "as_built": {
+        "u_roof": 0.4,
+        "u_wall": 1.6,
+        "u_floor": 0.45,
+        "u_window": 3.1,
+        "u_door": 2.0,
+        "kwh_m2_yr": 128.4
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": null,
+        "kwh_m2_yr": 74.8
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 61.5
+      }
+    },
+    {
+      "type_label": "Multi Family House",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "1991-2003",
+      "period": "1991-2002",
+      "as_built": {
+        "u_roof": 0.4,
+        "u_wall": 1.6,
+        "u_floor": 0.5,
+        "u_window": 3.1,
+        "u_door": 2.0,
+        "kwh_m2_yr": 122.4
+      },
+      "standard_refurbishment": {
+        "u_roof": null,
+        "u_wall": 0.6,
+        "u_window": null,
+        "kwh_m2_yr": 81.2
+      },
+      "ambitious_refurbishment": {
+        "u_roof": null,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 65.0
+      }
+    },
+    {
+      "type_label": "Multi Family House",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "2004 - 2009",
+      "period": "2003-2013",
+      "as_built": {
+        "u_roof": 0.25,
+        "u_wall": 0.35,
+        "u_floor": 0.25,
+        "u_window": 1.85,
+        "u_door": 2.0,
+        "kwh_m2_yr": 55.0
+      },
+      "standard_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": null,
+        "kwh_m2_yr": 55.0
+      },
+      "ambitious_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 52.8
+      }
+    },
+    {
+      "type_label": "Multi Family House",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "post 2010",
+      "period": "post-2013",
+      "as_built": {
+        "u_roof": 0.18,
+        "u_wall": 0.28,
+        "u_floor": 0.22,
+        "u_window": 1.85,
+        "u_door": 2.0,
+        "kwh_m2_yr": 50.6
+      },
+      "standard_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": null,
+        "kwh_m2_yr": null
+      },
+      "ambitious_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": null,
+        "u_door": null,
+        "kwh_m2_yr": null
+      }
+    },
+    {
+      "type_label": "Apartment Building",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "1945-1964",
+      "period": "1945-64",
+      "as_built": {
+        "u_roof": 2.3,
+        "u_wall": 2.1,
+        "u_floor": 0.45,
+        "u_window": 4.8,
+        "u_door": 3.0,
+        "kwh_m2_yr": 175.7
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 2.2,
+        "kwh_m2_yr": 56.5
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.3,
+        "u_window": 1.6,
+        "u_door": 1.8,
+        "kwh_m2_yr": 48.8
+      }
+    },
+    {
+      "type_label": "Apartment Building",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "1965-1980",
+      "period": "1965-80",
+      "as_built": {
+        "u_roof": 1.5,
+        "u_wall": 1.6,
+        "u_floor": 0.45,
+        "u_window": 3.1,
+        "u_door": 2.0,
+        "kwh_m2_yr": 121.9
+      },
+      "standard_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": null,
+        "kwh_m2_yr": 70.2
+      },
+      "ambitious_refurbishment": {
+        "u_roof": 0.13,
+        "u_wall": 0.6,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 51.8
+      }
+    },
+    {
+      "type_label": "Apartment Building",
+      "use_cat": "bostad_flerfamilj",
+      "period_label": "2004 - 2010",
+      "period": "2003-2013",
+      "as_built": {
+        "u_roof": 0.25,
+        "u_wall": 0.28,
+        "u_floor": 0.25,
+        "u_window": 1.85,
+        "u_door": 2.0,
+        "kwh_m2_yr": 44.3
+      },
+      "standard_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": null,
+        "kwh_m2_yr": 44.3
+      },
+      "ambitious_refurbishment": {
+        "u_roof": null,
+        "u_wall": null,
+        "u_window": 1.6,
+        "u_door": null,
+        "kwh_m2_yr": 41.5
+      }
+    }
+  ]
+}

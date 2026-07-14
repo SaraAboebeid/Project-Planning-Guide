@@ -12,6 +12,9 @@ python-dateutil==2.9.0.post0
 pytz==2025.2
 numpy==2.4.1
 duckdb==1.5.2
+geopandas==1.1.4
+shapely==2.1.2
+pyproj==3.7.2
 
 # Web & Utilities
 requests==2.32.5
