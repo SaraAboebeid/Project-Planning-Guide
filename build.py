@@ -99,6 +99,7 @@ JS_FILES = [
     "cesium.js",
     "ui.js",
     "pvgis.js",
+    "energy_sim.js",
     "facade_inspector.js",
     "search.js",
     "roads.js",

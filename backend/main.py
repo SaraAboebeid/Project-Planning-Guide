@@ -28,6 +28,8 @@ from fastapi.staticfiles import StaticFiles
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from tools.idf.generate_idf import build_shoebox_idf
+
 app = FastAPI(title="Project Planning Guide API", version="0.1.0")
 
 app.add_middleware(
@@ -1698,6 +1700,245 @@ async def pvgis_proxy(
         if not r.is_success:
             raise HTTPException(r.status_code, f"PVGIS returned {r.status_code}")
         return r.json()
+
+
+# ── Energy simulation (EPSM) ─────────────────────────────────────────────────
+# Self-hosted EnergyPlus runner (see docker-compose.epsm.yml, tools/idf/) -
+# EPSM_BASE_URL defaults to the port docker-compose.epsm.yml maps its Django
+# backend to (8010, since our own FastAPI backend keeps 8000).
+EPSM_BASE_URL = os.environ.get("EPSM_BASE_URL", "http://localhost:8010").strip()
+SIM_DB_PATH = PROJECT_ROOT / "data" / "simulation_database.json"
+EPW_DIR = PROJECT_ROOT / "data" / "epw"
+
+# city_id (tools/uk/cities.py, or "gothenburg" for Sweden) -> EPW filename in
+# data/epw/. All 4 London districts share one weather station (Heathrow).
+CITY_TO_EPW = {
+    "gothenburg": "SWE_VG_Goteborg.City.AP.025120_TMYx.2009-2023.epw",
+    "london_kings_cross": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
+    "london_westminster": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
+    "london_canary_wharf": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
+    "london_southwark": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
+}
+
+
+def _load_sim_db() -> list:
+    if SIM_DB_PATH.exists():
+        try:
+            return json.loads(SIM_DB_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    return []
+
+
+def _save_sim_db(records: list) -> None:
+    SIM_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SIM_DB_PATH.write_text(json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _floors_of(building_info: dict) -> int:
+    floors = building_info.get("floors")
+    try:
+        if floors:
+            return max(1, round(float(floors)))
+    except (TypeError, ValueError):
+        pass
+    height = building_info.get("height")
+    if height:
+        return max(1, round(float(height) / 3.2))
+    return 1
+
+
+async def _fetch_and_normalize_results(simulation_id: str, building_info: dict) -> dict:
+    """Fetch EPSM's raw results and recompute per-m2 figures using our own
+    total floor area (floors x footprint_m2), not EPSM's own per-m2 fields.
+
+    EPSM normalizes by the zone's physical Floor surface area alone (i.e.
+    the building's footprint) - fine for a single-storey building, but for
+    a 20-storey tower modelled as one full-height shoebox zone (see
+    tools/idf/generate_idf.py) that understates the real total floor area
+    by a factor of ~20, so EPSM's own "heatingDemand"/"totalEnergyUse"
+    fields come out roughly floors-times too high per m2. Confirmed by hand
+    during Phase 1 testing: a 20-storey Westminster building's EPSM-reported
+    heatingDemand was ~948 kWh/m2/yr, correcting to ~47 kWh/m2/yr once
+    divided by total floor area instead of footprint alone - a plausible
+    result next to that building's real tabula_kwh_m2_yr of 205.5.
+    """
+    import httpx
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.get(f"{EPSM_BASE_URL}/api/simulation/{simulation_id}/results/")
+        r.raise_for_status()
+        raw = r.json()
+    row = raw[0] if isinstance(raw, list) and raw else (raw if isinstance(raw, dict) else {})
+
+    floors = _floors_of(building_info)
+    footprint = building_info.get("footprint_m2") or row.get("totalArea") or 1.0
+    total_floor_area = building_info.get("floor_area_m2") or (float(footprint) * floors)
+
+    energy_use = row.get("energy_use") or {}
+
+    def _kwh(category: str) -> float:
+        return float((energy_use.get(category) or {}).get("total") or 0.0)
+
+    heating_kwh = _kwh("Heating")
+    cooling_kwh = _kwh("Cooling")
+    lighting_kwh = _kwh("Interior Lighting") + _kwh("Exterior Lighting")
+    equipment_kwh = _kwh("Interior Equipment") + _kwh("Exterior Equipment")
+    total_kwh = heating_kwh + cooling_kwh + lighting_kwh + equipment_kwh
+
+    def _per_m2(kwh: float) -> Optional[float]:
+        return round(kwh / total_floor_area, 1) if total_floor_area else None
+
+    return {
+        "raw": row,
+        "floors": floors,
+        "footprint_m2": round(float(footprint), 1),
+        "total_floor_area_m2": round(total_floor_area, 1),
+        "heating_kwh": round(heating_kwh, 1),
+        "cooling_kwh": round(cooling_kwh, 1),
+        "lighting_kwh": round(lighting_kwh, 1),
+        "equipment_kwh": round(equipment_kwh, 1),
+        "total_kwh": round(total_kwh, 1),
+        "heating_kwh_m2_yr": _per_m2(heating_kwh),
+        "cooling_kwh_m2_yr": _per_m2(cooling_kwh),
+        "lighting_kwh_m2_yr": _per_m2(lighting_kwh),
+        "equipment_kwh_m2_yr": _per_m2(equipment_kwh),
+        "total_kwh_m2_yr": _per_m2(total_kwh),
+    }
+
+
+class SimulationSubmitRequest(BaseModel):
+    lat: float
+    lon: float
+    address: Optional[str] = None
+    country: str  # "se" | "gb"
+    city_id: str
+    building: dict[str, Any]
+    wwr_override: Optional[float] = None
+
+
+@app.post("/api/simulation-submit")
+async def submit_simulation(req: SimulationSubmitRequest):
+    """Generate a shoebox IDF for this building and hand it to EPSM to run.
+    Returns immediately with EPSM's simulation_id/task_id - poll
+    /api/simulation-status/{id} for progress."""
+    import httpx
+
+    epw_name = CITY_TO_EPW.get(req.city_id)
+    if not epw_name:
+        raise HTTPException(400, f"No weather file mapped for city_id '{req.city_id}'")
+    epw_path = EPW_DIR / epw_name
+    if not epw_path.exists():
+        raise HTTPException(500, f"Weather file missing on server: {epw_path.name}")
+
+    try:
+        idf_text = build_shoebox_idf(
+            req.building, req.country, req.city_id, str(epw_path),
+            wwr_override=req.wwr_override, building_name=req.address,
+        )
+    except Exception as exc:
+        raise HTTPException(400, f"IDF generation failed: {exc}")
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        files = {
+            "idf_files": ("model.idf", idf_text.encode("utf-8"), "text/plain"),
+            "weather_file": (epw_name, epw_path.read_bytes(), "application/octet-stream"),
+        }
+        try:
+            r = await client.post(f"{EPSM_BASE_URL}/api/simulation/run/", files=files)
+        except httpx.RequestError as exc:
+            raise HTTPException(502, f"Could not reach EPSM at {EPSM_BASE_URL}: {exc}")
+        if not r.is_success:
+            raise HTTPException(r.status_code, f"EPSM rejected the simulation: {r.text[:500]}")
+        payload = r.json()
+
+    simulation_id = payload.get("simulation_id")
+    records = _load_sim_db()
+    records = [
+        rec for rec in records
+        if not (_haversine_m(rec["lat"], rec["lon"], req.lat, req.lon) <= 20 and rec.get("status") == "queued")
+    ]
+    records.append({
+        "lat": req.lat,
+        "lon": req.lon,
+        "address": req.address,
+        "country": req.country,
+        "city_id": req.city_id,
+        "building_info": req.building,
+        "epsm_simulation_id": simulation_id,
+        "epsm_task_id": payload.get("task_id"),
+        "status": "queued",
+        "submitted_at": datetime.datetime.utcnow().isoformat() + "Z",
+        "completed_at": None,
+        "results": None,
+        "error": None,
+    })
+    _save_sim_db(records)
+    return {"simulation_id": simulation_id, "task_id": payload.get("task_id"), "status": "queued"}
+
+
+@app.get("/api/simulation-status/{simulation_id}")
+async def simulation_status(simulation_id: str):
+    """Proxy EPSM's own status endpoint. On first observing 'completed', also
+    fetches + normalizes results and folds them into the cached record."""
+    import httpx
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        try:
+            r = await client.get(f"{EPSM_BASE_URL}/api/simulation/{simulation_id}/status/")
+        except httpx.RequestError as exc:
+            raise HTTPException(502, f"Could not reach EPSM at {EPSM_BASE_URL}: {exc}")
+        if not r.is_success:
+            raise HTTPException(r.status_code, f"EPSM status lookup failed: {r.text[:300]}")
+        status_payload = r.json()
+
+    records = _load_sim_db()
+    record = next((rec for rec in records if rec.get("epsm_simulation_id") == simulation_id), None)
+    status = status_payload.get("status")
+    if record is not None and status == "completed" and record.get("status") != "completed":
+        record["status"] = "completed"
+        record["completed_at"] = datetime.datetime.utcnow().isoformat() + "Z"
+        record["results"] = await _fetch_and_normalize_results(simulation_id, record.get("building_info") or {})
+        _save_sim_db(records)
+    elif record is not None and status == "failed" and record.get("status") != "failed":
+        record["status"] = "failed"
+        record["error"] = status_payload.get("error_message") or status_payload.get("error")
+        _save_sim_db(records)
+    return status_payload
+
+
+@app.get("/api/simulation-results/{simulation_id}")
+async def simulation_results(simulation_id: str):
+    """Return the cached, normalized results for a completed simulation."""
+    records = _load_sim_db()
+    record = next((rec for rec in records if rec.get("epsm_simulation_id") == simulation_id), None)
+    if record is None:
+        raise HTTPException(404, "Unknown simulation_id")
+    if record.get("status") != "completed":
+        raise HTTPException(409, f"Simulation not completed yet (status={record.get('status')})")
+    return record["results"]
+
+
+@app.get("/api/simulation-lookup")
+async def lookup_simulation(lat: float = Query(...), lon: float = Query(...), radius_m: float = Query(25)):
+    """Return the nearest saved/running simulation record within radius_m metres, or null."""
+    records = _load_sim_db()
+    best = None
+    best_dist = radius_m
+    for r in records:
+        d = _haversine_m(r["lat"], r["lon"], lat, lon)
+        if d <= best_dist:
+            best_dist = d
+            best = r
+    if best is None:
+        return {"found": False, "record": None}
+    return {"found": True, "record": best, "dist_m": round(best_dist, 1)}
+
+
+@app.get("/api/simulation-database")
+async def get_simulation_database():
+    """Return all saved simulation records."""
+    return {"records": _load_sim_db()}
 
 
 # -- Static frontend (built React SPA + standalone 3D maps) -----------------

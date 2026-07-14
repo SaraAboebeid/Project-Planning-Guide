@@ -6,15 +6,15 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="uk_3d.css?v=20260714-114335">
-  <link rel="stylesheet" href="sidebar-theme.css?v=20260714-114335">
+  <link rel="stylesheet" href="uk_3d.css?v=20260714-155845">
+  <link rel="stylesheet" href="sidebar-theme.css?v=20260714-155845">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
        is stamped on <body> by bootstrap.js. */
     body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
   </style>
-  <script src="uk_3d.meta.js?v=20260714-114335" defer></script>
-  <script src="viewer/js/bootstrap.js?v=20260714-114335" defer></script>
+  <script src="uk_3d.meta.js?v=20260714-155845" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260714-155845" defer></script>
 </head>
 <body>
 
@@ -278,6 +278,9 @@
       <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>Rooftop PV Estimate</button>
       <div class="analysis-note" id="pvgis-saved-badge" style="display:none"></div>
       <div id="pvgis-result"></div>
+      <button class="tool-btn" id="btn-sim" disabled>Run Energy Simulation</button>
+      <div class="analysis-note" id="sim-saved-badge" style="display:none"></div>
+      <div id="sim-result"></div>
       <div id="lp-no-selection">Select a building to enable tools</div>
     </div>
   </div>

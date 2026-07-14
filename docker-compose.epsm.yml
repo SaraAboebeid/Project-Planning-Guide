@@ -1,0 +1,168 @@
+# =============================================================================
+# EPSM (Energy Performance Simulation Manager) — local-only simulation backend
+# =============================================================================
+# Runs a trimmed-down copy of https://github.com/snjsomnath/epsm using its
+# prebuilt images, purely as a local API our own backend calls to submit
+# EnergyPlus simulations (see tools/idf/ and backend/main.py's /api/simulation-*
+# endpoints). We never open EPSM's own web UI, so its React frontend and Nginx
+# reverse proxy are omitted entirely.
+#
+# The database uses a STOCK postgres image, not EPSM's own custom Dockerfile:
+# EPSM's backend entrypoint (docker-entrypoint.sh) runs `manage.py migrate`
+# automatically on every startup, which creates the real, current schema from
+# scratch. EPSM's own database/init + database/migrations SQL scripts are
+# leftovers from a pre-Django auth system ("replaces external authentication
+# services") and reference tables Django's migrations already create — running
+# them against a fresh Django-migrated schema risks conflicting more than it
+# helps, so they're deliberately not used here.
+#
+# Usage:
+#   docker compose -f docker-compose.epsm.yml up -d
+#   docker compose -f docker-compose.epsm.yml logs -f epsm-backend
+#   docker compose -f docker-compose.epsm.yml down          # keep data
+#   docker compose -f docker-compose.epsm.yml down -v       # wipe data too
+#
+# Our own dashboard backend (backend/main.py) reaches this via EPSM_BASE_URL,
+# which defaults to http://localhost:8010 — our FastAPI backend keeps port
+# 8000 (see backend/main.py, launch.py), so EPSM's Django backend is remapped
+# to the host's 8010 instead of colliding with it.
+# =============================================================================
+
+services:
+  epsm-db:
+    image: postgres:15-alpine
+    container_name: epsm_db
+    environment:
+      POSTGRES_DB: epsm_db
+      POSTGRES_USER: epsm_user
+      POSTGRES_PASSWORD: epsm_local_dev_password
+    volumes:
+      - epsm_pgdata:/var/lib/postgresql/data
+    networks:
+      - epsm-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U epsm_user -d epsm_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  epsm-redis:
+    image: redis:7-alpine
+    container_name: epsm_redis
+    volumes:
+      - epsm_redisdata:/data
+    command: redis-server --appendonly yes
+    networks:
+      - epsm-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  epsm-backend:
+    image: ghcr.io/snjsomnath/epsm-backend:latest
+    container_name: epsm_backend
+    # Docker Desktop on Windows forwards /var/run/docker.sock in a way that
+    # the image's own docker-entrypoint.sh can't actually chmod/regroup from
+    # inside the container (its `groupadd -g $DOCKER_GID docker` silently
+    # no-ops when DOCKER_GID=0, since GID 0 is already "root", and the
+    # fallback `chmod 666` on the socket also silently fails - confirmed by
+    # `docker exec ... ls -la /var/run/docker.sock` still showing root:root
+    # 660 after startup). Running as root sidesteps this entirely - the
+    # image's own USER directive is only overridden for these two services,
+    # both of which need to invoke `docker run nrel/energyplus` as a sibling
+    # container.
+    user: "0:0"
+    environment:
+      DJANGO_SECRET_KEY: local-dev-only-not-for-production-0e9f8a7b6c5d4e3f2a1b
+      DEBUG: "True"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DB_NAME: epsm_db
+      DB_USER: epsm_user
+      DB_PASSWORD: epsm_local_dev_password
+      DB_HOST: epsm-db
+      DB_PORT: "5432"
+      REDIS_HOST: epsm-redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: redis://epsm-redis:6379/0
+      CELERY_RESULT_BACKEND: redis://epsm-redis:6379/0
+      ENERGYPLUS_DOCKER_IMAGE: nrel/energyplus:23.2.0
+      SIMULATION_TIMEOUT: "600"
+      CORS_ALLOWED_ORIGINS: "http://localhost:8000,http://localhost:5173,http://localhost:8765"
+      # Needed so EPSM's own sibling `docker run` for EnergyPlus can resolve
+      # the per-run media directory back to a real host path (see EPSM's
+      # backend/simulation/services.py) - since this compose file's own
+      # media volume is Docker-managed rather than a bind mount, this is left
+      # as an approximation and revisited if simulations fail to locate output.
+      HOST_MEDIA_ROOT: /var/lib/docker/volumes/project-planning-guide_epsm_media/_data
+      # GID of /var/run/docker.sock as seen inside a Linux container under
+      # Docker Desktop (confirmed via `docker run --rm -v ... alpine stat -c
+      # '%g' /var/run/docker.sock` -> 0). Without this set, EPSM's own
+      # docker-entrypoint.sh skips its `chmod 666 /var/run/docker.sock` step
+      # entirely and the container's appuser can't reach the socket at all -
+      # every simulation then fails at the `docker run energyplus` step with
+      # "permission denied ... docker.sock".
+      DOCKER_GID: "0"
+    volumes:
+      - epsm_media:/app/media
+      - epsm_static:/app/staticfiles
+      - epsm_logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8010:8000"
+    depends_on:
+      epsm-db:
+        condition: service_healthy
+      epsm-redis:
+        condition: service_healthy
+    networks:
+      - epsm-net
+    restart: unless-stopped
+
+  epsm-worker:
+    image: ghcr.io/snjsomnath/epsm-backend:latest
+    container_name: epsm_worker
+    command: celery -A config worker --loglevel=info --concurrency=2
+    user: "0:0"  # see epsm-backend's comment above - needed for docker.sock access
+    environment:
+      DJANGO_SECRET_KEY: local-dev-only-not-for-production-0e9f8a7b6c5d4e3f2a1b
+      DEBUG: "True"
+      DB_NAME: epsm_db
+      DB_USER: epsm_user
+      DB_PASSWORD: epsm_local_dev_password
+      DB_HOST: epsm-db
+      DB_PORT: "5432"
+      REDIS_HOST: epsm-redis
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: redis://epsm-redis:6379/0
+      CELERY_RESULT_BACKEND: redis://epsm-redis:6379/0
+      ENERGYPLUS_DOCKER_IMAGE: nrel/energyplus:23.2.0
+      SIMULATION_TIMEOUT: "600"
+      HOST_MEDIA_ROOT: /var/lib/docker/volumes/project-planning-guide_epsm_media/_data
+      DOCKER_GID: "0"
+    volumes:
+      - epsm_media:/app/media
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      epsm-db:
+        condition: service_healthy
+      epsm-redis:
+        condition: service_healthy
+    networks:
+      - epsm-net
+    restart: unless-stopped
+
+networks:
+  epsm-net:
+    driver: bridge
+
+volumes:
+  epsm_pgdata:
+  epsm_redisdata:
+  epsm_media:
+  epsm_static:
+  epsm_logs:

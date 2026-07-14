@@ -211,24 +211,31 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
 async function showInfoPanel(b, idx) {
   selectedBuilding = { ...b, _idx: idx };
   lastPvgis = null; lastWWR = null;
+  window.lastSavedWWR = null;
   // Enable analysis tool buttons
   document.getElementById('btn-inspect').disabled = false;
   document.getElementById('btn-pvgis').disabled   = false;
+  document.getElementById('btn-sim').disabled     = false;
   document.getElementById('lp-no-selection').style.display = 'none';
   // Reset PVGIS result and saved badges when switching buildings
   const pvr = document.getElementById('pvgis-result');
   pvr.style.display = 'none'; pvr.innerHTML = '';
   document.getElementById('pvgis-saved-badge').style.display = 'none';
   document.getElementById('inspect-saved-badge').style.display = 'none';
+  const simr = document.getElementById('sim-result');
+  simr.style.display = 'none'; simr.innerHTML = '';
+  document.getElementById('sim-saved-badge').style.display = 'none';
+  if (typeof window.stopSimulationPolling === 'function') window.stopSimulationPolling();
   // Auto-load saved results for this building
   const bRing = b.coordinates && b.coordinates[0];
   if (bRing && bRing.length) {
     const bLat = (bRing.reduce((s,c) => s+c[1], 0) / bRing.length).toFixed(5);
     const bLon = (bRing.reduce((s,c) => s+c[0], 0) / bRing.length).toFixed(5);
     try {
-      const [pvRes, wwrRes] = await Promise.all([
+      const [pvRes, wwrRes, simRes] = await Promise.all([
         fetch(`http://localhost:8000/api/pvgis-lookup?lat=${bLat}&lon=${bLon}`).then(r=>r.json()),
         fetch(`http://localhost:8000/api/wwr-lookup?lat=${bLat}&lon=${bLon}`).then(r=>r.json()),
+        fetch(`http://localhost:8000/api/simulation-lookup?lat=${bLat}&lon=${bLon}`).then(r=>r.json()),
       ]);
       if (pvRes.found) {
         const r = pvRes.record;
@@ -239,9 +246,13 @@ async function showInfoPanel(b, idx) {
       }
       if (wwrRes.found) {
         const r = wwrRes.record;
+        window.lastSavedWWR = r;
         const badge = document.getElementById('inspect-saved-badge');
         badge.innerHTML = '&#128190; Saved WWR: ' + r.average_wwr + '% (AI)';
         badge.style.display = 'block';
+      }
+      if (simRes.found && typeof window.renderSimulationRecord === 'function') {
+        window.renderSimulationRecord(simRes.record);
       }
     } catch(e) { /* lookup not critical */ }
   }
@@ -296,7 +307,9 @@ function hideInfoPanel() {
   // Disable analysis tool buttons
   document.getElementById('btn-inspect').disabled = true;
   document.getElementById('btn-pvgis').disabled   = true;
+  document.getElementById('btn-sim').disabled     = true;
   document.getElementById('lp-no-selection').style.display = 'block';
+  if (typeof window.stopSimulationPolling === 'function') window.stopSimulationPolling();
 }
 
 document.getElementById('info-close').addEventListener('click', hideInfoPanel);

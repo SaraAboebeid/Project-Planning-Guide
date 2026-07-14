@@ -73,6 +73,7 @@
     'viewer/js/cesium.js',
     'viewer/js/ui.js',
     'viewer/js/pvgis.js',
+    'viewer/js/energy_sim.js',
     'viewer/js/facade_inspector.js',
     'viewer/js/search.js',
     'viewer/js/roads.js',
