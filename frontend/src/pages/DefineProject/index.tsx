@@ -15,7 +15,6 @@ import {
   EXPLORATION_OPTIONS,
   EXPLORATION_CONSTRAINTS,
   SCALE_OPTIONS_BY_TYPE,
-  COUNTRY_OPTIONS,
   BUILDING_USES,
   RE_ELECTRICITY_THRESHOLDS,
   BUILDING_DEVELOPMENT_OPTIONS,
@@ -116,6 +115,14 @@ export default function DefineProject() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.buildingPoints]);
 
+  // Country/city normally arrive already set from the landing page's
+  // startAt() (see LandingPage.tsx) - this only covers reaching Step 1
+  // directly (a bookmark, a refresh) without that handoff.
+  useEffect(() => {
+    if (!project.country) setProject({ country: "Sweden", city: "Gothenburg" });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const pt = project.projectType;
 
   /* ── derived lists ───────────────────────────────────────────── */
@@ -189,7 +196,6 @@ export default function DefineProject() {
     if (!project.explorationApproaches.length) missing.push("at least one exploration approach");
     if (!project.selectedKpis.length) missing.push("at least one KPI");
     if (!project.scale) missing.push("project scale");
-    if (!project.country) missing.push("country");
     if (pt === "Energy Community Planning" && !project.ecEnergyFocus.length) {
       missing.push("energy focus");
     }
@@ -223,8 +229,10 @@ export default function DefineProject() {
                               && (pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0);
   const showKpis           = showExploration && project.explorationApproaches.length > 0;
   const showScale          = showKpis && project.selectedKpis.length > 0;
-  const showCountry        = showScale && !!project.scale;
-  const showProjectName    = showCountry && !!project.country;
+  // Country/city are chosen once on the landing page (see LandingPage.tsx's
+  // startAt()), not asked again here - Step 1 used to have its own separate
+  // Country question, redundant now that Sweden/UK/etc have dedicated pages.
+  const showProjectName    = showScale && !!project.scale;
   const showLocation       = showProjectName;
 
   /* ── progress tracker ──────────────────────────────────────── */
@@ -241,7 +249,6 @@ export default function DefineProject() {
     ["Exploration",        project.explorationApproaches.length > 0],
     ["KPIs",              project.selectedKpis.length > 0],
     ["Scale",             !!project.scale],
-    ["Country",           !!project.country],
     ["Project name",      !!project.projectName.trim()],
     ["Location",          !!project.address.trim()],
   ];
@@ -779,33 +786,6 @@ export default function DefineProject() {
         </div>
       </Card>}
 
-      {/* ── COUNTRY ── */}
-      {showCountry && <Card className="animate-fadeIn">
-        <Label required>Country</Label>
-        <div className="flex gap-2 mt-1">
-          {COUNTRY_OPTIONS.map((c) => {
-            const isDisabled = c === "Belgium" || c === "Ireland" || c === "United Kingdom";
-            return (
-              <button
-                key={c}
-                onClick={() => !isDisabled && setProject({ country: c })}
-                disabled={isDisabled}
-                title={isDisabled ? "Coming soon" : undefined}
-                className={`px-4 py-2 rounded-lg text-sm font-medium border ${
-                  isDisabled
-                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                    : project.country === c
-                    ? "bg-navy text-white border-navy"
-                    : "bg-white border-gray-300 hover:border-gray-400"
-                }`}
-              >
-                {c}
-              </button>
-            );
-          })}
-        </div>
-      </Card>}
-
       {/* ── PROJECT NAME ── */}
       {showProjectName && <Card className="animate-fadeIn">
         <Label>Project Name</Label>
@@ -824,6 +804,8 @@ export default function DefineProject() {
           <Label>Project Location</Label>
           <LocationMap
             scale={project.scale}
+            country={project.country}
+            city={project.city}
             onAddressChange={(addr) => setProject({ address: addr })}
             onPointsChange={(pts) => setProject({ buildingPoints: pts })}
             onBboxChange={handleBboxChange}

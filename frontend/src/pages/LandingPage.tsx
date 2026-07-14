@@ -150,6 +150,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const reset = useWizardStore((s) => s.reset);
+  const setProject = useWizardStore((s) => s.setProject);
 
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>("se");
   const [selectedCity, setSelectedCity]       = useState("Gothenburg");
@@ -184,7 +185,18 @@ export default function LandingPage() {
     return () => { active = false; };
   }, []);
 
-  const handleStart = () => { reset(); navigate("/step/1"); };
+  // Country/city are chosen once here on the landing page (the top-bar
+  // pickers below), not asked again in the wizard - Step 1 used to have its
+  // own separate "Country" question, but now that Sweden/UK/etc already have
+  // dedicated pages there's no reason to ask twice. Every entry point into
+  // the wizard resets project state first, so country/city must be set
+  // *after* reset(), not before.
+  const startAt = (path: string) => {
+    reset();
+    setProject({ country: country.name, city: selectedCity || null });
+    navigate(path);
+  };
+  const handleStart = () => startAt("/step/1");
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#0a0d14", fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -202,10 +214,7 @@ export default function LandingPage() {
             key={step.n}
             iconPath={step.icon}
             label={step.shortLabel}
-            onClick={() => {
-              reset();
-              navigate(step.path);
-            }}
+            onClick={() => startAt(step.path)}
           />
         ))}
 
@@ -413,10 +422,7 @@ export default function LandingPage() {
               return (
                 <button
                   key={step.n}
-                  onClick={() => {
-                    reset();
-                    navigate(step.path);
-                  }}
+                  onClick={() => startAt(step.path)}
                   className="flex-1 rounded-2xl p-3 text-left border transition-all cursor-pointer"
                   style={{
                     background: "rgba(13,17,40,0.82)",
@@ -488,9 +494,9 @@ export default function LandingPage() {
                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
             <div className="text-[9px] text-white/30 uppercase tracking-widest mb-2">Shortcuts</div>
             <div className="flex gap-2">
-              <Shortcut iconPath={IC.import}   label="Import Data"        onClick={() => { reset(); navigate("/step/2"); }} />
-              <Shortcut iconPath={IC.compare}  label="Compare Scenarios"  onClick={() => { reset(); navigate("/pathways"); }} />
-              <Shortcut iconPath={IC.generate} label="Generate Report"    onClick={() => { reset(); navigate("/analysis"); }} />
+              <Shortcut iconPath={IC.import}   label="Import Data"        onClick={() => startAt("/step/2")} />
+              <Shortcut iconPath={IC.compare}  label="Compare Scenarios"  onClick={() => startAt("/pathways")} />
+              <Shortcut iconPath={IC.generate} label="Generate Report"    onClick={() => startAt("/analysis")} />
             </div>
           </div>
 

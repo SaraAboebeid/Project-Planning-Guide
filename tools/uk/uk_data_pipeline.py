@@ -198,6 +198,21 @@ def ring_of(el: dict) -> list | None:
     return ring
 
 
+def _modal(values):
+    """Most common non-null value across a block's certificates, or None."""
+    vals = [v for v in values if v]
+    return Counter(vals).most_common(1)[0][0] if vals else None
+
+
+def _modal_bool(values):
+    """Majority True/False across a block's certificates, ignoring unknowns
+    (None). None if no certificate carried an answer either way."""
+    vals = [v for v in values if v is not None]
+    if not vals:
+        return None
+    return sum(vals) >= len(vals) / 2
+
+
 def footprint_m2(ring: list) -> float:
     """Shoelace area, with longitude scaled by cos(lat) - fine at building scale."""
     lat0 = math.radians(sum(p[1] for p in ring) / len(ring))
@@ -520,6 +535,21 @@ def build_city(city: dict, priors: dict, refresh: bool = False, epc_details: boo
             epc_source = "epc"
             address = matches[0]["address"]
             stats["epc"] += 1
+            # Only populated if the pipeline was run with --epc-details (these
+            # live on the full certificate document, not the search result).
+            # Represent a multi-certificate block by its modal/majority value,
+            # same reasoning as `band` above - one extruded building, one value.
+            property_type = _modal([m["property_type"] for m in matches])
+            built_form = _modal([m["built_form"] for m in matches])
+            main_fuel = _modal([m["main_fuel"] for m in matches])
+            mainheat_description = _modal([m["mainheat_description"] for m in matches])
+            mainheat_energy_eff = _modal([m["mainheat_energy_eff"] for m in matches])
+            hotwater_description = _modal([m["hotwater_description"] for m in matches])
+            has_heat_pump = _modal_bool([m["has_heat_pump"] for m in matches])
+            has_solar_pv = _modal_bool([m["has_solar_pv"] for m in matches])
+            mains_gas_flag = _modal_bool([m["mains_gas_flag"] for m in matches])
+            consumptions = [m["energy_consumption_kwh_m2_yr"] for m in matches if m["energy_consumption_kwh_m2_yr"] is not None]
+            energy_consumption_kwh_m2_yr = round(sum(consumptions) / len(consumptions), 1) if consumptions else None
         else:
             band = None
             sap = None
@@ -529,6 +559,16 @@ def build_city(city: dict, priors: dict, refresh: bool = False, epc_details: boo
                 p for p in [tags.get("addr:housenumber"), tags.get("addr:street")] if p
             ) or tags.get("name")
             epc_source = None
+            property_type = None
+            built_form = None
+            main_fuel = None
+            mainheat_description = None
+            mainheat_energy_eff = None
+            hotwater_description = None
+            has_heat_pump = None
+            has_solar_pv = None
+            mains_gas_flag = None
+            energy_consumption_kwh_m2_yr = None
 
         period = year_to_band(year)
 
@@ -598,6 +638,16 @@ def build_city(city: dict, priors: dict, refresh: bool = False, epc_details: boo
                 "floor_area_m2": round(sum(areas), 1) if areas else None,
                 "epc_certificates": len(matches),
                 "osm_id": osm_id,
+                "property_type": property_type,
+                "built_form": built_form,
+                "main_fuel": main_fuel,
+                "mainheat_description": mainheat_description,
+                "mainheat_energy_eff": mainheat_energy_eff,
+                "hotwater_description": hotwater_description,
+                "has_heat_pump": has_heat_pump,
+                "has_solar_pv": has_solar_pv,
+                "mains_gas_flag": mains_gas_flag,
+                "energy_consumption_kwh_m2_yr": energy_consumption_kwh_m2_yr,
             }
         )
 
@@ -634,6 +684,11 @@ def build_city(city: dict, priors: dict, refresh: bool = False, epc_details: boo
     )
     if eubucco.rows:
         print(f"    EUBUCCO-enriched height/floors/type: {stats['eubucco_matched']:,}/{len(records):,}")
+    if epc_details:
+        n_hvac = sum(1 for r in records if r["mainheat_description"])
+        n_hp = sum(1 for r in records if r["has_heat_pump"])
+        n_pv = sum(1 for r in records if r["has_solar_pv"])
+        print(f"    HVAC detail (--epc-details): {n_hvac:,} buildings   heat pump: {n_hp:,}   solar PV: {n_pv:,}")
     if stats["tabula_matched"]:
         print(
             f"    TABULA envelope (U-values) matched: {stats['tabula_matched']:,}/{len(records):,} "
@@ -650,9 +705,10 @@ def main() -> None:
     ap.add_argument(
         "--epc-details",
         action="store_true",
-        help="also fetch full certificate details (floor area/property type/age band/SAP) - "
-             "one extra request per matched certificate, so much slower; off by default, "
-             "the EPC band itself doesn't need it",
+        help="also fetch full certificate details (floor area/property type/age band/SAP, "
+             "plus HVAC fields: heating/hot-water description, main fuel, heat pump and "
+             "solar PV flags) - one extra request per matched certificate, so much slower; "
+             "off by default, the EPC band itself doesn't need it",
     )
     args = ap.parse_args()
 

@@ -241,15 +241,6 @@ export const SCALE_OPTIONS_BY_TYPE: Record<ProjectType, string[]> = {
   "Renewable Energy Planning": ["Building", "Neighborhood", "Portfolio", "City"],
 };
 
-// ── Countries ──────────────────────────────────────────────────────────────
-
-export const COUNTRY_OPTIONS = [
-  "Belgium",
-  "Ireland",
-  "Sweden",
-  "United Kingdom",
-];
-
 // ── Building Uses (Neighborhood scale) ─────────────────────────────────────
 
 export const BUILDING_USES = [

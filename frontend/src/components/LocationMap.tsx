@@ -24,6 +24,7 @@ import {
 import L from "leaflet";
 import type { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { countryCodeFromName, mapCenterFor } from "../config/countryNav";
 
 // ── Fix Leaflet default icon paths broken by Vite bundling ──────────────────
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -279,6 +280,12 @@ function AddressInput({
 
 interface LocationMapProps {
   scale: string | null;
+  /** Country name as stored in project.country (e.g. "Sweden"/"United Kingdom") - determines
+   * which country's addresses Nominatim searches and where the map centers by default. */
+  country?: string | null;
+  /** City name as stored in project.city (e.g. "Gothenburg"/"London") - narrows the default
+   * map center further than country alone; falls back to the country's overview center. */
+  city?: string | null;
   onAddressChange: (addressString: string) => void;
   onPointsChange?: (points: { lat: number; lon: number; label: string }[]) => void;
   onBboxChange?: (bbox: { north: number; south: number; east: number; west: number } | null) => void;
@@ -286,11 +293,15 @@ interface LocationMapProps {
 
 export default function LocationMap({
   scale,
+  country,
+  city,
   onAddressChange,
   onPointsChange,
   onBboxChange,
 }: LocationMapProps) {
   const isBuilding = scale === "Building";
+  const countryCode = countryCodeFromName(country);
+  const mapCenter = mapCenterFor(countryCode, city);
 
   const [locationMode, setLocationMode] = useState<"addresses" | "bbox">(
     "addresses"
@@ -374,8 +385,9 @@ export default function LocationMap({
       ]
     : null;
 
-  // Default map center: Sweden overview
-  const defaultCenter: LatLngTuple = [62.0, 15.0];
+  // Default map center: the project's own country/city (falls back to a
+  // Sweden overview if neither is set - see mapCenterFor).
+  const defaultCenter: LatLngTuple = [mapCenter.lat, mapCenter.lon];
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -423,9 +435,10 @@ export default function LocationMap({
                 onGeocode={(lat, lon, label) =>
                   updateGeoPoint(i, lat, lon, label)
                 }
+                countryCode={countryCode}
                 placeholder={
                   isBuilding
-                    ? "Type an address in Sweden…"
+                    ? `Type an address in ${country ?? "Sweden"}…`
                     : `Address ${i + 1} — type to search`
                 }
               />
@@ -492,7 +505,7 @@ export default function LocationMap({
       <div className="h-64 rounded-xl overflow-hidden border border-gray-200">
         <MapContainer
           center={defaultCenter}
-          zoom={5}
+          zoom={mapCenter.zoom}
           className="h-full w-full"
           scrollWheelZoom
         >

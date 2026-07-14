@@ -32,6 +32,15 @@ in the spec, i.e. not fixed - fetch_certificate_detail() below tries the standar
 EPC register column names but has not been verified against a live response, since
 building this required no token).
 
+The full certificate document also carries HVAC/low-carbon-tech fields, using the
+same standard column names as the bulk CSV export (main_fuel, mainheat_description,
+mainheat_energy_eff, secondheat_description, hotwater_description/energy_eff,
+mains_gas_flag, solar_water_heating_flag, photo_supply_pct) plus two derived flags
+(has_heat_pump, has_solar_pv) read off the free-text heating description, since the
+register has no single "has a heat pump" column. These are only populated when
+fetch_postcodes(..., with_details=True) makes the extra per-certificate call - see
+uk_data_pipeline.py's --epc-details flag.
+
 Usage:
     python tools/uk/ingest_epc.py --postcodes NG1 5FS, NG1 6AA
     python tools/uk/ingest_epc.py --city nottingham
@@ -120,6 +129,36 @@ def _num(v):
         return None
 
 
+def _flag(v) -> bool | None:
+    """EPC Y/N-style fields ('Y', 'N', 'Yes', 'No', true/false) -> bool, or
+    None if genuinely absent (not the same as a confirmed 'No')."""
+    s = str(v if v is not None else "").strip().upper()
+    if s in ("Y", "YES", "TRUE", "1"):
+        return True
+    if s in ("N", "NO", "FALSE", "0"):
+        return False
+    return None
+
+
+# No single EPC column flags "has a heat pump" - it has to be read off the
+# free-text heating description (e.g. "Air source heat pump, radiators, electric").
+# Covers air/ground/water source heat pumps; a false negative just means the
+# text didn't use the phrase "heat pump", not that detection is unreliable.
+def _has_heat_pump(mainheat_description) -> bool | None:
+    if not mainheat_description:
+        return None
+    return "heat pump" in str(mainheat_description).lower()
+
+
+def _has_solar_pv(photo_supply_pct, mainheat_description=None) -> bool | None:
+    if photo_supply_pct is not None:
+        return photo_supply_pct > 0
+    text = str(mainheat_description or "").lower()
+    if "photovoltaic" in text or "solar pv" in text:
+        return True
+    return None
+
+
 # GET /api/domestic/search returns EnergyCertificateSearchResult objects - band and
 # identity fields only, in camelCase. See the module docstring for where the
 # fuller fields (floor area, property type, age band, SAP score) actually live.
@@ -146,13 +185,30 @@ def _row(rec: dict) -> dict:
         "floor_area_m2": None,
         "co2_t_per_yr": None,
         "inspection_date": None,
+        "energy_consumption_kwh_m2_yr": None,
+        "main_fuel": None,
+        "mainheat_description": None,
+        "mainheat_energy_eff": None,
+        "secondheat_description": None,
+        "hotwater_description": None,
+        "hotwater_energy_eff": None,
+        "mains_gas_flag": None,
+        "solar_water_heating_flag": None,
+        "photo_supply_pct": None,
+        "has_heat_pump": None,
+        "has_solar_pv": None,
     }
 
 
 # The bulk CSV export uses the classic EPC register column names (lowercase,
 # hyphenated), a different convention from the JSON API - and unlike the search
-# API, the bulk file carries every field on one row.
+# API, the bulk file carries every field on one row. NOTE: unlike
+# fetch_certificate_detail() below (verified against a live response), these
+# column-name assumptions are the well-documented historical bulk-CSV schema
+# but have not themselves been checked against a real downloaded file.
 def _row_from_csv(rec: dict) -> dict:
+    mainheat_description = rec.get("mainheat-description")
+    photo_supply_pct = _num(rec.get("photo-supply"))
     return {
         "certificate_number": rec.get("lmk-key"),
         "uprn": str(rec.get("uprn") or "").strip() or None,
@@ -172,6 +228,18 @@ def _row_from_csv(rec: dict) -> dict:
         "floor_area_m2": _num(rec.get("total-floor-area")),
         "co2_t_per_yr": _num(rec.get("co2-emissions-current")),
         "inspection_date": rec.get("inspection-date"),
+        "energy_consumption_kwh_m2_yr": _num(rec.get("energy-consumption-current")),
+        "main_fuel": rec.get("main-fuel"),
+        "mainheat_description": mainheat_description,
+        "mainheat_energy_eff": rec.get("mainheat-energy-eff"),
+        "secondheat_description": rec.get("secondheat-description"),
+        "hotwater_description": rec.get("hotwater-description"),
+        "hotwater_energy_eff": rec.get("hotwater-energy-eff"),
+        "mains_gas_flag": _flag(rec.get("mains-gas-flag")),
+        "solar_water_heating_flag": _flag(rec.get("solar-water-heating-flag")),
+        "photo_supply_pct": photo_supply_pct,
+        "has_heat_pump": _has_heat_pump(mainheat_description),
+        "has_solar_pv": _has_solar_pv(photo_supply_pct, mainheat_description),
         "council": None,
         "constituency": None,
         "post_town": None,
@@ -179,13 +247,49 @@ def _row_from_csv(rec: dict) -> dict:
     }
 
 
+def _desc_and_rating(value):
+    """main_heating/secondary_heating/hot_water/main_heating_controls are
+    each either a single {description, energy_efficiency_rating, ...} object
+    or a list of them (RdSAP allows more than one heating system) - verified
+    against a live response (schema RdSAP-Schema-21.0.1). Returns the first
+    entry's (description, energy_efficiency_rating), or (None, None)."""
+    if isinstance(value, list):
+        value = value[0] if value else None
+    if isinstance(value, dict):
+        return value.get("description"), value.get("energy_efficiency_rating")
+    return None, None
+
+
+def _find_pv_percent(photovoltaic_supply):
+    """sap_energy_source.photovoltaic_supply is a tagged-union-style nested
+    dict - a live no-PV response looks like
+    {"none_or_no_details": {"percent_roof_area": 0}}. The "has PV" sibling
+    key hasn't been observed live, so search generically for whichever
+    sub-dict carries percent_roof_area rather than hardcoding a key name."""
+    if not isinstance(photovoltaic_supply, dict):
+        return None
+    for v in photovoltaic_supply.values():
+        if isinstance(v, dict) and "percent_roof_area" in v:
+            return _num(v["percent_roof_area"])
+    return None
+
+
 def fetch_certificate_detail(certificate_number: str, token: str, session: requests.Session) -> dict:
     """
-    GET /api/certificate?certificate_number=... - the full document, for the
-    fields the search endpoint doesn't carry (floor area, property type, age
-    band, SAP score). The spec declares this schema `additionalProperties: true`
-    (i.e. unfixed), so this tries the standard EPC register column names and
-    returns {} for anything not found - not yet verified against a live response.
+    GET /api/certificate?certificate_number=... - the full RdSAP calculation
+    document, for fields the search endpoint doesn't carry (floor area,
+    property type, age band, SAP score, HVAC/low-carbon-tech details).
+
+    Schema verified against a live response (schema_type "RdSAP-Schema-21.0.1"):
+    it is NOT the flat kebab-case bulk-CSV schema _row_from_csv() uses below -
+    heating/hot-water/window/etc are nested {description, energy_efficiency_rating,
+    environmental_efficiency_rating} objects (main_heating/main_heating_controls
+    are lists of these, secondary_heating/hot_water are single objects),
+    `property_type` is a numeric SAP code with no confirmed decode table (use
+    the free-text `dwelling_type` instead, e.g. "Ground-floor maisonette"),
+    `built_form` is also a raw SAP code (e.g. "NR") passed through undecoded,
+    and `construction_age_band` lives per-building-part under
+    sap_building_parts, not at the top level.
     """
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     r = session.get(
@@ -198,22 +302,38 @@ def fetch_certificate_detail(certificate_number: str, token: str, session: reque
         return {}
     doc = (r.json() or {}).get("data") or {}
 
-    def g(*keys):
-        for k in keys:
-            if k in doc and doc[k] not in (None, ""):
-                return doc[k]
-        return None
+    building_parts = doc.get("sap_building_parts") or []
+    age_band = building_parts[0].get("construction_age_band") if building_parts else None
+
+    mainheat_description, mainheat_energy_eff = _desc_and_rating(doc.get("main_heating"))
+    secondheat_description, _ = _desc_and_rating(doc.get("secondary_heating"))
+    hotwater_description, hotwater_energy_eff = _desc_and_rating(doc.get("hot_water"))
+
+    energy_source = doc.get("sap_energy_source") or {}
+    photo_supply_pct = _find_pv_percent(energy_source.get("photovoltaic_supply"))
 
     return {
-        "band_potential": _band(g("potential-energy-rating", "potentialEnergyRating")),
-        "sap": _num(g("current-energy-efficiency", "currentEnergyEfficiency")),
-        "sap_potential": _num(g("potential-energy-efficiency", "potentialEnergyEfficiency")),
-        "property_type": g("property-type", "propertyType"),
-        "built_form": g("built-form", "builtForm"),
-        "age_band": g("construction-age-band", "constructionAgeBand"),
-        "floor_area_m2": _num(g("total-floor-area", "totalFloorArea")),
-        "co2_t_per_yr": _num(g("co2-emissions-current", "co2EmissionsCurrent")),
-        "inspection_date": g("inspection-date", "inspectionDate"),
+        "band_potential": _band(doc.get("potential_energy_efficiency_band")),
+        "sap": _num(doc.get("energy_rating_current")),
+        "sap_potential": _num(doc.get("energy_rating_potential")),
+        "property_type": doc.get("dwelling_type"),
+        "built_form": doc.get("built_form"),
+        "age_band": age_band,
+        "floor_area_m2": _num(doc.get("total_floor_area")),
+        "co2_t_per_yr": _num(doc.get("co2_emissions_current")),
+        "inspection_date": doc.get("inspection_date"),
+        "energy_consumption_kwh_m2_yr": _num(doc.get("energy_consumption_current")),
+        "main_fuel": None,  # no confirmed decode table for sap_heating's numeric fuel codes; see mainheat_description
+        "mainheat_description": mainheat_description,
+        "mainheat_energy_eff": mainheat_energy_eff,
+        "secondheat_description": secondheat_description,
+        "hotwater_description": hotwater_description,
+        "hotwater_energy_eff": hotwater_energy_eff,
+        "mains_gas_flag": _flag(energy_source.get("mains_gas")),
+        "solar_water_heating_flag": _flag(doc.get("solar_water_heating")),
+        "photo_supply_pct": photo_supply_pct,
+        "has_heat_pump": _has_heat_pump(mainheat_description),
+        "has_solar_pv": _has_solar_pv(photo_supply_pct, mainheat_description),
     }
 
 

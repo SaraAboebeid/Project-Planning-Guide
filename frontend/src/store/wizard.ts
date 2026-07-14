@@ -59,6 +59,7 @@ interface ProjectState {
   buildingDevelopmentType: BuildingDevelopmentType | null;
   projectName: string;
   country: string | null;
+  city: string | null;
   scale: string | null;
   systemsInScope: string[];
   selectedKpis: string[];
@@ -125,6 +126,7 @@ const DEFAULT_PROJECT: ProjectState = {
   buildingDevelopmentType: null,
   projectName: "",
   country: null,
+  city: null,
   scale: null,
   systemsInScope: [],
   selectedKpis: [],
