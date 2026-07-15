@@ -92,7 +92,7 @@ export const api = {
   /** Submit a shoebox EnergyPlus simulation (baseline or a renovation package
    * with envelope U-value overrides) - see backend's /api/simulation-submit. */
   simulationSubmit: (body: {
-    lat: number; lon: number; address?: string | null; country: string; city_id: string;
+    lat: number; lon: number; address?: string | null; country: string; city_id?: string;
     building: Record<string, unknown>; wwr_override?: number;
     u_wall_override?: number; u_roof_override?: number; u_win_override?: number; u_floor_override?: number;
     package_id?: string; package_label?: string | null;

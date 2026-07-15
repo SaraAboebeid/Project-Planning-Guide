@@ -15,7 +15,7 @@ const IC = {
   survey: "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 14H7v-2h4v2zm6-4H7v-2h10v2zm0-4H7V7h10v2z",
 };
 
-type Status = "live" | "cached" | "estimated";
+type Status = "live" | "cached" | "estimated" | "placeholder";
 
 type Source = {
   id: string;
@@ -32,11 +32,13 @@ const STATUS_LABEL: Record<Status, string> = {
   live: "Live",
   cached: "Cached",
   estimated: "Estimated",
+  placeholder: "Placeholder",
 };
 const STATUS_COLOR: Record<Status, string> = {
   live: "#96D74C",
   cached: "#4A90E2",
   estimated: "#F59E0B",
+  placeholder: "#EF4444",
 };
 
 async function fetchJson<T>(path: string): Promise<T> {
@@ -157,6 +159,28 @@ const UK_SOURCES: Source[] = [
         "/api/uk/retrofit-cost"
       );
       return Object.entries(data.costs["dwelling age"]).map(([label, v]) => ({ dwelling_age: label, ...v }));
+    },
+  },
+  {
+    id: "uk_cost_carbon",
+    name: "Renovation Cost & Embodied Carbon",
+    description:
+      "Two real candidate sources were reviewed and NOT wired in: the ICE Database Educational V5.0 " +
+      "(Circular Ecology / University of Bath) — real embodied-carbon-per-material data, but its license explicitly " +
+      "prohibits use “in software or tools (unless 100% a teaching aid only) or ... any carbon calculations” " +
+      "outside teaching/learning the subject, which this tool's real carbon math would violate; and the DBT/ONS " +
+      "“Construction Building Materials” bulletin — real, open (Crown copyright/OGL) data, but it publishes " +
+      "price indices and production volumes, not per-assembly £/m² unit costs, so it's the wrong shape of " +
+      "data for per-package costing. Until a properly-licensed UK cost/carbon source is wired in, the renovation " +
+      "calculator shows flat SYNTHETIC placeholder £/m² and kg CO₂e/m² rates per refurbishment " +
+      "tier — round, made-up numbers used only to test the pipeline end-to-end, not for real decisions.",
+    accent: "#EF4444",
+    iconD: IC.tabula,
+    status: "placeholder",
+    fields: ["tier", "cost_gbp_per_m2", "carbon_kgco2e_per_m2", "note"],
+    sampleFn: async () => {
+      const { UK_PLACEHOLDER_SAMPLE } = await import("../config/ukPlaceholderCostCarbon");
+      return UK_PLACEHOLDER_SAMPLE;
     },
   },
 ];

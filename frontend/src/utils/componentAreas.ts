@@ -22,6 +22,7 @@ export interface ResolvedBuildingGeometry {
   wallAreaM2: number | null;       // real perimeter x height when available
   wallPerimeterM: number | null;   // null for bbox-scope buildings (no real polygon exposed there yet)
   useCat: string | null;
+  tabulaPeriod: string | null;
   tabulaUWall: number | null;
   tabulaURoof: number | null;
   tabulaUWin: number | null;
@@ -50,6 +51,7 @@ export function resolveBuildingGeometry(
       wallAreaM2: building.wall_area_m2,
       wallPerimeterM: building.wall_perimeter_m,
       useCat: building.use_cat,
+      tabulaPeriod: building.tabula_period,
       tabulaUWall: building.tabula_u_wall,
       tabulaURoof: building.tabula_u_roof,
       tabulaUWin: building.tabula_u_win,
@@ -65,6 +67,7 @@ export function resolveBuildingGeometry(
     wallAreaM2: approxPerimeter && building.height_m ? approxPerimeter * building.height_m : null,
     wallPerimeterM: null,
     useCat: building.building_use,
+    tabulaPeriod: building.tabula_period,
     tabulaUWall: building.u_wall,
     tabulaURoof: building.u_roof,
     tabulaUWin: building.u_window,

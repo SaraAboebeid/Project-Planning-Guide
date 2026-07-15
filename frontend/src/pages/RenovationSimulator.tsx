@@ -6,15 +6,22 @@ import { lineItemsFor, type AreaLineItem } from "../config/componentAreaLineItem
 import { resolveBuildingGeometry, computeAreaForLineItem, quantityUnitLabel } from "../utils/componentAreas";
 import { itemsForLineItem, estimateCarbon, recommendationsForLineItem, type KpiKey } from "../utils/materialRecommendation";
 import { useSimulationPoller } from "../hooks/useSimulationPoller";
+import {
+  loadUkArchetypes, findUkArchetype, REFURB_TIERS,
+  type TabulaArchetypeGB, type RefurbTierKey,
+} from "../utils/ukArchetype";
+import { UK_PLACEHOLDER_RATES, fmtGBP } from "../config/ukPlaceholderCostCarbon";
 import type { WikellsItem } from "../config/wikellsData";
 import type { BoverketResource, WWRRecord } from "../types";
 import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw } from "lucide-react";
 
-/* Sweden/Gothenburg is the only real building dataset with EPSM weather
- * wired up (see backend's CITY_TO_EPW) - the wizard has no UK-building
- * resolution path yet, unlike the classic 3D viewer. */
-const COUNTRY = "se";
-const CITY_ID = "gothenburg";
+/* Sweden/Gothenburg is the only geometry+cost+carbon-complete dataset - UK
+ * buildings resolve via /api/uk/building (Phase 1) and get real EPSM energy
+ * simulation, but there's no UK cost/carbon catalogue equivalent to
+ * Wikells/Boverket yet, so UK packages price as "-" and use TABULA GB's
+ * whole-building refurbishment tiers (see ukArchetype.ts) in place of a
+ * per-component material picker. */
+const CITY_ID = "gothenburg"; // Sweden only - UK omits city_id, server auto-resolves the nearest district from lat/lon
 
 const COMPONENT_COLORS: Record<string, string> = {
   "Walls": "#721CB8", "Windows": "#F59E0B", "Doors": "#4ECDC4", "Floor": "#4A90E2",
@@ -30,6 +37,17 @@ function uLabel(u?: number) {
   if (u <= 0.20) return { label: "Good", color: "#4ECDC4" };
   if (u <= 0.30) return { label: "Standard", color: "#F59E0B" };
   return { label: "Basic", color: "#EF4444" };
+}
+
+const UK_TIER_SELECTIONS_KEY = "UK::RefurbTier";
+
+function ukOverridesFromTier(tier: TabulaArchetypeGB[RefurbTierKey] | undefined | null): Record<string, number> {
+  const overrides: Record<string, number> = {};
+  if (!tier) return overrides;
+  if (tier.u_wall != null) overrides.u_wall_override = tier.u_wall;
+  if (tier.u_roof != null) overrides.u_roof_override = tier.u_roof;
+  if (tier.u_window != null) overrides.u_win_override = tier.u_window;
+  return overrides;
 }
 
 /* ─── Material picker for one area line item (single-select) ─────────────── */
@@ -95,11 +113,108 @@ function LineItemPicker({
   );
 }
 
+/* ─── UK refurbishment-tier picker (whole-building, not per-component) ────── */
+function UkTierPicker({
+  archetype, selectedTier, onSelect, footprintM2,
+}: {
+  archetype: TabulaArchetypeGB | null;
+  selectedTier: RefurbTierKey | null;
+  onSelect: (tier: RefurbTierKey) => void;
+  footprintM2: number | null;
+}) {
+  if (!archetype) {
+    return (
+      <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
+        <p style={{ fontSize: 12, color: "#F59E0B", margin: 0 }}>
+          No TABULA GB archetype matched this building's type/era - envelope U-value overrides aren't available, but a
+          baseline EnergyPlus simulation can still run on the as-built defaults.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ borderRadius: 10, padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
+          As-built (TABULA {archetype.type_label}, {archetype.period_label})
+        </div>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          {(["u_wall", "u_roof", "u_window", "u_floor"] as const).map((k) => (
+            archetype.as_built[k] != null && (
+              <span key={k} style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                {k.replace("u_", "U-")}: <b style={{ color: "rgba(255,255,255,0.8)" }}>{archetype.as_built[k]}</b>
+              </span>
+            )
+          ))}
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+            TABULA estimate: <b style={{ color: "rgba(255,255,255,0.8)" }}>{archetype.as_built.kwh_m2_yr} kWh/m²/yr</b>
+          </span>
+        </div>
+      </div>
+
+      {REFURB_TIERS.map(({ key, label }) => {
+        const tier = archetype[key];
+        const checked = selectedTier === key;
+        const color = "#721CB8";
+        const rate = UK_PLACEHOLDER_RATES[key];
+        const estCost = footprintM2 != null ? Math.round(rate.costGbpPerM2 * footprintM2) : null;
+        const estCarbon = footprintM2 != null ? Math.round(rate.carbonKgCo2ePerM2 * footprintM2) : null;
+        return (
+          <button
+            key={key}
+            onClick={() => onSelect(key)}
+            style={{
+              width: "100%", textAlign: "left", padding: "12px 14px", borderRadius: 10, cursor: "pointer",
+              border: `1px solid ${checked ? `${color}55` : "rgba(255,255,255,0.08)"}`,
+              background: checked ? `${color}18` : "rgba(255,255,255,0.03)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <div style={{
+                width: 15, height: 15, borderRadius: "50%", flexShrink: 0,
+                border: `2px solid ${checked ? color : "rgba(255,255,255,0.2)"}`,
+                background: checked ? color : "transparent",
+              }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: checked ? "#fff" : "rgba(255,255,255,0.75)" }}>{label}</span>
+            </div>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", paddingLeft: 23 }}>
+              {(["u_wall", "u_roof", "u_window", "u_door"] as const).map((k) => (
+                tier[k] != null && (
+                  <span key={k} style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                    {k.replace("u_", "U-")}: <b style={{ color: "rgba(255,255,255,0.8)" }}>{tier[k]}</b>
+                  </span>
+                )
+              ))}
+              <span style={{ fontSize: 11, color: "#60a5fa" }}>
+                TABULA estimate: <b>{tier.kwh_m2_yr} kWh/m²/yr</b>
+              </span>
+              {estCost != null && estCarbon != null && (
+                <span style={{ fontSize: 11, color: "#F59E0B" }}>
+                  ~{fmtGBP(estCost)} · ~{estCarbon.toLocaleString("en-GB")} kg CO₂e <i>(placeholder)</i>
+                </span>
+              )}
+            </div>
+          </button>
+        );
+      })}
+      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: 0 }}>
+        Cost and embodied carbon for UK packages are SYNTHETIC PLACEHOLDER figures (flat £/m² and kg CO₂e/m² rates,
+        not derived from any real dataset) shown only to test the calculator pipeline end-to-end - replace with a
+        real, licensed UK cost/carbon source before using these numbers for an actual decision. The energy columns
+        below come from a real EnergyPlus simulation using this tier's U-values.
+      </p>
+    </div>
+  );
+}
+
 /* ─── Main page ───────────────────────────────────────────────────────────── */
 export default function RenovationSimulator() {
   const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
   const { submitAndPoll, resumePoll } = useSimulationPoller();
+
+  const isUK = project.country === "United Kingdom";
+  const COUNTRY = isUK ? "gb" : "se";
 
   const components = project.renovationEnvelopeComponents.length > 0
     ? project.renovationEnvelopeComponents
@@ -114,6 +229,8 @@ export default function RenovationSimulator() {
   const [boverketByComponent, setBoverketByComponent] = useState<Record<string, BoverketResource[]>>({});
   const [activeItemKey, setActiveItemKey] = useState<string>(lineItems[0]?.key ?? "");
   const [draftSelection, setDraftSelection] = useState<Record<string, string>>({});
+  const [ukArchetype, setUkArchetype] = useState<TabulaArchetypeGB | null>(null);
+  const [ukTier, setUkTier] = useState<RefurbTierKey | null>(null);
   const [packageName, setPackageName] = useState("");
   // A ref, not state: React StrictMode double-invokes effects in dev without
   // an intervening re-render, so a useState guard here would let both
@@ -124,7 +241,7 @@ export default function RenovationSimulator() {
 
   const packages = project.renovationCalcPackages;
 
-  /* ── fetch WWR + Boverket data + hydrate baseline/in-flight packages ──── */
+  /* ── fetch WWR + Boverket/TABULA data + hydrate baseline/in-flight packages ── */
   useEffect(() => {
     if (!geometry || initializedRef.current) return;
     initializedRef.current = true;
@@ -133,9 +250,15 @@ export default function RenovationSimulator() {
       if (r.found) setWwr(r.record);
     }).catch(() => { /* not critical */ });
 
-    const uniqueComponents = Array.from(new Set(lineItems.map((li) => li.boverketComponent)));
-    Promise.all(uniqueComponents.map((c) => api.boverketMaterials(c).then((res) => [c, res] as const).catch(() => [c, []] as const)))
-      .then((pairs) => setBoverketByComponent(Object.fromEntries(pairs)));
+    if (isUK) {
+      loadUkArchetypes().then((archetypes) => {
+        setUkArchetype(findUkArchetype(archetypes, geometry.useCat, geometry.tabulaPeriod));
+      }).catch(() => { /* no archetype match available */ });
+    } else {
+      const uniqueComponents = Array.from(new Set(lineItems.map((li) => li.boverketComponent)));
+      Promise.all(uniqueComponents.map((c) => api.boverketMaterials(c).then((res) => [c, res] as const).catch(() => [c, []] as const)))
+        .then((pairs) => setBoverketByComponent(Object.fromEntries(pairs)));
+    }
 
     api.simulationLookupAll(geometry.lat, geometry.lon).then(({ records }) => {
       // Read live store state, not the `packages` closed over at render time -
@@ -190,11 +313,14 @@ export default function RenovationSimulator() {
     if (!geometry) return;
     const pkg = makeBaselinePackage({ status: "idle", simulationId: null, heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null, error: null });
     setProject({ renovationCalcPackages: [...useWizardStore.getState().project.renovationCalcPackages, pkg] });
-    submitAndPoll("baseline", { lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY, city_id: CITY_ID, building: {} });
+    submitAndPoll("baseline", {
+      lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY,
+      ...(isUK ? {} : { city_id: CITY_ID }), building: {},
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geometry]);
+  }, [geometry, isUK]);
 
-  /* ── derived: items/areas/recommendations for the active line item ────── */
+  /* ── derived: items/areas/recommendations for the active line item (Sweden only) ── */
   const activeItem = lineItems.find((li) => li.key === activeItemKey) ?? lineItems[0];
   const activeCatalogue = activeItem ? itemsForLineItem(activeItem) : [];
   const activeBoverket = activeItem ? (boverketByComponent[activeItem.boverketComponent] ?? []) : [];
@@ -213,8 +339,13 @@ export default function RenovationSimulator() {
 
   /* ── add a new package ─────────────────────────────────────────────────── */
   const PACKAGE_COLORS = ["#721CB8", "#4ECDC4", "#F59E0B", "#96D74C", "#F97316", "#5FA5FF"];
+
   function addPackage() {
     if (!geometry) return;
+    if (isUK) {
+      addUkPackage();
+      return;
+    }
     const selections: Record<string, { wikellsCode: string; quantity: number }> = {};
     let costSEK = 0;
     let carbonKgCO2e = 0;
@@ -255,11 +386,53 @@ export default function RenovationSimulator() {
       if (item.key === "Windows") overrides.u_win_override = wikellsItem.uValue;
       if (item.key === "Floor" || item.key === "VertExt::Floor") overrides.u_floor_override = wikellsItem.uValue;
     }
-    submitAndPoll(id, { lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY, city_id: CITY_ID, building: {}, package_label: name, ...overrides });
+    submitAndPoll(id, {
+      lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY,
+      city_id: CITY_ID, building: {}, package_label: name, ...overrides,
+    });
+  }
+
+  function addUkPackage() {
+    if (!geometry || !ukArchetype || !ukTier) return;
+    const tier = ukArchetype[ukTier];
+    const tierMeta = REFURB_TIERS.find((t) => t.key === ukTier)!;
+    const rate = UK_PLACEHOLDER_RATES[ukTier];
+    const footprint = geometry.footprintM2 ?? 0;
+
+    const id = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const name = packageName.trim() || tierMeta.label;
+    const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
+    const pkg: RenovationCalcPackage = {
+      id, name, color, isBaseline: false,
+      selections: { [UK_TIER_SELECTIONS_KEY]: { wikellsCode: ukTier, quantity: 1 } },
+      // SYNTHETIC PLACEHOLDER figures (see ukPlaceholderCostCarbon.ts) - not a
+      // real UK cost/carbon source, shown only for pipeline-testing purposes.
+      costSEK: footprint ? Math.round(rate.costGbpPerM2 * footprint) : null,
+      carbonKgCO2e: footprint ? Math.round(rate.carbonKgCo2ePerM2 * footprint) : null,
+      simulation: { status: "idle", simulationId: null, heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null, error: null },
+    };
+    setProject({ renovationCalcPackages: [...packages, pkg] });
+    setPackageName("");
+    setUkTier(null);
+
+    submitAndPoll(id, {
+      lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY,
+      building: {}, package_label: name, ...ukOverridesFromTier(tier),
+    });
   }
 
   function retryPackage(pkg: RenovationCalcPackage) {
     if (!geometry) return;
+    if (isUK) {
+      const sel = pkg.selections[UK_TIER_SELECTIONS_KEY];
+      const tierKey = sel?.wikellsCode as RefurbTierKey | undefined;
+      const tier = tierKey && ukArchetype ? ukArchetype[tierKey] : null;
+      submitAndPoll(pkg.id, {
+        lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY,
+        building: {}, package_label: pkg.name, ...ukOverridesFromTier(tier),
+      });
+      return;
+    }
     const overrides: Record<string, number> = {};
     for (const [key, sel] of Object.entries(pkg.selections)) {
       const wikellsItem = itemByCode[sel.wikellsCode];
@@ -291,7 +464,7 @@ export default function RenovationSimulator() {
           packageIndex: i + 1,
           components: Object.fromEntries(Object.entries(p.selections).map(([k, s]) => {
             const it = itemByCode[s.wikellsCode];
-            return [k, { code: s.wikellsCode, description: it?.description ?? "", costSEK: it?.costSEK ?? 0, uValue: it?.uValue }];
+            return [k, { code: s.wikellsCode, description: it?.description ?? s.wikellsCode, costSEK: it?.costSEK ?? 0, uValue: it?.uValue }];
           })),
           energyUse: total, saving, carbonSaving: Math.round(saving * 0.2),
           cost: p.costSEK ?? 0,
@@ -300,6 +473,8 @@ export default function RenovationSimulator() {
     });
     navigate("/step/5");
   }
+
+  const canAddPackage = isUK ? ukTier != null : Object.keys(draftSelection).length > 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1100 }}>
@@ -311,8 +486,9 @@ export default function RenovationSimulator() {
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>Renovation Calculator</h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          Pick a material per component, add it as a package, and compare real cost, embodied carbon, and
-          EnergyPlus-simulated performance against the building's as-built baseline.
+          {isUK
+            ? "Pick a TABULA refurbishment tier and compare real EnergyPlus-simulated performance against the building's as-built baseline."
+            : "Pick a material per component, add it as a package, and compare real cost, embodied carbon, and EnergyPlus-simulated performance against the building's as-built baseline."}
         </p>
       </div>
 
@@ -322,7 +498,13 @@ export default function RenovationSimulator() {
         </div>
       )}
 
-      {geometry && (
+      {geometry && isUK && (
+        <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(114,28,184,0.2)" }}>
+          <UkTierPicker archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier} footprintM2={geometry.footprintM2} />
+        </div>
+      )}
+
+      {geometry && !isUK && (
         <>
           {/* Component tabs + material picker */}
           <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }}>
@@ -392,7 +574,11 @@ export default function RenovationSimulator() {
               </div>
             )}
           </div>
+        </>
+      )}
 
+      {geometry && (
+        <>
           {/* Add package */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
             <input
@@ -403,12 +589,12 @@ export default function RenovationSimulator() {
             />
             <button
               onClick={addPackage}
-              disabled={Object.keys(draftSelection).length === 0}
+              disabled={!canAddPackage}
               style={{
                 display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
                 border: "1px solid rgba(150,215,76,0.4)", background: "rgba(150,215,76,0.12)", color: "#96D74C",
-                cursor: Object.keys(draftSelection).length === 0 ? "not-allowed" : "pointer",
-                opacity: Object.keys(draftSelection).length === 0 ? 0.5 : 1,
+                cursor: canAddPackage ? "pointer" : "not-allowed",
+                opacity: canAddPackage ? 1 : 0.5,
               }}
             >
               <Plus size={13} /> Add package
@@ -428,8 +614,12 @@ export default function RenovationSimulator() {
                   <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: pkg.color, marginRight: 6 }} />
                   {pkg.name}
                 </span>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{pkg.costSEK != null ? fmtSEK(pkg.costSEK) : "—"}</span>
-                <span style={{ fontSize: 12, color: "#60a5fa" }}>{pkg.carbonKgCO2e != null ? `${pkg.carbonKgCO2e.toLocaleString("sv-SE")} kg` : "—"}</span>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && pkg.costSEK != null ? "Synthetic placeholder - not a real UK cost source" : undefined}>
+                  {pkg.costSEK == null ? "—" : isUK ? `${fmtGBP(pkg.costSEK)}*` : fmtSEK(pkg.costSEK)}
+                </span>
+                <span style={{ fontSize: 12, color: "#60a5fa" }} title={isUK && pkg.carbonKgCO2e != null ? "Synthetic placeholder - not a real UK carbon source" : undefined}>
+                  {pkg.carbonKgCO2e == null ? "—" : isUK ? `${pkg.carbonKgCO2e.toLocaleString("en-GB")} kg*` : `${pkg.carbonKgCO2e.toLocaleString("sv-SE")} kg`}
+                </span>
                 <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{pkg.simulation.heatingKwhM2Yr != null ? `${pkg.simulation.heatingKwhM2Yr}` : "—"}</span>
                 <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{pkg.simulation.coolingKwhM2Yr != null ? `${pkg.simulation.coolingKwhM2Yr}` : "—"}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C" }}>{pkg.simulation.totalKwhM2Yr != null ? `${pkg.simulation.totalKwhM2Yr}` : "—"}</span>
@@ -449,6 +639,11 @@ export default function RenovationSimulator() {
             ))}
             {packages.length === 0 && (
               <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>No packages yet.</p>
+            )}
+            {isUK && packages.some((p) => p.costSEK != null) && (
+              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
+                * Synthetic placeholder cost/carbon (not a real UK data source) - see ukPlaceholderCostCarbon.ts.
+              </p>
             )}
           </div>
 
