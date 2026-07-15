@@ -474,6 +474,11 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
 
   try {
     const results = [];
+    // Balconies on different facades ADD UP (unlike WWR, which is one ratio
+    // per facade averaged across facades) - kept as parallel arrays so the
+    // sum can't accidentally get averaged alongside the WWR values.
+    const balconyCounts = [];
+    const balconyAreas = [];
     let source = 'ai';
     let backendAvailable = true;
 
@@ -492,6 +497,8 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
           const data = await resp.json();
           if (data.wwr !== undefined && data.wwr !== null) {
             results.push(Math.round(data.wwr));
+            balconyCounts.push(data.balcony_count || 0);
+            balconyAreas.push(data.balcony_area_m2 != null ? data.balcony_area_m2 : null);
             source = data.source || 'ai';
           }
         } else {
@@ -506,22 +513,30 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
 
     if (!backendAvailable || results.length === 0) {
       const h = wwrHeuristic(buildingInfo);
-      toSend.forEach(() => results.push(h));
+      toSend.forEach(() => { results.push(h); balconyCounts.push(0); balconyAreas.push(null); });
       source = 'ai';
       document.getElementById('facade-sub').textContent = 'Backend offline — using archetype heuristic ✓';
     } else {
-      document.getElementById('facade-sub').textContent = 'AI estimation complete ✓';
+      const balconyCountTotal = balconyCounts.reduce((a, b) => a + b, 0);
+      document.getElementById('facade-sub').textContent =
+        `AI estimation complete ✓ (${balconyCountTotal} balcon${balconyCountTotal === 1 ? 'y' : 'ies'} detected)`;
     }
 
     const avg = Math.round(results.reduce((a, b) => a + b, 0) / results.length);
     const dirs = toSend.map(t => t.dir);
+    const balconyCountTotal = balconyCounts.reduce((a, b) => a + b, 0);
+    const nonNullAreas = balconyAreas.filter(a => a != null);
+    const balconyAreaTotal = nonNullAreas.length ? nonNullAreas.reduce((a, b) => a + b, 0) : null;
     showWWR(avg, results, source === 'heuristic' ? 'heuristic' : source);
-    lastWWR = { avg, perFacade: results, source };
+    lastWWR = { avg, perFacade: results, source, balconyCountTotal, balconyAreaTotal };
 
     if (source !== 'heuristic') {
       const saveRow = document.getElementById('wwr-save-row');
       saveRow.style.display = 'block';
-      saveRow._pendingWWR = { avg, results, dirs, source, buildingInfo };
+      saveRow._pendingWWR = {
+        avg, results, dirs, source, buildingInfo,
+        balconyCounts, balconyCountTotal, balconyAreaTotal,
+      };
       document.getElementById('wwr-save-status').textContent = '';
       const sb = document.getElementById('btn-wwr-save');
       sb.textContent = 'Save to WWR Database';
@@ -555,6 +570,9 @@ document.getElementById('btn-wwr-save').addEventListener('click', async () => {
         directions: pending.dirs,
         source: pending.source,
         building_info: pending.buildingInfo,
+        balcony_count_total: pending.balconyCountTotal || 0,
+        balcony_area_m2_total: pending.balconyAreaTotal,
+        per_facade_balcony_count: pending.balconyCounts,
       }),
     });
     if (resp.ok) {

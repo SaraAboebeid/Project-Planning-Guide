@@ -106,6 +106,31 @@
       "eubucco_matched": 1368,
       "tabula_matched": 684,
       "data_file": "uk/buildings_london_southwark.json"
+    },
+    {
+      "id": "rotherham",
+      "name": "Rotherham",
+      "district": "Town Centre",
+      "region": "Yorkshire and the Humber",
+      "lat": 53.4302,
+      "lon": -1.3568,
+      "radius_m": 1200,
+      "buildings": 2515,
+      "with_epc": 139,
+      "estimated_from_ehs": 1689,
+      "no_band": 687,
+      "band_distribution": {
+        "A": 3,
+        "B": 60,
+        "C": 832,
+        "D": 744,
+        "E": 145,
+        "F": 31,
+        "G": 13
+      },
+      "eubucco_matched": 2499,
+      "tabula_matched": 1822,
+      "data_file": "uk/buildings_rotherham.json"
     }
   ]
 }

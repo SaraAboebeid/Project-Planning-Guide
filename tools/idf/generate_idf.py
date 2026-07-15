@@ -158,8 +158,19 @@ def build_shoebox_idf(
     epw_path: str | Path,
     wwr_override: Optional[float] = None,
     building_name: Optional[str] = None,
+    u_wall_override: Optional[float] = None,
+    u_roof_override: Optional[float] = None,
+    u_win_override: Optional[float] = None,
+    u_floor_override: Optional[float] = None,
 ) -> str:
-    """Return a complete EnergyPlus 23.2 IDF (as text) for one building."""
+    """Return a complete EnergyPlus 23.2 IDF (as text) for one building.
+
+    The u_*_override params exist for the renovation-package calculator: a
+    package swaps one or more envelope U-values (e.g. a new wall material)
+    without needing a copy of the building dict - each override takes
+    priority over the building's own tabula_u_* field, same pattern as the
+    existing wwr_override.
+    """
     ring = building["coordinates"][0]
     ring2d = G.ensure_ccw(G.project_ring(ring))
     height = float(building["height"])
@@ -172,10 +183,10 @@ def build_shoebox_idf(
     use_cat = building.get("use_cat")
     gains = _gains_profile(use_cat)
 
-    u_wall = building.get("tabula_u_wall") or D.DEFAULT_U_WALL
-    u_roof = building.get("tabula_u_roof") or D.DEFAULT_U_ROOF
-    u_win = building.get("tabula_u_win") or D.DEFAULT_U_WIN
-    u_floor = D.DEFAULT_U_FLOOR
+    u_wall = u_wall_override if u_wall_override is not None else (building.get("tabula_u_wall") or D.DEFAULT_U_WALL)
+    u_roof = u_roof_override if u_roof_override is not None else (building.get("tabula_u_roof") or D.DEFAULT_U_ROOF)
+    u_win = u_win_override if u_win_override is not None else (building.get("tabula_u_win") or D.DEFAULT_U_WIN)
+    u_floor = u_floor_override if u_floor_override is not None else D.DEFAULT_U_FLOOR
     wwr = wwr_override if wwr_override is not None else D.DEFAULT_WWR_BY_USE.get(use_cat or "", D.DEFAULT_WWR_FALLBACK)
 
     name_base = _safe_name(building_name or building.get("address") or f"{city_id} building")

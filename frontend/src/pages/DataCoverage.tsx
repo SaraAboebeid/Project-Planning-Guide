@@ -1523,7 +1523,7 @@ export default function DataCoverage() {
     if (pts.length > 0 && buildings.length === 0 && !bboxStats) {
       (async () => {
         try {
-          const results = await Promise.all(pts.map(p => api.lookupBuilding(p.lat, p.lon)));
+          const results = await Promise.all(pts.map(p => api.lookupBuilding(p.lat, p.lon, project.country)));
           let savedWWRNew = null;
           try {
             const first = pts[0];

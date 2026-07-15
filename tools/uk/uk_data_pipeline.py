@@ -199,15 +199,21 @@ def ring_of(el: dict) -> list | None:
 
 
 def _modal(values):
-    """Most common non-null value across a block's certificates, or None."""
-    vals = [v for v in values if v]
+    """Most common non-null value across a block's certificates, or None.
+    Defensive against unexpected non-scalar field shapes (seen live: the EPC
+    detail endpoint returns a nested dict for `dwelling_type` on at least
+    some real certificates, rather than the plain string documented from the
+    one sample response this was built against) - non-hashable values are
+    skipped rather than crashing the whole pipeline run over one record.
+    """
+    vals = [v for v in values if v and isinstance(v, (str, int, float))]
     return Counter(vals).most_common(1)[0][0] if vals else None
 
 
 def _modal_bool(values):
     """Majority True/False across a block's certificates, ignoring unknowns
     (None). None if no certificate carried an answer either way."""
-    vals = [v for v in values if v is not None]
+    vals = [v for v in values if isinstance(v, bool)]
     if not vals:
         return None
     return sum(vals) >= len(vals) / 2

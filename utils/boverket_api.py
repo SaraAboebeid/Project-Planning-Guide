@@ -10,7 +10,7 @@ API Documentation: https://api-portal.boverket.se/reference#api=klimatdatabas
 import json
 import urllib.request
 import urllib.error
-import streamlit as st
+from functools import lru_cache
 
 BASE_URL = "https://api.boverket.se/klimatdatabas/api/Klimat/v2"
 
@@ -47,7 +47,7 @@ def _api_get(path: str, timeout: int = 12) -> dict | list | str | None:
 
 # ── Cached public API functions ────────────────────────────────────
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@lru_cache(maxsize=None)
 def get_latest_version() -> str | None:
     """Return the latest database version string, e.g. '02.07.000'."""
     data = _api_get("GetLatestVersion/sv/json")
@@ -56,7 +56,7 @@ def get_latest_version() -> str | None:
     return None
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@lru_cache(maxsize=None)
 def get_all_versions() -> list[str]:
     """Return list of all available version strings."""
     data = _api_get("GetAllVersions/sv/json")
@@ -65,7 +65,7 @@ def get_all_versions() -> list[str]:
     return []
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@lru_cache(maxsize=None)
 def get_categories(version: str | None = None, culture: str = "en") -> list[dict]:
     """
     Return flat list of subcategories.
@@ -87,7 +87,7 @@ def get_categories(version: str | None = None, culture: str = "en") -> list[dict
     return result
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@lru_cache(maxsize=None)
 def get_resources_by_category(
     category_id: int,
     version: str | None = None,
@@ -105,7 +105,7 @@ def get_resources_by_category(
     return []
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@lru_cache(maxsize=None)
 def get_all_resources(version: str | None = None, culture: str = "en") -> list[dict]:
     """Return every resource in the database (all categories)."""
     ver = version or get_latest_version() or "02.07.000"
@@ -261,7 +261,7 @@ RENOVATION_COMPONENTS = [
 ]
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@lru_cache(maxsize=None)
 def get_resources_for_component(
     component: str,
     version: str | None = None,
@@ -294,3 +294,11 @@ def get_resources_for_component(
             results.append(res)
 
     return results
+
+
+def fetch_materials(component: str, version: str | None = None, culture: str = "en") -> list[dict]:
+    """FastAPI-facing entry point: category+keyword-filtered Boverket resources
+    for `component` (one of RENOVATION_COMPONENTS), flattened via
+    resource_summary() into plain JSON-safe dicts."""
+    resources = get_resources_for_component(component, version=version, culture=culture)
+    return [resource_summary(r) for r in resources]

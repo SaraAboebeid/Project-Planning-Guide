@@ -109,6 +109,25 @@ export interface WWRRecord {
   source: string;
   building_info: Record<string, unknown>;
   saved_at: string;
+  balcony_count_total?: number;
+  balcony_area_m2_total?: number | null;
+}
+
+/** One material resource from the Boverket Klimatdatabas, flattened by
+ * utils/boverket_api.py's resource_summary(). GWP figures are kg CO2e per
+ * the resource's own Unit (see the Unit field, usually per-kg or per-m2). */
+export interface BoverketResource {
+  Name: string;
+  Unit: string;
+  Category: string;
+  "GWP A1-A3 (Conservative)": number | "—";
+  "GWP A1-A3 (Typical)": number | "—";
+  "GWP A4 (Transport)": number | "—";
+  "GWP A5.1 (Installation)": number | "—";
+  "GWP Max (Cons+A4+A5)": number | "—";
+  "GWP Min (Typ+A4+A5)": number | "—";
+  "Density / Conversion": string;
+  "Waste Factor": string | number;
 }
 
 /** Nearest EUBUCCO building returned by /api/building */
@@ -118,12 +137,17 @@ export interface BuildingLookup {
   floors: number | null;
   area_atemp: number | null;    // total Atemp (GFA) from EPC
   footprint_m2: number | null; // EUBUCCO polygon area (single building footprint)
+  wall_perimeter_m: number | null; // true polygon perimeter, not a square approximation
+  wall_area_m2: number | null;     // wall_perimeter_m x height
+  roof_area_m2: number | null;     // alias of footprint_m2
+  floor_area_m2: number | null;    // alias of footprint_m2
   use_cat: string | null;
   year: number | null;
   energy: number | null;        // kWh/m²/yr
   eclass: string | null;
   tabula_period: string | null;
   tabula_u_wall: number | null;
+  tabula_u_roof: number | null;
   tabula_u_win: number | null;
   has_epc: boolean;
   lat: number;

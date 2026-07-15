@@ -52,6 +52,33 @@ export interface RenovationPackage {
   selections: Record<string, PackageComponent>; // key = renovation component label
 }
 
+/* ── Renovation calculator (wizard Step 4 / RenovationSimulator.tsx) ──
+   Deliberately a separate type/field from RenovationPackage/renovationPackages
+   above - those are still live, used by the standalone /pathways vertical-
+   extension tool (RenovationPackages.tsx) and must keep their existing shape. */
+export interface RenovationCalcSelection {
+  wikellsCode: string;
+  quantity: number; // m² for area line items, a unit count for count line items - see AreaLineItem.quantityKind
+}
+
+export interface RenovationCalcPackage {
+  id: string;               // "baseline" | `pkg-${uuid}`
+  name: string;
+  color: string;
+  isBaseline: boolean;
+  selections: Record<string, RenovationCalcSelection>; // key = AreaLineItem.key
+  costSEK: number | null;
+  carbonKgCO2e: number | null;
+  simulation: {
+    status: "idle" | "queued" | "running" | "completed" | "failed";
+    simulationId: string | null;
+    heatingKwhM2Yr: number | null;
+    coolingKwhM2Yr: number | null;
+    totalKwhM2Yr: number | null;
+    error: string | null;
+  };
+}
+
 /* ── State shape ── */
 
 interface ProjectState {
@@ -102,6 +129,10 @@ interface ProjectState {
   /* renovation packages built in step 4 */
   renovationPackages: RenovationPackage[];
   selectedPackageId: string | null;
+  /* Step 4 Renovation calculator (RenovationSimulator.tsx) - real geometry-
+     driven packages with an EPSM comparison, separate from the legacy
+     renovationPackages field above */
+  renovationCalcPackages: RenovationCalcPackage[];
   /* Step 3 Renovation — supplementary data uploaded by user to fill data gaps */
   supplementaryData: Record<string, Record<string, unknown>>; // building address → field overrides
   /* Step 3 Renovation — baseline EPSM simulation status */
@@ -157,6 +188,7 @@ const DEFAULT_PROJECT: ProjectState = {
   simulationMaterials: {},
   renovationPackages: [],
   selectedPackageId: null,
+  renovationCalcPackages: [],
   supplementaryData: {},
   baselineStatus: "idle",
   renovationBaselineResults: [],

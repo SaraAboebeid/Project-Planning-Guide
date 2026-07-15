@@ -102,7 +102,6 @@ export const ENVELOPE_COMPONENTS = [
   "Walls",
   "Windows",
   "Doors",
-  "Structure (Columns & Beams)",
   "Floor",
   "Roof",
   "Balcony",

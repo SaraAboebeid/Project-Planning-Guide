@@ -84,6 +84,17 @@ CITIES = [
         "local_authority": "Nottingham",
         "eubucco_file": "UKF1.parquet",  # Derbyshire and Nottinghamshire (NUTS2)
     },
+    {
+        "id": "rotherham",
+        "name": "Rotherham",
+        "district": "Town Centre",
+        "region": "Yorkshire and the Humber",
+        "lat": 53.4302,
+        "lon": -1.3568,
+        "radius_m": 1200,
+        "local_authority": "Rotherham",
+        "eubucco_file": "UKE3.parquet",  # South Yorkshire (NUTS2)
+    },
 ]
 
 CITIES_BY_ID = {c["id"]: c for c in CITIES}

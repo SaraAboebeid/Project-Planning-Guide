@@ -94,7 +94,7 @@ export default function DefineProject() {
       setBuildingLoading(true);
       try {
         const results = await Promise.all(
-          pts.map((p) => api.lookupBuilding(p.lat, p.lon))
+          pts.map((p) => api.lookupBuilding(p.lat, p.lon, project.country))
         );
         // Also check the WWR database for the first building
         let savedWWR = null;
@@ -443,10 +443,6 @@ export default function DefineProject() {
                 },
                 "Doors": {
                   icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="7" y="4" width="14" height="20" rx="1" stroke="currentColor" strokeWidth="1.5"/><circle cx="18" cy="14" r="1.2" fill="currentColor"/><line x1="7" y1="24" x2="3" y2="24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="21" y1="24" x2="25" y2="24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                },
-                "Structure (Columns & Beams)": {
-                  subtitle: "Columns & Beams",
-                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="5" y="4" width="5" height="20" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="18" y="4" width="5" height="20" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="3" y="6" width="22" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="3" y="19" width="22" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>
                 },
                 "Balcony": {
                   icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="12" width="20" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><line x1="8" y1="15" x2="8" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="14" y1="15" x2="14" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="20" y1="15" x2="20" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="4" y1="22" x2="24" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><rect x="8" y="6" width="12" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>

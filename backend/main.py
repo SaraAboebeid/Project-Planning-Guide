@@ -150,6 +150,109 @@ def uk_buildings(city_id: str):
     return _read_uk_json(Path(city["data_file"]).name)
 
 
+# Cached per city_id - mirrors _get_buildings_list()'s single-file cache, just
+# keyed by which UK district's JSON to load.
+_UK_BUILDINGS_CACHE: dict[str, list] = {}
+
+def _get_uk_buildings_list(city_id: str) -> list:
+    if city_id not in _UK_BUILDINGS_CACHE:
+        registry = _read_uk_json("cities.json")
+        city = next((c for c in registry["cities"] if c["id"] == city_id), None)
+        if city is None:
+            known = ", ".join(c["id"] for c in registry["cities"]) or "none built yet"
+            raise HTTPException(404, f"Unknown city '{city_id}'. Built cities: {known}")
+        raw = _read_uk_json(Path(city["data_file"]).name)
+        _UK_BUILDINGS_CACHE[city_id] = _sanitize(raw)
+    return _UK_BUILDINGS_CACHE[city_id]
+
+
+def _resolve_uk_city_id(lat: float, lon: float) -> str:
+    """Nearest built UK district to a point, so callers don't need their own
+    copy of the district registry - mirrors how Sweden's /api/building never
+    asks the caller which "area" a point is in either."""
+    registry = _read_uk_json("cities.json")
+    cities = registry["cities"]
+    if not cities:
+        raise HTTPException(404, "No UK cities built yet")
+    nearest = min(cities, key=lambda c: _haversine_m(lat, lon, c["lat"], c["lon"]))
+    if _haversine_m(lat, lon, nearest["lat"], nearest["lon"]) > nearest.get("radius_m", 1200) * 2:
+        raise HTTPException(404, "No built UK district near this point")
+    return nearest["id"]
+
+
+@app.get("/api/uk/building")
+def get_uk_building(lat: float = Query(...), lon: float = Query(...), city_id: str | None = Query(None)):
+    """UK equivalent of /api/building - nearest real building within 150m of a
+    point, enriched with the same true-perimeter geometry fields (this session's
+    Phase 1 work), reusing the exact same helpers get_building() uses. Unlike
+    Sweden, UK's own per-building tabula_u_wall/roof/win/period are already
+    computed by tools/uk/uk_data_pipeline.py, so there's no TABULA/BBR
+    derivation fallback needed here - just read them straight off the record.
+    city_id is optional - when omitted, the nearest built UK district is
+    resolved automatically (see _resolve_uk_city_id).
+    """
+    if not city_id:
+        city_id = _resolve_uk_city_id(lat, lon)
+    buildings = _get_uk_buildings_list(city_id)
+
+    candidates: list[tuple[float, dict]] = []
+    for b in buildings:
+        coords = b.get("coordinates") or []
+        c_lat, c_lon = _polygon_centroid(coords)
+        if c_lat == 0.0 and c_lon == 0.0:
+            continue
+        d = _haversine_m(lat, lon, c_lat, c_lon)
+        if d <= 150:
+            candidates.append((d, b))
+
+    if not candidates:
+        raise HTTPException(404, f"No building found within 150 m of the given point in '{city_id}'")
+
+    best_dist, best = min(candidates, key=lambda item: item[0])
+
+    footprint: float | None = None
+    if best.get("footprint_m2") and best["footprint_m2"] > 0:
+        footprint = round(float(best["footprint_m2"]), 1)
+    else:
+        fp = _shoelace_m2(best.get("coordinates") or [])
+        if fp and fp > 0:
+            footprint = round(fp, 1)
+
+    c_lat, c_lon = _polygon_centroid(best.get("coordinates") or [])
+
+    perimeter_m = _ring_perimeter_m(best.get("coordinates") or [])
+    height_val = best.get("height")
+    wall_area_m2 = (
+        round(perimeter_m * float(height_val), 1)
+        if perimeter_m and height_val
+        else None
+    )
+
+    return {
+        "address":       best.get("address"),
+        "height":        _clean(height_val),
+        "floors":        _clean(best.get("floors")),
+        "area_atemp":    _clean(best.get("floor_area_m2")),  # UK's own EPC-sourced total floor area
+        "footprint_m2":  _clean(footprint),
+        "wall_perimeter_m": _clean(round(perimeter_m, 1)) if perimeter_m else None,
+        "wall_area_m2":  _clean(wall_area_m2),
+        "roof_area_m2":  _clean(footprint),
+        "floor_area_m2": _clean(footprint),
+        "use_cat":       best.get("use_cat"),
+        "year":          _clean(best.get("year")),
+        "energy":        _clean(best.get("tabula_kwh_m2_yr")),  # UK has no measured "energy" field; TABULA estimate is the closest equivalent
+        "eclass":        best.get("eclass"),
+        "tabula_period": best.get("tabula_period"),
+        "tabula_u_wall": _clean(best.get("tabula_u_wall")),
+        "tabula_u_roof": _clean(best.get("tabula_u_roof")),
+        "tabula_u_win":  _clean(best.get("tabula_u_win")),
+        "has_epc":       bool(best.get("has_epc")),
+        "lat":           round(c_lat, 6),
+        "lon":           round(c_lon, 6),
+        "dist_m":        round(best_dist, 1),
+    }
+
+
 # ── Country profile (summary KPIs for the 3D viewer sidebar) ────────────────
 @app.get("/api/country-profile")
 def country_profile(country: str = Query(...)):
@@ -434,6 +537,20 @@ def _shoelace_m2(coords: list) -> float | None:
     return deg2 * m2_per_deg2
 
 
+def _ring_perimeter_m(coords: list) -> float | None:
+    """True footprint perimeter (sum of real edge lengths, not a square
+    approximation). Reuses the exact same projection/winding/edge-length
+    primitives tools/idf/generate_idf.py uses to build a building's wall
+    surfaces, so this number matches what the IDF actually models."""
+    ring = coords[0] if coords else []
+    if len(ring) < 3:
+        return None
+    from tools.idf.geometry import project_ring, ensure_ccw, edge_length
+    ring2d = ensure_ccw(project_ring(ring))
+    n = len(ring2d)
+    return sum(edge_length(ring2d[i], ring2d[(i + 1) % n]) for i in range(n))
+
+
 # Building types considered "secondary" — only chosen if no primary building is nearby
 _SECONDARY_USE = {"komplement", "industri"}
 
@@ -503,6 +620,18 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
     # Centroid
     c_lat, c_lon = _polygon_centroid(best.get("coordinates") or [])
 
+    # Real wall area (true polygon perimeter x height) for the renovation
+    # calculator - NOT a square approximation. roof_area_m2/floor_area_m2
+    # are just named aliases of footprint_m2, added so the frontend contract
+    # is unambiguous about which figure to use for which component.
+    perimeter_m = _ring_perimeter_m(best.get("coordinates") or [])
+    height_val = best.get("height")
+    wall_area_m2 = (
+        round(perimeter_m * float(height_val), 1)
+        if perimeter_m and height_val
+        else None
+    )
+
     # U-values: use stored value if available, otherwise derive from TABULA/BBR table
     u_wall = best.get("tabula_u_wall")
     u_win  = best.get("tabula_u_win")
@@ -522,12 +651,17 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
         "floors":        _clean(best.get("floors")),
         "area_atemp":    _clean(best.get("area")),      # total GFA / Atemp from EPC
         "footprint_m2":  _clean(footprint),
+        "wall_perimeter_m": _clean(round(perimeter_m, 1)) if perimeter_m else None,
+        "wall_area_m2":  _clean(wall_area_m2),
+        "roof_area_m2":  _clean(footprint),
+        "floor_area_m2": _clean(footprint),
         "use_cat":       best.get("use_cat"),
         "year":          _clean(best.get("year")),
         "energy":        _clean(best.get("energy")),    # kWh/m²/yr
         "eclass":        best.get("eclass"),
         "tabula_period": period,
         "tabula_u_wall": _clean(u_wall),
+        "tabula_u_roof": _clean(best.get("tabula_u_roof")),
         "tabula_u_win":  _clean(u_win),
         "has_epc":       bool(best.get("has_epc")),
         "lat":           round(c_lat, 6),
@@ -908,14 +1042,17 @@ async def estimate_wwr(req: WWRRequest):
         p = (
             "You are an architectural analyst. I am showing you a photograph of a "
             "building facade captured from a 3D city model viewer.\n\n"
-            "Task: Estimate the Window-to-Wall Ratio (WWR) — the percentage of the "
+            "Task 1: Estimate the Window-to-Wall Ratio (WWR) — the percentage of the "
             "visible facade area that is glazed (windows, glass doors, curtain wall, "
-            "etc.).\n\n"
+            "etc.).\n"
+            "Task 2: Count visible balconies attached to the dominant building in "
+            "this single facade image, and estimate their combined area in m² if "
+            "you can judge scale (null if you can't).\n\n"
             "Instructions:\n"
             "- Focus only on the dominant building in the frame.\n"
             "- Count window openings relative to total wall area.\n"
             "- If the image is unclear or shows only ground/sky, give your best "
-            "estimate based on the building type and era.\n\n"
+            "estimate based on the building type and era, and 0 balconies.\n\n"
             "Building info: "
         )
         if req.building_info:
@@ -930,7 +1067,8 @@ async def estimate_wwr(req: WWRRequest):
             f"Facade direction: {req.direction}.\n\n"
             "Respond with ONLY a JSON object, no other text:\n"
             '{"wwr": <integer 0-100>, "confidence": "low"|"medium"|"high", '
-            '"notes": "<one sentence>"}'
+            '"notes": "<one sentence>", "balcony_count": <integer >=0>, '
+            '"balcony_area_m2": <number or null>}'
         )
         return p
 
@@ -978,6 +1116,8 @@ async def estimate_wwr(req: WWRRequest):
                         "wwr": int(parsed.get("wwr", 25)),
                         "confidence": parsed.get("confidence", "medium"),
                         "notes": parsed.get("notes", ""),
+                        "balcony_count": int(parsed.get("balcony_count", 0) or 0),
+                        "balcony_area_m2": parsed.get("balcony_area_m2"),
                         "source": "claude-sonnet-4-5-vision",
                     }
         except Exception as exc:
@@ -1021,6 +1161,8 @@ async def estimate_wwr(req: WWRRequest):
                         "wwr": int(parsed.get("wwr", 25)),
                         "confidence": parsed.get("confidence", "medium"),
                         "notes": parsed.get("notes", ""),
+                        "balcony_count": int(parsed.get("balcony_count", 0) or 0),
+                        "balcony_area_m2": parsed.get("balcony_area_m2"),
                         "source": "gpt-4.1-vision",
                     }
         except Exception as exc:
@@ -1059,6 +1201,10 @@ async def estimate_wwr(req: WWRRequest):
         "wwr": wwr,
         "confidence": "low",
         "notes": "Heuristic estimate (no OPENAI_API_KEY configured).",
+        # No reliable heuristic exists for balcony count/area from building
+        # metadata alone - explicit null/zero rather than a guess.
+        "balcony_count": 0,
+        "balcony_area_m2": None,
         "source": "heuristic",
     }
 
@@ -1550,6 +1696,12 @@ class WWRSaveRequest(BaseModel):
     directions: list[str]
     source: str = "ai"
     building_info: Optional[dict[str, Any]] = None
+    # Balconies on different facades add up (unlike WWR, which averages) -
+    # the client sums per-facade counts/areas before calling this endpoint;
+    # this handler just persists whatever total it's given.
+    balcony_count_total: int = 0
+    balcony_area_m2_total: Optional[float] = None
+    per_facade_balcony_count: Optional[list[int]] = None
 
 
 @app.post("/api/wwr-save")
@@ -1570,6 +1722,9 @@ async def save_wwr(req: WWRSaveRequest):
         "directions": req.directions,
         "source": req.source,
         "building_info": req.building_info or {},
+        "balcony_count_total": req.balcony_count_total,
+        "balcony_area_m2_total": req.balcony_area_m2_total,
+        "per_facade_balcony_count": req.per_facade_balcony_count,
         "saved_at": datetime.datetime.utcnow().isoformat() + "Z",
     })
     _save_wwr_db(records)
@@ -1718,6 +1873,7 @@ CITY_TO_EPW = {
     "london_westminster": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
     "london_canary_wharf": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
     "london_southwark": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
+    "rotherham": "GBR_ENG_Doncaster.Sheffield-Hood.AP.034054_TMYx.2011-2025.epw",
 }
 
 
@@ -1812,9 +1968,28 @@ class SimulationSubmitRequest(BaseModel):
     lon: float
     address: Optional[str] = None
     country: str  # "se" | "gb"
-    city_id: str
-    building: dict[str, Any]
+    # Optional for "gb" - auto-resolved from lat/lon (nearest built UK
+    # district) when omitted, same as /api/uk/building. Sweden has only one
+    # city_id ("gothenburg") so callers always send it explicitly.
+    city_id: Optional[str] = None
+    # Optional: the classic 3D viewer (viewer/js/energy_sim.js) already has
+    # the full building dict (incl. real polygon coordinates) in memory and
+    # sends it directly. The React wizard's /api/building response never
+    # includes the raw polygon (kept server-side, see _ring_perimeter_m), so
+    # its callers omit this and rely on server-side resolution below instead.
+    building: Optional[dict[str, Any]] = None
     wwr_override: Optional[float] = None
+    u_wall_override: Optional[float] = None
+    u_roof_override: Optional[float] = None
+    u_win_override: Optional[float] = None
+    u_floor_override: Optional[float] = None
+    # Distinguishes multiple simulations at the SAME building location (the
+    # renovation-package calculator runs baseline + N packages per building).
+    # Defaults to "baseline" so existing callers (viewer/js/energy_sim.js,
+    # which never sends this) keep today's exact 1-simulation-per-location
+    # behavior unchanged.
+    package_id: str = "baseline"
+    package_label: Optional[str] = None
 
 
 @app.post("/api/simulation-submit")
@@ -1824,17 +1999,39 @@ async def submit_simulation(req: SimulationSubmitRequest):
     /api/simulation-status/{id} for progress."""
     import httpx
 
-    epw_name = CITY_TO_EPW.get(req.city_id)
+    city_id = req.city_id
+    if req.country == "gb" and not city_id:
+        city_id = _resolve_uk_city_id(req.lat, req.lon)
+
+    epw_name = CITY_TO_EPW.get(city_id or "")
     if not epw_name:
-        raise HTTPException(400, f"No weather file mapped for city_id '{req.city_id}'")
+        raise HTTPException(400, f"No weather file mapped for city_id '{city_id}'")
     epw_path = EPW_DIR / epw_name
     if not epw_path.exists():
         raise HTTPException(500, f"Weather file missing on server: {epw_path.name}")
 
+    building = req.building
+    if not building or not building.get("coordinates"):
+        # Caller sent no polygon (the wizard's /api/building and /api/uk/building
+        # never return one) - re-resolve the real building server-side, same
+        # nearest-match logic those endpoints use, so we're not trusting a
+        # client-reconstructed building dict for something as physical as geometry.
+        def _dist(b: dict) -> float:
+            c_lat, c_lon = _polygon_centroid(b.get("coordinates") or [])
+            return _haversine_m(req.lat, req.lon, c_lat, c_lon)
+
+        source = _get_uk_buildings_list(city_id) if req.country == "gb" else _get_buildings_list()
+        candidates = [b for b in source if _dist(b) <= 150]
+        if not candidates:
+            raise HTTPException(404, "No building with real geometry found near this location")
+        building = min(candidates, key=_dist)
+
     try:
         idf_text = build_shoebox_idf(
-            req.building, req.country, req.city_id, str(epw_path),
+            building, req.country, city_id, str(epw_path),
             wwr_override=req.wwr_override, building_name=req.address,
+            u_wall_override=req.u_wall_override, u_roof_override=req.u_roof_override,
+            u_win_override=req.u_win_override, u_floor_override=req.u_floor_override,
         )
     except Exception as exc:
         raise HTTPException(400, f"IDF generation failed: {exc}")
@@ -1854,17 +2051,28 @@ async def submit_simulation(req: SimulationSubmitRequest):
 
     simulation_id = payload.get("simulation_id")
     records = _load_sim_db()
+    # Only evict a previously-queued record for the SAME package at this
+    # location - not every simulation there. Pre-existing records (and
+    # viewer/js/energy_sim.js, which never sends package_id) default to
+    # "baseline" via .get(..., "baseline"), so this stays backward-compatible
+    # with the original 1-simulation-per-location behavior for that caller.
     records = [
         rec for rec in records
-        if not (_haversine_m(rec["lat"], rec["lon"], req.lat, req.lon) <= 20 and rec.get("status") == "queued")
+        if not (
+            _haversine_m(rec["lat"], rec["lon"], req.lat, req.lon) <= 20
+            and rec.get("package_id", "baseline") == req.package_id
+            and rec.get("status") == "queued"
+        )
     ]
     records.append({
         "lat": req.lat,
         "lon": req.lon,
         "address": req.address,
         "country": req.country,
-        "city_id": req.city_id,
-        "building_info": req.building,
+        "city_id": city_id,
+        "building_info": building,
+        "package_id": req.package_id,
+        "package_label": req.package_label,
         "epsm_simulation_id": simulation_id,
         "epsm_task_id": payload.get("task_id"),
         "status": "queued",
@@ -1920,12 +2128,19 @@ async def simulation_results(simulation_id: str):
 
 
 @app.get("/api/simulation-lookup")
-async def lookup_simulation(lat: float = Query(...), lon: float = Query(...), radius_m: float = Query(25)):
-    """Return the nearest saved/running simulation record within radius_m metres, or null."""
+async def lookup_simulation(
+    lat: float = Query(...), lon: float = Query(...), radius_m: float = Query(25),
+    package_id: Optional[str] = Query(None),
+):
+    """Return the nearest saved/running simulation record within radius_m
+    metres, or null. When package_id is given, only records for that package
+    are considered (omit it for the pre-existing single-building behavior)."""
     records = _load_sim_db()
     best = None
     best_dist = radius_m
     for r in records:
+        if package_id is not None and r.get("package_id", "baseline") != package_id:
+            continue
         d = _haversine_m(r["lat"], r["lon"], lat, lon)
         if d <= best_dist:
             best_dist = d
@@ -1933,6 +2148,18 @@ async def lookup_simulation(lat: float = Query(...), lon: float = Query(...), ra
     if best is None:
         return {"found": False, "record": None}
     return {"found": True, "record": best, "dist_m": round(best_dist, 1)}
+
+
+@app.get("/api/simulation-lookup-all")
+async def lookup_simulation_all(lat: float = Query(...), lon: float = Query(...), radius_m: float = Query(25)):
+    """Every saved/running simulation record within radius_m of this location -
+    one row per package_id (baseline + N renovation packages) - nearest first.
+    Lets the renovation calculator rehydrate every package's status in one call."""
+    records = _load_sim_db()
+    hits = [(_haversine_m(r["lat"], r["lon"], lat, lon), r) for r in records]
+    hits = [(d, r) for d, r in hits if d <= radius_m]
+    hits.sort(key=lambda t: t[0])
+    return {"records": [{"dist_m": round(d, 1), **r} for d, r in hits]}
 
 
 @app.get("/api/simulation-database")

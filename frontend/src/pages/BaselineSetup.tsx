@@ -6,18 +6,27 @@ import { Building2, FileJson, Upload, Zap, X, Loader2, BarChart2, Thermometer, D
 
 /** Normalise a bbox BuildingRecord into the same shape as BuildingLookup */
 function recordToLookup(r: BuildingRecord, idx: number): BuildingLookup {
+  // bbox rows never carry a real polygon (only /api/building does), so wall
+  // area here is the same square-approximation fallback used elsewhere for
+  // this same reason - see frontend/src/utils/componentAreas.ts.
+  const approxPerimeter = r.footprint_m2 ? 4 * Math.sqrt(r.footprint_m2) : null;
   return {
     address:       r.address || null,
     height:        r.height_m,
     floors:        r.floors,
     area_atemp:    null,
     footprint_m2:  r.footprint_m2,
+    wall_perimeter_m: null,
+    wall_area_m2:  approxPerimeter && r.height_m ? approxPerimeter * r.height_m : null,
+    roof_area_m2:  r.footprint_m2,
+    floor_area_m2: r.footprint_m2,
     use_cat:       r.building_use,
     year:          r.year_built,
     energy:        r.energy_kwh_m2,
     eclass:        r.epc_class,
     tabula_period: r.tabula_period,
     tabula_u_wall: r.u_wall,
+    tabula_u_roof: r.u_roof,
     tabula_u_win:  r.u_window,
     has_epc:       r.has_epc ?? false,
     lat:           r.lat,

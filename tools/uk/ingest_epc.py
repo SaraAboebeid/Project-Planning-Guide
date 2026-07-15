@@ -260,6 +260,16 @@ def _desc_and_rating(value):
     return None, None
 
 
+def _scalar(v):
+    """Coerce a field that's documented/observed as a plain string to one -
+    seen live: at least one real certificate returns a nested dict for
+    `dwelling_type` instead of the plain string ("Ground-floor maisonette")
+    the single sample response this module was built against. Rather than
+    guess at that alternate shape, just drop it to None so a downstream
+    Counter()-based aggregation never crashes on an unhashable value."""
+    return v if isinstance(v, (str, int, float)) else None
+
+
 def _find_pv_percent(photovoltaic_supply):
     """sap_energy_source.photovoltaic_supply is a tagged-union-style nested
     dict - a live no-PV response looks like
@@ -292,13 +302,28 @@ def fetch_certificate_detail(certificate_number: str, token: str, session: reque
     sap_building_parts, not at the top level.
     """
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-    r = session.get(
-        f"{BASE_URL}/api/certificate",
-        params={"certificate_number": certificate_number},
-        headers=headers,
-        timeout=30,
-    )
-    if r.status_code != 200:
+    r = None
+    for attempt in range(3):
+        try:
+            r = session.get(
+                f"{BASE_URL}/api/certificate",
+                params={"certificate_number": certificate_number},
+                headers=headers,
+                timeout=30,
+            )
+            break
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
+            # Seen live: the server occasionally drops the connection mid-response
+            # during a long run of N+1 detail fetches - a transient blip, not a
+            # real failure, so a short retry is worth it rather than losing the
+            # whole (multi-minute) batch to one flaky request.
+            if attempt == 2:
+                print(f"    detail fetch for {certificate_number} failed after 3 attempts: {exc}")
+                return {}
+            wait = 2 ** attempt * 3
+            print(f"    detail fetch for {certificate_number} dropped ({exc.__class__.__name__}); retrying in {wait}s")
+            time.sleep(wait)
+    if r is None or r.status_code != 200:
         return {}
     doc = (r.json() or {}).get("data") or {}
 
@@ -316,8 +341,8 @@ def fetch_certificate_detail(certificate_number: str, token: str, session: reque
         "band_potential": _band(doc.get("potential_energy_efficiency_band")),
         "sap": _num(doc.get("energy_rating_current")),
         "sap_potential": _num(doc.get("energy_rating_potential")),
-        "property_type": doc.get("dwelling_type"),
-        "built_form": doc.get("built_form"),
+        "property_type": _scalar(doc.get("dwelling_type")),
+        "built_form": _scalar(doc.get("built_form")),
         "age_band": age_band,
         "floor_area_m2": _num(doc.get("total_floor_area")),
         "co2_t_per_yr": _num(doc.get("co2_emissions_current")),
@@ -350,12 +375,19 @@ def fetch_postcode(postcode: str, token: str, session: requests.Session) -> list
     page = 1
     while True:
         for attempt in range(MAX_RETRIES):
-            r = session.get(
-                SEARCH_DOMESTIC,
-                params={"postcode": pc, "current_page": page, "page_size": 5000},
-                headers=headers,
-                timeout=45,
-            )
+            try:
+                r = session.get(
+                    SEARCH_DOMESTIC,
+                    params={"postcode": pc, "current_page": page, "page_size": 5000},
+                    headers=headers,
+                    timeout=45,
+                )
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
+                # Same transient mid-response drop seen on the detail endpoint.
+                wait = min(2 ** attempt * 3, 30)
+                print(f"    {pc} connection dropped ({exc.__class__.__name__}); retrying in {wait}s (attempt {attempt + 1}/{MAX_RETRIES})")
+                time.sleep(wait)
+                continue
             if r.status_code == 429:
                 retry_after = r.headers.get("Retry-After")
                 wait = float(retry_after) if retry_after else min(2 ** attempt * 5, 60)

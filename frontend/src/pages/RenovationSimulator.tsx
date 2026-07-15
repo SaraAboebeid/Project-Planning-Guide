@@ -1,848 +1,467 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useWizardStore } from "../store/wizard";
-import { WIKELLS_CHAPTERS, type WikellsItem } from "../config/wikellsData";
-import type { BuildingRecord } from "../types";
-import { Search, ChevronDown, ChevronUp, FlaskConical, LayoutGrid, Eye, Play, Building2, Users, CheckSquare, Loader2, BarChart2, Leaf, Download, TrendingDown } from "lucide-react";
+import { useWizardStore, type RenovationCalcPackage } from "../store/wizard";
+import { api } from "../api/client";
+import { lineItemsFor, type AreaLineItem } from "../config/componentAreaLineItems";
+import { resolveBuildingGeometry, computeAreaForLineItem, quantityUnitLabel } from "../utils/componentAreas";
+import { itemsForLineItem, estimateCarbon, recommendationsForLineItem, type KpiKey } from "../utils/materialRecommendation";
+import { useSimulationPoller } from "../hooks/useSimulationPoller";
+import type { WikellsItem } from "../config/wikellsData";
+import type { BoverketResource, WWRRecord } from "../types";
+import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw } from "lucide-react";
 
-function bboxLabel(r: BuildingRecord, i: number): string {
-  return r.address || `Building ${i + 1}`;
-}
-
-/* ─── Component → Wikells chapter mapping ─────────────────────────────────── */
-// Keys match the exact labels used in Step 1 (ENVELOPE_COMPONENTS in projectConfig.ts)
-const COMPONENT_CHAPTERS: Record<string, string[]> = {
-  "Walls":                            ["ch7"],
-  "Windows":                          ["ch16"],
-  "Doors":                            ["ch16"],
-  "Floor":                            ["ch9", "ch15"],
-  "Roof":                             ["ch11"],
-  "Balcony":                          ["ch9"],
-  "Structure (Columns & Beams)":      ["ch7", "ch8"],
-  "Vertical Extension (New Floor)":   ["ch9", "ch11"],
-};
-
-// Default components for renovation if none specified
-const DEFAULT_COMPONENTS = ["Walls", "Roof", "Windows"];
-
-// Map component label → friendly display name
-const COMPONENT_LABEL: Record<string, string> = {
-  "Walls":                            "Walls",
-  "Windows":                          "Windows",
-  "Doors":                            "Doors",
-  "Floor":                            "Floor",
-  "Roof":                             "Roof",
-  "Balcony":                          "Balcony",
-  "Structure (Columns & Beams)":      "Structure",
-  "Vertical Extension (New Floor)":   "Vertical Extension",
-};
+/* Sweden/Gothenburg is the only real building dataset with EPSM weather
+ * wired up (see backend's CITY_TO_EPW) - the wizard has no UK-building
+ * resolution path yet, unlike the classic 3D viewer. */
+const COUNTRY = "se";
+const CITY_ID = "gothenburg";
 
 const COMPONENT_COLORS: Record<string, string> = {
-  "Walls":                            "#721CB8",
-  "Windows":                          "#F59E0B",
-  "Doors":                            "#4ECDC4",
-  "Floor":                            "#4A90E2",
-  "Roof":                             "#4ECDC4",
-  "Balcony":                          "#96D74C",
-  "Structure (Columns & Beams)":      "#EF4444",
-  "Vertical Extension (New Floor)":   "#F97316",
+  "Walls": "#721CB8", "Windows": "#F59E0B", "Doors": "#4ECDC4", "Floor": "#4A90E2",
+  "Roof": "#4ECDC4", "Balcony": "#96D74C", "Vertical Extension (New Floor)": "#F97316",
 };
 
-/* ─── Helpers ─────────────────────────────────────────────────────────────── */
+function fmtSEK(n: number): string {
+  return n.toLocaleString("sv-SE", { maximumFractionDigits: 0 }) + " SEK";
+}
 function uLabel(u?: number) {
   if (!u) return null;
   if (u <= 0.13) return { label: "Excellent", color: "#96D74C" };
-  if (u <= 0.20) return { label: "Good",      color: "#4ECDC4" };
-  if (u <= 0.30) return { label: "Standard",  color: "#F59E0B" };
-  return              { label: "Basic",       color: "#EF4444" };
+  if (u <= 0.20) return { label: "Good", color: "#4ECDC4" };
+  if (u <= 0.30) return { label: "Standard", color: "#F59E0B" };
+  return { label: "Basic", color: "#EF4444" };
 }
 
-/** Rough embodied-carbon estimate. Uses weightKgM2 × 0.5 kg CO₂e/kg (generic construction average). */
-function carbonKgM2(item: WikellsItem): number | null {
-  if (!item.weightKgM2) return null;
-  return Math.round(item.weightKgM2 * 0.5);
-}
-
-/* ─── Material picker for one component ───────────────────────────────────── */
-function MaterialPicker({
-  component,
-  selected,
-  onChange,
+/* ─── Material picker for one area line item (single-select) ─────────────── */
+function LineItemPicker({
+  item, items, selectedCode, onSelect, recommendations, boverketResources,
 }: {
-  component: string;
-  selected: string[];
-  onChange: (codes: string[]) => void;
+  item: AreaLineItem;
+  items: WikellsItem[];
+  selectedCode: string | null;
+  onSelect: (code: string) => void;
+  recommendations: Record<string, KpiKey[]>;
+  boverketResources: BoverketResource[];
 }) {
-  const [query, setQuery] = useState("");
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
-
-  const chapterIds = COMPONENT_CHAPTERS[component] ?? ["ch7"];
-  const chapters = WIKELLS_CHAPTERS.filter(c => chapterIds.includes(c.id));
-  const allItems: WikellsItem[] = chapters.flatMap(c => c.subGroups.flatMap(g => g.items));
-
-  const filtered = useMemo(() => {
-    if (!query) return allItems;
-    const q = query.toLowerCase();
-    return allItems.filter(i =>
-      i.description.toLowerCase().includes(q) || i.code.includes(q)
-    );
-  }, [allItems, query]);
-
-  const toggle = (code: string) => {
-    onChange(selected.includes(code)
-      ? selected.filter(c => c !== code)
-      : [...selected, code]
-    );
-  };
-
-  const color = COMPONENT_COLORS[component] ?? "#721CB8";
-
+  const color = COMPONENT_COLORS[item.parentComponent] ?? "#721CB8";
+  if (items.length === 0) {
+    return <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>No catalogue materials found for this item.</p>;
+  }
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {/* Search */}
-      <div style={{ position: "relative" }}>
-        <Search size={12} color="rgba(255,255,255,0.3)" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-        <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Search materials…"
-          style={{
-            width: "100%", paddingLeft: 30, paddingRight: 12, paddingTop: 7, paddingBottom: 7,
-            borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)",
-            background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12,
-            boxSizing: "border-box",
-          }}
-        />
-        {selected.length > 0 && (
-          <span style={{
-            position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-            fontSize: 10, fontWeight: 700, color: color,
-            background: `${color}22`, borderRadius: 10, padding: "1px 6px",
-          }}>{selected.length} selected</span>
-        )}
-      </div>
-
-      {/* Items */}
-      <div style={{ maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
-        {query
-          ? filtered.map(item => <MaterialRow key={item.code} item={item} checked={selected.includes(item.code)} onToggle={() => toggle(item.code)} color={color} />)
-          : chapters.flatMap(ch =>
-              ch.subGroups.map(sg => {
-                const groupItems = sg.items;
-                const key = `${ch.id}-${sg.label}`;
-                const isOpen = openGroups.has(key);
-                const groupSelected = groupItems.filter(i => selected.includes(i.code)).length;
-                return (
-                  <div key={key}>
-                    <button
-                      onClick={() => setOpenGroups(s => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; })}
-                      style={{
-                        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "6px 10px", borderRadius: 8, border: 0, cursor: "pointer",
-                        background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.65)", fontSize: 11, fontWeight: 600,
-                      }}
-                    >
-                      <span>{sg.label}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        {groupSelected > 0 && (
-                          <span style={{ fontSize: 10, fontWeight: 700, color, background: `${color}22`, borderRadius: 10, padding: "1px 6px" }}>{groupSelected}</span>
-                        )}
-                        {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                      </div>
-                    </button>
-                    {isOpen && groupItems.map(item => (
-                      <MaterialRow key={item.code} item={item} checked={selected.includes(item.code)} onToggle={() => toggle(item.code)} color={color} />
-                    ))}
-                  </div>
-                );
-              })
-            )
-        }
-        {filtered.length === 0 && (
-          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "12px 10px" }}>No results for "{query}"</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MaterialRow({ item, checked, onToggle, color }: {
-  item: WikellsItem; checked: boolean; onToggle: () => void; color: string;
-}) {
-  const ul = uLabel(item.uValue);
-  return (
-    <button
-      onClick={onToggle}
-      style={{
-        width: "100%", display: "flex", alignItems: "center", gap: 10,
-        padding: "7px 10px", borderRadius: 8, border: `1px solid ${checked ? `${color}55` : "transparent"}`,
-        background: checked ? `${color}18` : "rgba(255,255,255,0.02)",
-        cursor: "pointer", textAlign: "left", transition: "all .12s",
-      }}
-    >
-      {/* Checkbox */}
-      <div style={{
-        width: 15, height: 15, borderRadius: 4, flexShrink: 0,
-        border: `2px solid ${checked ? color : "rgba(255,255,255,0.2)"}`,
-        background: checked ? color : "transparent",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        {checked && <svg width="8" height="8" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>}
-      </div>
-      {/* Code */}
-      <span style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{item.code}</span>
-      {/* Description */}
-      <span style={{ flex: 1, fontSize: 11, color: checked ? "#fff" : "rgba(255,255,255,0.65)", lineHeight: 1.3 }}>{item.description}</span>
-      {/* Cost */}
-      <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>
-        {item.costSEK.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} SEK/m²
-      </span>
-      {/* U-value badge */}
-      {ul && (
-        <span style={{ fontSize: 9, fontWeight: 700, color: ul.color, background: `${ul.color}22`, borderRadius: 8, padding: "1px 5px", flexShrink: 0 }}>
-          U={item.uValue}
-        </span>
-      )}
-      {/* Carbon badge */}
-      {carbonKgM2(item) !== null && (
-        <span style={{ fontSize: 9, fontWeight: 700, color: "#60a5fa", background: "rgba(96,165,250,0.12)", borderRadius: 8, padding: "1px 5px", flexShrink: 0 }}>
-          ~{carbonKgM2(item)} kg CO₂e/m²
-        </span>
-      )}
-    </button>
-  );
-}
-
-/* ─── Simulation preview ───────────────────────────────────────────────────── */
-type SortKey = "default" | "cost_asc" | "cost_desc" | "carbon_asc" | "carbon_desc";
-
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "default",     label: "Default" },
-  { key: "cost_asc",    label: "Cost ↑ cheapest first" },
-  { key: "cost_desc",   label: "Cost ↓ most expensive" },
-  { key: "carbon_asc",  label: "CO₂e ↑ lowest first" },
-  { key: "carbon_desc", label: "CO₂e ↓ highest first" },
-];
-
-function comboMetrics(combo: Record<string, WikellsItem>) {
-  const totalCost = Object.values(combo).reduce((a, b) => a + b.costSEK, 0);
-  const carbonVals = Object.values(combo).map(b => carbonKgM2(b)).filter((v): v is number => v !== null);
-  const totalCarbon = carbonVals.length > 0 ? carbonVals.reduce((a, b) => a + b, 0) : null;
-  return { totalCost, totalCarbon };
-}
-
-function SimulationPreview({ combinations }: { combinations: Record<string, WikellsItem>[] }) {
-  const [sortKey, setSortKey] = useState<SortKey>("default");
-  const [showAll, setShowAll] = useState(false);
-
-  const sorted = useMemo(() => {
-    if (sortKey === "default") return combinations;
-    return [...combinations].sort((a, b) => {
-      const ma = comboMetrics(a);
-      const mb = comboMetrics(b);
-      if (sortKey === "cost_asc")    return ma.totalCost - mb.totalCost;
-      if (sortKey === "cost_desc")   return mb.totalCost - ma.totalCost;
-      if (sortKey === "carbon_asc")  return (ma.totalCarbon ?? Infinity) - (mb.totalCarbon ?? Infinity);
-      if (sortKey === "carbon_desc") return (mb.totalCarbon ?? -Infinity) - (ma.totalCarbon ?? -Infinity);
-      return 0;
-    });
-  }, [combinations, sortKey]);
-
-  const PAGE = 8;
-  const visible = showAll ? sorted : sorted.slice(0, PAGE);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {/* Sort controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
-        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>Sort by:</span>
-        {SORT_OPTIONS.map(opt => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 260, overflowY: "auto" }}>
+      {items.map((it) => {
+        const checked = selectedCode === it.code;
+        const carbon = estimateCarbon(it, boverketResources);
+        const ul = uLabel(it.uValue);
+        const tags = recommendations[it.code] ?? [];
+        return (
           <button
-            key={opt.key}
-            onClick={() => setSortKey(opt.key)}
+            key={it.code}
+            onClick={() => onSelect(it.code)}
             style={{
-              padding: "4px 11px", borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer",
-              border: `1px solid ${sortKey === opt.key ? "rgba(78,205,196,0.5)" : "rgba(255,255,255,0.1)"}`,
-              background: sortKey === opt.key ? "rgba(78,205,196,0.12)" : "rgba(255,255,255,0.04)",
-              color: sortKey === opt.key ? "#4ECDC4" : "rgba(255,255,255,0.45)",
+              width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left",
+              padding: "8px 10px", borderRadius: 8, cursor: "pointer",
+              border: `1px solid ${checked ? `${color}55` : "transparent"}`,
+              background: checked ? `${color}18` : "rgba(255,255,255,0.02)",
             }}
           >
-            {opt.label}
+            <div style={{
+              width: 15, height: 15, borderRadius: "50%", flexShrink: 0,
+              border: `2px solid ${checked ? color : "rgba(255,255,255,0.2)"}`,
+              background: checked ? color : "transparent",
+            }} />
+            <span style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{it.code}</span>
+            <span style={{ flex: 1, fontSize: 11, color: checked ? "#fff" : "rgba(255,255,255,0.65)", lineHeight: 1.3 }}>{it.description}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>
+              {fmtSEK(it.costSEK)}/{item.quantityKind === "area" ? "m²" : "st"}
+            </span>
+            {ul && (
+              <span style={{ fontSize: 9, fontWeight: 700, color: ul.color, background: `${ul.color}22`, borderRadius: 8, padding: "1px 5px", flexShrink: 0 }}>
+                U={it.uValue}
+              </span>
+            )}
+            <span style={{ fontSize: 9, fontWeight: 700, color: "#60a5fa", background: "rgba(96,165,250,0.12)", borderRadius: 8, padding: "1px 5px", flexShrink: 0 }}>
+              ~{carbon.value} kg CO₂e{carbon.confidence !== "legacy" ? "?" : ""}
+            </span>
+            {tags.map((t) => (
+              <span key={t} style={{ fontSize: 9, fontWeight: 700, color: "#96D74C", background: "rgba(150,215,76,0.14)", borderRadius: 8, padding: "1px 6px", flexShrink: 0 }}>
+                ★ {t}
+              </span>
+            ))}
           </button>
-        ))}
-      </div>
-
-      {/* Header row */}
-      <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 150px 150px", gap: 12, padding: "4px 14px", marginBottom: 2 }}>
-        <span />
-        <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1 }}>Components</span>
-        <span style={{ fontSize: 10, fontWeight: 700, color: sortKey.startsWith("cost") ? "#4ECDC4" : "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, textAlign: "right" }}>Cost / m²</span>
-        <span style={{ fontSize: 10, fontWeight: 700, color: sortKey.startsWith("carbon") ? "#60a5fa" : "rgba(96,165,250,0.5)", textTransform: "uppercase", letterSpacing: 1, textAlign: "right" }}>Est. CO₂e / m²</span>
-      </div>
-
-      {visible.map((combo, i) => {
-        const { totalCost, totalCarbon } = comboMetrics(combo);
-        const rank = i + 1;
-        return (
-          <div key={i} style={{
-            borderRadius: 10, padding: "10px 14px",
-            background: rank === 1 && sortKey !== "default" ? "rgba(78,205,196,0.06)" : "rgba(255,255,255,0.03)",
-            border: `1px solid ${rank === 1 && sortKey !== "default" ? "rgba(78,205,196,0.25)" : "rgba(255,255,255,0.07)"}`,
-            display: "grid", gridTemplateColumns: "36px 1fr 150px 150px", gap: 12, alignItems: "center",
-          }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: rank === 1 && sortKey !== "default" ? "#4ECDC4" : "rgba(255,255,255,0.25)" }}>
-              {rank === 1 && sortKey !== "default" ? "★" : `#${rank}`}
-            </span>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {Object.entries(combo).map(([comp, item]) => (
-                <span key={comp} style={{
-                  fontSize: 10, padding: "2px 8px", borderRadius: 6,
-                  background: `${COMPONENT_COLORS[comp] ?? "#721CB8"}22`,
-                  color: COMPONENT_COLORS[comp] ?? "#721CB8",
-                  border: `1px solid ${COMPONENT_COLORS[comp] ?? "#721CB8"}44`,
-                }}>
-                  {COMPONENT_LABEL[comp] ?? comp}: {item.code}
-                </span>
-              ))}
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: sortKey.startsWith("cost") ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.55)", textAlign: "right" }}>
-              {totalCost.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} SEK/m²
-            </span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: totalCarbon ? (sortKey.startsWith("carbon") ? "#93c5fd" : "#60a5fa") : "rgba(255,255,255,0.2)", textAlign: "right" }}>
-              {totalCarbon ? `~${totalCarbon} kg` : "—"}
-            </span>
-          </div>
         );
       })}
-
-      {!showAll && sorted.length > PAGE && (
-        <button
-          onClick={() => setShowAll(true)}
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }}
-        >
-          Show all {sorted.length} combinations
-        </button>
-      )}
-      {showAll && sorted.length > PAGE && (
-        <button
-          onClick={() => setShowAll(false)}
-          style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }}
-        >
-          Show fewer
-        </button>
-      )}
-
-      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", margin: "2px 0 0", fontStyle: "italic" }}>
-        * CO₂e is a rough estimate (0.5 kg CO₂e/kg material). Precise values require EPD data.
-      </p>
     </div>
   );
 }
 
 /* ─── Main page ───────────────────────────────────────────────────────────── */
 export default function RenovationSimulator() {
-  const navigate  = useNavigate();
+  const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
+  const { submitAndPoll, resumePoll } = useSimulationPoller();
 
-  // Derive relevant components (from Step 1 selections, or defaults)
-  const components = useMemo(() => {
-    const comps = project.renovationEnvelopeComponents.length > 0
-      ? project.renovationEnvelopeComponents
-      : DEFAULT_COMPONENTS;
-    return comps.filter(c => !!COMPONENT_CHAPTERS[c]);
-  }, [project.renovationEnvelopeComponents]);
+  const components = project.renovationEnvelopeComponents.length > 0
+    ? project.renovationEnvelopeComponents
+    : ["Walls", "Roof", "Windows"];
+  const lineItems = useMemo(() => lineItemsFor(components), [components]);
 
-  // Derive available buildings from Step 2 — mirrors BaselineSetup logic exactly
-  const buildings = useMemo(() => {
-    const result: { id: string; label: string }[] = [];
-    if (project.lookedUpBuildings.length > 0) {
-      project.lookedUpBuildings.forEach((b, i) => {
-        result.push({ id: `b_${i}`, label: b.address ?? `Building ${i + 1}` });
-      });
-    } else if (project.lookedUpBuilding) {
-      result.push({ id: "b_0", label: project.lookedUpBuilding.address ?? "Building" });
-    } else if (project.bboxRows.length > 0) {
-      project.bboxRows.forEach((r, i) => {
-        result.push({ id: `br_${i}`, label: bboxLabel(r, i) });
-      });
-    }
-    return result;
-  }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows]);
+  const building = project.lookedUpBuilding ?? project.lookedUpBuildings[0] ?? project.bboxRows[0] ?? null;
+  const geometry = useMemo(() => resolveBuildingGeometry(building), [building]);
 
-  // "all" = apply same combinations to all buildings; otherwise array of selected building IDs
-  const [buildingScope, setBuildingScope] = useState<"all" | string[]>("all");
+  const [wwr, setWwr] = useState<WWRRecord | null>(null);
+  const [manualOverrides, setManualOverrides] = useState<Record<string, number>>({});
+  const [boverketByComponent, setBoverketByComponent] = useState<Record<string, BoverketResource[]>>({});
+  const [activeItemKey, setActiveItemKey] = useState<string>(lineItems[0]?.key ?? "");
+  const [draftSelection, setDraftSelection] = useState<Record<string, string>>({});
+  const [packageName, setPackageName] = useState("");
+  // A ref, not state: React StrictMode double-invokes effects in dev without
+  // an intervening re-render, so a useState guard here would let both
+  // invocations see the same stale "not yet initialized" value and both
+  // submit a baseline. A ref mutation is synchronous and immediately visible
+  // to the second invocation.
+  const initializedRef = useRef(false);
 
-  const selectedBuildings = buildingScope === "all" ? buildings : buildings.filter(b => (buildingScope as string[]).includes(b.id));
+  const packages = project.renovationCalcPackages;
 
-  const [materials, setMaterials] = useState<Record<string, string[]>>(
-    project.simulationMaterials ?? {}
-  );
-  const [activeComponent, setActiveComponent] = useState(components[0] ?? "Walls");
-  const [showPreview, setShowPreview] = useState(false);
+  /* ── fetch WWR + Boverket data + hydrate baseline/in-flight packages ──── */
+  useEffect(() => {
+    if (!geometry || initializedRef.current) return;
+    initializedRef.current = true;
 
-  // Get item lookup for selected codes
-  const allItems = useMemo(() =>
-    WIKELLS_CHAPTERS.flatMap(c => c.subGroups.flatMap(g => g.items)),
-    []
-  );
-  const itemByCode = useMemo(() =>
-    Object.fromEntries(allItems.map(i => [i.code, i])),
-    [allItems]
-  );
+    api.lookupWWR(geometry.lat, geometry.lon).then((r) => {
+      if (r.found) setWwr(r.record);
+    }).catch(() => { /* not critical */ });
 
-  // Compute combinations (cartesian product across components)
-  const combinations = useMemo(() => {
-    const activeComps = components.filter(c => (materials[c]?.length ?? 0) > 0);
-    if (activeComps.length === 0) return [];
-    const lists = activeComps.map(c => materials[c]!.map(code => ({ comp: c, code })));
-    // Cartesian product
-    let result: Record<string, WikellsItem>[] = [{}];
-    for (const list of lists) {
-      result = result.flatMap(combo =>
-        list.map(({ comp, code }) => ({
-          ...combo,
-          [comp]: itemByCode[code]!,
-        }))
-      );
-    }
-    return result;
-  }, [components, materials, itemByCode]);
+    const uniqueComponents = Array.from(new Set(lineItems.map((li) => li.boverketComponent)));
+    Promise.all(uniqueComponents.map((c) => api.boverketMaterials(c).then((res) => [c, res] as const).catch(() => [c, []] as const)))
+      .then((pairs) => setBoverketByComponent(Object.fromEntries(pairs)));
 
-  const totalSelected = Object.values(materials).reduce((a, b) => a + b.length, 0);
-
-  const [simRunning, setSimRunning] = useState(false);
-  const [simProgress, setSimProgress] = useState(0);
-  const [simResults, setSimResults] = useState<null | {
-    packageIndex: number;
-    components: Record<string, WikellsItem>;
-    energyUse: number;
-    saving: number;
-    carbonSaving: number;
-    cost: number;
-  }[]>(null);
-
-  // Baseline energy use from Step 3 dummy results (average across buildings, or fallback)
-  const baselineEnergyUse = useMemo(() => {
-    const b = project.lookedUpBuilding ?? project.lookedUpBuildings[0];
-    const bboxB = project.bboxRows[0];
-    if (b?.energy) return b.energy;
-    if (bboxB?.energy_kwh_m2) return bboxB.energy_kwh_m2;
-    const year = b?.year ?? bboxB?.year_built ?? 1970;
-    return Math.round(90 + (year % 80) + (b?.tabula_u_wall ?? bboxB?.u_wall ?? 0.5) * 60);
-  }, [project.lookedUpBuilding, project.lookedUpBuildings, project.bboxRows]);
-
-  function runSimulation() {
-    setProject({ simulationMaterials: materials });
-    setSimRunning(true);
-    setSimProgress(0);
-    setSimResults(null);
-    let p = 0;
-    const iv = setInterval(() => {
-      p += Math.round(5 + Math.random() * 12);
-      if (p >= 100) {
-        clearInterval(iv);
-        setSimProgress(100);
-        setSimRunning(false);
-        // Generate dummy results per combination
-        const results = combinations.slice(0, Math.min(combinations.length, 20)).map((combo, idx) => {
-          const items = Object.values(combo);
-          const totalCost = items.reduce((a, b) => a + b.costSEK, 0);
-          // U-value weighted reduction: lower avg U = more saving
-          const avgU = items.filter(i => i.uValue).reduce((a, b) => a + (b.uValue ?? 0.4), 0) / Math.max(items.filter(i => i.uValue).length, 1);
-          const savingPct = Math.min(Math.round((0.6 - avgU) / 0.6 * 45 + (idx % 5) * 2 + Math.random() * 6), 55);
-          const saving = Math.round(baselineEnergyUse * Math.max(savingPct, 5) / 100);
-          const carbonSaving = Math.round(saving * 0.2); // ~0.2 kg CO2e per kWh
-          return {
-            packageIndex: idx + 1,
-            components: combo,
-            energyUse: Math.round(baselineEnergyUse - saving),
-            saving,
-            carbonSaving,
-            cost: totalCost,
-          };
-        });
-        // Sort best saving first
-        results.sort((a, b) => b.saving - a.saving);
-        setSimResults(results);
-        setProject({
-          simulationMaterials: materials,
-          renovationSimResults: results.map(r => ({
-            packageIndex: r.packageIndex,
-            components: Object.fromEntries(
-              Object.entries(r.components).map(([comp, item]) => [comp, {
-                code: item.code,
-                description: item.description,
-                costSEK: item.costSEK,
-                uValue: item.uValue,
-              }])
-            ),
-            energyUse: r.energyUse,
-            saving: r.saving,
-            carbonSaving: r.carbonSaving,
-            cost: r.cost,
-          })),
-        });
-      } else {
-        setSimProgress(p);
+    api.simulationLookupAll(geometry.lat, geometry.lon).then(({ records }) => {
+      // Read live store state, not the `packages` closed over at render time -
+      // by the time this async callback runs, that snapshot may be stale.
+      const existingIds = new Set(useWizardStore.getState().project.renovationCalcPackages.map((p) => p.id));
+      for (const rec of records) {
+        const pkgId = (rec.package_id as string) ?? "baseline";
+        if (existingIds.has(pkgId)) continue;
+        if (pkgId !== "baseline") continue; // only auto-adopt the baseline; user-built packages are session-local until re-added
+        const status = rec.status as string;
+        if (status === "completed") {
+          const results = rec.results as Record<string, number> | null;
+          setProject({
+            renovationCalcPackages: [
+              ...useWizardStore.getState().project.renovationCalcPackages,
+              makeBaselinePackage({
+                status: "completed",
+                simulationId: rec.epsm_simulation_id,
+                heatingKwhM2Yr: results?.heating_kwh_m2_yr ?? null,
+                coolingKwhM2Yr: results?.cooling_kwh_m2_yr ?? null,
+                totalKwhM2Yr: results?.total_kwh_m2_yr ?? null,
+                error: null,
+              }),
+            ],
+          });
+        } else if (status === "queued" || status === "running") {
+          setProject({
+            renovationCalcPackages: [
+              ...useWizardStore.getState().project.renovationCalcPackages,
+              makeBaselinePackage({ status: status as "queued" | "running", simulationId: rec.epsm_simulation_id, heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null, error: null }),
+            ],
+          });
+          resumePoll("baseline", rec.epsm_simulation_id);
+        }
+        existingIds.add(pkgId);
       }
-    }, 220);
+      // No baseline found anywhere yet - submit one now.
+      if (!existingIds.has("baseline")) {
+        submitBaseline();
+      }
+    }).catch(() => {
+      if (!useWizardStore.getState().project.renovationCalcPackages.some((p) => p.isBaseline)) submitBaseline();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geometry]);
+
+  function makeBaselinePackage(simulation: RenovationCalcPackage["simulation"]): RenovationCalcPackage {
+    return { id: "baseline", name: "Baseline (as-built)", color: "rgba(255,255,255,0.4)", isBaseline: true, selections: {}, costSEK: null, carbonKgCO2e: null, simulation };
   }
 
-  function downloadSimResults() {
-    if (!simResults) return;
-    const payload = {
-      generated: new Date().toISOString(),
-      simulation: "EPSM Renovation Packages",
-      baselineEnergyUse_kWh_m2_yr: baselineEnergyUse,
-      packages: simResults.map(r => ({
-        rank: r.packageIndex,
-        energyUse_kWh_m2_yr: r.energyUse,
-        energySaving_kWh_m2_yr: r.saving,
-        carbonSaving_kgCO2e_m2_yr: r.carbonSaving,
-        cost_SEK_m2: Math.round(r.cost),
-        components: Object.fromEntries(
-          Object.entries(r.components).map(([comp, item]) => [comp, { code: item.code, description: item.description, costSEK: item.costSEK, uValue: item.uValue ?? null }])
-        ),
-      })),
+  const submitBaseline = useCallback(() => {
+    if (!geometry) return;
+    const pkg = makeBaselinePackage({ status: "idle", simulationId: null, heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null, error: null });
+    setProject({ renovationCalcPackages: [...useWizardStore.getState().project.renovationCalcPackages, pkg] });
+    submitAndPoll("baseline", { lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY, city_id: CITY_ID, building: {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geometry]);
+
+  /* ── derived: items/areas/recommendations for the active line item ────── */
+  const activeItem = lineItems.find((li) => li.key === activeItemKey) ?? lineItems[0];
+  const activeCatalogue = activeItem ? itemsForLineItem(activeItem) : [];
+  const activeBoverket = activeItem ? (boverketByComponent[activeItem.boverketComponent] ?? []) : [];
+  const activeRecommendations = useMemo(
+    () => (activeItem ? recommendationsForLineItem(activeCatalogue, activeBoverket, project.selectedKpis) : {}),
+    [activeItem, activeCatalogue, activeBoverket, project.selectedKpis]
+  );
+  const activeQuantity = activeItem && geometry ? computeAreaForLineItem(activeItem, geometry, wwr, manualOverrides) : null;
+
+  const itemByCode = useMemo(() => {
+    const all = lineItems.flatMap((li) => itemsForLineItem(li));
+    return Object.fromEntries(all.map((i) => [i.code, i]));
+  }, [lineItems]);
+
+  const boverketAll = useMemo(() => Object.values(boverketByComponent).flat(), [boverketByComponent]);
+
+  /* ── add a new package ─────────────────────────────────────────────────── */
+  const PACKAGE_COLORS = ["#721CB8", "#4ECDC4", "#F59E0B", "#96D74C", "#F97316", "#5FA5FF"];
+  function addPackage() {
+    if (!geometry) return;
+    const selections: Record<string, { wikellsCode: string; quantity: number }> = {};
+    let costSEK = 0;
+    let carbonKgCO2e = 0;
+    for (const item of lineItems) {
+      const code = draftSelection[item.key];
+      if (!code) continue;
+      const quantity = computeAreaForLineItem(item, geometry, wwr, manualOverrides);
+      if (quantity == null) continue;
+      selections[item.key] = { wikellsCode: code, quantity };
+      const wikellsItem = itemByCode[code];
+      if (wikellsItem) {
+        costSEK += wikellsItem.costSEK * quantity;
+        carbonKgCO2e += estimateCarbon(wikellsItem, boverketAll).value * quantity;
+      }
+    }
+    if (Object.keys(selections).length === 0) return;
+
+    const id = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const name = packageName.trim() || `Package ${packages.filter((p) => !p.isBaseline).length + 1}`;
+    const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
+    const pkg: RenovationCalcPackage = {
+      id, name, color, isBaseline: false, selections,
+      costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e),
+      simulation: { status: "idle", simulationId: null, heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null, error: null },
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "epsm_package_results.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    setProject({ renovationCalcPackages: [...packages, pkg] });
+    setPackageName("");
+    setDraftSelection({});
+
+    const overrides: Record<string, number> = {};
+    for (const item of lineItems) {
+      const sel = selections[item.key];
+      if (!sel) continue;
+      const wikellsItem = itemByCode[sel.wikellsCode];
+      if (!wikellsItem?.uValue) continue;
+      if (item.key === "Walls" || item.key === "VertExt::Walls") overrides.u_wall_override = wikellsItem.uValue;
+      if (item.key === "Roof" || item.key === "VertExt::Roof") overrides.u_roof_override = wikellsItem.uValue;
+      if (item.key === "Windows") overrides.u_win_override = wikellsItem.uValue;
+      if (item.key === "Floor" || item.key === "VertExt::Floor") overrides.u_floor_override = wikellsItem.uValue;
+    }
+    submitAndPoll(id, { lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY, city_id: CITY_ID, building: {}, package_label: name, ...overrides });
   }
 
-  const handleSaveAndContinue = () => {
-    setProject({ simulationMaterials: materials });
+  function retryPackage(pkg: RenovationCalcPackage) {
+    if (!geometry) return;
+    const overrides: Record<string, number> = {};
+    for (const [key, sel] of Object.entries(pkg.selections)) {
+      const wikellsItem = itemByCode[sel.wikellsCode];
+      if (!wikellsItem?.uValue) continue;
+      if (key === "Walls" || key === "VertExt::Walls") overrides.u_wall_override = wikellsItem.uValue;
+      if (key === "Roof" || key === "VertExt::Roof") overrides.u_roof_override = wikellsItem.uValue;
+      if (key === "Windows") overrides.u_win_override = wikellsItem.uValue;
+      if (key === "Floor" || key === "VertExt::Floor") overrides.u_floor_override = wikellsItem.uValue;
+    }
+    submitAndPoll(pkg.id, { lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY, city_id: CITY_ID, building: {}, package_label: pkg.name, ...overrides });
+  }
+
+  const baselineTotal = packages.find((p) => p.isBaseline)?.simulation.totalKwhM2Yr ?? null;
+
+  function handleSaveAndContinue() {
+    const baseline = packages.find((p) => p.isBaseline);
+    setProject({
+      renovationBaselineResults: baseline
+        ? [{
+            address: geometry?.address ?? "", energyUse: baseline.simulation.totalKwhM2Yr ?? 0,
+            heating: baseline.simulation.heatingKwhM2Yr ?? 0, cooling: baseline.simulation.coolingKwhM2Yr ?? 0,
+            dhw: 0, airLeakage: 0, eClass: null, eClassFromEpc: false,
+          }]
+        : [],
+      renovationSimResults: packages.filter((p) => !p.isBaseline).map((p, i) => {
+        const total = p.simulation.totalKwhM2Yr ?? baselineTotal ?? 0;
+        const saving = Math.max(0, Math.round((baselineTotal ?? total) - total));
+        return {
+          packageIndex: i + 1,
+          components: Object.fromEntries(Object.entries(p.selections).map(([k, s]) => {
+            const it = itemByCode[s.wikellsCode];
+            return [k, { code: s.wikellsCode, description: it?.description ?? "", costSEK: it?.costSEK ?? 0, uValue: it?.uValue }];
+          })),
+          energyUse: total, saving, carbonSaving: Math.round(saving * 0.2),
+          cost: p.costSEK ?? 0,
+        };
+      }),
+    });
     navigate("/step/5");
-  };
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1100 }}>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
-      {/* Header */}
       <div>
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
           Renovation Planning · Step 4
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>
-          Material Simulation Setup
-        </h1>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>Renovation Calculator</h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          Select which Wikells materials to test for each building component.
-          The tool will generate all combinations and send them to simulation.
+          Pick a material per component, add it as a package, and compare real cost, embodied carbon, and
+          EnergyPlus-simulated performance against the building's as-built baseline.
         </p>
       </div>
 
-      {/* Building scope selector */}
-      {buildings.length > 0 && (
-        <div style={{
-          borderRadius: 14, padding: "16px 18px",
-          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <Building2 size={14} color="#4ECDC4" />
-            <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>Apply combinations to</span>
+      {!geometry && (
+        <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
+          <p style={{ fontSize: 12, color: "#F59E0B", margin: 0 }}>No building resolved yet — go back to Step 1/2 and select a location.</p>
+        </div>
+      )}
+
+      {geometry && (
+        <>
+          {/* Component tabs + material picker */}
+          <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, marginBottom: 4, textTransform: "uppercase" }}>
+                Area line items
+              </div>
+              {lineItems.map((item) => {
+                const color = COMPONENT_COLORS[item.parentComponent] ?? "#721CB8";
+                const isActive = activeItemKey === item.key;
+                const hasSelection = !!draftSelection[item.key];
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => setActiveItemKey(item.key)}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "10px 12px", borderRadius: 10, border: `1px solid ${isActive ? `${color}55` : "rgba(255,255,255,0.07)"}`,
+                      background: isActive ? `${color}18` : "rgba(255,255,255,0.03)", cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: hasSelection ? color : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#fff" : "rgba(255,255,255,0.6)" }}>{item.label}</span>
+                    </div>
+                  </button>
+                );
+              })}
+              {lineItems.length === 0 && (
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>
+                  No components selected. Go back to Step 1.
+                </p>
+              )}
+            </div>
+
+            {activeItem && (
+              <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: `1px solid ${COMPONENT_COLORS[activeItem.parentComponent] ?? "#721CB8"}33` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{activeItem.label}</h3>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                    {activeQuantity != null
+                      ? `${activeQuantity.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} ${quantityUnitLabel(activeItem.quantityKind)}`
+                      : "quantity: manual entry needed"}
+                  </span>
+                </div>
+                {activeQuantity == null && (
+                  <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="number"
+                      placeholder={`Enter ${quantityUnitLabel(activeItem.quantityKind)}`}
+                      onChange={(e) => setManualOverrides((m) => ({ ...m, [activeItem.key]: Number(e.target.value) || 0 }))}
+                      style={{ width: 140, padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }}
+                    />
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>
+                      {activeItem.key === "Doors" ? "no automatic signal — enter a door count" : "no data source for this building yet"}
+                    </span>
+                  </div>
+                )}
+                <LineItemPicker
+                  item={activeItem}
+                  items={activeCatalogue}
+                  selectedCode={draftSelection[activeItem.key] ?? null}
+                  onSelect={(code) => setDraftSelection((d) => ({ ...d, [activeItem.key]: code }))}
+                  recommendations={activeRecommendations}
+                  boverketResources={activeBoverket}
+                />
+              </div>
+            )}
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {/* All buildings toggle */}
+
+          {/* Add package */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <input
+              value={packageName}
+              onChange={(e) => setPackageName(e.target.value)}
+              placeholder="Package name (optional)"
+              style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }}
+            />
             <button
-              onClick={() => setBuildingScope("all")}
+              onClick={addPackage}
+              disabled={Object.keys(draftSelection).length === 0}
               style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "7px 14px", borderRadius: 8, border: `1px solid ${buildingScope === "all" ? "rgba(78,205,196,0.5)" : "rgba(255,255,255,0.1)"}`,
-                background: buildingScope === "all" ? "rgba(78,205,196,0.12)" : "rgba(255,255,255,0.04)",
-                color: buildingScope === "all" ? "#4ECDC4" : "rgba(255,255,255,0.5)",
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                border: "1px solid rgba(150,215,76,0.4)", background: "rgba(150,215,76,0.12)", color: "#96D74C",
+                cursor: Object.keys(draftSelection).length === 0 ? "not-allowed" : "pointer",
+                opacity: Object.keys(draftSelection).length === 0 ? 0.5 : 1,
               }}
             >
-              <Users size={12} />
-              All buildings ({buildings.length})
+              <Plus size={13} /> Add package
             </button>
-            {/* Per-building toggles */}
-            {buildings.map(b => {
-              const isSelected = Array.isArray(buildingScope) && buildingScope.includes(b.id);
-              return (
-                <button
-                  key={b.id}
-                  onClick={() => {
-                    if (buildingScope === "all") {
-                      setBuildingScope([b.id]);
-                    } else {
-                      const cur = buildingScope as string[];
-                      setBuildingScope(cur.includes(b.id)
-                        ? cur.filter(id => id !== b.id)
-                        : [...cur, b.id]
-                      );
-                    }
-                  }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "7px 14px", borderRadius: 8,
-                    border: `1px solid ${isSelected ? "rgba(114,28,184,0.5)" : "rgba(255,255,255,0.1)"}`,
-                    background: isSelected ? "rgba(114,28,184,0.15)" : "rgba(255,255,255,0.04)",
-                    color: isSelected ? "#c084fc" : "rgba(255,255,255,0.5)",
-                    fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}
-                  title={b.label}
-                >
-                  {isSelected ? <CheckSquare size={12} /> : <Building2 size={12} />}
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{b.label}</span>
-                </button>
-              );
-            })}
-          </div>
-          {Array.isArray(buildingScope) && buildingScope.length === 0 && (
-            <p style={{ fontSize: 11, color: "#F59E0B", marginTop: 8, marginBottom: 0 }}>⚠ Select at least one building, or switch back to "All buildings".</p>
-          )}
-        </div>
-      )}
-
-      {/* Stats bar */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        {[
-          { label: "Buildings", value: buildingScope === "all" ? (buildings.length || "All") : (buildingScope as string[]).length, color: "#4ECDC4" },
-          { label: "Materials selected", value: totalSelected, color: "#4ECDC4" },
-          { label: "Packages to simulate", value: combinations.length, color: combinations.length > 50 ? "#F59E0B" : "#96D74C" },
-          { label: "Est. runtime", value: combinations.length === 0 ? "—" : `~${Math.ceil(combinations.length * 0.5)} min`, color: "rgba(255,255,255,0.5)" },
-        ].map(s => (
-          <div key={s.label} style={{
-            borderRadius: 12, padding: "14px 16px",
-            background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
-          }}>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700 }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main layout: component tabs + material picker */}
-      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }}>
-
-        {/* Component list */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, marginBottom: 4, textTransform: "uppercase" }}>
-            Building Components
-          </div>
-          {components.map(comp => {
-            const count = materials[comp]?.length ?? 0;
-            const color = COMPONENT_COLORS[comp] ?? "#721CB8";
-            const isActive = activeComponent === comp;
-            return (
-              <button
-                key={comp}
-                onClick={() => setActiveComponent(comp)}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 12px", borderRadius: 10, border: `1px solid ${isActive ? `${color}55` : "rgba(255,255,255,0.07)"}`,
-                  background: isActive ? `${color}18` : "rgba(255,255,255,0.03)",
-                  cursor: "pointer", transition: "all .12s",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: count > 0 ? color : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#fff" : "rgba(255,255,255,0.6)" }}>
-                    {COMPONENT_LABEL[comp] ?? comp}
-                  </span>
-                </div>
-                {count > 0 && (
-                  <span style={{ fontSize: 10, fontWeight: 700, color, background: `${color}22`, borderRadius: 10, padding: "1px 7px" }}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          {components.length === 0 && (
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>
-              No components defined. Go back to Step 1 to select renovation scope.
-            </p>
-          )}
-        </div>
-
-        {/* Material picker */}
-        <div style={{
-          borderRadius: 14, padding: "18px 20px",
-          background: "rgba(255,255,255,0.03)", border: `1px solid ${COMPONENT_COLORS[activeComponent] ?? "#721CB8"}33`,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <div style={{ width: 10, height: 10, borderRadius: "50%", background: COMPONENT_COLORS[activeComponent] ?? "#721CB8" }} />
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>
-              {COMPONENT_LABEL[activeComponent] ?? activeComponent}
-            </h3>
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>
-              — select materials to test
-            </span>
-            {(materials[activeComponent]?.length ?? 0) > 0 && (
-              <button
-                onClick={() => setMaterials(m => ({ ...m, [activeComponent]: [] }))}
-                style={{ marginLeft: "auto", fontSize: 10, color: "rgba(255,255,255,0.3)", background: "transparent", border: 0, cursor: "pointer" }}
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-          <MaterialPicker
-            component={activeComponent}
-            selected={materials[activeComponent] ?? []}
-            onChange={codes => setMaterials(m => ({ ...m, [activeComponent]: codes }))}
-          />
-        </div>
-      </div>
-
-      {/* Combination preview */}
-      {combinations.length > 0 && (
-        <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden" }}>
-          <button
-            onClick={() => setShowPreview(v => !v)}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "14px 18px", border: 0, background: "transparent", color: "#fff", cursor: "pointer",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Eye size={16} color="#4ECDC4" />
-              <span style={{ fontSize: 13, fontWeight: 700 }}>Preview Combinations</span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
-                {combinations.length} packages will be simulated
-              </span>
-            </div>
-            {showPreview ? <ChevronUp size={16} color="rgba(255,255,255,0.4)" /> : <ChevronDown size={16} color="rgba(255,255,255,0.4)" />}
-          </button>
-          {showPreview && (
-            <div style={{ padding: "0 18px 18px" }}>
-              <SimulationPreview combinations={combinations} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Warning for large batch */}
-      {combinations.length > 50 && (
-        <div style={{ borderRadius: 10, padding: "12px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", display: "flex", gap: 10, alignItems: "flex-start" }}>
-          <span style={{ fontSize: 14 }}>⚠️</span>
-          <div>
-            <p style={{ fontSize: 12, fontWeight: 700, color: "#F59E0B", margin: "0 0 2px" }}>Large simulation batch</p>
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", margin: 0 }}>
-              {combinations.length} combinations detected. Consider reducing the number of materials per component to keep simulation time manageable.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Simulation progress + results */}
-      {(simRunning || simResults) && (
-        <div style={{
-          borderRadius: 14, padding: "20px 22px",
-          background: simResults ? "rgba(150,215,76,0.04)" : "rgba(255,255,255,0.03)",
-          border: `1px solid ${simResults ? "rgba(150,215,76,0.22)" : "rgba(255,255,255,0.08)"}`,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            {simRunning
-              ? <Loader2 size={15} color="#96D74C" style={{ animation: "spin 1s linear infinite" }} />
-              : <BarChart2 size={15} color="#96D74C" />}
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
-              {simRunning ? "Running EPSM simulation…" : "Simulation Results"}
-            </span>
-            {simResults && (
-              <>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{simResults.length} packages ranked by energy saving</span>
-                <button
-                  onClick={downloadSimResults}
-                  style={{
-                    marginLeft: "auto", display: "flex", alignItems: "center", gap: 6,
-                    padding: "5px 13px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                    border: "1px solid rgba(78,205,196,0.35)", background: "rgba(78,205,196,0.08)", color: "#4ECDC4",
-                  }}
-                >
-                  <Download size={12} /> Download JSON
-                </button>
-              </>
-            )}
           </div>
 
-          {/* Progress bar */}
-          {simRunning && (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Testing {combinations.length} package{combinations.length !== 1 ? "s" : ""}…</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#96D74C" }}>{simProgress}%</span>
-              </div>
-              <div style={{ height: 6, borderRadius: 4, background: "rgba(255,255,255,0.08)" }}>
-                <div style={{ height: "100%", borderRadius: 4, background: "linear-gradient(90deg,#721CB8,#96D74C)", width: `${simProgress}%`, transition: "width 0.2s" }} />
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-                {["Loading baseline", "Applying material properties", "Running energy model", "Computing carbon impact", "Ranking packages"].map((s, i) => (
-                  <span key={s} style={{
-                    fontSize: 10, padding: "2px 8px", borderRadius: 6, fontWeight: 600,
-                    background: simProgress > i * 20 ? "rgba(150,215,76,0.12)" : "rgba(255,255,255,0.04)",
-                    color: simProgress > i * 20 ? "#96D74C" : "rgba(255,255,255,0.25)",
-                    border: `1px solid ${simProgress > i * 20 ? "rgba(150,215,76,0.25)" : "rgba(255,255,255,0.07)"}`,
-                  }}>{simProgress > i * 20 ? "✓" : "○"} {s}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Results table */}
-          {simResults && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {/* Baseline row */}
-              <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 120px 120px 120px 120px", gap: 10, padding: "4px 12px", marginBottom: 2 }}>
-                <span />
-                <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1 }}>Package</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, textAlign: "right" }}>Energy use</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#96D74C", textTransform: "uppercase", letterSpacing: 1, textAlign: "right" }}>Saving</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: 1, textAlign: "right" }}>CO₂e saved</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, textAlign: "right" }}>Cost</span>
-              </div>
-              {/* Baseline reference */}
-              <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 120px 120px 120px 120px", gap: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", alignItems: "center" }}>
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>—</span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)" }}>Baseline (as-built)</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.4)", textAlign: "right" }}>{baselineEnergyUse} kWh/m²</span>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
-              </div>
-              {simResults.map((r, i) => (
-                <div key={i} style={{
-                  display: "grid", gridTemplateColumns: "28px 1fr 120px 120px 120px 120px", gap: 10,
-                  padding: "10px 12px", borderRadius: 10, alignItems: "center",
-                  background: i === 0 ? "rgba(150,215,76,0.06)" : "rgba(255,255,255,0.02)",
-                  border: `1px solid ${i === 0 ? "rgba(150,215,76,0.22)" : "rgba(255,255,255,0.06)"}`,
-                }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? "#96D74C" : "rgba(255,255,255,0.25)" }}>{i === 0 ? "★" : `#${i + 1}`}</span>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {Object.entries(r.components).map(([comp, item]) => (
-                      <span key={comp} style={{
-                        fontSize: 9, padding: "1px 6px", borderRadius: 5,
-                        background: `${COMPONENT_COLORS[comp] ?? "#721CB8"}22`,
-                        color: COMPONENT_COLORS[comp] ?? "#721CB8",
-                        border: `1px solid ${COMPONENT_COLORS[comp] ?? "#721CB8"}44`,
-                      }}>{COMPONENT_LABEL[comp] ?? comp}: {item.code}</span>
-                    ))}
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.65)", textAlign: "right" }}>{r.energyUse} kWh/m²</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C", textAlign: "right" }}>−{r.saving} kWh/m²</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#60a5fa", textAlign: "right" }}>−{r.carbonSaving} kg</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>{r.cost.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} SEK/m²</span>
-                </div>
+          {/* Comparison table */}
+          <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "16px 18px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 110px 110px 110px 110px 110px 110px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 8 }}>
+              {["Package", "Cost", "Carbon", "Heating", "Cooling", "Total", "Status"].map((h) => (
+                <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>{h}</span>
               ))}
-              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: "2px 0 0" }}>
-                * Illustrative EPSM outputs. Energy saving relative to as-built baseline ({baselineEnergyUse} kWh/m²·yr).
-              </p>
             </div>
-          )}
-        </div>
+            {[...packages].sort((a, b) => (a.isBaseline ? -1 : b.isBaseline ? 1 : 0)).map((pkg) => (
+              <div key={pkg.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 110px 110px 110px 110px 110px 110px", gap: 10, padding: "8px 4px", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: pkg.isBaseline ? "rgba(255,255,255,0.5)" : "#fff" }}>
+                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: pkg.color, marginRight: 6 }} />
+                  {pkg.name}
+                </span>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{pkg.costSEK != null ? fmtSEK(pkg.costSEK) : "—"}</span>
+                <span style={{ fontSize: 12, color: "#60a5fa" }}>{pkg.carbonKgCO2e != null ? `${pkg.carbonKgCO2e.toLocaleString("sv-SE")} kg` : "—"}</span>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{pkg.simulation.heatingKwhM2Yr != null ? `${pkg.simulation.heatingKwhM2Yr}` : "—"}</span>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{pkg.simulation.coolingKwhM2Yr != null ? `${pkg.simulation.coolingKwhM2Yr}` : "—"}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C" }}>{pkg.simulation.totalKwhM2Yr != null ? `${pkg.simulation.totalKwhM2Yr}` : "—"}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {(pkg.simulation.status === "queued" || pkg.simulation.status === "running") && <Loader2 size={13} color="#F59E0B" style={{ animation: "spin 1s linear infinite" }} />}
+                  {pkg.simulation.status === "completed" && <CheckCircle2 size={13} color="#96D74C" />}
+                  {pkg.simulation.status === "failed" && (
+                    <>
+                      <XCircle size={13} color="#EF4444" />
+                      <button onClick={() => retryPackage(pkg)} title={pkg.simulation.error ?? "Retry"} style={{ background: "transparent", border: 0, cursor: "pointer", color: "#EF4444" }}>
+                        <RefreshCw size={12} />
+                      </button>
+                    </>
+                  )}
+                </span>
+              </div>
+            ))}
+            {packages.length === 0 && (
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>No packages yet.</p>
+            )}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              onClick={handleSaveAndContinue}
+              style={{ padding: "10px 22px", borderRadius: 10, fontSize: 13, fontWeight: 700, border: 0, cursor: "pointer", background: "linear-gradient(90deg,#721CB8,#96D74C)", color: "#fff" }}
+            >
+              Save & Continue →
+            </button>
+          </div>
+        </>
       )}
-
-
-
     </div>
   );
 }
