@@ -1,11 +1,10 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useWizardStore, type RenovationCalcPackage } from "../store/wizard";
+import { useWizardStore, type RenovationCalcPackage, type RenovationCalcBuildingResult, type RenovationCalcSelection } from "../store/wizard";
 import { api } from "../api/client";
 import { lineItemsFor, type AreaLineItem } from "../config/componentAreaLineItems";
-import { resolveBuildingGeometry, computeAreaForLineItem, quantityUnitLabel } from "../utils/componentAreas";
+import { resolveBuildingGeometry, computeAreaForLineItem, quantityUnitLabel, type ResolvedBuildingGeometry } from "../utils/componentAreas";
 import { itemsForLineItem, estimateCarbon, recommendationsForLineItem, type KpiKey } from "../utils/materialRecommendation";
-import { useSimulationPoller } from "../hooks/useSimulationPoller";
 import {
   loadUkArchetypes, findUkArchetype, REFURB_TIERS,
   type TabulaArchetypeGB, type RefurbTierKey,
@@ -13,15 +12,22 @@ import {
 import { UK_PLACEHOLDER_RATES, fmtGBP } from "../config/ukPlaceholderCostCarbon";
 import type { WikellsItem } from "../config/wikellsData";
 import type { BoverketResource, WWRRecord } from "../types";
-import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
 
 /* Sweden/Gothenburg is the only geometry+cost+carbon-complete dataset - UK
- * buildings resolve via /api/uk/building (Phase 1) and get real EPSM energy
+ * buildings resolve via /api/uk/building and get real EPSM energy
  * simulation, but there's no UK cost/carbon catalogue equivalent to
- * Wikells/Boverket yet, so UK packages price as "-" and use TABULA GB's
- * whole-building refurbishment tiers (see ukArchetype.ts) in place of a
- * per-component material picker. */
+ * Wikells/Boverket yet, so UK packages price via SYNTHETIC placeholder
+ * rates (see ukPlaceholderCostCarbon.ts) and use TABULA GB's whole-building
+ * refurbishment tiers in place of a per-component material picker.
+ *
+ * Every package here is submitted as ONE EPSM batch across every building
+ * selected in Step 2 (see backend's /api/simulation-batch-submit) - not
+ * just the first one - so a package's cost/carbon/energy are per-building
+ * (footprint/wall area differ per building) and the comparison table shows
+ * portfolio aggregates with a per-building breakdown on expand. */
 const CITY_ID = "gothenburg"; // Sweden only - UK omits city_id, server auto-resolves the nearest district from lat/lon
+const UK_TIER_SELECTIONS_KEY = "UK::RefurbTier";
 
 const COMPONENT_COLORS: Record<string, string> = {
   "Walls": "#721CB8", "Windows": "#F59E0B", "Doors": "#4ECDC4", "Floor": "#4A90E2",
@@ -39,8 +45,6 @@ function uLabel(u?: number) {
   return { label: "Basic", color: "#EF4444" };
 }
 
-const UK_TIER_SELECTIONS_KEY = "UK::RefurbTier";
-
 function ukOverridesFromTier(tier: TabulaArchetypeGB[RefurbTierKey] | undefined | null): Record<string, number> {
   const overrides: Record<string, number> = {};
   if (!tier) return overrides;
@@ -48,6 +52,46 @@ function ukOverridesFromTier(tier: TabulaArchetypeGB[RefurbTierKey] | undefined 
   if (tier.u_roof != null) overrides.u_roof_override = tier.u_roof;
   if (tier.u_window != null) overrides.u_win_override = tier.u_window;
   return overrides;
+}
+
+function overridesFromSeSelections(
+  selections: Record<string, RenovationCalcSelection>,
+  itemByCode: Record<string, WikellsItem>
+): Record<string, number> {
+  const overrides: Record<string, number> = {};
+  for (const [key, sel] of Object.entries(selections)) {
+    const wikellsItem = itemByCode[sel.wikellsCode];
+    if (!wikellsItem?.uValue) continue;
+    if (key === "Walls" || key === "VertExt::Walls") overrides.u_wall_override = wikellsItem.uValue;
+    if (key === "Roof" || key === "VertExt::Roof") overrides.u_roof_override = wikellsItem.uValue;
+    if (key === "Windows") overrides.u_win_override = wikellsItem.uValue;
+    if (key === "Floor" || key === "VertExt::Floor") overrides.u_floor_override = wikellsItem.uValue;
+  }
+  return overrides;
+}
+
+/** Aggregate a package's per-building rows into portfolio-level figures for
+ * the comparison table - energy is averaged (it's a per-m² rate, comparable
+ * across differently-sized buildings), cost/carbon are summed (portfolio
+ * totals, not rates). */
+function pkgAggregate(pkg: RenovationCalcPackage) {
+  const n = pkg.buildings.length;
+  const completed = pkg.buildings.filter((b) => b.status === "completed").length;
+  const failed = pkg.buildings.filter((b) => b.status === "failed").length;
+  const avg = (xs: (number | null)[]) => {
+    const vals = xs.filter((x): x is number => x != null);
+    return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
+  };
+  const sumOrNull = (xs: (number | null)[]) =>
+    xs.some((x) => x != null) ? Math.round(xs.reduce((a: number, x) => a + (x ?? 0), 0)) : null;
+  return {
+    n, completed, failed, pending: n - completed - failed,
+    avgHeatingKwhM2Yr: avg(pkg.buildings.map((b) => b.heatingKwhM2Yr)),
+    avgCoolingKwhM2Yr: avg(pkg.buildings.map((b) => b.coolingKwhM2Yr)),
+    avgTotalKwhM2Yr: avg(pkg.buildings.map((b) => b.totalKwhM2Yr)),
+    totalCostSEK: sumOrNull(pkg.buildings.map((b) => b.costSEK)),
+    totalCarbonKgCO2e: sumOrNull(pkg.buildings.map((b) => b.carbonKgCO2e)),
+  };
 }
 
 /* ─── Material picker for one area line item (single-select) ─────────────── */
@@ -115,12 +159,14 @@ function LineItemPicker({
 
 /* ─── UK refurbishment-tier picker (whole-building, not per-component) ────── */
 function UkTierPicker({
-  archetype, selectedTier, onSelect, footprintM2,
+  archetype, selectedTier, onSelect, footprintM2, buildingCount, uSource,
 }: {
   archetype: TabulaArchetypeGB | null;
   selectedTier: RefurbTierKey | null;
   onSelect: (tier: RefurbTierKey) => void;
   footprintM2: number | null;
+  buildingCount: number;
+  uSource: string | null;
 }) {
   if (!archetype) {
     return (
@@ -132,11 +178,16 @@ function UkTierPicker({
       </div>
     );
   }
+  const eraLabel = uSource === "known_year" ? "known construction year" : uSource === "ehs_sampled_period" ? "estimated era" : "era unknown";
+  const eraColor = uSource === "known_year" ? "#96D74C" : "#F59E0B";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ borderRadius: 10, padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
-          As-built (TABULA {archetype.type_label}, {archetype.period_label})
+        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+          <span>As-built (TABULA {archetype.type_label}, {archetype.period_label}) - matched from building 1{buildingCount > 1 ? ` of ${buildingCount}` : ""}</span>
+          <span style={{ color: eraColor, background: `${eraColor}22`, padding: "1px 7px", borderRadius: 8, fontWeight: 700, textTransform: "none", letterSpacing: 0 }}>
+            {eraLabel}
+          </span>
         </div>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           {(["u_wall", "u_roof", "u_window", "u_floor"] as const).map((k) => (
@@ -190,7 +241,7 @@ function UkTierPicker({
               </span>
               {estCost != null && estCarbon != null && (
                 <span style={{ fontSize: 11, color: "#F59E0B" }}>
-                  ~{fmtGBP(estCost)} · ~{estCarbon.toLocaleString("en-GB")} kg CO₂e <i>(placeholder)</i>
+                  ~{fmtGBP(estCost)} · ~{estCarbon.toLocaleString("en-GB")} kg CO₂e <i>(building 1, placeholder)</i>
                 </span>
               )}
             </div>
@@ -201,7 +252,7 @@ function UkTierPicker({
         Cost and embodied carbon for UK packages are SYNTHETIC PLACEHOLDER figures (flat £/m² and kg CO₂e/m² rates,
         not derived from any real dataset) shown only to test the calculator pipeline end-to-end - replace with a
         real, licensed UK cost/carbon source before using these numbers for an actual decision. The energy columns
-        below come from a real EnergyPlus simulation using this tier's U-values.
+        below come from a real EnergyPlus simulation using this tier's U-values, applied to every selected building.
       </p>
     </div>
   );
@@ -211,7 +262,6 @@ function UkTierPicker({
 export default function RenovationSimulator() {
   const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
-  const { submitAndPoll, resumePoll } = useSimulationPoller();
 
   const isUK = project.country === "United Kingdom";
   const COUNTRY = isUK ? "gb" : "se";
@@ -221,10 +271,19 @@ export default function RenovationSimulator() {
     : ["Walls", "Roof", "Windows"];
   const lineItems = useMemo(() => lineItemsFor(components), [components]);
 
-  const building = project.lookedUpBuilding ?? project.lookedUpBuildings[0] ?? project.bboxRows[0] ?? null;
-  const geometry = useMemo(() => resolveBuildingGeometry(building), [building]);
+  /* Every building selected in Step 2 - not just the first one. */
+  const buildings = useMemo(() => {
+    if (project.lookedUpBuildings.length > 0) return project.lookedUpBuildings;
+    if (project.lookedUpBuilding) return [project.lookedUpBuilding];
+    return project.bboxRows;
+  }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows]);
 
-  const [wwr, setWwr] = useState<WWRRecord | null>(null);
+  const geometries = useMemo(
+    () => buildings.map((b) => resolveBuildingGeometry(b)).filter((g): g is ResolvedBuildingGeometry => g !== null),
+    [buildings]
+  );
+
+  const [wwrByIndex, setWwrByIndex] = useState<Record<number, WWRRecord | null>>({});
   const [manualOverrides, setManualOverrides] = useState<Record<string, number>>({});
   const [boverketByComponent, setBoverketByComponent] = useState<Record<string, BoverketResource[]>>({});
   const [activeItemKey, setActiveItemKey] = useState<string>(lineItems[0]?.key ?? "");
@@ -232,27 +291,127 @@ export default function RenovationSimulator() {
   const [ukArchetype, setUkArchetype] = useState<TabulaArchetypeGB | null>(null);
   const [ukTier, setUkTier] = useState<RefurbTierKey | null>(null);
   const [packageName, setPackageName] = useState("");
+  const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
   // A ref, not state: React StrictMode double-invokes effects in dev without
   // an intervening re-render, so a useState guard here would let both
   // invocations see the same stale "not yet initialized" value and both
-  // submit a baseline. A ref mutation is synchronous and immediately visible
-  // to the second invocation.
+  // submit a baseline batch. A ref mutation is synchronous and immediately
+  // visible to the second invocation.
   const initializedRef = useRef(false);
+  const pollHandles = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
   const packages = project.renovationCalcPackages;
 
-  /* ── fetch WWR + Boverket/TABULA data + hydrate baseline/in-flight packages ── */
+  const stopPoll = useCallback((packageId: string) => {
+    const h = pollHandles.current[packageId];
+    if (h) { clearInterval(h); delete pollHandles.current[packageId]; }
+  }, []);
+
+  const pollBatch = useCallback((packageId: string, batchId: string) => {
+    stopPoll(packageId);
+    const tick = async () => {
+      try {
+        const status = await api.simulationBatchStatus(batchId);
+        setProject({
+          renovationCalcPackages: useWizardStore.getState().project.renovationCalcPackages.map((p) => {
+            if (p.id !== packageId) return p;
+            return {
+              ...p,
+              buildings: p.buildings.map((b, i) => {
+                const row = status.buildings[i];
+                if (!row) return b;
+                return {
+                  ...b,
+                  status: (row.status as RenovationCalcBuildingResult["status"]) ?? b.status,
+                  heatingKwhM2Yr: row.results?.heating_kwh_m2_yr ?? b.heatingKwhM2Yr,
+                  coolingKwhM2Yr: row.results?.cooling_kwh_m2_yr ?? b.coolingKwhM2Yr,
+                  totalKwhM2Yr: row.results?.total_kwh_m2_yr ?? b.totalKwhM2Yr,
+                  error: row.error ?? b.error,
+                };
+              }),
+            };
+          }),
+        });
+        if (status.buildings.every((b) => b.status === "completed" || b.status === "failed")) {
+          stopPoll(packageId);
+        }
+      } catch {
+        // Transient network hiccup - keep polling.
+      }
+    };
+    tick();
+    pollHandles.current[packageId] = setInterval(tick, 4000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopPoll]);
+
+  const submitBatch = useCallback(async (packageId: string, overrides: Record<string, number>, packageLabel?: string) => {
+    try {
+      const { batch_id } = await api.simulationBatchSubmit({
+        country: COUNTRY,
+        ...(isUK ? {} : { city_id: CITY_ID }),
+        buildings: geometries.map((g) => ({ lat: g.lat, lon: g.lon, address: g.address })),
+        package_id: packageId, package_label: packageLabel ?? null,
+        ...overrides,
+      });
+      setProject({
+        renovationCalcPackages: useWizardStore.getState().project.renovationCalcPackages.map((p) =>
+          p.id === packageId ? { ...p, batchId: batch_id } : p
+        ),
+      });
+      pollBatch(packageId, batch_id);
+    } catch (err) {
+      setProject({
+        renovationCalcPackages: useWizardStore.getState().project.renovationCalcPackages.map((p) =>
+          p.id === packageId
+            ? { ...p, buildings: p.buildings.map((b) => ({ ...b, status: "failed" as const, error: (err as Error).message })) }
+            : p
+        ),
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geometries, isUK, pollBatch]);
+
+  function makeBuildingRows(
+    costCarbonFor?: (g: ResolvedBuildingGeometry, i: number) => { costSEK: number | null; carbonKgCO2e: number | null }
+  ): RenovationCalcBuildingResult[] {
+    return geometries.map((g, i) => {
+      const cc = costCarbonFor ? costCarbonFor(g, i) : { costSEK: null, carbonKgCO2e: null };
+      return {
+        address: g.address ?? `Building ${i + 1}`, lat: g.lat, lon: g.lon, status: "queued",
+        heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null,
+        costSEK: cc.costSEK, carbonKgCO2e: cc.carbonKgCO2e, error: null,
+      };
+    });
+  }
+
+  const submitBaseline = useCallback(() => {
+    if (geometries.length === 0) return;
+    const pkg: RenovationCalcPackage = {
+      id: "baseline", name: "Baseline (as-built)", color: "rgba(255,255,255,0.4)", isBaseline: true,
+      selections: {}, batchId: null, buildings: makeBuildingRows(),
+    };
+    setProject({ renovationCalcPackages: [...useWizardStore.getState().project.renovationCalcPackages.filter((p) => p.id !== "baseline"), pkg] });
+    submitBatch("baseline", {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geometries, submitBatch]);
+
+  /* ── fetch WWR (per building) + Boverket/TABULA data + submit baseline ── */
   useEffect(() => {
-    if (!geometry || initializedRef.current) return;
+    if (geometries.length === 0 || initializedRef.current) return;
     initializedRef.current = true;
 
-    api.lookupWWR(geometry.lat, geometry.lon).then((r) => {
-      if (r.found) setWwr(r.record);
-    }).catch(() => { /* not critical */ });
+    Promise.all(
+      geometries.map((g) => api.lookupWWR(g.lat, g.lon).then((r) => (r.found ? r.record : null)).catch(() => null))
+    ).then((records) => setWwrByIndex(Object.fromEntries(records.map((r, i) => [i, r] as const))));
 
     if (isUK) {
       loadUkArchetypes().then((archetypes) => {
-        setUkArchetype(findUkArchetype(archetypes, geometry.useCat, geometry.tabulaPeriod));
+        // tabulaPeriodUsed (not tabulaPeriod) always carries whichever period actually
+        // drove the backend's own TABULA lookup - real known year OR an EHS-sampled
+        // era - so this matches the SAME archetype the building's as-built u-values
+        // came from, rather than falling back to an arbitrary one when the era was
+        // sampled (the common case - tabulaPeriod itself stays null for those).
+        setUkArchetype(findUkArchetype(archetypes, geometries[0]!.useCat, geometries[0]!.tabulaPeriodUsed));
       }).catch(() => { /* no archetype match available */ });
     } else {
       const uniqueComponents = Array.from(new Set(lineItems.map((li) => li.boverketComponent)));
@@ -260,65 +419,23 @@ export default function RenovationSimulator() {
         .then((pairs) => setBoverketByComponent(Object.fromEntries(pairs)));
     }
 
-    api.simulationLookupAll(geometry.lat, geometry.lon).then(({ records }) => {
-      // Read live store state, not the `packages` closed over at render time -
-      // by the time this async callback runs, that snapshot may be stale.
-      const existingIds = new Set(useWizardStore.getState().project.renovationCalcPackages.map((p) => p.id));
-      for (const rec of records) {
-        const pkgId = (rec.package_id as string) ?? "baseline";
-        if (existingIds.has(pkgId)) continue;
-        if (pkgId !== "baseline") continue; // only auto-adopt the baseline; user-built packages are session-local until re-added
-        const status = rec.status as string;
-        if (status === "completed") {
-          const results = rec.results as Record<string, number> | null;
-          setProject({
-            renovationCalcPackages: [
-              ...useWizardStore.getState().project.renovationCalcPackages,
-              makeBaselinePackage({
-                status: "completed",
-                simulationId: rec.epsm_simulation_id,
-                heatingKwhM2Yr: results?.heating_kwh_m2_yr ?? null,
-                coolingKwhM2Yr: results?.cooling_kwh_m2_yr ?? null,
-                totalKwhM2Yr: results?.total_kwh_m2_yr ?? null,
-                error: null,
-              }),
-            ],
-          });
-        } else if (status === "queued" || status === "running") {
-          setProject({
-            renovationCalcPackages: [
-              ...useWizardStore.getState().project.renovationCalcPackages,
-              makeBaselinePackage({ status: status as "queued" | "running", simulationId: rec.epsm_simulation_id, heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null, error: null }),
-            ],
-          });
-          resumePoll("baseline", rec.epsm_simulation_id);
+    const existing = useWizardStore.getState().project.renovationCalcPackages;
+    if (!existing.some((p) => p.isBaseline)) {
+      submitBaseline();
+    } else {
+      for (const pkg of existing) {
+        if (pkg.batchId && pkg.buildings.some((b) => b.status === "queued" || b.status === "running")) {
+          pollBatch(pkg.id, pkg.batchId);
         }
-        existingIds.add(pkgId);
       }
-      // No baseline found anywhere yet - submit one now.
-      if (!existingIds.has("baseline")) {
-        submitBaseline();
-      }
-    }).catch(() => {
-      if (!useWizardStore.getState().project.renovationCalcPackages.some((p) => p.isBaseline)) submitBaseline();
-    });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geometry]);
+  }, [geometries.length]);
 
-  function makeBaselinePackage(simulation: RenovationCalcPackage["simulation"]): RenovationCalcPackage {
-    return { id: "baseline", name: "Baseline (as-built)", color: "rgba(255,255,255,0.4)", isBaseline: true, selections: {}, costSEK: null, carbonKgCO2e: null, simulation };
-  }
-
-  const submitBaseline = useCallback(() => {
-    if (!geometry) return;
-    const pkg = makeBaselinePackage({ status: "idle", simulationId: null, heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null, error: null });
-    setProject({ renovationCalcPackages: [...useWizardStore.getState().project.renovationCalcPackages, pkg] });
-    submitAndPoll("baseline", {
-      lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY,
-      ...(isUK ? {} : { city_id: CITY_ID }), building: {},
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geometry, isUK]);
+  useEffect(() => {
+    const handles = pollHandles.current;
+    return () => { Object.values(handles).forEach(clearInterval); };
+  }, []);
 
   /* ── derived: items/areas/recommendations for the active line item (Sweden only) ── */
   const activeItem = lineItems.find((li) => li.key === activeItemKey) ?? lineItems[0];
@@ -328,7 +445,7 @@ export default function RenovationSimulator() {
     () => (activeItem ? recommendationsForLineItem(activeCatalogue, activeBoverket, project.selectedKpis) : {}),
     [activeItem, activeCatalogue, activeBoverket, project.selectedKpis]
   );
-  const activeQuantity = activeItem && geometry ? computeAreaForLineItem(activeItem, geometry, wwr, manualOverrides) : null;
+  const activeQuantity = activeItem && geometries[0] ? computeAreaForLineItem(activeItem, geometries[0], wwrByIndex[0] ?? null, manualOverrides) : null;
 
   const itemByCode = useMemo(() => {
     const all = lineItems.flatMap((li) => itemsForLineItem(li));
@@ -341,133 +458,115 @@ export default function RenovationSimulator() {
   const PACKAGE_COLORS = ["#721CB8", "#4ECDC4", "#F59E0B", "#96D74C", "#F97316", "#5FA5FF"];
 
   function addPackage() {
-    if (!geometry) return;
+    if (geometries.length === 0) return;
     if (isUK) {
       addUkPackage();
       return;
     }
-    const selections: Record<string, { wikellsCode: string; quantity: number }> = {};
-    let costSEK = 0;
-    let carbonKgCO2e = 0;
+    const selections: Record<string, RenovationCalcSelection> = {};
     for (const item of lineItems) {
       const code = draftSelection[item.key];
       if (!code) continue;
-      const quantity = computeAreaForLineItem(item, geometry, wwr, manualOverrides);
-      if (quantity == null) continue;
-      selections[item.key] = { wikellsCode: code, quantity };
-      const wikellsItem = itemByCode[code];
-      if (wikellsItem) {
-        costSEK += wikellsItem.costSEK * quantity;
-        carbonKgCO2e += estimateCarbon(wikellsItem, boverketAll).value * quantity;
-      }
+      selections[item.key] = { wikellsCode: code, quantity: 0 };
     }
     if (Object.keys(selections).length === 0) return;
 
     const id = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
     const name = packageName.trim() || `Package ${packages.filter((p) => !p.isBaseline).length + 1}`;
     const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
-    const pkg: RenovationCalcPackage = {
-      id, name, color, isBaseline: false, selections,
-      costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e),
-      simulation: { status: "idle", simulationId: null, heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null, error: null },
-    };
+
+    const buildingRows = makeBuildingRows((g, i) => {
+      let costSEK = 0, carbonKgCO2e = 0, any = false;
+      for (const item of lineItems) {
+        const sel = selections[item.key];
+        if (!sel) continue;
+        const quantity = computeAreaForLineItem(item, g, wwrByIndex[i] ?? null, manualOverrides);
+        if (quantity == null) continue;
+        const wikellsItem = itemByCode[sel.wikellsCode];
+        if (wikellsItem) {
+          any = true;
+          costSEK += wikellsItem.costSEK * quantity;
+          carbonKgCO2e += estimateCarbon(wikellsItem, boverketAll).value * quantity;
+        }
+      }
+      return any ? { costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e) } : { costSEK: null, carbonKgCO2e: null };
+    });
+
+    const pkg: RenovationCalcPackage = { id, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows };
     setProject({ renovationCalcPackages: [...packages, pkg] });
     setPackageName("");
     setDraftSelection({});
-
-    const overrides: Record<string, number> = {};
-    for (const item of lineItems) {
-      const sel = selections[item.key];
-      if (!sel) continue;
-      const wikellsItem = itemByCode[sel.wikellsCode];
-      if (!wikellsItem?.uValue) continue;
-      if (item.key === "Walls" || item.key === "VertExt::Walls") overrides.u_wall_override = wikellsItem.uValue;
-      if (item.key === "Roof" || item.key === "VertExt::Roof") overrides.u_roof_override = wikellsItem.uValue;
-      if (item.key === "Windows") overrides.u_win_override = wikellsItem.uValue;
-      if (item.key === "Floor" || item.key === "VertExt::Floor") overrides.u_floor_override = wikellsItem.uValue;
-    }
-    submitAndPoll(id, {
-      lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY,
-      city_id: CITY_ID, building: {}, package_label: name, ...overrides,
-    });
+    submitBatch(id, overridesFromSeSelections(selections, itemByCode), name);
   }
 
   function addUkPackage() {
-    if (!geometry || !ukArchetype || !ukTier) return;
+    if (geometries.length === 0 || !ukArchetype || !ukTier) return;
     const tier = ukArchetype[ukTier];
     const tierMeta = REFURB_TIERS.find((t) => t.key === ukTier)!;
     const rate = UK_PLACEHOLDER_RATES[ukTier];
-    const footprint = geometry.footprintM2 ?? 0;
 
     const id = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
     const name = packageName.trim() || tierMeta.label;
     const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
+
+    const buildingRows = makeBuildingRows((g) => {
+      const footprint = g.footprintM2 ?? 0;
+      return footprint
+        ? { costSEK: Math.round(rate.costGbpPerM2 * footprint), carbonKgCO2e: Math.round(rate.carbonKgCo2ePerM2 * footprint) }
+        : { costSEK: null, carbonKgCO2e: null };
+    });
+
     const pkg: RenovationCalcPackage = {
       id, name, color, isBaseline: false,
       selections: { [UK_TIER_SELECTIONS_KEY]: { wikellsCode: ukTier, quantity: 1 } },
-      // SYNTHETIC PLACEHOLDER figures (see ukPlaceholderCostCarbon.ts) - not a
-      // real UK cost/carbon source, shown only for pipeline-testing purposes.
-      costSEK: footprint ? Math.round(rate.costGbpPerM2 * footprint) : null,
-      carbonKgCO2e: footprint ? Math.round(rate.carbonKgCo2ePerM2 * footprint) : null,
-      simulation: { status: "idle", simulationId: null, heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null, error: null },
+      batchId: null, buildings: buildingRows,
     };
     setProject({ renovationCalcPackages: [...packages, pkg] });
     setPackageName("");
     setUkTier(null);
-
-    submitAndPoll(id, {
-      lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY,
-      building: {}, package_label: name, ...ukOverridesFromTier(tier),
-    });
+    submitBatch(id, ukOverridesFromTier(tier), name);
   }
 
   function retryPackage(pkg: RenovationCalcPackage) {
-    if (!geometry) return;
+    if (geometries.length === 0) return;
+    let overrides: Record<string, number> = {};
     if (isUK) {
       const sel = pkg.selections[UK_TIER_SELECTIONS_KEY];
       const tierKey = sel?.wikellsCode as RefurbTierKey | undefined;
       const tier = tierKey && ukArchetype ? ukArchetype[tierKey] : null;
-      submitAndPoll(pkg.id, {
-        lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY,
-        building: {}, package_label: pkg.name, ...ukOverridesFromTier(tier),
-      });
-      return;
+      overrides = ukOverridesFromTier(tier);
+    } else {
+      overrides = overridesFromSeSelections(pkg.selections, itemByCode);
     }
-    const overrides: Record<string, number> = {};
-    for (const [key, sel] of Object.entries(pkg.selections)) {
-      const wikellsItem = itemByCode[sel.wikellsCode];
-      if (!wikellsItem?.uValue) continue;
-      if (key === "Walls" || key === "VertExt::Walls") overrides.u_wall_override = wikellsItem.uValue;
-      if (key === "Roof" || key === "VertExt::Roof") overrides.u_roof_override = wikellsItem.uValue;
-      if (key === "Windows") overrides.u_win_override = wikellsItem.uValue;
-      if (key === "Floor" || key === "VertExt::Floor") overrides.u_floor_override = wikellsItem.uValue;
-    }
-    submitAndPoll(pkg.id, { lat: geometry.lat, lon: geometry.lon, address: geometry.address, country: COUNTRY, city_id: CITY_ID, building: {}, package_label: pkg.name, ...overrides });
+    setProject({
+      renovationCalcPackages: useWizardStore.getState().project.renovationCalcPackages.map((p) =>
+        p.id === pkg.id ? { ...p, buildings: p.buildings.map((b) => ({ ...b, status: "queued" as const, error: null })) } : p
+      ),
+    });
+    submitBatch(pkg.id, overrides, pkg.name);
   }
 
-  const baselineTotal = packages.find((p) => p.isBaseline)?.simulation.totalKwhM2Yr ?? null;
+  const baselinePkg = packages.find((p) => p.isBaseline);
+  const baselineAgg = baselinePkg ? pkgAggregate(baselinePkg) : null;
 
   function handleSaveAndContinue() {
-    const baseline = packages.find((p) => p.isBaseline);
     setProject({
-      renovationBaselineResults: baseline
-        ? [{
-            address: geometry?.address ?? "", energyUse: baseline.simulation.totalKwhM2Yr ?? 0,
-            heating: baseline.simulation.heatingKwhM2Yr ?? 0, cooling: baseline.simulation.coolingKwhM2Yr ?? 0,
-            dhw: 0, airLeakage: 0, eClass: null, eClassFromEpc: false,
-          }]
-        : [],
       renovationSimResults: packages.filter((p) => !p.isBaseline).map((p, i) => {
-        const total = p.simulation.totalKwhM2Yr ?? baselineTotal ?? 0;
-        const saving = Math.max(0, Math.round((baselineTotal ?? total) - total));
+        const agg = pkgAggregate(p);
+        const total = agg.avgTotalKwhM2Yr ?? baselineAgg?.avgTotalKwhM2Yr ?? 0;
+        const baseTotal = baselineAgg?.avgTotalKwhM2Yr ?? total;
+        const saving = Math.max(0, Math.round(baseTotal - total));
+        const carbonSaving = agg.totalCarbonKgCO2e != null && baselineAgg?.totalCarbonKgCO2e != null
+          ? Math.max(0, Math.round(baselineAgg.totalCarbonKgCO2e - agg.totalCarbonKgCO2e))
+          : Math.round(saving * 0.2);
         return {
           packageIndex: i + 1,
           components: Object.fromEntries(Object.entries(p.selections).map(([k, s]) => {
             const it = itemByCode[s.wikellsCode];
             return [k, { code: s.wikellsCode, description: it?.description ?? s.wikellsCode, costSEK: it?.costSEK ?? 0, uValue: it?.uValue }];
           })),
-          energyUse: total, saving, carbonSaving: Math.round(saving * 0.2),
-          cost: p.costSEK ?? 0,
+          energyUse: total, saving, carbonSaving,
+          cost: agg.totalCostSEK ?? 0,
         };
       }),
     });
@@ -486,27 +585,34 @@ export default function RenovationSimulator() {
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>Renovation Calculator</h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          {isUK
-            ? "Pick a TABULA refurbishment tier and compare real EnergyPlus-simulated performance against the building's as-built baseline."
-            : "Pick a material per component, add it as a package, and compare real cost, embodied carbon, and EnergyPlus-simulated performance against the building's as-built baseline."}
+          {geometries.length > 1
+            ? `Pick ${isUK ? "a TABULA refurbishment tier" : "a material per component"}, add it as a package, and run a real EnergyPlus simulation across all ${geometries.length} buildings selected in Step 2 at once.`
+            : isUK
+              ? "Pick a TABULA refurbishment tier and compare real EnergyPlus-simulated performance against the building's as-built baseline."
+              : "Pick a material per component, add it as a package, and compare real cost, embodied carbon, and EnergyPlus-simulated performance against the building's as-built baseline."}
         </p>
       </div>
 
-      {!geometry && (
+      {geometries.length === 0 && (
         <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
-          <p style={{ fontSize: 12, color: "#F59E0B", margin: 0 }}>No building resolved yet — go back to Step 1/2 and select a location.</p>
+          <p style={{ fontSize: 12, color: "#F59E0B", margin: 0 }}>No buildings resolved yet — go back to Step 1/2 and select a location.</p>
         </div>
       )}
 
-      {geometry && isUK && (
+      {geometries.length > 0 && isUK && (
         <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(114,28,184,0.2)" }}>
-          <UkTierPicker archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier} footprintM2={geometry.footprintM2} />
+          <UkTierPicker
+            archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier}
+            footprintM2={geometries[0]?.footprintM2 ?? null} buildingCount={geometries.length}
+            uSource={geometries[0]?.tabulaUSource ?? null}
+          />
         </div>
       )}
 
-      {geometry && !isUK && (
+      {geometries.length > 0 && !isUK && (
         <>
-          {/* Component tabs + material picker */}
+          {/* Component tabs + material picker (quantities shown are for building 1; each
+              building's own quantity is computed at submission time from its own geometry) */}
           <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, marginBottom: 4, textTransform: "uppercase" }}>
@@ -546,7 +652,7 @@ export default function RenovationSimulator() {
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{activeItem.label}</h3>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
                     {activeQuantity != null
-                      ? `${activeQuantity.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} ${quantityUnitLabel(activeItem.quantityKind)}`
+                      ? `${activeQuantity.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} ${quantityUnitLabel(activeItem.quantityKind)}${geometries.length > 1 ? " (building 1)" : ""}`
                       : "quantity: manual entry needed"}
                   </span>
                 </div>
@@ -559,7 +665,7 @@ export default function RenovationSimulator() {
                       style={{ width: 140, padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }}
                     />
                     <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>
-                      {activeItem.key === "Doors" ? "no automatic signal — enter a door count" : "no data source for this building yet"}
+                      {activeItem.key === "Doors" ? "no automatic signal — enter a door count (applied to every building)" : "no data source for this building yet"}
                     </span>
                   </div>
                 )}
@@ -577,7 +683,7 @@ export default function RenovationSimulator() {
         </>
       )}
 
-      {geometry && (
+      {geometries.length > 0 && (
         <>
           {/* Add package */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -597,50 +703,81 @@ export default function RenovationSimulator() {
                 opacity: canAddPackage ? 1 : 0.5,
               }}
             >
-              <Plus size={13} /> Add package
+              <Plus size={13} /> Add package{geometries.length > 1 ? ` (${geometries.length} buildings)` : ""}
             </button>
           </div>
 
-          {/* Comparison table */}
+          {/* Comparison table - one row per package, portfolio aggregates, expandable per-building breakdown */}
           <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "16px 18px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 110px 110px 110px 110px 110px 110px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 8 }}>
-              {["Package", "Cost", "Carbon", "Heating", "Cooling", "Total", "Status"].map((h) => (
+            <div style={{ display: "grid", gridTemplateColumns: "24px 1.4fr 110px 110px 110px 110px 110px 110px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 8 }}>
+              {["", "Package", "Cost", "Carbon", "Heating", "Cooling", "Total", "Status"].map((h) => (
                 <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>{h}</span>
               ))}
             </div>
-            {[...packages].sort((a, b) => (a.isBaseline ? -1 : b.isBaseline ? 1 : 0)).map((pkg) => (
-              <div key={pkg.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 110px 110px 110px 110px 110px 110px", gap: 10, padding: "8px 4px", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: pkg.isBaseline ? "rgba(255,255,255,0.5)" : "#fff" }}>
-                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: pkg.color, marginRight: 6 }} />
-                  {pkg.name}
-                </span>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && pkg.costSEK != null ? "Synthetic placeholder - not a real UK cost source" : undefined}>
-                  {pkg.costSEK == null ? "—" : isUK ? `${fmtGBP(pkg.costSEK)}*` : fmtSEK(pkg.costSEK)}
-                </span>
-                <span style={{ fontSize: 12, color: "#60a5fa" }} title={isUK && pkg.carbonKgCO2e != null ? "Synthetic placeholder - not a real UK carbon source" : undefined}>
-                  {pkg.carbonKgCO2e == null ? "—" : isUK ? `${pkg.carbonKgCO2e.toLocaleString("en-GB")} kg*` : `${pkg.carbonKgCO2e.toLocaleString("sv-SE")} kg`}
-                </span>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{pkg.simulation.heatingKwhM2Yr != null ? `${pkg.simulation.heatingKwhM2Yr}` : "—"}</span>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{pkg.simulation.coolingKwhM2Yr != null ? `${pkg.simulation.coolingKwhM2Yr}` : "—"}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C" }}>{pkg.simulation.totalKwhM2Yr != null ? `${pkg.simulation.totalKwhM2Yr}` : "—"}</span>
-                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {(pkg.simulation.status === "queued" || pkg.simulation.status === "running") && <Loader2 size={13} color="#F59E0B" style={{ animation: "spin 1s linear infinite" }} />}
-                  {pkg.simulation.status === "completed" && <CheckCircle2 size={13} color="#96D74C" />}
-                  {pkg.simulation.status === "failed" && (
-                    <>
-                      <XCircle size={13} color="#EF4444" />
-                      <button onClick={() => retryPackage(pkg)} title={pkg.simulation.error ?? "Retry"} style={{ background: "transparent", border: 0, cursor: "pointer", color: "#EF4444" }}>
-                        <RefreshCw size={12} />
-                      </button>
-                    </>
+            {[...packages].sort((a, b) => (a.isBaseline ? -1 : b.isBaseline ? 1 : 0)).map((pkg) => {
+              const agg = pkgAggregate(pkg);
+              const expanded = expandedPkg === pkg.id;
+              return (
+                <div key={pkg.id}>
+                  <div style={{ display: "grid", gridTemplateColumns: "24px 1.4fr 110px 110px 110px 110px 110px 110px", gap: 10, padding: "8px 4px", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <button
+                      onClick={() => setExpandedPkg(expanded ? null : pkg.id)}
+                      style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(255,255,255,0.4)", padding: 0 }}
+                      title={expanded ? "Hide per-building breakdown" : "Show per-building breakdown"}
+                    >
+                      {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </button>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: pkg.isBaseline ? "rgba(255,255,255,0.5)" : "#fff" }}>
+                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: pkg.color, marginRight: 6 }} />
+                      {pkg.name}{agg.n > 1 ? ` (${agg.n} buildings)` : ""}
+                    </span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && agg.totalCostSEK != null ? "Synthetic placeholder - not a real UK cost source" : undefined}>
+                      {agg.totalCostSEK == null ? "—" : isUK ? `${fmtGBP(agg.totalCostSEK)}*` : fmtSEK(agg.totalCostSEK)}
+                    </span>
+                    <span style={{ fontSize: 12, color: "#60a5fa" }} title={isUK && agg.totalCarbonKgCO2e != null ? "Synthetic placeholder - not a real UK carbon source" : undefined}>
+                      {agg.totalCarbonKgCO2e == null ? "—" : isUK ? `${agg.totalCarbonKgCO2e.toLocaleString("en-GB")} kg*` : `${agg.totalCarbonKgCO2e.toLocaleString("sv-SE")} kg`}
+                    </span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{agg.avgHeatingKwhM2Yr ?? "—"}</span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{agg.avgCoolingKwhM2Yr ?? "—"}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C" }}>{agg.avgTotalKwhM2Yr ?? "—"}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {agg.pending > 0 && <Loader2 size={13} color="#F59E0B" style={{ animation: "spin 1s linear infinite" }} />}
+                      {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#96D74C" />}
+                      {agg.failed > 0 && (
+                        <>
+                          <XCircle size={13} color="#EF4444" />
+                          <button onClick={() => retryPackage(pkg)} title="Retry failed buildings" style={{ background: "transparent", border: 0, cursor: "pointer", color: "#EF4444" }}>
+                            <RefreshCw size={12} />
+                          </button>
+                        </>
+                      )}
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{agg.completed}/{agg.n}</span>
+                    </span>
+                  </div>
+                  {expanded && (
+                    <div style={{ padding: "6px 4px 10px 34px", display: "flex", flexDirection: "column", gap: 4 }}>
+                      {pkg.buildings.map((b) => (
+                        <div key={`${pkg.id}-${b.address}-${b.lat}-${b.lon}`} style={{ display: "grid", gridTemplateColumns: "1.4fr 110px 110px 110px 110px 110px 110px", gap: 10, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.address}</span>
+                          <span>{b.costSEK == null ? "—" : isUK ? fmtGBP(b.costSEK) : fmtSEK(b.costSEK)}</span>
+                          <span>{b.carbonKgCO2e == null ? "—" : `${b.carbonKgCO2e.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
+                          <span>{b.heatingKwhM2Yr ?? "—"}</span>
+                          <span>{b.coolingKwhM2Yr ?? "—"}</span>
+                          <span>{b.totalKwhM2Yr ?? "—"}</span>
+                          <span style={{ color: b.status === "failed" ? "#fca5a5" : b.status === "completed" ? "#96D74C" : "#F59E0B" }} title={b.error ?? undefined}>
+                            {b.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </span>
-              </div>
-            ))}
+                </div>
+              );
+            })}
             {packages.length === 0 && (
               <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>No packages yet.</p>
             )}
-            {isUK && packages.some((p) => p.costSEK != null) && (
+            {isUK && packages.some((p) => pkgAggregate(p).totalCostSEK != null) && (
               <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
                 * Synthetic placeholder cost/carbon (not a real UK data source) - see ukPlaceholderCostCarbon.ts.
               </p>

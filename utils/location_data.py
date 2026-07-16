@@ -5,12 +5,12 @@ Location and spatial data helpers for project-location selection and EPC coverag
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 from math import cos, radians
 from typing import Any
 
 import requests
-import streamlit as st
 
 
 DB_PATH = Path(__file__).resolve().parents[1] / "data" / "sensitivity" / "epc_sweden.duckdb"
@@ -29,7 +29,7 @@ def _is_cadastral_id(addr: str | None, fastbet: str | None = None) -> bool:
     return bool(_CADASTRAL_RE.match(addr_s))
 
 
-@st.cache_data(ttl=60 * 60 * 24, show_spinner=False)
+@lru_cache(maxsize=512)
 def _reverse_geocode_nominatim(lat: float, lon: float) -> str | None:
     """Attempt Nominatim reverse geocode; return 'Road HouseNumber' or None on failure."""
     try:
@@ -92,7 +92,7 @@ def _connect_duckdb():
     return con
 
 
-@st.cache_data(ttl=60 * 60 * 24)
+@lru_cache(maxsize=512)
 def geocode_address(address: str, country_hint: str | None = None) -> dict[str, Any] | None:
     """Geocode an address using OpenStreetMap Nominatim."""
     q = (address or "").strip()
@@ -126,7 +126,7 @@ def geocode_address(address: str, country_hint: str | None = None) -> dict[str, 
     }
 
 
-@st.cache_data(ttl=60 * 60)
+@lru_cache(maxsize=256)
 def get_nearby_epc_snapshot(
     lat: float,
     lon: float,
@@ -274,7 +274,7 @@ def get_nearby_epc_snapshot(
     }
 
 
-@st.cache_data(ttl=60 * 30)
+@lru_cache(maxsize=256)
 def get_epc_snapshot_for_bbox(
     min_lat: float,
     max_lat: float,
@@ -412,7 +412,7 @@ def has_location_database() -> bool:
     return DB_PATH.exists()
 
 
-@st.cache_data(ttl=60 * 60)
+@lru_cache(maxsize=512)
 def get_epc_building_passport(formular_id: int | str) -> dict[str, Any] | None:
     """Return a full EPC record for a single building plus derived helper fields."""
     try:

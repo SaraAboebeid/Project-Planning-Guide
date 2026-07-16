@@ -29,6 +29,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.idf.generate_idf import build_shoebox_idf
+from backend import simdb
 
 app = FastAPI(title="Project Planning Guide API", version="0.1.0")
 
@@ -243,6 +244,15 @@ def get_uk_building(lat: float = Query(...), lon: float = Query(...), city_id: s
         "energy":        _clean(best.get("tabula_kwh_m2_yr")),  # UK has no measured "energy" field; TABULA estimate is the closest equivalent
         "eclass":        best.get("eclass"),
         "tabula_period": best.get("tabula_period"),
+        # Always populated when a TABULA match exists (real year OR an
+        # EHS-sampled era) - unlike tabula_period above, which stays null for
+        # a sampled era. This is what a caller should use to re-match the
+        # SAME archetype tabula_u_wall/roof/win below actually came from
+        # (e.g. to show refurbishment-tier options), not tabula_period.
+        "tabula_period_used": best.get("tabula_period_used"),
+        # "known_year" | "ehs_sampled_period" | None - lets a caller label
+        # the match as a known construction year vs. an EHS-sampled estimate.
+        "tabula_u_source": best.get("tabula_u_source"),
         "tabula_u_wall": _clean(best.get("tabula_u_wall")),
         "tabula_u_roof": _clean(best.get("tabula_u_roof")),
         "tabula_u_win":  _clean(best.get("tabula_u_win")),
@@ -405,6 +415,16 @@ async def geocode(address: str = Query(...)):
     return {"lat": float(hit["lat"]), "lon": float(hit["lon"]), "display_name": hit["display_name"]}
 
 
+def _df_records(df) -> list[dict]:
+    """DataFrame -> JSON-safe list of dicts (NaN -> None, same as _clean())."""
+    import pandas as pd
+
+    return [
+        {k: _clean(v) for k, v in row.items()}
+        for row in df.where(pd.notnull(df), None).to_dict(orient="records")
+    ]
+
+
 # ── EPC snapshot ─────────────────────────────────────────────────────────────
 @app.get("/api/epc/snapshot")
 def epc_snapshot(
@@ -413,26 +433,34 @@ def epc_snapshot(
     radius_m: int = Query(800),
 ):
     try:
-        from utils.location_data import get_epc_data
+        from utils.location_data import get_nearby_epc_snapshot, has_location_database
     except ImportError:
         raise HTTPException(501, "EPC module not available")
 
-    result = get_epc_data(lat, lon, radius_m)
-    return result
+    if not has_location_database():
+        raise HTTPException(501, "EPC database not available on this server")
+
+    result = get_nearby_epc_snapshot(lat, lon, radius_m)
+    return {
+        "summary": result["summary"],
+        "points": _df_records(result["points"]),
+        "classes": _df_records(result["classes"]),
+        "sample": _df_records(result["sample"]),
+    }
 
 
 # ── EPC passport ─────────────────────────────────────────────────────────────
 @app.get("/api/epc/passport/{formular_id}")
 def epc_passport(formular_id: str):
     try:
-        from utils.location_data import get_building_passport
+        from utils.location_data import get_epc_building_passport
     except ImportError:
         raise HTTPException(501, "EPC module not available")
 
-    passport = get_building_passport(formular_id)
+    passport = get_epc_building_passport(formular_id)
     if passport is None:
         raise HTTPException(404, "Building not found")
-    return passport
+    return {k: _clean(v) for k, v in passport.items()}
 
 
 # ── TABULA match ─────────────────────────────────────────────────────────────
@@ -1862,7 +1890,6 @@ async def pvgis_proxy(
 # EPSM_BASE_URL defaults to the port docker-compose.epsm.yml maps its Django
 # backend to (8010, since our own FastAPI backend keeps 8000).
 EPSM_BASE_URL = os.environ.get("EPSM_BASE_URL", "http://localhost:8010").strip()
-SIM_DB_PATH = PROJECT_ROOT / "data" / "simulation_database.json"
 EPW_DIR = PROJECT_ROOT / "data" / "epw"
 
 # city_id (tools/uk/cities.py, or "gothenburg" for Sweden) -> EPW filename in
@@ -1875,20 +1902,6 @@ CITY_TO_EPW = {
     "london_southwark": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
     "rotherham": "GBR_ENG_Doncaster.Sheffield-Hood.AP.034054_TMYx.2011-2025.epw",
 }
-
-
-def _load_sim_db() -> list:
-    if SIM_DB_PATH.exists():
-        try:
-            return json.loads(SIM_DB_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            return []
-    return []
-
-
-def _save_sim_db(records: list) -> None:
-    SIM_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    SIM_DB_PATH.write_text(json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _floors_of(building_info: dict) -> int:
@@ -1926,12 +1939,28 @@ async def _fetch_and_normalize_results(simulation_id: str, building_info: dict) 
         r.raise_for_status()
         raw = r.json()
     row = raw[0] if isinstance(raw, list) and raw else (raw if isinstance(raw, dict) else {})
+    result = _normalize_energy(row.get("energy_use") or {}, row.get("totalArea"), building_info)
+    result["raw"] = row
+    return result
 
+
+def _energy_use_dict_from_list(items: Optional[list]) -> dict:
+    """EPSM's /parallel-results/ endpoint reports per-category energy as a
+    LIST of {end_use, electricity, district_heating, total} rows, unlike the
+    single-simulation /results/ endpoint's {"Heating": {...}, "Cooling": {...}}
+    dict shape - this adapts the list shape to the same dict shape so both
+    paths can share _normalize_energy()."""
+    return {item["end_use"]: item for item in (items or []) if item.get("end_use")}
+
+
+def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], building_info: dict) -> dict:
+    """Recompute per-m2 figures using our own total floor area (floors x
+    footprint_m2), not EPSM's own per-m2 fields - see _fetch_and_normalize_results'
+    docstring for why (EPSM normalizes by the single shoebox zone's floor
+    surface alone, understating total floor area for multi-storey buildings)."""
     floors = _floors_of(building_info)
-    footprint = building_info.get("footprint_m2") or row.get("totalArea") or 1.0
+    footprint = building_info.get("footprint_m2") or footprint_from_epsm or 1.0
     total_floor_area = building_info.get("floor_area_m2") or (float(footprint) * floors)
-
-    energy_use = row.get("energy_use") or {}
 
     def _kwh(category: str) -> float:
         return float((energy_use.get(category) or {}).get("total") or 0.0)
@@ -1946,7 +1975,6 @@ async def _fetch_and_normalize_results(simulation_id: str, building_info: dict) 
         return round(kwh / total_floor_area, 1) if total_floor_area else None
 
     return {
-        "raw": row,
         "floors": floors,
         "footprint_m2": round(float(footprint), 1),
         "total_floor_area_m2": round(total_floor_area, 1),
@@ -1988,6 +2016,26 @@ class SimulationSubmitRequest(BaseModel):
     # Defaults to "baseline" so existing callers (viewer/js/energy_sim.js,
     # which never sends this) keep today's exact 1-simulation-per-location
     # behavior unchanged.
+    package_id: str = "baseline"
+    package_label: Optional[str] = None
+
+
+class BatchBuildingSpec(BaseModel):
+    lat: float
+    lon: float
+    address: Optional[str] = None
+    building: Optional[dict[str, Any]] = None
+
+
+class SimulationBatchSubmitRequest(BaseModel):
+    country: str  # "se" | "gb"
+    city_id: Optional[str] = None  # gb: auto-resolved from the first building if omitted
+    buildings: list[BatchBuildingSpec]
+    wwr_override: Optional[float] = None
+    u_wall_override: Optional[float] = None
+    u_roof_override: Optional[float] = None
+    u_win_override: Optional[float] = None
+    u_floor_override: Optional[float] = None
     package_id: str = "baseline"
     package_label: Optional[str] = None
 
@@ -2050,21 +2098,14 @@ async def submit_simulation(req: SimulationSubmitRequest):
         payload = r.json()
 
     simulation_id = payload.get("simulation_id")
-    records = _load_sim_db()
     # Only evict a previously-queued record for the SAME package at this
     # location - not every simulation there. Pre-existing records (and
     # viewer/js/energy_sim.js, which never sends package_id) default to
-    # "baseline" via .get(..., "baseline"), so this stays backward-compatible
-    # with the original 1-simulation-per-location behavior for that caller.
-    records = [
-        rec for rec in records
-        if not (
-            _haversine_m(rec["lat"], rec["lon"], req.lat, req.lon) <= 20
-            and rec.get("package_id", "baseline") == req.package_id
-            and rec.get("status") == "queued"
-        )
-    ]
-    records.append({
+    # "baseline" via package_id's own Pydantic default, so this stays
+    # backward-compatible with the original 1-simulation-per-location
+    # behavior for that caller.
+    simdb.evict_queued(req.lat, req.lon, req.package_id)
+    simdb.insert({
         "lat": req.lat,
         "lon": req.lon,
         "address": req.address,
@@ -2081,7 +2122,6 @@ async def submit_simulation(req: SimulationSubmitRequest):
         "results": None,
         "error": None,
     })
-    _save_sim_db(records)
     return {"simulation_id": simulation_id, "task_id": payload.get("task_id"), "status": "queued"}
 
 
@@ -2100,31 +2140,213 @@ async def simulation_status(simulation_id: str):
             raise HTTPException(r.status_code, f"EPSM status lookup failed: {r.text[:300]}")
         status_payload = r.json()
 
-    records = _load_sim_db()
-    record = next((rec for rec in records if rec.get("epsm_simulation_id") == simulation_id), None)
+    records = simdb.get_by_epsm_id(simulation_id)
+    record = records[0] if records else None
     status = status_payload.get("status")
     if record is not None and status == "completed" and record.get("status") != "completed":
-        record["status"] = "completed"
-        record["completed_at"] = datetime.datetime.utcnow().isoformat() + "Z"
-        record["results"] = await _fetch_and_normalize_results(simulation_id, record.get("building_info") or {})
-        _save_sim_db(records)
+        results = await _fetch_and_normalize_results(simulation_id, record.get("building_info") or {})
+        simdb.update_by_epsm_id(
+            simulation_id,
+            status="completed",
+            completed_at=datetime.datetime.utcnow().isoformat() + "Z",
+            results=results,
+        )
     elif record is not None and status == "failed" and record.get("status") != "failed":
-        record["status"] = "failed"
-        record["error"] = status_payload.get("error_message") or status_payload.get("error")
-        _save_sim_db(records)
+        simdb.update_by_epsm_id(
+            simulation_id,
+            status="failed",
+            error=status_payload.get("error_message") or status_payload.get("error"),
+        )
     return status_payload
 
 
 @app.get("/api/simulation-results/{simulation_id}")
 async def simulation_results(simulation_id: str):
     """Return the cached, normalized results for a completed simulation."""
-    records = _load_sim_db()
-    record = next((rec for rec in records if rec.get("epsm_simulation_id") == simulation_id), None)
+    records = simdb.get_by_epsm_id(simulation_id)
+    record = records[0] if records else None
     if record is None:
         raise HTTPException(404, "Unknown simulation_id")
     if record.get("status") != "completed":
         raise HTTPException(409, f"Simulation not completed yet (status={record.get('status')})")
     return record["results"]
+
+
+@app.post("/api/simulation-batch-submit")
+async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
+    """Generate one shoebox IDF per building and submit them ALL to EPSM in a
+    single call. EPSM natively accepts a LIST of idf_files in one request and
+    dispatches each as its own parallel Celery task under one shared
+    simulation_id (a proper Celery chord - the batch only reports "completed"
+    once every building's run finishes), with a /parallel-results/ endpoint
+    that tags each result with the idf_idx matching its position in the
+    upload list. That means no client-side concurrency management is needed
+    here - EPSM's own workers already parallelize the batch; we just need to
+    remember which idf_idx belongs to which building (see simdb's batch_id/
+    idf_idx columns) so results can be matched back afterward."""
+    import httpx
+
+    if not req.buildings:
+        raise HTTPException(400, "No buildings given")
+
+    city_id = req.city_id
+    if req.country == "gb" and not city_id:
+        # A batch is always scoped to one district/city - resolve from the first building.
+        first = req.buildings[0]
+        city_id = _resolve_uk_city_id(first.lat, first.lon)
+
+    epw_name = CITY_TO_EPW.get(city_id or "")
+    if not epw_name:
+        raise HTTPException(400, f"No weather file mapped for city_id '{city_id}'")
+    epw_path = EPW_DIR / epw_name
+    if not epw_path.exists():
+        raise HTTPException(500, f"Weather file missing on server: {epw_path.name}")
+
+    source = _get_uk_buildings_list(city_id) if req.country == "gb" else _get_buildings_list()
+
+    resolved: list[dict] = []
+    for i, b in enumerate(req.buildings):
+        building = b.building
+        if not building or not building.get("coordinates"):
+            def _dist(cand: dict, _lat=b.lat, _lon=b.lon) -> float:
+                c_lat, c_lon = _polygon_centroid(cand.get("coordinates") or [])
+                return _haversine_m(_lat, _lon, c_lat, c_lon)
+
+            candidates = [c for c in source if _dist(c) <= 150]
+            if not candidates:
+                raise HTTPException(404, f"No building with real geometry found near building {i} ({b.lat}, {b.lon})")
+            building = min(candidates, key=_dist)
+        resolved.append({"lat": b.lat, "lon": b.lon, "address": b.address, "building": building})
+
+    idf_payload: list[tuple[str, bytes, str]] = []
+    for i, rb in enumerate(resolved):
+        try:
+            idf_text = build_shoebox_idf(
+                rb["building"], req.country, city_id, str(epw_path),
+                wwr_override=req.wwr_override, building_name=rb["address"] or f"Building {i}",
+                u_wall_override=req.u_wall_override, u_roof_override=req.u_roof_override,
+                u_win_override=req.u_win_override, u_floor_override=req.u_floor_override,
+            )
+        except Exception as exc:
+            raise HTTPException(400, f"IDF generation failed for building {i} ({rb['address']}): {exc}")
+        idf_payload.append((f"building_{i}.idf", idf_text.encode("utf-8"), "text/plain"))
+
+    async with httpx.AsyncClient(timeout=120) as client:
+        files = [("idf_files", f) for f in idf_payload]
+        files.append(("weather_file", (epw_name, epw_path.read_bytes(), "application/octet-stream")))
+        data = {"parallel": "true", "max_workers": str(min(len(idf_payload), 8))}
+        try:
+            r = await client.post(f"{EPSM_BASE_URL}/api/simulation/run/", files=files, data=data)
+        except httpx.RequestError as exc:
+            raise HTTPException(502, f"Could not reach EPSM at {EPSM_BASE_URL}: {exc}")
+        if not r.is_success:
+            raise HTTPException(r.status_code, f"EPSM rejected the batch: {r.text[:500]}")
+        payload = r.json()
+
+    batch_id = payload.get("simulation_id")
+    now = datetime.datetime.utcnow().isoformat() + "Z"
+    # Evict stale queued records from a PREVIOUS run before inserting any of
+    # THIS batch's rows - doing it in the same loop as insert() is a real bug
+    # when two of this batch's own buildings are close together (a very
+    # normal case for a real portfolio/district): evicting building i+1 would
+    # delete building i's just-inserted "queued" row if they're within the
+    # eviction radius of each other, since it can't tell "stale" from
+    # "sibling submitted moments ago" by radius alone.
+    for rb in resolved:
+        simdb.evict_queued(rb["lat"], rb["lon"], req.package_id)
+    for i, rb in enumerate(resolved):
+        simdb.insert({
+            "lat": rb["lat"], "lon": rb["lon"], "address": rb["address"], "country": req.country,
+            "city_id": city_id, "building_info": rb["building"], "package_id": req.package_id,
+            "package_label": req.package_label, "batch_id": batch_id, "idf_idx": i,
+            "epsm_simulation_id": batch_id, "epsm_task_id": payload.get("task_id"),
+            "status": "queued", "submitted_at": now, "completed_at": None, "results": None, "error": None,
+        })
+
+    return {"batch_id": batch_id, "task_id": payload.get("task_id"), "total": len(resolved), "status": "queued"}
+
+
+@app.get("/api/simulation-batch-status/{batch_id}")
+async def simulation_batch_status(batch_id: str):
+    """Aggregate status for every building in a batch. Once EPSM's own status
+    for the shared simulation_id is 'completed', fetches /parallel-results/
+    ONCE and matches each result back to its building via idf_idx."""
+    import httpx
+
+    rows = simdb.get_by_epsm_id(batch_id)
+    if not rows:
+        raise HTTPException(404, "Unknown batch_id")
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        try:
+            r = await client.get(f"{EPSM_BASE_URL}/api/simulation/{batch_id}/status/")
+        except httpx.RequestError as exc:
+            raise HTTPException(502, f"Could not reach EPSM at {EPSM_BASE_URL}: {exc}")
+        if not r.is_success:
+            raise HTTPException(r.status_code, f"EPSM status lookup failed: {r.text[:300]}")
+        overall_status = (r.json() or {}).get("status")
+
+    still_pending = any(row["status"] not in ("completed", "failed") for row in rows)
+
+    if overall_status == "completed" and still_pending:
+        async with httpx.AsyncClient(timeout=30) as client:
+            pr = await client.get(f"{EPSM_BASE_URL}/api/simulation/{batch_id}/parallel-results/")
+        if pr.is_success:
+            payload = pr.json()
+            results_list = payload if isinstance(payload, list) else (payload.get("results") or [])
+            by_idx = {int(item["idf_idx"]): item for item in results_list if item.get("idf_idx") is not None}
+            now = datetime.datetime.utcnow().isoformat() + "Z"
+            for row in rows:
+                item = by_idx.get(row["idf_idx"])
+                if item is None:
+                    continue
+                item_status = "failed" if (item.get("status") or "").lower() in ("failed", "error") else "completed"
+                if item_status == "completed":
+                    normalized = _normalize_energy(
+                        _energy_use_dict_from_list(item.get("energy_uses")),
+                        item.get("total_area"),
+                        row.get("building_info") or {},
+                    )
+                    normalized["raw"] = item
+                    simdb.update_by_epsm_id(
+                        batch_id, idf_idx=row["idf_idx"],
+                        status="completed", completed_at=now, results=normalized,
+                    )
+                else:
+                    simdb.update_by_epsm_id(
+                        batch_id, idf_idx=row["idf_idx"],
+                        status="failed", completed_at=now,
+                        error=f"EnergyPlus run failed for this building (idf_idx={row['idf_idx']})",
+                    )
+            rows = simdb.get_by_epsm_id(batch_id)
+    elif overall_status == "failed" and still_pending:
+        now = datetime.datetime.utcnow().isoformat() + "Z"
+        for row in rows:
+            if row["status"] not in ("completed", "failed"):
+                simdb.update_by_epsm_id(
+                    batch_id, idf_idx=row["idf_idx"],
+                    status="failed", completed_at=now, error="EPSM batch failed",
+                )
+        rows = simdb.get_by_epsm_id(batch_id)
+
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row["status"]] = counts.get(row["status"], 0) + 1
+
+    return {
+        "batch_id": batch_id,
+        "total": len(rows),
+        "counts": counts,
+        "overall_status": overall_status,
+        "buildings": [
+            {
+                "idf_idx": row["idf_idx"], "lat": row["lat"], "lon": row["lon"], "address": row["address"],
+                "package_id": row["package_id"], "package_label": row["package_label"],
+                "status": row["status"], "results": row["results"], "error": row["error"],
+            }
+            for row in rows
+        ],
+    }
 
 
 @app.get("/api/simulation-lookup")
@@ -2135,19 +2357,10 @@ async def lookup_simulation(
     """Return the nearest saved/running simulation record within radius_m
     metres, or null. When package_id is given, only records for that package
     are considered (omit it for the pre-existing single-building behavior)."""
-    records = _load_sim_db()
-    best = None
-    best_dist = radius_m
-    for r in records:
-        if package_id is not None and r.get("package_id", "baseline") != package_id:
-            continue
-        d = _haversine_m(r["lat"], r["lon"], lat, lon)
-        if d <= best_dist:
-            best_dist = d
-            best = r
-    if best is None:
+    hit = simdb.find_nearest(lat, lon, radius_m, package_id)
+    if hit is None:
         return {"found": False, "record": None}
-    return {"found": True, "record": best, "dist_m": round(best_dist, 1)}
+    return {"found": True, "record": hit["record"], "dist_m": hit["dist_m"]}
 
 
 @app.get("/api/simulation-lookup-all")
@@ -2155,17 +2368,13 @@ async def lookup_simulation_all(lat: float = Query(...), lon: float = Query(...)
     """Every saved/running simulation record within radius_m of this location -
     one row per package_id (baseline + N renovation packages) - nearest first.
     Lets the renovation calculator rehydrate every package's status in one call."""
-    records = _load_sim_db()
-    hits = [(_haversine_m(r["lat"], r["lon"], lat, lon), r) for r in records]
-    hits = [(d, r) for d, r in hits if d <= radius_m]
-    hits.sort(key=lambda t: t[0])
-    return {"records": [{"dist_m": round(d, 1), **r} for d, r in hits]}
+    return {"records": simdb.find_all_near(lat, lon, radius_m)}
 
 
 @app.get("/api/simulation-database")
 async def get_simulation_database():
     """Return all saved simulation records."""
-    return {"records": _load_sim_db()}
+    return {"records": simdb.all_records()}
 
 
 # -- Static frontend (built React SPA + standalone 3D maps) -----------------

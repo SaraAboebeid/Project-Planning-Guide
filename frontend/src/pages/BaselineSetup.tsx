@@ -1,8 +1,9 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useWizardStore } from "../store/wizard";
+import { useWizardStore, type RenovationBaselineResult } from "../store/wizard";
+import { api } from "../api/client";
 import type { BuildingLookup, BuildingRecord } from "../types";
-import { Building2, FileJson, Upload, Zap, X, Loader2, BarChart2, Thermometer, Droplets, Wind, Download } from "lucide-react";
+import { Building2, FileJson, Upload, Zap, X, Loader2, BarChart2, Thermometer, Droplets, Download } from "lucide-react";
 
 /** Normalise a bbox BuildingRecord into the same shape as BuildingLookup */
 function recordToLookup(r: BuildingRecord, idx: number): BuildingLookup {
@@ -85,24 +86,9 @@ export default function BaselineSetup() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [simRunning, setSimRunning] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
+  const [simError, setSimError] = useState<string | null>(null);
 
-  /* ── Dummy EPSM baseline results (seeded from building data) ── */
-  const dummyResults = useMemo(() => {
-    return buildings.length === 0
-      ? [{ address: "Sample Building", energyUse: 142, heating: 88, cooling: 12, dhw: 24, airLeakage: 1.8, eClass: "D" as string | null, eClassFromEpc: false }]
-      : buildings.map((b, i) => {
-          const seed = (b.year ?? 1970) + i;
-          const eu = b.energy ?? Math.round(90 + (seed % 80) + (b.tabula_u_wall ?? 0.5) * 60);
-          const ht = Math.round(eu * 0.60);
-          const cl = Math.round(eu * 0.08);
-          const dh = Math.round(eu * 0.17);
-          const al = parseFloat((0.8 + (seed % 20) / 10).toFixed(1));
-          // Prefer the EPC energy class; only fall back to computed if unavailable
-          const eClassFromEpc = !!b.eclass;
-          const eClass = b.eclass ?? (eu > 200 ? "F" : eu > 160 ? "E" : eu > 130 ? "D" : eu > 100 ? "C" : "B");
-          return { address: bKey(b, i), energyUse: eu, heating: ht, cooling: cl, dhw: dh, airLeakage: al, eClass, eClassFromEpc };
-        });
-  }, [buildings]);
+  const results = project.renovationBaselineResults;
 
   const eClassColor: Record<string, string> = { A: "#22c55e", B: "#86efac", C: "#96D74C", D: "#F59E0B", E: "#f97316", F: "#EF4444", G: "#dc2626" };
 
@@ -110,15 +96,13 @@ export default function BaselineSetup() {
     const payload = {
       generated: new Date().toISOString(),
       simulation: "EPSM Baseline",
-      buildings: dummyResults.map(r => ({
+      buildings: results.map(r => ({
         address: r.address,
         energyClass: r.eClass,
-        energyClassSource: r.eClassFromEpc ? "EPC" : "EPSM computed",
+        energyClassSource: r.eClassFromEpc ? "EPC" : "not available",
         totalEnergyUse_kWh_m2_yr: r.energyUse,
         heatingDemand_kWh_m2_yr: r.heating,
         coolingDemand_kWh_m2_yr: r.cooling,
-        dhwDemand_kWh_m2_yr: r.dhw,
-        airLeakage_ach: r.airLeakage,
       })),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -129,30 +113,59 @@ export default function BaselineSetup() {
     URL.revokeObjectURL(url);
   }
 
-  function runBaseline() {
+  /** Real batch EPSM run - one shoebox IDF per building, submitted together
+   * (see backend's /api/simulation-batch-submit, which hands EPSM a LIST of
+   * IDF files it runs as independent parallel tasks under one batch_id).
+   * Polls batch-status every 3s until every building is completed/failed. */
+  async function runBaseline() {
+    if (buildings.length === 0) return;
     setSimRunning(true);
     setSimProgress(0);
-    let p = 0;
-    const iv = setInterval(() => {
-      p += Math.round(8 + Math.random() * 14);
-      if (p >= 100) {
-        clearInterval(iv);
-        setSimProgress(100);
-        setSimRunning(false);
-        setProject({ baselineStatus: "done", renovationBaselineResults: dummyResults.map(r => ({
-          address: r.address,
-          energyUse: r.energyUse,
-          heating: r.heating,
-          cooling: r.cooling,
-          dhw: r.dhw,
-          airLeakage: r.airLeakage,
-          eClass: r.eClass,
-          eClassFromEpc: r.eClassFromEpc,
-        })) });
-      } else {
-        setSimProgress(p);
+    setSimError(null);
+    const isUK = project.country === "United Kingdom";
+
+    try {
+      const { batch_id } = await api.simulationBatchSubmit({
+        country: isUK ? "gb" : "se",
+        buildings: buildings.map((b) => ({ lat: b.lat, lon: b.lon, address: b.address })),
+        package_id: "baseline",
+      });
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const status = await api.simulationBatchStatus(batch_id);
+        const done = (status.counts.completed ?? 0) + (status.counts.failed ?? 0);
+        setSimProgress(Math.round((done / status.total) * 100));
+
+        if (status.overall_status === "completed" || status.overall_status === "failed" || done === status.total) {
+          const mapped: RenovationBaselineResult[] = status.buildings.map((row, i) => {
+            const src = buildings[i];
+            const r = row.results;
+            return {
+              address: row.address ?? (src ? bKey(src, i) : `Building ${i + 1}`),
+              energyUse: r?.total_kwh_m2_yr ?? 0,
+              heating: r?.heating_kwh_m2_yr ?? 0,
+              cooling: r?.cooling_kwh_m2_yr ?? 0,
+              // The shoebox IDF model doesn't simulate domestic hot water or
+              // infiltration separately from the 4 end-uses EPSM reports
+              // (Heating/Cooling/Lighting/Equipment) - real 0s, not filler.
+              dhw: 0,
+              airLeakage: 0,
+              eClass: src?.eclass ?? null,
+              eClassFromEpc: !!src?.eclass,
+            };
+          });
+          setProject({ baselineStatus: "done", renovationBaselineResults: mapped });
+          setSimRunning(false);
+          setSimProgress(100);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       }
-    }, 280);
+    } catch (err) {
+      setSimError((err as Error).message);
+      setSimRunning(false);
+    }
   }
 
 
@@ -171,7 +184,7 @@ export default function BaselineSetup() {
     [buildings, supplementary],
   );
 
-  const allComplete = uploadSuccess || buildingStatus.every(s => s.complete);
+  const allComplete = buildings.length > 0 && (uploadSuccess || buildingStatus.every(s => s.complete));
   const totalMissing = buildingStatus.reduce((acc, s) => acc + s.missing.length, 0);
 
   /* ── JSON upload handler ── */
@@ -453,30 +466,27 @@ export default function BaselineSetup() {
               : "Complete all critical missing fields above before running the baseline simulation."}
         </p>
 
-        {/* Progress bar while running */}
+        {/* Progress bar while running - reflects real per-building EPSM
+            completion counts from the batch, not a simulated timer */}
         {simRunning && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Simulating buildings…</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Running EnergyPlus for each building…</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: "#96D74C" }}>{simProgress}%</span>
             </div>
             <div style={{ height: 6, borderRadius: 4, background: "rgba(255,255,255,0.08)" }}>
               <div style={{ height: "100%", borderRadius: 4, background: "linear-gradient(90deg,#5a9e1e,#96D74C)", width: `${simProgress}%`, transition: "width 0.25s" }} />
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-              {["Parsing geometry", "Applying U-values", "Computing heating loads", "Running annual sim", "Aggregating results"].map((s, i) => (
-                <span key={s} style={{
-                  fontSize: 10, padding: "2px 8px", borderRadius: 6, fontWeight: 600,
-                  background: simProgress > i * 20 ? "rgba(150,215,76,0.12)" : "rgba(255,255,255,0.04)",
-                  color: simProgress > i * 20 ? "#96D74C" : "rgba(255,255,255,0.25)",
-                  border: `1px solid ${simProgress > i * 20 ? "rgba(150,215,76,0.25)" : "rgba(255,255,255,0.07)"}`,
-                }}>{simProgress > i * 20 ? "✓" : "○"} {s}</span>
-              ))}
-            </div>
           </div>
         )}
 
-        {/* Dummy results */}
+        {simError && !simRunning && (
+          <div style={{ borderRadius: 8, padding: "10px 14px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", marginBottom: 14 }}>
+            <span style={{ fontSize: 12, color: "#fca5a5" }}>⚠ Baseline simulation failed: {simError}</span>
+          </div>
+        )}
+
+        {/* Real EPSM results */}
         {project.baselineStatus === "done" && !simRunning && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 2 }}>
@@ -494,7 +504,7 @@ export default function BaselineSetup() {
                 <Download size={12} /> Download JSON
               </button>
             </div>
-            {dummyResults.map(r => (
+            {results.map(r => (
               <div key={r.address} style={{
                 borderRadius: 12, padding: "14px 16px",
                 background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
@@ -515,13 +525,13 @@ export default function BaselineSetup() {
                     }}>Energy class {r.eClass ?? "—"}</span>
                   </div>
                 </div>
-                {/* Metric grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                {/* Metric grid - Total/Heating/Cooling are real EPSM output; the
+                    shoebox model doesn't simulate DHW or infiltration separately */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                   {[
                     { icon: <BarChart2 size={13} color="#F59E0B" />, label: "Total energy use", value: `${r.energyUse} kWh/m²·yr`, color: "#F59E0B" },
                     { icon: <Thermometer size={13} color="#ef4444" />, label: "Heating demand",   value: `${r.heating} kWh/m²·yr`,  color: "#fca5a5" },
-                    { icon: <Droplets size={13} color="#60a5fa" />,    label: "DHW demand",       value: `${r.dhw} kWh/m²·yr`,     color: "#93c5fd" },
-                    { icon: <Wind size={13} color="#a78bfa" />,        label: "Air leakage",      value: `${r.airLeakage} ach`,     color: "#c4b5fd" },
+                    { icon: <Droplets size={13} color="#60a5fa" />,    label: "Cooling demand",   value: `${r.cooling} kWh/m²·yr`,  color: "#93c5fd" },
                   ].map(m => (
                     <div key={m.label} style={{ borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>{m.icon}<span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{m.label}</span></div>
@@ -532,7 +542,9 @@ export default function BaselineSetup() {
               </div>
             ))}
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
-              * Results are illustrative EPSM outputs. Proceed to Step 4 to test renovation packages against this baseline.
+              * Real EnergyPlus (EPSM) output. Domestic hot water and infiltration aren't modelled by the current
+              shoebox geometry, so they're omitted rather than shown as a guess. Proceed to Step 4 to test renovation
+              packages against this baseline.
             </p>
           </div>
         )}

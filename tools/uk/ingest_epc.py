@@ -66,6 +66,7 @@ import cities as uk_cities
 ROOT = Path(__file__).resolve().parents[2]
 RAW_DIR = ROOT / "data" / "uk_raw"
 CACHE_DIR = RAW_DIR / "epc_cache"
+DETAIL_CACHE_DIR = RAW_DIR / "epc_detail_cache"
 
 BASE_URL = "https://api.get-energy-performance-data.communities.gov.uk"
 SEARCH_DOMESTIC = f"{BASE_URL}/api/domestic/search"
@@ -300,10 +301,24 @@ def fetch_certificate_detail(certificate_number: str, token: str, session: reque
     `built_form` is also a raw SAP code (e.g. "NR") passed through undecoded,
     and `construction_age_band` lives per-building-part under
     sap_building_parts, not at the top level.
+
+    Cached to disk per certificate_number (unlike the earlier version of this
+    function): a live N+1 run over 1,128 Rotherham certificates showed the
+    real bug this was hiding - every non-200 response (429 rate limits
+    included) fell through to a silent `return {}`, no retry, no log line,
+    so a single sustained rate-limit window quietly zeroed out detail data
+    for ~99% of a district's buildings while the run itself reported
+    "1128/1128" and exited 0. Caching successful results means a re-run
+    after the rate limit clears only needs to fetch what's still missing.
     """
+    DETAIL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache = DETAIL_CACHE_DIR / f"{certificate_number.replace('/', '_')}.json"
+    if cache.exists():
+        return json.loads(cache.read_text(encoding="utf-8"))
+
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     r = None
-    for attempt in range(3):
+    for attempt in range(MAX_RETRIES):
         try:
             r = session.get(
                 f"{BASE_URL}/api/certificate",
@@ -311,18 +326,37 @@ def fetch_certificate_detail(certificate_number: str, token: str, session: reque
                 headers=headers,
                 timeout=30,
             )
-            break
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
             # Seen live: the server occasionally drops the connection mid-response
             # during a long run of N+1 detail fetches - a transient blip, not a
             # real failure, so a short retry is worth it rather than losing the
             # whole (multi-minute) batch to one flaky request.
-            if attempt == 2:
-                print(f"    detail fetch for {certificate_number} failed after 3 attempts: {exc}")
+            if attempt == MAX_RETRIES - 1:
+                print(f"    detail fetch for {certificate_number} failed after {MAX_RETRIES} attempts: {exc}")
                 return {}
             wait = 2 ** attempt * 3
             print(f"    detail fetch for {certificate_number} dropped ({exc.__class__.__name__}); retrying in {wait}s")
             time.sleep(wait)
+            continue
+        if r.status_code == 429:
+            # This is the case the old code silently swallowed as "no data".
+            # Deliberately only 2 short attempts here, not the full
+            # MAX_RETRIES budget: per the module-level rate-limit note, a
+            # real cooldown needs actual wall-clock minutes, not a longer
+            # in-request backoff - burning e.g. 8 x 60s per certificate would
+            # turn one stuck run into hours. fetch_postcodes' circuit breaker
+            # is what actually detects "we're rate limited for real" and
+            # stops the batch early so a re-run (which skips this function's
+            # disk cache for anything already fetched) can pick up later.
+            retry_after = r.headers.get("Retry-After")
+            wait = float(retry_after) if retry_after else min(2 ** attempt * 5, 15)
+            if attempt >= 1:
+                print(f"    detail fetch for {certificate_number} rate limited - giving up for this run")
+                return {}
+            print(f"    rate limited on detail fetch for {certificate_number}; backing off {wait:.0f}s (attempt {attempt + 1}/2)")
+            time.sleep(wait)
+            continue
+        break
     if r is None or r.status_code != 200:
         return {}
     doc = (r.json() or {}).get("data") or {}
@@ -337,7 +371,7 @@ def fetch_certificate_detail(certificate_number: str, token: str, session: reque
     energy_source = doc.get("sap_energy_source") or {}
     photo_supply_pct = _find_pv_percent(energy_source.get("photovoltaic_supply"))
 
-    return {
+    result = {
         "band_potential": _band(doc.get("potential_energy_efficiency_band")),
         "sap": _num(doc.get("energy_rating_current")),
         "sap_potential": _num(doc.get("energy_rating_potential")),
@@ -360,6 +394,8 @@ def fetch_certificate_detail(certificate_number: str, token: str, session: reque
         "has_heat_pump": _has_heat_pump(mainheat_description),
         "has_solar_pv": _has_solar_pv(photo_supply_pct, mainheat_description),
     }
+    cache.write_text(json.dumps(result), encoding="utf-8")
+    return result
 
 
 def fetch_postcode(postcode: str, token: str, session: requests.Session) -> list[dict]:
@@ -461,10 +497,27 @@ def fetch_postcodes(postcodes, with_details: bool = True) -> list[dict]:
 
     if with_details and out:
         print(f"    fetching full details for {len(out):,} certificates ...")
+        consecutive_failures = 0
         for i, row in enumerate(out, 1):
             if not row.get("certificate_number"):
                 continue
-            row.update(fetch_certificate_detail(row["certificate_number"], token, session))
+            detail = fetch_certificate_detail(row["certificate_number"], token, session)
+            row.update(detail)
+            consecutive_failures = 0 if detail else consecutive_failures + 1
+            # A real, sustained rate-limit window (the API's cooldown needs
+            # actual wall-clock minutes, not a longer per-request backoff -
+            # see fetch_certificate_detail) shows up as many failures in a
+            # row. Stop the batch here rather than grinding through every
+            # remaining certificate one at a time, each doomed to also fail -
+            # already-fetched details are cached to disk, so a re-run after
+            # a short wait picks up exactly where this one stopped.
+            if consecutive_failures >= 8:
+                print(
+                    f"      {i}/{len(out)} - {consecutive_failures} detail fetches in a row failed "
+                    "(likely rate limited); stopping this batch early. Wait a few minutes and re-run - "
+                    "already-fetched details are cached and won't be re-fetched."
+                )
+                break
             time.sleep(RATE_LIMIT_SLEEP)
             if i % 100 == 0 or i == len(out):
                 print(f"      {i}/{len(out)}")

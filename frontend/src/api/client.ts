@@ -116,4 +116,30 @@ export const api = {
     get<{ records: Array<Record<string, unknown> & { package_id?: string; status: string; epsm_simulation_id: string }> }>(
       "/simulation-lookup-all", { lat: String(lat), lon: String(lon), radius_m: String(radiusM) }
     ),
+
+  /** Submit one shoebox EnergyPlus simulation per building, all in a single
+   * EPSM call (EPSM runs them as independent parallel tasks under one shared
+   * batch_id) - see backend's /api/simulation-batch-submit. */
+  simulationBatchSubmit: (body: {
+    country: string; city_id?: string;
+    buildings: Array<{ lat: number; lon: number; address?: string | null; building?: Record<string, unknown> }>;
+    wwr_override?: number;
+    u_wall_override?: number; u_roof_override?: number; u_win_override?: number; u_floor_override?: number;
+    package_id?: string; package_label?: string | null;
+  }) => post<{ batch_id: string; task_id: string; total: number; status: string }>("/simulation-batch-submit", body),
+
+  simulationBatchStatus: (batchId: string) =>
+    get<{
+      batch_id: string; total: number; counts: Record<string, number>; overall_status: string;
+      buildings: Array<{
+        idf_idx: number; lat: number; lon: number; address: string | null;
+        package_id: string; package_label: string | null; status: string;
+        results: {
+          heating_kwh_m2_yr: number | null; cooling_kwh_m2_yr: number | null;
+          lighting_kwh_m2_yr: number | null; equipment_kwh_m2_yr: number | null; total_kwh_m2_yr: number | null;
+          floors: number; footprint_m2: number; total_floor_area_m2: number;
+        } | null;
+        error: string | null;
+      }>;
+    }>(`/simulation-batch-status/${batchId}`),
 };

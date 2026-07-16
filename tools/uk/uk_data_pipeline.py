@@ -542,19 +542,22 @@ def build_city(city: dict, priors: dict, refresh: bool = False, epc_details: boo
             address = matches[0]["address"]
             stats["epc"] += 1
             # Only populated if the pipeline was run with --epc-details (these
-            # live on the full certificate document, not the search result).
+            # live on the full certificate document, not the search result) -
+            # .get() rather than [...] because postcode-level disk caches
+            # written before these fields existed in _row()'s schema won't
+            # have the keys at all, not just None values.
             # Represent a multi-certificate block by its modal/majority value,
             # same reasoning as `band` above - one extruded building, one value.
-            property_type = _modal([m["property_type"] for m in matches])
-            built_form = _modal([m["built_form"] for m in matches])
-            main_fuel = _modal([m["main_fuel"] for m in matches])
-            mainheat_description = _modal([m["mainheat_description"] for m in matches])
-            mainheat_energy_eff = _modal([m["mainheat_energy_eff"] for m in matches])
-            hotwater_description = _modal([m["hotwater_description"] for m in matches])
-            has_heat_pump = _modal_bool([m["has_heat_pump"] for m in matches])
-            has_solar_pv = _modal_bool([m["has_solar_pv"] for m in matches])
-            mains_gas_flag = _modal_bool([m["mains_gas_flag"] for m in matches])
-            consumptions = [m["energy_consumption_kwh_m2_yr"] for m in matches if m["energy_consumption_kwh_m2_yr"] is not None]
+            property_type = _modal([m.get("property_type") for m in matches])
+            built_form = _modal([m.get("built_form") for m in matches])
+            main_fuel = _modal([m.get("main_fuel") for m in matches])
+            mainheat_description = _modal([m.get("mainheat_description") for m in matches])
+            mainheat_energy_eff = _modal([m.get("mainheat_energy_eff") for m in matches])
+            hotwater_description = _modal([m.get("hotwater_description") for m in matches])
+            has_heat_pump = _modal_bool([m.get("has_heat_pump") for m in matches])
+            has_solar_pv = _modal_bool([m.get("has_solar_pv") for m in matches])
+            mains_gas_flag = _modal_bool([m.get("mains_gas_flag") for m in matches])
+            consumptions = [m.get("energy_consumption_kwh_m2_yr") for m in matches if m.get("energy_consumption_kwh_m2_yr") is not None]
             energy_consumption_kwh_m2_yr = round(sum(consumptions) / len(consumptions), 1) if consumptions else None
         else:
             band = None
@@ -635,6 +638,14 @@ def build_city(city: dict, priors: dict, refresh: bool = False, epc_details: boo
                 "postcode": postcode or None,
                 "uprn": uprn or None,
                 "tabula_period": period,
+                # Unlike tabula_period (which stays honestly null when there's no
+                # real known year), this always carries whichever period actually
+                # drove the archetype lookup above - real or EHS-sampled - so a
+                # frontend re-matching the same archetype (e.g. to show
+                # refurbishment-tier options) picks the SAME one the as-built
+                # u-values below came from, instead of an arbitrary fallback.
+                # tabula_u_source (below) distinguishes known vs estimated.
+                "tabula_period_used": tabula_period_used if tabula_archetype else None,
                 "tabula_u_wall": tabula_archetype["u_wall"] if tabula_archetype else None,
                 "tabula_u_roof": tabula_archetype["u_roof"] if tabula_archetype else None,
                 "tabula_u_win": tabula_archetype["u_window"] if tabula_archetype else None,

@@ -61,22 +61,33 @@ export interface RenovationCalcSelection {
   quantity: number; // m² for area line items, a unit count for count line items - see AreaLineItem.quantityKind
 }
 
+/** One selected building's own simulation outcome within a package - a
+ * package is one set of material/tier choices applied uniformly across
+ * every building selected in Step 2, submitted together as one EPSM batch
+ * (see backend's /api/simulation-batch-submit), so each building gets its
+ * own status/results/cost/carbon (footprint and wall area differ per
+ * building, so cost/carbon aren't a single shared number). */
+export interface RenovationCalcBuildingResult {
+  address: string;
+  lat: number;
+  lon: number;
+  status: "idle" | "queued" | "running" | "completed" | "failed";
+  heatingKwhM2Yr: number | null;
+  coolingKwhM2Yr: number | null;
+  totalKwhM2Yr: number | null;
+  costSEK: number | null;
+  carbonKgCO2e: number | null;
+  error: string | null;
+}
+
 export interface RenovationCalcPackage {
   id: string;               // "baseline" | `pkg-${uuid}`
   name: string;
   color: string;
   isBaseline: boolean;
   selections: Record<string, RenovationCalcSelection>; // key = AreaLineItem.key
-  costSEK: number | null;
-  carbonKgCO2e: number | null;
-  simulation: {
-    status: "idle" | "queued" | "running" | "completed" | "failed";
-    simulationId: string | null;
-    heatingKwhM2Yr: number | null;
-    coolingKwhM2Yr: number | null;
-    totalKwhM2Yr: number | null;
-    error: string | null;
-  };
+  batchId: string | null;   // the shared EPSM batch_id polled for every building below
+  buildings: RenovationCalcBuildingResult[];
 }
 
 /* ── State shape ── */

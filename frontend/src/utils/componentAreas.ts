@@ -23,6 +23,11 @@ export interface ResolvedBuildingGeometry {
   wallPerimeterM: number | null;   // null for bbox-scope buildings (no real polygon exposed there yet)
   useCat: string | null;
   tabulaPeriod: string | null;
+  // UK only - see BuildingLookup.tabula_period_used/tabula_u_source. Always
+  // null for Sweden (bbox rows and /api/building's own on-the-fly period
+  // derivation both only ever produce a "known year" period, never sampled).
+  tabulaPeriodUsed: string | null;
+  tabulaUSource: string | null;
   tabulaUWall: number | null;
   tabulaURoof: number | null;
   tabulaUWin: number | null;
@@ -52,6 +57,8 @@ export function resolveBuildingGeometry(
       wallPerimeterM: building.wall_perimeter_m,
       useCat: building.use_cat,
       tabulaPeriod: building.tabula_period,
+      tabulaPeriodUsed: building.tabula_period_used ?? null,
+      tabulaUSource: building.tabula_u_source ?? null,
       tabulaUWall: building.tabula_u_wall,
       tabulaURoof: building.tabula_u_roof,
       tabulaUWin: building.tabula_u_win,
@@ -68,6 +75,8 @@ export function resolveBuildingGeometry(
     wallPerimeterM: null,
     useCat: building.building_use,
     tabulaPeriod: building.tabula_period,
+    tabulaPeriodUsed: null,
+    tabulaUSource: null,
     tabulaUWall: building.u_wall,
     tabulaURoof: building.u_roof,
     tabulaUWin: building.u_window,

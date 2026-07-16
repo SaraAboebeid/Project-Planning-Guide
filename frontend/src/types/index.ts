@@ -146,6 +146,13 @@ export interface BuildingLookup {
   energy: number | null;        // kWh/m²/yr
   eclass: string | null;
   tabula_period: string | null;
+  // UK only: always populated when a TABULA match exists (a real known year
+  // OR an EHS-sampled era), unlike tabula_period which stays null for a
+  // sampled era - use this to re-match the SAME archetype tabula_u_wall/
+  // roof/win came from (e.g. a refurbishment-tier picker), not tabula_period.
+  tabula_period_used?: string | null;
+  // "known_year" | "ehs_sampled_period" | null - UK only.
+  tabula_u_source?: string | null;
   tabula_u_wall: number | null;
   tabula_u_roof: number | null;
   tabula_u_win: number | null;
