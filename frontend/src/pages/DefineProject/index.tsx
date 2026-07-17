@@ -22,6 +22,7 @@ import {
 } from "../../config/projectConfig";
 
 import LocationMap from "../../components/LocationMap";
+import { useWizardStepNav } from "../../components/wizardNav";
 
 /* ── tiny reusable bits ─────────────────────────────────────────── */
 
@@ -207,6 +208,9 @@ export default function DefineProject() {
     setStep(2);
     navigate("/step/2");
   }
+
+  // The wizard footer's Continue runs this page's validation + advance.
+  useWizardStepNav({ onNext: handleContinue });
 
   /* ── follow-up helpers ───────────────────────────────────────── */
   const followUps = (pt && FOLLOW_UP_SYSTEMS[pt]) || {};
@@ -850,11 +854,6 @@ export default function DefineProject() {
         </div>
       )}
 
-      {/* ── NAVIGATION ── */}
-      <div className="flex justify-between items-center pt-4 pb-8">
-        <button onClick={() => navigate("/")} className="ppg-btn-secondary">← Back</button>
-        <button onClick={handleContinue} className="ppg-btn-primary">Continue →</button>
-      </div>
     </div>
   );
 }

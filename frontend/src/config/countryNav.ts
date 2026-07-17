@@ -8,7 +8,7 @@ export type CountryCode = "se" | "gb" | "be" | "ie";
 
 export const COUNTRIES: { id: CountryCode; name: string; cities: string[] }[] = [
   { id: "se", name: "Sweden", cities: ["Stockholm", "Gothenburg", "Malmö"] },
-  { id: "gb", name: "United Kingdom", cities: ["London"] },
+  { id: "gb", name: "United Kingdom", cities: ["London", "Rotherham"] },
   { id: "be", name: "Belgium", cities: [] },
   { id: "ie", name: "Ireland", cities: [] },
 ];
@@ -24,6 +24,7 @@ export const CITY_COORDS: Record<string, { lat: number; lon: number; zoom: numbe
   Stockholm: { lat: 59.3293, lon: 18.0686, zoom: 11 },
   "Malmö": { lat: 55.6050, lon: 13.0038, zoom: 12 },
   London: { lat: 51.5072, lon: -0.1276, zoom: 11 },
+  Rotherham: { lat: 53.4302, lon: -1.3568, zoom: 13 },
 };
 
 // Country-level fallback center (no city selected, or a country with no

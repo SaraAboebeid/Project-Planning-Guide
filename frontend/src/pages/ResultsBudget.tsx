@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import { WIKELLS_CARBON_MAP } from "../config/wikellsCarbonMapping";
 import { WIKELLS_CHAPTERS } from "../config/wikellsData";
@@ -84,7 +83,6 @@ function Section({
 
 /* ══════════════════════════════════════════════════════════════════ */
 export default function ResultsBudget() {
-  const navigate = useNavigate();
   const { project } = useWizardStore();
 
   const isRenovation = project.projectType === "Renovation Planning";
@@ -420,9 +418,8 @@ export default function ResultsBudget() {
         </div>
       </Section>
 
-      {/* Navigation */}
-      <div className="flex justify-between pt-2 pb-8">
-        <button onClick={() => navigate("/step/4")} className="ppg-btn-secondary">← Back</button>
+      {/* Report actions (Back/Continue live in the wizard footer) */}
+      <div className="flex justify-end pt-2 pb-8">
         <div className="flex gap-3">
           <button
             onClick={handleCreateReport}

@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
+import { wizardNav } from "./wizardNav";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
@@ -265,10 +266,12 @@ export default function WizardLayout() {
 
         </div>
 
-        {/* ── BOTTOM NAV BAR ──────────────────────────────────────────── */}
+        {/* ── BOTTOM NAV BAR (the single wizard nav — pages register custom
+             Continue/Back behavior via useWizardStepNav rather than drawing
+             their own duplicate buttons) ──────────────────────────────── */}
         <footer className="shrink-0 flex items-center gap-3 px-6 py-3 z-20"
                 style={{ background: "#0d1117", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
-          <button onClick={goBack} style={{
+          <button onClick={() => (wizardNav.onBack ? wizardNav.onBack() : goBack())} style={{
             display: "flex", alignItems: "center", gap: 8, padding: "8px 16px",
             borderRadius: 12, fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.65)",
             background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)",
@@ -276,16 +279,8 @@ export default function WizardLayout() {
           }}>
             <Icon d={IC.arrowL} size={16} /> Back
           </button>
-          <button style={{
-            display: "flex", alignItems: "center", gap: 8, padding: "8px 16px",
-            borderRadius: 12, fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.65)",
-            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)",
-            cursor: "pointer", transition: "all 0.15s",
-          }}>
-            <Icon d={IC.save} size={16} /> Save Draft
-          </button>
           <div style={{ flex: 1 }} />
-          <button onClick={goNext} style={{
+          <button onClick={() => (wizardNav.onNext ? wizardNav.onNext() : goNext())} style={{
             display: "flex", alignItems: "center", gap: 8, padding: "8px 24px",
             borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#fff",
             background: "linear-gradient(135deg,#721CB8,#421869)",

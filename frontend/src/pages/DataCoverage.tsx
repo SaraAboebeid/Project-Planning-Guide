@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import { api } from "../api/client";
 import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
@@ -1503,7 +1502,6 @@ function MultiBuildingDataBanner({
    Component
 ───────────────────────────────────────────── */
 export default function DataCoverage() {
-  const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
   const building   = project.lookedUpBuilding ?? null;
   const buildings  = project.lookedUpBuildings ?? [];
@@ -2196,21 +2194,6 @@ export default function DataCoverage() {
         </div>
       )}
 
-      {/* Navigation */}
-      <div className="flex justify-between pt-4 pb-8">
-        <button
-          onClick={() => navigate("/step/1")}
-          className="px-5 py-2 rounded-lg border border-white/15 text-sm font-medium text-white/60 hover:bg-white/8"
-        >
-          &#x2190; Back
-        </button>
-        <button
-          onClick={() => navigate("/step/3")}
-          className="ppg-btn-primary px-6 py-2"
-        >
-          Continue &#x2192;
-        </button>
-      </div>
     </div>
   );
 }

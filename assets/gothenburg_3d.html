@@ -6,15 +6,15 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="gothenburg_3d.css?v=20260714-155845">
-  <link rel="stylesheet" href="sidebar-theme.css?v=20260714-155845">
+  <link rel="stylesheet" href="gothenburg_3d.css?v=20260716-151926">
+  <link rel="stylesheet" href="sidebar-theme.css?v=20260716-151926">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
        is stamped on <body> by bootstrap.js. */
     body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
   </style>
-  <script src="gothenburg_3d.meta.js?v=20260714-155845" defer></script>
-  <script src="viewer/js/bootstrap.js?v=20260714-155845" defer></script>
+  <script src="gothenburg_3d.meta.js?v=20260716-151926" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260716-151926" defer></script>
 </head>
 <body>
 
@@ -330,6 +330,10 @@
     <button class="btn" id="btn-ai-wwr">&#129302; AI Estimate</button>
     <button class="btn" id="btn-exit-inspect">&#x2715; Exit</button>
   </div>
+
+  <!-- Facade defect detection (ML model — placeholder until connected via FACADE_MODEL_URL) -->
+  <button class="btn" id="btn-detect-defects" style="width:100%;margin-top:6px;background:rgba(230,25,75,0.14);border-color:#e6194B;color:#f9a8b4;font-weight:600">&#128269; Detect Facade Defects</button>
+  <div id="facade-defects-result" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
 
   <!-- Zoom control -->
   <div style="display:flex;align-items:center;gap:6px;margin-top:8px;justify-content:center">

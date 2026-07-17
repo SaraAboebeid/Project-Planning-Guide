@@ -10,6 +10,7 @@ import {
   type TabulaArchetypeGB, type RefurbTierKey,
 } from "../utils/ukArchetype";
 import { UK_PLACEHOLDER_RATES, fmtGBP } from "../config/ukPlaceholderCostCarbon";
+import { useWizardStepNav } from "../components/wizardNav";
 import type { WikellsItem } from "../config/wikellsData";
 import type { BoverketResource, WWRRecord } from "../types";
 import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
@@ -575,6 +576,9 @@ export default function RenovationSimulator() {
 
   const canAddPackage = isUK ? ukTier != null : Object.keys(draftSelection).length > 0;
 
+  // The wizard footer's Continue saves this step's results before advancing.
+  useWizardStepNav({ onNext: handleSaveAndContinue });
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1100 }}>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -784,14 +788,6 @@ export default function RenovationSimulator() {
             )}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button
-              onClick={handleSaveAndContinue}
-              style={{ padding: "10px 22px", borderRadius: 10, fontSize: 13, fontWeight: 700, border: 0, cursor: "pointer", background: "linear-gradient(90deg,#721CB8,#96D74C)", color: "#fff" }}
-            >
-              Save & Continue →
-            </button>
-          </div>
         </>
       )}
     </div>

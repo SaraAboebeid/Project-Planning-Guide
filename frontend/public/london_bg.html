@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>London 3D Background</title>
+  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #cesium { width: 100%; height: 100%; overflow: hidden; background: #0a0d14; }
+    /* Hide all Cesium UI chrome */
+    .cesium-widget-credits,
+    .cesium-viewer-toolbar,
+    .cesium-viewer-animationContainer,
+    .cesium-viewer-timelineContainer,
+    .cesium-viewer-bottom,
+    .cesium-viewer-navigationHelpButton,
+    .cesium-viewer-geocoderContainer,
+    .cesium-infoBox,
+    .cesium-selection-wrapper { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="cesium"></div>
+  <script>
+    const viewer = new Cesium.Viewer('cesium', {
+      animation: false,
+      baseLayerPicker: false,
+      fullscreenButton: false,
+      geocoder: false,
+      homeButton: false,
+      infoBox: false,
+      sceneModePicker: false,
+      selectionIndicator: false,
+      timeline: false,
+      navigationHelpButton: false,
+      navigationInstructionsInitiallyVisible: false,
+      globe: false,
+      skyBox: false,
+      skyAtmosphere: false,
+    });
+
+    // Disable user interaction — this is a background-only viewer
+    viewer.scene.screenSpaceCameraController.enableInputs = false;
+
+    // ── Camera position ────────────────────────────────────────────────────
+    // Over the Thames by Tower Bridge, looking north across the river to the
+    // City of London skyline cluster (the Gherkin, Cheesegrater, Walkie-Talkie).
+    // Distinctly London — the Thames bend reads as London even on the flat
+    // fallback basemap when no 3D-tiles token is present.
+    const LONDON = {
+      lon: -0.0785,
+      lat: 51.5033,
+      height: 700,
+      heading: Cesium.Math.toRadians(345),
+      pitch: Cesium.Math.toRadians(-28),
+    };
+
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(LONDON.lon, LONDON.lat, LONDON.height),
+      orientation: {
+        heading: LONDON.heading,
+        pitch: LONDON.pitch,
+        roll: 0,
+      },
+    });
+
+    // ── Try Google Photorealistic 3D Tiles first ────────────────────────────
+    // Check URL param ?token=... or localStorage (set by the main 3D viewer)
+    const urlToken = new URLSearchParams(location.search).get('token');
+    const lsToken  = (() => { try { return localStorage.getItem('cesium_ion_token'); } catch { return null; } })();
+    const ionToken = urlToken || lsToken || '';
+
+    let tilesLoaded = false;
+
+    if (ionToken) {
+      Cesium.Ion.defaultAccessToken = ionToken;
+      Cesium.createGooglePhotorealistic3DTileset()
+        .then(tileset => {
+          viewer.scene.primitives.add(tileset);
+          tilesLoaded = true;
+          startSlowRotation();
+        })
+        .catch(() => loadFallbackMap());
+    } else {
+      loadFallbackMap();
+    }
+
+    // ── Fallback: dark CartoDB basemap ──────────────────────────────────────
+    function loadFallbackMap() {
+      viewer.imageryLayers.addImageryProvider(
+        new Cesium.UrlTemplateImageryProvider({
+          url: 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+          credit: '© OpenStreetMap contributors © CARTO',
+        })
+      );
+      startSlowRotation();
+    }
+
+    // ── Gentle slow pan for visual interest ────────────────────────────────
+    function startSlowRotation() {
+      let t = 0;
+      viewer.scene.postRender.addEventListener(() => {
+        t += 0.00008;
+        const lon = LONDON.lon + Math.sin(t) * 0.012;
+        const lat = LONDON.lat + Math.cos(t * 0.6) * 0.004;
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(lon, lat, LONDON.height),
+          orientation: {
+            heading: LONDON.heading + t * 0.4,
+            pitch: LONDON.pitch,
+            roll: 0,
+          },
+        });
+      });
+    }
+  </script>
+</body>
+</html>

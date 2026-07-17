@@ -34,6 +34,8 @@ from collections import Counter
 from pathlib import Path
 
 import requests
+from shapely.geometry import Point, Polygon
+from shapely.strtree import STRtree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cities as uk_cities
@@ -139,16 +141,24 @@ DEFAULT_HEIGHT = {
 # OpenStreetMap
 # ---------------------------------------------------------------------------
 def fetch_osm(city: dict, refresh: bool = False) -> dict:
-    cache = RAW_DIR / f"osm_{city['id']}.json"
+    # _v2: the query now also fetches standalone address nodes (see below), so
+    # the old buildings-only cache is a different filename and won't be reused.
+    cache = RAW_DIR / f"osm_{city['id']}_v2.json"
     if cache.exists() and not refresh:
         print(f"  using cached {cache.name}")
         return json.loads(cache.read_text(encoding="utf-8"))
 
+    # Also pull node["addr:housenumber"] - in dense areas most building
+    # footprints carry NO address on the polygon itself; the address lives on a
+    # separate OSM node inside/near the building. Fetching those nodes and
+    # spatially assigning them to buildings (see _assign_address_nodes) is what
+    # lets far more buildings join to an EPC certificate.
     query = f"""
 [out:json][timeout:240];
 (
   way["building"](around:{city['radius_m']},{city['lat']},{city['lon']});
   relation["building"]["type"="multipolygon"](around:{city['radius_m']},{city['lat']},{city['lon']});
+  node["addr:housenumber"](around:{city['radius_m']},{city['lat']},{city['lon']});
 );
 out geom;
 """
@@ -196,6 +206,47 @@ def ring_of(el: dict) -> list | None:
     if ring[0] != ring[-1]:
         ring.append(ring[0])
     return ring
+
+
+# Nodes sit slightly inside/on the footprint; a small buffer (~2.5 m here, in
+# degrees) catches address points placed right on the building edge without
+# reaching into the neighbouring building.
+_ADDR_NODE_BUFFER_DEG = 0.000025
+
+
+def _build_addr_index(addr_nodes: list):
+    """STRtree over OSM address nodes (node['addr:housenumber']) for a fast
+    point-in-building lookup. Returns (tree, points, tags) or None if empty."""
+    points, tags = [], []
+    for n in addr_nodes:
+        lon, lat = n.get("lon"), n.get("lat")
+        if lon is None or lat is None:
+            continue
+        points.append(Point(lon, lat))
+        tags.append(n.get("tags") or {})
+    if not points:
+        return None
+    return {"tree": STRtree(points), "points": points, "tags": tags}
+
+
+def _addr_tags_in_ring(addr_index, ring: list) -> list:
+    """Tag dicts of every address node that falls inside (or within a couple of
+    metres of) this building footprint - the addresses to try matching for a
+    building that has no usable address tag of its own."""
+    if addr_index is None:
+        return []
+    try:
+        poly = Polygon([(x, y) for x, y in ring])
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        region = poly.buffer(_ADDR_NODE_BUFFER_DEG)
+    except Exception:
+        return []
+    out = []
+    for i in addr_index["tree"].query(region):  # shapely 2.x: integer indices
+        if region.covers(addr_index["points"][i]):
+            out.append(addr_index["tags"][i])
+    return out
 
 
 def _modal(values):
@@ -446,16 +497,29 @@ def build_city(city: dict, priors: dict, refresh: bool = False, epc_details: boo
     osm = fetch_osm(city, refresh=refresh)
     elements = osm.get("elements", [])
 
+    # Buildings (polygons) vs standalone address nodes (points).
+    building_els = [
+        e for e in elements
+        if e.get("type") in ("way", "relation") and (e.get("tags") or {}).get("building")
+    ]
+    addr_nodes = [
+        e for e in elements
+        if e.get("type") == "node" and (e.get("tags") or {}).get("addr:housenumber")
+    ]
+    addr_index = _build_addr_index(addr_nodes)
+
     # OSM's multi-value convention joins several tag values with ";" - a single
     # building can carry "WC1H9DP;WC1H 9DR" in addr:postcode (e.g. a building
     # split across two postcodes). Passing that straight to the EPC API 400s.
+    # Include address-node postcodes too - many are postcodes no building
+    # polygon carries, so their certificates would otherwise never be fetched.
     postcodes = {
         pc.strip()
-        for e in elements
+        for e in (building_els + addr_nodes)
         for pc in ((e.get("tags") or {}).get("addr:postcode") or "").split(";")
         if pc.strip()
     }
-    print(f"  {len(elements):,} OSM buildings, {len(postcodes)} distinct postcodes")
+    print(f"  {len(building_els):,} OSM buildings, {len(addr_nodes):,} address nodes, {len(postcodes)} distinct postcodes")
 
     certs = ingest_epc.fetch_postcodes(postcodes, with_details=epc_details) if postcodes else []
     epc_idx = ingest_epc.index_by_address(certs)
@@ -477,7 +541,7 @@ def build_city(city: dict, priors: dict, refresh: bool = False, epc_details: boo
 
     records, stats = [], Counter()
 
-    for el in elements:
+    for el in building_els:
         ring = ring_of(el)
         if not ring:
             continue
@@ -505,24 +569,46 @@ def build_city(city: dict, priors: dict, refresh: bool = False, epc_details: boo
         if eu:
             stats["eubucco_matched"] += 1
 
+        # Candidate addresses = the building's OWN tags, plus every OSM address
+        # node inside its footprint. Many footprints carry no address of their
+        # own, so the contained nodes are what let them join to a certificate.
+        addr_sources = [tags] + _addr_tags_in_ring(addr_index, ring)
+
         postcode_candidates = [
             ingest_epc.norm_postcode(pc)
-            for pc in (tags.get("addr:postcode") or "").split(";")
+            for t in addr_sources
+            for pc in ((t.get("addr:postcode") or "").split(";"))
             if pc.strip()
         ]
         postcode = postcode_candidates[0] if postcode_candidates else ""
         house = ingest_epc.norm_house(tags.get("addr:housenumber") or "")
         uprn = str(tags.get("ref:GB:uprn") or "").strip()
 
-        matches = []
-        if uprn:
-            matches = epc_idx.get(("UPRN", uprn), [])
-        if not matches and house:
-            for pc in postcode_candidates:
-                matches = epc_idx.get((pc, house), [])
-                if matches:
-                    postcode = pc  # report whichever postcode actually matched
-                    break
+        # Gather all certificates reachable from any candidate address (UPRN or
+        # postcode+house), deduped by certificate number. A block legitimately
+        # aggregates many certificates (one per flat) - one extruded building.
+        seen_certs: dict = {}
+        matched_pc = ""
+        for t in addr_sources:
+            u = str(t.get("ref:GB:uprn") or "").strip()
+            if u:
+                for c in epc_idx.get(("UPRN", u), []):
+                    seen_certs[c["certificate_number"]] = c
+            h = ingest_epc.norm_house(t.get("addr:housenumber") or "")
+            if not h:
+                continue
+            for pc in (t.get("addr:postcode") or "").split(";"):
+                pc = ingest_epc.norm_postcode(pc.strip())
+                if not pc:
+                    continue
+                hits = epc_idx.get((pc, h), [])
+                if hits and not matched_pc:
+                    matched_pc, house = pc, h
+                for c in hits:
+                    seen_certs[c["certificate_number"]] = c
+        matches = list(seen_certs.values())
+        if matched_pc:
+            postcode = matched_pc  # report whichever postcode actually matched
 
         osm_id = f"{el.get('type')}/{el.get('id')}"
         rec_year = _f(tags.get("start_date")) or (eu["year"] if eu else None)
@@ -539,7 +625,15 @@ def build_city(city: dict, priors: dict, refresh: bool = False, epc_details: boo
             year = rec_year or (round(sum(ages) / len(ages)) if ages else None)
             areas = [m["floor_area_m2"] for m in matches if m["floor_area_m2"]]
             epc_source = "epc"
-            address = matches[0]["address"]
+            # Building display name: prefer the building's OWN OSM street address;
+            # otherwise a building-level label from the certs (strip the flat
+            # prefix so a block isn't named after one arbitrary flat).
+            osm_hn, osm_street = tags.get("addr:housenumber"), tags.get("addr:street")
+            if osm_hn and osm_street:
+                address = f"{osm_hn} {osm_street}"
+            else:
+                labels = [ingest_epc.building_label(m["address"]) for m in matches if m.get("address")]
+                address = Counter(labels).most_common(1)[0][0] if labels else matches[0]["address"]
             stats["epc"] += 1
             # Only populated if the pipeline was run with --epc-details (these
             # live on the full certificate document, not the search result) -

@@ -1,7 +1,8 @@
 // =============================================================
 // legend.js — Legend tabs, performance cards, compare basket
-// Depends on: DATA, PERIOD_CARDS, ECLASS_CARDS, USE_CARDS,
-//             PERIOD_STATS (all injected by build.py as constants)
+// Depends on: DATA (the building array). Performance cards (best/worst per
+//   use/class/era + median energy) are computed live from DATA below, so the
+//   legend works for any country/city without build-time card injection.
 // =============================================================
 
 const USE_LABELS_JS = {
@@ -43,12 +44,60 @@ const PERIOD_CSS = (window.VIEWER_PROFILE && window.VIEWER_PROFILE.period_colors
   '1996-2005':'rgb(255,99,71)', 'post-2005':'rgb(147,112,219)',
 };
 
-// Count buildings per key from DATA array (computed once at load)
+// Count buildings per key AND build the best/worst performance cards live
+// from the DATA array (computed once at load).
+//
+// The cards used to be injected by build.py as PERIOD_CARDS/ECLASS_CARDS/
+// USE_CARDS/PERIOD_STATS constants - but the UK build injects EMPTY objects
+// for those (its per-era energy stats weren't precomputed), so the UK legend
+// showed counts only, with nothing clickable and no median energy. Computing
+// them here from DATA makes the legend country-agnostic and always current:
+//   - energy metric  = measured EPC value (Sweden) OR the TABULA estimate (UK)
+//   - construction era = real period OR the EHS-sampled era used for the UK
+//     archetype (tabula_period is null for most UK buildings; tabula_period_used
+//     carries the era the archetype was actually matched on)
 const _useCounts = {}, _eclassCounts = {}, _periodCounts = {};
+const _byUse = {}, _byEclass = {}, _byPeriod = {};
 for (const b of DATA) {
-  _useCounts[b.use_cat]         = (_useCounts[b.use_cat]         || 0) + 1;
-  if (b.eclass)        _eclassCounts[b.eclass]        = (_eclassCounts[b.eclass]        || 0) + 1;
-  if (b.tabula_period) _periodCounts[b.tabula_period] = (_periodCounts[b.tabula_period] || 0) + 1;
+  const energy = (b.energy != null ? b.energy : b.tabula_kwh_m2_yr);
+  const period = b.tabula_period || b.tabula_period_used || null;
+  _useCounts[b.use_cat] = (_useCounts[b.use_cat] || 0) + 1;
+  if (b.eclass) _eclassCounts[b.eclass] = (_eclassCounts[b.eclass] || 0) + 1;
+  if (period)   _periodCounts[period]   = (_periodCounts[period]   || 0) + 1;
+
+  if (energy != null) {
+    const card = {
+      addr: b.address || '(no address)', energy: Math.round(energy),
+      eclass: b.eclass || null, year: b.year || null,
+      area: b.footprint_m2 ? Math.round(b.footprint_m2) : null, period,
+    };
+    if (!_byUse[b.use_cat]) _byUse[b.use_cat] = [];
+    _byUse[b.use_cat].push(card);
+    if (b.eclass) { if (!_byEclass[b.eclass]) _byEclass[b.eclass] = []; _byEclass[b.eclass].push(card); }
+    if (period)   { if (!_byPeriod[period])   _byPeriod[period]   = []; _byPeriod[period].push(card); }
+  }
+}
+
+function _bestWorst(list, n = 15) {
+  const sorted = [...list].sort((a, b) => a.energy - b.energy);
+  return { best: sorted.slice(0, n), worst: sorted.slice(-n).reverse() };
+}
+function _medianEnergy(list) {
+  if (!list.length) return null;
+  const vals = list.map(c => c.energy).sort((a, b) => a - b);
+  const m = Math.floor(vals.length / 2);
+  return vals.length % 2 ? vals[m] : Math.round((vals[m - 1] + vals[m]) / 2);
+}
+
+// Computed replacements for the (possibly empty) build-injected card constants.
+const _USE_CARDS = {}, _ECLASS_CARDS = {}, _PERIOD_CARDS = {}, _PERIOD_STATS = {};
+for (const k in _byUse) {
+  _USE_CARDS[k] = { buildings: [..._byUse[k]].sort((a, b) => a.energy - b.energy).slice(0, 100) };
+}
+for (const k in _byEclass) _ECLASS_CARDS[k] = _bestWorst(_byEclass[k]);
+for (const k in _byPeriod) {
+  _PERIOD_CARDS[k] = _bestWorst(_byPeriod[k]);
+  _PERIOD_STATS[k] = { median_kwh: _medianEnergy(_byPeriod[k]) };
 }
 
 function updateLegend(mode) {
@@ -58,7 +107,7 @@ function updateLegend(mode) {
   if (mode === 'use') {
     rows = Object.entries(USE_LABELS_JS).map(([key, lbl]) => {
       const cnt = _useCounts[key] || 0;
-      const cards = USE_CARDS[key];
+      const cards = _USE_CARDS[key];
       return { key, lbl, color: USE_CSS[key], cnt, hasCards: cards && cards.buildings.length > 0 };
     });
     container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Building use type</div>';
@@ -66,7 +115,7 @@ function updateLegend(mode) {
   } else if (mode === 'eclass') {
     rows = Object.entries(ECLASS_LABELS_JS).map(([key, lbl]) => {
       const cnt = _eclassCounts[key] || 0;
-      const cards = ECLASS_CARDS[key];
+      const cards = _ECLASS_CARDS[key];
       return { key, lbl, color: ECLASS_CSS[key], cnt, hasCards: cards && (cards.best.length || cards.worst.length) };
     });
     container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Energy class (A–G)</div>';
@@ -74,8 +123,8 @@ function updateLegend(mode) {
   } else { // year/period
     rows = Object.keys(PERIOD_LABELS_JS).map(key => {
       const cnt = _periodCounts[key] || 0;
-      const st  = PERIOD_STATS[key] || {};
-      const cards = PERIOD_CARDS[key];
+      const st  = _PERIOD_STATS[key] || {};
+      const cards = _PERIOD_CARDS[key];
       const sub = st.median_kwh ? ' · ' + st.median_kwh + ' kWh/m²' : '';
       return { key, lbl: PERIOD_LABELS_JS[key] + sub, color: PERIOD_CSS[key], cnt, hasCards: cards && (cards.best.length || cards.worst.length) };
     });
@@ -117,20 +166,20 @@ function showPerfCards(mode, key) {
   _compareSet.clear();
 
   if (mode === 'use') {
-    const entry = USE_CARDS[key];
+    const entry = _USE_CARDS[key];
     if (!entry || !entry.buildings.length) return;
     _perfList = [...entry.buildings];
     document.getElementById('perf-title').textContent = USE_LABELS_JS[key];
-    document.getElementById('perf-sub').textContent = _perfList.length + ' buildings with EPC data';
+    document.getElementById('perf-sub').textContent = _perfList.length + ' buildings with energy data';
   } else if (mode === 'eclass') {
-    const cards = ECLASS_CARDS[key];
+    const cards = _ECLASS_CARDS[key];
     if (!cards) return;
     const seen = new Set();
     _perfList = [...cards.best, ...cards.worst].filter(c => { const ok = !seen.has(c.addr); seen.add(c.addr); return ok; });
     document.getElementById('perf-title').textContent = 'Energy Class ' + key;
     document.getElementById('perf-sub').textContent = (ECLASS_LABELS_JS[key]||key) + ' · ' + _perfList.length + ' shown';
   } else {
-    const cards = PERIOD_CARDS[key];
+    const cards = _PERIOD_CARDS[key];
     if (!cards) return;
     const seen = new Set();
     _perfList = [...cards.best, ...cards.worst].filter(c => { const ok = !seen.has(c.addr); seen.add(c.addr); return ok; });

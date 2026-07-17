@@ -1,5 +1,4 @@
 ﻿import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import {
   CheckCircle2, AlertTriangle, XCircle,
@@ -121,7 +120,6 @@ function SectionCard({
    Main component
 ───────────────────────────────────────────── */
 export default function DataAssumptions() {
-  const navigate = useNavigate();
   const { project } = useWizardStore();
 
   const [openSec, setOpenSec] = useState<Set<string>>(
@@ -580,21 +578,6 @@ export default function DataAssumptions() {
       {/* Gothenburg 3D Explorer */}
       <BuildingMapPanel />
 
-      {/* Navigation */}
-      <div className="flex justify-between pt-4 pb-8">
-        <button
-          onClick={() => navigate("/step/2")}
-          className="px-5 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50"
-        >
-          &#x2190; Back
-        </button>
-        <button
-          onClick={() => navigate("/step/4")}
-          className="ppg-btn-primary px-6 py-2"
-        >
-          Next &#x2192;
-        </button>
-      </div>
     </div>
   );
 }

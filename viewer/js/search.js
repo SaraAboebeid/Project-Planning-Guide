@@ -7,13 +7,31 @@ const searchInput   = document.getElementById('search-input');
 const searchBtn     = document.getElementById('search-btn');
 const searchResults = document.getElementById('search-results');
 
+// Bias geocoding to the active city/country (set by bootstrap.js from the
+// build-time VIEWER_PROFILE) instead of hardcoding Gothenburg - so the UK
+// viewer searches London/Rotherham/etc., not Gothenburg.
+function _searchSuffix() {
+  const city = window.VIEWER_CITY || {};
+  const profile = window.VIEWER_PROFILE || {};
+  const parts = [city.name, profile.country_name].filter(Boolean);
+  return parts.length ? ' ' + parts.join(', ') : '';
+}
+
 async function geocodeAddress() {
   const q = searchInput.value.trim();
   if (!q) return;
   searchBtn.textContent = '…';
   try {
-    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=6&q=' +
-                encodeURIComponent(q + ' Gothenburg');
+    const params = new URLSearchParams({ format: 'json', limit: '6', q: q + _searchSuffix() });
+    const cc = (window.VIEWER_COUNTRY || '').toLowerCase(); // 'se' | 'gb'
+    if (cc) params.set('countrycodes', cc);
+    // Soft bias toward the viewed area (ranks nearby results higher; not bounded).
+    const c = window.VIEW_CENTER;
+    if (c) {
+      const d = 0.25;
+      params.set('viewbox', [c.lon - d, c.lat + d, c.lon + d, c.lat - d].join(','));
+    }
+    const url = 'https://nominatim.openstreetmap.org/search?' + params.toString();
     const data = await (await fetch(url)).json();
     if (!data.length) {
       searchResults.innerHTML = '<div class="result-item">No results</div>';

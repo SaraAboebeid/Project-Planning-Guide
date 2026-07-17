@@ -470,11 +470,17 @@ def tabula_match(
     build_year: int = Query(...),
 ):
     try:
-        from utils.tabula_matching import match_archetype
+        from utils.tabula_matching import match_archetype, match_confidence
     except ImportError:
         raise HTTPException(501, "TABULA module not available")
 
-    archetype, confidence = match_archetype(building_type, build_year)
+    # match_archetype() returns a single Optional[dict] (the archetype, or
+    # None for post-2005/unknown type); match_confidence() is a separate
+    # function returning the {level, score, reason} assessment - the two are
+    # NOT a tuple from one call (the old handler unpacked them as if they were,
+    # which would have raised even once the streamlit import was fixed).
+    archetype = match_archetype(building_type, build_year)
+    confidence = match_confidence(building_type, build_year)
     return {"archetype": archetype, "confidence": confidence}
 
 
@@ -1694,6 +1700,101 @@ async def vt_parking_availability(lot_id: int):
         "available": data.get("AvailableCapacity") or data.get("available"),
         "total":     data.get("TotalCapacity")     or data.get("total"),
         "updated":   data.get("LastUpdated")       or data.get("updated"),
+    }
+
+
+# ── Facade defect detection (ML model — PLACEHOLDER, not connected yet) ──────
+# A facade-defect ML model is being trained separately (see the ML repo:
+# BFDD RGB-IR segmentation + MBDD2025 Faster R-CNN object detection). It is
+# NOT wired in yet. This endpoint defines the integration contract now so the
+# real model is a drop-in later, and returns a clearly-labelled placeholder
+# ("model_connected": false) until then.
+#
+# Real model I/O contract (from the ML repo's scripts/demo_app.py):
+#   input : one RGB facade image
+#   output: boxes [[x1,y1,x2,y2], ...], labels [1..5], scores [0..1]
+#   5 defect classes (label index 1..5), in order:
+FACADE_DEFECT_CLASSES = ["crack", "leakage", "abscission", "corrosion", "bulge"]
+FACADE_DEFECT_CLASS_COLORS = {
+    "crack": "#e6194B", "leakage": "#4363d8", "abscission": "#f58231",
+    "corrosion": "#3cb44b", "bulge": "#911eb4",
+}
+# To connect the real model later: serve it as a small HTTP service exposing
+# POST /predict that takes {"image_base64": "..."} and returns
+# {"boxes": [...], "labels": [...], "scores": [...]}, then set the env var
+# FACADE_MODEL_URL to its base URL (mirrors how EPSM is wired via EPSM_BASE_URL).
+FACADE_MODEL_URL = os.environ.get("FACADE_MODEL_URL", "").strip()
+
+
+class FacadeDefectRequest(BaseModel):
+    image_base64: str
+    direction: str = "N"
+    building_info: Optional[dict[str, Any]] = None
+    # Minimum confidence to return (the demo app defaults to 0.3).
+    threshold: float = 0.3
+
+
+@app.post("/api/facade-defects")
+async def facade_defects(req: FacadeDefectRequest):
+    """Detect facade defects (crack/leakage/abscission/corrosion/bulge) in a
+    base64 facade image. PLACEHOLDER until the ML model is connected via
+    FACADE_MODEL_URL - returns model_connected=false + an empty defect list,
+    with the full class list so the UI can render its legend now.
+
+    When FACADE_MODEL_URL is set, proxies the image to that model service and
+    normalizes its boxes/labels/scores into the response shape below."""
+    base = {
+        "defect_classes": FACADE_DEFECT_CLASSES,
+        "class_colors": FACADE_DEFECT_CLASS_COLORS,
+        "direction": req.direction,
+    }
+
+    if not FACADE_MODEL_URL:
+        return {
+            **base,
+            "model_connected": False,
+            "source": "placeholder",
+            "defects": [],
+            "message": (
+                "Facade-defect ML model not connected yet. Set FACADE_MODEL_URL to a "
+                "running model service (POST /predict) to enable real detection."
+            ),
+        }
+
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            r = await client.post(
+                f"{FACADE_MODEL_URL}/predict",
+                json={"image_base64": req.image_base64},
+            )
+        r.raise_for_status()
+        raw = r.json()
+    except httpx.RequestError as exc:
+        raise HTTPException(502, f"Could not reach facade model at {FACADE_MODEL_URL}: {exc}")
+    except Exception as exc:
+        raise HTTPException(502, f"Facade model returned an unusable response: {exc}")
+
+    boxes = raw.get("boxes") or []
+    labels = raw.get("labels") or []
+    scores = raw.get("scores") or []
+    defects = []
+    for box, lbl, score in zip(boxes, labels, scores):
+        if score is None or float(score) < req.threshold:
+            continue
+        idx = int(lbl)
+        name = FACADE_DEFECT_CLASSES[idx - 1] if 1 <= idx <= len(FACADE_DEFECT_CLASSES) else f"class_{idx}"
+        defects.append({
+            "class": name,
+            "confidence": round(float(score), 3),
+            "box": [float(v) for v in box],
+        })
+    defects.sort(key=lambda d: d["confidence"], reverse=True)
+    return {
+        **base,
+        "model_connected": True,
+        "source": raw.get("source", "facade-model"),
+        "defects": defects,
     }
 
 

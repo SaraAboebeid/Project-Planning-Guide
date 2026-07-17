@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import { COUNTRIES, LIBRARY_TABS, tabPathFor, pathForCountry, type CountryCode } from "../config/countryNav";
@@ -138,11 +138,38 @@ const WORKFLOW_STEPS = [
   },
 ];
 
-const RECENT_ACTIVITY = [
-  { icon: "🏢", text: "Boplats data refreshed",        time: "2h ago" },
-  { icon: "🗺️", text: "Buildings layer updated",        time: "5h ago" },
-  { icon: "🚌", text: "Mobility data refreshed",        time: "1d ago" },
-];
+// Per-city 3D hero camera views (feed the parameterized city_bg.html). Distinct
+// per city so Sweden and the UK never show the same skyline.
+type BgView = { lat: number; lon: number; height: number; heading: number };
+const CITY_BG: Record<string, BgView> = {
+  Gothenburg: { lat: 57.704348, lon: 11.955460, height: 750, heading: 340 },
+  Stockholm:  { lat: 59.325100, lon: 18.071100, height: 700, heading: 30 },
+  "Malmö":    { lat: 55.605000, lon: 13.003800, height: 650, heading: 20 },
+  London:     { lat: 51.503300, lon: -0.078500, height: 700, heading: 345 },
+  Rotherham:  { lat: 53.430200, lon: -1.356800, height: 520, heading: 20 },
+};
+const COUNTRY_BG: Record<CountryCode, BgView> = {
+  se: CITY_BG.Gothenburg!,
+  gb: CITY_BG.London!,
+  be: { lat: 50.8467, lon: 4.3525, height: 700, heading: 20 }, // Brussels
+  ie: { lat: 53.3498, lon: -6.2603, height: 700, heading: 20 }, // Dublin
+};
+function bgUrlFor(country: CountryCode, city: string): string {
+  const v = CITY_BG[city] || COUNTRY_BG[country];
+  const p = new URLSearchParams({
+    lat: String(v.lat), lon: String(v.lon), height: String(v.height), heading: String(v.heading),
+  });
+  return `/city_bg.html?${p.toString()}`;
+}
+
+// Short descriptor shown in the hero location pill, per city.
+const CITY_DESC: Record<string, string> = {
+  Gothenburg: "Lindholmen District · Mixed-use redevelopment",
+  Stockholm:  "City Centre",
+  "Malmö":    "City Centre",
+  London:     "City of London · Financial district",
+  Rotherham:  "Town Centre · Regeneration area",
+};
 
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -155,8 +182,54 @@ export default function LandingPage() {
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>("se");
   const [selectedCity, setSelectedCity]       = useState("Gothenburg");
   const [boplatsListings, setBoplatsListings] = useState<string>("-");
+  const [ukStats, setUkStats] = useState<{ buildings: number; withEpc: number; estimated: number; districts: number } | null>(null);
+  // Raw UK districts (with per-band counts) + Sweden's coarse class share, for
+  // the "Retrofit Opportunity" card (share of buildings rated E-G).
+  const [ukCities, setUkCities] = useState<{ name: string; band_distribution?: Record<string, number> }[]>([]);
+  const [seShare, setSeShare] = useState<{ A_B: number; C_D: number; E_G: number } | null>(null);
 
   const country = COUNTRIES.find(c => c.id === selectedCountry)!;
+
+  // Buildings rated E-G (worst performers = renovation candidates) for the
+  // selected country/city. UK: summed per-band counts across the selected
+  // city's districts. Sweden: the coarse A_B / C_D / E_G share (Gothenburg
+  // only - the other Swedish cities have no building dataset yet).
+  const retrofit = useMemo(() => {
+    if (selectedCountry === "gb") {
+      const districts = ukCities.filter(c => c.name === selectedCity);
+      const bd: Record<string, number> = {};
+      for (const c of districts) {
+        for (const k of ["A", "B", "C", "D", "E", "F", "G"]) bd[k] = (bd[k] ?? 0) + ((c.band_distribution ?? {})[k] ?? 0);
+      }
+      const total = ["A", "B", "C", "D", "E", "F", "G"].reduce((s, k) => s + (bd[k] ?? 0), 0);
+      if (!total) return null;
+      const poor = (bd.E ?? 0) + (bd.F ?? 0) + (bd.G ?? 0);
+      const eff = (bd.A ?? 0) + (bd.B ?? 0) + (bd.C ?? 0);
+      const mid = bd.D ?? 0;
+      return { poorCount: poor, total, poorPct: Math.round((100 * poor) / total), effPct: (100 * eff) / total, midPct: (100 * mid) / total, ratedLabel: "with an energy rating" };
+    }
+    if (selectedCountry === "se" && selectedCity === "Gothenburg" && seShare) {
+      return { poorCount: null, total: null, poorPct: seShare.E_G, effPct: seShare.A_B, midPct: seShare.C_D, ratedLabel: "of the building stock" };
+    }
+    return null;
+  }, [selectedCountry, selectedCity, ukCities, seShare]);
+
+  // Stat pills are country-specific: Sweden shows the Gothenburg dataset totals,
+  // the UK shows the summed totals across its built districts (from
+  // /api/uk/cities) so the hero numbers match the selected country.
+  const statCards = selectedCountry === "gb"
+    ? [
+        { label: "buildings",      value: ukStats ? ukStats.buildings.toLocaleString("en-US") : "—", color: "#4A90E2" },
+        { label: "EPC matched",    value: ukStats ? ukStats.withEpc.toLocaleString("en-US") : "—",   color: "#96D74C" },
+        { label: "EHS estimated",  value: ukStats ? ukStats.estimated.toLocaleString("en-US") : "—", color: "#4ECDC4" },
+        { label: "districts",      value: ukStats ? String(ukStats.districts) : "—",                 color: "#721CB8" },
+      ]
+    : [
+        { label: "3D buildings",     value: "92,973",        color: "#4A90E2" },
+        { label: "EPC matched",      value: "87,712",        color: "#96D74C" },
+        { label: "TABULA matched",   value: "18,744",        color: "#4ECDC4" },
+        { label: "Boplats listings", value: boplatsListings, color: "#721CB8" },
+      ];
 
   useEffect(() => {
     let active = true;
@@ -182,6 +255,30 @@ export default function LandingPage() {
     }
 
     loadBoplatsCount();
+    return () => { active = false; };
+  }, []);
+
+  // UK district totals for the country-aware stat pills + per-band data for
+  // the retrofit card; plus Sweden's coarse class share.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/uk/cities")
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((d: { cities?: (Record<string, number> & { name: string; band_distribution?: Record<string, number> })[] }) => {
+        if (!active) return;
+        const cities = d.cities ?? [];
+        const sum = (k: string) => cities.reduce((a, c) => a + (Number(c[k]) || 0), 0);
+        setUkStats({ buildings: sum("buildings"), withEpc: sum("with_epc"), estimated: sum("estimated_from_ehs"), districts: cities.length });
+        setUkCities(cities.map(c => ({ name: c.name, band_distribution: c.band_distribution })));
+      })
+      .catch(() => { /* stat pills fall back to "—" for the UK */ });
+
+    fetch("/api/country-profile?country=se")
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((d: { viewer?: { energy_class_share?: { A_B: number; C_D: number; E_G: number } } }) => {
+        if (active && d.viewer?.energy_class_share) setSeShare(d.viewer.energy_class_share);
+      })
+      .catch(() => { /* retrofit card shows a placeholder for SE if absent */ });
     return () => { active = false; };
   }, []);
 
@@ -270,7 +367,7 @@ export default function LandingPage() {
                   key={c.id}
                   onClick={() => {
                     setSelectedCountry(c.id);
-                    if (c.cities.length) setSelectedCity(c.cities[0]);
+                    setSelectedCity(c.cities[0] ?? "");
                     // Already viewing a page with a per-country build (Data
                     // Explorer, 3D Viewer)? Swap straight to this country's
                     // version instead of leaving the pill and the page out of sync.
@@ -332,11 +429,13 @@ export default function LandingPage() {
         {/* ── Hero (3D background) ────────────────────────────────────── */}
         <div className="flex-1 relative overflow-hidden">
 
-          {/* 3D Lindholmen background iframe */}
+          {/* 3D city background iframe — camera follows the selected country/city
+              (key forces a reload so the camera actually moves on change) */}
           <iframe
-            src="/lindholmen_bg.html"
+            key={`${selectedCountry}:${selectedCity}`}
+            src={bgUrlFor(selectedCountry, selectedCity)}
             className="absolute inset-0 w-full h-full border-0 pointer-events-none"
-            title="Lindholmen 3D View"
+            title={`${selectedCity || country.name} 3D View`}
           />
 
           {/* Gradient overlay: strong left, fade to transparent right */}
@@ -346,12 +445,11 @@ export default function LandingPage() {
           <div className="absolute bottom-0 left-0 right-0 h-44 pointer-events-none"
                style={{ background: "linear-gradient(to top, rgba(10,13,20,0.75) 0%, transparent 100%)" }} />
 
-          {/* ── Stats overlay (top right) ────────────────────────────── */}
+          {/* ── Stats overlay (top right) — country-aware ────────────── */}
           <div className="absolute top-4 right-4 flex gap-1.5 pointer-events-none z-10">
-            <StatCard label="3D buildings"     value="92,973"  barColor="#4A90E2" />
-            <StatCard label="EPC matched"      value="87,712"  barColor="#96D74C" />
-            <StatCard label="TABULA matched"   value="18,744"  barColor="#4ECDC4" />
-            <StatCard label="Boplats listings" value={boplatsListings} barColor="#721CB8" />
+            {statCards.map(s => (
+              <StatCard key={s.label} label={s.label} value={s.value} barColor={s.color} />
+            ))}
           </div>
 
 
@@ -365,7 +463,7 @@ export default function LandingPage() {
                 <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-white/90
                                  bg-[#721CB8]/40 border border-[#721CB8]/50 backdrop-blur-sm
                                  px-2.5 py-1 rounded-md">
-                  Gothenburg Digital Twin
+                  {(selectedCity || country.name)} Digital Twin
                 </span>
                 <span className="flex items-center gap-1.5 text-[10px] text-white/60">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#96D74C] animate-pulse" />
@@ -404,12 +502,13 @@ export default function LandingPage() {
                 </button>
               </div>
 
-              {/* Location pill */}
+              {/* Location pill — reflects the selected city */}
               <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg w-fit"
                    style={{ background: "rgba(10,13,20,0.45)", border: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(8px)" }}>
                 <span style={{ fontSize: 10 }}>📍</span>
-                <span className="text-[10px] text-white/45">Lindholmen District</span>
-                <span className="text-[10px] text-white/25">· Mixed-use redevelopment</span>
+                <span className="text-[10px] text-white/45">
+                  {CITY_DESC[selectedCity] ?? (selectedCity || country.name)}
+                </span>
               </div>
 
             </div>
@@ -457,72 +556,53 @@ export default function LandingPage() {
         <div className="shrink-0 flex gap-3 px-5 py-3 z-30"
              style={{ background: "rgba(10,13,20,0.97)", borderTop: "1px solid rgba(255,255,255,0.07)", minHeight: "120px" }}>
 
-          {/* Active project */}
-          <div className="flex-[1.2] rounded-xl px-4 py-3"
-               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <div className="text-[9px] text-white/30 uppercase tracking-widest mb-2">Active project</div>
-            <div className="text-[12px] font-semibold text-white/90 mb-0.5">Lindholmen Mixed-Use</div>
-            <div className="text-[10px] text-white/35 mb-3">Updated 2h ago</div>
-            <button
-              onClick={handleStart}
-              className="text-[10px] text-white/50 hover:text-white/80 border border-white/12
-                         hover:border-white/25 px-3 py-1 rounded-lg transition-all cursor-pointer bg-transparent"
-            >
-              Change project ›
-            </button>
-          </div>
-
-          {/* Recent activity */}
+          {/* Retrofit Opportunity — share of buildings rated E–G (worst
+              performers = highest-impact renovation candidates), from real
+              EPC/energy-class data for the selected city */}
           <div className="flex-[2] rounded-xl px-4 py-3"
                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <div className="text-[9px] text-white/30 uppercase tracking-widest mb-2">Recent activity</div>
-            <div className="flex flex-col gap-1.5">
-              {RECENT_ACTIVITY.map((a) => (
-                <div key={a.text} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[13px]">{a.icon}</span>
-                    <span className="text-[11px] text-white/60">{a.text}</span>
-                  </div>
-                  <span className="text-[10px] text-white/25">{a.time}</span>
-                </div>
-              ))}
+            <div className="text-[9px] text-white/30 uppercase tracking-widest mb-2">
+              Retrofit Opportunity · {selectedCity || country.name}
             </div>
+            {retrofit ? (
+              <>
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span className="text-[28px] font-bold leading-none" style={{ color: "#EF4444" }}>{retrofit.poorPct}%</span>
+                  <span className="text-[11px] text-white/55">
+                    rated <b className="text-white/80">E–G</b>
+                    {retrofit.poorCount != null ? ` · ${retrofit.poorCount.toLocaleString("en-US")} buildings` : ""} {retrofit.ratedLabel}
+                  </span>
+                </div>
+                <div className="text-[10px] text-white/35 mb-2">Worst-performing stock — the highest-impact renovation candidates.</div>
+                {/* Efficient (A–C) / mid (D) / poor (E–G) split */}
+                <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                  <div style={{ width: `${retrofit.effPct}%`, background: "#96D74C" }} />
+                  <div style={{ width: `${retrofit.midPct}%`, background: "#F59E0B" }} />
+                  <div style={{ width: `${Math.max(0, 100 - retrofit.effPct - retrofit.midPct)}%`, background: "#EF4444" }} />
+                </div>
+                <div className="flex gap-4 mt-1.5">
+                  {[["#96D74C", "A–C efficient"], ["#F59E0B", "D average"], ["#EF4444", "E–G poor"]].map(([c, l]) => (
+                    <span key={l} className="flex items-center gap-1.5 text-[10px] text-white/45">
+                      <span className="w-2 h-2 rounded-sm" style={{ background: c }} /> {l}
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="text-[11px] text-white/40 py-4">
+                Building-stock energy ratings aren't available for {selectedCity || country.name} yet.
+              </div>
+            )}
           </div>
 
-          {/* Shortcuts */}
-          <div className="flex-[1.5] rounded-xl px-4 py-3"
+          {/* Quick start */}
+          <div className="flex-[1.4] rounded-xl px-4 py-3"
                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <div className="text-[9px] text-white/30 uppercase tracking-widest mb-2">Shortcuts</div>
+            <div className="text-[9px] text-white/30 uppercase tracking-widest mb-2">Quick start</div>
             <div className="flex gap-2">
               <Shortcut iconPath={IC.import}   label="Import Data"        onClick={() => startAt("/step/2")} />
               <Shortcut iconPath={IC.compare}  label="Compare Scenarios"  onClick={() => startAt("/pathways")} />
               <Shortcut iconPath={IC.generate} label="Generate Report"    onClick={() => startAt("/analysis")} />
-            </div>
-          </div>
-
-          {/* Weather + wind */}
-          <div className="flex-[1.2] rounded-xl px-4 py-3"
-               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <div className="text-[9px] text-white/30 uppercase tracking-widest mb-1">Gothenburg</div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-2xl">⛅</span>
-              <span className="text-[28px] font-bold text-white/90 leading-none">16°C</span>
-            </div>
-            <div className="text-[10px] text-white/35 mb-2">Partly cloudy</div>
-            {/* Wind comfort mini chart */}
-            <div>
-              <div className="text-[9px] text-white/25 mb-1">Wind comfort (m/s)</div>
-              <svg width="100%" height="28" viewBox="0 0 120 28" preserveAspectRatio="none">
-                <polyline
-                  points="0,20 15,16 30,14 45,18 60,10 75,8 90,12 105,9 120,7"
-                  fill="none" stroke="rgba(150,215,76,0.7)" strokeWidth="1.5"
-                  strokeLinejoin="round" strokeLinecap="round"
-                />
-                <polyline
-                  points="0,20 15,16 30,14 45,18 60,10 75,8 90,12 105,9 120,7 120,28 0,28"
-                  fill="rgba(150,215,76,0.08)" stroke="none"
-                />
-              </svg>
             </div>
           </div>
 

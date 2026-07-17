@@ -540,22 +540,6 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
         </div>
       )}
 
-      {/* Nav */}
-      <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 24, paddingBottom: 8 }}>
-        <button onClick={() => navigate("/step/3")} style={{
-          display: "flex", alignItems: "center", gap: 8, padding: "8px 18px",
-          borderRadius: 10, fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.60)",
-          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
-          cursor: "pointer",
-        }}>ΓåÉ Back</button>
-        <button onClick={() => navigate("/step/5")} style={{
-          display: "flex", alignItems: "center", gap: 8, padding: "8px 20px",
-          borderRadius: 10, fontSize: 13, fontWeight: 600, color: "#fff",
-          background: "linear-gradient(135deg,#721CB8,#421869)",
-          border: "1px solid rgba(114,28,184,0.5)", cursor: "pointer",
-          boxShadow: "0 4px 14px rgba(114,28,184,0.35)",
-        }}>Continue ΓåÆ</button>
-      </div>
     </div>
   );
 }

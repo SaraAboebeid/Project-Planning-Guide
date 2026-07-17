@@ -549,6 +549,103 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────
+// Facade defect detection (ML model) — PLACEHOLDER until connected.
+// A facade-defect model (crack/leakage/abscission/corrosion/bulge) is being
+// trained separately; the backend endpoint /api/facade-defects returns
+// model_connected=false until FACADE_MODEL_URL points at the running model.
+// This sends whatever facade(s) are captured and renders defects (or the
+// clear "not connected yet" message) so the wiring is testable now.
+// ─────────────────────────────────────────────────────────────────
+const _DEFECT_COLORS = {
+  crack: '#e6194B', leakage: '#4363d8', abscission: '#f58231',
+  corrosion: '#3cb44b', bulge: '#911eb4',
+};
+
+document.getElementById('btn-detect-defects')?.addEventListener('click', async () => {
+  const resultEl = document.getElementById('facade-defects-result');
+  const btn = document.getElementById('btn-detect-defects');
+  if (!facadeBuilding) return;
+
+  // Same capture-source logic as the AI WWR button: prefer the manual crop,
+  // else use whichever cardinal canvases were captured.
+  const manualCanvas = document.getElementById('canvas-manual');
+  const manualCaptured = (() => {
+    if (manualCanvas.width !== 520) return true;
+    const px = manualCanvas.getContext('2d').getImageData(50, 50, 1, 1).data;
+    return !(px[0] === 13 && px[1] === 13 && px[2] === 26);
+  })();
+  const cardinals = DIRS.map(d => ({ canvas: document.getElementById('canvas-' + d), dir: d }))
+    .filter(({ canvas }) => {
+      const px = canvas.getContext('2d').getImageData(50, 50, 1, 1).data;
+      return !(px[0] === 26 && px[1] === 26 && px[2] === 46);
+    });
+  const toSend = manualCaptured ? [{ canvas: manualCanvas, dir: 'Manual' }] : cardinals;
+
+  if (toSend.length === 0) {
+    resultEl.innerHTML = '<span style="color:#d97706">Capture a facade first — Draw &amp; Capture or a cardinal view.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  const _label = btn.innerHTML;
+  btn.innerHTML = 'Detecting…';
+  resultEl.innerHTML = '<span style="color:#94a3b8">Running facade-defect detection…</span>';
+
+  const buildingInfo = {
+    address: facadeBuilding.address || '', year: facadeBuilding.year || null,
+    use: facadeBuilding.use_cat || '', eclass: facadeBuilding.eclass || null,
+  };
+
+  try {
+    let modelConnected = null;
+    let message = '';
+    const perFacade = [];
+    for (const { canvas, dir } of toSend) {
+      const imageBase64 = canvas.toDataURL('image/jpeg', 0.82).split(',')[1];
+      const resp = await fetch('http://localhost:8000/api/facade-defects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: imageBase64, direction: dir, building_info: buildingInfo }),
+        signal: AbortSignal.timeout(60000),
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      modelConnected = data.model_connected;
+      message = data.message || '';
+      perFacade.push({ dir, defects: data.defects || [] });
+    }
+
+    if (modelConnected === false) {
+      resultEl.innerHTML =
+        '<div style="padding:8px 10px;border-radius:6px;background:rgba(217,119,6,0.12);border:1px solid rgba(217,119,6,0.3)">' +
+        '<div style="color:#fbbf24;font-weight:600;margin-bottom:2px">&#9203; Defect model not connected yet</div>' +
+        '<div style="color:var(--muted);font-size:10px">' + (message || 'Placeholder wired — connect the model via FACADE_MODEL_URL.') + '</div>' +
+        '</div>';
+    } else {
+      const total = perFacade.reduce((n, f) => n + f.defects.length, 0);
+      const rows = perFacade.map(f => {
+        const counts = {};
+        for (const d of f.defects) counts[d.class] = (counts[d.class] || 0) + 1;
+        const badges = Object.entries(counts).map(([c, n]) =>
+          '<span style="background:' + (_DEFECT_COLORS[c] || '#888') + '22;color:' + (_DEFECT_COLORS[c] || '#888') +
+          ';border-radius:6px;padding:1px 6px;font-size:10px;font-weight:600;margin-right:4px">' + n + '&times; ' + c + '</span>'
+        ).join('') || '<span style="color:var(--muted);font-size:10px">no defects</span>';
+        return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="width:44px;font-weight:700;color:#e6194B">' + f.dir + '</span>' + badges + '</div>';
+      }).join('');
+      resultEl.innerHTML =
+        '<div style="color:#4ade80;font-weight:600;margin-bottom:4px">&#10003; ' + total + ' defect(s) detected</div>' + rows;
+    }
+  } catch (err) {
+    const netErr = (err instanceof TypeError) || (err.message || '').toLowerCase().includes('fetch');
+    resultEl.innerHTML = '<span style="color:#f87171">' +
+      (netErr ? '&#9888; Backend not running — start it with: python launch.py' : 'Detection error: ' + err.message) + '</span>';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = _label;
+  }
+});
+
 document.getElementById('btn-wwr-save').addEventListener('click', async () => {
   const saveRow = document.getElementById('wwr-save-row');
   const pending = saveRow._pendingWWR;

@@ -111,10 +111,76 @@ def norm_postcode(pc: str) -> str:
 
 
 def norm_house(v) -> str:
-    """Normalise a house number/name for joining ('Flat 2, 14A' -> '14A')."""
+    """Normalise a plain OSM house number/tag for joining ('123' -> '123',
+    '10-14' -> '10'). For a full EPC address line use norm_building_house()
+    instead - it strips flat/unit prefixes so the *building* number is used."""
     s = str(v or "").upper().strip()
     m = re.search(r"\b(\d+[A-Z]?)\b", s)
     return m.group(1) if m else s
+
+
+# Sub-dwelling descriptors that PREFIX a flat/unit address, so the first number
+# in the string is the flat/unit number, not the building's. e.g.
+# "Flat 6, 123 Poplar High Street" -> building 123 (not flat 6);
+# "Upper Maisonette, 15 Woodstock Terrace" -> 15.
+_DWELLING_PREFIX = re.compile(
+    r"^(FLAT|FLATS|APARTMENT|APARTMENTS|APT|UNIT|ROOM|ROOMS|STUDIO|MAISONETTE|"
+    r"ANNEX|ANNEXE|PENTHOUSE|BASEMENT|GROUND|FIRST|SECOND|THIRD|FOURTH|FIFTH|"
+    r"SIXTH|SEVENTH|EIGHTH|NINTH|TENTH|UPPER|LOWER|TOP|REAR|FRONT|BLOCK)\b"
+)
+
+
+def norm_building_house(address) -> str:
+    """Extract the BUILDING house number from a full EPC address, for joining
+    against OSM building tags.
+
+    The critical difference from norm_house(): an EPC address for a flat is
+    typically "Flat 6, 123 Poplar High Street", where the FIRST number (6) is
+    the flat, and the building number (123) comes after the sub-dwelling
+    descriptor. Keying by the first number (the old behaviour) meant most
+    flats - the majority of urban certificates - never joined to their
+    building. Examples:
+      "Flat 6, 123 Poplar High Street"        -> "123"   (not "6")
+      "Apartment 4, 10-14 Bridgegate"         -> "10"
+      "Upper Maisonette, 15 Woodstock Terrace"-> "15"
+      "39 Cottage Street"                     -> "39"
+      "2b Woodstock Terrace"                  -> "2B"
+    """
+    s = str(address or "").upper().strip()
+    segs = [seg.strip() for seg in s.split(",") if seg.strip()]
+    # Drop leading sub-dwelling descriptor segments (the flat/unit identifier).
+    while segs and _DWELLING_PREFIX.match(segs[0]):
+        segs.pop(0)
+    for seg in segs:
+        m = re.search(r"\b(\d+[A-Z]?)\b", seg)
+        if m:
+            return m.group(1)
+    m = re.search(r"\b(\d+[A-Z]?)\b", s)
+    return m.group(1) if m else s
+
+
+def building_label(address) -> str:
+    """A building-level display name from a full EPC address: drop the leading
+    flat/unit token so a block reads for the building, not one arbitrary flat:
+      "Flat 342, Ice Wharf, 17 New Wharf Road" -> "Ice Wharf, 17 New Wharf Road"
+      "Apartment 316, Romney House, 47 Marsham Street" -> "Romney House, 47 Marsham Street"
+      "Flat 57 Abell House, 31 John Islip Street" -> "Abell House, 31 John Islip Street"
+      "39 Cottage Street" -> "39 Cottage Street"  (unchanged)
+    """
+    s = str(address or "").strip()
+    # Strip a leading "Flat 57 " / "Apartment 316, " / "Unit 4, " token.
+    s = re.sub(
+        r"^(flat|flats|apartment|apartments|apt|unit|room|studio|maisonette|penthouse|annexe?)\s+\d+[a-z]?\b[\s,]*",
+        "", s, flags=re.I,
+    )
+    # Strip a leading floor/maisonette descriptor that forms its own segment,
+    # e.g. "Upper Maisonette, ", "Ground Floor Flat, ".
+    s = re.sub(
+        r"^(ground|first|second|third|fourth|fifth|upper|lower|top|basement|rear|front)[\w\s]*?,\s*",
+        "", s, flags=re.I,
+    )
+    s = s.strip().strip(",").strip()
+    return s or str(address or "").strip()
 
 
 def _band(v) -> str | None:
@@ -165,12 +231,15 @@ def _has_solar_pv(photo_supply_pct, mainheat_description=None) -> bool | None:
 # fuller fields (floor area, property type, age band, SAP score) actually live.
 def _row(rec: dict) -> dict:
     address_lines = [rec.get(f"addressLine{i}") for i in range(1, 5)]
+    address = ", ".join(p for p in address_lines if p)
     return {
         "certificate_number": rec.get("certificateNumber"),
         "uprn": str(rec.get("uprn") or "").strip() or None,
         "postcode": norm_postcode(rec.get("postcode")),
-        "address": ", ".join(p for p in address_lines if p),
-        "house": norm_house(address_lines[0]),
+        "address": address,
+        # Full address, not just line 1: for a flat the building number lives
+        # on a later line, and norm_building_house strips the flat prefix.
+        "house": norm_building_house(address),
         "band": _band(rec.get("currentEnergyEfficiencyBand")),
         "council": rec.get("council"),
         "constituency": rec.get("constituency"),
@@ -210,15 +279,15 @@ def _row(rec: dict) -> dict:
 def _row_from_csv(rec: dict) -> dict:
     mainheat_description = rec.get("mainheat-description")
     photo_supply_pct = _num(rec.get("photo-supply"))
+    csv_address = ", ".join(
+        p for p in [rec.get("address1"), rec.get("address2"), rec.get("address3")] if p
+    ) or rec.get("address")
     return {
         "certificate_number": rec.get("lmk-key"),
         "uprn": str(rec.get("uprn") or "").strip() or None,
         "postcode": norm_postcode(rec.get("postcode")),
-        "address": ", ".join(
-            p for p in [rec.get("address1"), rec.get("address2"), rec.get("address3")] if p
-        )
-        or rec.get("address"),
-        "house": norm_house(rec.get("address1") or rec.get("address")),
+        "address": csv_address,
+        "house": norm_building_house(csv_address),
         "band": _band(rec.get("current-energy-rating")),
         "band_potential": _band(rec.get("potential-energy-rating")),
         "sap": _num(rec.get("current-energy-efficiency")),
@@ -554,7 +623,12 @@ def index_by_address(rows) -> dict:
     for r in rows:
         if not r.get("postcode"):
             continue
-        idx.setdefault((r["postcode"], r["house"]), []).append(r)
+        # Derive the building-number key from the (correct) full address here
+        # rather than trusting the row's stored `house`: on-disk postcode caches
+        # written before the flat-number fix hold the old flat-number key, and
+        # this makes those caches match correctly without re-fetching.
+        house = norm_building_house(r.get("address") or "") or r.get("house")
+        idx.setdefault((r["postcode"], house), []).append(r)
         if r.get("uprn"):
             idx.setdefault(("UPRN", r["uprn"]), []).append(r)
     return idx

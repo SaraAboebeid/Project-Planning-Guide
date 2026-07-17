@@ -17,10 +17,9 @@ Data sources loaded from:
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
-
-import streamlit as st
 
 # ── Paths ────────────────────────────────────────────────────────────
 _DATA_DIR = (
@@ -94,7 +93,7 @@ def climate_zone_from_county(county_name: str) -> Optional[int]:
 
 
 # ── Data loading (cached) ───────────────────────────────────────────
-@st.cache_data(ttl=None)
+@lru_cache(maxsize=1)
 def _load_tabula_data() -> tuple[dict, dict]:
     """Load both TABULA JSON files and return (envelope_dict, energy_dict)."""
     with open(_DATA_DIR / "tabula_swedish_data.json", encoding="utf-8") as f:
