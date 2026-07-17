@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { WIKELLS_CHAPTERS, wikellsStats } from "../config/wikellsData";
+import OptimizationAssumptions from "../components/OptimizationAssumptions";
 
 // ── Icon helper ──────────────────────────────────────────────────────────────
 function Icon({ d, size = 16 }: { d: string; size?: number }) {
@@ -723,6 +724,9 @@ export default function DataExplorer() {
           <SourceCard key={s.id} source={s} addressFilter={addressFilter} />
         ))}
       </div>
+
+      {/* Optimization assumptions + equations + sources */}
+      <OptimizationAssumptions />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import OptimizationAssumptions from "../components/OptimizationAssumptions";
 
 function Icon({ d, size = 16 }: { d: string; size?: number }) {
   return (
@@ -426,6 +427,9 @@ export default function UKDataExplorer() {
           <SourceCard key={source.id} source={source} />
         ))}
       </div>
+
+      {/* Optimization assumptions + equations + sources (defaults to UK) */}
+      <OptimizationAssumptions defaultCountry="UK" />
 
       <div style={{ marginTop: 24, fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
         Sources: OpenStreetMap (ODbL) · Energy Performance of Buildings Register, MHCLG (Open Government Licence v3.0) ·

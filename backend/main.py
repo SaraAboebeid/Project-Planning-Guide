@@ -2760,6 +2760,116 @@ async def chat(req: ChatRequest):
         return {"configured": True, "reply": f"Sorry, the assistant is unavailable right now ({e})."}
 
 
+# ── Live electricity spot price (day-ahead) ─────────────────────────────────
+#
+# Sweden: elprisetjustnu.se — a free, no-auth JSON feed of Nord Pool day-ahead
+# spot prices per bidding zone (Gothenburg = SE3). Fields per hour:
+#   { "SEK_per_kWh": .., "EUR_per_kWh": .., "EXR": .., "time_start", "time_end" }
+# Prices are the raw spot (excl. VAT, grid fee, tax) — the marginal energy price
+# the optimizer needs for operating-cost discounting.
+
+_ENERGY_PRICE_CACHE: dict = {}   # (country, date) -> payload
+
+
+@app.get("/api/energy-price")
+async def energy_price(country: str = Query("se"), zone: str = Query("SE3")):
+    """Day-ahead electricity spot price. country=se uses Nord Pool via
+    elprisetjustnu.se (zone SE1–SE4, Gothenburg=SE3). Returns the daily average
+    plus hourly series and the source. country=uk is pending a live UK source."""
+    import httpx
+    from datetime import date, timedelta
+
+    c = country.lower()
+    if c == "uk":
+        # Octopus Agile — a free, no-auth half-hourly UK tariff that tracks the
+        # wholesale (day-ahead) price; region "C" = London. value_exc_vat (p/kWh)
+        # is the wholesale-tracking rate, comparable to the SE spot (excl. VAT).
+        url = ("https://api.octopus.energy/v1/products/AGILE-24-04-03/"
+               "electricity-tariffs/E-1R-AGILE-24-04-03-C/standard-unit-rates/?page_size=48")
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                r = await client.get(url)
+            data = r.json() if r.status_code == 200 else {}
+            results = data.get("results") or []
+        except Exception:  # noqa: BLE001
+            results = []
+        pkwh = [row.get("value_exc_vat") for row in results
+                if isinstance(row.get("value_exc_vat"), (int, float))]
+        if not pkwh:
+            return {"country": "uk", "live": False,
+                    "note": "UK price temporarily unavailable from the source.",
+                    "source": "https://octopus.energy/agile/"}
+        gbp = [round(p / 100.0, 4) for p in pkwh]  # p/kWh -> GBP/kWh
+        return {
+            "country": "uk",
+            "zone": "GB (region C, London)",
+            "live": True,
+            "unit": "GBP/kWh",
+            "average_price": round(sum(gbp) / len(gbp), 4),
+            "min_price": min(gbp),
+            "max_price": max(gbp),
+            "hourly": [{"start": row.get("valid_from"), "gbp_per_kwh": round(row["value_exc_vat"] / 100.0, 4)}
+                       for row in results if isinstance(row.get("value_exc_vat"), (int, float))],
+            "note": "Octopus Agile half-hourly rate (tracks GB wholesale/day-ahead), excl. VAT.",
+            "source": "https://octopus.energy/agile/ (tracks GB wholesale)",
+        }
+
+    z = zone.upper()
+    if not z.startswith("SE") or z not in {"SE1", "SE2", "SE3", "SE4"}:
+        z = "SE3"
+
+    async def _fetch(d: date):
+        url = f"https://www.elprisetjustnu.se/api/v1/prices/{d.year}/{d.month:02d}-{d.day:02d}_{z}.json"
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(url)
+        if r.status_code != 200:
+            return None
+        try:
+            rows = r.json()
+        except Exception:  # noqa: BLE001
+            return None
+        return rows if isinstance(rows, list) and rows else None
+
+    # Try today, then yesterday (day-ahead for "today" may not be posted yet).
+    today = date.today()
+    rows = None
+    used = None
+    for d in (today, today - timedelta(days=1)):
+        key = (z, d.isoformat())
+        if key in _ENERGY_PRICE_CACHE:
+            rows, used = _ENERGY_PRICE_CACHE[key], d
+            break
+        try:
+            rows = await _fetch(d)
+        except Exception:  # noqa: BLE001
+            rows = None
+        if rows:
+            _ENERGY_PRICE_CACHE[key] = rows
+            used = d
+            break
+
+    if not rows:
+        return {"country": "se", "zone": z, "live": False,
+                "note": "Spot price temporarily unavailable from the source.",
+                "source": "https://www.elprisetjustnu.se"}
+
+    sek = [row.get("SEK_per_kWh") for row in rows if isinstance(row.get("SEK_per_kWh"), (int, float))]
+    avg = round(sum(sek) / len(sek), 4) if sek else None
+    return {
+        "country": "se",
+        "zone": z,
+        "live": True,
+        "date": used.isoformat() if used else None,
+        "unit": "SEK/kWh",
+        "average_price": avg,
+        "min_price": round(min(sek), 4) if sek else None,
+        "max_price": round(max(sek), 4) if sek else None,
+        "hourly": [{"start": row.get("time_start"), "sek_per_kwh": row.get("SEK_per_kWh")} for row in rows],
+        "note": "Nord Pool day-ahead spot, excl. VAT/grid/energy tax.",
+        "source": "https://www.elprisetjustnu.se (Nord Pool day-ahead)",
+    }
+
+
 # -- Static frontend (built React SPA + standalone 3D maps) -----------------
 # Only mounted when the build output exists; harmless during local API-only dev.
 _FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"

@@ -94,6 +94,12 @@ export const api = {
   chat: (messages: { role: "user" | "assistant"; content: string }[]) =>
     post<{ reply: string; configured: boolean }>("/chat", { messages }),
 
+  /** Live day-ahead electricity spot price (SE = Nord Pool via elprisetjustnu). */
+  energyPrice: (country = "se") =>
+    get<{ country: string; zone?: string; live: boolean; date?: string; unit?: string;
+          average_price?: number | null; min_price?: number | null; max_price?: number | null;
+          note?: string; source?: string | null }>("/energy-price", { country }),
+
   /** Look up saved AI WWR for a building (null if none saved) */
   lookupWWR: (lat: number, lon: number) =>
     get<{ found: boolean; record: WWRRecord | null; dist_m?: number }>("/wwr-lookup", {
