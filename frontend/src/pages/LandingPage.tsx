@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import { COUNTRIES, LIBRARY_TABS, tabPathFor, pathForCountry, type CountryCode } from "../config/countryNav";
+import ChatWidget from "../components/ChatWidget";
 
 // ── Inline SVG icon set ────────────────────────────────────────────────────
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
@@ -226,8 +227,8 @@ export default function LandingPage() {
       ]
     : [
         { label: "3D buildings",     value: "92,973",        color: "#4A90E2" },
-        { label: "EPC matched",      value: "87,712",        color: "#96D74C" },
-        { label: "TABULA matched",   value: "18,744",        color: "#4ECDC4" },
+        { label: "EPC matched",      value: "84,349",        color: "#96D74C" },
+        { label: "TABULA matched",   value: "17,346",        color: "#4ECDC4" },
         { label: "Boplats listings", value: boplatsListings, color: "#721CB8" },
       ];
 
@@ -609,6 +610,8 @@ export default function LandingPage() {
         </div>{/* end bottom strip */}
 
       </div>{/* end main area */}
+
+      <ChatWidget />
     </div>
   );
 }

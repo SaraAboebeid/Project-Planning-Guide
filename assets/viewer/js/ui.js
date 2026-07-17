@@ -172,9 +172,13 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
 
     let html = '<div style="font-weight:600;font-size:13px;margin-bottom:4px;color:#6d28d9">' +
       (b.address || b.all_addresses || 'Building') + '</div>';
-    // Show all addresses if multiple units share this EPC
-    if (b.all_addresses && b.all_addresses !== b.address && b.all_addresses.includes(',')) {
-      html += '<div style="font-size:10px;color:#64748b;margin-bottom:5px">' + b.all_addresses + '</div>';
+    // Show every entrance when one EPC covers multiple addresses (pipe-separated)
+    if (b.all_addresses && b.all_addresses.indexOf('|') !== -1) {
+      const _entrances = b.all_addresses.split('|').map(function (s) { return s.trim(); }).filter(Boolean);
+      if (_entrances.length > 1) {
+        html += '<div style="font-size:10px;color:#64748b;margin-bottom:5px">' +
+          _entrances.length + ' addresses: ' + _entrances.join(', ') + '</div>';
+      }
     }
     const useLabel = b.use_cat ? b.use_cat.replace(/_/g,' ') : 'Unknown';
     html += '<div style="margin-bottom:6px"><span style="background:rgba(114,28,184,0.12);color:#4c1d95;border-radius:4px;padding:2px 7px;font-size:11px">' + useLabel + '</span></div>';
@@ -259,6 +263,10 @@ async function showInfoPanel(b, idx) {
   const rows = [];
   const row = (l,v) => v != null && v !== '' ? rows.push('<div class="tt-row"><span class="tt-lbl">'+l+'</span><span class="tt-val">'+v+'</span></div>') : null;
   row('Address',  b.address);
+  if (b.all_addresses && b.all_addresses.indexOf('|') !== -1) {
+    const _e = b.all_addresses.split('|').map(function (s) { return s.trim(); }).filter(Boolean);
+    if (_e.length > 1) row('All entrances', _e.join(', '));
+  }
   row('Use',      b.use_cat ? b.use_cat.replace(/_/g,' ') : null);
   row('Energy class', b.eclass);
   row('Energy',   b.energy ? b.energy + ' kWh/m²' : null);

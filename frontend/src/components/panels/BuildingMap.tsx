@@ -81,7 +81,7 @@ export default function BuildingMapPanel() {
             {
               icon: <Zap className="w-3.5 h-3.5 text-emerald-500" />,
               title: "Energy class",
-              desc: "18,694 EPC buildings colored A-G. Non-EPC buildings dimmed.",
+              desc: "17,352 EPC buildings colored A-G. Non-EPC buildings dimmed.",
               accent: "bg-emerald-50 border-emerald-100",
             },
             {
@@ -106,8 +106,8 @@ export default function BuildingMapPanel() {
       <div className="border-t border-slate-100 px-5 py-3 flex flex-wrap gap-x-6 gap-y-1">
         {[
           { icon: <Building2 className="w-3 h-3" />, value: "92,973",             label: "buildings" },
-          { icon: <Zap       className="w-3 h-3" />, value: "18,694",             label: "with EPC energy class" },
-          { icon: <Layers    className="w-3 h-3" />, value: "17,957",             label: "TABULA matched" },
+          { icon: <Zap       className="w-3 h-3" />, value: "17,352",             label: "with EPC energy class" },
+          { icon: <Layers    className="w-3 h-3" />, value: "17,346",             label: "TABULA matched" },
           { icon: <Map       className="w-3 h-3" />, value: "Central Gothenburg", label: "coverage" },
         ].map((s) => (
           <div key={s.label} className="flex items-center gap-1.5 text-[11px] text-slate-500">

@@ -80,6 +80,20 @@ export const api = {
       east:  String(east),  west:  String(west),
     }),
 
+  /** Named neighborhoods (Gothenburg primärområden) with building counts */
+  listDistricts: (country = "se") =>
+    get<{ country: string; districts: { name: string; count: number; lat: number; lon: number }[] }>(
+      "/districts", { country },
+    ),
+
+  /** All building records inside a named district (neighborhood-scale selection) */
+  buildingsByDistrict: (district: string) =>
+    get<BuildingRecord[]>("/buildings/bbox/list", { district }),
+
+  /** Bilingual (EN/SV) data-grounded chatbot. Send the full turn history. */
+  chat: (messages: { role: "user" | "assistant"; content: string }[]) =>
+    post<{ reply: string; configured: boolean }>("/chat", { messages }),
+
   /** Look up saved AI WWR for a building (null if none saved) */
   lookupWWR: (lat: number, lon: number) =>
     get<{ found: boolean; record: WWRRecord | null; dist_m?: number }>("/wwr-lookup", {

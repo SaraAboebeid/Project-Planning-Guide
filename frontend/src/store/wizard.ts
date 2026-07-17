@@ -99,6 +99,8 @@ interface ProjectState {
   country: string | null;
   city: string | null;
   scale: string | null;
+  neighborhoodName: string;   // free-text area name when scale = "Neighborhood"
+  district: string | null;    // resolved primärområde name → auto-selects its buildings in Step 2
   systemsInScope: string[];
   selectedKpis: string[];
   explorationApproaches: string[];
@@ -167,6 +169,8 @@ const DEFAULT_PROJECT: ProjectState = {
   projectType: null,
   buildingDevelopmentType: null,
   projectName: "",
+  neighborhoodName: "",
+  district: null,
   country: null,
   city: null,
   scale: null,

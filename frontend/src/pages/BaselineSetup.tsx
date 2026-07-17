@@ -184,8 +184,10 @@ export default function BaselineSetup() {
     [buildings, supplementary],
   );
 
-  const allComplete = buildings.length > 0 && (uploadSuccess || buildingStatus.every(s => s.complete));
-  const totalMissing = buildingStatus.reduce((acc, s) => acc + s.missing.length, 0);
+  // The batch baseline only needs each building's lat/lon; missing envelope
+  // details fall back to TABULA archetype defaults in the shoebox IDF, so the
+  // run always completes. No need to gate on "all fields present" anymore.
+  const canRunBaseline = buildings.length > 0;
 
   /* ── JSON upload handler ── */
   function handleFile(file: File) {
@@ -263,122 +265,63 @@ export default function BaselineSetup() {
           Renovation Planning · Step 3
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>
-          Data Completion & Baseline
+          Baseline Simulation
         </h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          Review missing building data from Step 2, upload any gaps as JSON,
-          then run a baseline energy simulation in EPSM before testing renovation packages.
+          Run a real EnergyPlus (EPSM) baseline for the building{buildings.length !== 1 ? "s" : ""} selected in Step 2 —
+          the as-built energy performance you'll compare renovation packages against in Step 4.
         </p>
       </div>
 
-      {/* ── Summary strip ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-        {[
-          { label: "Buildings",           value: buildings.length || "—",         color: "#4ECDC4" },
-          { label: "Missing fields",       value: totalMissing,                    color: totalMissing > 0 ? "#F59E0B" : "#96D74C" },
-          { label: "Ready for baseline",   value: allComplete ? "Yes ✓" : "Not yet", color: allComplete ? "#96D74C" : "#EF4444" },
-        ].map(s => (
-          <div key={s.label} style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700 }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Data gap cards ── */}
+      {/* ── Buildings to simulate (compact list, no data-gap repetition) ── */}
       {buildings.length === 0 ? (
         <div style={{ borderRadius: 12, padding: "20px 24px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)" }}>
           <p style={{ fontSize: 13, color: "#F59E0B", margin: 0 }}>
-            No buildings loaded yet — go back to Step 2 to look up buildings.
+            No buildings loaded yet — go back to Step 2 to select buildings.
           </p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, textTransform: "uppercase" }}>
-            Data coverage per building
+        <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <Building2 size={14} color="#4ECDC4" />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
+              {buildings.length} building{buildings.length !== 1 ? "s" : ""} to simulate
+            </span>
           </div>
-          {buildingStatus.map(bs => (
-            <div key={bs.key} style={{
-              borderRadius: 14, padding: "16px 18px",
-              background: "rgba(255,255,255,0.03)",
-              border: `1px solid ${bs.complete ? "rgba(150,215,76,0.22)" : "rgba(245,158,11,0.22)"}`,
-            }}>
-              {/* Building header */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                <Building2 size={14} color={bs.complete ? "#96D74C" : "#F59E0B"} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {bs.key}
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: bs.complete ? "#96D74C" : "#F59E0B", flexShrink: 0 }}>
-                  {bs.covered}/{REQUIRED_FIELDS.length} present
-                </span>
-                <div style={{ width: 80, height: 4, borderRadius: 4, background: "rgba(255,255,255,0.1)", flexShrink: 0 }}>
-                  <div style={{
-                    height: "100%", borderRadius: 4,
-                    background: bs.complete ? "#96D74C" : "#F59E0B",
-                    width: `${(bs.covered / REQUIRED_FIELDS.length) * 100}%`,
-                    transition: "width .3s",
-                  }} />
-                </div>
-              </div>
-
-              {/* Field chips */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {REQUIRED_FIELDS.map(f => {
-                  const val = mergedVal(bs.b, f.key, bs.sup);
-                  const present = val !== null && val !== undefined && val !== "";
-                  const fromUpload = bs.sup[f.key] !== undefined && bs.sup[f.key] !== null;
-                  return (
-                    <span key={f.key} style={{
-                      fontSize: 10, padding: "3px 9px", borderRadius: 7, fontWeight: 600,
-                      background: present
-                        ? fromUpload ? "rgba(96,165,250,0.15)" : "rgba(150,215,76,0.1)"
-                        : f.priority === "high" ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)",
-                      color: present
-                        ? fromUpload ? "#93c5fd" : "#86efac"
-                        : f.priority === "high" ? "#fca5a5" : "#fcd34d",
-                      border: `1px solid ${present
-                        ? fromUpload ? "rgba(96,165,250,0.3)" : "rgba(150,215,76,0.2)"
-                        : f.priority === "high" ? "rgba(239,68,68,0.25)" : "rgba(245,158,11,0.2)"}`,
-                    }}>
-                      {present ? "✓" : "✗"} {f.label}
-                      {present && f.unit ? `: ${val}` : ""}
-                      {fromUpload ? " ↑" : ""}
-                    </span>
-                  );
-                })}
-              </div>
-
-              {/* High-priority missing list */}
-              {bs.missing.filter(f => f.priority === "high").length > 0 && (
-                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", margin: "10px 0 0" }}>
-                  <span style={{ color: "#fca5a5", fontWeight: 600 }}>Critical missing: </span>
-                  {bs.missing.filter(f => f.priority === "high").map(f => f.label).join(", ")}
-                </p>
-              )}
-            </div>
-          ))}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {buildingStatus.map(bs => (
+              <span key={bs.key} style={{
+                fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 600,
+                background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.65)",
+                border: "1px solid rgba(255,255,255,0.08)", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                {bs.key}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* ── Upload section ── */}
-      <div style={{ borderRadius: 14, padding: "20px 22px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          <FileJson size={15} color="#4ECDC4" />
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>Upload Supplementary Data</h3>
+      {/* ── Optional: supplementary data upload (collapsed - data coverage
+             itself was already reviewed in Step 2) ── */}
+      <details style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <summary style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none", listStyle: "none" }}>
+          <FileJson size={14} color="#4ECDC4" />
+          <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>Optional: upload supplementary data</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>fill any gaps as JSON ▾</span>
+        </summary>
+        <div style={{ marginTop: 14 }}>
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 14px", lineHeight: 1.55 }}>
+          Provide any missing field values as a <strong style={{ color: "rgba(255,255,255,0.6)" }}>.json</strong> file.
+          Fields are matched to buildings by <code style={{ fontSize: 11 }}>address</code> (or by position for a single building).
           {Object.keys(supplementary).length > 0 && (
             <button
               onClick={() => { setProject({ supplementaryData: {} }); setUploadSuccess(false); }}
-              style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "rgba(255,255,255,0.3)", background: "transparent", border: 0, cursor: "pointer" }}
+              style={{ marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "rgba(255,255,255,0.4)", background: "transparent", border: 0, cursor: "pointer" }}
             >
               <X size={11} /> Clear uploads
             </button>
           )}
-        </div>
-        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 14px", lineHeight: 1.55 }}>
-          Provide missing field values as a <strong style={{ color: "rgba(255,255,255,0.6)" }}>.json</strong> file.
-          Fields are matched to buildings by <code style={{ fontSize: 11 }}>address</code> (or by position for a single building).
-          Uploaded values appear in <span style={{ color: "#93c5fd" }}>blue ↑</span> above.
         </p>
 
         {/* Drop zone */}
@@ -433,19 +376,20 @@ export default function BaselineSetup() {
             </p>
           )}
         </details>
-      </div>
+        </div>
+      </details>
 
       {/* ── Baseline simulation ── */}
       <div style={{
         borderRadius: 14, padding: "20px 22px",
-        background: allComplete ? "rgba(150,215,76,0.05)" : "rgba(255,255,255,0.02)",
-        border: `1px solid ${allComplete ? "rgba(150,215,76,0.25)" : "rgba(255,255,255,0.07)"}`,
+        background: canRunBaseline ? "rgba(150,215,76,0.05)" : "rgba(255,255,255,0.02)",
+        border: `1px solid ${canRunBaseline ? "rgba(150,215,76,0.25)" : "rgba(255,255,255,0.07)"}`,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           {simRunning
             ? <Loader2 size={15} color="#96D74C" style={{ animation: "spin 1s linear infinite" }} />
-            : <Zap size={15} color={allComplete ? "#96D74C" : "rgba(255,255,255,0.2)"} />}
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: allComplete ? "#fff" : "rgba(255,255,255,0.35)", margin: 0 }}>
+            : <Zap size={15} color={canRunBaseline ? "#96D74C" : "rgba(255,255,255,0.2)"} />}
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: canRunBaseline ? "#fff" : "rgba(255,255,255,0.35)", margin: 0 }}>
             Baseline Energy Simulation
           </h3>
           {project.baselineStatus === "done" && !simRunning && (
@@ -461,9 +405,9 @@ export default function BaselineSetup() {
         <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "0 0 16px", lineHeight: 1.55 }}>
           {simRunning
             ? "Running EPSM simulation — please wait…"
-            : allComplete
-              ? `Send ${buildings.length || 1} building${(buildings.length || 1) !== 1 ? "s" : ""} to EPSM to compute the as-built baseline before testing renovation packages.`
-              : "Complete all critical missing fields above before running the baseline simulation."}
+            : canRunBaseline
+              ? `Send ${buildings.length} building${buildings.length !== 1 ? "s" : ""} to EPSM to compute the as-built baseline. Missing envelope details fall back to TABULA archetype defaults, so the run always completes.`
+              : "Select buildings in Step 2 first."}
         </p>
 
         {/* Progress bar while running - reflects real per-building EPSM
@@ -550,15 +494,15 @@ export default function BaselineSetup() {
         )}
 
         <button
-          disabled={!allComplete || simRunning}
+          disabled={!canRunBaseline || simRunning}
           onClick={runBaseline}
           style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "11px 24px", borderRadius: 10, border: 0,
-            background: allComplete && !simRunning ? "linear-gradient(135deg,#5a9e1e,#96D74C)" : "rgba(255,255,255,0.06)",
-            color: allComplete && !simRunning ? "#0a0d14" : "rgba(255,255,255,0.2)",
-            fontSize: 13, fontWeight: 800, cursor: allComplete && !simRunning ? "pointer" : "not-allowed",
-            boxShadow: allComplete && !simRunning ? "0 4px 14px rgba(150,215,76,0.3)" : "none",
+            background: canRunBaseline && !simRunning ? "linear-gradient(135deg,#5a9e1e,#96D74C)" : "rgba(255,255,255,0.06)",
+            color: canRunBaseline && !simRunning ? "#0a0d14" : "rgba(255,255,255,0.2)",
+            fontSize: 13, fontWeight: 800, cursor: canRunBaseline && !simRunning ? "pointer" : "not-allowed",
+            boxShadow: canRunBaseline && !simRunning ? "0 4px 14px rgba(150,215,76,0.3)" : "none",
           }}
         >
           {simRunning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={14} />}

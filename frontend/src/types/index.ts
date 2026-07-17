@@ -78,6 +78,7 @@ export interface BboxStats {
 /** Individual building record returned by /api/buildings/bbox/list */
 export interface BuildingRecord {
   address: string;
+  all_addresses?: string | null;   // every entrance on this EPC, "16A | 16B | 16C"
   cadastral_id: string | null;
   lat: number;
   lon: number;
@@ -85,6 +86,7 @@ export interface BuildingRecord {
   year_built: number | null;
   height_m: number | null;
   floors: number | null;
+  atemp: number | null;
   footprint_m2: number | null;
   energy_kwh_m2: number | null;
   epc_class: string | null;
@@ -133,6 +135,7 @@ export interface BoverketResource {
 /** Nearest EUBUCCO building returned by /api/building */
 export interface BuildingLookup {
   address: string | null;
+  all_addresses?: string | null;   // every entrance on this EPC, "16A | 16B | 16C"
   height: number | null;
   floors: number | null;
   area_atemp: number | null;    // total Atemp (GFA) from EPC

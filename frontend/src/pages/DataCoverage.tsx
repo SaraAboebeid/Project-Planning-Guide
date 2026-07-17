@@ -5,7 +5,7 @@ import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import {
   CheckCircle2, AlertTriangle, XCircle,
   ChevronDown, ChevronUp, MapPin, Layers, Database, Check, X,
-  Building2, Globe2, Download,
+  Building2, Globe2, Download, Loader2,
 } from "lucide-react";
 
 
@@ -150,9 +150,15 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           defaultHas: false,
         },
         {
-          key: "r_edem", label: "Specific energy demand (kWh/m²·yr)",
+          key: "r_edem", label: "Energy demand (kWh/m²·yr)",
           primarySource: "Energy Performance Certificate (EPC)", primaryConfidence: "High",
           fallbackSource: "Boverket average by building type & construction era", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+          defaultHas: false,
+        },
+        {
+          key: "r_atemp", label: "Heated floor area (ATEMP)",
+          primarySource: "Energy Performance Certificate (ATEMP)", primaryConfidence: "High",
+          fallbackSource: "Estimated from footprint × floors", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
           defaultHas: false,
         },
       ],
@@ -164,8 +170,8 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         items: [
           {
             key: "r_fp",   label: "Building footprint dimensions",
-            primarySource: "EUBUCCO / EPC database", primaryConfidence: "High",
-            fallbackSource: "Energy Performance Certificate / Cadastral Data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            primarySource: "EUBUCCO / OSM building polygon", primaryConfidence: "High",
+            fallbackSource: "Cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
@@ -176,14 +182,14 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
           },
           {
             key: "r_flrs", label: "Number of floors",
-            primarySource: "EUBUCCO / EPC database", primaryConfidence: "High",
-            fallbackSource: "Energy Performance Certificate / Street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            primarySource: "EPC declaration (EgenAntalPlan) / building model", primaryConfidence: "High",
+            fallbackSource: "EUBUCCO / street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
           {
             key: "r_use",  label: "Building use",
-            primarySource: "EUBUCCO / EPC database", primaryConfidence: "High",
-            fallbackSource: "Energy Performance Certificate", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            primarySource: "EPC declaration / building type", primaryConfidence: "High",
+            fallbackSource: "EUBUCCO building type", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
         ],
@@ -192,9 +198,9 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         category: "Building Envelope",
         items: [
           {
-            key: "r_mat",  label: "Existing construction materials",
-            primarySource: "Design drawings / BIM model", primaryConfidence: "High",
-            fallbackSource: "Archetype model", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
+            key: "r_mat",  label: "Construction U-values",
+            primarySource: "TABULA archetype (U-values by construction era & type)", primaryConfidence: "High",
+            fallbackSource: "TABULA archetype (U-values by construction era & type)", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
             defaultHas: false,
           },
         ],
@@ -630,7 +636,8 @@ const FIELD_MAP: Record<string, BKey> = {
   r_use:   "use_cat",
   r_mat:   "tabula_period",  // TABULA matched → construction type/materials known
   r_epc:   "eclass",         // EPC energy class (A–G)
-  r_edem:  "energy",         // EPC specific energy demand (kWh/m²·yr)
+  r_edem:  "energy",         // EPC energy demand (kWh/m²·yr)
+  r_atemp: "area_atemp",     // EPC heated floor area (ATEMP)
   // EC – Buildings
   ec_b_fp:    "footprint_m2",
   ec_b_hgt:   "height",
@@ -651,6 +658,44 @@ const FIELD_MAP: Record<string, BKey> = {
   re_rpv_area: "footprint_m2",
   re_fpv_area: "height",
 };
+
+// Real provenance chips per parameter (SOURCE column), so a value is never
+// mislabelled "User". The actual source differs by country (verified against
+// each pipeline):
+//   Sweden  - footprint & height: EUBUCCO; floors: EPC (EgenAntalPlan);
+//             use: EPC (andamal1, else EUBUCCO type); energy/class/ATEMP: EPC.
+//   UK      - footprint & use: OSM; height & floors: EUBUCCO enrichment;
+//             energy/class/ATEMP (total floor area): EPC.
+//   Both    - energy demand / class / heated floor area (ATEMP): EPC;
+//             construction U-values: TABULA.
+function sourceBadgesFor(key: string, country: string | null | undefined, hasEpc: boolean): string[] | null {
+  const uk: Record<string, string[]> = {
+    r_fp:    ["OSM"],
+    r_hgt:   ["EUBUCCO"],
+    r_flrs:  ["EUBUCCO"],
+    r_use:   hasEpc ? ["OSM", "EPC"] : ["OSM"],
+    r_epc:   ["EPC"], r_edem: ["EPC"], r_atemp: ["EPC"], r_mat: ["TABULA"],
+  };
+  const se: Record<string, string[]> = {
+    r_fp:    ["EUBUCCO"],
+    r_hgt:   ["EUBUCCO"],
+    r_flrs:  ["EPC"],
+    r_use:   hasEpc ? ["EPC"] : ["EUBUCCO"],
+    r_epc:   ["EPC"], r_edem: ["EPC"], r_atemp: ["EPC"], r_mat: ["TABULA"],
+  };
+  return (country === "United Kingdom" ? uk : se)[key] ?? null;
+}
+const BADGE_STYLE: Record<string, string> = {
+  EUBUCCO: "bg-purple-900/40 text-purple-300 border-purple-700/50",
+  OSM:     "bg-sky-900/40 text-sky-400 border-sky-700/50",
+  EPC:     "bg-emerald-900/40 text-emerald-400 border-emerald-700/50",
+  TABULA:  "bg-amber-900/40 text-amber-400 border-amber-700/50",
+  Boverket:"bg-orange-900/40 text-orange-400 border-orange-700/50",
+  User:    "bg-white/8 text-white/55 border-white/15",
+};
+function SourceChip({ label }: { label: string }) {
+  return <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold border ${BADGE_STYLE[label] ?? BADGE_STYLE.User}`}>{label}</span>;
+}
 
 /** Check if a BuildingLookup field is truthy (handles boolean has_epc correctly) */
 function bKeyPresent(building: BuildingLookup, bKey: BKey): boolean {
@@ -756,6 +801,7 @@ const BKEY_TO_RECORD_FIELD: Partial<Record<string, keyof BuildingRecord>> = {
   tabula_period: "tabula_period",
   has_epc:       "has_epc",
   energy:        "energy_kwh_m2",
+  area_atemp:    "atemp",
   eclass:        "epc_class",
   tabula_u_wall: "u_wall",
   tabula_u_win:  "u_window",
@@ -892,18 +938,46 @@ function rankBgColor(rank: number, total: number): string {
   return "";
 }
 
+function deriveStats(rows: BuildingRecord[]): BboxStats {
+  const num = (v: number | null | undefined): v is number => v !== null && v !== undefined && !Number.isNaN(v);
+  const avg = (vals: (number | null)[]): number | null => {
+    const c = vals.filter(num);
+    return c.length ? Math.round((c.reduce((a, b) => a + b, 0) / c.length) * 10) / 10 : null;
+  };
+  const uses = rows.map(r => r.building_use).filter((u): u is string => !!u);
+  const useCounts = uses.reduce<Record<string, number>>((m, u) => { m[u] = (m[u] ?? 0) + 1; return m; }, {});
+  const common_use = Object.entries(useCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  return {
+    count: rows.length,
+    with_height:    rows.filter(r => num(r.height_m)).length,
+    with_floors:    rows.filter(r => num(r.floors)).length,
+    with_year:      rows.filter(r => num(r.year_built)).length,
+    with_energy:    rows.filter(r => num(r.energy_kwh_m2)).length,
+    with_epc:       rows.filter(r => !!r.epc_class).length,
+    with_use:       uses.length,
+    with_footprint: rows.filter(r => num(r.footprint_m2)).length,
+    avg_height:    avg(rows.map(r => r.height_m)),
+    avg_floors:    avg(rows.map(r => r.floors)),
+    avg_year:      avg(rows.map(r => r.year_built)),
+    avg_energy:    avg(rows.map(r => r.energy_kwh_m2)),
+    avg_footprint: avg(rows.map(r => r.footprint_m2)),
+    common_use,
+  };
+}
+
 function BboxDataBanner({
-  bboxStats,
+  bboxStats: bboxStatsProp,
   bbox,
+  district,
   onRowsChange,
   onSelectionChange,
 }: {
-  bboxStats: BboxStats;
+  bboxStats: BboxStats | null;
   bbox: { north: number; south: number; east: number; west: number } | null;
+  district?: string | null;
   onRowsChange?: (rows: BuildingRecord[]) => void;
   onSelectionChange?: (selected: Set<number>) => void;
 }) {
-  const epcPct = Math.round((bboxStats.with_epc / bboxStats.count) * 100);
   const [loading, setLoading]         = useState(false);
   const [rows, setRows]               = useState<BuildingRecord[] | null>(null);
   const [viewOpen, setViewOpen]       = useState(false);
@@ -913,21 +987,33 @@ function BboxDataBanner({
   const [sortCol, setSortCol]         = useState<keyof BuildingRecord>("energy_kwh_m2");
   const PAGE_SIZE = 50;
 
+  // In district mode there are no precomputed aggregate stats, so derive them
+  // from the fetched rows once they load.
+  const bboxStats: BboxStats = bboxStatsProp ?? deriveStats(rows ?? []);
+  const epcPct = bboxStats.count ? Math.round((bboxStats.with_epc / bboxStats.count) * 100) : 0;
+
   // Notify parent whenever rows or selection changes
   useEffect(() => { onRowsChange?.(rows ?? []); }, [rows, onRowsChange]);
   useEffect(() => { onSelectionChange?.(selected); }, [selected, onSelectionChange]);
 
-  // Auto-fetch rows on mount so downstream steps always have building data
+  // Auto-fetch rows on mount so downstream steps always have building data,
+  // and open the table automatically once they're loaded. District mode
+  // additionally auto-selects every building (the whole neighborhood is in scope).
   useEffect(() => {
-    if (bbox && !rows) loadRows();
+    if ((bbox || district) && !rows) loadRows().then(() => setViewOpen(true));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadRows() {
-    if (!bbox) return;
+    if (!bbox && !district) return;
     setLoading(true);
     try {
-      const data = await api.buildingsBboxList(bbox.north, bbox.south, bbox.east, bbox.west);
+      const data = district
+        ? await api.buildingsByDistrict(district)
+        : await api.buildingsBboxList(bbox!.north, bbox!.south, bbox!.east, bbox!.west);
       setRows(data);
+      // Auto-select the entire neighborhood so Steps 3-4 simulate all of it
+      // (the user can still uncheck buildings to narrow the scope).
+      if (district) setSelected(new Set(data.map((_, i) => i)));
     } finally {
       setLoading(false);
     }
@@ -1108,6 +1194,15 @@ function BboxDataBanner({
           <div className="text-xs font-bold text-white/75 mt-0.5">{Math.round(bboxStats.with_floors/bboxStats.count*100)}% <span className="font-normal text-white/30">({bboxStats.with_floors}/{bboxStats.count})</span></div>
         </div>
       </div>
+
+      {/* Prominent loading state while the buildings list is being fetched */}
+      {loading && !rows && (
+        <div className="border-t border-white/10 flex flex-col items-center justify-center gap-3 py-12">
+          <Loader2 className="w-9 h-9 text-purple-400 animate-spin" />
+          <div className="text-sm font-semibold text-white/70">Loading buildings…</div>
+          <div className="text-xs text-white/35">Fetching {bboxStats.count.toLocaleString()} buildings in the selected area</div>
+        </div>
+      )}
 
       {/* Inline table */}
       {viewOpen && rows && (
@@ -1297,10 +1392,20 @@ function BboxDataBanner({
                   const rowBg  = rankBgColor(rank, rankedRows.length);
                   return (
                     <tr key={i} className={`border-b border-white/6 ${rowBg}`}>
-                      <td className="px-2 py-1.5 font-medium whitespace-nowrap max-w-[220px] text-white/75" title={isCadastralId(r.address, r.cadastral_id) ? (r.cadastral_id ?? "—") : formatAddress(r.address)}>
-                        <span className="mr-1.5 text-xs text-white/30">{rank + 1}</span>
-                        <span className="truncate">{isCadastralId(r.address, r.cadastral_id) ? "—" : formatAddress(r.address)}</span>
-                      </td>
+                      {(() => {
+                        const entrances = (r.all_addresses ?? "").split("|").map(s => s.trim()).filter(Boolean);
+                        const extra = entrances.length - 1;
+                        const fullTitle = entrances.length > 1
+                          ? entrances.join(", ")
+                          : (isCadastralId(r.address, r.cadastral_id) ? (r.cadastral_id ?? "—") : formatAddress(r.address));
+                        return (
+                          <td className="px-2 py-1.5 font-medium whitespace-nowrap max-w-[220px] text-white/75" title={fullTitle}>
+                            <span className="mr-1.5 text-xs text-white/30">{rank + 1}</span>
+                            <span className="truncate">{isCadastralId(r.address, r.cadastral_id) ? "—" : formatAddress(r.address)}</span>
+                            {extra > 0 && <span className="ml-1 text-[10px] text-teal/70" title={entrances.join(", ")}>+{extra}</span>}
+                          </td>
+                        );
+                      })()}
                       {COMPARE_COLS.map(c => {
                         const val      = r[c.key];
                         const present  = val !== null && val !== undefined;
@@ -1557,15 +1662,17 @@ export default function DataCoverage() {
   const [bboxRows, setBboxRows]               = useState<BuildingRecord[]>([]);
   const [bboxSelectedIdx, setBboxSelectedIdx] = useState<Set<number>>(new Set());
 
-  // Persist bbox rows to wizard store so the report can access them
-  useEffect(() => { setProject({ bboxRows }); }, [bboxRows]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Active rows for coverage: selected ones if any, otherwise all bbox rows
+  // Active rows: the buildings the user CHECKED (or all bbox rows if none are
+  // checked yet). These are what coverage is computed on AND what flows to
+  // Steps 3-4 - so the user simulates only the buildings they selected here.
   const activeCovRows = useMemo<BuildingRecord[]>(() => {
     if (!bboxRows.length) return [];
     if (bboxSelectedIdx.size > 0) return bboxRows.filter((_, i) => bboxSelectedIdx.has(i));
     return bboxRows;
   }, [bboxRows, bboxSelectedIdx]);
+
+  // Persist the SELECTED buildings downstream (Steps 3-4 read project.bboxRows).
+  useEffect(() => { setProject({ bboxRows: activeCovRows }); }, [activeCovRows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Per-parameter coverage from activeCovRows
   const coverageMap = useMemo<Record<string, { count: number; total: number } | null>>(() => {
@@ -1757,11 +1864,12 @@ export default function DataCoverage() {
         />
       )}
 
-      {/* EUBUCCO bbox aggregate banner (bbox draw mode) */}
-      {bboxStats && (
+      {/* EUBUCCO bbox aggregate banner (bbox draw mode OR neighborhood-by-name) */}
+      {(bboxStats || project.district) && (
         <BboxDataBanner
           bboxStats={bboxStats}
           bbox={project.currentBbox ?? null}
+          district={project.district ?? null}
           onRowsChange={setBboxRows}
           onSelectionChange={setBboxSelectedIdx}
         />
@@ -1929,7 +2037,7 @@ export default function DataCoverage() {
                       && haveBuildings.length > 0
                       && haveBuildings.length < buildings.length;
                     const isBreakdownOpen = expandedBreakdownRows.has(item.key);
-                    const epcFields = ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year"];
+                    const epcFields = ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year","area_atemp"];
 
                     /* Coverage from active bbox rows */
                     const covInfo = coverageMap[item.key] ?? null;
@@ -2032,6 +2140,10 @@ export default function DataCoverage() {
                           <span className="text-xs text-white/40 leading-tight">
                             {item.hasData
                               ? (() => {
+                                  // Explicit real-provenance chips for the core building/energy
+                                  // parameters (overrides the inferred badge so nothing shows "User").
+                                  const mapped = sourceBadgesFor(item.key, project.country, (building?.has_epc ?? buildings.some(b => b.has_epc)) === true);
+                                  if (mapped) return <span className="inline-flex gap-1">{mapped.map(m => <SourceChip key={m} label={m} />)}</span>;
                                   if (item.key === "r_matlist") return <span className="px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">User</span>;
                                   if (savedWWR && WWR_KEYS.includes(item.key))
                                     return <span className="px-1.5 py-0.5 rounded-full bg-sky-900/40 text-sky-400 text-[9px] font-bold border border-sky-700/50">WWR DB</span>;

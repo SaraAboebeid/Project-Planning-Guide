@@ -64,6 +64,35 @@ export default function DefineProject() {
   const [buildingLoading, setBuildingLoading] = useState(false);
   const lookupDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /* ── Named neighborhoods (Gothenburg primärområden) for the picker ─── */
+  const [districts, setDistricts] = useState<{ name: string; count: number }[]>([]);
+  const [districtQuery, setDistrictQuery] = useState(project.district ?? project.neighborhoodName ?? "");
+  const [districtOpen, setDistrictOpen] = useState(false);
+  const isSweden = project.country !== "United Kingdom";
+
+  useEffect(() => {
+    if (project.scale === "Neighborhood" && isSweden && districts.length === 0) {
+      api.listDistricts("se").then(r => setDistricts(r.districts)).catch(() => {});
+    }
+  }, [project.scale, isSweden, districts.length]);
+
+  const districtMatches = districtQuery.trim()
+    ? districts.filter(d => d.name.toLowerCase().includes(districtQuery.trim().toLowerCase())).slice(0, 12)
+    : districts.slice(0, 12);
+
+  const selectedDistrict = districts.find(x => x.name === project.district) ?? null;
+
+  function pickDistrict(name: string) {
+    setDistrictQuery(name);
+    setDistrictOpen(false);
+    setProject({
+      neighborhoodName: name,
+      district: name,
+      bboxStats: null,
+      currentBbox: null,
+    });
+  }
+
   /* ── Bbox lookup — fires when user finishes drawing a bbox ──── */
   async function handleBboxChange(bbox: { north: number; south: number; east: number; west: number } | null) {
     if (!bbox) {
@@ -762,7 +791,7 @@ export default function DefineProject() {
       )}
 
       {/* ── SCALE ── */}
-      {showScale && <Card className="animate-fadeIn">
+      {showScale && <Card className={`animate-fadeIn ${districtOpen ? "relative z-40" : ""}`}>
         <Label required>Scale</Label>
         {pt === "Energy Community Planning" && (
           <p className="text-xs text-gray-500 mb-2">
@@ -780,10 +809,66 @@ export default function DefineProject() {
                   : "bg-white border-gray-300 hover:border-gray-400"
               }`}
             >
-              {opt}
+              {opt === "Building" ? "Building(s)" : opt}
             </button>
           ))}
         </div>
+
+        {/* Neighborhood name — searchable picker of real Gothenburg
+            primärområden (SE); typing "lindholm" resolves "Lindholmen" and
+            auto-selects all its buildings in Step 2. UK keeps free text. */}
+        {project.scale === "Neighborhood" && (
+          <div className="mt-4">
+            <Label>Neighborhood name</Label>
+            {isSweden && districts.length > 0 ? (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={districtQuery}
+                  onChange={(e) => { setDistrictQuery(e.target.value); setDistrictOpen(true); if (project.district) setProject({ district: null }); }}
+                  onFocus={() => setDistrictOpen(true)}
+                  onBlur={() => setTimeout(() => setDistrictOpen(false), 150)}
+                  placeholder="e.g. Lindholmen, Majorna, Gamlestaden"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
+                />
+                {districtOpen && districtMatches.length > 0 && (
+                  <ul className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-lg border border-white/10 bg-[#11161d] shadow-xl shadow-black/40">
+                    {districtMatches.map((d) => (
+                      <li key={d.name}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); pickDistrict(d.name); }}
+                          className="flex w-full items-center justify-between px-4 py-2 text-sm hover:bg-white/10 text-left"
+                        >
+                          <span className="text-white/85">{d.name}</span>
+                          <span className="text-xs text-white/40">{d.count.toLocaleString()} buildings</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {selectedDistrict ? (
+                  <p className="text-xs text-emerald-700 mt-1">
+                    ✓ <span className="font-semibold">{selectedDistrict.name}</span> — all {selectedDistrict.count.toLocaleString()} buildings will be loaded in Step 2.
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-1">Pick a Gothenburg neighborhood to auto-select every building within it.</p>
+                )}
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={project.neighborhoodName}
+                  onChange={(e) => setProject({ neighborhoodName: e.target.value })}
+                  placeholder="e.g. Canary Wharf"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
+                />
+                <p className="text-xs text-gray-500 mt-1">Name the neighborhood/district this project covers.</p>
+              </>
+            )}
+          </div>
+        )}
       </Card>}
 
       {/* ── PROJECT NAME ── */}
@@ -799,7 +884,9 @@ export default function DefineProject() {
       </Card>}
 
       {/* ── LOCATION ── */}
-      {showLocation && (
+      {/* District-by-name (SE neighborhood) selects buildings directly, so the
+          bbox-draw map is redundant and hidden in that case. */}
+      {showLocation && !(project.scale === "Neighborhood" && isSweden && project.district) && (
         <Card className="animate-fadeIn">
           <Label>Project Location</Label>
           <LocationMap

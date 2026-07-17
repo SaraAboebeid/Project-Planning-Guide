@@ -303,6 +303,15 @@ export default function RenovationSimulator() {
 
   const packages = project.renovationCalcPackages;
 
+  // Which building(s) a new package applies to: "all" or a specific index.
+  // Entries carry the ORIGINAL building index so per-building lookups (wwr,
+  // cost/carbon) stay correct even when a package targets a single building.
+  const [targetIdx, setTargetIdx] = useState<number | "all">("all");
+  type GeoEntry = { g: ResolvedBuildingGeometry; idx: number };
+  const allEntries: GeoEntry[] = useMemo(() => geometries.map((g, i) => ({ g, idx: i })), [geometries]);
+  const targetEntries: GeoEntry[] = targetIdx === "all" ? allEntries : (geometries[targetIdx] ? [{ g: geometries[targetIdx]!, idx: targetIdx }] : allEntries);
+  const targetSuffix = () => targetIdx === "all" ? "" : ` · ${geometries[targetIdx]?.address ?? `Building ${targetIdx + 1}`}`;
+
   const stopPoll = useCallback((packageId: string) => {
     const h = pollHandles.current[packageId];
     if (h) { clearInterval(h); delete pollHandles.current[packageId]; }
@@ -345,12 +354,12 @@ export default function RenovationSimulator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopPoll]);
 
-  const submitBatch = useCallback(async (packageId: string, overrides: Record<string, number>, packageLabel?: string) => {
+  const submitBatch = useCallback(async (packageId: string, overrides: Record<string, number>, packageLabel: string | undefined, entries: GeoEntry[]) => {
     try {
       const { batch_id } = await api.simulationBatchSubmit({
         country: COUNTRY,
         ...(isUK ? {} : { city_id: CITY_ID }),
-        buildings: geometries.map((g) => ({ lat: g.lat, lon: g.lon, address: g.address })),
+        buildings: entries.map(({ g }) => ({ lat: g.lat, lon: g.lon, address: g.address })),
         package_id: packageId, package_label: packageLabel ?? null,
         ...overrides,
       });
@@ -373,12 +382,13 @@ export default function RenovationSimulator() {
   }, [geometries, isUK, pollBatch]);
 
   function makeBuildingRows(
+    entries: GeoEntry[],
     costCarbonFor?: (g: ResolvedBuildingGeometry, i: number) => { costSEK: number | null; carbonKgCO2e: number | null }
   ): RenovationCalcBuildingResult[] {
-    return geometries.map((g, i) => {
-      const cc = costCarbonFor ? costCarbonFor(g, i) : { costSEK: null, carbonKgCO2e: null };
+    return entries.map(({ g, idx }) => {
+      const cc = costCarbonFor ? costCarbonFor(g, idx) : { costSEK: null, carbonKgCO2e: null };
       return {
-        address: g.address ?? `Building ${i + 1}`, lat: g.lat, lon: g.lon, status: "queued",
+        address: g.address ?? `Building ${idx + 1}`, lat: g.lat, lon: g.lon, status: "queued",
         heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null,
         costSEK: cc.costSEK, carbonKgCO2e: cc.carbonKgCO2e, error: null,
       };
@@ -387,12 +397,13 @@ export default function RenovationSimulator() {
 
   const submitBaseline = useCallback(() => {
     if (geometries.length === 0) return;
+    const entries = geometries.map((g, i) => ({ g, idx: i }));
     const pkg: RenovationCalcPackage = {
       id: "baseline", name: "Baseline (as-built)", color: "rgba(255,255,255,0.4)", isBaseline: true,
-      selections: {}, batchId: null, buildings: makeBuildingRows(),
+      selections: {}, batchId: null, buildings: makeBuildingRows(entries),
     };
     setProject({ renovationCalcPackages: [...useWizardStore.getState().project.renovationCalcPackages.filter((p) => p.id !== "baseline"), pkg] });
-    submitBatch("baseline", {});
+    submitBatch("baseline", {}, undefined, entries);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geometries, submitBatch]);
 
@@ -473,10 +484,10 @@ export default function RenovationSimulator() {
     if (Object.keys(selections).length === 0) return;
 
     const id = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    const name = packageName.trim() || `Package ${packages.filter((p) => !p.isBaseline).length + 1}`;
+    const name = (packageName.trim() || `Package ${packages.filter((p) => !p.isBaseline).length + 1}`) + targetSuffix();
     const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
 
-    const buildingRows = makeBuildingRows((g, i) => {
+    const buildingRows = makeBuildingRows(targetEntries, (g, i) => {
       let costSEK = 0, carbonKgCO2e = 0, any = false;
       for (const item of lineItems) {
         const sel = selections[item.key];
@@ -497,7 +508,7 @@ export default function RenovationSimulator() {
     setProject({ renovationCalcPackages: [...packages, pkg] });
     setPackageName("");
     setDraftSelection({});
-    submitBatch(id, overridesFromSeSelections(selections, itemByCode), name);
+    submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
   }
 
   function addUkPackage() {
@@ -507,10 +518,10 @@ export default function RenovationSimulator() {
     const rate = UK_PLACEHOLDER_RATES[ukTier];
 
     const id = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    const name = packageName.trim() || tierMeta.label;
+    const name = (packageName.trim() || tierMeta.label) + targetSuffix();
     const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
 
-    const buildingRows = makeBuildingRows((g) => {
+    const buildingRows = makeBuildingRows(targetEntries, (g) => {
       const footprint = g.footprintM2 ?? 0;
       return footprint
         ? { costSEK: Math.round(rate.costGbpPerM2 * footprint), carbonKgCO2e: Math.round(rate.carbonKgCo2ePerM2 * footprint) }
@@ -525,7 +536,7 @@ export default function RenovationSimulator() {
     setProject({ renovationCalcPackages: [...packages, pkg] });
     setPackageName("");
     setUkTier(null);
-    submitBatch(id, ukOverridesFromTier(tier), name);
+    submitBatch(id, ukOverridesFromTier(tier), name, targetEntries);
   }
 
   function retryPackage(pkg: RenovationCalcPackage) {
@@ -539,12 +550,20 @@ export default function RenovationSimulator() {
     } else {
       overrides = overridesFromSeSelections(pkg.selections, itemByCode);
     }
+    // Retry the SAME buildings this package targets (matched back to their geometry).
+    const entries: GeoEntry[] = pkg.buildings
+      .map((b) => {
+        const idx = geometries.findIndex((g) => g.lat === b.lat && g.lon === b.lon);
+        return idx >= 0 ? { g: geometries[idx]!, idx } : null;
+      })
+      .filter((e): e is GeoEntry => e !== null);
+    if (entries.length === 0) return;
     setProject({
       renovationCalcPackages: useWizardStore.getState().project.renovationCalcPackages.map((p) =>
         p.id === pkg.id ? { ...p, buildings: p.buildings.map((b) => ({ ...b, status: "queued" as const, error: null })) } : p
       ),
     });
-    submitBatch(pkg.id, overrides, pkg.name);
+    submitBatch(pkg.id, overrides, pkg.name, entries);
   }
 
   const baselinePkg = packages.find((p) => p.isBaseline);
@@ -600,6 +619,66 @@ export default function RenovationSimulator() {
       {geometries.length === 0 && (
         <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
           <p style={{ fontSize: 12, color: "#F59E0B", margin: 0 }}>No buildings resolved yet — go back to Step 1/2 and select a location.</p>
+        </div>
+      )}
+
+      {/* ── Buildings & baseline performance + package target selector ── */}
+      {geometries.length > 0 && (
+        <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Buildings & baseline performance</span>
+            {geometries.length > 1 && (
+              <>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>· new package applies to:</span>
+                <button
+                  onClick={() => setTargetIdx("all")}
+                  style={{
+                    fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
+                    border: `1px solid ${targetIdx === "all" ? "#96D74C" : "rgba(255,255,255,0.12)"}`,
+                    background: targetIdx === "all" ? "rgba(150,215,76,0.15)" : "transparent",
+                    color: targetIdx === "all" ? "#96D74C" : "rgba(255,255,255,0.6)",
+                  }}
+                >
+                  All buildings ({geometries.length})
+                </button>
+              </>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 8 }}>
+            {geometries.map((g, i) => {
+              const row = baselinePkg?.buildings[i];
+              const total = row?.totalKwhM2Yr;
+              const selectable = geometries.length > 1;
+              const selected = targetIdx === i;
+              return (
+                <button
+                  key={`${g.lat}-${g.lon}-${i}`}
+                  onClick={() => selectable && setTargetIdx(i)}
+                  style={{
+                    textAlign: "left", padding: "10px 12px", borderRadius: 10,
+                    cursor: selectable ? "pointer" : "default",
+                    border: `1px solid ${selected ? "#96D74C55" : "rgba(255,255,255,0.08)"}`,
+                    background: selected ? "rgba(150,215,76,0.1)" : "rgba(255,255,255,0.02)",
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
+                    {g.address ?? `Building ${i + 1}`}
+                  </div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                    Baseline:{" "}
+                    <b style={{ color: total != null ? "#96D74C" : "rgba(255,255,255,0.4)" }}>
+                      {total != null ? `${total} kWh/m²/yr` : row?.status === "failed" ? "failed" : "running…"}
+                    </b>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {geometries.length > 1 && (
+            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: "8px 0 0" }}>
+              Pick a building to build a package just for it, or “All buildings” to apply the same package to every one. Each package runs its own EnergyPlus batch.
+            </p>
+          )}
         </div>
       )}
 
@@ -707,7 +786,7 @@ export default function RenovationSimulator() {
                 opacity: canAddPackage ? 1 : 0.5,
               }}
             >
-              <Plus size={13} /> Add package{geometries.length > 1 ? ` (${geometries.length} buildings)` : ""}
+              <Plus size={13} /> Add package{geometries.length > 1 ? ` (${targetIdx === "all" ? `all ${geometries.length}` : "1 building"})` : ""}
             </button>
           </div>
 

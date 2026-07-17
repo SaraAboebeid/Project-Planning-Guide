@@ -681,6 +681,7 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
 
     return {
         "address":       best.get("address"),
+        "all_addresses": best.get("all_addresses"),     # every entrance on this EPC (e.g. "16A | 16B | 16C")
         "height":        _clean(best.get("height")),
         "floors":        _clean(best.get("floors")),
         "area_atemp":    _clean(best.get("area")),      # total GFA / Atemp from EPC
@@ -766,30 +767,94 @@ def buildings_bbox_stats(
         "avg_footprint":  round(sum(footprints) / len(footprints), 1) if footprints else None,
         "common_use":     common_val("use_cat"),
     }
+_DISTRICTS_CACHE: dict | None = None
+
+
+@app.get("/api/districts")
+def list_districts(country: str = Query("se")):
+    """List named neighborhoods (Gothenburg primärområden) with building counts.
+
+    Powers the neighborhood-scale picker: the frontend matches the user's typed
+    name against this list, then fetches that district's buildings via
+    /api/buildings/bbox/list?district=<name>.
+    """
+    global _DISTRICTS_CACHE
+    if country.lower() != "se":
+        return {"country": country, "districts": []}
+    if _DISTRICTS_CACHE is None:
+        agg: dict[str, dict] = {}
+        for b in _get_buildings_list():
+            name = (b.get("primary_area") or "").strip()
+            if not name:
+                continue
+            coords = b.get("coordinates") or []
+            c_lat, c_lon = _polygon_centroid(coords)
+            if c_lat == 0.0 and c_lon == 0.0:
+                continue
+            d = agg.setdefault(name, {"name": name, "count": 0, "lat_sum": 0.0, "lon_sum": 0.0})
+            d["count"] += 1
+            d["lat_sum"] += c_lat
+            d["lon_sum"] += c_lon
+        districts = [
+            {
+                "name": d["name"],
+                "count": d["count"],
+                "lat": round(d["lat_sum"] / d["count"], 6),
+                "lon": round(d["lon_sum"] / d["count"], 6),
+            }
+            for d in agg.values()
+        ]
+        districts.sort(key=lambda x: x["name"])
+        _DISTRICTS_CACHE = {"country": "se", "districts": districts}
+    return _DISTRICTS_CACHE
+
+
 @app.get("/api/buildings/bbox/list")
 def buildings_bbox_list(
-    north: float = Query(...),
-    south: float = Query(...),
-    east:  float = Query(...),
-    west:  float = Query(...),
+    north: float | None = Query(None),
+    south: float | None = Query(None),
+    east:  float | None = Query(None),
+    west:  float | None = Query(None),
+    district: str | None = Query(None),
 ):
-    """Return individual building records in bbox, joined with Boplats rental data where available."""
+    """Return individual building records, joined with Boplats rental data where available.
+
+    Either a bounding box (north/south/east/west) or a ``district`` name
+    (Gothenburg primärområde, e.g. "Lindholmen") selects the buildings. When
+    ``district`` is given, every building whose ``primary_area`` matches is
+    returned regardless of bbox — this powers neighborhood-scale auto-selection.
+    """
     import re, sqlite3, httpx
     from concurrent.futures import ThreadPoolExecutor, wait as fut_wait
 
-    # ── Match buildings in bbox ──────────────────────────────────────────────
+    # ── Match buildings by district name or bbox ─────────────────────────────
     all_buildings = _get_buildings_list()
     matched: list[tuple] = []
-    for b in all_buildings:
-        coords = b.get("coordinates") or []
-        c_lat, c_lon = _polygon_centroid(coords)
-        if c_lat == 0.0 and c_lon == 0.0:
-            continue
-        if south <= c_lat <= north and west <= c_lon <= east:
+    have_bbox = None not in (north, south, east, west)
+    if district:
+        want = district.strip().casefold()
+        for b in all_buildings:
+            if (b.get("primary_area") or "").strip().casefold() != want:
+                continue
+            coords = b.get("coordinates") or []
+            c_lat, c_lon = _polygon_centroid(coords)
+            if c_lat == 0.0 and c_lon == 0.0:
+                continue
             matched.append((b, round(c_lat, 6), round(c_lon, 6)))
-
-    if not matched:
-        raise HTTPException(404, "No buildings found in bounding box")
+        if not matched:
+            raise HTTPException(404, f"No buildings found in district '{district}'")
+    elif have_bbox:
+        for b in all_buildings:
+            coords = b.get("coordinates") or []
+            c_lat, c_lon = _polygon_centroid(coords)
+            if c_lat == 0.0 and c_lon == 0.0:
+                continue
+            if south <= c_lat <= north and west <= c_lon <= east:
+                matched.append((b, round(c_lat, 6), round(c_lon, 6)))
+        if not matched:
+            raise HTTPException(404, "No buildings found in bounding box")
+    else:
+        raise HTTPException(422, "Provide either a bounding box or a district name")
 
     # ── Load Boplats rental data (keyed by normalised address) ───────────────
     def _norm(s: str) -> str:
@@ -842,6 +907,7 @@ def buildings_bbox_list(
 
         result.append({
             "address":              addr,
+            "all_addresses":        b.get("all_addresses"),   # all entrances (one EPC can list several)
             "cadastral_id":         addr if addr and _CADASTRAL_RE.match(addr.strip()) else None,
             "lat":                  lat,
             "lon":                  lon,
@@ -849,6 +915,7 @@ def buildings_bbox_list(
             "year_built":           b.get("year"),
             "height_m":             b.get("height"),
             "floors":               b.get("floors"),
+            "atemp":                b.get("area"),   # EPC heated floor area (ATEMP)
             "footprint_m2":         b.get("footprint_m2"),
             "energy_kwh_m2":        b.get("energy"),
             "epc_class":            b.get("eclass"),
@@ -868,7 +935,12 @@ def buildings_bbox_list(
             return True
         return bool(_CADASTRAL_RE.match(addr.strip()))
 
-    needs = [(i, row["lat"], row["lon"]) for i, row in enumerate(result) if _needs_geocode(row["address"])]
+    # Skip reverse-geocoding for district/bulk fetches — a neighborhood can hold
+    # hundreds of cadastral-only parcels and 120 Nominatim lookups would add ~25s.
+    # EPC-matched rows already carry street addresses; the rest keep their id.
+    needs = [] if district else [
+        (i, row["lat"], row["lon"]) for i, row in enumerate(result) if _needs_geocode(row["address"])
+    ]
     needs = needs[:120]  # cap to keep response time bounded
 
     if needs:
@@ -2476,6 +2548,216 @@ async def lookup_simulation_all(lat: float = Query(...), lon: float = Query(...)
 async def get_simulation_database():
     """Return all saved simulation records."""
     return {"records": simdb.all_records()}
+
+
+# ── Home-page chatbot (bilingual EN/SV, grounded in the real building data) ──
+#
+# Claude answers questions about the Gothenburg building/EPC dataset using the
+# tools below, which read the live buildings.json. It detects the user's
+# language and replies in the same one. No key configured → a clear message.
+
+def _chat_agg(sel: list) -> dict:
+    from collections import Counter
+    n = len(sel)
+    energies = [b["energy"] for b in sel if b.get("energy")]
+    classes  = [b.get("eclass") for b in sel if b.get("eclass")]
+    years    = [b["year"] for b in sel if b.get("year")]
+    atemp    = [b["area"] for b in sel if b.get("area")]
+    return {
+        "buildings":            n,
+        "epc_rated":            len(classes),
+        "epc_coverage_pct":     round(len(classes) / n * 100, 1) if n else 0,
+        "avg_energy_kwh_m2_yr": round(sum(energies) / len(energies), 1) if energies else None,
+        "energy_class_counts":  dict(Counter(classes).most_common()) if classes else {},
+        "avg_year_built":       round(sum(years) / len(years)) if years else None,
+        "avg_heated_area_m2":   round(sum(atemp) / len(atemp)) if atemp else None,
+    }
+
+
+def _chat_tool_city_overview(_args: dict) -> dict:
+    d = _chat_agg(_get_buildings_list())
+    d["scope"] = "All mapped buildings in central Gothenburg"
+    return d
+
+
+def _chat_tool_district_stats(args: dict) -> dict:
+    import difflib
+    from collections import Counter
+    district = (args.get("district") or "").strip()
+    recs = _get_buildings_list()
+    want = district.casefold()
+    sel = [b for b in recs if (b.get("primary_area") or "").strip().casefold() == want]
+    if not sel:
+        names = sorted({(b.get("primary_area") or "").strip() for b in recs if b.get("primary_area")})
+        near = difflib.get_close_matches(district, names, n=5, cutoff=0.3)
+        return {"error": f"No neighborhood named '{district}'.", "did_you_mean": near}
+    d = _chat_agg(sel)
+    d["district"] = district
+    return d
+
+
+def _chat_tool_list_districts(_args: dict) -> dict:
+    from collections import Counter
+    c = Counter((b.get("primary_area") or "").strip() for b in _get_buildings_list() if b.get("primary_area"))
+    return {"districts": [{"name": k, "buildings": v} for k, v in sorted(c.items())]}
+
+
+def _chat_tool_find_address(args: dict) -> dict:
+    query = (args.get("query") or "").strip().casefold()
+    if not query:
+        return {"matches": [], "count": 0}
+    out = []
+    for b in _get_buildings_list():
+        hay = ((b.get("address") or "") + " " + (b.get("all_addresses") or "")).casefold()
+        if query in hay:
+            out.append({k: b.get(k) for k in
+                        ("address", "all_addresses", "eclass", "energy", "year", "use_cat", "primary_area", "area")})
+            if len(out) >= 8:
+                break
+    return {"matches": out, "count": len(out)}
+
+
+_CHAT_TOOLS = [
+    {"name": "get_city_overview",
+     "description": "Overall statistics for all mapped buildings in central Gothenburg: total count, EPC-rated count and coverage, average specific energy use, energy-class distribution, average build year and heated area.",
+     "input_schema": {"type": "object", "properties": {}, "required": []}},
+    {"name": "get_district_stats",
+     "description": "Statistics for one Gothenburg neighborhood (primärområde) such as Majorna, Lindholmen, Gamlestaden, Askim. Returns building count, EPC-rated count/coverage, average specific energy use (kWh/m²/yr), energy-class distribution, average build year and heated floor area.",
+     "input_schema": {"type": "object", "properties": {"district": {"type": "string", "description": "Neighborhood name"}}, "required": ["district"]}},
+    {"name": "list_districts",
+     "description": "List every Gothenburg neighborhood (primärområde) with its building count.",
+     "input_schema": {"type": "object", "properties": {}, "required": []}},
+    {"name": "find_buildings_by_address",
+     "description": "Find buildings whose street address (any entrance) matches a query. Returns EPC class, specific energy use, build year, use type, neighborhood and heated area for each match.",
+     "input_schema": {"type": "object", "properties": {"query": {"type": "string", "description": "Street/address text to search for"}}, "required": ["query"]}},
+]
+
+_CHAT_TOOL_IMPL = {
+    "get_city_overview":         _chat_tool_city_overview,
+    "get_district_stats":        _chat_tool_district_stats,
+    "list_districts":            _chat_tool_list_districts,
+    "find_buildings_by_address": _chat_tool_find_address,
+}
+
+_CHAT_SYSTEM = (
+    "You are the assistant for the Project Planning Guide — a building-energy and "
+    "retrofit planning dashboard for Gothenburg, Sweden. You help users understand "
+    "the building stock and its energy data.\n\n"
+    "Data context:\n"
+    "- ~92,973 mapped buildings in central Gothenburg (geometry from EUBUCCO/OSM).\n"
+    "- Energy Performance Certificates (EPC = energideklaration, from Boverket) cover "
+    "~17,300 buildings: specific energy use (kWh/m²/yr), energy class A–G, heated floor "
+    "area (ATEMP), and build year.\n"
+    "- Buildings are grouped into official neighborhoods (primärområden) such as Majorna, "
+    "Lindholmen, Gamlestaden, Askim.\n"
+    "- Construction U-values come from TABULA archetypes.\n\n"
+    "Rules:\n"
+    "- ALWAYS use the tools to get real numbers. NEVER invent or guess statistics.\n"
+    "- Detect the user's language (English or Swedish) and reply in THAT SAME language: "
+    "a Swedish question gets a Swedish answer, an English question gets an English answer.\n"
+    "- Be concise and friendly; give numbers with brief context.\n"
+    "- If a neighborhood is not found, offer the closest matches the tool suggests.\n"
+    "- You only answer about this Gothenburg building/energy dataset and how to use the "
+    "dashboard. For unrelated questions, politely say so in the user's language."
+)
+
+
+class ChatTurn(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatTurn]
+
+
+def _run_tool(name: str, args: dict) -> dict:
+    impl = _CHAT_TOOL_IMPL.get(name)
+    try:
+        return impl(args) if impl else {"error": "unknown tool"}
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)}
+
+
+async def _chat_openai(turns: list, key: str) -> dict:
+    """ChatGPT (OpenAI) function-calling loop over the building-data tools."""
+    import httpx
+    headers = {"Authorization": f"Bearer {key}", "content-type": "application/json"}
+    tools = [{"type": "function",
+              "function": {"name": t["name"], "description": t["description"],
+                           "parameters": t["input_schema"]}} for t in _CHAT_TOOLS]
+    msgs: list = [{"role": "system", "content": _CHAT_SYSTEM}] + turns
+    async with httpx.AsyncClient(timeout=60) as client:
+        for _ in range(6):
+            payload = {"model": "gpt-4o", "messages": msgs, "tools": tools, "temperature": 0.2}
+            r = await client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+            data = r.json()
+            if "error" in data:
+                return {"configured": True, "reply": f"Sorry, the assistant hit an error: {data['error'].get('message', '')}"}
+            msg = data["choices"][0]["message"]
+            msgs.append(msg)
+            calls = msg.get("tool_calls")
+            if calls:
+                for tc in calls:
+                    fn = tc["function"]["name"]
+                    try:
+                        a = json.loads(tc["function"].get("arguments") or "{}")
+                    except Exception:  # noqa: BLE001
+                        a = {}
+                    msgs.append({"role": "tool", "tool_call_id": tc["id"],
+                                 "content": json.dumps(_run_tool(fn, a), ensure_ascii=False)})
+                continue
+            return {"configured": True, "reply": (msg.get("content") or "…").strip()}
+    return {"configured": True, "reply": "Sorry, I couldn't complete that — please try rephrasing."}
+
+
+async def _chat_anthropic(turns: list, key: str) -> dict:
+    """Claude tool-use loop (fallback when only ANTHROPIC_API_KEY is set)."""
+    import httpx
+    headers = {"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
+    conv: list = list(turns)
+    async with httpx.AsyncClient(timeout=60) as client:
+        for _ in range(6):
+            payload = {"model": "claude-sonnet-4-5", "max_tokens": 1024,
+                       "system": _CHAT_SYSTEM, "tools": _CHAT_TOOLS, "messages": conv}
+            r = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
+            data = r.json()
+            if data.get("type") == "error" or "content" not in data:
+                return {"configured": True, "reply": f"Sorry, the assistant hit an error: {data.get('error', {}).get('message', 'unknown error')}"}
+            content = data["content"]
+            conv.append({"role": "assistant", "content": content})
+            if data.get("stop_reason") == "tool_use":
+                results = [{"type": "tool_result", "tool_use_id": b.get("id"),
+                            "content": json.dumps(_run_tool(b.get("name"), b.get("input", {})), ensure_ascii=False)}
+                           for b in content if b.get("type") == "tool_use"]
+                conv.append({"role": "user", "content": results})
+                continue
+            text = "".join(b.get("text", "") for b in content if b.get("type") == "text")
+            return {"configured": True, "reply": text.strip() or "…"}
+    return {"configured": True, "reply": "Sorry, I couldn't complete that — please try rephrasing."}
+
+
+@app.post("/api/chat")
+async def chat(req: ChatRequest):
+    """Bilingual, data-grounded chatbot. Prefers ChatGPT (OPENAI_API_KEY),
+    falls back to Claude (ANTHROPIC_API_KEY). Returns {reply, configured}."""
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    turns = [{"role": m.role, "content": m.content}
+             for m in req.messages if m.role in ("user", "assistant") and m.content]
+    if not turns or turns[-1]["role"] != "user":
+        raise HTTPException(400, "The last message must be from the user.")
+    if not openai_key and not anthropic_key:
+        return {"configured": False,
+                "reply": "The assistant isn't configured yet — add OPENAI_API_KEY (or ANTHROPIC_API_KEY) "
+                         "to the backend .env to enable it. / Assistenten är inte konfigurerad ännu — lägg "
+                         "till OPENAI_API_KEY (eller ANTHROPIC_API_KEY) i backend-.env för att aktivera den."}
+    try:
+        if openai_key:
+            return await _chat_openai(turns, openai_key)
+        return await _chat_anthropic(turns, anthropic_key)
+    except Exception as e:  # noqa: BLE001
+        return {"configured": True, "reply": f"Sorry, the assistant is unavailable right now ({e})."}
 
 
 # -- Static frontend (built React SPA + standalone 3D maps) -----------------

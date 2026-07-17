@@ -204,11 +204,25 @@ def process_data() -> dict:
             e_agg.area_atemp,
             e_agg.energy_kwh_m2,
             e_agg.energy_class,
+            -- Primary display address: the building's own entrance (matched on
+            -- husnummer), else the declaration's first address.
             COALESCE(
                 MIN(CASE WHEN TRY_CAST(f.husnummer AS BIGINT) = e.IdHusnr
                               THEN TRIM(e.IdAdr) END),
                 e_agg.address
-            ) AS address
+            ) AS address,
+            -- ALL entrance addresses for this building. One EPC (FormularId) can
+            -- list many addresses (e.g. Markmyntsgatan 16A-16E all on the same
+            -- footprint); keep every one so no entrance is silently dropped and
+            -- a search for "16C" can still resolve. Prefer the husnummer-matched
+            -- set, fall back to every address on the declaration.
+            COALESCE(
+                STRING_AGG(DISTINCT CASE WHEN TRY_CAST(f.husnummer AS BIGINT) = e.IdHusnr
+                                              THEN TRIM(e.IdAdr) END, ' | '
+                           ORDER BY CASE WHEN TRY_CAST(f.husnummer AS BIGINT) = e.IdHusnr
+                                              THEN TRIM(e.IdAdr) END),
+                e_agg.all_addresses
+            ) AS all_addresses
         FROM footprints f
         LEFT JOIN epc e ON f.FormularId = e.FormularId
                         AND e.IdAdr IS NOT NULL
@@ -221,7 +235,8 @@ def process_data() -> dict:
                 MAX(EgenAtemp)                      AS area_atemp,
                 MIN(EgiSpecifikEnergianvandning)     AS energy_kwh_m2,
                 MIN(EgiEnergiklass)                 AS energy_class,
-                MIN(IdAdr)                          AS address
+                MIN(IdAdr)                          AS address,
+                STRING_AGG(DISTINCT TRIM(IdAdr), ' | ' ORDER BY TRIM(IdAdr)) AS all_addresses
             FROM epc
             WHERE IdAdr IS NOT NULL AND TRIM(IdAdr) != ''
             GROUP BY FormularId
@@ -230,13 +245,14 @@ def process_data() -> dict:
         GROUP BY f.FormularId, f.objektidentitet, f.geom,
                  f.andamal1, f.fastighetsbeteckning, f.husnummer,
                  e_agg.year_built, e_agg.floors_epc, e_agg.area_atemp,
-                 e_agg.energy_kwh_m2, e_agg.energy_class, e_agg.address
+                 e_agg.energy_kwh_m2, e_agg.energy_class, e_agg.address,
+                 e_agg.all_addresses
     """).fetchdf()
     con.close()
 
     epc_raw["geometry"] = epc_raw["geom"].apply(lambda b: shapely_wkb.loads(bytes(b)))
     epc_cols = ["FormularId", "andamal1", "fastighetsbeteckning", "year_built", "floors_epc",
-                "area_atemp", "energy_kwh_m2", "energy_class", "address", "geometry"]
+                "area_atemp", "energy_kwh_m2", "energy_class", "address", "all_addresses", "geometry"]
     epc_gdf = gpd.GeoDataFrame(epc_raw[epc_cols], crs="EPSG:4326")
 
     epc_3006 = epc_gdf.to_crs("EPSG:3006")
@@ -250,39 +266,83 @@ def process_data() -> dict:
     epc_polys = epc_3006[epc_3006.geometry.intersects(bbox_poly.buffer(200))].copy()
     print(f"  EPC footprints in bbox: {len(epc_polys):,}")
 
-    epc_cents = epc_polys.copy()
+    # ── EUBUCCO ↔ Lantmäteriet footprint matching ───────────────────────────
+    # EUBUCCO (OSM geometry) carries no cadastral id or address, so the only link
+    # to the footprint registry (and its EPC energy data) is geometric. Instead
+    # of nearest-centroid — which in dense blocks assigns a building the EPC of a
+    # *neighbour* and spreads one certificate across several buildings — match by
+    # polygon OVERLAP: each building takes the footprint that covers the largest
+    # share of its own area. Any positive overlap above a small sliver threshold
+    # counts (5% — recovers buildings whose OSM outline is merely offset from the
+    # cadastral footprint); buildings that overlap nothing fall back to nearest
+    # centroid within 20 m. Finally an energy certificate is never spread across
+    # neighbours: when one footprint lands on several buildings, only those that
+    # strongly overlap it (>=30%) keep it — otherwise just the single
+    # best-overlapping building does. Validated: the old centroid method handed
+    # ~1,800 buildings an EPC for a footprint their polygon never touches.
+    OVERLAP_MIN     = 0.05   # min overlap to prefer a footprint over centroid fallback
+    OVERLAP_STRONG  = 0.30   # confident same-building; also the dedup priority cutoff
+    FALLBACK_DIST_M = 20
+
+    epc_polys = epc_polys.reset_index(drop=True)
+    epc_polys["fp_idx"] = range(len(epc_polys))
+
+    gdf_poly = (gdf_3006.reset_index()
+                        .rename(columns={"index": "eubucco_idx"})[["eubucco_idx", "geometry"]]
+                        .copy())
+    gdf_poly["e_area"] = gdf_poly.geometry.area
+
+    ov = gpd.overlay(gdf_poly, epc_polys[["fp_idx", "geometry"]],
+                     how="intersection", keep_geom_type=False)
+    ov["i_area"] = ov.geometry.area
+    ov["frac"] = ov["i_area"] / ov["e_area"]
+    ov_best = ov.sort_values("i_area", ascending=False).drop_duplicates("eubucco_idx")
+    primary = ov_best.loc[ov_best["frac"] >= OVERLAP_MIN, ["eubucco_idx", "fp_idx", "frac"]].copy()
+
+    # Centroid fallback for buildings that overlap no footprint at all
+    rest = gdf_poly[~gdf_poly["eubucco_idx"].isin(set(primary["eubucco_idx"]))].copy()
+    rest["geometry"] = rest.geometry.centroid
+    epc_cents = epc_polys[["fp_idx", "geometry"]].copy()
     epc_cents["geometry"] = epc_polys.geometry.centroid
+    fb = gpd.sjoin_nearest(rest[["eubucco_idx", "geometry"]], epc_cents,
+                           how="inner", max_distance=FALLBACK_DIST_M, distance_col="dist_m")
+    fb = fb.sort_values("dist_m").drop_duplicates("eubucco_idx")[["eubucco_idx", "fp_idx"]]
+    fb["frac"] = 0.0
 
-    gdf_3006_pts = gdf_3006.copy()
-    gdf_3006_pts = gdf_3006_pts.reset_index().rename(columns={"index": "eubucco_idx"})
-    gdf_3006_pts["geometry"] = gdf_3006_pts["geometry"].centroid
-    gdf_3006_pts = gdf_3006_pts[["eubucco_idx", "geometry"]]
+    assign = pd.concat([primary, fb], ignore_index=True).drop_duplicates("eubucco_idx")
 
-    MAX_DIST_M = 30
-    joined_nearest = gpd.sjoin_nearest(
-        gdf_3006_pts, epc_cents,
-        how="left", max_distance=MAX_DIST_M, distance_col="dist_m"
-    )
-    joined = joined_nearest.sort_values("dist_m").drop_duplicates("eubucco_idx")
+    # De-duplicate energy certificates across neighbours. A building that strongly
+    # overlaps the footprint (>=30%) always keeps the EPC — even if a sibling also
+    # overlaps it (genuine OSM split). Weak/fallback claimants are dropped only
+    # when a strong claimant exists; if none do, the single best-overlapping one wins.
+    energy_fp = set(epc_polys.loc[epc_polys["energy_kwh_m2"].notna(), "fp_idx"])
+    assign["has_energy"] = assign["fp_idx"].isin(energy_fp)
+    keep = set(assign.loc[~assign["has_energy"], "eubucco_idx"])
+    for _fp, grp in assign[assign["has_energy"]].groupby("fp_idx"):
+        strong = grp[grp["frac"] >= OVERLAP_STRONG]
+        if len(strong):
+            keep.update(strong["eubucco_idx"].tolist())
+        else:
+            keep.add(grp.sort_values("frac", ascending=False)["eubucco_idx"].iloc[0])
+    assign = assign[~(assign["has_energy"] & ~assign["eubucco_idx"].isin(keep))]
 
-    def _mode(x):
-        vc = x.dropna().value_counts()
-        return vc.index[0] if len(vc) else None
-    def _med(x):
-        v = pd.to_numeric(x, errors="coerce").dropna()
-        return round(float(v.median()), 1) if len(v) else None
-
-    agg = joined.groupby("eubucco_idx").agg(
-        andamal1_epc   =("andamal1",             _mode),
-        fastighet_epc  =("fastighetsbeteckning", _mode),
-        year_built_epc =("year_built",           _med),
-        floors_epc     =("floors_epc",           _med),
-        area_atemp_epc =("area_atemp",           _med),
-        energy_kwh_m2  =("energy_kwh_m2",        _med),
-        energy_class   =("energy_class",         _mode),
-        address_epc    =("address",              _mode),
-        formular_id    =("FormularId",           _mode),
-    )
+    # Map the chosen footprint's attributes back onto each EUBUCCO building
+    attr = epc_polys[["fp_idx", "andamal1", "fastighetsbeteckning", "year_built",
+                      "floors_epc", "area_atemp", "energy_kwh_m2", "energy_class",
+                      "address", "all_addresses", "FormularId"]]
+    agg = (assign.merge(attr, on="fp_idx", how="left")
+                 .set_index("eubucco_idx")
+                 .rename(columns={
+                     "andamal1":             "andamal1_epc",
+                     "fastighetsbeteckning": "fastighet_epc",
+                     "year_built":           "year_built_epc",
+                     "area_atemp":           "area_atemp_epc",
+                     "address":              "address_epc",
+                     "all_addresses":        "all_addresses",
+                     "FormularId":           "formular_id",
+                 })[["andamal1_epc", "fastighet_epc", "year_built_epc", "floors_epc",
+                     "area_atemp_epc", "energy_kwh_m2", "energy_class", "address_epc",
+                     "all_addresses", "formular_id"]])
     gdf = gdf.join(agg)
     matched = gdf["andamal1_epc"].notna().sum()
     gdf["use_cat"] = gdf["andamal1_epc"].apply(andamal_to_use)

@@ -438,11 +438,11 @@ export default function LocationMap({
                 countryCode={countryCode}
                 placeholder={
                   isBuilding
-                    ? `Type an address in ${country ?? "Sweden"}…`
+                    ? `Address ${i + 1} in ${country ?? "Sweden"} — type to search`
                     : `Address ${i + 1} — type to search`
                 }
               />
-              {!isBuilding && addressInputs.length > 1 && (
+              {addressInputs.length > 1 && (
                 <button
                   onClick={() => removeAddress(i)}
                   className="mt-0.5 px-2.5 py-2 rounded-lg border border-gray-300 text-gray-500 hover:text-red-500 hover:border-red-300 text-sm"
@@ -452,17 +452,16 @@ export default function LocationMap({
               )}
             </div>
           ))}
-          {!isBuilding && (
-            <button
-              onClick={() => {
-                setAddressInputs([...addressInputs, ""]);
-                setGeoPoints([...geoPoints, null]);
-              }}
-              className="text-sm text-teal hover:underline"
-            >
-              + Add another address
-            </button>
-          )}
+          {/* Both Building(s) and area scales can list several buildings. */}
+          <button
+            onClick={() => {
+              setAddressInputs([...addressInputs, ""]);
+              setGeoPoints([...geoPoints, null]);
+            }}
+            className="text-sm text-teal hover:underline"
+          >
+            + Add another building
+          </button>
         </div>
       )}
 
