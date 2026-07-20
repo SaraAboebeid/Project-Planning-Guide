@@ -307,6 +307,20 @@ export default function RenovationSimulator() {
   // Entries carry the ORIGINAL building index so per-building lookups (wwr,
   // cost/carbon) stay correct even when a package targets a single building.
   const [targetIdx, setTargetIdx] = useState<number | "all">("all");
+
+  // Climate scenarios (weather files) to simulate against. Every package — and
+  // the as-built baseline — is run under EACH selected scenario, so Step 4 can
+  // compare a renovation measure vs baseline AND across future climates.
+  const [climateScenarios, setClimateScenarios] = useState<{ id: string; label: string }[]>([]);
+  const [selectedScenarios, setSelectedScenarios] = useState<string[]>(["baseline"]);
+  useEffect(() => {
+    if (!isUK) api.listClimateScenarios("se").then((r) => setClimateScenarios(r.scenarios)).catch(() => {});
+  }, [isUK]);
+  const scenarioLabel = useCallback(
+    (id: string) => climateScenarios.find((s) => s.id === id)?.label ?? id,
+    [climateScenarios],
+  );
+
   type GeoEntry = { g: ResolvedBuildingGeometry; idx: number };
   const allEntries: GeoEntry[] = useMemo(() => geometries.map((g, i) => ({ g, idx: i })), [geometries]);
   const targetEntries: GeoEntry[] = targetIdx === "all" ? allEntries : (geometries[targetIdx] ? [{ g: geometries[targetIdx]!, idx: targetIdx }] : allEntries);
@@ -354,11 +368,11 @@ export default function RenovationSimulator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopPoll]);
 
-  const submitBatch = useCallback(async (packageId: string, overrides: Record<string, number>, packageLabel: string | undefined, entries: GeoEntry[]) => {
+  const submitBatch = useCallback(async (packageId: string, overrides: Record<string, number>, packageLabel: string | undefined, entries: GeoEntry[], scenario: string = "baseline") => {
     try {
       const { batch_id } = await api.simulationBatchSubmit({
         country: COUNTRY,
-        ...(isUK ? {} : { city_id: CITY_ID }),
+        ...(isUK ? {} : { city_id: CITY_ID, climate_scenario: scenario }),
         buildings: entries.map(({ g }) => ({ lat: g.lat, lon: g.lon, address: g.address })),
         package_id: packageId, package_label: packageLabel ?? null,
         ...overrides,
@@ -398,14 +412,33 @@ export default function RenovationSimulator() {
   const submitBaseline = useCallback(() => {
     if (geometries.length === 0) return;
     const entries = geometries.map((g, i) => ({ g, idx: i }));
-    const pkg: RenovationCalcPackage = {
-      id: "baseline", name: "Baseline (as-built)", color: "rgba(255,255,255,0.4)", isBaseline: true,
+    // One as-built baseline run per scenario — covering both the current
+    // selection AND any scenario an existing package already uses, so every
+    // package's saving is measured against the baseline under the SAME weather.
+    const existing = useWizardStore.getState().project.renovationCalcPackages
+      .filter((p) => !p.isBaseline).map((p) => p.climateScenario || "baseline");
+    const scenarios = isUK ? ["baseline"]
+      : Array.from(new Set([...(selectedScenarios.length ? selectedScenarios : ["baseline"]), ...existing]));
+    const baselinePkgs: RenovationCalcPackage[] = scenarios.map((sc) => ({
+      id: `baseline__${sc}`,
+      name: "Baseline (as-built)" + (sc === "baseline" || isUK ? "" : ` · ${scenarioLabel(sc)}`),
+      color: "rgba(255,255,255,0.4)", isBaseline: true, climateScenario: sc,
       selections: {}, batchId: null, buildings: makeBuildingRows(entries),
-    };
-    setProject({ renovationCalcPackages: [...useWizardStore.getState().project.renovationCalcPackages.filter((p) => p.id !== "baseline"), pkg] });
-    submitBatch("baseline", {}, undefined, entries);
+    }));
+    setProject({ renovationCalcPackages: [
+      ...useWizardStore.getState().project.renovationCalcPackages.filter((p) => !p.isBaseline),
+      ...baselinePkgs,
+    ] });
+    scenarios.forEach((sc) => submitBatch(`baseline__${sc}`, {}, undefined, entries, sc));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geometries, submitBatch]);
+  }, [geometries, submitBatch, selectedScenarios, isUK, scenarioLabel]);
+
+  /* Re-run the as-built baseline when the scenario selection changes (after the
+     initial load), so a newly-added future scenario gets its baseline too. */
+  useEffect(() => {
+    if (initializedRef.current && geometries.length > 0) submitBaseline();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedScenarios]);
 
   /* ── fetch WWR (per building) + Boverket/TABULA data + submit baseline ── */
   useEffect(() => {
@@ -483,9 +516,9 @@ export default function RenovationSimulator() {
     }
     if (Object.keys(selections).length === 0) return;
 
-    const id = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    const name = (packageName.trim() || `Package ${packages.filter((p) => !p.isBaseline).length + 1}`) + targetSuffix();
-    const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
+    const baseId = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const baseName = (packageName.trim() || `Package ${baseGroupCount() + 1}`) + targetSuffix();
+    const color = PACKAGE_COLORS[baseGroupCount() % PACKAGE_COLORS.length]!;
 
     const buildingRows = makeBuildingRows(targetEntries, (g, i) => {
       let costSEK = 0, carbonKgCO2e = 0, any = false;
@@ -504,11 +537,25 @@ export default function RenovationSimulator() {
       return any ? { costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e) } : { costSEK: null, carbonKgCO2e: null };
     });
 
-    const pkg: RenovationCalcPackage = { id, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows };
-    setProject({ renovationCalcPackages: [...packages, pkg] });
+    // One run per selected climate scenario (cost/carbon are weather-independent,
+    // so they're copied; only the EnergyPlus energy differs per scenario).
+    const overrides = overridesFromSeSelections(selections, itemByCode);
+    const scenarios = selectedScenarios.length ? selectedScenarios : ["baseline"];
+    const newPkgs: RenovationCalcPackage[] = scenarios.map((sc) => ({
+      id: `${baseId}__${sc}`,
+      name: baseName + (sc === "baseline" ? "" : ` · ${scenarioLabel(sc)}`),
+      color, isBaseline: false, selections, batchId: null,
+      buildings: buildingRows.map((b) => ({ ...b })), climateScenario: sc,
+    }));
+    setProject({ renovationCalcPackages: [...packages, ...newPkgs] });
     setPackageName("");
     setDraftSelection({});
-    submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
+    scenarios.forEach((sc) => submitBatch(`${baseId}__${sc}`, overrides, baseName, targetEntries, sc));
+  }
+
+  // Number of distinct renovation packages (scenario variants share one group).
+  function baseGroupCount(): number {
+    return new Set(packages.filter((p) => !p.isBaseline).map((p) => p.id.split("__")[0])).size;
   }
 
   function addUkPackage() {
@@ -563,21 +610,30 @@ export default function RenovationSimulator() {
         p.id === pkg.id ? { ...p, buildings: p.buildings.map((b) => ({ ...b, status: "queued" as const, error: null })) } : p
       ),
     });
-    submitBatch(pkg.id, overrides, pkg.name, entries);
+    submitBatch(pkg.id, overrides, pkg.name, entries, pkg.climateScenario || "baseline");
   }
 
-  const baselinePkg = packages.find((p) => p.isBaseline);
-  const baselineAgg = baselinePkg ? pkgAggregate(baselinePkg) : null;
+  // As-built baseline aggregate for a given climate scenario (each package is
+  // compared to the baseline run under the SAME weather).
+  const baselinePkgFor = (scenario: string | undefined) =>
+    packages.find((p) => p.isBaseline && (p.climateScenario || "baseline") === (scenario || "baseline"));
+  const baselineAggFor = (scenario: string | undefined) => {
+    const bp = baselinePkgFor(scenario);
+    return bp ? pkgAggregate(bp) : null;
+  };
+  // Current-climate as-built baseline, used by the per-building overview strip.
+  const baselinePkg = baselinePkgFor("baseline");
 
   function handleSaveAndContinue() {
     setProject({
       renovationSimResults: packages.filter((p) => !p.isBaseline).map((p, i) => {
         const agg = pkgAggregate(p);
-        const total = agg.avgTotalKwhM2Yr ?? baselineAgg?.avgTotalKwhM2Yr ?? 0;
-        const baseTotal = baselineAgg?.avgTotalKwhM2Yr ?? total;
+        const bAgg = baselineAggFor(p.climateScenario);
+        const total = agg.avgTotalKwhM2Yr ?? bAgg?.avgTotalKwhM2Yr ?? 0;
+        const baseTotal = bAgg?.avgTotalKwhM2Yr ?? total;
         const saving = Math.max(0, Math.round(baseTotal - total));
-        const carbonSaving = agg.totalCarbonKgCO2e != null && baselineAgg?.totalCarbonKgCO2e != null
-          ? Math.max(0, Math.round(baselineAgg.totalCarbonKgCO2e - agg.totalCarbonKgCO2e))
+        const carbonSaving = agg.totalCarbonKgCO2e != null && bAgg?.totalCarbonKgCO2e != null
+          ? Math.max(0, Math.round(bAgg.totalCarbonKgCO2e - agg.totalCarbonKgCO2e))
           : Math.round(saving * 0.2);
         return {
           packageIndex: i + 1,
@@ -615,6 +671,47 @@ export default function RenovationSimulator() {
               : "Pick a material per component, add it as a package, and compare real cost, embodied carbon, and EnergyPlus-simulated performance against the building's as-built baseline."}
         </p>
       </div>
+
+      {/* Climate scenarios (weather files) — run every package under each, to
+          compare the retrofit vs baseline AND across future climates. */}
+      {!isUK && climateScenarios.length > 1 && (
+        <div style={{
+          borderRadius: 12, padding: "10px 14px",
+          background: "rgba(78,205,196,0.06)", border: "1px solid rgba(78,205,196,0.25)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#4ECDC4" }}>🌡️ Climate scenarios to simulate</span>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.40)" }}>
+              — each package (and the as-built baseline) runs under every one you pick.
+            </span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {climateScenarios.map((s) => {
+              const on = selectedScenarios.includes(s.id);
+              const isBase = s.id === "baseline";
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedScenarios((prev) =>
+                    isBase ? prev  // baseline is always kept as the reference
+                      : prev.includes(s.id) ? prev.filter((x) => x !== s.id) : [...prev, s.id])}
+                  disabled={isBase}
+                  style={{
+                    fontSize: 11.5, fontWeight: 600, padding: "5px 11px", borderRadius: 99,
+                    cursor: isBase ? "default" : "pointer",
+                    background: on ? "rgba(78,205,196,0.18)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${on ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
+                    color: on ? "#4ECDC4" : "rgba(255,255,255,0.55)",
+                    opacity: isBase ? 0.85 : 1,
+                  }}
+                >
+                  {on ? "✓ " : ""}{s.label}{isBase ? " (reference)" : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {geometries.length === 0 && (
         <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
@@ -797,7 +894,17 @@ export default function RenovationSimulator() {
                 <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>{h}</span>
               ))}
             </div>
-            {[...packages].sort((a, b) => (a.isBaseline ? -1 : b.isBaseline ? 1 : 0)).map((pkg) => {
+            {(() => {
+              // Group rows by climate scenario (reference climate first), and
+              // within each climate put the as-built baseline first.
+              const order = ["baseline", ...selectedScenarios.filter((s) => s !== "baseline")];
+              const scPos = (sc?: string) => { const i = order.indexOf(sc || "baseline"); return i < 0 ? 99 : i; };
+              return [...packages].sort((a, b) => {
+                const d = scPos(a.climateScenario) - scPos(b.climateScenario);
+                if (d !== 0) return d;
+                return a.isBaseline === b.isBaseline ? 0 : a.isBaseline ? -1 : 1;
+              });
+            })().map((pkg) => {
               const agg = pkgAggregate(pkg);
               const expanded = expandedPkg === pkg.id;
               return (
@@ -822,7 +929,20 @@ export default function RenovationSimulator() {
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{agg.avgHeatingKwhM2Yr ?? "—"}</span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{agg.avgCoolingKwhM2Yr ?? "—"}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C" }}>{agg.avgTotalKwhM2Yr ?? "—"}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C" }}>
+                      {agg.avgTotalKwhM2Yr ?? "—"}
+                      {!pkg.isBaseline && agg.avgTotalKwhM2Yr != null && (() => {
+                        const bt = baselineAggFor(pkg.climateScenario)?.avgTotalKwhM2Yr;
+                        if (bt == null) return null;
+                        const d = Math.round(bt - agg.avgTotalKwhM2Yr!);   // baseline − package = saving
+                        return (
+                          <span title="vs as-built baseline under the same climate"
+                            style={{ fontSize: 9.5, fontWeight: 600, marginLeft: 4, color: d >= 0 ? "#96D74C" : "#fca5a5" }}>
+                            ({d >= 0 ? "−" : "+"}{Math.abs(d)})
+                          </span>
+                        );
+                      })()}
+                    </span>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       {agg.pending > 0 && <Loader2 size={13} color="#F59E0B" style={{ animation: "spin 1s linear infinite" }} />}
                       {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#96D74C" />}

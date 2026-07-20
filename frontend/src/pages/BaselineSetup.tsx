@@ -88,6 +88,24 @@ export default function BaselineSetup() {
   const [simProgress, setSimProgress] = useState(0);
   const [simError, setSimError] = useState<string | null>(null);
 
+  // Which buildings to run the baseline for. null = all (the default); a Set
+  // once the user starts (de)selecting. Lets you run all, or just a subset.
+  const [selected, setSelected] = useState<Set<number> | null>(null);
+  const allIdx = useMemo(() => new Set(buildings.map((_, i) => i)), [buildings]);
+  const effectiveSelected = selected ?? allIdx;
+  const runList = useMemo(
+    () => buildings.filter((_, i) => effectiveSelected.has(i)),
+    [buildings, effectiveSelected],
+  );
+  function toggleBuilding(i: number) {
+    setSelected((prev) => {
+      const base = prev ?? new Set(allIdx);
+      const next = new Set(base);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+  }
+
   const results = project.renovationBaselineResults;
 
   const eClassColor: Record<string, string> = { A: "#22c55e", B: "#86efac", C: "#96D74C", D: "#F59E0B", E: "#f97316", F: "#EF4444", G: "#dc2626" };
@@ -118,7 +136,7 @@ export default function BaselineSetup() {
    * IDF files it runs as independent parallel tasks under one batch_id).
    * Polls batch-status every 3s until every building is completed/failed. */
   async function runBaseline() {
-    if (buildings.length === 0) return;
+    if (runList.length === 0) return;
     setSimRunning(true);
     setSimProgress(0);
     setSimError(null);
@@ -127,7 +145,7 @@ export default function BaselineSetup() {
     try {
       const { batch_id } = await api.simulationBatchSubmit({
         country: isUK ? "gb" : "se",
-        buildings: buildings.map((b) => ({ lat: b.lat, lon: b.lon, address: b.address })),
+        buildings: runList.map((b) => ({ lat: b.lat, lon: b.lon, address: b.address })),
         package_id: "baseline",
       });
 
@@ -139,7 +157,7 @@ export default function BaselineSetup() {
 
         if (status.overall_status === "completed" || status.overall_status === "failed" || done === status.total) {
           const mapped: RenovationBaselineResult[] = status.buildings.map((row, i) => {
-            const src = buildings[i];
+            const src = runList[i];
             const r = row.results;
             return {
               address: row.address ?? (src ? bKey(src, i) : `Building ${i + 1}`),
@@ -187,7 +205,7 @@ export default function BaselineSetup() {
   // The batch baseline only needs each building's lat/lon; missing envelope
   // details fall back to TABULA archetype defaults in the shoebox IDF, so the
   // run always completes. No need to gate on "all fields present" anymore.
-  const canRunBaseline = buildings.length > 0;
+  const canRunBaseline = runList.length > 0;
 
   /* ── JSON upload handler ── */
   function handleFile(file: File) {
@@ -282,22 +300,44 @@ export default function BaselineSetup() {
         </div>
       ) : (
         <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
             <Building2 size={14} color="#4ECDC4" />
             <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
-              {buildings.length} building{buildings.length !== 1 ? "s" : ""} to simulate
+              {effectiveSelected.size} of {buildings.length} building{buildings.length !== 1 ? "s" : ""} selected
+            </span>
+            <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+              <button onClick={() => setSelected(null)}
+                style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
+                  background: "rgba(78,205,196,0.12)", border: "1px solid rgba(78,205,196,0.35)", color: "#4ECDC4" }}>
+                Select all
+              </button>
+              <button onClick={() => setSelected(new Set())}
+                style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
+                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)" }}>
+                Clear
+              </button>
             </span>
           </div>
+          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", margin: "0 0 10px" }}>
+            Click a building to include or exclude it from the baseline run.
+          </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {buildingStatus.map(bs => (
-              <span key={bs.key} style={{
-                fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 600,
-                background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.65)",
-                border: "1px solid rgba(255,255,255,0.08)", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}>
-                {bs.key}
-              </span>
-            ))}
+            {buildingStatus.map((bs, idx) => {
+              const on = effectiveSelected.has(idx);
+              return (
+                <button key={bs.key} onClick={() => toggleBuilding(idx)} title={on ? "Click to exclude" : "Click to include"}
+                  style={{
+                    fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 600, cursor: "pointer",
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    background: on ? "rgba(78,205,196,0.14)" : "rgba(255,255,255,0.03)",
+                    color: on ? "#4ECDC4" : "rgba(255,255,255,0.4)",
+                    border: `1px solid ${on ? "#4ECDC4" : "rgba(255,255,255,0.08)"}`,
+                    maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                  <span style={{ fontSize: 10 }}>{on ? "✓" : "＋"}</span>{bs.key}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -406,8 +446,8 @@ export default function BaselineSetup() {
           {simRunning
             ? "Running EPSM simulation — please wait…"
             : canRunBaseline
-              ? `Send ${buildings.length} building${buildings.length !== 1 ? "s" : ""} to EPSM to compute the as-built baseline. Missing envelope details fall back to TABULA archetype defaults, so the run always completes.`
-              : "Select buildings in Step 2 first."}
+              ? `Send ${runList.length} building${runList.length !== 1 ? "s" : ""} to EPSM to compute the as-built baseline. Missing envelope details fall back to TABULA archetype defaults, so the run always completes.`
+              : "Select at least one building above to run the baseline."}
         </p>
 
         {/* Progress bar while running - reflects real per-building EPSM
@@ -506,7 +546,7 @@ export default function BaselineSetup() {
           }}
         >
           {simRunning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={14} />}
-          {simRunning ? "Running…" : project.baselineStatus === "done" ? "Re-run Baseline in EPSM" : "Run Baseline in EPSM"}
+          {simRunning ? "Running…" : `${project.baselineStatus === "done" ? "Re-run" : "Run"} baseline for ${runList.length} building${runList.length !== 1 ? "s" : ""} in EPSM`}
         </button>
       </div>
 

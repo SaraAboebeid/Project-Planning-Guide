@@ -67,17 +67,20 @@ export const api = {
       : get<BuildingLookup>("/building", { lat: String(lat), lon: String(lon) }),
 
   /** Aggregate EUBUCCO stats for all buildings in a bounding box */
-  lookupBuildingsBbox: (north: number, south: number, east: number, west: number) =>
+  lookupBuildingsBbox: (north: number, south: number, east: number, west: number, polygon?: string) =>
     get<BboxStats>("/buildings/bbox/stats", {
       north: String(north), south: String(south),
       east:  String(east),  west:  String(west),
+      ...(polygon ? { polygon } : {}),
     }),
 
-  /** Individual building records in a bounding box, with Boplats data merged */
-  buildingsBboxList: (north: number, south: number, east: number, west: number) =>
+  /** Individual building records in a bounding box (optionally refined to a drawn
+   *  polygon), with Boplats data merged. `polygon` is "lon,lat;lon,lat;…". */
+  buildingsBboxList: (north: number, south: number, east: number, west: number, polygon?: string) =>
     get<BuildingRecord[]>("/buildings/bbox/list", {
       north: String(north), south: String(south),
       east:  String(east),  west:  String(west),
+      ...(polygon ? { polygon } : {}),
     }),
 
   /** Named neighborhoods (Gothenburg primärområden) with building counts */
@@ -115,8 +118,12 @@ export const api = {
     lat: number; lon: number; address?: string | null; country: string; city_id?: string;
     building: Record<string, unknown>; wwr_override?: number;
     u_wall_override?: number; u_roof_override?: number; u_win_override?: number; u_floor_override?: number;
-    package_id?: string; package_label?: string | null;
+    package_id?: string; package_label?: string | null; climate_scenario?: string;
   }) => post<{ simulation_id: string; task_id: string; status: string }>("/simulation-submit", body),
+
+  /** Climate scenarios available for Step 4 weather selection (SE = baseline + futures). */
+  listClimateScenarios: (country = "se") =>
+    get<{ country: string; scenarios: { id: string; label: string }[] }>("/climate-scenarios", { country }),
 
   simulationStatus: (id: string) =>
     get<{ status: string; progress?: number; error?: string | null; error_message?: string | null }>(`/simulation-status/${id}`),
@@ -145,7 +152,7 @@ export const api = {
     buildings: Array<{ lat: number; lon: number; address?: string | null; building?: Record<string, unknown> }>;
     wwr_override?: number;
     u_wall_override?: number; u_roof_override?: number; u_win_override?: number; u_floor_override?: number;
-    package_id?: string; package_label?: string | null;
+    package_id?: string; package_label?: string | null; climate_scenario?: string;
   }) => post<{ batch_id: string; task_id: string; total: number; status: string }>("/simulation-batch-submit", body),
 
   simulationBatchStatus: (batchId: string) =>

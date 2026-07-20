@@ -18,6 +18,8 @@ import {
   Marker,
   Popup,
   Rectangle,
+  Polygon,
+  CircleMarker,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -192,6 +194,23 @@ function BboxDragHandler({
   return null;
 }
 
+// ── Polygon (any-shape) draw handler: click to add each vertex ──────────────
+function PolygonClickHandler({
+  onAddVertex,
+}: {
+  onAddVertex: (lat: number, lng: number) => void;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    map.getContainer().style.cursor = "crosshair";
+    return () => { map.getContainer().style.cursor = ""; };
+  }, [map]);
+  useMapEvents({
+    click(e) { onAddVertex(e.latlng.lat, e.latlng.lng); },
+  });
+  return null;
+}
+
 // ── Address input with dropdown autocomplete ─────────────────────────────────
 
 function AddressInput({
@@ -289,6 +308,12 @@ interface LocationMapProps {
   onAddressChange: (addressString: string) => void;
   onPointsChange?: (points: { lat: number; lon: number; label: string }[]) => void;
   onBboxChange?: (bbox: { north: number; south: number; east: number; west: number } | null) => void;
+  /** Fires when a free-form polygon is drawn/cleared. `polygon` is "lon,lat;…"
+   *  and `bbox` is the polygon's bounding box (so downstream stays bbox-driven). */
+  onPolygonChange?: (
+    polygon: string | null,
+    bbox: { north: number; south: number; east: number; west: number } | null,
+  ) => void;
 }
 
 export default function LocationMap({
@@ -298,12 +323,13 @@ export default function LocationMap({
   onAddressChange,
   onPointsChange,
   onBboxChange,
+  onPolygonChange,
 }: LocationMapProps) {
   const isBuilding = scale === "Building";
   const countryCode = countryCodeFromName(country);
   const mapCenter = mapCenterFor(countryCode, city);
 
-  const [locationMode, setLocationMode] = useState<"addresses" | "bbox">(
+  const [locationMode, setLocationMode] = useState<"addresses" | "bbox" | "polygon">(
     "addresses"
   );
   const [addressInputs, setAddressInputs] = useState<string[]>([""]);
@@ -313,6 +339,10 @@ export default function LocationMap({
   const [bboxPreview, setBboxPreview] = useState<BboxCoords | null>(null);
   const [bboxDone, setBboxDone] = useState(false);
 
+  // Free-form polygon vertices ([lat, lng] for Leaflet); done = closed & applied
+  const [polyVerts, setPolyVerts] = useState<LatLngTuple[]>([]);
+  const [polyDone, setPolyDone] = useState(false);
+
   // Reset when scale changes
   useEffect(() => {
     setLocationMode("addresses");
@@ -321,10 +351,42 @@ export default function LocationMap({
     setBbox(null);
     setBboxPreview(null);
     setBboxDone(false);
+    setPolyVerts([]);
+    setPolyDone(false);
     onAddressChange("");
     onBboxChange?.(null);
+    onPolygonChange?.(null, null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scale]);
+
+  // ── Polygon handlers ───────────────────────────────────────────────────────
+  function addPolyVertex(lat: number, lng: number) {
+    if (polyDone) return;
+    setPolyVerts((prev) => [...prev, [lat, lng] as LatLngTuple]);
+  }
+  function clearPolygon() {
+    setPolyVerts([]);
+    setPolyDone(false);
+    onPolygonChange?.(null, null);
+    onBboxChange?.(null);
+    onAddressChange("");
+    onPointsChange?.([]);
+  }
+  function finishPolygon() {
+    if (polyVerts.length < 3) return;
+    setPolyDone(true);
+    const lats = polyVerts.map((v) => v[0]);
+    const lngs = polyVerts.map((v) => v[1]);
+    const box = {
+      north: Math.max(...lats), south: Math.min(...lats),
+      east: Math.max(...lngs), west: Math.min(...lngs),
+    };
+    // Encode as "lon,lat;lon,lat;…" for the backend point-in-polygon filter.
+    const encoded = polyVerts.map((v) => `${v[1].toFixed(6)},${v[0].toFixed(6)}`).join(";");
+    onAddressChange(`SHAPE: ${polyVerts.length} points`);
+    onPointsChange?.([]);
+    onPolygonChange?.(encoded, box);
+  }
 
   // ── Address handlers ─────────────────────────────────────────────────────
 
@@ -393,8 +455,10 @@ export default function LocationMap({
 
   return (
     <div className="space-y-3 mt-2">
-      {/* Mode toggle — only for Neighborhood / Portfolio */}
-      {!isBuilding && (
+      {/* Mode toggle — Building(s): pick by address, or draw a rectangle / any
+          shape to grab a group of buildings. (Neighborhood uses the district
+          list; City = the whole city — so no area drawing there.) */}
+      {isBuilding && (
         <div className="flex gap-2">
           <button
             onClick={() => setLocationMode("addresses")}
@@ -414,13 +478,49 @@ export default function LocationMap({
                 : "bg-white border-gray-300 hover:border-gray-400"
             }`}
           >
-            Draw Area on Map
+            Draw Rectangle
+          </button>
+          <button
+            onClick={() => setLocationMode("polygon")}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+              locationMode === "polygon"
+                ? "bg-navy text-white border-navy"
+                : "bg-white border-gray-300 hover:border-gray-400"
+            }`}
+          >
+            Draw Any Shape
           </button>
         </div>
       )}
 
-      {/* Address inputs */}
-      {(isBuilding || locationMode === "addresses") && (
+      {/* Polygon draw controls */}
+      {isBuilding && locationMode === "polygon" && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 flex items-center gap-3 flex-wrap">
+          <span>
+            {polyDone
+              ? `✓ Shape with ${polyVerts.length} points — buildings inside are selected.`
+              : polyVerts.length === 0
+              ? "Click on the map to drop each corner of your area."
+              : `${polyVerts.length} point${polyVerts.length > 1 ? "s" : ""} added${polyVerts.length >= 3 ? " — click “Finish shape” to close it." : " (need at least 3)."}`}
+          </span>
+          <span className="flex gap-2 ml-auto">
+            {!polyDone && polyVerts.length >= 3 && (
+              <button onClick={finishPolygon} className="px-2.5 py-1 rounded-md bg-teal text-white text-xs font-semibold hover:brightness-110">
+                Finish shape
+              </button>
+            )}
+            {polyVerts.length > 0 && (
+              <button onClick={clearPolygon} className="px-2.5 py-1 rounded-md border border-gray-300 text-xs font-medium hover:border-gray-400">
+                Clear
+              </button>
+            )}
+          </span>
+        </div>
+      )}
+
+      {/* Address inputs — the default for every scale; at Building(s) they hide
+          when the user switches to a draw mode. */}
+      {(!isBuilding || locationMode === "addresses") && (
         <div className="space-y-2">
           {addressInputs.map((addr, i) => (
             <div key={i} className="flex gap-2 items-start">
@@ -466,7 +566,7 @@ export default function LocationMap({
       )}
 
       {/* Bbox draw instructions */}
-      {!isBuilding && locationMode === "bbox" && (
+      {isBuilding && locationMode === "bbox" && (
         <div className="flex items-center gap-2 text-xs text-gray-600 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
           <span>🖱️</span>
           <span>
@@ -491,7 +591,7 @@ export default function LocationMap({
       )}
 
       {/* Bbox coordinates summary — only when finalized */}
-      {!isBuilding && locationMode === "bbox" && bboxDone && bbox && (
+      {isBuilding && locationMode === "bbox" && bboxDone && bbox && (
         <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2.5">
           <div><span className="font-medium">North:</span> {bbox.north.toFixed(5)}°</div>
           <div><span className="font-medium">South:</span> {bbox.south.toFixed(5)}°</div>
@@ -527,7 +627,7 @@ export default function LocationMap({
             ))}
 
           {/* Bbox drag-draw handler */}
-          {!isBuilding && locationMode === "bbox" && (
+          {isBuilding && locationMode === "bbox" && (
             <BboxDragHandler onDraw={handleBboxDraw} />
           )}
 
@@ -543,6 +643,22 @@ export default function LocationMap({
               }}
             />
           )}
+
+          {/* Free-form polygon: click handler + shape + vertex dots */}
+          {isBuilding && locationMode === "polygon" && !polyDone && (
+            <PolygonClickHandler onAddVertex={addPolyVertex} />
+          )}
+          {isBuilding && locationMode === "polygon" && polyVerts.length >= 2 && (
+            <Polygon
+              positions={polyVerts}
+              pathOptions={{ color: "#0d9488", weight: 2, fillColor: "#14b8a6", fillOpacity: 0.14 }}
+            />
+          )}
+          {isBuilding && locationMode === "polygon" &&
+            polyVerts.map((v, i) => (
+              <CircleMarker key={i} center={v} radius={4}
+                pathOptions={{ color: "#0d9488", fillColor: "#fff", fillOpacity: 1, weight: 2 }} />
+            ))}
         </MapContainer>
       </div>
     </div>

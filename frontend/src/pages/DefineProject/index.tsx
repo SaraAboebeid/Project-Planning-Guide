@@ -102,11 +102,33 @@ export default function DefineProject() {
     setBuildingLoading(true);
     try {
       const stats = await api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west);
-      setProject({ bboxStats: stats, lookedUpBuilding: null, currentBbox: bbox });
+      // A rectangle supersedes any previously drawn free-form polygon.
+      setProject({ bboxStats: stats, lookedUpBuilding: null, currentBbox: bbox, selectionPolygon: null });
       // Sync bbox to 3D viewer via localStorage
       try { localStorage.setItem('ppg_bbox', JSON.stringify(bbox)); } catch { /* ignore */ }
     } catch {
       setProject({ bboxStats: null });
+    } finally {
+      setBuildingLoading(false);
+    }
+  }
+
+  /* ── Polygon (any-shape) lookup — fires when a shape is finished/cleared ── */
+  async function handlePolygonChange(
+    polygon: string | null,
+    bbox: { north: number; south: number; east: number; west: number } | null,
+  ) {
+    if (!polygon || !bbox) {
+      setProject({ bboxStats: null, selectionPolygon: null });
+      return;
+    }
+    setBuildingLoading(true);
+    try {
+      const stats = await api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west, polygon);
+      setProject({ bboxStats: stats, lookedUpBuilding: null, currentBbox: bbox, selectionPolygon: polygon });
+      try { localStorage.setItem('ppg_bbox', JSON.stringify(bbox)); } catch { /* ignore */ }
+    } catch {
+      setProject({ bboxStats: null, selectionPolygon: null });
     } finally {
       setBuildingLoading(false);
     }
@@ -365,8 +387,8 @@ export default function DefineProject() {
                 key={t}
                 onClick={() => handleTypeChange(t)}
                 style={{
-                  background: selected ? "rgba(114,28,184,0.12)" : "rgba(13,17,40,0.85)",
-                  border: `2px solid ${selected ? "#721CB8" : "rgba(255,255,255,0.10)"}`,
+                  background: selected ? "rgba(78,205,196,0.10)" : "rgba(13,17,40,0.85)",
+                  border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.10)"}`,
                   borderRadius: 16,
                   padding: "24px 20px",
                   textAlign: "center",
@@ -377,10 +399,10 @@ export default function DefineProject() {
                   flexDirection: "column",
                   alignItems: "center",
                   gap: 12,
-                  boxShadow: selected ? "0 0 0 1px #721CB8, 0 4px 20px rgba(114,28,184,0.25)" : "none",
+                  boxShadow: selected ? "0 0 0 1px #4ECDC4, 0 4px 20px rgba(78,205,196,0.25)" : "none",
                 }}
                 onMouseEnter={e => {
-                  if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(114,28,184,0.40)";
+                  if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(78,205,196,0.35)";
                 }}
                 onMouseLeave={e => {
                   if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.10)";
@@ -390,8 +412,8 @@ export default function DefineProject() {
                 <div style={{
                   position: "absolute", top: 12, right: 12,
                   width: 22, height: 22, borderRadius: "50%",
-                  border: `2px solid ${selected ? "#721CB8" : "rgba(255,255,255,0.25)"}`,
-                  background: selected ? "#721CB8" : "transparent",
+                  border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.25)"}`,
+                  background: selected ? "#4ECDC4" : "transparent",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
                   {selected && (
@@ -437,7 +459,7 @@ export default function DefineProject() {
                 onClick={() => setProject({ buildingDevelopmentType: opt.value })}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
                   project.buildingDevelopmentType === opt.value
-                    ? "bg-navy text-white border-navy"
+                    ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
                 }`}
               >
@@ -562,7 +584,7 @@ export default function DefineProject() {
                 onClick={() => toggleSystem(sys)}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
                   systemsSet.has(sys)
-                    ? "bg-navy text-white border-navy"
+                    ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
                 }`}
               >
@@ -605,7 +627,7 @@ export default function DefineProject() {
                       }
                       className={`px-4 py-1 rounded-lg text-sm font-medium border ${
                         (opt === "Yes") === answer
-                          ? "bg-teal text-white border-teal"
+                          ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
                           : "bg-white border-gray-300"
                       }`}
                     >
@@ -637,7 +659,7 @@ export default function DefineProject() {
                         onClick={() => setProject({ ecExistingPv: val })}
                         className={`px-4 py-1 rounded-lg text-sm font-medium border ${
                           project.ecExistingPv === val
-                            ? "bg-teal text-white border-teal"
+                            ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
                             : "bg-white border-gray-300"
                         }`}
                       >
@@ -662,7 +684,7 @@ export default function DefineProject() {
                         onClick={() => setProject({ ecExistingBattery: val })}
                         className={`px-4 py-1 rounded-lg text-sm font-medium border ${
                           project.ecExistingBattery === val
-                            ? "bg-teal text-white border-teal"
+                            ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
                             : "bg-white border-gray-300"
                         }`}
                       >
@@ -693,7 +715,7 @@ export default function DefineProject() {
                     }
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
                       project.reElectricityThreshold === opt
-                        ? "bg-navy text-white border-navy"
+                        ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
                         : "bg-white border-gray-300"
                     }`}
                   >
@@ -722,7 +744,7 @@ export default function DefineProject() {
                 }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
                   project.ecEnergyFocus.includes(opt)
-                    ? "bg-navy text-white border-navy"
+                    ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
                     : "bg-white text-gray-600 border-gray-300"
                 }`}
               >
@@ -748,7 +770,7 @@ export default function DefineProject() {
                   onClick={() => toggleExploration(approach)}
                   className={`w-full text-left rounded-xl border-2 px-4 py-3 transition ${
                     selected
-                      ? "border-teal bg-teal/5"
+                      ? "border-[#4ECDC4] bg-[#4ECDC4]/5"
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
@@ -778,7 +800,7 @@ export default function DefineProject() {
                 onClick={() => toggleKpi(kpi)}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
                   project.selectedKpis.includes(kpi)
-                    ? "bg-green text-white border-green"
+                    ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
                 }`}
                 style={{ color: project.selectedKpis.includes(kpi) ? "#fff" : "rgba(255,255,255,0.80)" }}
@@ -805,7 +827,7 @@ export default function DefineProject() {
               onClick={() => setProject({ scale: opt, buildingUses: [] })}
               className={`px-4 py-2 rounded-lg text-sm font-medium border ${
                 project.scale === opt
-                  ? "bg-navy text-white border-navy"
+                  ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
                   : "bg-white border-gray-300 hover:border-gray-400"
               }`}
             >
@@ -896,6 +918,7 @@ export default function DefineProject() {
             onAddressChange={(addr) => setProject({ address: addr })}
             onPointsChange={(pts) => setProject({ buildingPoints: pts })}
             onBboxChange={handleBboxChange}
+            onPolygonChange={handlePolygonChange}
           />
 
           {/* Building lookup status */}

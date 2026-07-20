@@ -96,7 +96,7 @@ window.setBasemap = function(type) {
       // on (the UK default), it's still real-world-elevation ground truth even
       // with Google tiles gone, and blindly zeroing the offset here would
       // un-align our buildings from it again.
-      refreshBuildingBaseOffsetFromTiles().then(() => { if (buildingDS) rebuildBuildings(); });
+      refreshBuildingBaseOffsetFromTiles().then(() => { if (buildingPrimitive) rebuildBuildings(); });
       document.getElementById('btn-tiles').classList.remove('active');
     }
     viewer.imageryLayers.removeAll();
@@ -314,7 +314,7 @@ async function loadGoogleTiles(token, { skipAutoRebuild = false } = {}) {
       // Run calibration in background so the viewer is interactive immediately.
       (async () => {
         await refreshBuildingBaseOffsetFromTiles();
-        if (buildingDS) await rebuildBuildings();
+        if (buildingPrimitive) await rebuildBuildings();
       })();
     }
   } catch(err) {
@@ -347,7 +347,7 @@ document.getElementById('btn-tiles').addEventListener('click', () => {
     tilesEnabled = false;
     if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
     resetGroundCalibration();
-    if (buildingDS) rebuildBuildings();
+    if (buildingPrimitive) rebuildBuildings();
     document.getElementById('btn-tiles').classList.remove('active');
     // Restore previous basemap if photo was active
     if (_currentBasemap === 'photo') {
@@ -368,14 +368,15 @@ document.getElementById('btn-tiles').addEventListener('click', () => {
 document.getElementById('btn-eubucco').addEventListener('click', () => {
   eubuccoVisible = !eubuccoVisible;
   document.getElementById('btn-eubucco').classList.toggle('active', eubuccoVisible);
-  if (buildingDS) buildingDS.show = eubuccoVisible;
+  if (buildingPrimitive) buildingPrimitive.show = eubuccoVisible;
 });
 
 // ─────────────────────────────────────────────────────────────────
-// Build extruded buildings — CustomDataSource (no Cesium workers needed)
+// Build extruded buildings — one batched Cesium.Primitive (memory-safe at
+// city scale; tessellated in web workers, picked via per-instance id)
 // ─────────────────────────────────────────────────────────────────
 let colorMode = 'use';
-let buildingDS = null;
+let buildingPrimitive = null;
 
 function getBuildingColor(b) {
   if (colorMode === 'eclass')
@@ -406,54 +407,64 @@ async function rebuildBuildings() {
   rebuildPending = false;
   setLoading('Loading ' + DATA.length.toLocaleString() + ' buildings...');
   try {
-    if (buildingDS) { viewer.dataSources.remove(buildingDS, true); buildingDS = null; }
-    buildingDS = new Cesium.CustomDataSource('buildings');
-    const CHUNK = 300;
-    for (let start = 0; start < DATA.length; start += CHUNK) {
-      const end = Math.min(start + CHUNK, DATA.length);
-      for (let i = start; i < end; i++) {
-        const b = DATA[i];
-        const ring = b.coordinates[0];
-        if (!ring || ring.length < 3) continue;
-        const flat = [];
-        for (const [lo, la] of ring) { flat.push(lo, la); }
-        const h = Math.max(3, b.height || (b.floors ? b.floors * 3 : 6));
-        const c = ringCentroid(ring);
-        const baseH = window.getBuildingBaseOffset(c.lon, c.lat);
-        const roofH = baseH + h;
-        const col = getBuildingColor(b);
+    // Remove the previous batched primitive (frees its GPU + worker memory).
+    if (buildingPrimitive) { viewer.scene.primitives.remove(buildingPrimitive); buildingPrimitive = null; }
 
-        // Roof cap — flat polygon on top
-        const eRoof = buildingDS.entities.add({
-          polygon: {
-            hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
-            height: roofH,
-            material: col.brighten(0.15, new Cesium.Color()).withAlpha(0.95),
-            outline: false,
-          },
-        });
-        eRoof._dataIdx = i;
-
-        // Facade walls — explicit vertical surfaces, clearly visible from any angle
-        const wallPositions = Cesium.Cartesian3.fromDegreesArray(flat);
-        const maxH = new Array(ring.length).fill(roofH);
-        const minH = new Array(ring.length).fill(baseH);
-        const eWall = buildingDS.entities.add({
-          wall: {
-            positions: wallPositions,
-            maximumHeights: maxH,
-            minimumHeights: minH,
-            material: col.withAlpha(0.90),
-            outline: true,
-            outlineColor: col.darken(0.3, new Cesium.Color()).withAlpha(1.0),
-          },
-        });
-        eWall._dataIdx = i;
+    // One GeometryInstance per building — an extruded polygon (walls + roof +
+    // floor as a single solid) — all batched into ONE Cesium.Primitive. This
+    // draws ~93k buildings in a handful of GPU batches instead of ~186k Cesium
+    // entities, which used to exhaust browser memory and crash the tab.
+    const instances = [];
+    const VF = Cesium.PerInstanceColorAppearance.VERTEX_FORMAT;
+    for (let i = 0; i < DATA.length; i++) {
+      const b = DATA[i];
+      const ring = b.coordinates && b.coordinates[0];
+      if (!ring || ring.length < 3) continue;
+      const flat = [];
+      for (const [lo, la] of ring) { flat.push(lo, la); }
+      const h = Math.max(3, b.height || (b.floors ? b.floors * 3 : 6));
+      const c = ringCentroid(ring);
+      const baseH = window.getBuildingBaseOffset(c.lon, c.lat);
+      const col = getBuildingColor(b);
+      instances.push(new Cesium.GeometryInstance({
+        geometry: new Cesium.PolygonGeometry({
+          polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
+          height: baseH,
+          extrudedHeight: baseH + h,
+          vertexFormat: VF,
+        }),
+        attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(col) },
+        // Picked as h.id._dataIdx in ui.js — behaviour preserved.
+        id: { _dataIdx: i },
+      }));
+      // Yield periodically so building the instance list never freezes the UI.
+      if ((i & 8191) === 0) {
+        setLoading('Preparing ' + DATA.length.toLocaleString() + ' buildings... ' + Math.round(i / DATA.length * 100) + '%');
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(r => setTimeout(r, 0));
       }
-      setLoading('Loading buildings... ' + Math.round(end / DATA.length * 100) + '%');
-      await new Promise(r => setTimeout(r, 0));
     }
-    await viewer.dataSources.add(buildingDS);
+
+    setLoading('Rendering buildings...');
+    buildingPrimitive = new Cesium.Primitive({
+      geometryInstances: instances,
+      appearance: new Cesium.PerInstanceColorAppearance({ closed: true, translucent: false }),
+      asynchronous: true,          // Cesium tessellates in web workers, off the main thread
+      releaseGeometryInstances: true,
+    });
+    buildingPrimitive.show = eubuccoVisible;
+    viewer.scene.primitives.add(buildingPrimitive);
+
+    // Clear the loader once the primitive has finished tessellating.
+    await new Promise((resolve) => {
+      let waited = 0;
+      const tick = () => {
+        if (!buildingPrimitive || buildingPrimitive.ready || waited > 20000) { resolve(); return; }
+        waited += 16;
+        requestAnimationFrame(tick);
+      };
+      tick();
+    });
     setLoading('');
   } finally {
     rebuildInProgress = false;
@@ -512,7 +523,7 @@ async function toggleOsmBuildings(on, { skipAutoRebuild = false } = {}) {
     // mesh - recalibrate against whichever ground-truth layer(s) are now active so
     // our own extruded buildings don't end up floating below/above it.
     await refreshBuildingBaseOffsetFromTiles();
-    if (buildingDS) await rebuildBuildings();
+    if (buildingPrimitive) await rebuildBuildings();
   }
 }
 window.toggleOsmBuildings = toggleOsmBuildings;
@@ -555,7 +566,7 @@ viewer.camera.flyTo({
   if (window.VIEWER_COUNTRY && window.VIEWER_COUNTRY !== 'se') {
     await toggleOsmBuildings(true, { skipAutoRebuild: true });
   }
-  // buildingDS is still null here, so calibrating first means the very first
+  // buildingPrimitive is still null here, so calibrating first means the very first
   // build is already correctly aligned - no misaligned flash on first load.
   await refreshBuildingBaseOffsetFromTiles();
   await rebuildBuildings();

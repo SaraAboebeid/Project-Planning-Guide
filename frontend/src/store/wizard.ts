@@ -81,13 +81,14 @@ export interface RenovationCalcBuildingResult {
 }
 
 export interface RenovationCalcPackage {
-  id: string;               // "baseline" | `pkg-${uuid}`
+  id: string;               // "baseline" | `pkg-${uuid}` (suffixed `__<scenario>` per climate)
   name: string;
   color: string;
   isBaseline: boolean;
   selections: Record<string, RenovationCalcSelection>; // key = AreaLineItem.key
   batchId: string | null;   // the shared EPSM batch_id polled for every building below
   buildings: RenovationCalcBuildingResult[];
+  climateScenario?: string; // weather file this run used ("baseline" | "2050_ssp585" | …)
 }
 
 /* ── State shape ── */
@@ -135,6 +136,8 @@ interface ProjectState {
   savedWWR: WWRRecord | null;
   /* raw bbox coords from the map draw (north/south/east/west) */
   currentBbox: { north: number; south: number; east: number; west: number } | null;
+  /* optional drawn polygon "lon,lat;lon,lat;…" refining the bbox to any shape */
+  selectionPolygon: string | null;
   /* all bbox building rows loaded in step 2 */
   bboxRows: BuildingRecord[];
   /* simulation material selections (Step 4, Renovation) */
@@ -198,6 +201,7 @@ const DEFAULT_PROJECT: ProjectState = {
   lookedUpBuildings: [],
   bboxStats: null,
   currentBbox: null,
+  selectionPolygon: null,
   bboxRows: [],
   savedWWR: null,
   simulationMaterials: {},

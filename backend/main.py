@@ -706,15 +706,51 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
 
 
 # ── All buildings within a bounding box — aggregate stats ───────────────────
+def _parse_polygon(s: str | None) -> list[tuple[float, float]] | None:
+    """Parse a "lon,lat;lon,lat;..." string into a list of (lon, lat) vertices."""
+    if not s:
+        return None
+    pts: list[tuple[float, float]] = []
+    for pair in s.split(";"):
+        pair = pair.strip()
+        if not pair:
+            continue
+        try:
+            lon_s, lat_s = pair.split(",")
+            pts.append((float(lon_s), float(lat_s)))
+        except Exception:  # noqa: BLE001
+            continue
+    return pts if len(pts) >= 3 else None
+
+
+def _point_in_poly(lon: float, lat: float, poly: list[tuple[float, float]]) -> bool:
+    """Ray-casting point-in-polygon test. poly is a list of (lon, lat)."""
+    inside = False
+    n = len(poly)
+    j = n - 1
+    for i in range(n):
+        xi, yi = poly[i]
+        xj, yj = poly[j]
+        if ((yi > lat) != (yj > lat)) and (lon < (xj - xi) * (lat - yi) / (yj - yi + 1e-15) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+
 @app.get("/api/buildings/bbox/stats")
 def buildings_bbox_stats(
     north: float = Query(...),
     south: float = Query(...),
     east:  float = Query(...),
     west:  float = Query(...),
+    polygon: str | None = Query(None),
 ):
-    """Return aggregate EUBUCCO stats for every building whose centroid is inside the bbox."""
+    """Return aggregate EUBUCCO stats for every building whose centroid is inside
+    the bbox. If a ``polygon`` (lon,lat;… vertices) is given, the bbox is used as
+    a fast prefilter and buildings are then refined to those inside the polygon,
+    so an arbitrary drawn shape selects exactly its buildings."""
     from collections import Counter
+    poly = _parse_polygon(polygon)
     all_buildings = _get_buildings_list()
     matched: list = []
     for b in all_buildings:
@@ -723,6 +759,8 @@ def buildings_bbox_stats(
         if c_lat == 0.0 and c_lon == 0.0:
             continue
         if south <= c_lat <= north and west <= c_lon <= east:
+            if poly and not _point_in_poly(c_lon, c_lat, poly):
+                continue
             matched.append(b)
 
     count = len(matched)
@@ -816,21 +854,23 @@ def buildings_bbox_list(
     east:  float | None = Query(None),
     west:  float | None = Query(None),
     district: str | None = Query(None),
+    polygon: str | None = Query(None),
 ):
     """Return individual building records, joined with Boplats rental data where available.
 
-    Either a bounding box (north/south/east/west) or a ``district`` name
-    (Gothenburg primärområde, e.g. "Lindholmen") selects the buildings. When
-    ``district`` is given, every building whose ``primary_area`` matches is
-    returned regardless of bbox — this powers neighborhood-scale auto-selection.
+    Selection is by ``district`` name (Gothenburg primärområde), a bounding box
+    (north/south/east/west), or — for an arbitrary drawn shape — a bbox plus a
+    ``polygon`` (lon,lat;… vertices) which refines the bbox matches to those
+    whose centroid falls inside the polygon.
     """
     import re, sqlite3, httpx
     from concurrent.futures import ThreadPoolExecutor, wait as fut_wait
 
-    # ── Match buildings by district name or bbox ─────────────────────────────
+    # ── Match buildings by district name or bbox (optionally polygon-refined) ─
     all_buildings = _get_buildings_list()
     matched: list[tuple] = []
     have_bbox = None not in (north, south, east, west)
+    poly = _parse_polygon(polygon)
     if district:
         want = district.strip().casefold()
         for b in all_buildings:
@@ -850,9 +890,11 @@ def buildings_bbox_list(
             if c_lat == 0.0 and c_lon == 0.0:
                 continue
             if south <= c_lat <= north and west <= c_lon <= east:
+                if poly and not _point_in_poly(c_lon, c_lat, poly):
+                    continue
                 matched.append((b, round(c_lat, 6), round(c_lon, 6)))
         if not matched:
-            raise HTTPException(404, "No buildings found in bounding box")
+            raise HTTPException(404, "No buildings found in the drawn area" if poly else "No buildings found in bounding box")
     else:
         raise HTTPException(422, "Provide either a bounding box or a district name")
 
@@ -2069,12 +2111,54 @@ EPW_DIR = PROJECT_ROOT / "data" / "epw"
 # data/epw/. All 4 London districts share one weather station (Heathrow).
 CITY_TO_EPW = {
     "gothenburg": "SWE_VG_Goteborg.City.AP.025120_TMYx.2009-2023.epw",
-    "london_kings_cross": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
-    "london_westminster": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
-    "london_canary_wharf": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
-    "london_southwark": "GBR_ENG_London-Heathrow.Intl.AP.037720_TMYx.2011-2025.epw",
+    "london_kings_cross": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
+    "london_westminster": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
+    "london_canary_wharf": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
+    "london_southwark": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
     "rotherham": "GBR_ENG_Doncaster.Sheffield-Hood.AP.034054_TMYx.2011-2025.epw",
 }
+
+# Gothenburg climate scenarios (Landvetter AP station). "baseline" is the
+# current-climate TMY; the others are morphed future-climate EPWs (SSP pathway ×
+# horizon) so Step 4 can test how a retrofit performs under future weather.
+GOTHENBURG_CLIMATE_SCENARIOS = {
+    "baseline":    "SWE_VG_Gothenburg-Landvetter.AP.025260_TMYx.2011-2025.epw",
+    "2050_ssp245": "SWE_VG_Gothenburg-Landvetter.AP_CNRM-CM6-1-HR_ssp245_2050.epw",
+    "2050_ssp370": "SWE_VG_Gothenburg-Landvetter.AP_CNRM-CM6-1-HR_ssp370_2050.epw",
+    "2050_ssp585": "SWE_VG_Gothenburg-Landvetter.AP_CNRM-CM6-1-HR_ssp585_2050.epw",
+    "2080_ssp126": "SWE_VG_Gothenburg-Landvetter.AP_EC-Earth3_ssp126_2080.epw",
+    "2080_ssp245": "SWE_VG_Gothenburg-Landvetter.AP_EC-Earth3_ssp245_2080.epw",
+    "2080_ssp370": "SWE_VG_Gothenburg-Landvetter.AP_EC-Earth3_ssp370_2080.epw",
+    "2080_ssp585": "SWE_VG_Gothenburg-Landvetter.AP_EC-Earth3_ssp585_2080.epw",
+}
+
+
+def _resolve_epw(city_id: Optional[str], country: str, climate_scenario: Optional[str]) -> str:
+    """Pick the EPW filename. For Gothenburg a climate_scenario (default
+    'baseline' = Landvetter TMY) selects current vs future-climate weather."""
+    if (country or "").lower() == "se" or city_id == "gothenburg":
+        return GOTHENBURG_CLIMATE_SCENARIOS.get(
+            climate_scenario or "baseline", GOTHENBURG_CLIMATE_SCENARIOS["baseline"])
+    return CITY_TO_EPW.get(city_id or "", "")
+
+
+@app.get("/api/climate-scenarios")
+def climate_scenarios(country: str = Query("se")):
+    """List the climate scenarios available for a country (Step 4 picker)."""
+    if country.lower() != "se":
+        return {"country": country, "scenarios": [{"id": "baseline", "label": "Current climate (TMY)"}]}
+    labels = {
+        "baseline":    "Current climate (TMY 2011–2025)",
+        "2050_ssp245": "2050 · SSP2-4.5 (middle-of-the-road)",
+        "2050_ssp370": "2050 · SSP3-7.0 (high emissions)",
+        "2050_ssp585": "2050 · SSP5-8.5 (very high emissions)",
+        "2080_ssp126": "2080 · SSP1-2.6 (low emissions)",
+        "2080_ssp245": "2080 · SSP2-4.5 (middle-of-the-road)",
+        "2080_ssp370": "2080 · SSP3-7.0 (high emissions)",
+        "2080_ssp585": "2080 · SSP5-8.5 (very high emissions)",
+    }
+    return {"country": "se",
+            "scenarios": [{"id": k, "label": labels[k]} for k in GOTHENBURG_CLIMATE_SCENARIOS]}
 
 
 def _floors_of(building_info: dict) -> int:
@@ -2191,6 +2275,8 @@ class SimulationSubmitRequest(BaseModel):
     # behavior unchanged.
     package_id: str = "baseline"
     package_label: Optional[str] = None
+    # Gothenburg only: which weather to simulate against (see GOTHENBURG_CLIMATE_SCENARIOS).
+    climate_scenario: Optional[str] = None
 
 
 class BatchBuildingSpec(BaseModel):
@@ -2211,6 +2297,8 @@ class SimulationBatchSubmitRequest(BaseModel):
     u_floor_override: Optional[float] = None
     package_id: str = "baseline"
     package_label: Optional[str] = None
+    # Gothenburg only: which weather to simulate against (see GOTHENBURG_CLIMATE_SCENARIOS).
+    climate_scenario: Optional[str] = None
 
 
 @app.post("/api/simulation-submit")
@@ -2224,7 +2312,7 @@ async def submit_simulation(req: SimulationSubmitRequest):
     if req.country == "gb" and not city_id:
         city_id = _resolve_uk_city_id(req.lat, req.lon)
 
-    epw_name = CITY_TO_EPW.get(city_id or "")
+    epw_name = _resolve_epw(city_id, req.country, req.climate_scenario)
     if not epw_name:
         raise HTTPException(400, f"No weather file mapped for city_id '{city_id}'")
     epw_path = EPW_DIR / epw_name
@@ -2368,7 +2456,7 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
         first = req.buildings[0]
         city_id = _resolve_uk_city_id(first.lat, first.lon)
 
-    epw_name = CITY_TO_EPW.get(city_id or "")
+    epw_name = _resolve_epw(city_id, req.country, req.climate_scenario)
     if not epw_name:
         raise HTTPException(400, f"No weather file mapped for city_id '{city_id}'")
     epw_path = EPW_DIR / epw_name

@@ -57,7 +57,10 @@
   });
 
   const dataUrl = city.data_file || 'buildings.json';
-  const response = await fetch(`${dataUrl}${versionSuffix}`, { cache: 'no-store' });
+  // The ?v=<build version> suffix already busts the cache on every rebuild, so
+  // let the browser cache this ~58 MB payload between reloads of the same build
+  // (was cache:'no-store', which re-downloaded it every single time).
+  const response = await fetch(`${dataUrl}${versionSuffix}`, { cache: 'default' });
   if (!response.ok) {
     throw new Error(`Could not load ${dataUrl} (${response.status})`);
   }
@@ -92,4 +95,23 @@
     // eslint-disable-next-line no-await-in-loop
     await loadScript(src);
   }
-})();
+})().catch((err) => {
+  // Any boot failure (data fetch, a script failing to load, JSON parse) used to
+  // throw unhandled and leave the viewer stuck forever on the loading screen.
+  // Surface it instead so the problem is visible.
+  const el = document.getElementById('loading');
+  if (el) {
+    el.style.display = 'flex';
+    el.innerHTML =
+      '<div style="text-align:center;padding:40px;max-width:460px">' +
+      '<div style="font-size:44px;margin-bottom:14px">&#9888;&#65039;</div>' +
+      '<h1 style="color:#F5A623;font-size:17px;margin-bottom:10px">The 3D viewer failed to load</h1>' +
+      '<p style="color:#94a3b8;font-size:13px;line-height:1.7">' +
+      String((err && err.message) || err).replace(/[<>&]/g, '') +
+      '<br><br>Check that the backend/dev server is running, then reload. ' +
+      'If it persists, open the browser console for details.</p>' +
+      '</div>';
+  }
+  // eslint-disable-next-line no-console
+  console.error('[viewer] boot failed:', err);
+});

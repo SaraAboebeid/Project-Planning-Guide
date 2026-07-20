@@ -969,12 +969,14 @@ function BboxDataBanner({
   bboxStats: bboxStatsProp,
   bbox,
   district,
+  polygon,
   onRowsChange,
   onSelectionChange,
 }: {
   bboxStats: BboxStats | null;
   bbox: { north: number; south: number; east: number; west: number } | null;
   district?: string | null;
+  polygon?: string | null;
   onRowsChange?: (rows: BuildingRecord[]) => void;
   onSelectionChange?: (selected: Set<number>) => void;
 }) {
@@ -1009,11 +1011,11 @@ function BboxDataBanner({
     try {
       const data = district
         ? await api.buildingsByDistrict(district)
-        : await api.buildingsBboxList(bbox!.north, bbox!.south, bbox!.east, bbox!.west);
+        : await api.buildingsBboxList(bbox!.north, bbox!.south, bbox!.east, bbox!.west, polygon ?? undefined);
       setRows(data);
-      // Auto-select the entire neighborhood so Steps 3-4 simulate all of it
-      // (the user can still uncheck buildings to narrow the scope).
-      if (district) setSelected(new Set(data.map((_, i) => i)));
+      // Auto-select the whole selection (district or drawn shape) so Steps 3-4
+      // simulate all of it (the user can still uncheck buildings to narrow).
+      if (district || polygon) setSelected(new Set(data.map((_, i) => i)));
     } finally {
       setLoading(false);
     }
@@ -1870,6 +1872,7 @@ export default function DataCoverage() {
           bboxStats={bboxStats}
           bbox={project.currentBbox ?? null}
           district={project.district ?? null}
+          polygon={project.selectionPolygon ?? null}
           onRowsChange={setBboxRows}
           onSelectionChange={setBboxSelectedIdx}
         />

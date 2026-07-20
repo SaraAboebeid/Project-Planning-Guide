@@ -194,34 +194,66 @@ def process_data() -> dict:
     print("Loading EPC footprints ...")
     con = duckdb.connect("data/sensitivity/epc_sweden.duckdb", read_only=True)
     epc_raw = con.execute("""
+        WITH epc_cad AS (
+            -- Representative property EPC per cadastral: the declaration covering
+            -- the MOST addresses (the shared/BRF one). One energideklaration often
+            -- covers a whole property (several buildings + entrances) but Lantmäteriet
+            -- only FormularId-links it to ONE footprint. This lets that rating also
+            -- attach to the property's other HEATED buildings (not garages/sheds).
+            -- Restricted to the Gothenburg region to avoid cadastral-name collisions
+            -- with other municipalities.
+            SELECT cad, energy, cls, atemp, yr, floors, all_addr, first_addr FROM (
+                SELECT UPPER(TRIM(IdFastBet)) AS cad,
+                       MIN(EgiSpecifikEnergianvandning) AS energy,
+                       MIN(EgiEnergiklass)              AS cls,
+                       MAX(EgenAtemp)                   AS atemp,
+                       MIN(EgenNybyggAr)                AS yr,
+                       MAX(EgenAntalPlan)               AS floors,
+                       STRING_AGG(DISTINCT TRIM(IdAdr), ' | ' ORDER BY TRIM(IdAdr)) AS all_addr,
+                       MIN(IdAdr)                       AS first_addr,
+                       ROW_NUMBER() OVER (PARTITION BY UPPER(TRIM(IdFastBet))
+                                          ORDER BY COUNT(DISTINCT TRIM(IdAdr)) DESC, FormularId DESC) AS rn
+                FROM epc
+                WHERE IdFastBet IS NOT NULL AND TRIM(IdFastBet) != ''
+                  AND IdAdr IS NOT NULL AND TRIM(IdAdr) != ''
+                  AND EgiSpecifikEnergianvandning IS NOT NULL
+                  AND IdKommun IN ('Göteborg','Mölndal','Partille','Härryda','Kungälv','Ale',
+                                   'Lerum','Öckerö','Kungsbacka','Stenungsund','Tjörn','Lilla Edet',
+                                   'Alingsås','Bollebygd')
+                GROUP BY UPPER(TRIM(IdFastBet)), FormularId
+            ) WHERE rn = 1
+        )
         SELECT
             f.FormularId,
             f.geom,
             f.andamal1,
             f.fastighetsbeteckning,
-            e_agg.year_built,
-            e_agg.floors_epc,
-            e_agg.area_atemp,
-            e_agg.energy_kwh_m2,
-            e_agg.energy_class,
+            -- FormularId link first; else the property (cadastral) EPC for heated buildings.
+            COALESCE(e_agg.year_built,    CASE WHEN f.FormularId IS NULL AND f.andamal1 NOT ILIKE 'Komplement%' THEN MAX(c.yr)     END) AS year_built,
+            COALESCE(e_agg.floors_epc,    CASE WHEN f.FormularId IS NULL AND f.andamal1 NOT ILIKE 'Komplement%' THEN MAX(c.floors) END) AS floors_epc,
+            COALESCE(e_agg.area_atemp,    CASE WHEN f.FormularId IS NULL AND f.andamal1 NOT ILIKE 'Komplement%' THEN MAX(c.atemp)  END) AS area_atemp,
+            COALESCE(e_agg.energy_kwh_m2, CASE WHEN f.FormularId IS NULL AND f.andamal1 NOT ILIKE 'Komplement%' THEN MAX(c.energy) END) AS energy_kwh_m2,
+            COALESCE(e_agg.energy_class,  CASE WHEN f.FormularId IS NULL AND f.andamal1 NOT ILIKE 'Komplement%' THEN MAX(c.cls)    END) AS energy_class,
             -- Primary display address: the building's own entrance (matched on
-            -- husnummer), else the declaration's first address.
+            -- husnummer), else the declaration's first address, else the property EPC's.
             COALESCE(
                 MIN(CASE WHEN TRY_CAST(f.husnummer AS BIGINT) = e.IdHusnr
                               THEN TRIM(e.IdAdr) END),
-                e_agg.address
+                e_agg.address,
+                CASE WHEN f.FormularId IS NULL AND f.andamal1 NOT ILIKE 'Komplement%' THEN MAX(c.first_addr) END
             ) AS address,
             -- ALL entrance addresses for this building. One EPC (FormularId) can
             -- list many addresses (e.g. Markmyntsgatan 16A-16E all on the same
             -- footprint); keep every one so no entrance is silently dropped and
             -- a search for "16C" can still resolve. Prefer the husnummer-matched
-            -- set, fall back to every address on the declaration.
+            -- set, then the declaration's, then the property EPC's addresses.
             COALESCE(
                 STRING_AGG(DISTINCT CASE WHEN TRY_CAST(f.husnummer AS BIGINT) = e.IdHusnr
                                               THEN TRIM(e.IdAdr) END, ' | '
                            ORDER BY CASE WHEN TRY_CAST(f.husnummer AS BIGINT) = e.IdHusnr
                                               THEN TRIM(e.IdAdr) END),
-                e_agg.all_addresses
+                e_agg.all_addresses,
+                CASE WHEN f.FormularId IS NULL AND f.andamal1 NOT ILIKE 'Komplement%' THEN MAX(c.all_addr) END
             ) AS all_addresses
         FROM footprints f
         LEFT JOIN epc e ON f.FormularId = e.FormularId
@@ -241,6 +273,7 @@ def process_data() -> dict:
             WHERE IdAdr IS NOT NULL AND TRIM(IdAdr) != ''
             GROUP BY FormularId
         ) e_agg ON f.FormularId = e_agg.FormularId
+        LEFT JOIN epc_cad c ON UPPER(TRIM(f.fastighetsbeteckning)) = c.cad
         WHERE f.geom IS NOT NULL
         GROUP BY f.FormularId, f.objektidentitet, f.geom,
                  f.andamal1, f.fastighetsbeteckning, f.husnummer,
