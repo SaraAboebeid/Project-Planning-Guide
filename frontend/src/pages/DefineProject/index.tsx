@@ -15,6 +15,7 @@ import {
   EXPLORATION_OPTIONS,
   EXPLORATION_CONSTRAINTS,
   SCALE_OPTIONS_BY_TYPE,
+  PORTFOLIO_OWNERS,
   BUILDING_USES,
   RE_ELECTRICITY_THRESHOLDS,
   BUILDING_DEVELOPMENT_OPTIONS,
@@ -889,6 +890,28 @@ export default function DefineProject() {
                 <p className="text-xs text-gray-500 mt-1">Name the neighborhood/district this project covers.</p>
               </>
             )}
+          </div>
+        )}
+
+        {/* Property owner — shown at Portfolio scale. Placeholder registry for
+            now; the building→owner mapping is filled in later. */}
+        {project.scale === "Portfolio" && (
+          <div className="mt-4">
+            <Label>Property owner</Label>
+            <select
+              value={project.propertyOwner ?? ""}
+              onChange={(e) => setProject({ propertyOwner: e.target.value || null })}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
+              style={{ backgroundColor: "#11161d", color: "#fff" }}
+            >
+              <option value="" style={{ backgroundColor: "#11161d", color: "#fff" }}>Select a property owner…</option>
+              {PORTFOLIO_OWNERS.map((owner) => (
+                <option key={owner} value={owner} style={{ backgroundColor: "#11161d", color: "#fff" }}>{owner}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Placeholder list — buildings will be mapped to their owner later; this scopes the portfolio to one owner.
+            </p>
           </div>
         )}
       </Card>}

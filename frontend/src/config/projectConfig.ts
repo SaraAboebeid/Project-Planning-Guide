@@ -198,12 +198,12 @@ export const EXPLORATION_CONSTRAINTS: Record<string, ExplorationConstraint> = {
     hint: "Select exactly 1 KPI",
   },
   "Multi-objective Optimization": {
-    min_kpis: 2,
-    max_kpis: 5,
+    min_kpis: 1,
+    max_kpis: null,
     icon: "⚖️",
     description:
-      "Find optimal trade-offs between 2–5 competing objectives.",
-    hint: "Select 2–5 KPIs",
+      "Find optimal trade-offs between competing objectives.",
+    hint: "Select one or more KPIs",
     weighting: true,
   },
   "Resource Allocation Planning": {
@@ -239,6 +239,21 @@ export const SCALE_OPTIONS_BY_TYPE: Record<ProjectType, string[]> = {
   "Renovation Planning": ["Building", "Portfolio", "Neighborhood", "City"],
   "Renewable Energy Planning": ["Building", "Portfolio", "Neighborhood", "City"],
 };
+
+// ── Property owners (Portfolio scale) ──────────────────────────────────────
+// Placeholder registry of Gothenburg property owners, shown as a dropdown when
+// the Portfolio scale is selected. Alphabetical. The building→owner mapping is
+// filled in later; for now this only records which owner a portfolio project is
+// scoped to.
+export const PORTFOLIO_OWNERS = [
+  "Akademiska Hus",
+  "Balder",
+  "Bostadsbolaget",
+  "Familjebostäder",
+  "Poseidon",
+  "Stena Fastigheter",
+  "Wallenstam",
+];
 
 // ── Building Uses (Neighborhood scale) ─────────────────────────────────────
 

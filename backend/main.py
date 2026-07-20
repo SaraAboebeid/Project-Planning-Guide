@@ -2848,6 +2848,98 @@ def _chat_tool_find_address(args: dict) -> dict:
     return {"matches": out, "count": len(out)}
 
 
+# ── Raw EPC (energideklaration) dataset introspection ────────────────────────
+# The tools above answer questions about the merged buildings.json. These two let
+# the assistant answer questions about the underlying Boverket EPC dataset itself
+# — which FIELDS it contains and how well-populated they are (e.g. "do EPCs have
+# an owner-name field?", "how many list a ventilation type?"). Backed by the
+# read-only DuckDB (national EPC table, ~1.88M rows, 262 columns).
+_EPC_DB_PATH = PROJECT_ROOT / "data" / "sensitivity" / "epc_sweden.duckdb"
+
+# Human concept → real column-name substrings, so the model can ask in plain
+# language. A concept that maps to NO column simply isn't in the dataset.
+_EPC_FIELD_SYNONYMS = {
+    "energy": ["EgiSpecifik", "Egi"], "energy class": ["EgiEnergiklass"],
+    "area": ["Atemp"], "atemp": ["Atemp"], "year": ["Nybygg", "Ar"],
+    "address": ["IdAdr", "IdPostnr", "IdPostort"], "cadastral": ["IdFastBet"],
+    "municipality": ["IdKommun"], "ventilation": ["Vent"], "heating": ["Uppv", "Varme"],
+    "cooling": ["Kyla", "Fjarrkyla"], "radon": ["Rad"], "measures": ["Atg"],
+    "owner": ["agare", "ägare", "owner", "namn"], "name": ["namn", "name"],
+}
+_EPC_COLS_CACHE: list[str] | None = None
+_EPC_ROWS_CACHE: int | None = None
+
+
+def _epc_con():
+    import duckdb
+    return duckdb.connect(str(_EPC_DB_PATH), read_only=True)
+
+
+def _epc_cols_rows():
+    global _EPC_COLS_CACHE, _EPC_ROWS_CACHE
+    if _EPC_COLS_CACHE is None:
+        con = _epc_con()
+        try:
+            _EPC_COLS_CACHE = [c[1] for c in con.execute("PRAGMA table_info('epc')").fetchall()]
+            _EPC_ROWS_CACHE = con.execute("SELECT COUNT(*) FROM epc").fetchone()[0]
+        finally:
+            con.close()
+    return _EPC_COLS_CACHE, _EPC_ROWS_CACHE
+
+
+def _chat_tool_epc_dataset_info(_args: dict) -> dict:
+    cols, rows = _epc_cols_rows()
+    con = _epc_con()
+    try:
+        declarations = con.execute("SELECT COUNT(DISTINCT FormularId) FROM epc").fetchone()[0]
+    finally:
+        con.close()
+    return {
+        "source": "Boverket energideklaration (EPC) register — national Sweden dataset",
+        "total_epc_records": rows,
+        "distinct_declarations": declarations,
+        "total_columns": len(cols),
+        "available_fields": {
+            "specific energy use (kWh/m²/yr)": "EgiSpecifikEnergianvandning",
+            "energy class A–G": "EgiEnergiklass",
+            "heated floor area ATEMP (m²)": "EgenAtemp",
+            "build year": "EgenNybyggAr",
+            "street address": "IdAdr", "postcode": "IdPostnr", "municipality": "IdKommun",
+            "cadastral (fastighetsbeteckning)": "IdFastBet", "house number": "IdHusnr",
+            "ventilation type": "VentTyp*", "improvement proposals": "AtgForslag*",
+        },
+        "not_included": [
+            "owner name (ägarens namn) — no owner/person-name field exists (Boverket omits personal data)",
+            "any personal / contact data",
+        ],
+        "note": "Use search_epc_fields to check whether a specific field exists and how many records populate it.",
+    }
+
+
+def _chat_tool_search_epc_fields(args: dict) -> dict:
+    cols, rows = _epc_cols_rows()
+    kw = (args.get("keyword") or "").strip()
+    if not kw:
+        return {"error": "keyword required"}
+    needles = [kw.lower()] + [s.lower() for s in _EPC_FIELD_SYNONYMS.get(kw.lower(), [])]
+    matched = sorted({c for c in cols for n in needles if n in c.lower()})
+    if not matched:
+        return {
+            "keyword": kw, "matched_columns": [], "total_epc_records": rows,
+            "answer": f"No EPC field matches '{kw}'. This dataset does not include that information "
+                      f"(it has {len(cols)} fields, none related to '{kw}').",
+        }
+    con = _epc_con()
+    out = []
+    try:
+        for c in matched[:12]:
+            nn = con.execute(f'SELECT COUNT("{c}") FROM epc').fetchone()[0]
+            out.append({"column": c, "records_with_value": nn, "coverage_pct": round(nn / rows * 100, 1)})
+    finally:
+        con.close()
+    return {"keyword": kw, "total_epc_records": rows, "matched_columns": out}
+
+
 _CHAT_TOOLS = [
     {"name": "get_city_overview",
      "description": "Overall statistics for all mapped buildings in central Gothenburg: total count, EPC-rated count and coverage, average specific energy use, energy-class distribution, average build year and heated area.",
@@ -2861,6 +2953,12 @@ _CHAT_TOOLS = [
     {"name": "find_buildings_by_address",
      "description": "Find buildings whose street address (any entrance) matches a query. Returns EPC class, specific energy use, build year, use type, neighborhood and heated area for each match.",
      "input_schema": {"type": "object", "properties": {"query": {"type": "string", "description": "Street/address text to search for"}}, "required": ["query"]}},
+    {"name": "get_epc_dataset_info",
+     "description": "Describe the raw Boverket EPC (energideklaration) dataset itself: total records, distinct declarations, which FIELDS it contains and which are NOT included (e.g. owner name is not present). Use this for questions about what data an EPC holds or what fields the dataset has.",
+     "input_schema": {"type": "object", "properties": {}, "required": []}},
+    {"name": "search_epc_fields",
+     "description": "Check whether the EPC dataset contains a given kind of field and how many records populate it. Give a keyword/concept (e.g. 'owner name', 'ventilation', 'radon', 'cooling', 'energy class'); returns the matching EPC columns with their record counts and coverage %, or states clearly that no such field exists. Use this to answer 'how many EPCs have X' or 'do EPCs include X' questions.",
+     "input_schema": {"type": "object", "properties": {"keyword": {"type": "string", "description": "Field concept to look for, e.g. 'owner name', 'ventilation', 'radon'"}}, "required": ["keyword"]}},
 ]
 
 _CHAT_TOOL_IMPL = {
@@ -2868,6 +2966,8 @@ _CHAT_TOOL_IMPL = {
     "get_district_stats":        _chat_tool_district_stats,
     "list_districts":            _chat_tool_list_districts,
     "find_buildings_by_address": _chat_tool_find_address,
+    "get_epc_dataset_info":      _chat_tool_epc_dataset_info,
+    "search_epc_fields":         _chat_tool_search_epc_fields,
 }
 
 _CHAT_SYSTEM = (
@@ -2881,9 +2981,16 @@ _CHAT_SYSTEM = (
     "area (ATEMP), and build year.\n"
     "- Buildings are grouped into official neighborhoods (primärområden) such as Majorna, "
     "Lindholmen, Gamlestaden, Askim.\n"
-    "- Construction U-values come from TABULA archetypes.\n\n"
+    "- Construction U-values come from TABULA archetypes.\n"
+    "- The underlying national Boverket EPC register (~1.88M records) can be inspected for "
+    "which FIELDS it contains and their coverage (get_epc_dataset_info, search_epc_fields). "
+    "It has energy, class, area, year, address, cadastral and technical fields, but NO "
+    "owner-name or personal-data fields.\n\n"
     "Rules:\n"
     "- ALWAYS use the tools to get real numbers. NEVER invent or guess statistics.\n"
+    "- For questions about what an EPC/energideklaration contains, which fields exist, or "
+    "'how many EPCs have <field>', use get_epc_dataset_info and search_epc_fields rather "
+    "than declining — even if the field turns out not to exist, confirm that via the tool.\n"
     "- Detect the user's language (English or Swedish) and reply in THAT SAME language: "
     "a Swedish question gets a Swedish answer, an English question gets an English answer.\n"
     "- Be concise and friendly; give numbers with brief context.\n"
