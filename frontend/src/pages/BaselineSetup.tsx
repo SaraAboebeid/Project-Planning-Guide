@@ -145,6 +145,9 @@ export default function BaselineSetup() {
     try {
       const { batch_id } = await api.simulationBatchSubmit({
         country: isUK ? "gb" : "se",
+        // Sweden needs an explicit city_id (only "gothenburg" is mapped); UK omits
+        // it and the server resolves the nearest district from lat/lon.
+        ...(isUK ? {} : { city_id: "gothenburg" }),
         buildings: runList.map((b) => ({ lat: b.lat, lon: b.lon, address: b.address })),
         package_id: "baseline",
       });

@@ -26,6 +26,30 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 import type { EpcSnapshot, EpcPassport, TabulaArchetype, MatchConfidence, BuildingLookup, BboxStats, BuildingRecord, WWRRecord, BoverketResource } from "../types";
 
+/* ── Optimizer (POST /api/optimize) ── */
+export interface OptimizeOption { code: string; label?: string; u_value: number; cost: number; carbon: number; }
+export interface OptimizeComponentInput { key: string; area_m2: number; baseline_u: number; options: OptimizeOption[]; }
+export interface OptimizeParams {
+  f_dh: number; energy_price: number; carbon_factor_heat: number; discount_rate: number;
+  study_period_yr: number; floor_area_m2: number; baseline_total_kwh_m2_yr: number;
+}
+export interface OptimizeRequestBody {
+  components: OptimizeComponentInput[]; params: OptimizeParams; max_results?: number;
+}
+export interface OptimizePoint {
+  energy_kwh_m2_yr: number; total_cost: number; total_carbon: number;
+  initial_cost: number; initial_carbon: number; htr_w_per_k: number;
+  selections: Record<string, string>; selection_labels: Record<string, string>; tags?: string[];
+}
+export interface OptimizeCloudPoint { energy_kwh_m2_yr: number; total_cost: number; total_carbon: number; }
+export interface OptimizeResponse {
+  baseline: { energy_kwh_m2_yr: number; total_cost: number; total_carbon: number; htr_w_per_k: number };
+  pareto: OptimizePoint[];
+  cloud: OptimizeCloudPoint[];
+  evaluated: number; unique_points: number; combinations_total: number; pareto_count: number; truncated: boolean;
+  params_used: { annuity_factor: number; q_fixed_kwh_yr: number; study_period_yr: number };
+}
+
 export const api = {
   /** Geocode an address → { lat, lon, display_name } */
   geocode: (address: string) =>
@@ -118,12 +142,8 @@ export const api = {
     lat: number; lon: number; address?: string | null; country: string; city_id?: string;
     building: Record<string, unknown>; wwr_override?: number;
     u_wall_override?: number; u_roof_override?: number; u_win_override?: number; u_floor_override?: number;
-    package_id?: string; package_label?: string | null; climate_scenario?: string;
+    package_id?: string; package_label?: string | null;
   }) => post<{ simulation_id: string; task_id: string; status: string }>("/simulation-submit", body),
-
-  /** Climate scenarios available for Step 4 weather selection (SE = baseline + futures). */
-  listClimateScenarios: (country = "se") =>
-    get<{ country: string; scenarios: { id: string; label: string }[] }>("/climate-scenarios", { country }),
 
   simulationStatus: (id: string) =>
     get<{ status: string; progress?: number; error?: string | null; error_message?: string | null }>(`/simulation-status/${id}`),
@@ -152,8 +172,13 @@ export const api = {
     buildings: Array<{ lat: number; lon: number; address?: string | null; building?: Record<string, unknown> }>;
     wwr_override?: number;
     u_wall_override?: number; u_roof_override?: number; u_win_override?: number; u_floor_override?: number;
-    package_id?: string; package_label?: string | null; climate_scenario?: string;
+    package_id?: string; package_label?: string | null;
   }) => post<{ batch_id: string; task_id: string; total: number; status: string }>("/simulation-batch-submit", body),
+
+  /** Multi-objective renovation optimizer — enumerate material combinations,
+   * score on the fast degree-day physics, return the Pareto-optimal front over
+   * (cost, carbon, energy). The winners are then validated in EPSM. */
+  optimize: (body: OptimizeRequestBody) => post<OptimizeResponse>("/optimize", body),
 
   simulationBatchStatus: (batchId: string) =>
     get<{

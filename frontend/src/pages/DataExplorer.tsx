@@ -726,7 +726,7 @@ export default function DataExplorer() {
       </div>
 
       {/* Optimization assumptions + equations + sources */}
-      <OptimizationAssumptions />
+      <OptimizationAssumptions country="SE" />
     </div>
   );
 }

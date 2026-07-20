@@ -158,3 +158,38 @@ export const EQUATIONS: EquationDoc[] = [
 export function assumptionsFor(country: Country): Assumption[] {
   return ASSUMPTIONS[country];
 }
+
+/* ─── Methods ─────────────────────────────────────────────────────────────────
+   Building-physics methods behind the numbers (distinct from the optimizer
+   equations above). Currently: how a component U-value is obtained when the
+   material catalogue has no manufacturer-supplied value. */
+
+export interface MethodDoc {
+  name: string;
+  latexish: string;
+  explain: string;
+  source: string;
+  sourceUrl: string;
+}
+
+export const METHODS: MethodDoc[] = [
+  {
+    name: "Component U-value from assembly (EN ISO 6946)",
+    latexish: "U = 1 / R_tot ,   R_tot = R_si + R_se + Σ_j (d_j / λ_j)     [W/(m²·K)]",
+    explain:
+      "Where a catalogue material carries no manufacturer U-value, it is derived from the build-up: sum each layer's thermal resistance (thickness d ÷ design conductivity λ) plus the inside/outside surface resistances (R_si, R_se — walls 0.13/0.04, roofs 0.10/0.04, ground floors 0.17/~0). Timber-framed layers apply the ISO 6946 upper/lower-bound average so studs bypassing the insulation raise U realistically. The method was validated against the catalogue items that already carry a supplied U-value before being applied to the rest.",
+    source: "EN ISO 6946:2017; design λ values from EN ISO 10456 / Swedish BBR",
+    sourceUrl: "https://www.iso.org/standard/65708.html",
+  },
+];
+
+/* ─── Attribution ────────────────────────────────────────────────────────────
+   The multi-objective MILP formulation (decision variables, the cost / carbon /
+   energy objective functions and constraints above) is based on the work of
+   Jenny Enerbäck and Ann-Brith Strömberg. */
+
+export const OPTIMIZER_ATTRIBUTION = {
+  names: ["Jenny Enerbäck", "Ann-Brith Strömberg"],
+  text:
+    "The optimization model — its multi-objective MILP formulation and the cost, carbon and energy equations above — is based on the work of Jenny Enerbäck and Ann-Brith Strömberg.",
+};

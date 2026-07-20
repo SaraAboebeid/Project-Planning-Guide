@@ -11,6 +11,9 @@ import {
 } from "../utils/ukArchetype";
 import { UK_PLACEHOLDER_RATES, fmtGBP } from "../config/ukPlaceholderCostCarbon";
 import { useWizardStepNav } from "../components/wizardNav";
+import OptimizerPanel from "../components/OptimizerPanel";
+import { ASSUMPTIONS } from "../config/optimizationAssumptions";
+import type { OptimizeComponentInput, OptimizeParams, OptimizePoint } from "../api/client";
 import type { WikellsItem } from "../config/wikellsData";
 import type { BoverketResource, WWRRecord } from "../types";
 import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
@@ -71,6 +74,22 @@ function overridesFromSeSelections(
   return overrides;
 }
 
+/* Baseline (as-built) U-values the shoebox falls back to when a building has no
+   per-component U — mirrors tools/idf/defaults.py (DEFAULT_U_*). Maps a Sweden
+   area-line-item key to the U-override component's baseline U-value; null means
+   the line item isn't a U-override component (e.g. Doors, Balcony). */
+function baselineUForKey(key: string): number | null {
+  if (key === "Walls" || key === "VertExt::Walls") return 0.40;
+  if (key === "Roof" || key === "VertExt::Roof") return 0.30;
+  if (key === "Windows") return 1.80;
+  if (key === "Floor" || key === "VertExt::Floor") return 0.40;
+  return null;
+}
+
+function assumptionValue(country: "SE" | "UK", key: string): number | null {
+  return ASSUMPTIONS[country].find((a) => a.key === key)?.value ?? null;
+}
+
 /** Aggregate a package's per-building rows into portfolio-level figures for
  * the comparison table - energy is averaged (it's a per-m² rate, comparable
  * across differently-sized buildings), cost/carbon are summed (portfolio
@@ -97,12 +116,12 @@ function pkgAggregate(pkg: RenovationCalcPackage) {
 
 /* ─── Material picker for one area line item (single-select) ─────────────── */
 function LineItemPicker({
-  item, items, selectedCode, onSelect, recommendations, boverketResources,
+  item, items, selectedCodes, onToggle, recommendations, boverketResources,
 }: {
   item: AreaLineItem;
   items: WikellsItem[];
-  selectedCode: string | null;
-  onSelect: (code: string) => void;
+  selectedCodes: string[];
+  onToggle: (code: string) => void;
   recommendations: Record<string, KpiKey[]>;
   boverketResources: BoverketResource[];
 }) {
@@ -113,14 +132,14 @@ function LineItemPicker({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 260, overflowY: "auto" }}>
       {items.map((it) => {
-        const checked = selectedCode === it.code;
+        const checked = selectedCodes.includes(it.code);
         const carbon = estimateCarbon(it, boverketResources);
         const ul = uLabel(it.uValue);
         const tags = recommendations[it.code] ?? [];
         return (
           <button
             key={it.code}
-            onClick={() => onSelect(it.code)}
+            onClick={() => onToggle(it.code)}
             style={{
               width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left",
               padding: "8px 10px", borderRadius: 8, cursor: "pointer",
@@ -129,10 +148,12 @@ function LineItemPicker({
             }}
           >
             <div style={{
-              width: 15, height: 15, borderRadius: "50%", flexShrink: 0,
+              width: 15, height: 15, borderRadius: 4, flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
               border: `2px solid ${checked ? color : "rgba(255,255,255,0.2)"}`,
               background: checked ? color : "transparent",
-            }} />
+              fontSize: 10, color: "#0b1220", fontWeight: 900,
+            }}>{checked ? "✓" : ""}</div>
             <span style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{it.code}</span>
             <span style={{ flex: 1, fontSize: 11, color: checked ? "#fff" : "rgba(255,255,255,0.65)", lineHeight: 1.3 }}>{it.description}</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>
@@ -288,9 +309,26 @@ export default function RenovationSimulator() {
   const [manualOverrides, setManualOverrides] = useState<Record<string, number>>({});
   const [boverketByComponent, setBoverketByComponent] = useState<Record<string, BoverketResource[]>>({});
   const [activeItemKey, setActiveItemKey] = useState<string>(lineItems[0]?.key ?? "");
-  const [draftSelection, setDraftSelection] = useState<Record<string, string>>({});
+  // Per component, the set of materials to test. The generator builds one
+  // package for every combination (cartesian product) across components.
+  const [draftSelection, setDraftSelection] = useState<Record<string, string[]>>({});
+  function toggleMaterial(componentKey: string, code: string) {
+    setDraftSelection((d) => {
+      const cur = d[componentKey] ?? [];
+      const next = cur.includes(code) ? cur.filter((c) => c !== code) : [...cur, code];
+      return { ...d, [componentKey]: next };
+    });
+  }
+  // How many packages the current selection will generate (product of counts).
+  const packageCombos = useMemo(() => {
+    const withSel = lineItems.filter((li) => (draftSelection[li.key]?.length ?? 0) > 0);
+    return withSel.reduce((n, li) => n * (draftSelection[li.key]?.length ?? 1), withSel.length ? 1 : 0);
+  }, [lineItems, draftSelection]);
   const [ukArchetype, setUkArchetype] = useState<TabulaArchetypeGB | null>(null);
   const [ukTier, setUkTier] = useState<RefurbTierKey | null>(null);
+  // Live day-ahead spot price (SE) for the optimizer's operating-cost term;
+  // falls back to the documented assumption value if the feed is unavailable.
+  const [livePriceSek, setLivePriceSek] = useState<number | null>(null);
   const [packageName, setPackageName] = useState("");
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
   // A ref, not state: React StrictMode double-invokes effects in dev without
@@ -307,20 +345,6 @@ export default function RenovationSimulator() {
   // Entries carry the ORIGINAL building index so per-building lookups (wwr,
   // cost/carbon) stay correct even when a package targets a single building.
   const [targetIdx, setTargetIdx] = useState<number | "all">("all");
-
-  // Climate scenarios (weather files) to simulate against. Every package — and
-  // the as-built baseline — is run under EACH selected scenario, so Step 4 can
-  // compare a renovation measure vs baseline AND across future climates.
-  const [climateScenarios, setClimateScenarios] = useState<{ id: string; label: string }[]>([]);
-  const [selectedScenarios, setSelectedScenarios] = useState<string[]>(["baseline"]);
-  useEffect(() => {
-    if (!isUK) api.listClimateScenarios("se").then((r) => setClimateScenarios(r.scenarios)).catch(() => {});
-  }, [isUK]);
-  const scenarioLabel = useCallback(
-    (id: string) => climateScenarios.find((s) => s.id === id)?.label ?? id,
-    [climateScenarios],
-  );
-
   type GeoEntry = { g: ResolvedBuildingGeometry; idx: number };
   const allEntries: GeoEntry[] = useMemo(() => geometries.map((g, i) => ({ g, idx: i })), [geometries]);
   const targetEntries: GeoEntry[] = targetIdx === "all" ? allEntries : (geometries[targetIdx] ? [{ g: geometries[targetIdx]!, idx: targetIdx }] : allEntries);
@@ -368,11 +392,11 @@ export default function RenovationSimulator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopPoll]);
 
-  const submitBatch = useCallback(async (packageId: string, overrides: Record<string, number>, packageLabel: string | undefined, entries: GeoEntry[], scenario: string = "baseline") => {
+  const submitBatch = useCallback(async (packageId: string, overrides: Record<string, number>, packageLabel: string | undefined, entries: GeoEntry[]) => {
     try {
       const { batch_id } = await api.simulationBatchSubmit({
         country: COUNTRY,
-        ...(isUK ? {} : { city_id: CITY_ID, climate_scenario: scenario }),
+        ...(isUK ? {} : { city_id: CITY_ID }),
         buildings: entries.map(({ g }) => ({ lat: g.lat, lon: g.lon, address: g.address })),
         package_id: packageId, package_label: packageLabel ?? null,
         ...overrides,
@@ -412,33 +436,14 @@ export default function RenovationSimulator() {
   const submitBaseline = useCallback(() => {
     if (geometries.length === 0) return;
     const entries = geometries.map((g, i) => ({ g, idx: i }));
-    // One as-built baseline run per scenario — covering both the current
-    // selection AND any scenario an existing package already uses, so every
-    // package's saving is measured against the baseline under the SAME weather.
-    const existing = useWizardStore.getState().project.renovationCalcPackages
-      .filter((p) => !p.isBaseline).map((p) => p.climateScenario || "baseline");
-    const scenarios = isUK ? ["baseline"]
-      : Array.from(new Set([...(selectedScenarios.length ? selectedScenarios : ["baseline"]), ...existing]));
-    const baselinePkgs: RenovationCalcPackage[] = scenarios.map((sc) => ({
-      id: `baseline__${sc}`,
-      name: "Baseline (as-built)" + (sc === "baseline" || isUK ? "" : ` · ${scenarioLabel(sc)}`),
-      color: "rgba(255,255,255,0.4)", isBaseline: true, climateScenario: sc,
+    const pkg: RenovationCalcPackage = {
+      id: "baseline", name: "Baseline (as-built)", color: "rgba(255,255,255,0.4)", isBaseline: true,
       selections: {}, batchId: null, buildings: makeBuildingRows(entries),
-    }));
-    setProject({ renovationCalcPackages: [
-      ...useWizardStore.getState().project.renovationCalcPackages.filter((p) => !p.isBaseline),
-      ...baselinePkgs,
-    ] });
-    scenarios.forEach((sc) => submitBatch(`baseline__${sc}`, {}, undefined, entries, sc));
+    };
+    setProject({ renovationCalcPackages: [...useWizardStore.getState().project.renovationCalcPackages.filter((p) => p.id !== "baseline"), pkg] });
+    submitBatch("baseline", {}, undefined, entries);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geometries, submitBatch, selectedScenarios, isUK, scenarioLabel]);
-
-  /* Re-run the as-built baseline when the scenario selection changes (after the
-     initial load), so a newly-added future scenario gets its baseline too. */
-  useEffect(() => {
-    if (initializedRef.current && geometries.length > 0) submitBaseline();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedScenarios]);
+  }, [geometries, submitBatch]);
 
   /* ── fetch WWR (per building) + Boverket/TABULA data + submit baseline ── */
   useEffect(() => {
@@ -482,6 +487,15 @@ export default function RenovationSimulator() {
     return () => { Object.values(handles).forEach(clearInterval); };
   }, []);
 
+  useEffect(() => {
+    if (isUK) return;
+    let active = true;
+    api.energyPrice("se").then((r) => {
+      if (active && r.live && r.average_price != null) setLivePriceSek(r.average_price);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [isUK]);
+
   /* ── derived: items/areas/recommendations for the active line item (Sweden only) ── */
   const activeItem = lineItems.find((li) => li.key === activeItemKey) ?? lineItems[0];
   const activeCatalogue = activeItem ? itemsForLineItem(activeItem) : [];
@@ -499,63 +513,92 @@ export default function RenovationSimulator() {
 
   const boverketAll = useMemo(() => Object.values(boverketByComponent).flat(), [boverketByComponent]);
 
+  // Confirmation before simulating: the packages the current selection will
+  // create, with the U-value each material applies to the IDF (a material with
+  // no U-value in the catalogue leaves that component's energy at baseline).
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const previewPackages = useMemo(() => {
+    const chosen = lineItems
+      .map((item) => ({ item, codes: draftSelection[item.key] ?? [] }))
+      .filter((c) => c.codes.length > 0);
+    let combos: Array<Record<string, string>> = [{}];
+    for (const { item, codes } of chosen) {
+      combos = combos.flatMap((combo) => codes.map((code) => ({ ...combo, [item.key]: code })));
+    }
+    return combos.map((combo) => ({
+      parts: chosen.map(({ item }) => {
+        const it = itemByCode[combo[item.key]!];
+        return { component: item.label, desc: it?.description ?? combo[item.key], uValue: it?.uValue ?? null };
+      }),
+    }));
+  }, [lineItems, draftSelection, itemByCode]);
+
   /* ── add a new package ─────────────────────────────────────────────────── */
   const PACKAGE_COLORS = ["#721CB8", "#4ECDC4", "#F59E0B", "#96D74C", "#F97316", "#5FA5FF"];
 
+  // Short material label for auto-naming, e.g. "300 blown glass wool".
+  function matShort(it?: WikellsItem): string {
+    if (!it) return "?";
+    return it.description
+      .replace(/^(EW |IW |Intermediate floor |Attic floor |Ground floor |Terrace slab )/i, "")
+      .replace(/\s+with .*$/i, "")
+      .trim()
+      .slice(0, 30);
+  }
+
+  // Build ONE package per combination of the materials selected across
+  // components (cartesian product). Pick 2 walls + 2 roofs → 4 packages, each
+  // auto-named from the chosen materials.
   function addPackage() {
     if (geometries.length === 0) return;
     if (isUK) {
       addUkPackage();
       return;
     }
-    const selections: Record<string, RenovationCalcSelection> = {};
-    for (const item of lineItems) {
-      const code = draftSelection[item.key];
-      if (!code) continue;
-      selections[item.key] = { wikellsCode: code, quantity: 0 };
+    const chosen = lineItems
+      .map((item) => ({ item, codes: draftSelection[item.key] ?? [] }))
+      .filter((c) => c.codes.length > 0);
+    if (chosen.length === 0) return;
+
+    let combos: Array<Record<string, string>> = [{}];
+    for (const { item, codes } of chosen) {
+      combos = combos.flatMap((combo) => codes.map((code) => ({ ...combo, [item.key]: code })));
     }
-    if (Object.keys(selections).length === 0) return;
 
-    const baseId = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    const baseName = (packageName.trim() || `Package ${baseGroupCount() + 1}`) + targetSuffix();
-    const color = PACKAGE_COLORS[baseGroupCount() % PACKAGE_COLORS.length]!;
+    const existing = packages.filter((p) => !p.isBaseline).length;
+    const prefix = packageName.trim();
+    const stamp = Date.now();
 
-    const buildingRows = makeBuildingRows(targetEntries, (g, i) => {
-      let costSEK = 0, carbonKgCO2e = 0, any = false;
-      for (const item of lineItems) {
-        const sel = selections[item.key];
-        if (!sel) continue;
-        const quantity = computeAreaForLineItem(item, g, wwrByIndex[i] ?? null, manualOverrides);
-        if (quantity == null) continue;
-        const wikellsItem = itemByCode[sel.wikellsCode];
-        if (wikellsItem) {
-          any = true;
-          costSEK += wikellsItem.costSEK * quantity;
-          carbonKgCO2e += estimateCarbon(wikellsItem, boverketAll).value * quantity;
+    const newPkgs: RenovationCalcPackage[] = combos.map((combo, k) => {
+      const selections: Record<string, RenovationCalcSelection> = Object.fromEntries(
+        Object.entries(combo).map(([key, code]) => [key, { wikellsCode: code, quantity: 0 } as RenovationCalcSelection]),
+      );
+      const autoName = chosen.map(({ item }) => matShort(itemByCode[combo[item.key]!])).join(" + ");
+      const name = (prefix ? `${prefix} — ${autoName}` : autoName) + targetSuffix();
+      const color = PACKAGE_COLORS[(existing + k) % PACKAGE_COLORS.length]!;
+      const buildingRows = makeBuildingRows(targetEntries, (g, i) => {
+        let costSEK = 0, carbonKgCO2e = 0, any = false;
+        for (const { item } of chosen) {
+          const sel = selections[item.key];
+          if (!sel) continue;
+          const quantity = computeAreaForLineItem(item, g, wwrByIndex[i] ?? null, manualOverrides);
+          if (quantity == null) continue;
+          const wikellsItem = itemByCode[sel.wikellsCode];
+          if (wikellsItem) {
+            any = true;
+            costSEK += wikellsItem.costSEK * quantity;
+            carbonKgCO2e += estimateCarbon(wikellsItem, boverketAll).value * quantity;
+          }
         }
-      }
-      return any ? { costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e) } : { costSEK: null, carbonKgCO2e: null };
+        return any ? { costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e) } : { costSEK: null, carbonKgCO2e: null };
+      });
+      return { id: `pkg-${stamp}-${k}-${Math.round(Math.random() * 1e6)}`, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows };
     });
 
-    // One run per selected climate scenario (cost/carbon are weather-independent,
-    // so they're copied; only the EnergyPlus energy differs per scenario).
-    const overrides = overridesFromSeSelections(selections, itemByCode);
-    const scenarios = selectedScenarios.length ? selectedScenarios : ["baseline"];
-    const newPkgs: RenovationCalcPackage[] = scenarios.map((sc) => ({
-      id: `${baseId}__${sc}`,
-      name: baseName + (sc === "baseline" ? "" : ` · ${scenarioLabel(sc)}`),
-      color, isBaseline: false, selections, batchId: null,
-      buildings: buildingRows.map((b) => ({ ...b })), climateScenario: sc,
-    }));
     setProject({ renovationCalcPackages: [...packages, ...newPkgs] });
     setPackageName("");
     setDraftSelection({});
-    scenarios.forEach((sc) => submitBatch(`${baseId}__${sc}`, overrides, baseName, targetEntries, sc));
-  }
-
-  // Number of distinct renovation packages (scenario variants share one group).
-  function baseGroupCount(): number {
-    return new Set(packages.filter((p) => !p.isBaseline).map((p) => p.id.split("__")[0])).size;
+    newPkgs.forEach((pkg) => submitBatch(pkg.id, overridesFromSeSelections(pkg.selections, itemByCode), pkg.name, targetEntries));
   }
 
   function addUkPackage() {
@@ -610,30 +653,118 @@ export default function RenovationSimulator() {
         p.id === pkg.id ? { ...p, buildings: p.buildings.map((b) => ({ ...b, status: "queued" as const, error: null })) } : p
       ),
     });
-    submitBatch(pkg.id, overrides, pkg.name, entries, pkg.climateScenario || "baseline");
+    submitBatch(pkg.id, overrides, pkg.name, entries);
   }
 
-  // As-built baseline aggregate for a given climate scenario (each package is
-  // compared to the baseline run under the SAME weather).
-  const baselinePkgFor = (scenario: string | undefined) =>
-    packages.find((p) => p.isBaseline && (p.climateScenario || "baseline") === (scenario || "baseline"));
-  const baselineAggFor = (scenario: string | undefined) => {
-    const bp = baselinePkgFor(scenario);
-    return bp ? pkgAggregate(bp) : null;
-  };
-  // Current-climate as-built baseline, used by the per-building overview strip.
-  const baselinePkg = baselinePkgFor("baseline");
+  const baselinePkg = packages.find((p) => p.isBaseline);
+  const baselineAgg = baselinePkg ? pkgAggregate(baselinePkg) : null;
+
+  /* ── Multi-objective optimizer input (Sweden) ────────────────────────────
+     Build the per-component option matrix + economy/climate params from the
+     already-resolved geometry, cost, carbon and EPSM baseline. The optimizer
+     searches every combination on the fast physics; winners are validated in
+     EPSM via validateOptimizerPick below. */
+  const optimizerInput = useMemo((): { input: { components: OptimizeComponentInput[]; params: OptimizeParams } | null; disabledReason?: string } => {
+    if (isUK) return { input: null, disabledReason: "The optimizer currently supports Sweden (Wikells cost/carbon) only." };
+    const repIdx = targetIdx === "all" ? 0 : targetIdx;
+    const repGeo = geometries[repIdx];
+    if (!repGeo) return { input: null, disabledReason: "No building resolved yet." };
+    const baseTotal = baselinePkg?.buildings[repIdx]?.totalKwhM2Yr ?? null;
+    if (baseTotal == null) return { input: null, disabledReason: "Waiting for the baseline EnergyPlus run to finish…" };
+    const footprint = repGeo.footprintM2 ?? 0;
+    const floors = Math.max(1, Math.round((repGeo.height ?? 3.2) / 3.2));
+    const floorArea = footprint * floors;
+    if (!floorArea) return { input: null, disabledReason: "Building floor area unknown for this building." };
+
+    const comps: OptimizeComponentInput[] = [];
+    for (const li of lineItems) {
+      const baseU = baselineUForKey(li.key);
+      if (baseU == null) continue; // not a U-override component
+      const area = computeAreaForLineItem(li, repGeo, wwrByIndex[repIdx] ?? null, manualOverrides);
+      if (area == null || area <= 0) continue;
+      const draft = draftSelection[li.key] ?? [];
+      let cands = itemsForLineItem(li).filter((it) => it.uValue != null);
+      if (draft.length) cands = cands.filter((it) => draft.includes(it.code)); // scope the search to picked materials
+      const options = cands.map((it) => ({
+        code: it.code,
+        label: matShort(it),
+        u_value: it.uValue!,
+        cost: Math.round(it.costSEK * area),
+        carbon: Math.round(estimateCarbon(it, boverketAll).value * area),
+      }));
+      if (options.length === 0) continue;
+      comps.push({ key: li.key, area_m2: Math.round(area), baseline_u: baseU, options });
+    }
+    if (comps.length === 0)
+      return { input: null, disabledReason: "No catalogue materials with U-values for these components — pick some in the builder above." };
+
+    const params: OptimizeParams = {
+      f_dh: (24 * (assumptionValue("SE", "degree_days") ?? 3300)) / 1000,
+      energy_price: livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8,
+      carbon_factor_heat: assumptionValue("SE", "carbon_factor_heat") ?? 0.022,
+      discount_rate: assumptionValue("SE", "discount_rate") ?? 0.03,
+      study_period_yr: 30,
+      floor_area_m2: Math.round(floorArea),
+      baseline_total_kwh_m2_yr: baseTotal,
+    };
+    return { input: { components: comps, params } };
+  }, [isUK, targetIdx, geometries, baselinePkg, lineItems, draftSelection, wwrByIndex, manualOverrides, boverketAll, livePriceSek]);
+
+  // Which optimizer picks are already validated (as a package) — keyed by the
+  // touched (non-"keep") component→material selections, matching the panel.
+  const validatedKeys = useMemo(
+    () => new Set(
+      packages.filter((p) => !p.isBaseline).map((p) =>
+        Object.entries(p.selections)
+          .filter(([k]) => baselineUForKey(k) != null)
+          .map(([k, s]) => `${k}=${s.wikellsCode}`)
+          .sort()
+          .join("|")
+      )
+    ),
+    [packages]
+  );
+
+  // Turn one Pareto winner into a real package + EPSM run (drops into the
+  // comparison table below alongside any hand-built packages).
+  function validateOptimizerPick(point: OptimizePoint) {
+    if (geometries.length === 0) return;
+    const touched = Object.entries(point.selections).filter(([, code]) => code !== "__keep__");
+    if (touched.length === 0) return;
+    const selections: Record<string, RenovationCalcSelection> = Object.fromEntries(
+      touched.map(([key, code]) => [key, { wikellsCode: code, quantity: 0 } as RenovationCalcSelection])
+    );
+    const autoName = touched.map(([, code]) => matShort(itemByCode[code])).join(" + ");
+    const name = `Optimal · ${autoName}` + targetSuffix();
+    const existing = packages.filter((p) => !p.isBaseline).length;
+    const color = PACKAGE_COLORS[existing % PACKAGE_COLORS.length]!;
+    const buildingRows = makeBuildingRows(targetEntries, (g, i) => {
+      let costSEK = 0, carbonKgCO2e = 0, any = false;
+      for (const [key] of touched) {
+        const li = lineItems.find((l) => l.key === key);
+        if (!li) continue;
+        const quantity = computeAreaForLineItem(li, g, wwrByIndex[i] ?? null, manualOverrides);
+        if (quantity == null) continue;
+        const it = itemByCode[selections[key]!.wikellsCode];
+        if (it) { any = true; costSEK += it.costSEK * quantity; carbonKgCO2e += estimateCarbon(it, boverketAll).value * quantity; }
+      }
+      return any ? { costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e) } : { costSEK: null, carbonKgCO2e: null };
+    });
+    const id = `pkg-opt-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const pkg: RenovationCalcPackage = { id, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows };
+    setProject({ renovationCalcPackages: [...packages, pkg] });
+    submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
+  }
 
   function handleSaveAndContinue() {
     setProject({
       renovationSimResults: packages.filter((p) => !p.isBaseline).map((p, i) => {
         const agg = pkgAggregate(p);
-        const bAgg = baselineAggFor(p.climateScenario);
-        const total = agg.avgTotalKwhM2Yr ?? bAgg?.avgTotalKwhM2Yr ?? 0;
-        const baseTotal = bAgg?.avgTotalKwhM2Yr ?? total;
+        const total = agg.avgTotalKwhM2Yr ?? baselineAgg?.avgTotalKwhM2Yr ?? 0;
+        const baseTotal = baselineAgg?.avgTotalKwhM2Yr ?? total;
         const saving = Math.max(0, Math.round(baseTotal - total));
-        const carbonSaving = agg.totalCarbonKgCO2e != null && bAgg?.totalCarbonKgCO2e != null
-          ? Math.max(0, Math.round(bAgg.totalCarbonKgCO2e - agg.totalCarbonKgCO2e))
+        const carbonSaving = agg.totalCarbonKgCO2e != null && baselineAgg?.totalCarbonKgCO2e != null
+          ? Math.max(0, Math.round(baselineAgg.totalCarbonKgCO2e - agg.totalCarbonKgCO2e))
           : Math.round(saving * 0.2);
         return {
           packageIndex: i + 1,
@@ -649,7 +780,7 @@ export default function RenovationSimulator() {
     navigate("/step/5");
   }
 
-  const canAddPackage = isUK ? ukTier != null : Object.keys(draftSelection).length > 0;
+  const canAddPackage = isUK ? ukTier != null : packageCombos > 0;
 
   // The wizard footer's Continue saves this step's results before advancing.
   useWizardStepNav({ onNext: handleSaveAndContinue });
@@ -671,47 +802,6 @@ export default function RenovationSimulator() {
               : "Pick a material per component, add it as a package, and compare real cost, embodied carbon, and EnergyPlus-simulated performance against the building's as-built baseline."}
         </p>
       </div>
-
-      {/* Climate scenarios (weather files) — run every package under each, to
-          compare the retrofit vs baseline AND across future climates. */}
-      {!isUK && climateScenarios.length > 1 && (
-        <div style={{
-          borderRadius: 12, padding: "10px 14px",
-          background: "rgba(78,205,196,0.06)", border: "1px solid rgba(78,205,196,0.25)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#4ECDC4" }}>🌡️ Climate scenarios to simulate</span>
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.40)" }}>
-              — each package (and the as-built baseline) runs under every one you pick.
-            </span>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {climateScenarios.map((s) => {
-              const on = selectedScenarios.includes(s.id);
-              const isBase = s.id === "baseline";
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedScenarios((prev) =>
-                    isBase ? prev  // baseline is always kept as the reference
-                      : prev.includes(s.id) ? prev.filter((x) => x !== s.id) : [...prev, s.id])}
-                  disabled={isBase}
-                  style={{
-                    fontSize: 11.5, fontWeight: 600, padding: "5px 11px", borderRadius: 99,
-                    cursor: isBase ? "default" : "pointer",
-                    background: on ? "rgba(78,205,196,0.18)" : "rgba(255,255,255,0.05)",
-                    border: `1px solid ${on ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
-                    color: on ? "#4ECDC4" : "rgba(255,255,255,0.55)",
-                    opacity: isBase ? 0.85 : 1,
-                  }}
-                >
-                  {on ? "✓ " : ""}{s.label}{isBase ? " (reference)" : ""}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {geometries.length === 0 && (
         <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
@@ -801,7 +891,7 @@ export default function RenovationSimulator() {
               {lineItems.map((item) => {
                 const color = COMPONENT_COLORS[item.parentComponent] ?? "#721CB8";
                 const isActive = activeItemKey === item.key;
-                const hasSelection = !!draftSelection[item.key];
+                const selCount = draftSelection[item.key]?.length ?? 0;
                 return (
                   <button
                     key={item.key}
@@ -813,9 +903,12 @@ export default function RenovationSimulator() {
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: hasSelection ? color : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: selCount > 0 ? color : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
                       <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#fff" : "rgba(255,255,255,0.6)" }}>{item.label}</span>
                     </div>
+                    {selCount > 0 && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color, background: `${color}22`, borderRadius: 99, padding: "1px 7px" }}>{selCount}</span>
+                    )}
                   </button>
                 );
               })}
@@ -852,8 +945,8 @@ export default function RenovationSimulator() {
                 <LineItemPicker
                   item={activeItem}
                   items={activeCatalogue}
-                  selectedCode={draftSelection[activeItem.key] ?? null}
-                  onSelect={(code) => setDraftSelection((d) => ({ ...d, [activeItem.key]: code }))}
+                  selectedCodes={draftSelection[activeItem.key] ?? []}
+                  onToggle={(code) => toggleMaterial(activeItem.key, code)}
                   recommendations={activeRecommendations}
                   boverketResources={activeBoverket}
                 />
@@ -866,15 +959,20 @@ export default function RenovationSimulator() {
       {geometries.length > 0 && (
         <>
           {/* Add package */}
+          {!isUK && packageCombos > 1 && (
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", margin: "0 0 -6px" }}>
+              You picked materials across components — this will generate <strong style={{ color: "#4ECDC4" }}>{packageCombos} packages</strong> (every combination), each named after its materials.
+            </p>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
             <input
               value={packageName}
               onChange={(e) => setPackageName(e.target.value)}
-              placeholder="Package name (optional)"
+              placeholder={isUK ? "Package name (optional)" : "Name prefix (optional)"}
               style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }}
             />
             <button
-              onClick={addPackage}
+              onClick={() => (isUK ? addPackage() : setConfirmOpen(true))}
               disabled={!canAddPackage}
               style={{
                 display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
@@ -883,9 +981,79 @@ export default function RenovationSimulator() {
                 opacity: canAddPackage ? 1 : 0.5,
               }}
             >
-              <Plus size={13} /> Add package{geometries.length > 1 ? ` (${targetIdx === "all" ? `all ${geometries.length}` : "1 building"})` : ""}
+              <Plus size={13} /> {isUK ? "Add package" : `Generate ${packageCombos || ""} package${packageCombos === 1 ? "" : "s"}`}{geometries.length > 1 ? ` (${targetIdx === "all" ? `all ${geometries.length}` : "1 building"})` : ""}
             </button>
           </div>
+
+          {/* Confirmation before simulating — review every package + the U-value
+              each material applies to the IDF, then commit them to EPSM. */}
+          {confirmOpen && (
+            <div onClick={() => setConfirmOpen(false)} style={{
+              position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.6)",
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+            }}>
+              <div onClick={(e) => e.stopPropagation()} style={{
+                width: "min(720px, 96vw)", maxHeight: "84vh", display: "flex", flexDirection: "column",
+                background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, overflow: "hidden",
+              }}>
+                <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>
+                    Confirm {previewPackages.length} package{previewPackages.length === 1 ? "" : "s"} to simulate
+                  </h3>
+                  <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.5 }}>
+                    Each package rebuilds the shoebox IDF with the chosen materials' <strong style={{ color: "rgba(255,255,255,0.7)" }}>U-values</strong>, then runs EnergyPlus against the as-built baseline.
+                    {targetIdx === "all" && geometries.length > 1 ? ` Applied to all ${geometries.length} buildings.` : ""}
+                  </p>
+                </div>
+                <div style={{ overflowY: "auto", padding: "8px 20px", flex: 1 }}>
+                  {previewPackages.map((pkg, i) => (
+                    <div key={i} style={{ padding: "10px 0", borderBottom: i < previewPackages.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 5 }}>
+                        <span style={{ color: "rgba(255,255,255,0.4)", marginRight: 6 }}>{i + 1}.</span>
+                        {pkg.parts.map((p) => (p.desc || "").replace(/^(EW |IW )/, "")).join("  +  ")}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {pkg.parts.map((p, j) => (
+                          <span key={j} style={{
+                            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 99,
+                            background: p.uValue != null ? "rgba(78,205,196,0.12)" : "rgba(245,158,11,0.12)",
+                            border: `1px solid ${p.uValue != null ? "rgba(78,205,196,0.3)" : "rgba(245,158,11,0.35)"}`,
+                            color: p.uValue != null ? "#4ECDC4" : "#F59E0B",
+                          }}>
+                            {p.component}: {p.uValue != null ? `U=${p.uValue} W/m²K` : "no U-value → energy unchanged"}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button onClick={() => setConfirmOpen(false)} style={{
+                    padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.65)",
+                  }}>Cancel</button>
+                  <button onClick={() => { addPackage(); setConfirmOpen(false); }} style={{
+                    padding: "8px 18px", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer",
+                    background: "linear-gradient(135deg,#5a9e1e,#96D74C)", border: 0, color: "#0a0d14",
+                  }}>Confirm &amp; simulate {previewPackages.length}</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Multi-objective optimizer (Sweden) — Pareto front over the fast
+              degree-day physics; each validated winner runs in EPSM and drops
+              into the comparison table below. */}
+          {!isUK && (
+            <OptimizerPanel
+              input={optimizerInput.input}
+              disabledReason={optimizerInput.disabledReason}
+              onValidate={validateOptimizerPick}
+              currency="SEK"
+              validatedKeys={validatedKeys}
+              selectedKpis={project.selectedKpis}
+            />
+          )}
 
           {/* Comparison table - one row per package, portfolio aggregates, expandable per-building breakdown */}
           <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "16px 18px" }}>
@@ -894,17 +1062,7 @@ export default function RenovationSimulator() {
                 <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>{h}</span>
               ))}
             </div>
-            {(() => {
-              // Group rows by climate scenario (reference climate first), and
-              // within each climate put the as-built baseline first.
-              const order = ["baseline", ...selectedScenarios.filter((s) => s !== "baseline")];
-              const scPos = (sc?: string) => { const i = order.indexOf(sc || "baseline"); return i < 0 ? 99 : i; };
-              return [...packages].sort((a, b) => {
-                const d = scPos(a.climateScenario) - scPos(b.climateScenario);
-                if (d !== 0) return d;
-                return a.isBaseline === b.isBaseline ? 0 : a.isBaseline ? -1 : 1;
-              });
-            })().map((pkg) => {
+            {[...packages].sort((a, b) => (a.isBaseline ? -1 : b.isBaseline ? 1 : 0)).map((pkg) => {
               const agg = pkgAggregate(pkg);
               const expanded = expandedPkg === pkg.id;
               return (
@@ -929,20 +1087,7 @@ export default function RenovationSimulator() {
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{agg.avgHeatingKwhM2Yr ?? "—"}</span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{agg.avgCoolingKwhM2Yr ?? "—"}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C" }}>
-                      {agg.avgTotalKwhM2Yr ?? "—"}
-                      {!pkg.isBaseline && agg.avgTotalKwhM2Yr != null && (() => {
-                        const bt = baselineAggFor(pkg.climateScenario)?.avgTotalKwhM2Yr;
-                        if (bt == null) return null;
-                        const d = Math.round(bt - agg.avgTotalKwhM2Yr!);   // baseline − package = saving
-                        return (
-                          <span title="vs as-built baseline under the same climate"
-                            style={{ fontSize: 9.5, fontWeight: 600, marginLeft: 4, color: d >= 0 ? "#96D74C" : "#fca5a5" }}>
-                            ({d >= 0 ? "−" : "+"}{Math.abs(d)})
-                          </span>
-                        );
-                      })()}
-                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C" }}>{agg.avgTotalKwhM2Yr ?? "—"}</span>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       {agg.pending > 0 && <Loader2 size={13} color="#F59E0B" style={{ animation: "spin 1s linear infinite" }} />}
                       {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#96D74C" />}

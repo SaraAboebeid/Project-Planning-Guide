@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { ProjectType, BuildingDevelopmentType } from "../config/projectConfig";
 import type { BuildingLookup, BboxStats, WWRRecord, BuildingRecord } from "../types";
 
@@ -88,7 +89,6 @@ export interface RenovationCalcPackage {
   selections: Record<string, RenovationCalcSelection>; // key = AreaLineItem.key
   batchId: string | null;   // the shared EPSM batch_id polled for every building below
   buildings: RenovationCalcBuildingResult[];
-  climateScenario?: string; // weather file this run used ("baseline" | "2050_ssp585" | …)
 }
 
 /* ── State shape ── */
@@ -214,19 +214,51 @@ const DEFAULT_PROJECT: ProjectState = {
   renovationSimResults: [],
 };
 
-export const useWizardStore = create<WizardState>((set) => ({
-  project: { ...DEFAULT_PROJECT },
-  setProject: (partial) =>
-    set((s) => ({ project: { ...s.project, ...partial } })),
+/* sessionStorage wrapper that never throws — if storage is disabled or over
+   quota (a large neighborhood selection), we simply skip persisting rather than
+   crash the wizard. */
+const safeSessionStorage = {
+  getItem: (name: string): string | null => {
+    try { return sessionStorage.getItem(name); } catch { return null; }
+  },
+  setItem: (name: string, value: string): void => {
+    try { sessionStorage.setItem(name, value); } catch { /* quota/disabled — ignore */ }
+  },
+  removeItem: (name: string): void => {
+    try { sessionStorage.removeItem(name); } catch { /* ignore */ }
+  },
+};
 
-  currentStep: 1,
-  steps: STEPS,
-  setStep: (n) => set({ currentStep: n }),
-
-  reset: () =>
-    set({
+/* Persisted so an idle-tab reload (Vite dev reconnect, HMR, or an accidental
+   refresh) doesn't wipe the project — losing projectType would otherwise make
+   every step router fall through to its non-renovation branch, so a Renovation
+   Planning flow would silently render as the generic/Energy-Community pages.
+   sessionStorage: state survives reloads within the tab, and a fresh tab starts
+   clean rather than resuming a stale old project. */
+export const useWizardStore = create<WizardState>()(
+  persist(
+    (set) => ({
       project: { ...DEFAULT_PROJECT },
+      setProject: (partial) =>
+        set((s) => ({ project: { ...s.project, ...partial } })),
+
       currentStep: 1,
       steps: STEPS,
+      setStep: (n) => set({ currentStep: n }),
+
+      reset: () =>
+        set({
+          project: { ...DEFAULT_PROJECT },
+          currentStep: 1,
+          steps: STEPS,
+        }),
     }),
-}));
+    {
+      name: "ppg-wizard-v1",
+      storage: createJSONStorage(() => safeSessionStorage),
+      // Persist only the wizard data — never the action functions or the static
+      // STEPS list (those come from the initializer on every load).
+      partialize: (s) => ({ project: s.project, currentStep: s.currentStep }),
+    }
+  )
+);

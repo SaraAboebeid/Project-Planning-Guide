@@ -2110,55 +2110,13 @@ EPW_DIR = PROJECT_ROOT / "data" / "epw"
 # city_id (tools/uk/cities.py, or "gothenburg" for Sweden) -> EPW filename in
 # data/epw/. All 4 London districts share one weather station (Heathrow).
 CITY_TO_EPW = {
-    "gothenburg": "SWE_VG_Goteborg.City.AP.025120_TMYx.2009-2023.epw",
+    "gothenburg": "SWE_VG_Gothenburg-Landvetter.AP.025260_TMYx.2011-2025.epw",
     "london_kings_cross": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
     "london_westminster": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
     "london_canary_wharf": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
     "london_southwark": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
     "rotherham": "GBR_ENG_Doncaster.Sheffield-Hood.AP.034054_TMYx.2011-2025.epw",
 }
-
-# Gothenburg climate scenarios (Landvetter AP station). "baseline" is the
-# current-climate TMY; the others are morphed future-climate EPWs (SSP pathway ×
-# horizon) so Step 4 can test how a retrofit performs under future weather.
-GOTHENBURG_CLIMATE_SCENARIOS = {
-    "baseline":    "SWE_VG_Gothenburg-Landvetter.AP.025260_TMYx.2011-2025.epw",
-    "2050_ssp245": "SWE_VG_Gothenburg-Landvetter.AP_CNRM-CM6-1-HR_ssp245_2050.epw",
-    "2050_ssp370": "SWE_VG_Gothenburg-Landvetter.AP_CNRM-CM6-1-HR_ssp370_2050.epw",
-    "2050_ssp585": "SWE_VG_Gothenburg-Landvetter.AP_CNRM-CM6-1-HR_ssp585_2050.epw",
-    "2080_ssp126": "SWE_VG_Gothenburg-Landvetter.AP_EC-Earth3_ssp126_2080.epw",
-    "2080_ssp245": "SWE_VG_Gothenburg-Landvetter.AP_EC-Earth3_ssp245_2080.epw",
-    "2080_ssp370": "SWE_VG_Gothenburg-Landvetter.AP_EC-Earth3_ssp370_2080.epw",
-    "2080_ssp585": "SWE_VG_Gothenburg-Landvetter.AP_EC-Earth3_ssp585_2080.epw",
-}
-
-
-def _resolve_epw(city_id: Optional[str], country: str, climate_scenario: Optional[str]) -> str:
-    """Pick the EPW filename. For Gothenburg a climate_scenario (default
-    'baseline' = Landvetter TMY) selects current vs future-climate weather."""
-    if (country or "").lower() == "se" or city_id == "gothenburg":
-        return GOTHENBURG_CLIMATE_SCENARIOS.get(
-            climate_scenario or "baseline", GOTHENBURG_CLIMATE_SCENARIOS["baseline"])
-    return CITY_TO_EPW.get(city_id or "", "")
-
-
-@app.get("/api/climate-scenarios")
-def climate_scenarios(country: str = Query("se")):
-    """List the climate scenarios available for a country (Step 4 picker)."""
-    if country.lower() != "se":
-        return {"country": country, "scenarios": [{"id": "baseline", "label": "Current climate (TMY)"}]}
-    labels = {
-        "baseline":    "Current climate (TMY 2011–2025)",
-        "2050_ssp245": "2050 · SSP2-4.5 (middle-of-the-road)",
-        "2050_ssp370": "2050 · SSP3-7.0 (high emissions)",
-        "2050_ssp585": "2050 · SSP5-8.5 (very high emissions)",
-        "2080_ssp126": "2080 · SSP1-2.6 (low emissions)",
-        "2080_ssp245": "2080 · SSP2-4.5 (middle-of-the-road)",
-        "2080_ssp370": "2080 · SSP3-7.0 (high emissions)",
-        "2080_ssp585": "2080 · SSP5-8.5 (very high emissions)",
-    }
-    return {"country": "se",
-            "scenarios": [{"id": k, "label": labels[k]} for k in GOTHENBURG_CLIMATE_SCENARIOS]}
 
 
 def _floors_of(building_info: dict) -> int:
@@ -2275,8 +2233,6 @@ class SimulationSubmitRequest(BaseModel):
     # behavior unchanged.
     package_id: str = "baseline"
     package_label: Optional[str] = None
-    # Gothenburg only: which weather to simulate against (see GOTHENBURG_CLIMATE_SCENARIOS).
-    climate_scenario: Optional[str] = None
 
 
 class BatchBuildingSpec(BaseModel):
@@ -2297,8 +2253,6 @@ class SimulationBatchSubmitRequest(BaseModel):
     u_floor_override: Optional[float] = None
     package_id: str = "baseline"
     package_label: Optional[str] = None
-    # Gothenburg only: which weather to simulate against (see GOTHENBURG_CLIMATE_SCENARIOS).
-    climate_scenario: Optional[str] = None
 
 
 @app.post("/api/simulation-submit")
@@ -2311,8 +2265,10 @@ async def submit_simulation(req: SimulationSubmitRequest):
     city_id = req.city_id
     if req.country == "gb" and not city_id:
         city_id = _resolve_uk_city_id(req.lat, req.lon)
+    elif req.country == "se" and not city_id:
+        city_id = "gothenburg"  # only Swedish city currently mapped — safe default
 
-    epw_name = _resolve_epw(city_id, req.country, req.climate_scenario)
+    epw_name = CITY_TO_EPW.get(city_id or "")
     if not epw_name:
         raise HTTPException(400, f"No weather file mapped for city_id '{city_id}'")
     epw_path = EPW_DIR / epw_name
@@ -2455,8 +2411,10 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
         # A batch is always scoped to one district/city - resolve from the first building.
         first = req.buildings[0]
         city_id = _resolve_uk_city_id(first.lat, first.lon)
+    elif req.country == "se" and not city_id:
+        city_id = "gothenburg"  # only Swedish city currently mapped — safe default
 
-    epw_name = _resolve_epw(city_id, req.country, req.climate_scenario)
+    epw_name = CITY_TO_EPW.get(city_id or "")
     if not epw_name:
         raise HTTPException(400, f"No weather file mapped for city_id '{city_id}'")
     epw_path = EPW_DIR / epw_name
@@ -2636,6 +2594,191 @@ async def lookup_simulation_all(lat: float = Query(...), lon: float = Query(...)
 async def get_simulation_database():
     """Return all saved simulation records."""
     return {"records": simdb.all_records()}
+
+
+# ── Multi-objective renovation optimizer ────────────────────────────────────
+#
+# The "search all combinations" half of the hybrid optimizer: enumerate every
+# material combination, score each on the fast degree-day physics (cheap,
+# analytic — no EnergyPlus), and return the Pareto-optimal front over the three
+# competing objectives (cost, carbon, energy). The frontend then validates just
+# those Pareto winners in EPSM. The MILP formulation and the cost/carbon/energy
+# objective functions are based on the work of Jenny Enerbäck & Ann-Brith
+# Strömberg (see optimizationAssumptions.ts for the documented equations).
+
+class OptimizeOption(BaseModel):
+    code: str
+    label: Optional[str] = None
+    u_value: float                    # W/(m²·K) this option imposes on its component
+    cost: float = 0.0                 # total initial cost over the component area (SEK/GBP)
+    carbon: float = 0.0               # total embodied carbon over the component area (kg CO₂e)
+
+
+class OptimizeComponent(BaseModel):
+    key: str                          # "Walls" | "Roof" | "Windows" | "Floor" (+ VertExt variants)
+    area_m2: float
+    baseline_u: float                 # as-built U the baseline EPSM run used for this component
+    options: list[OptimizeOption]
+
+
+class OptimizeParams(BaseModel):
+    f_dh: float                       # 24·HDD/1000  [kWh per (W/K) per yr]
+    energy_price: float               # per kWh (SEK or GBP), spot
+    carbon_factor_heat: float         # kg CO₂e / kWh, operational heat
+    discount_rate: float = 0.03
+    study_period_yr: int = 30
+    floor_area_m2: float
+    baseline_total_kwh_m2_yr: float   # measured baseline from the EPSM run — anchors Q_fixed
+
+
+class OptimizeRequest(BaseModel):
+    components: list[OptimizeComponent]
+    params: OptimizeParams
+    max_results: int = 24             # cap on returned Pareto points (kept spread + extremes)
+    max_combos: int = 100000          # enumeration cap (guards against combinatorial blow-up)
+    cloud_cap: int = 3000             # cap on the returned scatter cloud (evenly sampled); 0 = none
+
+
+@app.post("/api/optimize")
+async def optimize_renovation(req: OptimizeRequest):
+    """Enumerate material combinations, Pareto-filter on (cost, carbon, energy)
+    using the degree-day physics, return the non-dominated front. Fast/analytic
+    — the caller validates the returned winners in EPSM."""
+    import itertools
+
+    p = req.params
+    N = max(1, int(p.study_period_yr))
+    r = p.discount_rate
+    # Present-value annuity factor Σ_{y=1..N} 1/(1+r)^y for discounted operating cost.
+    annuity = sum(1.0 / (1.0 + r) ** y for y in range(1, N + 1)) if r > 0 else float(N)
+
+    floor_area = p.floor_area_m2 if p.floor_area_m2 else 1.0
+
+    # Anchor Q_fixed (the non-envelope load a retrofit can't change) to the real
+    # baseline EPSM result, so the physics curve passes through the known baseline
+    # point when every component is left at its as-built U-value.
+    baseline_htr = sum(c.area_m2 * c.baseline_u for c in req.components)
+    baseline_total_kwh = p.baseline_total_kwh_m2_yr * floor_area
+    q_fixed = max(0.0, baseline_total_kwh - baseline_htr * p.f_dh)
+
+    # Each component contributes exactly one option. A synthetic "keep as-built"
+    # option (U = baseline, no cost/carbon) lets the optimizer decide a component
+    # isn't worth touching — essential for the cost/carbon trade-off.
+    choice_lists: list[list[tuple[OptimizeComponent, OptimizeOption]]] = []
+    for c in req.components:
+        keep = OptimizeOption(code="__keep__", label="Keep as-built", u_value=c.baseline_u)
+        choice_lists.append([(c, keep)] + [(c, o) for o in c.options])
+
+    total_combos = 1
+    for cl in choice_lists:
+        total_combos *= len(cl)
+    truncated = total_combos > req.max_combos
+
+    def score(combo: list[tuple[OptimizeComponent, OptimizeOption]]) -> dict:
+        htr = sum(comp.area_m2 * opt.u_value for comp, opt in combo)
+        q_total = q_fixed + htr * p.f_dh
+        energy_m2 = q_total / floor_area
+        init_cost = sum(opt.cost for _, opt in combo)
+        init_carbon = sum(opt.carbon for _, opt in combo)
+        op_cost = q_total * p.energy_price * annuity
+        op_carbon = q_total * p.carbon_factor_heat * N
+        return {
+            "energy_kwh_m2_yr": round(energy_m2, 1),
+            "total_cost": round(init_cost + op_cost),
+            "total_carbon": round(init_carbon + op_carbon),
+            "initial_cost": round(init_cost),
+            "initial_carbon": round(init_carbon),
+            "htr_w_per_k": round(htr, 1),
+            "selections": {comp.key: opt.code for comp, opt in combo},
+            "selection_labels": {comp.key: (opt.label or opt.code) for comp, opt in combo},
+        }
+
+    # Enumerate (capped) and de-duplicate identical objective triples — many
+    # different material picks collapse to the same U/cost/carbon.
+    seen: dict[tuple, dict] = {}
+    evaluated = 0
+    for combo in itertools.product(*choice_lists):
+        if evaluated >= req.max_combos:
+            break
+        pt = score(list(combo))
+        sig = (pt["total_cost"], pt["total_carbon"], pt["energy_kwh_m2_yr"])
+        if sig not in seen:
+            seen[sig] = pt
+        evaluated += 1
+    points = list(seen.values())
+
+    # Pareto skyline. Sorting by cost ascending means every already-kept point
+    # has cost ≤ the current one, so the current point is dominated iff a kept
+    # point is also ≤ in carbon AND energy (with at least one strictly less).
+    points.sort(key=lambda z: (z["total_cost"], z["total_carbon"], z["energy_kwh_m2_yr"]))
+    pareto: list[dict] = []
+    for x in points:
+        dominated = False
+        for y in pareto:
+            if (y["total_carbon"] <= x["total_carbon"] and y["energy_kwh_m2_yr"] <= x["energy_kwh_m2_yr"]
+                    and (y["total_cost"] < x["total_cost"] or y["total_carbon"] < x["total_carbon"]
+                         or y["energy_kwh_m2_yr"] < x["energy_kwh_m2_yr"])):
+                dominated = True
+                break
+        if not dominated:
+            pareto.append(x)
+
+    # Tag the three extreme picks so the UI can highlight them.
+    for metric_key, label in (("total_cost", "cheapest"), ("total_carbon", "lowest-carbon"),
+                              ("energy_kwh_m2_yr", "lowest-energy")):
+        if pareto:
+            best = min(pareto, key=lambda z: z[metric_key])
+            best.setdefault("tags", []).append(label)
+
+    # Cap the returned front to max_results, always keeping tagged extremes plus
+    # an even spread across the rest (sorted by energy for a readable curve).
+    pareto.sort(key=lambda z: z["energy_kwh_m2_yr"])
+    if len(pareto) > req.max_results:
+        tagged = [x for x in pareto if x.get("tags")]
+        others = [x for x in pareto if not x.get("tags")]
+        slots = max(0, req.max_results - len(tagged))
+        step = (len(others) / slots) if slots else 0
+        picked_ids = {id(x) for x in tagged}
+        for i in range(slots):
+            picked_ids.add(id(others[min(len(others) - 1, int(i * step))]))
+        pareto = [x for x in pareto if id(x) in picked_ids]
+
+    baseline_point = {
+        "energy_kwh_m2_yr": round(p.baseline_total_kwh_m2_yr, 1),
+        "total_cost": round(baseline_total_kwh * p.energy_price * annuity),
+        "total_carbon": round(baseline_total_kwh * p.carbon_factor_heat * N),
+        "initial_cost": 0, "initial_carbon": 0,
+        "htr_w_per_k": round(baseline_htr, 1),
+    }
+
+    # The scatter cloud of every evaluated (de-duplicated) combination — just the
+    # three objective values, so the frontend can animate the point cloud filling
+    # in and the running frontier tightening. Evenly sampled if it exceeds the cap
+    # (keeps payload bounded while preserving the shape of the cloud).
+    cloud_src = points  # de-duplicated, sorted by cost
+    if req.cloud_cap and len(cloud_src) > req.cloud_cap:
+        step = len(cloud_src) / req.cloud_cap
+        cloud_src = [cloud_src[min(len(cloud_src) - 1, int(i * step))] for i in range(req.cloud_cap)]
+    cloud = [
+        {"energy_kwh_m2_yr": c["energy_kwh_m2_yr"], "total_cost": c["total_cost"], "total_carbon": c["total_carbon"]}
+        for c in cloud_src
+    ] if req.cloud_cap else []
+
+    return {
+        "baseline": baseline_point,
+        "pareto": pareto,
+        "cloud": cloud,
+        "evaluated": evaluated,
+        "unique_points": len(points),
+        "combinations_total": total_combos,
+        "pareto_count": len(pareto),
+        "truncated": truncated,
+        "params_used": {
+            "annuity_factor": round(annuity, 3),
+            "q_fixed_kwh_yr": round(q_fixed),
+            "study_period_yr": N,
+        },
+    }
 
 
 # ── Home-page chatbot (bilingual EN/SV, grounded in the real building data) ──

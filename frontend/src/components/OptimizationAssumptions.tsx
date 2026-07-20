@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { ASSUMPTIONS, EQUATIONS, type Country } from "../config/optimizationAssumptions";
+import { ASSUMPTIONS, EQUATIONS, METHODS, OPTIMIZER_ATTRIBUTION, type Country } from "../config/optimizationAssumptions";
 import { api } from "../api/client";
 
-/* The five economy/climate parameters + equations + sources for the MILP
-   optimizer. Shared by the Sweden and UK Data Explorers (defaultCountry differs). */
-export default function OptimizationAssumptions({ defaultCountry = "SE" }: { defaultCountry?: Country }) {
-  const [country, setCountry] = useState<Country>(defaultCountry);
+/* The five economy/climate parameters + equations + methods + sources for the
+   MILP optimizer. Locked to a single country per page — the Sweden and UK Data
+   Explorers each render their own instance (no cross-country toggle). */
+export default function OptimizationAssumptions({ country = "SE" }: { country?: Country }) {
   const [livePrice, setLivePrice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,25 +21,20 @@ export default function OptimizationAssumptions({ defaultCountry = "SE" }: { def
 
   const rows = ASSUMPTIONS[country];
   const white = (o: number) => `rgba(255,255,255,${o})`;
+  const countryName = country === "SE" ? "Sweden" : "United Kingdom";
 
   return (
     <div style={{ marginTop: 28 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
         <h2 style={{ fontSize: 16, fontWeight: 800, color: "#fff", margin: 0 }}>Optimization assumptions</h2>
-        <div style={{ display: "flex", gap: 6 }}>
-          {(["SE", "UK"] as const).map(c => (
-            <button key={c} onClick={() => setCountry(c)} style={{
-              padding: "3px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700, cursor: "pointer",
-              background: country === c ? "rgba(114,28,184,0.35)" : "rgba(255,255,255,0.06)",
-              border: `1px solid ${country === c ? "rgba(114,28,184,0.6)" : "rgba(255,255,255,0.10)"}`,
-              color: country === c ? "#fff" : white(0.55),
-            }}>{c === "SE" ? "Sweden" : "United Kingdom"}</button>
-          ))}
-        </div>
+        <span style={{
+          padding: "3px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700,
+          background: "rgba(114,28,184,0.35)", border: "1px solid rgba(114,28,184,0.6)", color: "#fff",
+        }}>{countryName}</span>
       </div>
       <p style={{ fontSize: 12, color: white(0.45), margin: "0 0 14px 0" }}>
-        The five economy/climate parameters that turn the building physics into cost, carbon and energy —
-        each with its source. Used by the multi-objective (MILP) optimizer.
+        The five economy/climate parameters that turn the building physics into cost, carbon and energy for
+        {" "}{countryName} — each with its source. Used by the multi-objective (MILP) optimizer.
       </p>
 
       {/* Parameter cards */}
@@ -88,6 +83,35 @@ export default function OptimizationAssumptions({ defaultCountry = "SE" }: { def
         Q_fixed is derived per building from its EPC (total specific energy minus envelope transmission), not a
         looked-up constant. Values marked PROVISIONAL still need confirming against the cited source.
       </p>
+
+      {/* Methods */}
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: white(0.8), margin: "18px 0 8px 0" }}>Methods</h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {METHODS.map(m => (
+          <div key={m.name} style={{
+            background: "rgba(255,255,255,0.03)", border: `1px solid ${white(0.07)}`, borderRadius: 10, padding: "9px 14px",
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: white(0.8) }}>{m.name}</div>
+            <code style={{
+              display: "block", fontSize: 11.5, color: "#4ECDC4", margin: "4px 0",
+              fontFamily: "ui-monospace, monospace", whiteSpace: "pre-wrap", wordBreak: "break-word",
+            }}>{m.latexish}</code>
+            <div style={{ fontSize: 11, color: white(0.42) }}>{m.explain}</div>
+            <a href={m.sourceUrl} target="_blank" rel="noreferrer" style={{
+              fontSize: 10.5, color: "#9B7FD4", textDecoration: "none", marginTop: 4, display: "inline-block",
+            }}>Source: {m.source} ↗</a>
+          </div>
+        ))}
+      </div>
+
+      {/* Attribution — Enerbäck & Strömberg */}
+      <div style={{
+        marginTop: 18, background: "rgba(78,205,196,0.06)", border: "1px solid rgba(78,205,196,0.22)",
+        borderRadius: 10, padding: "10px 14px",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#4ECDC4", marginBottom: 3 }}>Model attribution</div>
+        <div style={{ fontSize: 11.5, color: white(0.6) }}>{OPTIMIZER_ATTRIBUTION.text}</div>
+      </div>
     </div>
   );
 }

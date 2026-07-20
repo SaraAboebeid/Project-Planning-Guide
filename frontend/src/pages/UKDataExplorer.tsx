@@ -429,7 +429,7 @@ export default function UKDataExplorer() {
       </div>
 
       {/* Optimization assumptions + equations + sources (defaults to UK) */}
-      <OptimizationAssumptions defaultCountry="UK" />
+      <OptimizationAssumptions country="UK" />
 
       <div style={{ marginTop: 24, fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
         Sources: OpenStreetMap (ODbL) · Energy Performance of Buildings Register, MHCLG (Open Government Licence v3.0) ·

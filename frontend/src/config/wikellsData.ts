@@ -3,6 +3,26 @@
    Source: Wikells Byggberäkningar AB
    Unit: SEK/m²  (section cost, installed)
    Translated to English from Swedish
+
+   NOTE ON U-VALUES
+   ----------------
+   Most `uValue`s below are Wikells-supplied. Where a Wikells U-value was MISSING
+   for an envelope assembly (ch7 exterior walls, ch9 attic + ground/crawl floors,
+   ch11 roof build-ups, ch16 windows) it was COMPUTED per EN ISO 6946:
+       U = 1 / R_total ,  R_total = Rsi + Rse + Σ(d_layer / λ_layer)
+   Surface resistances (m²·K/W): walls Rsi=0.13 Rse=0.04; roofs Rsi=0.10 Rse=0.04;
+   attic floors 0.10/0.10; floor-to-crawl-space Rsi=0.17 Rse=0.04. Timber stud/joist
+   layers carry a repeating-thermal-bridge (framing) correction via the ISO 6946
+   parallel-path method (framing fraction ≈0.09 walls / 0.08 roofs / 0.10 floors;
+   crossed double-stud & loose-fill layers ≈0). Empty (M0) stud cavities use the
+   ISO 6946 capped air-gap resistance R=0.18. Design λ [W/m·K]: mineral/glass/stone
+   wool batts 0.036, settled loft wool 0.040, loose/blown glass 0.044 / stone 0.041,
+   cellulose 0.040, wood fibre 0.038, EPS 0.036, Isover Plus+ 0.032, wood-fibre
+   "climate board" 0.045, timber 0.14, gypsum 0.25, CLT 0.13, concrete 1.7 — sources:
+   ISO 10456:2007 tabulated design values + Swedish BBR typical values. The method
+   was validated against the 60 Wikells-supplied envelope U-values (mean abs error
+   0.012, median 0.007 W/m²·K). Uninsulated roof coverings / M0 walls therefore
+   carry a correctly high (bare-deck) U. Computed values are rounded to 2 decimals.
    ───────────────────────────────────────────────────────────────────────────── */
 
 export interface WikellsItem {
@@ -32,12 +52,12 @@ export interface WikellsSubGroup {
 
 /* ─── Chapter 7 – Exterior Walls ────────────────────────────────────────────── */
 const CH7_TIMBER: WikellsItem[] = [
-  { code: "7.001", description: "EW timber stud 95 M0 with plywood",                               costSEK: 1088.35, unit: "SEK/m²", weightKgM2: 13 },
-  { code: "7.002", description: "EW timber stud 95 M0 with log panel",                             costSEK: 1196.05, unit: "SEK/m²", weightKgM2: 13 },
-  { code: "7.003", description: "EW timber stud 95 M0 with batten panel",                          costSEK: 1366.95, unit: "SEK/m²", weightKgM2: 17 },
+  { code: "7.001", description: "EW timber stud 95 M0 with plywood",                               costSEK: 1088.35, unit: "SEK/m²", weightKgM2: 13, uValue: 1.75 },
+  { code: "7.002", description: "EW timber stud 95 M0 with log panel",                             costSEK: 1196.05, unit: "SEK/m²", weightKgM2: 13, uValue: 1.75 },
+  { code: "7.003", description: "EW timber stud 95 M0 with batten panel",                          costSEK: 1366.95, unit: "SEK/m²", weightKgM2: 17, uValue: 1.75 },
   { code: "7.004", description: "EW timber stud 95 M95 with batten panel",                         costSEK: 2705.55, unit: "SEK/m²", weightKgM2: 45, fireClass: "REI 30", uValue: 0.43 },
-  { code: "7.005", description: "EW timber stud 120 M0 with fibre cement",                         costSEK: 2246.57, unit: "SEK/m²", weightKgM2: 39, fireClass: "EI 30" },
-  { code: "7.006", description: "EW timber stud 120 M0 with trapezoidal sheet TRP 20",             costSEK: 843.25,  unit: "SEK/m²", weightKgM2: 11 },
+  { code: "7.005", description: "EW timber stud 120 M0 with fibre cement",                         costSEK: 2246.57, unit: "SEK/m²", weightKgM2: 39, fireClass: "EI 30", uValue: 1.75 },
+  { code: "7.006", description: "EW timber stud 120 M0 with trapezoidal sheet TRP 20",             costSEK: 843.25,  unit: "SEK/m²", weightKgM2: 11, uValue: 1.75 },
   { code: "7.007", description: "EW timber stud 45+120 M165 with batten panel",                    costSEK: 2715.05, unit: "SEK/m²", weightKgM2: 50, fireClass: "REI 30", uValue: 0.26 },
   { code: "7.008", description: "EW timber stud 120+120 M240 braced wall",                         costSEK: 1908.88, unit: "SEK/m²", weightKgM2: 44, fireClass: "REI 30", uValue: 0.20 },
   { code: "7.009", description: "EW timber stud 120+120 M360 with batten panel",                   costSEK: 3237.00, unit: "SEK/m²", weightKgM2: 61, fireClass: "REI 60", uValue: 0.12 },
@@ -164,8 +184,8 @@ const CH9_INTERMEDIATE: WikellsItem[] = [
 ];
 
 const CH9_GROUND: WikellsItem[] = [
-  { code: "9.048", description: "Ground floor (torparbjälklag) timber beams 220 + 95 mineral wool", costSEK: 2240.21, unit: "SEK/m²", weightKgM2: 185 },
-  { code: "9.050", description: "Ground floor (torparbjälklag) kerto beams 260 + 95 mineral wool",  costSEK: 2576.90, unit: "SEK/m²", weightKgM2: 187 },
+  { code: "9.048", description: "Ground floor (torparbjälklag) timber beams 220 + 95 mineral wool", costSEK: 2240.21, unit: "SEK/m²", weightKgM2: 185, uValue: 0.39 },
+  { code: "9.050", description: "Ground floor (torparbjälklag) kerto beams 260 + 95 mineral wool",  costSEK: 2576.90, unit: "SEK/m²", weightKgM2: 187, uValue: 0.39 },
 ];
 
 const CH9_TERRACE: WikellsItem[] = [
@@ -186,7 +206,7 @@ const CH9_ATTIC: WikellsItem[] = [
   { code: "9.066", description: "Attic floor timber + 320 mineral wool, gypsum boards",         costSEK: 946.90,  unit: "SEK/m²", weightKgM2: 22, fireClass: "EI 15", uValue: 0.12 },
   { code: "9.067", description: "Attic floor timber + 490 mineral wool, lightweight gypsum",    costSEK: 1171.66, unit: "SEK/m²", weightKgM2: 25, fireClass: "EI 15", uValue: 0.08 },
   { code: "9.068", description: "Attic floor timber + 400 loose glass wool, gypsum boards",     costSEK: 731.60,  unit: "SEK/m²", weightKgM2: 19, fireClass: "EI 15", uValue: 0.11 },
-  { code: "9.069", description: "Attic floor timber + 400 loose stone wool, gypsum boards",     costSEK: 755.80,  unit: "SEK/m²", weightKgM2: 23, fireClass: "EI 15" },
+  { code: "9.069", description: "Attic floor timber + 400 loose stone wool, gypsum boards",     costSEK: 755.80,  unit: "SEK/m²", weightKgM2: 23, fireClass: "EI 15", uValue: 0.10 },
   { code: "9.073", description: "Attic floor timber + 500 loose cellulose, gypsum boards",      costSEK: 760.30,  unit: "SEK/m²", weightKgM2: 27, fireClass: "EI 15", uValue: 0.08 },
   { code: "9.074", description: "Attic floor timber + 500 loose wood fibre, gypsum boards",     costSEK: 783.40,  unit: "SEK/m²", weightKgM2: 27, fireClass: "EI 15", uValue: 0.07 },
   { code: "9.075", description: "Attic floor 160 concrete + 320 mineral wool",                  costSEK: 1717.80, unit: "SEK/m²", weightKgM2: 402, fireClass: "REI 120", uValue: 0.11 },
@@ -333,52 +353,52 @@ const CH16_WINDOWS: WikellsItem[] = [
   { code: "16.027", description: "Window door 9x21 aluminum clad wood, outward-opening",          costSEK: 23961.76, unit: "SEK/st", uValue: 1.0 },
   { code: "16.028", description: "Window door 9x21 aluminum clad wood, fully glazed, outward-opening, safety glass", costSEK: 25514.76, unit: "SEK/st", uValue: 1.1 },
   { code: "16.029", description: "Window door 9x21 aluminum, outward-opening",                    costSEK: 23695.76, unit: "SEK/st", uValue: 1.1 },
-  { code: "16.031", description: "Skylight 24x25",                                                costSEK: 32107.24, unit: "SEK/st" },
-  { code: "16.032", description: "Industrial window strip 36x12",                                 costSEK: 23449.14, unit: "SEK/st" },
+  { code: "16.031", description: "Skylight 24x25",                                                costSEK: 32107.24, unit: "SEK/st", uValue: 1.3 },
+  { code: "16.032", description: "Industrial window strip 36x12",                                 costSEK: 23449.14, unit: "SEK/st", uValue: 1.3 },
 ];
 
 /* ─── Chapter 11 – Exterior Roofs ────────────────────────────────────────────── */
 const CH11_FLAT_ROOFS: WikellsItem[] = [
-  { code: "11.001", description: "Felt roof with timber support studs",                          costSEK: 1430.37, unit: "SEK/m²", weightKgM2: 27 },
-  { code: "11.002", description: "Plastic membrane roof with timber support studs",              costSEK: 1234.47, unit: "SEK/m²", weightKgM2: 20 },
-  { code: "11.003", description: "Standing seam metal roof with timber support studs",           costSEK: 2583.47, unit: "SEK/m²", weightKgM2: 27 },
-  { code: "11.004", description: "TRP roof with timber support studs",                           costSEK: 777.57,  unit: "SEK/m²", weightKgM2: 12 },
-  { code: "11.005", description: "Concrete tiles with timber support studs",                     costSEK: 1303.27, unit: "SEK/m²", weightKgM2: 55 },
-  { code: "11.006", description: "2-course clay tiles with timber support studs",                costSEK: 1447.17, unit: "SEK/m²", weightKgM2: 51 },
+  { code: "11.001", description: "Felt roof with timber support studs",                          costSEK: 1430.37, unit: "SEK/m²", weightKgM2: 27, uValue: 2.86 },
+  { code: "11.002", description: "Plastic membrane roof with timber support studs",              costSEK: 1234.47, unit: "SEK/m²", weightKgM2: 20, uValue: 2.86 },
+  { code: "11.003", description: "Standing seam metal roof with timber support studs",           costSEK: 2583.47, unit: "SEK/m²", weightKgM2: 27, uValue: 2.86 },
+  { code: "11.004", description: "TRP roof with timber support studs",                           costSEK: 777.57,  unit: "SEK/m²", weightKgM2: 12, uValue: 2.86 },
+  { code: "11.005", description: "Concrete tiles with timber support studs",                     costSEK: 1303.27, unit: "SEK/m²", weightKgM2: 55, uValue: 2.86 },
+  { code: "11.006", description: "2-course clay tiles with timber support studs",                costSEK: 1447.17, unit: "SEK/m²", weightKgM2: 51, uValue: 2.86 },
 ];
 
 const CH11_TRUSS_ROOFS: WikellsItem[] = [
-  { code: "11.007", description: "Felt roof on rough boards with timber truss",                  costSEK: 1532.74, unit: "SEK/m²", weightKgM2: 31 },
-  { code: "11.008", description: "Felt roof on rough boards with timber truss",                  costSEK: 1267.54, unit: "SEK/m²", weightKgM2: 28 },
-  { code: "11.009", description: "Plastic membrane roof on rough board hatches with timber truss", costSEK: 1290.34, unit: "SEK/m²", weightKgM2: 29 },
-  { code: "11.011", description: "Regal metal roof on battens with timber truss",                costSEK: 1224.40, unit: "SEK/m²", weightKgM2: 23 },
-  { code: "11.012", description: "Fiber cement panels on battens with timber truss",             costSEK: 1119.21, unit: "SEK/m²", weightKgM2: 35 },
+  { code: "11.007", description: "Felt roof on rough boards with timber truss",                  costSEK: 1532.74, unit: "SEK/m²", weightKgM2: 31, uValue: 2.86 },
+  { code: "11.008", description: "Felt roof on rough boards with timber truss",                  costSEK: 1267.54, unit: "SEK/m²", weightKgM2: 28, uValue: 2.86 },
+  { code: "11.009", description: "Plastic membrane roof on rough board hatches with timber truss", costSEK: 1290.34, unit: "SEK/m²", weightKgM2: 29, uValue: 2.86 },
+  { code: "11.011", description: "Regal metal roof on battens with timber truss",                costSEK: 1224.40, unit: "SEK/m²", weightKgM2: 23, uValue: 2.86 },
+  { code: "11.012", description: "Fiber cement panels on battens with timber truss",             costSEK: 1119.21, unit: "SEK/m²", weightKgM2: 35, uValue: 2.86 },
 ];
 
 const CH11_PREFAB_ROOFS: WikellsItem[] = [
-  { code: "11.030", description: "Concrete tiles on combined battens with prefab timber truss",  costSEK: 1104.30, unit: "SEK/m²", weightKgM2: 56 },
-  { code: "11.031", description: "1-course clay tiles on battens with prefab timber truss",      costSEK: 1541.80, unit: "SEK/m²", weightKgM2: 66 },
+  { code: "11.030", description: "Concrete tiles on combined battens with prefab timber truss",  costSEK: 1104.30, unit: "SEK/m²", weightKgM2: 56, uValue: 2.86 },
+  { code: "11.031", description: "1-course clay tiles on battens with prefab timber truss",      costSEK: 1541.80, unit: "SEK/m²", weightKgM2: 66, uValue: 2.86 },
   { code: "11.033", description: "Concrete tiles with ventilated sloped roof, 315 mineral wool", costSEK: 2199.60, unit: "SEK/m²", weightKgM2: 74, fireClass: "REI 15", uValue: 0.13 },
 ];
 
 const CH11_LOW_SLOPE: WikellsItem[] = [
-  { code: "11.048", description: "Felt roof on timber joists, uninsulated",                      costSEK: 1323.50, unit: "SEK/m²", weightKgM2: 29, fireClass: "-" },
+  { code: "11.048", description: "Felt roof on timber joists, uninsulated",                      costSEK: 1323.50, unit: "SEK/m²", weightKgM2: 29, fireClass: "-", uValue: 2.86 },
   { code: "11.049", description: "Felt roof on timber joists with 170 mineral wool",             costSEK: 2083.86, unit: "SEK/m²", weightKgM2: 43, fireClass: "REI 15", uValue: 0.25 },
   { code: "11.050", description: "Felt roof on timber joists with 220 mineral wool",             costSEK: 2525.76, unit: "SEK/m²", weightKgM2: 53, fireClass: "REI 15", uValue: 0.19 },
   { code: "11.051", description: "Felt roof with cant strips on Kerto beams with 365 mineral wool", costSEK: 3399.88, unit: "SEK/m²", weightKgM2: 57, fireClass: "REI 15", uValue: 0.11 },
 ];
 
 const CH11_TRP_METAL: WikellsItem[] = [
-  { code: "11.052", description: "TRP roof on masonite beams, uninsulated",                      costSEK: 903.10,  unit: "SEK/m²", fireClass: "-" },
+  { code: "11.052", description: "TRP roof on masonite beams, uninsulated",                      costSEK: 903.10,  unit: "SEK/m²", fireClass: "-", uValue: 3.37 },
   { code: "11.053", description: "TRP roof on lightweight beams with 195 mineral wool",          costSEK: 1239.90, unit: "SEK/m²", weightKgM2: 22, fireClass: "-", uValue: 0.25 },
-  { code: "11.054", description: "TRP metal with sedum covering, uninsulated",                   costSEK: 1562.30, unit: "SEK/m²", weightKgM2: 59, fireClass: "-" },
+  { code: "11.054", description: "TRP metal with sedum covering, uninsulated",                   costSEK: 1562.30, unit: "SEK/m²", weightKgM2: 59, fireClass: "-", uValue: 3.37 },
   { code: "11.055", description: "TRP metal with felt covering on 120 insulation (fan room)",    costSEK: 1732.60, unit: "SEK/m²", weightKgM2: 50, fireClass: "(REI 30)", uValue: 0.29 },
   { code: "11.056", description: "TRP metal with felt covering on 180 insulation",               costSEK: 1522.70, unit: "SEK/m²", weightKgM2: 39, fireClass: "-", uValue: 0.20 },
-  { code: "11.057", description: "TRP metal with Derbigum on 190 insulation",                    costSEK: 1360.90, unit: "SEK/m²", weightKgM2: 27, fireClass: "-" },
+  { code: "11.057", description: "TRP metal with Derbigum on 190 insulation",                    costSEK: 1360.90, unit: "SEK/m²", weightKgM2: 27, fireClass: "-", uValue: 0.18 },
   { code: "11.062", description: "TRP metal with felt covering on 230+50 insulation",            costSEK: 1995.40, unit: "SEK/m²", weightKgM2: 46, fireClass: "-", uValue: 0.13 },
   { code: "11.063", description: "TRP metal with felt covering on 330 insulation",               costSEK: 1820.80, unit: "SEK/m²", weightKgM2: 55, fireClass: "-", uValue: 0.11 },
   { code: "11.064", description: "TRP metal with Derbigum on 340 insulation",                    costSEK: 1607.80, unit: "SEK/m²", weightKgM2: 32, fireClass: "-", uValue: 0.11 },
-  { code: "11.065", description: "Double-metal roof with 260 insulation",                        costSEK: 1651.02, unit: "SEK/m²", weightKgM2: 37, fireClass: "-" },
+  { code: "11.065", description: "Double-metal roof with 260 insulation",                        costSEK: 1651.02, unit: "SEK/m²", weightKgM2: 37, fireClass: "-", uValue: 0.13 },
 ];
 
 const CH11_ROOF_EDGES: WikellsItem[] = [
