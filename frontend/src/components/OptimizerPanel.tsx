@@ -64,17 +64,50 @@ export default function OptimizerPanel({
 
   return (
     <div style={{ borderRadius: 14, background: "rgba(114,28,184,0.06)", border: "1px solid rgba(114,28,184,0.28)", overflow: "hidden" }}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left",
-          padding: "14px 18px", cursor: "pointer", background: "transparent", border: "none",
-        }}
-      >
-        <Sparkles size={16} color="#B98BE8" />
-        <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Optimizer — best cost / carbon / energy trade-offs</span>
-        <span style={{ marginLeft: "auto", color: white(0.4) }}>{open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</span>
-      </button>
+      {/* The run action stays reachable whether or not the panel is expanded —
+          it used to be hidden inside the collapsed body. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px" }}>
+        <button
+          onClick={() => setOpen((o) => !o)}
+          style={{
+            display: "flex", alignItems: "center", gap: 10, textAlign: "left", flex: 1,
+            cursor: "pointer", background: "transparent", border: "none", padding: 0,
+          }}
+        >
+          <Sparkles size={16} color="#B98BE8" />
+          <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Optimizer — best cost / carbon / energy trade-offs</span>
+          {result && !open && (
+            <span style={{ fontSize: 11, color: white(0.45) }}>
+              {result.pareto_count} optimal of {result.combinations_total.toLocaleString()}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => { setOpen(true); run(); }}
+          disabled={!canRun || loading}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 15px", borderRadius: 9,
+            fontSize: 12, fontWeight: 800, flexShrink: 0,
+            cursor: canRun && !loading ? "pointer" : "not-allowed",
+            background: canRun ? "rgba(114,28,184,0.35)" : "rgba(255,255,255,0.05)",
+            border: `1px solid ${canRun ? "rgba(114,28,184,0.6)" : "rgba(255,255,255,0.1)"}`,
+            color: canRun ? "#fff" : white(0.4),
+          }}
+        >
+          {loading && <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />}
+          {result ? "Re-run" : "Run optimization"}
+        </button>
+
+        <button onClick={() => setOpen((o) => !o)}
+          style={{ background: "transparent", border: 0, cursor: "pointer", color: white(0.4), padding: 0, flexShrink: 0 }}
+          title={open ? "Collapse" : "Expand"}>
+          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </button>
+      </div>
+      {disabledReason && !open && (
+        <div style={{ fontSize: 11, color: "#F59E0B", padding: "0 18px 12px" }}>{disabledReason}</div>
+      )}
 
       {open && (
         <div style={{ padding: "0 18px 18px" }}>
@@ -86,20 +119,6 @@ export default function OptimizerPanel({
           </p>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-            <button
-              onClick={run}
-              disabled={!canRun || loading}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 10,
-                fontSize: 13, fontWeight: 700, cursor: canRun && !loading ? "pointer" : "not-allowed",
-                background: canRun ? "rgba(114,28,184,0.35)" : "rgba(255,255,255,0.05)",
-                border: `1px solid ${canRun ? "rgba(114,28,184,0.6)" : "rgba(255,255,255,0.1)"}`,
-                color: canRun ? "#fff" : white(0.4),
-              }}
-            >
-              {loading && <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />}
-              {result ? "Re-run optimization" : "Run optimization"}
-            </button>
             {disabledReason && <span style={{ fontSize: 11.5, color: "#F59E0B" }}>{disabledReason}</span>}
             {result && (
               <span style={{ fontSize: 11.5, color: white(0.45) }}>

@@ -87,6 +87,34 @@ interface ComponentConfig {
   carbonUnmatched?: string[];
 }
 
+/* Step 4 is a sequence — buildings, then designs, then packages, then results.
+   Numbering it makes that legible; without it the page reads as five unrelated
+   cards of equal weight and you can't tell what to do first. `state` dims a
+   stage that isn't reachable yet and says what unlocks it. */
+function StageHeader({
+  n, title, hint, state = "active",
+}: {
+  n: number;
+  title: string;
+  hint?: string;
+  state?: "active" | "waiting" | "done";
+}) {
+  const dim = state === "waiting";
+  const accent = state === "done" ? "#96D74C" : dim ? "rgba(255,255,255,0.25)" : "#4ECDC4";
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "6px 0 2px", opacity: dim ? 0.55 : 1 }}>
+      <span style={{
+        flexShrink: 0, width: 20, height: 20, borderRadius: "50%", display: "inline-flex",
+        alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
+        color: dim ? "rgba(255,255,255,0.4)" : "#0b1220", background: accent,
+        transform: "translateY(3px)",
+      }}>{n}</span>
+      <span style={{ fontSize: 13.5, fontWeight: 800, color: dim ? "rgba(255,255,255,0.55)" : "#fff" }}>{title}</span>
+      {hint && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{hint}</span>}
+    </div>
+  );
+}
+
 /** Which components can be composed from layers (windows/doors cannot). */
 function kindForKey(key: string): ComponentKind | null {
   if (key === "Walls" || key === "VertExt::Walls") return "wall";
@@ -175,85 +203,93 @@ function LineItemPicker({
   item, items, selectedCodes, onToggle, recommendations, boverketResources,
 }: {
   item: AreaLineItem;
-  items: WikellsItem[];
+  /** Codes already saved as configurations — the tick shows real state. */
   selectedCodes: string[];
+  items: WikellsItem[];
   onToggle: (code: string) => void;
   recommendations: Record<string, KpiKey[]>;
   boverketResources: BoverketResource[];
 }) {
   const color = COMPONENT_COLORS[item.parentComponent] ?? "#721CB8";
+  const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   if (items.length === 0) {
     return <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>No catalogue materials found for this item.</p>;
   }
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 260, overflowY: "auto" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: 300, overflowY: "auto", overflowX: "hidden" }}>
       {items.map((it) => {
-        const checked = selectedCodes.includes(it.code);
         const carbon = estimateCarbon(it, boverketResources);
         const ul = uLabel(it.uValue);
         const tags = recommendations[it.code] ?? [];
+        const p = parseAssemblyParts(it.description);
+        const chips: { label: string; color: string }[] = [];
+        if (p.frame) chips.push({ label: p.frame, color: "#F59E0B" });
+        if (p.insulationMm != null) {
+          chips.push(p.insulationMm === 0
+            ? { label: "no insulation", color: "#EF4444" }
+            : { label: `${p.insulationMm} mm ${p.insulationType ?? "insulation"}`, color: "#4ECDC4" });
+        }
+        if (p.cladding) chips.push({ label: p.cladding, color: "#4A90E2" });
+        const hovered = hoveredCode === it.code;
+        const checked = selectedCodes.includes(it.code);
         return (
+          // The tick means "saved as one of my configurations" — ticking creates
+          // it, unticking removes it. That's real state, unlike the previous
+          // checkbox which could never tick.
           <button
             key={it.code}
             onClick={() => onToggle(it.code)}
+            onMouseEnter={() => setHoveredCode(it.code)}
+            onMouseLeave={() => setHoveredCode(null)}
+            onFocus={() => setHoveredCode(it.code)}
+            onBlur={() => setHoveredCode(null)}
+            title={checked ? "Remove this configuration" : it.description}
             style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left",
-              padding: "8px 10px", borderRadius: 8, cursor: "pointer",
-              border: `1px solid ${checked ? `${color}55` : "transparent"}`,
-              background: checked ? `${color}18` : "rgba(255,255,255,0.02)",
+              width: "100%", display: "grid",
+              gridTemplateColumns: "18px 34px minmax(0,1fr) 96px 58px 74px",
+              gap: 8, alignItems: "center", textAlign: "left",
+              padding: "6px 9px", borderRadius: 8, cursor: "pointer",
+              border: `1px solid ${checked ? "rgba(78,205,196,0.45)" : hovered ? `${color}55` : "transparent"}`,
+              background: checked ? "rgba(78,205,196,0.12)" : hovered ? `${color}18` : "rgba(255,255,255,0.02)",
             }}
           >
-            <div style={{
-              width: 15, height: 15, borderRadius: 4, flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              border: `2px solid ${checked ? color : "rgba(255,255,255,0.2)"}`,
-              background: checked ? color : "transparent",
-              fontSize: 10, color: "#0b1220", fontWeight: 900,
-            }}>{checked ? "✓" : ""}</div>
-            <span style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{it.code}</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 11, color: checked ? "#fff" : "rgba(255,255,255,0.65)", lineHeight: 1.3 }}>{it.description}</span>
-              {/* Layer categories parsed out of the Wikells description — frame,
-                  insulation and cladding are in the data but not as fields. */}
-              {(() => {
-                const p = parseAssemblyParts(it.description);
-                const chips: { label: string; color: string }[] = [];
-                if (p.frame) chips.push({ label: p.frame, color: "#F59E0B" });
-                if (p.insulationMm != null) {
-                  chips.push(p.insulationMm === 0
-                    ? { label: "no insulation", color: "#EF4444" }
-                    : { label: `${p.insulationMm} mm ${p.insulationType ?? "insulation"}`, color: "#4ECDC4" });
-                }
-                if (p.cladding) chips.push({ label: p.cladding, color: "#4A90E2" });
-                if (!chips.length) return null;
-                return (
-                  <span style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
-                    {chips.map((c) => (
-                      <span key={c.label} style={{
-                        fontSize: 8.5, fontWeight: 700, color: c.color, background: `${c.color}1e`,
-                        border: `1px solid ${c.color}44`, borderRadius: 7, padding: "0px 5px", whiteSpace: "nowrap",
-                      }}>{c.label}</span>
-                    ))}
-                  </span>
-                );
-              })()}
+            <span style={{
+              width: 15, height: 15, borderRadius: 4, display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#0b1220",
+              border: `2px solid ${checked ? "#4ECDC4" : hovered ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.2)"}`,
+              background: checked ? "#4ECDC4" : "transparent",
+            }}>{checked ? "✓" : ""}</span>
+            <span style={{ fontSize: 9.5, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>{it.code}</span>
+
+            <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ fontSize: 11, color: hovered ? "#fff" : "rgba(255,255,255,0.7)", lineHeight: 1.25,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.description}</span>
+              {chips.length > 0 && (
+                <span style={{ display: "flex", gap: 3, overflow: "hidden", whiteSpace: "nowrap" }}>
+                  {chips.map((c) => (
+                    <span key={c.label} style={{
+                      fontSize: 8.5, fontWeight: 700, color: c.color, background: `${c.color}1e`,
+                      border: `1px solid ${c.color}44`, borderRadius: 6, padding: "0 4px", flexShrink: 0,
+                    }}>{c.label}</span>
+                  ))}
+                </span>
+              )}
             </span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>
+
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>
               {fmtSEK(it.costSEK)}/{item.quantityKind === "area" ? "m²" : "st"}
             </span>
-            {ul && (
-              <span style={{ fontSize: 9, fontWeight: 700, color: ul.color, background: `${ul.color}22`, borderRadius: 8, padding: "1px 5px", flexShrink: 0 }}>
-                U={it.uValue}
-              </span>
-            )}
-            <span style={{ fontSize: 9, fontWeight: 700, color: "#60a5fa", background: "rgba(96,165,250,0.12)", borderRadius: 8, padding: "1px 5px", flexShrink: 0 }}>
-              ~{carbon.value} kg CO₂e{carbon.confidence !== "legacy" ? "?" : ""}
+            <span style={{ textAlign: "right" }}>
+              {ul && (
+                <span style={{ fontSize: 9, fontWeight: 700, color: ul.color, background: `${ul.color}22`, borderRadius: 7, padding: "1px 5px" }}>
+                  U {it.uValue}
+                </span>
+              )}
             </span>
-            {tags.map((t) => (
-              <span key={t} style={{ fontSize: 9, fontWeight: 700, color: "#96D74C", background: "rgba(150,215,76,0.14)", borderRadius: 8, padding: "1px 6px", flexShrink: 0 }}>
-                ★ {t}
-              </span>
-            ))}
+            <span style={{ fontSize: 9, fontWeight: 700, color: "#60a5fa", textAlign: "right" }}>
+              ~{carbon.value} kg
+              {tags.length > 0 && <span style={{ color: "#96D74C", marginLeft: 4 }}>★{tags.length}</span>}
+            </span>
           </button>
         );
       })}
@@ -641,6 +677,25 @@ export default function RenovationSimulator() {
 
   const removeConfig = (id: string) => setConfigs((cs) => cs.filter((c) => c.id !== id));
 
+  /** Tick = save this catalogue assembly as a configuration; untick = remove it. */
+  function toggleCatalogueConfig(code: string) {
+    if (!activeItem) return;
+    const existing = configs.find(
+      (c) => c.componentKey === activeItem.key && c.source === "catalogue" && c.wikellsCode === code,
+    );
+    if (existing) removeConfig(existing.id);
+    else saveCatalogueConfig(code);
+  }
+
+  /** Catalogue codes already saved for the active component — drives the ticks. */
+  const activeCatalogueCodes = useMemo(
+    () => (activeItem
+      ? configs.filter((c) => c.componentKey === activeItem.key && c.source === "catalogue")
+               .map((c) => c.wikellsCode!).filter(Boolean)
+      : []),
+    [configs, activeItem],
+  );
+
   /* Packages = cartesian product across components that have configurations. */
   const configuredComponents = useMemo(
     () => lineItems
@@ -966,11 +1021,10 @@ export default function RenovationSimulator() {
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>Renovation Calculator</h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          {geometries.length > 1
-            ? `Pick ${isUK ? "a TABULA refurbishment tier" : "a material per component"}, add it as a package, and run a real EnergyPlus simulation across all ${geometries.length} buildings selected in Step 2 at once.`
-            : isUK
-              ? "Pick a TABULA refurbishment tier and compare real EnergyPlus-simulated performance against the building's as-built baseline."
-              : "Pick a material per component, add it as a package, and compare real cost, embodied carbon, and EnergyPlus-simulated performance against the building's as-built baseline."}
+          {isUK
+            ? "Pick a TABULA refurbishment tier and compare real EnergyPlus performance against the as-built baseline."
+            : <>Design build-ups per component, combine them into packages, and simulate each in EnergyPlus against the as-built baseline
+               {geometries.length > 1 ? ` — across all ${geometries.length} buildings from Step 2.` : "."}</>}
         </p>
       </div>
 
@@ -978,6 +1032,14 @@ export default function RenovationSimulator() {
         <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
           <p style={{ fontSize: 12, color: "#F59E0B", margin: 0 }}>No buildings resolved yet — go back to Step 1/2 and select a location.</p>
         </div>
+      )}
+
+      {geometries.length > 0 && (
+        <StageHeader n={1} title="Buildings & baseline"
+          hint={baselineAgg?.avgTotalKwhM2Yr != null
+            ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr`
+            : "running the as-built simulation…"}
+          state={baselineAgg?.avgTotalKwhM2Yr != null ? "done" : "active"} />
       )}
 
       {/* ── Buildings & baseline performance + package target selector ── */}
@@ -1052,37 +1114,56 @@ export default function RenovationSimulator() {
 
       {geometries.length > 0 && !isUK && (
         <>
+          <StageHeader n={2} title="Design configurations"
+            hint={configs.length
+              ? configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" · ")
+              : "save one or more build-ups per component"}
+            state={configs.length ? "done" : "active"} />
           {/* Component tabs + material picker (quantities shown are for building 1; each
               building's own quantity is computed at submission time from its own geometry) */}
           <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, marginBottom: 4, textTransform: "uppercase" }}>
-                Area line items
-              </div>
-              {lineItems.map((item) => {
-                const color = COMPONENT_COLORS[item.parentComponent] ?? "#721CB8";
-                const isActive = activeItemKey === item.key;
-                const selCount = draftSelection[item.key]?.length ?? 0;
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => setActiveItemKey(item.key)}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "10px 12px", borderRadius: 10, border: `1px solid ${isActive ? `${color}55` : "rgba(255,255,255,0.07)"}`,
-                      background: isActive ? `${color}18` : "rgba(255,255,255,0.03)", cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: selCount > 0 ? color : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#fff" : "rgba(255,255,255,0.6)" }}>{item.label}</span>
+              {/* Grouped by what they belong to: the existing building vs a new
+                  storey. Flattened, "Walls" and "New Walls" sat adjacent with
+                  nothing explaining the difference. */}
+              {(() => {
+                const groups = new Map<string, typeof lineItems>();
+                lineItems.forEach((li) => {
+                  const g = li.key.startsWith("VertExt::") ? "Vertical extension (new floor)" : "Existing building";
+                  const arr = groups.get(g); if (arr) arr.push(li); else groups.set(g, [li]);
+                });
+                return [...groups.entries()].map(([groupLabel, items]) => (
+                  <div key={groupLabel} style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 4 }}>
+                    <div style={{ fontSize: 9.5, fontWeight: 800, color: "rgba(255,255,255,0.28)", letterSpacing: 1.2, textTransform: "uppercase", marginTop: 2 }}>
+                      {groupLabel}
                     </div>
-                    {selCount > 0 && (
-                      <span style={{ fontSize: 10, fontWeight: 700, color, background: `${color}22`, borderRadius: 99, padding: "1px 7px" }}>{selCount}</span>
-                    )}
-                  </button>
-                );
-              })}
+                    {items.map((item) => {
+                      const color = COMPONENT_COLORS[item.parentComponent] ?? "#721CB8";
+                      const isActive = activeItemKey === item.key;
+                      const cfgCount = configs.filter((c) => c.componentKey === item.key).length;
+                      return (
+                        <button
+                          key={item.key}
+                          onClick={() => setActiveItemKey(item.key)}
+                          style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "9px 12px", borderRadius: 10, border: `1px solid ${isActive ? `${color}55` : "rgba(255,255,255,0.07)"}`,
+                            background: isActive ? `${color}18` : "rgba(255,255,255,0.03)", cursor: "pointer",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfgCount > 0 ? "#4ECDC4" : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#fff" : "rgba(255,255,255,0.6)" }}>{item.label}</span>
+                          </div>
+                          {cfgCount > 0 && (
+                            <span style={{ fontSize: 10, fontWeight: 800, color: "#4ECDC4", background: "rgba(78,205,196,0.16)", borderRadius: 99, padding: "1px 7px" }}>{cfgCount}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ));
+              })()}
               {lineItems.length === 0 && (
                 <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>
                   No components selected. Go back to Step 1.
@@ -1117,14 +1198,11 @@ export default function RenovationSimulator() {
                 {(() => {
                   const mine = configs.filter((c) => c.componentKey === activeItem.key);
                   return (
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 6 }}>
-                        Your {activeItem.label.toLowerCase()} configurations ({mine.length})
-                      </div>
-                      {mine.length === 0 && (
-                        <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.35)", fontStyle: "italic", margin: "0 0 8px" }}>
-                          None yet — design one below. Add several to compare them as separate packages.
-                        </p>
+                    <div style={{ marginBottom: mine.length ? 14 : 4 }}>
+                      {mine.length > 0 && (
+                        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 6 }}>
+                          Saved ({mine.length}) — each becomes a package option
+                        </div>
                       )}
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {mine.map((c) => (
@@ -1165,7 +1243,6 @@ export default function RenovationSimulator() {
                 {/* ── Design a new configuration ── */}
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>New configuration</span>
                     {(["catalogue", "layers"] as const).map((m) => {
                       const disabled = m === "layers" && !kindForKey(activeItem.key);
                       return (
@@ -1187,14 +1264,11 @@ export default function RenovationSimulator() {
 
                   {draftMode === "catalogue" ? (
                     <>
-                      <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", margin: "0 0 6px" }}>
-                        Click an assembly to save it as a configuration.
-                      </p>
                       <LineItemPicker
                         item={activeItem}
                         items={activeCatalogue}
-                        selectedCodes={[]}
-                        onToggle={(code) => saveCatalogueConfig(code)}
+                        selectedCodes={activeCatalogueCodes}
+                        onToggle={toggleCatalogueConfig}
                         recommendations={activeRecommendations}
                         boverketResources={activeBoverket}
                       />
@@ -1225,6 +1299,13 @@ export default function RenovationSimulator() {
       {geometries.length > 0 && (
         <>
           {/* ══ PACKAGES — the product of your configurations ══════════════ */}
+          {!isUK && (
+            <StageHeader n={3} title="Packages"
+              hint={packageCombosList.length
+                ? `${activeCombos.length} selected of ${packageCombosList.length}`
+                : "needs at least one configuration"}
+              state={packageCombosList.length ? "active" : "waiting"} />
+          )}
           {!isUK && (
             <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
@@ -1298,6 +1379,18 @@ export default function RenovationSimulator() {
             </div>
           )}
 
+          {/* The optimizer is an ALTERNATIVE to simulating everything, not a
+              sibling step — labelled so you can tell which tool you want. */}
+          {!isUK && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 -4px" }}>
+              <span style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>
+                or, if there are too many to run
+              </span>
+              <span style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
+            </div>
+          )}
+
           {/* Multi-objective optimizer (Sweden) — Pareto front over the fast
               degree-day physics; each validated winner runs in EPSM and drops
               into the comparison table below. */}
@@ -1311,6 +1404,12 @@ export default function RenovationSimulator() {
               selectedKpis={project.selectedKpis}
             />
           )}
+
+          <StageHeader n={4} title="Results"
+            hint={packages.filter((p) => !p.isBaseline).length
+              ? `${packages.filter((p) => !p.isBaseline).length} package${packages.filter((p) => !p.isBaseline).length === 1 ? "" : "s"} vs baseline`
+              : "simulate a package to compare"}
+            state={packages.filter((p) => !p.isBaseline).length ? "active" : "waiting"} />
 
           {/* Comparison table - one row per package, portfolio aggregates, expandable per-building breakdown */}
           <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "16px 18px" }}>

@@ -105,6 +105,9 @@ export default function ParetoChart({
   const batch = Math.max(1, Math.ceil(total / 45));
   const [revealed, setRevealed] = useState(total);
   const [playing, setPlaying] = useState(false);
+  /** Clicking a Pareto marker pins it here; the detail card below is a real,
+   *  stationary target you can click — unlike the hover tooltip. */
+  const [pinned, setPinned] = useState<OptimizePoint | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // New results → play the reveal from the start.
@@ -180,7 +183,9 @@ export default function ParetoChart({
             {Object.entries((d as OptDatum).point.selection_labels).filter(([, v]) => v !== "Keep as-built").map(([k, v]) => (
               <div key={k}>{k.replace("VertExt::", "")}: {v}</div>
             ))}
-            <div style={{ color: "#4ECDC4", marginTop: 3 }}>{(d as OptDatum).validated ? "✓ validated in EPSM" : "click to validate in EPSM →"}</div>
+            <div style={{ color: "#4ECDC4", marginTop: 3 }}>
+              {(d as OptDatum).validated ? "✓ validated in EPSM" : "click to pin this package"}
+            </div>
           </div>
         )}
       </div>
@@ -243,7 +248,10 @@ export default function ParetoChart({
                   onClick={(d: unknown) => {
                     const o = d as { point?: OptimizePoint; payload?: { point?: OptimizePoint } } | undefined;
                     const p = o?.point ?? o?.payload?.point;
-                    if (p) onValidate(p);
+                    // PIN the selection instead of acting on it directly. The
+                    // hover tooltip disappears the moment the mouse moves, so a
+                    // "click to validate" living inside it was unusable.
+                    if (p) setPinned(p);
                   }} />
               )}
             </ScatterChart>
@@ -261,9 +269,52 @@ export default function ParetoChart({
         </div>
       </div>
 
+      {/* Pinned package — a stationary target, unlike the hover tooltip */}
+      {pinned && (() => {
+        const isVal = validatedKeys.has(pointKey(pinned));
+        const touched = Object.entries(pinned.selection_labels).filter(([, v]) => v !== "Keep as-built");
+        return (
+          <div style={{ marginTop: 8, padding: "11px 14px", borderRadius: 10,
+            background: "rgba(78,205,196,0.08)", border: "1px solid rgba(78,205,196,0.35)" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#4ECDC4", marginBottom: 4 }}>Selected package</div>
+                {touched.length === 0
+                  ? <div style={{ fontSize: 11.5, color: white(0.5), fontStyle: "italic" }}>Keep everything as-built</div>
+                  : touched.map(([k, v]) => (
+                      <div key={k} style={{ fontSize: 11.5, color: white(0.8) }}>
+                        <span style={{ color: white(0.45) }}>{k.replace("VertExt::", "")}:</span> {v}
+                      </div>
+                    ))}
+                <div style={{ fontSize: 11, color: white(0.55), marginTop: 5 }}>
+                  {fmt(pinned[OBJECTIVES.energy.metric], OBJECTIVES.energy)}
+                  {" · "}{fmt(pinned[OBJECTIVES.cost.metric], OBJECTIVES.cost)}
+                  {" · "}{fmt(pinned[OBJECTIVES.carbon.metric], OBJECTIVES.carbon)}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  onClick={() => onValidate(pinned)}
+                  disabled={isVal}
+                  style={{ padding: "8px 15px", borderRadius: 9, fontSize: 12, fontWeight: 800,
+                    cursor: isVal ? "default" : "pointer",
+                    border: `1px solid ${isVal ? "rgba(150,215,76,0.5)" : "rgba(78,205,196,0.55)"}`,
+                    background: isVal ? "rgba(150,215,76,0.14)" : "rgba(78,205,196,0.18)",
+                    color: isVal ? "#96D74C" : "#4ECDC4" }}>
+                  {isVal ? "✓ Validated in EPSM" : "Validate in EPSM →"}
+                </button>
+                <button onClick={() => setPinned(null)}
+                  style={{ background: "transparent", border: 0, cursor: "pointer", color: white(0.4), fontSize: 16, lineHeight: 1 }}
+                  title="Clear selection">×</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 10.5, color: white(0.5), marginTop: 2, paddingLeft: 8 }}>
         <span><span style={{ color: "#B98BE8" }}>—●</span> {xO.short}/{yO.short} frontier</span>
-        <span><span style={{ color: "#4ECDC4" }}>◯</span> optimal package (click to validate)</span>
+        <span><span style={{ color: "#4ECDC4" }}>◯</span> optimal package (click to select)</span>
         <span><span style={{ color: "#96D74C" }}>●</span> validated in EPSM</span>
         <span><span style={{ color: "#fff" }}>◆</span> baseline</span>
       </div>

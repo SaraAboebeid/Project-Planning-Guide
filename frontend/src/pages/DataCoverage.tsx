@@ -818,7 +818,11 @@ function BboxDataBanner({
 
   // In district mode there are no precomputed aggregate stats, so derive them
   // from the fetched rows once they load.
-  const bboxStats: BboxStats = bboxStatsProp ?? deriveStats(rows ?? []);
+  // Describe EXACTLY the rows in the table below. The server aggregate counts
+  // raw EUBUCCO geometries, while the list endpoint collapses duplicates onto
+  // one row per address — so the header read "9 buildings · 89% EPC" above a
+  // table of 8 rows that all had an EPC. Same denominator, or the numbers lie.
+  const bboxStats: BboxStats = rows ? deriveStats(rows) : (bboxStatsProp ?? deriveStats([]));
   const epcPct = bboxStats.count ? Math.round((bboxStats.with_epc / bboxStats.count) * 100) : 0;
 
   // Notify parent whenever rows or selection changes

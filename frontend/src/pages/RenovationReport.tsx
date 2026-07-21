@@ -122,6 +122,121 @@ export default function RenovationReport() {
     ];
   }, [simResults, baselineEU]);
 
+  /* ── Printable report (→ Save as PDF) ──────────────────────────────────────
+     Opens a self-contained, print-styled document and calls print(); the browser's
+     "Save as PDF" produces the file. No PDF library, no server round-trip, and
+     the output stays selectable text rather than a screenshot. */
+  function materialsOf(r: typeof simResults[0]): { component: string; desc: string; u?: number }[] {
+    return Object.entries(r.components ?? {}).map(([component, c]) => ({
+      component: component.replace("VertExt::", "New "),
+      desc: c.description || c.code,
+      u: c.uValue,
+    }));
+  }
+
+  function downloadPdf() {
+    const esc = (s: unknown) => String(s ?? "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]!));
+    const sek = (n: number) => Math.round(n).toLocaleString("sv-SE") + " SEK";
+
+    const bestBlock = (label: string, r: typeof simResults[0] | null | undefined, why: string) => {
+      if (!r) return "";
+      const mats = materialsOf(r);
+      return `
+      <div class="best">
+        <div class="best-h">${esc(label)} <span class="why">${esc(why)}</span></div>
+        <div class="best-n">Package ${r.packageIndex}</div>
+        <table class="mat">
+          <thead><tr><th>Component</th><th>Material / assembly</th><th>U-value</th></tr></thead>
+          <tbody>
+            ${mats.length
+              ? mats.map((m) => `<tr><td>${esc(m.component)}</td><td>${esc(m.desc)}</td><td>${m.u != null ? m.u.toFixed(2) + " W/m²K" : "—"}</td></tr>`).join("")
+              : `<tr><td colspan="3" class="muted">No component detail recorded for this package.</td></tr>`}
+          </tbody>
+        </table>
+        <div class="kv">
+          <span><b>${r.energyUse.toFixed(1)}</b> kWh/m²·yr</span>
+          <span>saves <b>${r.saving.toFixed(1)}</b> kWh/m²·yr</span>
+          <span><b>${sek(r.cost)}</b></span>
+          <span><b>${Math.round(r.carbonSaving).toLocaleString("sv-SE")}</b> kg CO₂e saved</span>
+        </div>
+      </div>`;
+    };
+
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>${esc(project.projectName || "Renovation Report")}</title>
+<style>
+  @page { size: A4; margin: 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Inter, system-ui, sans-serif; color:#0f172a; margin:0; font-size:11pt; line-height:1.5; }
+  h1 { font-size:20pt; margin:0 0 4px; }
+  h2 { font-size:12pt; margin:22px 0 8px; padding-bottom:4px; border-bottom:2px solid #4ECDC4; }
+  .sub { color:#64748b; font-size:10pt; margin-bottom:4px; }
+  table { width:100%; border-collapse:collapse; font-size:9.5pt; margin-top:6px; }
+  th { text-align:left; background:#f1f5f9; padding:5px 7px; font-size:8.5pt; text-transform:uppercase; letter-spacing:.04em; color:#475569; }
+  td { padding:5px 7px; border-bottom:1px solid #e2e8f0; vertical-align:top; }
+  .muted { color:#94a3b8; font-style:italic; }
+  .best { border:1px solid #cbd5e1; border-left:4px solid #4ECDC4; border-radius:6px; padding:10px 13px; margin-bottom:10px; page-break-inside:avoid; }
+  .best-h { font-weight:800; font-size:11pt; }
+  .why { font-weight:500; color:#64748b; font-size:9pt; }
+  .best-n { color:#64748b; font-size:9pt; margin-bottom:4px; }
+  .mat th { background:#f8fafc; }
+  .kv { margin-top:7px; display:flex; gap:16px; flex-wrap:wrap; font-size:9.5pt; color:#334155; }
+  .foot { margin-top:26px; padding-top:8px; border-top:1px solid #e2e8f0; color:#94a3b8; font-size:8.5pt; }
+  .no-print { margin-bottom:14px; }
+  @media print { .no-print { display:none; } }
+</style></head><body>
+  <div class="no-print">
+    <button onclick="window.print()" style="padding:9px 18px;font-size:13px;font-weight:700;border-radius:8px;border:1px solid #4ECDC4;background:#e6fffb;cursor:pointer">
+      Save as PDF
+    </button>
+  </div>
+
+  <h1>${esc(project.projectName || "Renovation Report")}</h1>
+  <div class="sub">${esc(project.locationLabel || project.address || "Unknown location")} ·
+    ${buildings.length} building${buildings.length !== 1 ? "s" : ""} ·
+    ${esc(components.join(", ") || "no components")}</div>
+  <div class="sub">Generated ${new Date().toLocaleString("sv-SE")}</div>
+
+  <h2>Baseline (as-built)</h2>
+  <table><thead><tr><th>Building</th><th>Energy class</th><th>Energy use</th><th>Heating</th></tr></thead><tbody>
+  ${baselines.length ? baselines.map((b) => `<tr>
+      <td>${esc(b.address)}</td><td>${esc(b.eClass ?? "—")}</td>
+      <td>${b.energyUse.toFixed(1)} kWh/m²·yr</td><td>${b.heating.toFixed(1)} kWh/m²·yr</td></tr>`).join("")
+    : `<tr><td colspan="4" class="muted">No baseline simulation recorded.</td></tr>`}
+  </tbody></table>
+
+  <h2>Recommended packages — and what they are made of</h2>
+  ${bestBlock("Best energy saving", bestEnergy, "largest reduction in energy use")}
+  ${bestBlock("Lowest cost", bestCost, "cheapest to build")}
+  ${bestBlock("Lowest carbon", bestCarbon, "largest CO₂e saving")}
+  ${bestBlock("Best balanced", bestBalanced, "weighted 40% energy / 30% carbon / 30% cost")}
+
+  <h2>All simulated packages</h2>
+  <table><thead><tr><th>#</th><th>Materials</th><th>Energy</th><th>Saving</th><th>Cost</th><th>CO₂e saved</th></tr></thead><tbody>
+  ${simResults.length ? simResults.map((r) => `<tr>
+      <td>${r.packageIndex}</td>
+      <td>${esc(materialsOf(r).map((m) => `${m.component}: ${m.desc}`).join("; ") || "—")}</td>
+      <td>${r.energyUse.toFixed(1)}</td><td>${r.saving.toFixed(1)}</td>
+      <td>${sek(r.cost)}</td><td>${Math.round(r.carbonSaving).toLocaleString("sv-SE")}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="muted">No packages simulated.</td></tr>`}
+  </tbody></table>
+
+  <div class="foot">
+    Energy from EnergyPlus (EPSM) single-zone shoebox simulation · U-values per EN ISO 6946 ·
+    cost from Wikells Sektionsfakta · embodied carbon from Boverket Klimatdatabas ·
+    baseline energy class from Boverket EPC. Cooling is not reported: the single-zone model
+    does not reach the cooling setpoint.
+  </div>
+</body></html>`;
+
+    const w = window.open("", "_blank");
+    if (!w) { alert("Allow pop-ups for this site to generate the PDF."); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 350);
+  }
+
   /* ── Download report as JSON ── */
   function downloadReport() {
     const report = {
@@ -147,10 +262,12 @@ export default function RenovationReport() {
       materialsSelected: materials,
       simulationResults: simResults,
       recommendations: {
-        lowestEnergy:  bestEnergy  ? { packageIndex: bestEnergy.packageIndex,  energyUse: bestEnergy.energyUse,  saving: bestEnergy.saving,  carbonSaving: bestEnergy.carbonSaving,  cost: bestEnergy.cost  } : null,
-        lowestCost:    bestCost    ? { packageIndex: bestCost.packageIndex,    cost: bestCost.cost,    saving: bestCost.saving    } : null,
-        lowestCarbon:  bestCarbon  ? { packageIndex: bestCarbon.packageIndex,  carbonSaving: bestCarbon.carbonSaving, cost: bestCarbon.cost  } : null,
-        bestBalanced:  bestBalanced ? { packageIndex: bestBalanced.packageIndex, energyUse: bestBalanced.energyUse, cost: bestBalanced.cost, carbonSaving: bestBalanced.carbonSaving } : null,
+        // Materials included: a recommendation that doesn't say what it is made
+        // of isn't actionable.
+        lowestEnergy:  bestEnergy  ? { packageIndex: bestEnergy.packageIndex,  materials: materialsOf(bestEnergy),  energyUse: bestEnergy.energyUse,  saving: bestEnergy.saving,  carbonSaving: bestEnergy.carbonSaving,  cost: bestEnergy.cost  } : null,
+        lowestCost:    bestCost    ? { packageIndex: bestCost.packageIndex,    materials: materialsOf(bestCost),    cost: bestCost.cost,    saving: bestCost.saving    } : null,
+        lowestCarbon:  bestCarbon  ? { packageIndex: bestCarbon.packageIndex,  materials: materialsOf(bestCarbon),  carbonSaving: bestCarbon.carbonSaving, cost: bestCarbon.cost  } : null,
+        bestBalanced:  bestBalanced ? { packageIndex: bestBalanced.packageIndex, materials: materialsOf(bestBalanced), energyUse: bestBalanced.energyUse, cost: bestBalanced.cost, carbonSaving: bestBalanced.carbonSaving } : null,
       },
     };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
@@ -226,17 +343,31 @@ export default function RenovationReport() {
             {project.locationLabel || project.address || "Unknown location"} · {buildings.length} building{buildings.length !== 1 ? "s" : ""} · {components.length} component{components.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <button
-          onClick={downloadReport}
-          style={{
-            display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
-            padding: "10px 20px", borderRadius: 10, border: "1px solid rgba(78,205,196,0.4)",
-            background: "rgba(78,205,196,0.1)", color: "#4ECDC4",
-            fontSize: 13, fontWeight: 700, cursor: "pointer",
-          }}
-        >
-          <Download size={14} /> Download Report
-        </button>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <button
+            onClick={downloadPdf}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 20px", borderRadius: 10, border: "1px solid rgba(78,205,196,0.55)",
+              background: "rgba(78,205,196,0.16)", color: "#4ECDC4",
+              fontSize: 13, fontWeight: 800, cursor: "pointer",
+            }}
+          >
+            <Download size={14} /> Download PDF
+          </button>
+          <button
+            onClick={downloadReport}
+            title="Raw data for further analysis"
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.15)",
+              background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)",
+              fontSize: 13, fontWeight: 700, cursor: "pointer",
+            }}
+          >
+            JSON
+          </button>
+        </div>
       </div>
 
       {/* ── No data warning ── */}
