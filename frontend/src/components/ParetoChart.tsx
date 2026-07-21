@@ -236,7 +236,15 @@ export default function ParetoChart({
               <Scatter data={baselineDatum} shape={<BaselineDot />} isAnimationActive={false} />
               {showOptimal && (
                 <Scatter data={optimalData} shape={<OptimalDot />} isAnimationActive={false}
-                  onClick={(d: unknown) => { const p = (d as OptDatum | undefined)?.point; if (p) onValidate(p); }} />
+                  style={{ cursor: "pointer" }}
+                  // Recharts hands back the datum wrapped in a props object on some
+                  // versions and bare on others — read both, or the click silently
+                  // does nothing (which is what the tooltip was inviting you to do).
+                  onClick={(d: unknown) => {
+                    const o = d as { point?: OptimizePoint; payload?: { point?: OptimizePoint } } | undefined;
+                    const p = o?.point ?? o?.payload?.point;
+                    if (p) onValidate(p);
+                  }} />
               )}
             </ScatterChart>
           </ResponsiveContainer>

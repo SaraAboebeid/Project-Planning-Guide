@@ -48,6 +48,13 @@ interface NominatimResult {
   display_name: string;
   lat: string;
   lon: string;
+  /** [south, north, west, east] as strings — Nominatim returns this for every
+      result. For a street or a suburb it covers the whole feature, which is what
+      "select every building on this street / in this area" is built on. */
+  boundingbox?: string[];
+  type?: string;
+  class?: string;
+  addresstype?: string;
 }
 
 interface GeoPoint {
@@ -217,17 +224,21 @@ function AddressInput({
   value,
   onChange,
   onGeocode,
+  onSelectResult,
   placeholder,
   countryCode = "se",
 }: {
   value: string;
   onChange: (v: string) => void;
   onGeocode: (lat: number, lon: number, label: string) => void;
+  /** Receives the whole Nominatim hit (incl. boundingbox) — used by area mode. */
+  onSelectResult?: (r: NominatimResult) => void;
   placeholder?: string;
   countryCode?: string;
 }) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState<number | null>(null);
   const { results, loading } = useNominatim(query, countryCode);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -253,6 +264,7 @@ function AddressInput({
     setQuery(r.display_name);
     onChange(r.display_name);
     onGeocode(parseFloat(r.lat), parseFloat(r.lon), r.display_name);
+    onSelectResult?.(r);
     setOpen(false);
   }
 
@@ -279,12 +291,28 @@ function AddressInput({
         </span>
       )}
       {open && results.length > 0 && (
-        <ul className="absolute z-[10000] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg text-sm max-h-56 overflow-auto">
-          {results.map((r) => (
+        // Explicit colours: the light-theme utility classes this used to carry
+        // rendered as near-invisible text floating over the map.
+        <ul
+          className="absolute z-[10000] w-full mt-1 rounded-lg text-sm max-h-56 overflow-auto"
+          style={{
+            backgroundColor: "#11161d",
+            border: "1px solid rgba(255,255,255,0.14)",
+            boxShadow: "0 12px 32px rgba(0,0,0,0.55)",
+          }}
+        >
+          {results.map((r, i) => (
             <li
               key={r.place_id}
               onMouseDown={() => handleSelect(r)}
-              className="px-4 py-2 hover:bg-purple-50 cursor-pointer text-gray-700 border-b last:border-0 border-gray-100 leading-snug"
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+              className="px-4 py-2 cursor-pointer leading-snug"
+              style={{
+                color: hovered === i ? "#fff" : "rgba(255,255,255,0.82)",
+                background: hovered === i ? "rgba(114,28,184,0.35)" : "transparent",
+                borderBottom: i < results.length - 1 ? "1px solid rgba(255,255,255,0.07)" : "none",
+              }}
             >
               {r.display_name}
             </li>
@@ -329,9 +357,11 @@ export default function LocationMap({
   const countryCode = countryCodeFromName(country);
   const mapCenter = mapCenterFor(countryCode, city);
 
-  const [locationMode, setLocationMode] = useState<"addresses" | "bbox" | "polygon">(
+  const [locationMode, setLocationMode] = useState<"addresses" | "area" | "bbox" | "polygon">(
     "addresses"
   );
+  // Street/area search: the label of the feature whose bounds are selected.
+  const [areaLabel, setAreaLabel] = useState<string | null>(null);
   const [addressInputs, setAddressInputs] = useState<string[]>([""]);
   const [geoPoints, setGeoPoints] = useState<(GeoPoint | null)[]>([null]);
 
@@ -353,11 +383,42 @@ export default function LocationMap({
     setBboxDone(false);
     setPolyVerts([]);
     setPolyDone(false);
+    setAreaLabel(null);
     onAddressChange("");
     onBboxChange?.(null);
     onPolygonChange?.(null, null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scale]);
+
+  /* Street / area search → select every building inside the feature's bounds.
+     Nominatim returns a boundingbox for each hit: for "Jättestensgatan" that is
+     the whole street, for a suburb the whole suburb. Feeding it through the same
+     bbox path the draw tools use means Step 2 loads every building inside it,
+     instead of a single pin. */
+  function selectAreaFromResult(r: NominatimResult) {
+    const bb = r.boundingbox;
+    if (!bb || bb.length < 4) return;
+    const south = parseFloat(bb[0]!), north = parseFloat(bb[1]!);
+    const west  = parseFloat(bb[2]!), east  = parseFloat(bb[3]!);
+    if (![south, north, west, east].every(Number.isFinite)) return;
+
+    // A house-number hit collapses to a point; pad it to a small block so the
+    // selection is still an area rather than one building.
+    const MIN_SPAN = 0.0008; // ~90 m
+    const latPad = Math.max(0, (MIN_SPAN - (north - south)) / 2);
+    const lonPad = Math.max(0, (MIN_SPAN - (east - west)) / 2);
+    const box: BboxCoords = {
+      north: north + latPad, south: south - latPad,
+      east:  east  + lonPad, west:  west  - lonPad,
+    };
+
+    setBbox(box);
+    setBboxPreview(null);
+    setBboxDone(true);
+    setAreaLabel(r.display_name.split(",").slice(0, 2).join(",").trim());
+    onBboxChange?.(box);
+    onPolygonChange?.(null, null);
+  }
 
   // ── Polygon handlers ───────────────────────────────────────────────────────
   function addPolyVertex(lat: number, lng: number) {
@@ -471,6 +532,16 @@ export default function LocationMap({
             Addresses
           </button>
           <button
+            onClick={() => setLocationMode("area")}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+              locationMode === "area"
+                ? "bg-navy text-white border-navy"
+                : "bg-white border-gray-300 hover:border-gray-400"
+            }`}
+          >
+            Street / Area
+          </button>
+          <button
             onClick={() => setLocationMode("bbox")}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
               locationMode === "bbox"
@@ -490,6 +561,40 @@ export default function LocationMap({
           >
             Draw Any Shape
           </button>
+        </div>
+      )}
+
+      {/* Street / area search — one search box that selects a whole feature */}
+      {isBuilding && locationMode === "area" && (
+        <div className="space-y-2">
+          <AddressInput
+            value=""
+            onChange={() => {}}
+            onGeocode={() => {}}
+            onSelectResult={selectAreaFromResult}
+            countryCode={countryCode}
+            placeholder="Search a street or area, e.g. Jättestensgatan or Lindholmen…"
+          />
+          {areaLabel ? (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 flex items-center gap-3 flex-wrap">
+              <span>
+                ✓ <strong>{areaLabel}</strong> — every building inside its bounds is selected.
+              </span>
+              <button
+                onClick={() => {
+                  setAreaLabel(null); setBbox(null); setBboxDone(false); onBboxChange?.(null);
+                }}
+                className="ml-auto px-2.5 py-1 rounded-md border border-gray-300 text-xs font-medium hover:border-gray-400"
+              >
+                Clear
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500">
+              Picks the whole street or area, not a single building. Fine-tune afterwards by
+              unticking buildings in Step 2.
+            </p>
+          )}
         </div>
       )}
 

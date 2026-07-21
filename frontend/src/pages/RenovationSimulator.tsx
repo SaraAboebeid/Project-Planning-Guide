@@ -12,7 +12,11 @@ import {
 import { UK_PLACEHOLDER_RATES, fmtGBP } from "../config/ukPlaceholderCostCarbon";
 import { useWizardStepNav } from "../components/wizardNav";
 import OptimizerPanel from "../components/OptimizerPanel";
+import AssemblyBuilder from "../components/AssemblyBuilder";
 import { ASSUMPTIONS } from "../config/optimizationAssumptions";
+import { computeAssemblyU, type AssemblyLayer, type ComponentKind } from "../config/assemblyLayers";
+import { computeAssemblyCarbon, nearestWikellsAssembly } from "../utils/assemblyCosting";
+import { parseAssemblyParts } from "../config/materialProperties";
 import type { OptimizeComponentInput, OptimizeParams, OptimizePoint } from "../api/client";
 import type { WikellsItem } from "../config/wikellsData";
 import type { BoverketResource, WWRRecord } from "../types";
@@ -41,6 +45,55 @@ const COMPONENT_COLORS: Record<string, string> = {
 function fmtSEK(n: number): string {
   return n.toLocaleString("sv-SE", { maximumFractionDigits: 0 }) + " SEK";
 }
+
+/* Comparison-table layout. Cooling is deliberately absent: the single-zone
+   shoebox never reaches the 25 °C setpoint, so it always reports 0 and a column
+   of zeros just reads as a broken number. */
+const TABLE_COLS     = "24px 1.4fr 110px 110px 120px 150px 110px";
+const BREAKDOWN_COLS = "1.4fr 110px 110px 120px 150px 110px";
+
+/** Change against the baseline, shown under a value. Down = less energy = good. */
+function vsBaseline(value: number | null, base: number | null, isBaseline: boolean) {
+  if (isBaseline) {
+    return <span style={{ display: "block", fontSize: 9.5, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>baseline</span>;
+  }
+  if (value == null || base == null || base === 0) return null;
+  const pct = Math.round(((value - base) / base) * 100);
+  if (pct === 0) {
+    return <span style={{ display: "block", fontSize: 9.5, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>±0% vs baseline</span>;
+  }
+  const better = pct < 0;
+  return (
+    <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, marginTop: 2, color: better ? "#96D74C" : "#EF4444" }}>
+      {better ? "▼" : "▲"} {Math.abs(pct)}% vs baseline
+    </span>
+  );
+}
+
+/* One saved build-up for one component. The library holds as many as you like
+   per component — 2 wall configs x 3 floor configs = 6 packages. */
+interface ComponentConfig {
+  id: string;
+  componentKey: string;
+  name: string;
+  source: "catalogue" | "layers";
+  wikellsCode?: string;
+  layers?: AssemblyLayer[];
+  uValue: number | null;
+  costPerM2: number | null;
+  costFromCode?: string;
+  costDeltaU?: number;
+  carbonPerM2: number | null;
+  carbonUnmatched?: string[];
+}
+
+/** Which components can be composed from layers (windows/doors cannot). */
+function kindForKey(key: string): ComponentKind | null {
+  if (key === "Walls" || key === "VertExt::Walls") return "wall";
+  if (key === "Roof" || key === "VertExt::Roof") return "roof";
+  if (key === "Floor" || key === "VertExt::Floor") return "floor";
+  return null;
+}
 function uLabel(u?: number) {
   if (!u) return null;
   if (u <= 0.13) return { label: "Excellent", color: "#96D74C" };
@@ -64,12 +117,15 @@ function overridesFromSeSelections(
 ): Record<string, number> {
   const overrides: Record<string, number> = {};
   for (const [key, sel] of Object.entries(selections)) {
-    const wikellsItem = itemByCode[sel.wikellsCode];
-    if (!wikellsItem?.uValue) continue;
-    if (key === "Walls" || key === "VertExt::Walls") overrides.u_wall_override = wikellsItem.uValue;
-    if (key === "Roof" || key === "VertExt::Roof") overrides.u_roof_override = wikellsItem.uValue;
-    if (key === "Windows") overrides.u_win_override = wikellsItem.uValue;
-    if (key === "Floor" || key === "VertExt::Floor") overrides.u_floor_override = wikellsItem.uValue;
+    // A layer-composed assembly wins: its U comes from the actual build-up
+    // (EN ISO 6946) rather than a catalogue row, so it REPLACES the catalogue
+    // U-value when rebuilding the shoebox IDF.
+    const u = sel.customUValue ?? itemByCode[sel.wikellsCode]?.uValue;
+    if (!u) continue;
+    if (key === "Walls" || key === "VertExt::Walls") overrides.u_wall_override = u;
+    if (key === "Roof" || key === "VertExt::Roof") overrides.u_roof_override = u;
+    if (key === "Windows") overrides.u_win_override = u;
+    if (key === "Floor" || key === "VertExt::Floor") overrides.u_floor_override = u;
   }
   return overrides;
 }
@@ -155,7 +211,33 @@ function LineItemPicker({
               fontSize: 10, color: "#0b1220", fontWeight: 900,
             }}>{checked ? "✓" : ""}</div>
             <span style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{it.code}</span>
-            <span style={{ flex: 1, fontSize: 11, color: checked ? "#fff" : "rgba(255,255,255,0.65)", lineHeight: 1.3 }}>{it.description}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 11, color: checked ? "#fff" : "rgba(255,255,255,0.65)", lineHeight: 1.3 }}>{it.description}</span>
+              {/* Layer categories parsed out of the Wikells description — frame,
+                  insulation and cladding are in the data but not as fields. */}
+              {(() => {
+                const p = parseAssemblyParts(it.description);
+                const chips: { label: string; color: string }[] = [];
+                if (p.frame) chips.push({ label: p.frame, color: "#F59E0B" });
+                if (p.insulationMm != null) {
+                  chips.push(p.insulationMm === 0
+                    ? { label: "no insulation", color: "#EF4444" }
+                    : { label: `${p.insulationMm} mm ${p.insulationType ?? "insulation"}`, color: "#4ECDC4" });
+                }
+                if (p.cladding) chips.push({ label: p.cladding, color: "#4A90E2" });
+                if (!chips.length) return null;
+                return (
+                  <span style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
+                    {chips.map((c) => (
+                      <span key={c.label} style={{
+                        fontSize: 8.5, fontWeight: 700, color: c.color, background: `${c.color}1e`,
+                        border: `1px solid ${c.color}44`, borderRadius: 7, padding: "0px 5px", whiteSpace: "nowrap",
+                      }}>{c.label}</span>
+                    ))}
+                  </span>
+                );
+              })()}
+            </span>
             <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", flexShrink: 0 }}>
               {fmtSEK(it.costSEK)}/{item.quantityKind === "area" ? "m²" : "st"}
             </span>
@@ -309,21 +391,23 @@ export default function RenovationSimulator() {
   const [manualOverrides, setManualOverrides] = useState<Record<string, number>>({});
   const [boverketByComponent, setBoverketByComponent] = useState<Record<string, BoverketResource[]>>({});
   const [activeItemKey, setActiveItemKey] = useState<string>(lineItems[0]?.key ?? "");
-  // Per component, the set of materials to test. The generator builds one
-  // package for every combination (cartesian product) across components.
+  // Kept for the UK tier flow and for scoping the optimizer's candidate set; the
+  // Sweden package flow is driven by the saved configuration library instead.
   const [draftSelection, setDraftSelection] = useState<Record<string, string[]>>({});
-  function toggleMaterial(componentKey: string, code: string) {
-    setDraftSelection((d) => {
-      const cur = d[componentKey] ?? [];
-      const next = cur.includes(code) ? cur.filter((c) => c !== code) : [...cur, code];
-      return { ...d, [componentKey]: next };
-    });
-  }
   // How many packages the current selection will generate (product of counts).
   const packageCombos = useMemo(() => {
     const withSel = lineItems.filter((li) => (draftSelection[li.key]?.length ?? 0) > 0);
     return withSel.reduce((n, li) => n * (draftSelection[li.key]?.length ?? 1), withSel.length ? 1 : 0);
   }, [lineItems, draftSelection]);
+  /* ── Configuration library ────────────────────────────────────────────────
+     Named build-ups the user designs per component. Packages are the cartesian
+     product across components that have at least one configuration. */
+  const [configs, setConfigs] = useState<ComponentConfig[]>([]);
+  const [draftMode, setDraftMode] = useState<"catalogue" | "layers">("catalogue");
+  const [draftLayers, setDraftLayers] = useState<AssemblyLayer[]>([]);
+  const [draftName, setDraftName] = useState("");
+  const [excludedCombos, setExcludedCombos] = useState<Set<string>>(new Set());
+
   const [ukArchetype, setUkArchetype] = useState<TabulaArchetypeGB | null>(null);
   const [ukTier, setUkTier] = useState<RefurbTierKey | null>(null);
   // Live day-ahead spot price (SE) for the optimizer's operating-cost term;
@@ -513,25 +597,68 @@ export default function RenovationSimulator() {
 
   const boverketAll = useMemo(() => Object.values(boverketByComponent).flat(), [boverketByComponent]);
 
-  // Confirmation before simulating: the packages the current selection will
-  // create, with the U-value each material applies to the IDF (a material with
-  // no U-value in the catalogue leaves that component's energy at baseline).
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const previewPackages = useMemo(() => {
-    const chosen = lineItems
-      .map((item) => ({ item, codes: draftSelection[item.key] ?? [] }))
-      .filter((c) => c.codes.length > 0);
-    let combos: Array<Record<string, string>> = [{}];
-    for (const { item, codes } of chosen) {
-      combos = combos.flatMap((combo) => codes.map((code) => ({ ...combo, [item.key]: code })));
+
+  /* ── Configuration library: save / delete / derive packages ─────────────── */
+  const allItems = useMemo(() => Object.values(itemByCode), [itemByCode]);
+
+  function saveCatalogueConfig(code: string) {
+    if (!activeItem) return;
+    const it = itemByCode[code];
+    if (!it) return;
+    setConfigs((cs) => [...cs, {
+      id: `cfg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      componentKey: activeItem.key,
+      name: draftName.trim() || matShort(it),
+      source: "catalogue", wikellsCode: code,
+      uValue: it.uValue ?? null,
+      costPerM2: it.costSEK ?? null,
+      carbonPerM2: estimateCarbon(it, boverketAll).value ?? null,
+    }]);
+    setDraftName("");
+  }
+
+  function saveLayerConfig() {
+    if (!activeItem) return;
+    const kind = kindForKey(activeItem.key);
+    if (!kind || draftLayers.length === 0) return;
+    const u = computeAssemblyU(draftLayers, kind);
+    const carbon = computeAssemblyCarbon(draftLayers, boverketAll);
+    // Cost is quoted from the nearest REAL Wikells assembly — Wikells prices
+    // complete sections, never single layers, so a per-layer rate would be made up.
+    const cost = nearestWikellsAssembly(u.uValue, kind, allItems);
+    const ins = draftLayers.find((l) => l.materialId.startsWith("mw_")
+      || ["eps", "xps", "pir", "cellulose", "wood_fibre"].includes(l.materialId));
+    setConfigs((cs) => [...cs, {
+      id: `cfg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      componentKey: activeItem.key,
+      name: draftName.trim() || `${ins ? `${ins.thicknessMm} mm ins.` : "custom"} · U ${u.uValue?.toFixed(2) ?? "—"}`,
+      source: "layers", layers: draftLayers, uValue: u.uValue,
+      costPerM2: cost?.costSEK ?? null, costFromCode: cost?.code, costDeltaU: cost?.deltaU,
+      carbonPerM2: carbon.total, carbonUnmatched: carbon.unmatched,
+    }]);
+    setDraftLayers([]); setDraftName("");
+  }
+
+  const removeConfig = (id: string) => setConfigs((cs) => cs.filter((c) => c.id !== id));
+
+  /* Packages = cartesian product across components that have configurations. */
+  const configuredComponents = useMemo(
+    () => lineItems
+      .map((item) => ({ item, cfgs: configs.filter((c) => c.componentKey === item.key) }))
+      .filter((x) => x.cfgs.length > 0),
+    [lineItems, configs],
+  );
+
+  const packageCombosList = useMemo(() => {
+    let combos: ComponentConfig[][] = [[]];
+    for (const { cfgs } of configuredComponents) {
+      combos = combos.flatMap((c) => cfgs.map((cfg) => [...c, cfg]));
     }
-    return combos.map((combo) => ({
-      parts: chosen.map(({ item }) => {
-        const it = itemByCode[combo[item.key]!];
-        return { component: item.label, desc: it?.description ?? combo[item.key], uValue: it?.uValue ?? null };
-      }),
-    }));
-  }, [lineItems, draftSelection, itemByCode]);
+    return configuredComponents.length ? combos : [];
+  }, [configuredComponents]);
+
+  const comboKey = (combo: ComponentConfig[]) => combo.map((c) => c.id).join("+");
+  const activeCombos = packageCombosList.filter((c) => !excludedCombos.has(comboKey(c)));
 
   /* ── add a new package ─────────────────────────────────────────────────── */
   const PACKAGE_COLORS = ["#721CB8", "#4ECDC4", "#F59E0B", "#96D74C", "#F97316", "#5FA5FF"];
@@ -599,6 +726,50 @@ export default function RenovationSimulator() {
     setPackageName("");
     setDraftSelection({});
     newPkgs.forEach((pkg) => submitBatch(pkg.id, overridesFromSeSelections(pkg.selections, itemByCode), pkg.name, targetEntries));
+  }
+
+  /** Simulate every selected combination: one EPSM batch per package, across all
+   *  targeted buildings. A layer-composed configuration passes its computed U
+   *  through `customUValue`, which replaces the catalogue U in the IDF. */
+  function simulateConfiguredPackages() {
+    if (geometries.length === 0 || activeCombos.length === 0) return;
+    const existing = packages.filter((p) => !p.isBaseline).length;
+    const stamp = Date.now();
+
+    const newPkgs: RenovationCalcPackage[] = activeCombos.map((combo, k) => {
+      const selections: Record<string, RenovationCalcSelection> = {};
+      combo.forEach((cfg) => {
+        selections[cfg.componentKey] = {
+          wikellsCode: cfg.wikellsCode ?? "",
+          quantity: 0,
+          ...(cfg.source === "layers" && cfg.uValue != null
+            ? { customUValue: cfg.uValue, customLabel: cfg.name }
+            : {}),
+        };
+      });
+      const name = combo.map((c) => c.name).join(" + ") + targetSuffix();
+      const color = PACKAGE_COLORS[(existing + k) % PACKAGE_COLORS.length]!;
+      const buildingRows = makeBuildingRows(targetEntries, (g, i) => {
+        let costSEK = 0, carbonKgCO2e = 0, any = false;
+        combo.forEach((cfg) => {
+          const li = lineItems.find((l) => l.key === cfg.componentKey);
+          if (!li) return;
+          const qty = computeAreaForLineItem(li, g, wwrByIndex[i] ?? null, manualOverrides);
+          if (qty == null) return;
+          if (cfg.costPerM2 != null) { costSEK += cfg.costPerM2 * qty; any = true; }
+          if (cfg.carbonPerM2 != null) { carbonKgCO2e += cfg.carbonPerM2 * qty; any = true; }
+        });
+        return any ? { costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e) } : { costSEK: null, carbonKgCO2e: null };
+      });
+      return {
+        id: `pkg-${stamp}-${k}-${Math.round(Math.random() * 1e6)}`,
+        name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows,
+      };
+    });
+
+    setProject({ renovationCalcPackages: [...packages, ...newPkgs] });
+    newPkgs.forEach((pkg) =>
+      submitBatch(pkg.id, overridesFromSeSelections(pkg.selections, itemByCode), pkg.name, targetEntries));
   }
 
   function addUkPackage() {
@@ -942,14 +1113,109 @@ export default function RenovationSimulator() {
                     </span>
                   </div>
                 )}
-                <LineItemPicker
-                  item={activeItem}
-                  items={activeCatalogue}
-                  selectedCodes={draftSelection[activeItem.key] ?? []}
-                  onToggle={(code) => toggleMaterial(activeItem.key, code)}
-                  recommendations={activeRecommendations}
-                  boverketResources={activeBoverket}
-                />
+                {/* ── Saved configurations for this component ── */}
+                {(() => {
+                  const mine = configs.filter((c) => c.componentKey === activeItem.key);
+                  return (
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 6 }}>
+                        Your {activeItem.label.toLowerCase()} configurations ({mine.length})
+                      </div>
+                      {mine.length === 0 && (
+                        <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.35)", fontStyle: "italic", margin: "0 0 8px" }}>
+                          None yet — design one below. Add several to compare them as separate packages.
+                        </p>
+                      )}
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {mine.map((c) => (
+                          <div key={c.id} style={{ minWidth: 190, padding: "9px 11px", borderRadius: 10,
+                            background: "rgba(78,205,196,0.07)", border: "1px solid rgba(78,205,196,0.28)" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1 }}>{c.name}</span>
+                              <button onClick={() => removeConfig(c.id)} title="Delete configuration"
+                                style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(239,68,68,0.75)", padding: 0 }}>
+                                <XCircle size={13} />
+                              </button>
+                            </div>
+                            <div style={{ fontSize: 11, color: "#4ECDC4", fontWeight: 700, marginTop: 3 }}>
+                              U {c.uValue?.toFixed(2) ?? "—"} W/m²K
+                            </div>
+                            <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
+                              {c.costPerM2 != null ? `${Math.round(c.costPerM2).toLocaleString("sv-SE")} SEK/m²` : "cost —"}
+                              {" · "}
+                              {c.carbonPerM2 != null ? `${c.carbonPerM2.toFixed(1)} kg CO₂e/m²` : "carbon —"}
+                            </div>
+                            {c.costFromCode && (
+                              <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.32)", marginTop: 3 }}>
+                                cost from Wikells {c.costFromCode} (nearest, ΔU {c.costDeltaU?.toFixed(2)})
+                              </div>
+                            )}
+                            {c.carbonUnmatched && c.carbonUnmatched.length > 0 && (
+                              <div style={{ fontSize: 9.5, color: "#F59E0B", marginTop: 3 }}>
+                                no Boverket data: {c.carbonUnmatched.join(", ")}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* ── Design a new configuration ── */}
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>New configuration</span>
+                    {(["catalogue", "layers"] as const).map((m) => {
+                      const disabled = m === "layers" && !kindForKey(activeItem.key);
+                      return (
+                        <button key={m} disabled={disabled} onClick={() => setDraftMode(m)}
+                          style={{ fontSize: 11, fontWeight: 700, padding: "4px 11px", borderRadius: 8,
+                            cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.35 : 1,
+                            border: `1px solid ${draftMode === m ? "rgba(78,205,196,0.6)" : "rgba(255,255,255,0.12)"}`,
+                            background: draftMode === m ? "rgba(78,205,196,0.16)" : "transparent",
+                            color: draftMode === m ? "#4ECDC4" : "rgba(255,255,255,0.55)" }}>
+                          {m === "catalogue" ? "Catalogue assembly" : "Build from layers"}
+                        </button>
+                      );
+                    })}
+                    <input value={draftName} onChange={(e) => setDraftName(e.target.value)}
+                      placeholder="Name (optional)"
+                      style={{ marginLeft: "auto", width: 180, padding: "5px 10px", borderRadius: 8,
+                        border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 11.5 }} />
+                  </div>
+
+                  {draftMode === "catalogue" ? (
+                    <>
+                      <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", margin: "0 0 6px" }}>
+                        Click an assembly to save it as a configuration.
+                      </p>
+                      <LineItemPicker
+                        item={activeItem}
+                        items={activeCatalogue}
+                        selectedCodes={[]}
+                        onToggle={(code) => saveCatalogueConfig(code)}
+                        recommendations={activeRecommendations}
+                        boverketResources={activeBoverket}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <AssemblyBuilder
+                        kind={kindForKey(activeItem.key)!}
+                        layers={draftLayers}
+                        onChange={setDraftLayers}
+                      />
+                      <button onClick={saveLayerConfig} disabled={draftLayers.length === 0}
+                        style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 15px",
+                          borderRadius: 8, fontSize: 12, fontWeight: 700,
+                          cursor: draftLayers.length ? "pointer" : "not-allowed", opacity: draftLayers.length ? 1 : 0.45,
+                          border: "1px solid rgba(78,205,196,0.5)", background: "rgba(78,205,196,0.15)", color: "#4ECDC4" }}>
+                        <Plus size={13} /> Save as configuration
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -958,86 +1224,77 @@ export default function RenovationSimulator() {
 
       {geometries.length > 0 && (
         <>
-          {/* Add package */}
-          {!isUK && packageCombos > 1 && (
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", margin: "0 0 -6px" }}>
-              You picked materials across components — this will generate <strong style={{ color: "#4ECDC4" }}>{packageCombos} packages</strong> (every combination), each named after its materials.
-            </p>
-          )}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <input
-              value={packageName}
-              onChange={(e) => setPackageName(e.target.value)}
-              placeholder={isUK ? "Package name (optional)" : "Name prefix (optional)"}
-              style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }}
-            />
-            <button
-              onClick={() => (isUK ? addPackage() : setConfirmOpen(true))}
-              disabled={!canAddPackage}
-              style={{
-                display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                border: "1px solid rgba(150,215,76,0.4)", background: "rgba(150,215,76,0.12)", color: "#96D74C",
-                cursor: canAddPackage ? "pointer" : "not-allowed",
-                opacity: canAddPackage ? 1 : 0.5,
-              }}
-            >
-              <Plus size={13} /> {isUK ? "Add package" : `Generate ${packageCombos || ""} package${packageCombos === 1 ? "" : "s"}`}{geometries.length > 1 ? ` (${targetIdx === "all" ? `all ${geometries.length}` : "1 building"})` : ""}
-            </button>
-          </div>
-
-          {/* Confirmation before simulating — review every package + the U-value
-              each material applies to the IDF, then commit them to EPSM. */}
-          {confirmOpen && (
-            <div onClick={() => setConfirmOpen(false)} style={{
-              position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.6)",
-              display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-            }}>
-              <div onClick={(e) => e.stopPropagation()} style={{
-                width: "min(720px, 96vw)", maxHeight: "84vh", display: "flex", flexDirection: "column",
-                background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, overflow: "hidden",
-              }}>
-                <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>
-                    Confirm {previewPackages.length} package{previewPackages.length === 1 ? "" : "s"} to simulate
-                  </h3>
-                  <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.5 }}>
-                    Each package rebuilds the shoebox IDF with the chosen materials' <strong style={{ color: "rgba(255,255,255,0.7)" }}>U-values</strong>, then runs EnergyPlus against the as-built baseline.
-                    {targetIdx === "all" && geometries.length > 1 ? ` Applied to all ${geometries.length} buildings.` : ""}
-                  </p>
-                </div>
-                <div style={{ overflowY: "auto", padding: "8px 20px", flex: 1 }}>
-                  {previewPackages.map((pkg, i) => (
-                    <div key={i} style={{ padding: "10px 0", borderBottom: i < previewPackages.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 5 }}>
-                        <span style={{ color: "rgba(255,255,255,0.4)", marginRight: 6 }}>{i + 1}.</span>
-                        {pkg.parts.map((p) => (p.desc || "").replace(/^(EW |IW )/, "")).join("  +  ")}
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {pkg.parts.map((p, j) => (
-                          <span key={j} style={{
-                            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 99,
-                            background: p.uValue != null ? "rgba(78,205,196,0.12)" : "rgba(245,158,11,0.12)",
-                            border: `1px solid ${p.uValue != null ? "rgba(78,205,196,0.3)" : "rgba(245,158,11,0.35)"}`,
-                            color: p.uValue != null ? "#4ECDC4" : "#F59E0B",
-                          }}>
-                            {p.component}: {p.uValue != null ? `U=${p.uValue} W/m²K` : "no U-value → energy unchanged"}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                  <button onClick={() => setConfirmOpen(false)} style={{
-                    padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.65)",
-                  }}>Cancel</button>
-                  <button onClick={() => { addPackage(); setConfirmOpen(false); }} style={{
-                    padding: "8px 18px", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer",
-                    background: "linear-gradient(135deg,#5a9e1e,#96D74C)", border: 0, color: "#0a0d14",
-                  }}>Confirm &amp; simulate {previewPackages.length}</button>
-                </div>
+          {/* ══ PACKAGES — the product of your configurations ══════════════ */}
+          {!isUK && (
+            <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Packages</span>
+                {configuredComponents.length > 0 ? (
+                  <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)" }}>
+                    {configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" × ")}
+                    {" = "}
+                    <strong style={{ color: "#4ECDC4" }}>{packageCombosList.length} package{packageCombosList.length === 1 ? "" : "s"}</strong>
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.35)", fontStyle: "italic" }}>
+                    Save at least one configuration above to build packages.
+                  </span>
+                )}
               </div>
+
+              {packageCombosList.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 10 }}>
+                  {packageCombosList.map((combo) => {
+                    const key = comboKey(combo);
+                    const on = !excludedCombos.has(key);
+                    return (
+                      <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5,
+                        color: on ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)", cursor: "pointer", padding: "3px 0" }}>
+                        <input type="checkbox" checked={on} onChange={() => setExcludedCombos((st) => {
+                          const n = new Set(st); n.has(key) ? n.delete(key) : n.add(key); return n;
+                        })} style={{ accentColor: "#4ECDC4" }} />
+                        <span style={{ flex: 1 }}>{combo.map((c) => c.name).join("  +  ")}</span>
+                        <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)" }}>
+                          {combo.map((c) => `U ${c.uValue?.toFixed(2) ?? "—"}`).join(" · ")}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              {packageCombosList.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <button onClick={simulateConfiguredPackages} disabled={activeCombos.length === 0}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", borderRadius: 9,
+                      fontSize: 12.5, fontWeight: 800,
+                      border: "1px solid rgba(150,215,76,0.45)", background: "rgba(150,215,76,0.14)", color: "#96D74C",
+                      cursor: activeCombos.length ? "pointer" : "not-allowed", opacity: activeCombos.length ? 1 : 0.45 }}>
+                    <Plus size={14} /> Simulate {activeCombos.length} package{activeCombos.length === 1 ? "" : "s"}
+                    {geometries.length > 1 && targetIdx === "all" ? ` × ${geometries.length} buildings` : ""}
+                  </button>
+                  <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", maxWidth: 460, lineHeight: 1.5 }}>
+                    {activeCombos.length <= 10
+                      ? "Small enough to run every combination in EnergyPlus directly — exact results for exactly these designs."
+                      : "That's a lot of EnergyPlus runs. Use the optimizer below to find the best trade-offs first, then simulate only those."}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* UK keeps the tier-based flow */}
+          {isUK && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <input value={packageName} onChange={(e) => setPackageName(e.target.value)}
+                placeholder="Package name (optional)"
+                style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }} />
+              <button onClick={() => addPackage()} disabled={!canAddPackage}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  border: "1px solid rgba(150,215,76,0.4)", background: "rgba(150,215,76,0.12)", color: "#96D74C",
+                  cursor: canAddPackage ? "pointer" : "not-allowed", opacity: canAddPackage ? 1 : 0.5 }}>
+                <Plus size={13} /> Add package
+              </button>
             </div>
           )}
 
@@ -1057,9 +1314,24 @@ export default function RenovationSimulator() {
 
           {/* Comparison table - one row per package, portfolio aggregates, expandable per-building breakdown */}
           <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "16px 18px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "24px 1.4fr 110px 110px 110px 110px 110px 110px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 8 }}>
-              {["", "Package", "Cost", "Carbon", "Heating", "Cooling", "Total", "Status"].map((h) => (
-                <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>{h}</span>
+            <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 8 }}>
+              {[
+                { k: "exp", l: "" },
+                { k: "pkg", l: "Package" },
+                { k: "cost", l: "Cost" },
+                { k: "carbon", l: "Carbon" },
+                { k: "heat", l: "Heating", sub: "kWh/m²·yr" },
+                { k: "total", l: "Total energy", sub: "heating + hot water + lighting + equipment, kWh/m²·yr" },
+                { k: "status", l: "Status" },
+              ].map((h) => (
+                <span key={h.k} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>
+                  {h.l}
+                  {h.sub && (
+                    <span style={{ display: "block", fontSize: 8.5, fontWeight: 600, letterSpacing: 0, textTransform: "none", color: "rgba(255,255,255,0.22)", lineHeight: 1.3, marginTop: 2 }}>
+                      {h.sub}
+                    </span>
+                  )}
+                </span>
               ))}
             </div>
             {[...packages].sort((a, b) => (a.isBaseline ? -1 : b.isBaseline ? 1 : 0)).map((pkg) => {
@@ -1067,7 +1339,13 @@ export default function RenovationSimulator() {
               const expanded = expandedPkg === pkg.id;
               return (
                 <div key={pkg.id}>
-                  <div style={{ display: "grid", gridTemplateColumns: "24px 1.4fr 110px 110px 110px 110px 110px 110px", gap: 10, padding: "8px 4px", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div style={{
+                    display: "grid", gridTemplateColumns: TABLE_COLS, gap: 10, padding: "8px 4px", alignItems: "center",
+                    borderBottom: "1px solid rgba(255,255,255,0.04)",
+                    // The baseline is the reference every other row is measured against — mark it.
+                    background: pkg.isBaseline ? "rgba(255,255,255,0.035)" : undefined,
+                    borderLeft: pkg.isBaseline ? "2px solid rgba(255,255,255,0.25)" : "2px solid transparent",
+                  }}>
                     <button
                       onClick={() => setExpandedPkg(expanded ? null : pkg.id)}
                       style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(255,255,255,0.4)", padding: 0 }}
@@ -1085,9 +1363,14 @@ export default function RenovationSimulator() {
                     <span style={{ fontSize: 12, color: "#60a5fa" }} title={isUK && agg.totalCarbonKgCO2e != null ? "Synthetic placeholder - not a real UK carbon source" : undefined}>
                       {agg.totalCarbonKgCO2e == null ? "—" : isUK ? `${agg.totalCarbonKgCO2e.toLocaleString("en-GB")} kg*` : `${agg.totalCarbonKgCO2e.toLocaleString("sv-SE")} kg`}
                     </span>
-                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{agg.avgHeatingKwhM2Yr ?? "—"}</span>
-                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{agg.avgCoolingKwhM2Yr ?? "—"}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C" }}>{agg.avgTotalKwhM2Yr ?? "—"}</span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>
+                      {agg.avgHeatingKwhM2Yr ?? "—"}
+                      {vsBaseline(agg.avgHeatingKwhM2Yr, baselineAgg?.avgHeatingKwhM2Yr ?? null, pkg.isBaseline)}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: pkg.isBaseline ? "rgba(255,255,255,0.6)" : "#96D74C" }}>
+                      {agg.avgTotalKwhM2Yr ?? "—"}
+                      {vsBaseline(agg.avgTotalKwhM2Yr, baselineAgg?.avgTotalKwhM2Yr ?? null, pkg.isBaseline)}
+                    </span>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       {agg.pending > 0 && <Loader2 size={13} color="#F59E0B" style={{ animation: "spin 1s linear infinite" }} />}
                       {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#96D74C" />}
@@ -1105,12 +1388,11 @@ export default function RenovationSimulator() {
                   {expanded && (
                     <div style={{ padding: "6px 4px 10px 34px", display: "flex", flexDirection: "column", gap: 4 }}>
                       {pkg.buildings.map((b) => (
-                        <div key={`${pkg.id}-${b.address}-${b.lat}-${b.lon}`} style={{ display: "grid", gridTemplateColumns: "1.4fr 110px 110px 110px 110px 110px 110px", gap: 10, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                        <div key={`${pkg.id}-${b.address}-${b.lat}-${b.lon}`} style={{ display: "grid", gridTemplateColumns: BREAKDOWN_COLS, gap: 10, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.address}</span>
                           <span>{b.costSEK == null ? "—" : isUK ? fmtGBP(b.costSEK) : fmtSEK(b.costSEK)}</span>
                           <span>{b.carbonKgCO2e == null ? "—" : `${b.carbonKgCO2e.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
                           <span>{b.heatingKwhM2Yr ?? "—"}</span>
-                          <span>{b.coolingKwhM2Yr ?? "—"}</span>
                           <span>{b.totalKwhM2Yr ?? "—"}</span>
                           <span style={{ color: b.status === "failed" ? "#fca5a5" : b.status === "completed" ? "#96D74C" : "#F59E0B" }} title={b.error ?? undefined}>
                             {b.status}

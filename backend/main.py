@@ -2664,10 +2664,28 @@ async def optimize_renovation(req: OptimizeRequest):
     # Each component contributes exactly one option. A synthetic "keep as-built"
     # option (U = baseline, no cost/carbon) lets the optimizer decide a component
     # isn't worth touching — essential for the cost/carbon trade-off.
+    # A retrofit option must actually IMPROVE the component. The Wikells
+    # catalogue mixes complete insulated assemblies (roof + 340 mm insulation,
+    # U=0.11) with bare coverings and uninsulated build-ups (TRP roof on
+    # masonite beams, U=3.37; "M0" studs with no insulation, U=1.75). Those are
+    # single layers, not whole-component retrofits — offering them as such made
+    # the optimizer propose packages that INCREASE heating demand several-fold
+    # and produced nonsense energy figures. Anything worse than as-built is
+    # dropped and reported, never silently.
     choice_lists: list[list[tuple[OptimizeComponent, OptimizeOption]]] = []
+    excluded: list[dict] = []
     for c in req.components:
         keep = OptimizeOption(code="__keep__", label="Keep as-built", u_value=c.baseline_u)
-        choice_lists.append([(c, keep)] + [(c, o) for o in c.options])
+        improving = []
+        for o in c.options:
+            if o.u_value <= c.baseline_u:
+                improving.append(o)
+            else:
+                excluded.append({
+                    "component": c.key, "code": o.code, "label": o.label,
+                    "u_value": o.u_value, "baseline_u": c.baseline_u,
+                })
+        choice_lists.append([(c, keep)] + [(c, o) for o in improving])
 
     total_combos = 1
     for cl in choice_lists:
@@ -2773,6 +2791,14 @@ async def optimize_renovation(req: OptimizeRequest):
         "combinations_total": total_combos,
         "pareto_count": len(pareto),
         "truncated": truncated,
+        # Catalogue rows dropped because their U-value is worse than as-built
+        # (bare coverings / uninsulated build-ups — single layers, not retrofits).
+        "excluded_options": excluded,
+        # The anchor only holds if the measured baseline exceeds the transmission
+        # implied by the as-built U-values. When it doesn't, q_fixed clamps to 0
+        # and every absolute energy figure is inflated — surface it rather than
+        # quietly reporting impossible numbers.
+        "anchor_ok": baseline_total_kwh >= baseline_htr * p.f_dh,
         "params_used": {
             "annuity_factor": round(annuity, 3),
             "q_fixed_kwh_yr": round(q_fixed),

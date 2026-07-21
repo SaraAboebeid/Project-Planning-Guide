@@ -172,6 +172,59 @@ export function parseInsulationThicknessMm(description: string): number | null {
    Uses the chapter id + description keywords so each option inherits the right
    service life. chapterId is the WikellsChapter.id ("ch7","ch9","ch11","ch16"). */
 
+/* ─── Decompose a Wikells assembly into its layer categories ──────────────────
+   Wikells groups walls by FRAME type (Timber Stud Frame, CLT Frame, Concrete
+   Frame …) and states the insulation and cladding inside the description text
+   rather than as structured fields:
+
+       "EW timber stud 145+145 — 300 blown glass wool + boarding"
+              └ frame              └ insulation        └ cladding
+
+   so the categories are present in the data but invisible until parsed. An
+   insulation of 0 mm identifies the bare "M0" build-ups, which are single
+   layers rather than retrofit assemblies. */
+
+export interface AssemblyParts {
+  frame: string | null;
+  insulationMm: number | null;
+  insulationType: string | null;
+  cladding: string | null;
+}
+
+const _INS_TYPE =
+  "(?:blown\\s+)?(?:glass wool|rock wool|stone wool|mineral wool|cellulose|wood fibre|EPS|Isover Plus\\+|climate board|insulation)";
+
+export function parseAssemblyParts(description: string): AssemblyParts {
+  const d = description.trim();
+
+  const frameM = d.match(
+    /\b(timber stud\s*[\d]+(?:\+[\d]+)?|CLT\s*\d+|lightweight (?:concrete|clinker)|concrete|brick|steel sandwich)/i,
+  );
+
+  // "— 300 blown glass wool" / "M195+95" / "M0"
+  let insulationMm: number | null = null;
+  let insulationType: string | null = null;
+  const typed = d.match(new RegExp("(?:—\\s*|M)(\\d+)\\s*(" + _INS_TYPE + ")", "i"));
+  if (typed) {
+    insulationMm = parseInt(typed[1]!, 10);
+    insulationType = typed[2]!.toLowerCase();
+  } else {
+    const m = d.match(/M(\d+)(?:\+(\d+))?/);
+    if (m) insulationMm = parseInt(m[1]!, 10) + (m[2] ? parseInt(m[2], 10) : 0);
+    const extra = d.match(/\+\s*(\d+)\s*(EPS|climate board|facade board)/i);
+    if (extra && insulationMm != null) insulationMm += parseInt(extra[1]!, 10);
+  }
+
+  const cladM = d.match(/(?:\bwith\b|\+)\s+([A-Za-zÅÄÖåäö][A-Za-zÅÄÖåäö\s&/-]{2,28}?)(?:\s*$|,)/);
+
+  return {
+    frame: frameM ? frameM[1]!.replace(/\s+/g, " ") : null,
+    insulationMm,
+    insulationType,
+    cladding: cladM ? cladM[1]!.trim() : null,
+  };
+}
+
 export function classifyEnvelope(chapterId: string, description: string): EnvelopeCategory | null {
   const d = description.toLowerCase();
   switch (chapterId) {

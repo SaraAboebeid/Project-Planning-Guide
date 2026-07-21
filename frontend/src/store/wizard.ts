@@ -60,6 +60,12 @@ export interface RenovationPackage {
 export interface RenovationCalcSelection {
   wikellsCode: string;
   quantity: number; // m² for area line items, a unit count for count line items - see AreaLineItem.quantityKind
+  /** U-value of a layer-composed assembly (EN ISO 6946), when the user built the
+   *  build-up themselves instead of picking a catalogue row. It REPLACES the
+   *  catalogue item's U-value in the IDF override. */
+  customUValue?: number;
+  /** Human label for the composed assembly, e.g. "145 stud + 300 mineral wool". */
+  customLabel?: string;
 }
 
 /** One selected building's own simulation outcome within a package - a

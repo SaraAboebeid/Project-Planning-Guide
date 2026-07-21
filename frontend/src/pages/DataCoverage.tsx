@@ -1036,13 +1036,8 @@ function BboxDataBanner({
       {/* Inline table */}
       {viewOpen && rows && (
         <div className="border-t border-white/10">
-          {/* Legend + selection controls */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 pb-1 text-[10px] text-white/40">
-            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-900/50 border border-emerald-700/50" /> Data available</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-900/40 border border-red-700/40" /> Missing</span>
-            {rows.some(r => r.boplats_listings) && (
-              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-900/40 border border-amber-700/40" /> Boplats data</span>
-            )}
+          {/* Row count */}
+          <div className="flex items-center px-4 pt-2 pb-1 text-[10px] text-white/40">
             <span className="ml-auto text-gray-400">
               Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)} of {rows.length}
             </span>

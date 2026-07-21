@@ -896,3 +896,13 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
    cap silently clipped them when expanded. */
 .collapse-content { max-height: 4000px; }
 .collapse-content.collapsed { max-height: 0; }
+
+/* #lp-scroll is a flex column, so its children shrink to fit by default —
+   which squashed expanded accordion bodies (the Selected Building hint and the
+   Base Map list were cut off mid-row). Sections must keep their natural height
+   and let the panel scroll instead. */
+.collapse-head,
+.collapse-content,
+.lp-divider,
+#lp-stats,
+#city-switcher { flex-shrink: 0; }
