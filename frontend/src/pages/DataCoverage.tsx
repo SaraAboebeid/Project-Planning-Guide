@@ -3,11 +3,9 @@ import { useWizardStore } from "../store/wizard";
 import { api } from "../api/client";
 import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import {
-  CheckCircle2, AlertTriangle, XCircle,
-  ChevronDown, ChevronUp, MapPin, Layers, Database, Check, X,
-  Building2, Globe2, Download, Loader2,
+  ChevronUp,
+  Download, MapPin, Building2, Loader2, Layers, Globe2, Database,
 } from "lucide-react";
-
 
 /* ─────────────────────────────────────────────
    Types
@@ -15,7 +13,6 @@ import {
 type Status     = "Available" | "Estimated" | "Missing";
 type Confidence = "High" | "Medium" | "Low" | "—";
 type Action     = "None" | "Review" | "User input";
-type FilterId   = "All" | "Available" | "Estimated" | "Missing" | "Needs user input";
 
 /** Definition of a data parameter — two states depending on whether user has the data */
 interface DataItemDef {
@@ -34,6 +31,11 @@ interface DataItemDef {
 
   /* Should the toggle default to "I have this"? */
   defaultHas: boolean;
+
+  /* True when there is NO estimation path: the value either comes from its real
+     source (cadastral / EUBUCCO / Boverket EPC) or it is simply absent. Such a
+     field must never be reported as "Estimated" — nothing estimates it. */
+  noFallback?: boolean;
 }
 
 interface DataItemResolved {
@@ -78,39 +80,8 @@ function resolve(def: DataItemDef, hasData: boolean): DataItemResolved {
 /* ─────────────────────────────────────────────
    Style configs
 ───────────────────────────────────────────── */
-const STATUS_CFG: Record<Status, {
-  icon: React.ReactNode;
-  pillBg: string; pillBorder: string; pillText: string; rowAccent: string;
-}> = {
-  Available: {
-    icon:       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />,
-    pillBg:     "bg-emerald-900/30",  pillBorder: "border-emerald-700/50", pillText: "text-emerald-400",
-    rowAccent:  "hover:bg-emerald-900/20",
-  },
-  Estimated: {
-    icon:       <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />,
-    pillBg:     "bg-amber-900/30",    pillBorder: "border-amber-700/50",   pillText: "text-amber-400",
-    rowAccent:  "hover:bg-amber-900/20",
-  },
-  Missing: {
-    icon:       <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />,
-    pillBg:     "bg-red-900/30",      pillBorder: "border-red-700/50",     pillText: "text-red-400",
-    rowAccent:  "hover:bg-red-900/20",
-  },
-};
 
-const CONFIDENCE_CFG: Record<Confidence, { bar: string; pct: number; text: string }> = {
-  High:   { bar: "bg-emerald-500", pct: 90, text: "text-emerald-400" },
-  Medium: { bar: "bg-amber-400",   pct: 55, text: "text-amber-400"   },
-  Low:    { bar: "bg-red-400",     pct: 25, text: "text-red-400"     },
-  "—":    { bar: "bg-white/20",    pct: 0,  text: "text-white/30"    },
-};
 
-const ACTION_CFG: Record<Action, { bg: string; border: string; text: string }> = {
-  "None":       { bg: "bg-white/5",    border: "border-white/10",   text: "text-white/40" },
-  "Review":     { bg: "bg-amber-900/30",  border: "border-amber-700/40", text: "text-amber-400" },
-  "User input": { bg: "bg-red-900/30",    border: "border-red-700/40",   text: "text-red-400"   },
-};
 
 /* ─────────────────────────────────────────────
    Data definitions (all project types)
@@ -144,16 +115,16 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
       category: "Energy Performance (EPC)",
       items: [
         {
-          key: "r_epc",  label: "Baseline energy class (EPC)",
-          primarySource: "Energy Performance Certificate (EPC)", primaryConfidence: "High",
-          fallbackSource: "TABULA energy archetype by construction year & type", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-          defaultHas: false,
+          key: "r_epc",  label: "Energy class",
+          primarySource: "Boverket EPC (energideklaration)", primaryConfidence: "High",
+          fallbackSource: "—", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "None",
+          defaultHas: false, noFallback: true,
         },
         {
           key: "r_edem", label: "Energy demand (kWh/m²·yr)",
-          primarySource: "Energy Performance Certificate (EPC)", primaryConfidence: "High",
-          fallbackSource: "Boverket average by building type & construction era", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-          defaultHas: false,
+          primarySource: "Boverket EPC (energideklaration)", primaryConfidence: "High",
+          fallbackSource: "—", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "None",
+          defaultHas: false, noFallback: true,
         },
         {
           key: "r_atemp", label: "Heated floor area (ATEMP)",
@@ -170,27 +141,27 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
         items: [
           {
             key: "r_fp",   label: "Building footprint dimensions",
-            primarySource: "EUBUCCO / OSM building polygon", primaryConfidence: "High",
-            fallbackSource: "Cadastral data", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
+            primarySource: "Cadastral footprint (Lantmäteriet) / EUBUCCO polygon", primaryConfidence: "High",
+            fallbackSource: "—", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "None",
+            defaultHas: false, noFallback: true,
           },
           {
             key: "r_hgt",  label: "Building height",
-            primarySource: "EUBUCCO / urban dataset", primaryConfidence: "High",
-            fallbackSource: "Urban datasets", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
+            primarySource: "EUBUCCO", primaryConfidence: "High",
+            fallbackSource: "—", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "None",
+            defaultHas: false, noFallback: true,
           },
           {
             key: "r_flrs", label: "Number of floors",
-            primarySource: "EPC declaration (EgenAntalPlan) / building model", primaryConfidence: "High",
-            fallbackSource: "EUBUCCO / street-level imagery", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
+            primarySource: "EUBUCCO / Boverket EPC (EgenAntalPlan)", primaryConfidence: "High",
+            fallbackSource: "—", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "None",
+            defaultHas: false, noFallback: true,
           },
           {
             key: "r_use",  label: "Building use",
-            primarySource: "EPC declaration / building type", primaryConfidence: "High",
-            fallbackSource: "EUBUCCO building type", fallbackStatus: "Estimated", fallbackConfidence: "Medium", fallbackAction: "Review",
-            defaultHas: false,
+            primarySource: "Cadastral ändamål (Lantmäteriet) / EUBUCCO building type", primaryConfidence: "High",
+            fallbackSource: "—", fallbackStatus: "Missing", fallbackConfidence: "—", fallbackAction: "None",
+            defaultHas: false, noFallback: true,
           },
         ],
       });
@@ -659,138 +630,13 @@ const FIELD_MAP: Record<string, BKey> = {
   re_fpv_area: "height",
 };
 
-// Real provenance chips per parameter (SOURCE column), so a value is never
-// mislabelled "User". The actual source differs by country (verified against
-// each pipeline):
-//   Sweden  - footprint & height: EUBUCCO; floors: EPC (EgenAntalPlan);
-//             use: EPC (andamal1, else EUBUCCO type); energy/class/ATEMP: EPC.
-//   UK      - footprint & use: OSM; height & floors: EUBUCCO enrichment;
-//             energy/class/ATEMP (total floor area): EPC.
-//   Both    - energy demand / class / heated floor area (ATEMP): EPC;
-//             construction U-values: TABULA.
-function sourceBadgesFor(key: string, country: string | null | undefined, hasEpc: boolean): string[] | null {
-  const uk: Record<string, string[]> = {
-    r_fp:    ["OSM"],
-    r_hgt:   ["EUBUCCO"],
-    r_flrs:  ["EUBUCCO"],
-    r_use:   hasEpc ? ["OSM", "EPC"] : ["OSM"],
-    r_epc:   ["EPC"], r_edem: ["EPC"], r_atemp: ["EPC"], r_mat: ["TABULA"],
-  };
-  const se: Record<string, string[]> = {
-    r_fp:    ["EUBUCCO"],
-    r_hgt:   ["EUBUCCO"],
-    r_flrs:  ["EPC"],
-    r_use:   hasEpc ? ["EPC"] : ["EUBUCCO"],
-    r_epc:   ["EPC"], r_edem: ["EPC"], r_atemp: ["EPC"], r_mat: ["TABULA"],
-  };
-  return (country === "United Kingdom" ? uk : se)[key] ?? null;
-}
-const BADGE_STYLE: Record<string, string> = {
-  EUBUCCO: "bg-purple-900/40 text-purple-300 border-purple-700/50",
-  OSM:     "bg-sky-900/40 text-sky-400 border-sky-700/50",
-  EPC:     "bg-emerald-900/40 text-emerald-400 border-emerald-700/50",
-  TABULA:  "bg-amber-900/40 text-amber-400 border-amber-700/50",
-  Boverket:"bg-orange-900/40 text-orange-400 border-orange-700/50",
-  User:    "bg-white/8 text-white/55 border-white/15",
-};
-function SourceChip({ label }: { label: string }) {
-  return <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold border ${BADGE_STYLE[label] ?? BADGE_STYLE.User}`}>{label}</span>;
-}
 
-/** Check if a BuildingLookup field is truthy (handles boolean has_epc correctly) */
-function bKeyPresent(building: BuildingLookup, bKey: BKey): boolean {
-  const val = building[bKey];
-  if (typeof val === "boolean") return val === true;
-  return val !== null && val !== undefined;
-}
 
-// Build initial hasData state from EUBUCCO building (auto-fills available fields)
-function initFromBuilding(
-  defs: DataCategoryDef[],
-  building: BuildingLookup | null,
-): Record<string, boolean> {
-  const init: Record<string, boolean> = {};
-  defs.forEach(cat => cat.items.forEach(i => {
-    const bKey = FIELD_MAP[i.key];
-    const fromBuilding = bKey && building && bKeyPresent(building, bKey);
-    init[i.key] = fromBuilding ? true : i.defaultHas;
-  }));
-  return init;
-}
 
-function initFromBuildings(
-  defs: DataCategoryDef[],
-  buildings: BuildingLookup[],
-): Record<string, boolean> {
-  const init: Record<string, boolean> = {};
-  defs.forEach(cat => cat.items.forEach(i => {
-    const bKey = FIELD_MAP[i.key];
-    const fromAny = bKey && buildings.some(b => bKeyPresent(b, bKey));
-    init[i.key] = fromAny ? true : i.defaultHas;
-  }));
-  return init;
-}
 
-/* Returns a formatted value string for a given building + EUBUCCO key, or null if absent */
-function buildingFieldDisplay(b: BuildingLookup, bKey: BKey): string | null {
-  const v = b[bKey];
-  if (v === null || v === undefined) return null;
-  if (bKey === "footprint_m2") return `${Math.round(v as number)} m²`;
-  if (bKey === "height")       return `${(v as number).toFixed(1)} m`;
-  if (bKey === "floors")       return `${v} floors`;
-  if (bKey === "use_cat")      return String(v);
-  if (bKey === "tabula_u_wall") return `U=${(v as number).toFixed(2)} W/m²K`;
-  if (bKey === "tabula_u_win")  return `U-win=${(v as number).toFixed(2)} W/m²K`;
-  if (bKey === "tabula_period") return `TABULA ${String(v)}`;
-  if (bKey === "eclass")       return `Class ${v}`;
-  if (bKey === "has_epc")      return v === true ? "EPC registered" : null as unknown as string;
-  if (bKey === "year")         return String(v);
-  if (bKey === "energy")       return `${Math.round(v as number)} kWh/m²·yr`;
-  return String(v);
-}
-function buildingShortName(b: BuildingLookup, idx: number): string {
-  if (b.address && !isCadastralId(b.address)) return formatAddress(b.address.split(",")[0] ?? b.address);
-  return `Building ${idx + 1}`;
-}
 
-// Build initial hasData state from BboxStats (auto-fills fields covered by aggregate data)
-// Bbox provides: footprint, height, floors, use_cat, energy, epc coverage
-const BBOX_COVERED_BKEYS = new Set<BKey>(["footprint_m2", "height", "floors", "use_cat", "energy", "has_epc", "eclass", "tabula_period"]);
-function initFromBboxStats(
-  defs: DataCategoryDef[],
-  _stats: BboxStats | null,
-): Record<string, boolean> {
-  const init: Record<string, boolean> = {};
-  defs.forEach(cat => cat.items.forEach(i => {
-    const bKey = FIELD_MAP[i.key] as BKey | undefined;
-    init[i.key] = (bKey && BBOX_COVERED_BKEYS.has(bKey)) ? true : i.defaultHas;
-  }));
-  return init;
-}
 
-// Return a display string when a field is sourced from bbox aggregate data
-function bboxSourceText(key: string, bboxStats: BboxStats | null): string | null {
-  if (!bboxStats) return null;
-  const bKey = FIELD_MAP[key] as BKey | undefined;
-  if (!bKey || !BBOX_COVERED_BKEYS.has(bKey)) return null;
-  const meta = EUBUCCO_LABELS[bKey];
-  if (!meta) return `EUBUCCO aggregate — ${bboxStats.count} buildings`;
-  return `EUBUCCO aggregate — ${bboxStats.count} buildings`;
-}
 
-// Format actual EUBUCCO value for display in source column
-const EUBUCCO_LABELS: Partial<Record<BKey, { label: string; unit?: string }>> = {
-  footprint_m2:  { label: "footprint",        unit: "m²" },
-  height:        { label: "height",           unit: "m" },
-  floors:        { label: "floors" },
-  use_cat:       { label: "use" },
-  tabula_u_wall: { label: "U-wall",           unit: "W/m²K" },
-  tabula_u_win:  { label: "U-win",            unit: "W/m²K" },
-  tabula_period: { label: "TABULA archetype" },
-  eclass:        { label: "energy class" },
-  has_epc:       { label: "EPC" },
-  energy:        { label: "energy use",       unit: "kWh/m²" },
-};
 
 /** Maps BuildingLookup (BKey) field names → BuildingRecord field names for coverage checks */
 const BKEY_TO_RECORD_FIELD: Partial<Record<string, keyof BuildingRecord>> = {
@@ -834,25 +680,6 @@ function statusFromCoverage(count: number, total: number): Status {
   return "Missing";
 }
 
-function eubuccoSourceText(key: string, building: BuildingLookup | null): string | null {
-  if (!building) return null;
-  const bKey = FIELD_MAP[key] as BKey | undefined;
-  if (!bKey) return null;
-  // Boolean fields: only truthy value is meaningful
-  if (typeof building[bKey] === "boolean") {
-    if (!bKeyPresent(building, bKey)) return null;
-    const meta = EUBUCCO_LABELS[bKey];
-    return `EUBUCCO — ${meta?.label ?? String(bKey)}`;
-  }
-  const val = building[bKey];
-  if (val === null || val === undefined) return null;
-  const meta = EUBUCCO_LABELS[bKey];
-  if (!meta) return `EUBUCCO — ${val}`;
-  const formatted = typeof val === "number" && !Number.isInteger(val)
-    ? val.toFixed(2)
-    : String(val);
-  return `EUBUCCO — ${meta.label}: ${formatted}${meta.unit ? " " + meta.unit : ""}`;
-}
 
 /* ─────────────────────────────────────────────
    Bbox data summary banner (multi-building mode)
@@ -1613,10 +1440,8 @@ export default function DataCoverage() {
   const building   = project.lookedUpBuilding ?? null;
   const buildings  = project.lookedUpBuildings ?? [];
   const bboxStats  = project.bboxStats ?? null;
-  const savedWWR   = project.savedWWR ?? null;
   const isMulti    = buildings.length > 1;
 
-  const WWR_KEYS = ["ec_b_wwr", "ec_fpv_wwr", "re_fpv_wwr"];
 
   /* ── Auto-retry: if building lookups are missing (backend was down when step 1
      ran) re-run them as soon as DataCoverage mounts. ── */
@@ -1686,61 +1511,10 @@ export default function DataCoverage() {
     return map;
   }, [activeCovRows, defs]);
 
-  /* Auto-promote hasData=true whenever the active bbox rows actually provide a value
-     (e.g. EPC class/energy showing up once buildings are loaded or selected). */
-  useEffect(() => {
-    const entries = Object.entries(coverageMap);
-    if (!entries.length) return;
-    setHasData(prev => {
-      const next = { ...prev };
-      let changed = false;
-      for (const [k, info] of entries) {
-        if (info && info.count > 0 && !next[k]) {
-          next[k] = true;
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [coverageMap]);
+  /* One honest summary of the selection's data quality — what the old coverage
+     table was trying to say, in the two facts that actually change a decision:
+     how much of the selection has measured EPC data, and what is missing outright. */
 
-  /* Per-item "user has this data" state — keyed by item.key */
-  const [hasData, setHasData] = useState<Record<string, boolean>>(() => {
-    const base = bboxStats       ? initFromBboxStats(defs, bboxStats)
-               : isMulti        ? initFromBuildings(defs, buildings)
-               :                  initFromBuilding(defs, building);
-    if (savedWWR) WWR_KEYS.forEach(k => { base[k] = true; });
-    return base;
-  });
-
-  /* Reset when project type / systems change OR when building/bbox lookup updates */
-  useEffect(() => {
-    const base = bboxStats       ? initFromBboxStats(defs, bboxStats)
-               : isMulti        ? initFromBuildings(defs, buildings)
-               :                  initFromBuilding(defs, building);
-    if (savedWWR) WWR_KEYS.forEach(k => { base[k] = true; });
-    setHasData(base);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defs, building, bboxStats, buildings, savedWWR]);
-
-  const toggleHas = (key: string) =>
-    setHasData(prev => ({ ...prev, [key]: !prev[key] }));
-
-  const [expandedBreakdownRows, setExpandedBreakdownRows] = useState<Set<string>>(new Set());
-  const toggleBreakdown = (key: string) =>
-    setExpandedBreakdownRows(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-
-  const [activeFilter, setActiveFilter] = useState<FilterId>("All");
-  const [expandedCats, setExpandedCats] = useState<Set<string>>(
-    () => new Set(defs.map(c => c.category)),
-  );
-  useEffect(() => {
-    setExpandedCats(new Set(defs.map(c => c.category)));
-  }, [defs]);
 
   /* ── 2-way bridge: receive building selection from Cesium viewer ── */
   const [viewerSelection, setViewerSelection] = useState<{
@@ -1758,27 +1532,59 @@ export default function DataCoverage() {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const toggleCat = (cat: string) =>
-    setExpandedCats(prev => {
-      const next = new Set(prev);
-      next.has(cat) ? next.delete(cat) : next.add(cat);
-      return next;
-    });
 
-  /* Resolved items (respecting user toggles) */
+  /* Resolved items (respecting user toggles).
+     Where we have the actual buildings, the status reflects REAL coverage
+     across the selection — Available ≥75%, Estimated >0, Missing 0 — instead of
+     a flat "at least one building has this" boolean. A field the user set by
+     hand keeps their value. */
   const resolved = useMemo(
     () => defs.map(cat => ({
       category: cat.category,
-      items: cat.items.map(def => resolve(def, hasData[def.key] ?? def.defaultHas)),
+      items: cat.items.map(def => {
+        const cov = coverageMap[def.key];
+        // Availability is derived purely from what the selected buildings
+        // actually contain — there is no user "do you have this?" toggle any more.
+        const covStatus = cov && cov.total > 0 ? statusFromCoverage(cov.count, cov.total) : null;
+        const base = resolve(def, covStatus ? covStatus === "Available" : def.defaultHas);
+        if (!cov || covStatus === null) return base;
+
+        // Fields with no estimation path (footprint, height, floors, use, energy
+        // class, energy demand) are never "Estimated" — nothing estimates them.
+        // They come from cadastral / EUBUCCO / Boverket EPC, or they are absent.
+        // The source stays the real one and the n/N fraction carries the nuance.
+        const covHas = covStatus === "Available";
+
+        if (def.noFallback) {
+          const status: Status = covHas ? "Available" : "Missing";
+          return {
+            ...base,
+            status,
+            hasData: covHas,
+            source: cov.count > 0
+              ? `${def.primarySource}${cov.count < cov.total ? ` — ${cov.count}/${cov.total} buildings` : ""}`
+              : base.source,
+            confidence: cov.count > 0 ? def.primaryConfidence : base.confidence,
+            // Nothing for the user to supply — the value is in the registry or it isn't.
+            action: "None" as Action,
+          };
+        }
+
+        // Otherwise partial coverage is a MIX, not a pure fallback: the buildings
+        // that have the field get it from the real source (ATEMP from the EPC) and
+        // only the remainder is derived.
+        const source = covStatus === "Estimated" && cov.count > 0 && def.fallbackSource
+          ? `${def.primarySource} — ${cov.count}/${cov.total} buildings; rest: ${def.fallbackSource}`
+          : base.source;
+        return { ...base, status: covStatus, hasData: covHas, source };
+      }),
     })),
-    [defs, hasData],
+    [defs, coverageMap],
   );
 
   const allItems       = resolved.flatMap(c => c.items);
   const availableCount = allItems.filter(i => i.status === "Available").length;
   const estimatedCount = allItems.filter(i => i.status === "Estimated").length;
-  const missingCount   = allItems.filter(i => i.status === "Missing").length;
-  const userInputCount = allItems.filter(i => i.action === "User input").length;
   const totalCount     = allItems.length;
   const confPct = totalCount
     ? Math.round(((availableCount + estimatedCount * 0.5) / totalCount) * 100)
@@ -1805,19 +1611,7 @@ export default function DataCoverage() {
     setProject({ dataInputs: inputs });
   }, [resolved, setProject]);
 
-  const filteredItems = (items: DataItemResolved[]) => {
-    if (activeFilter === "All") return items;
-    if (activeFilter === "Needs user input") return items.filter(i => i.action === "User input");
-    return items.filter(i => i.status === activeFilter);
-  };
 
-  const FILTERS: { id: FilterId; dot?: string; count: number }[] = [
-    { id: "All",              count: totalCount      },
-    { id: "Available",        dot: "bg-emerald-500", count: availableCount },
-    { id: "Estimated",        dot: "bg-amber-400",   count: estimatedCount },
-    { id: "Missing",          dot: "bg-red-500",     count: missingCount   },
-    { id: "Needs user input", dot: "bg-red-300",     count: userInputCount },
-  ];
 
 
   return (
@@ -1825,9 +1619,11 @@ export default function DataCoverage() {
 
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-white">Data Requirements</h2>
+        <h2 className="text-2xl font-bold text-white">Building &amp; Site Data</h2>
         <p className="text-sm text-white/45 mt-1">
-          Review the inputs available for your project scope. Confirm which data you have direct access to — gaps are automatically filled from reference databases (TABULA, EPC, Boverket, PVGIS).
+          What data is available for each building, and what is missing — from the cadastral register (Lantmäteriet),
+          EUBUCCO and the Boverket EPC. An empty cell means that value simply doesn&apos;t exist for that building.
+          Select the buildings you want to carry into the analysis.
         </p>
       </div>
 
@@ -1903,411 +1699,6 @@ export default function DataCoverage() {
         </div>
       )}
 
-      {/* Coverage summary bar */}
-      {totalCount > 0 && (
-        <div className="bg-[#0d1117] rounded-2xl border border-white/10 p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-white/70">Overall Data Coverage</span>
-            <span className="text-xl font-bold text-[#721CB8]">{confPct}%</span>
-          </div>
-          <div className="w-full h-3 rounded-full bg-white/8 overflow-hidden flex">
-            <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(availableCount / totalCount) * 100}%` }} />
-            <div className="h-full bg-amber-400  transition-all" style={{ width: `${(estimatedCount / totalCount) * 100}%` }} />
-            <div className="h-full bg-red-400    transition-all" style={{ width: `${(missingCount   / totalCount) * 100}%` }} />
-          </div>
-          <div className="flex flex-wrap gap-4">
-            {[
-              { dot: "bg-emerald-500", label: "Available",   count: availableCount },
-              { dot: "bg-amber-400",   label: "Estimated",   count: estimatedCount },
-              { dot: "bg-red-400",     label: "Missing",     count: missingCount   },
-              { dot: "bg-red-300",     label: "Needs input", count: userInputCount },
-            ].map(({ dot, label, count }) => (
-              <div key={label} className="flex items-center gap-1.5">
-                <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
-                <span className="text-xs text-white/40">{label}</span>
-                <span className="text-xs font-bold text-white/70">{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Filter tabs */}
-      <div className="flex flex-wrap gap-1 bg-white/5 p-1 rounded-xl w-fit">
-        {FILTERS.map(({ id, dot, count }) => (
-          <button
-            key={id}
-            onClick={() => setActiveFilter(id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeFilter === id
-                ? "bg-white/10 text-white/90 shadow-sm"
-                : "text-white/40 hover:text-white/60"
-            }`}
-          >
-            {dot && <span className={`w-2 h-2 rounded-full ${dot}`} />}
-            {id}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-              activeFilter === id ? "bg-white/10 text-white/60" : "text-white/25"
-            }`}>{count}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Category cards */}
-      <div className="space-y-4">
-        {resolved.map(cat => {
-          const visibleItems = filteredItems(cat.items);
-          if (activeFilter !== "All" && visibleItems.length === 0) return null;
-          const isExpanded = expandedCats.has(cat.category);
-
-          const counts = {
-            available: cat.items.filter(i => i.status === "Available").length,
-            estimated: cat.items.filter(i => i.status === "Estimated").length,
-            missing:   cat.items.filter(i => i.status === "Missing").length,
-          };
-
-          return (
-            <div key={cat.category} className="bg-[#0d1117] rounded-2xl border border-white/8 overflow-hidden">
-
-              {/* Category header */}
-              <button
-                onClick={() => toggleCat(cat.category)}
-                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/4 transition"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-bold text-sm text-white/85">{cat.category}</span>
-                  <div className="flex items-center gap-1.5">
-                    {counts.available > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-900/30 border border-emerald-700/50 text-emerald-400 text-[10px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{counts.available}
-                      </span>
-                    )}
-                    {counts.estimated > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-900/30 border border-amber-700/50 text-amber-400 text-[10px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />{counts.estimated}
-                      </span>
-                    )}
-                    {counts.missing > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-900/30 border border-red-700/50 text-red-400 text-[10px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />{counts.missing}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {isExpanded
-                  ? <ChevronUp   className="w-4 h-4 text-slate-400" />
-                  : <ChevronDown className="w-4 h-4 text-slate-400" />}
-              </button>
-
-              {/* Table */}
-              {isExpanded && (
-                <div className="border-t border-slate-100">
-                  {/* Column headers */}
-                  <div className="grid grid-cols-[36px_1fr_140px_180px_90px_110px_110px] gap-x-3 px-5 py-2 bg-slate-50 border-b border-slate-100">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Have?</span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Parameter</span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Status</span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Source</span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                      {activeCovRows.length > 0
-                        ? bboxSelectedIdx.size > 0
-                          ? `Coverage (${bboxSelectedIdx.size} sel.)`
-                          : `Coverage (${activeCovRows.length})`
-                        : "Coverage"}
-                    </span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Confidence</span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Action Required</span>
-                  </div>
-
-                  {/* Rows */}
-                  {visibleItems.map((item, idx) => {
-                    const sc   = STATUS_CFG[item.status];
-                    const conf = CONFIDENCE_CFG[item.confidence];
-                    const act  = ACTION_CFG[item.action];
-                    /* find the def to get the full source tooltip */
-                    const def = defs.find(c => c.category === cat.category)
-                      ?.items.find(d => d.key === item.key);
-
-                    /* Per-building availability (multi-address mode only) */
-                    const rowBKey = isMulti ? FIELD_MAP[item.key] as BKey | undefined : undefined;
-                    const haveBuildings = rowBKey
-                      ? buildings.filter(b => b[rowBKey] !== null && b[rowBKey] !== undefined)
-                      : [];
-                    const missingBuildings = rowBKey
-                      ? buildings.filter(b => b[rowBKey] === null || b[rowBKey] === undefined)
-                      : [];
-                    const isPartial = isMulti && rowBKey !== undefined
-                      && haveBuildings.length > 0
-                      && haveBuildings.length < buildings.length;
-                    const isBreakdownOpen = expandedBreakdownRows.has(item.key);
-                    const epcFields = ["energy","eclass","tabula_u_wall","tabula_u_win","floors","year","area_atemp"];
-
-                    /* Coverage from active bbox rows */
-                    const covInfo = coverageMap[item.key] ?? null;
-                    const covStatus: Status | null = covInfo
-                      ? statusFromCoverage(covInfo.count, covInfo.total)
-                      : null;
-                    const effectiveSc = covStatus ? STATUS_CFG[covStatus] : sc;
-
-                    return (
-                      <div key={item.key}>
-                        {/* Main grid row */}
-                        <div
-                          className={`grid grid-cols-[36px_1fr_140px_180px_90px_110px_110px] gap-x-3 items-center px-5 py-3 transition-colors ${effectiveSc.rowAccent} ${
-                            idx < visibleItems.length - 1 && !isBreakdownOpen ? "border-b border-white/6" : ""
-                          } ${!item.hasData ? "opacity-80" : ""}`}
-                        >
-                          {/* Toggle */}
-                          <button
-                            title={item.hasData ? "I have this data — click to mark as unavailable" : "I don't have this data — click to mark as available"}
-                            onClick={() => toggleHas(item.key)}
-                            className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all flex-shrink-0 ${
-                              item.hasData
-                                ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
-                                : "bg-white/5 border-white/20 text-white/25 hover:border-white/40"
-                            }`}
-                          >
-                            {item.hasData
-                              ? <Check className="w-3.5 h-3.5" />
-                              : <X     className="w-3 h-3"   />}
-                          </button>
-
-                          {/* Parameter */}
-                          <div>
-                            <span className="text-sm text-white/80 font-medium leading-tight">{item.label}</span>
-                            {def && (
-                              <div className="text-[10px] text-slate-400 mt-0.5">
-                                {item.key === "r_matlist" ? (
-                                  item.hasData
-                                    ? <span className="text-emerald-600 font-medium">✓ Your material list will be used</span>
-                                    : <span className="text-amber-600 font-medium">No problem — Boverket &amp; Wikells material library will be used</span>
-                                ) : item.hasData
-                                  ? (() => {
-                                      // WWR database hit
-                                      if (savedWWR && WWR_KEYS.includes(item.key)) {
-                                        const saved = new Date(savedWWR.saved_at).toLocaleDateString();
-                                        return <span className="text-sky-600 font-medium">🏛 WWR database — avg {savedWWR.average_wwr}% · saved {saved}</span>;
-                                      }
-                                      const bbText = bboxSourceText(item.key, bboxStats);
-                                      if (bbText && cat.category !== "Building Information") return <span className="text-blue-600 font-medium">🗃 {bbText}</span>;
-                                      if (isMulti && rowBKey) {
-                                        if (isPartial) return (
-                                          <button
-                                            onClick={() => toggleBreakdown(item.key)}
-                                            className="text-amber-600 font-medium hover:text-amber-800 flex items-center gap-1"
-                                          >
-                                            ⚠ {haveBuildings.length}/{buildings.length} buildings have this data
-                                            <span className="text-[9px]">{isBreakdownOpen ? "▲" : "▼"}</span>
-                                          </button>
-                                        );
-                                        if (haveBuildings.length === buildings.length) {
-                                          const isEpc = buildings.some(b => b.has_epc) && epcFields.includes(FIELD_MAP[item.key] ?? "");
-                                          return <span className="text-purple-600 font-medium">🗄 EUBUCCO{isEpc ? " + EPC" : ""} — all {buildings.length} buildings</span>;
-                                        }
-                                      }
-                                      const eubuccoText = eubuccoSourceText(item.key, building);
-                                      return eubuccoText
-                                        ? <span className="text-purple-600 font-medium">🗄 {eubuccoText}</span>
-                                        : <span>Your data: <span className="text-slate-500 font-medium">{def.primarySource}</span></span>;
-                                    })()
-                                  : (
-                                    <span>
-                                      Fallback: <span className="text-slate-500 font-medium">{def.fallbackSource}</span>
-                                      {(item.key === "ec_b_wwr" || item.key === "ec_fpv_wwr" || item.key === "re_fpv_wwr") && (
-                                        <>
-                                          {" — "}
-                                          <a
-                                            href="http://127.0.0.1:8765/gothenburg_3d.html"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-purple-600 font-semibold hover:text-purple-800 underline underline-offset-2"
-                                          >
-                                            measure in Gothenburg 3D →
-                                          </a>
-                                        </>
-                                      )}
-                                    </span>
-                                  )
-                                }
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Status pill */}
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold w-fit ${effectiveSc.pillBg} ${effectiveSc.pillBorder} ${effectiveSc.pillText}`}>
-                            {effectiveSc.icon}
-                            {covStatus ?? item.status}
-                          </span>
-
-                          {/* Source (short) */}
-                          <span className="text-xs text-white/40 leading-tight">
-                            {item.hasData
-                              ? (() => {
-                                  // Explicit real-provenance chips for the core building/energy
-                                  // parameters (overrides the inferred badge so nothing shows "User").
-                                  const mapped = sourceBadgesFor(item.key, project.country, (building?.has_epc ?? buildings.some(b => b.has_epc)) === true);
-                                  if (mapped) return <span className="inline-flex gap-1">{mapped.map(m => <SourceChip key={m} label={m} />)}</span>;
-                                  if (item.key === "r_matlist") return <span className="px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">User</span>;
-                                  if (savedWWR && WWR_KEYS.includes(item.key))
-                                    return <span className="px-1.5 py-0.5 rounded-full bg-sky-900/40 text-sky-400 text-[9px] font-bold border border-sky-700/50">WWR DB</span>;
-                                  if (bboxSourceText(item.key, bboxStats) && cat.category !== "Building Information")
-                                    return <span className="px-1.5 py-0.5 rounded-full bg-blue-900/40 text-blue-400 text-[9px] font-bold border border-blue-700/50">EUBUCCO</span>;
-                                  if (isMulti && rowBKey) {
-                                    if (isPartial) return (
-                                      <button
-                                        onClick={() => toggleBreakdown(item.key)}
-                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold border border-amber-200 hover:bg-amber-200 transition-colors"
-                                      >
-                                        {haveBuildings.length}/{buildings.length}
-                                        <span>{isBreakdownOpen ? "▲" : "▼"}</span>
-                                      </button>
-                                    );
-                                    if (haveBuildings.length === buildings.length) {
-                                      const isEpc = buildings.some(b => b.has_epc) && epcFields.includes(FIELD_MAP[item.key] ?? "");
-                                      return isEpc
-                                        ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span></>
-                                        : <span className="px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50">EUBUCCO</span>;
-                                    }
-                                    if (def?.primarySource?.toLowerCase().includes("cesium"))
-                                      return <span className="px-1.5 py-0.5 rounded-full bg-sky-900/40 text-sky-400 text-[9px] font-bold border border-sky-700/50">Cesium</span>;
-                                    return <span className="px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">User</span>;
-                                  }
-                                  if (def?.primarySource?.toLowerCase().includes("cesium"))
-                                    return <span className="px-1.5 py-0.5 rounded-full bg-sky-900/40 text-sky-400 text-[9px] font-bold border border-sky-700/50">Cesium</span>;
-                                  const eubText = eubuccoSourceText(item.key, building);
-                                  if (eubText) {
-                                    const isEpc = building?.has_epc && epcFields.includes(FIELD_MAP[item.key] ?? "");
-                                    return isEpc
-                                      ? <><span className="px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50">EUBUCCO</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span></>
-                                      : <span className="px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50">EUBUCCO</span>;
-                                  }
-                                  return <span className="px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">User</span>;
-                                })()
-                              : (() => {
-                                  if (item.key === "r_matlist") return <><span className="px-1.5 py-0.5 rounded-full bg-orange-900/40 text-orange-400 text-[9px] font-bold border border-orange-700/50">Boverket</span><span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">Wikells</span></>;
-                                  const src = item.source.toLowerCase();
-                                  if (src.includes("tabula"))  return <span className="px-1.5 py-0.5 rounded-full bg-amber-900/40 text-amber-400 text-[9px] font-bold border border-amber-700/50">TABULA</span>;
-                                  if (src.includes("boverket")) return <span className="px-1.5 py-0.5 rounded-full bg-orange-900/40 text-orange-400 text-[9px] font-bold border border-orange-700/50">Boverket</span>;
-                                  if (src.includes("epc") || src.includes("energy performance")) return <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span>;
-                                  if (src.includes("pvgis")) return <span className="px-1.5 py-0.5 rounded-full bg-yellow-900/40 text-yellow-400 text-[9px] font-bold border border-yellow-700/50">PVGIS</span>;
-                                  if (src.includes("eubucco")) return <span className="px-1.5 py-0.5 rounded-full bg-purple-900/40 text-purple-300 text-[9px] font-bold border border-purple-700/50">EUBUCCO</span>;
-                                  if (src.includes("—") || src.includes("no ") || src.includes("must")) return <span className="px-1.5 py-0.5 rounded-full bg-red-900/40 text-red-400 text-[9px] font-bold border border-red-700/50">Missing</span>;
-                                  return <span className="px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 text-[9px] font-bold border border-white/15">Estimated</span>;
-                                })()
-                            }
-                          </span>
-
-                          {/* Coverage cell */}
-                          <div className="flex flex-col gap-0.5">
-                            {covInfo ? (
-                              <>
-                                <div className="flex items-center gap-1">
-                                  <div className="w-14 h-1.5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-                                    <div
-                                      className={`h-full rounded-full ${
-                                        covStatus === "Available" ? "bg-emerald-500"
-                                        : covStatus === "Estimated" ? "bg-amber-400"
-                                        : "bg-red-400"
-                                      }`}
-                                      style={{ width: `${Math.round((covInfo.count / covInfo.total) * 100)}%` }}
-                                    />
-                                  </div>
-                                  <span className={`text-[10px] font-bold ${
-                                    covStatus === "Available" ? "text-emerald-700"
-                                    : covStatus === "Estimated" ? "text-amber-700"
-                                    : "text-red-600"
-                                  }`}>
-                                    {Math.round((covInfo.count / covInfo.total) * 100)}%
-                                  </span>
-                                </div>
-                                <span className="text-[9px] text-slate-400">
-                                  {covInfo.count}/{covInfo.total} bldgs
-                                </span>
-                              </>
-                            ) : (
-                              <span className="text-xs text-slate-300">—</span>
-                            )}
-                          </div>
-
-                          {/* Confidence mini-bar */}
-                          <div className="flex items-center gap-1.5">
-                            {item.confidence !== "—" ? (
-                              <>
-                                <div className="w-12 h-1.5 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-                                  <div className={`h-full rounded-full ${conf.bar}`} style={{ width: `${conf.pct}%` }} />
-                                </div>
-                                <span className={`text-[11px] font-semibold ${conf.text}`}>{item.confidence}</span>
-                              </>
-                            ) : (
-                              <span className="text-xs text-slate-300">—</span>
-                            )}
-                          </div>
-
-                          {/* Action pill */}
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold w-fit ${act.bg} ${act.border} ${act.text}`}>
-                            {item.action}
-                          </span>
-                        </div>
-
-                        {/* Per-building breakdown panel (partial coverage only) */}
-                        {isBreakdownOpen && isPartial && rowBKey && (
-                          <div className={`mx-5 mb-3 rounded-xl border border-amber-200 bg-amber-50 overflow-hidden ${
-                            idx < visibleItems.length - 1 ? "border-b border-slate-100" : ""
-                          }`}>
-                            <div className="px-4 py-2 bg-amber-100 border-b border-amber-200 flex items-center justify-between">
-                              <span className="text-[11px] font-bold text-amber-800">
-                                Per-building data availability — {item.label}
-                              </span>
-                              <span className="text-[10px] text-amber-600">
-                                {haveBuildings.length} available · {missingBuildings.length} missing
-                              </span>
-                            </div>
-                            <div className="divide-y divide-amber-100">
-                              {buildings.map((b, bi) => {
-                                const hasVal = b[rowBKey] !== null && b[rowBKey] !== undefined;
-                                const displayVal = hasVal ? buildingFieldDisplay(b, rowBKey) : null;
-                                return (
-                                  <div key={bi} className="flex items-center gap-3 px-4 py-2">
-                                    <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${
-                                      hasVal ? "bg-emerald-500 text-white" : "bg-red-100 text-red-500 border border-red-200"
-                                    }`}>
-                                      {hasVal ? "✓" : "✗"}
-                                    </span>
-                                    <span className="text-xs text-slate-700 flex-1 truncate">
-                                      {buildingShortName(b, bi)}
-                                    </span>
-                                    {displayVal
-                                      ? <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">{displayVal}</span>
-                                      : <span className="text-[10px] text-slate-400 italic">not in EUBUCCO — fallback: {def?.fallbackSource ?? "estimated"}</span>
-                                    }
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Separator */}
-                        {idx < visibleItems.length - 1 && !isBreakdownOpen && (
-                          <div className="border-b border-slate-100 mx-0" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {totalCount === 0 && (
-        <div className="rounded-2xl border border-dashed border-gray-300 p-12 text-center text-gray-400 text-sm">
-          No data inputs configured for the selected project type and systems.
-          <br />
-          <span className="text-xs mt-1 block">Go back to Step 1 and select a project type.</span>
-        </div>
-      )}
 
     </div>
   );

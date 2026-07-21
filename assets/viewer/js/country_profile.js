@@ -9,23 +9,14 @@
   const panel = document.getElementById('country-profile');
   if (!panel) return;
 
-  const tabsWrap = document.getElementById('country-tabs');
   const summaryEl = document.getElementById('country-summary');
   const kpisEl = document.getElementById('country-kpis');
   const barsEl = document.getElementById('country-energy-bars');
-  if (!tabsWrap || !summaryEl || !kpisEl || !barsEl) return;
+  if (!summaryEl || !kpisEl || !barsEl) return;
 
+  // Country/city switching lives in the top-right navigation, so this panel is
+  // purely a readout for whichever country the viewer is currently showing.
   const ACTIVE = (window.VIEWER_COUNTRY || 'se').toLowerCase();
-
-  const scaffold = (name) => ({
-    viewer: {
-      summary: `${name} profile scaffold. Connect ${name} source metrics to activate KPIs.`,
-      kpis: [],
-      energy_class_share: {},
-    },
-  });
-
-  const NAMES = { se: 'Sweden', gb: 'United Kingdom', be: 'Belgium', ie: 'Ireland' };
 
   // ── Derive the active country's profile from the loaded buildings ─────────
   function shareFromData(data) {
@@ -93,12 +84,6 @@
     return value.toLocaleString('en-US');
   }
 
-  function setActiveCountryTab(countryCode) {
-    tabsWrap.querySelectorAll('button[data-country]').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.country === countryCode);
-    });
-  }
-
   function renderEnergyBars(share) {
     const rows = [
       { key: 'A_B', label: 'A-B', value: Number(share?.A_B || 0) },
@@ -140,7 +125,6 @@
   }
 
   async function loadCountryProfile(countryCode) {
-    setActiveCountryTab(countryCode);
     summaryEl.textContent = 'Loading profile...';
     kpisEl.innerHTML = '';
     barsEl.innerHTML = '';
@@ -159,19 +143,9 @@
       /* backend offline - fall through to locally derived figures */
     }
 
-    if (countryCode === ACTIVE) {
-      renderCountryProfile(await deriveActiveProfile());
-    } else {
-      renderCountryProfile(scaffold(NAMES[countryCode] || countryCode.toUpperCase()));
-    }
+    renderCountryProfile(await deriveActiveProfile());
   }
 
-  tabsWrap.addEventListener('click', (event) => {
-    const btn = event.target.closest('button[data-country]');
-    if (!btn) return;
-    loadCountryProfile((btn.dataset.country || ACTIVE).toLowerCase());
-  });
-
-  // Open on the country this viewer is actually showing.
+  // Always the country this viewer is actually showing.
   loadCountryProfile(ACTIVE);
 })();

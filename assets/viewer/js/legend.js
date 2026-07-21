@@ -141,9 +141,18 @@ function updateLegend(mode) {
       + (r.hasCards ? '<span style="margin-left:4px;font-size:10px;color:#a78bfa" title="Click to see best/worst">&#9654;</span>' : '');
     if (r.hasCards) {
       const _key = r.key, _mode = mode;
+      // Interactive rows are real controls: reachable and operable by keyboard.
+      div.setAttribute('role', 'button');
+      div.setAttribute('tabindex', '0');
+      div.setAttribute('aria-label', r.lbl + ' — show best and worst performers');
       div.addEventListener('mouseenter', () => div.style.background = 'rgba(167,139,250,0.1)');
       div.addEventListener('mouseleave', () => div.style.background = '');
+      div.addEventListener('focus', () => div.style.background = 'rgba(167,139,250,0.16)');
+      div.addEventListener('blur', () => div.style.background = '');
       div.addEventListener('click', () => showPerfCards(_mode, _key));
+      div.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showPerfCards(_mode, _key); }
+      });
     }
     container.appendChild(div);
   }

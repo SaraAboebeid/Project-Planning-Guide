@@ -72,6 +72,7 @@
   // Västtrafik and SCB are Swedish services with no UK equivalent, so they are
   // only loaded for Sweden rather than left to fail at runtime.
   const scripts = [
+    'viewer/js/layer_docs.js',   // must precede ui.js — it hydrates the info buttons
     'viewer/js/legend.js',
     'viewer/js/cesium.js',
     'viewer/js/ui.js',

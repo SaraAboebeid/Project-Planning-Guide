@@ -332,9 +332,17 @@ def process_data() -> dict:
     ov_best = ov.sort_values("i_area", ascending=False).drop_duplicates("eubucco_idx")
     primary = ov_best.loc[ov_best["frac"] >= OVERLAP_MIN, ["eubucco_idx", "fp_idx", "frac"]].copy()
 
-    # Centroid fallback for buildings that overlap no footprint at all
+    # Proximity fallback for buildings that overlap no footprint at all.
+    #
+    # Distance is measured from the footprint centroid to the building POLYGON,
+    # not to the building's centroid. A centroid is a poor proxy for a large or
+    # elongated building: Lindholmen 6:9 husnummer 8 is a 39 m² cadastral stub
+    # sitting ON the edge of a 3,744 m² school (0 m to the polygon, but 29 m to
+    # its centroid), so the old centroid-to-centroid test rejected it at 20 m and
+    # the school lost its EPC entirely (1065931, class D, 109 kWh/m²/yr).
+    # Measuring to the polygon keeps the same 20 m tolerance but applies it to
+    # the building's actual extent.
     rest = gdf_poly[~gdf_poly["eubucco_idx"].isin(set(primary["eubucco_idx"]))].copy()
-    rest["geometry"] = rest.geometry.centroid
     epc_cents = epc_polys[["fp_idx", "geometry"]].copy()
     epc_cents["geometry"] = epc_polys.geometry.centroid
     fb = gpd.sjoin_nearest(rest[["eubucco_idx", "geometry"]], epc_cents,

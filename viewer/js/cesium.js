@@ -559,17 +559,39 @@ viewer.camera.flyTo({
 // race used to cost a second full ~90s rebuild pass on Gothenburg's 93k
 // buildings rather than a quick correction.
 (async () => {
-  if (ION_TOKEN) {
-    document.getElementById('token-panel').style.display = 'none';
-    await loadGoogleTiles(ION_TOKEN, { skipAutoRebuild: true });
+  // Each stage is isolated: the buildings are the point of this viewer, so
+  // nothing optional above them is allowed to prevent them from rendering.
+  try {
+    if (ION_TOKEN) {
+      document.getElementById('token-panel').style.display = 'none';
+      await loadGoogleTiles(ION_TOKEN, { skipAutoRebuild: true });
+    }
+    if (window.VIEWER_COUNTRY && window.VIEWER_COUNTRY !== 'se') {
+      await toggleOsmBuildings(true, { skipAutoRebuild: true });
+    }
+  } catch (err) {
+    console.warn('Basemap / 3D tiles init failed - continuing without them:', err && err.message);
   }
-  if (window.VIEWER_COUNTRY && window.VIEWER_COUNTRY !== 'se') {
-    await toggleOsmBuildings(true, { skipAutoRebuild: true });
-  }
+
+  // Calibration only ALIGNS the extrusions to ground truth; it is not a
+  // prerequisite for drawing them. It retries up to 3x12s and then THROWS
+  // (tiles not streamed in yet, slow GPU, offline). That rejection used to
+  // propagate out of this IIFE and skip rebuildBuildings() altogether, so a
+  // slow tile stream left a blank map with no buildings at all.
   // buildingPrimitive is still null here, so calibrating first means the very first
   // build is already correctly aligned - no misaligned flash on first load.
-  await refreshBuildingBaseOffsetFromTiles();
-  await rebuildBuildings();
+  try {
+    await refreshBuildingBaseOffsetFromTiles();
+  } catch (err) {
+    console.warn('Ground calibration failed - extruding at ellipsoid height:', err && err.message);
+  }
+
+  try {
+    await rebuildBuildings();
+  } catch (err) {
+    console.error('Building render failed:', err);
+    setLoading('');
+  }
 })();
 
 // ─────────────────────────────────────────────────────────────────

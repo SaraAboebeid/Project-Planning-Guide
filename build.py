@@ -95,6 +95,7 @@ def _normalize_encoding_artifacts(text: str) -> str:
 
 JS_FILES = [
     "bootstrap.js",
+    "layer_docs.js",
     "legend.js",
     "cesium.js",
     "ui.js",

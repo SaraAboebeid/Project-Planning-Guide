@@ -720,3 +720,179 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
 #vt-ghost-knob {
   background: rgba(255,255,255,0.55) !important;
 }
+
+/* =============================================================
+   Sidebar UX pass — fixed header/footer, consistent accordions,
+   active-layer badges, recessive info buttons, real switch.
+   ============================================================= */
+
+/* ── Fixed search bar + footer so neither scrolls away ───────────────── */
+#lp-fixed-top {
+  flex-shrink: 0;
+  padding: 0 0 2px;
+  border-bottom: 1px solid var(--map-sidebar-border);
+  position: relative;
+  z-index: 5;
+}
+#lp-fixed-top #search-wrap { padding: 10px 12px 10px; }
+
+#lp-footer {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--map-sidebar-border);
+  background: rgba(0,0,0,0.18);
+}
+
+/* ── Accordion header: chevron first so every section reads the same ── */
+.collapse-head { padding: 0 4px; margin-top: 4px; }
+.collapse-toggle {
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.collapse-label { flex: 1; text-align: left; }
+.collapse-chevron {
+  flex-shrink: 0;
+  font-size: 9px;
+  line-height: 1;
+  transition: transform .18s ease;
+  opacity: .7;
+}
+/* Collapsed → chevron points right; expanded → points down. */
+.collapse-toggle[aria-expanded="false"] .collapse-chevron { transform: rotate(-90deg); }
+
+/* ── Active-layer badge on a section header ─────────────────────────── */
+.sec-badge {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: rgba(114,28,184,0.30);
+  border: 1px solid rgba(153,91,213,0.5);
+  color: #E4D4F7;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sec-badge[hidden] { display: none; }
+
+/* ── Info buttons: present but recessive until the row is used ───────── */
+.overlay-row .info-btn,
+.base-row .info-btn {
+  opacity: 0;
+  transition: opacity .15s, color .15s;
+}
+.overlay-row:hover .info-btn,
+.base-row:hover .info-btn,
+.overlay-row:focus-within .info-btn,
+.base-row:focus-within .info-btn,
+.info-btn:focus-visible { opacity: 1; }
+/* Never hide the section-level info buttons. */
+.collapse-head .info-btn { opacity: .55; }
+.collapse-head .info-btn:hover,
+.collapse-head .info-btn:focus-visible { opacity: 1; }
+
+/* ── Visible keyboard focus everywhere in the panel ──────────────────── */
+#left-panel button:focus-visible,
+#left-panel input:focus-visible,
+#left-panel select:focus-visible {
+  outline: 2px solid var(--map-sidebar-accent-2);
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+
+/* ── Exclusive (radio) vs multi (checkbox) made visually distinct ────── */
+.base-indicator { border-radius: 50%; }
+.overlay-check  { border-radius: 3px; }
+
+/* ── Selected-building section ───────────────────────────────────────── */
+#lp-no-selection {
+  /* Visible from first load — the original rule defaulted it to none, so the
+     empty state only ever appeared after actively deselecting a building.
+     JS still sets display inline on select/deselect, which overrides this. */
+  display: block;
+  padding: 8px 12px 10px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--map-sidebar-faint);
+  font-style: italic;
+}
+#building-content .analysis-tools-group { padding-top: 2px; }
+
+/* ── Sub-heading inside a section ────────────────────────────────────── */
+.lp-subhead {
+  padding: 8px 12px 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--map-sidebar-faint);
+}
+
+/* ── Filter box (SCB's 47 layers) ────────────────────────────────────── */
+.filter-wrap { position: relative; padding: 6px 12px 2px; }
+.filter-wrap input {
+  width: 100%;
+  padding: 6px 44px 6px 10px;
+  font: inherit;
+  font-size: 11px;
+  border-radius: 7px;
+  border: 1px solid var(--map-sidebar-border);
+  background: var(--map-sidebar-surface);
+  color: var(--map-sidebar-text);
+  outline: none;
+}
+.filter-wrap input::placeholder { color: var(--map-sidebar-faint); }
+.filter-count {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-20%);
+  font-size: 9.5px;
+  color: var(--map-sidebar-faint);
+  pointer-events: none;
+}
+
+/* ── Real switch (role="switch") — sized here; JS sets the colours ───── */
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--map-sidebar-muted);
+}
+.switch-label { flex: 1; }
+.switch {
+  display: inline-flex;
+  align-items: center;
+  width: 32px;
+  height: 17px;
+  border: none;
+  padding: 0;
+  border-radius: 9px;
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: #D1D5DB;
+  transition: background .2s;
+}
+.switch-knob {
+  position: absolute;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  background: #9CA3AF;
+  border-radius: 50%;
+  transition: left .2s, background .2s;
+}
+
+/* Sections can be tall (47 SCB layers, long legends) — the original 1200px
+   cap silently clipped them when expanded. */
+.collapse-content { max-height: 4000px; }
+.collapse-content.collapsed { max-height: 0; }

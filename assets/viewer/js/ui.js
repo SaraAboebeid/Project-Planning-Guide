@@ -34,11 +34,31 @@
   });
 })();
 
-// Accessibility + collapsible panel wiring
-(function initSidebarA11yAndCollapses() {
+// =============================================================
+// Sidebar shell: consistent accordions (persisted), active-layer
+// badges on collapsed sections, ARIA state sync, and the SCB filter.
+// =============================================================
+(function initSidebarShell() {
+  const LS_KEY = 'ppg.viewer.sections';
+
+  // Info buttons carry only a data-layer key in the markup; the prose lives in
+  // layer_docs.js. Hydrate them into the data-title/desc/source the tooltip reads.
+  function hydrateLayerDocs() {
+    const docs = window.LAYER_DOCS || {};
+    document.querySelectorAll('.info-btn[data-layer]').forEach(btn => {
+      const d = docs[btn.dataset.layer];
+      if (!d) return;
+      // Never overwrite an attribute already in the markup — that's how a button
+      // keeps a build-time templated value (e.g. {{BUILDINGS_SOURCE}}).
+      if (!btn.dataset.title && d.title) btn.dataset.title = d.title;
+      if (!btn.dataset.desc && d.desc) btn.dataset.desc = d.desc;
+      if (!btn.dataset.source && d.source) btn.dataset.source = d.source;
+    });
+  }
+
   function applyInfoButtonA11y() {
-    const infoButtons = document.querySelectorAll('.info-btn');
-    infoButtons.forEach(btn => {
+    hydrateLayerDocs();
+    document.querySelectorAll('.info-btn').forEach(btn => {
       if (!btn.getAttribute('aria-label')) {
         const title = btn.dataset.title || 'Layer information';
         btn.setAttribute('aria-label', 'More info: ' + title);
@@ -47,57 +67,154 @@
     });
   }
 
-  function ensureSectionInfoButton(toggleId, data) {
-    const toggle = document.getElementById(toggleId);
-    if (!toggle) return;
-    const head = toggle.closest('.collapse-head');
-    if (!head) return;
-    if (head.querySelector('.info-btn')) return;
-
-    const btn = document.createElement('button');
-    btn.className = 'info-btn';
-    btn.style.marginRight = '4px';
-    btn.dataset.title = data.title;
-    btn.dataset.desc = data.desc;
-    btn.dataset.source = data.source;
-    head.appendChild(btn);
+  // ── Open/closed state persists across reloads ──────────────────────────
+  function readState() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (_e) { return {}; }
+  }
+  function writeState(state) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (_e) { /* private mode */ }
   }
 
-  ensureSectionInfoButton('traffic-toggle', {
-    title: 'Traffic layers',
-    desc: 'Operational mobility layers including live transit vehicles and stops, disruption notices, and commuter parking availability from Vasttrafik.',
-    source: 'Vasttrafik · GTFS-RT · Storning API',
-  });
+  // Every section in the sidebar uses the same accordion pattern — no more
+  // "some sections collapse, some don't".
+  function bindAllCollapses() {
+    const saved = readState();
+    document.querySelectorAll('.collapse-toggle').forEach(toggle => {
+      const contentId = toggle.getAttribute('aria-controls');
+      const content = contentId && document.getElementById(contentId);
+      if (!content || toggle.dataset.collapseBound === '1') return;
+      toggle.dataset.collapseBound = '1';
 
-  ensureSectionInfoButton('analysis-tools-toggle', {
-    title: 'Analysis tools',
-    desc: 'Building-level diagnostics for facade window-to-wall ratio and rooftop PV potential. Tools are enabled when a building is selected.',
-    source: 'PPG analysis pipeline',
-  });
+      if (Object.prototype.hasOwnProperty.call(saved, contentId)) {
+        toggle.setAttribute('aria-expanded', saved[contentId] ? 'true' : 'false');
+      }
+      content.classList.toggle('collapsed', toggle.getAttribute('aria-expanded') !== 'true');
 
-  applyInfoButtonA11y();
-
-  function bindCollapse(toggleId, contentId) {
-    const toggle = document.getElementById(toggleId);
-    const content = document.getElementById(contentId);
-    if (!toggle || !content) return;
-    if (toggle.dataset.collapseBound === '1') return;
-    toggle.dataset.collapseBound = '1';
-
-    const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
-    content.classList.toggle('collapsed', !isExpanded);
-
-    toggle.addEventListener('click', () => {
-      const expanded = toggle.getAttribute('aria-expanded') === 'true';
-      toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-      content.classList.toggle('collapsed', expanded);
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        content.classList.toggle('collapsed', expanded);
+        const state = readState();
+        state[contentId] = !expanded;
+        writeState(state);
+        refreshBadges();
+      });
     });
   }
 
-  bindCollapse('traffic-toggle', 'traffic-content');
-  bindCollapse('stats-toggle', 'stats-content');
-  bindCollapse('urban-toggle', 'urban-content');
-  bindCollapse('analysis-tools-toggle', 'analysis-tools-content');
+  // ── Active-layer count badges ─────────────────────────────────────────
+  // A collapsed section can hide active layers; the badge says how many are
+  // on so the map never looks cluttered for no visible reason.
+  const BADGES = [
+    ['buildings-badge', 'buildings-content'],
+    ['traffic-badge',   'traffic-content'],
+    ['stats-badge',     'stats-content'],
+    ['urban-badge',     'urban-content'],
+  ];
+
+  // Writes MUST be idempotent: this runs from a MutationObserver, and assigning
+  // textContent replaces child nodes, which would re-trigger the observer.
+  function setBadge(badge, text) {
+    if (!badge) return;
+    if (text == null) {
+      if (!badge.hidden) badge.hidden = true;
+      return;
+    }
+    if (badge.textContent !== text) badge.textContent = text;
+    if (badge.hidden) badge.hidden = false;
+  }
+
+  function refreshBadges() {
+    BADGES.forEach(([badgeId, contentId]) => {
+      const badge = document.getElementById(badgeId);
+      const content = document.getElementById(contentId);
+      if (!badge || !content) return;
+      const n = content.querySelectorAll('.overlay-btn.active').length;
+      setBadge(badge, n > 0 ? n + ' on' : null);
+    });
+    // Base map is exclusive — show which one is active.
+    const activeBase = document.querySelector('.base-btn.active .base-name');
+    setBadge(document.getElementById('basemap-badge'),
+             activeBase ? activeBase.textContent.trim() : null);
+  }
+
+  // ── Keep ARIA in sync with whatever toggled the .active class ──────────
+  function syncAria() {
+    document.querySelectorAll('.base-btn').forEach(b =>
+      b.setAttribute('aria-checked', b.classList.contains('active') ? 'true' : 'false'));
+    document.querySelectorAll('.overlay-btn').forEach(b =>
+      b.setAttribute('aria-pressed', b.classList.contains('active') ? 'true' : 'false'));
+    document.querySelectorAll('#lp-tabs .lp-tab').forEach(b =>
+      b.setAttribute('aria-selected', b.classList.contains('active') ? 'true' : 'false'));
+    const ghost = document.getElementById('vt-ghost-toggle');
+    if (ghost) ghost.setAttribute('aria-checked', window._ghostModeOn ? 'true' : 'false');
+  }
+
+  // Re-entrancy guard: refreshAll writes into the very subtree the observer
+  // below watches, so without this a single mutation can feed itself forever.
+  let _refreshing = false;
+  function refreshAll() {
+    if (_refreshing) return;
+    _refreshing = true;
+    try { syncAria(); refreshBadges(); }
+    finally { _refreshing = false; }
+  }
+
+  // Other scripts (cesium.js, vasttrafik.js, scb_layers.js) flip .active
+  // directly, so observe the panel rather than trying to hook every caller.
+  // Watch ONLY class changes — never childList: refreshBadges() writes
+  // textContent, which is a childList mutation and would loop endlessly,
+  // pegging the main thread and hanging the viewer's async boot.
+  const panel = document.getElementById('left-panel');
+  if (panel && typeof MutationObserver !== 'undefined') {
+    const obs = new MutationObserver(() => refreshAll());
+    obs.observe(panel, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  }
+
+  // ── SCB layer filter (47 layers is unusable as a flat list) ───────────
+  function bindScbFilter() {
+    const input = document.getElementById('scb-filter');
+    const container = document.getElementById('scb-layers-container');
+    const countEl = document.getElementById('scb-filter-count');
+    if (!input || !container || input.dataset.bound === '1') return;
+    input.dataset.bound = '1';
+
+    const apply = () => {
+      const q = input.value.trim().toLowerCase();
+      const rows = container.querySelectorAll('.scb-row');
+      let shown = 0;
+      rows.forEach(row => {
+        const nameEl = row.querySelector('.base-name');
+        const name = (nameEl ? nameEl.textContent : '').toLowerCase();
+        const hit = !q || name.indexOf(q) !== -1;
+        row.style.display = hit ? '' : 'none';
+        if (hit) shown++;
+      });
+      if (countEl) countEl.textContent = rows.length ? shown + '/' + rows.length : '';
+    };
+    input.addEventListener('input', apply);
+    apply();
+  }
+
+  // Ghost mode is toggled by a listener on the whole row (vasttrafik.js), so
+  // mirror the resulting state onto the switch after it has run.
+  const ghostRow = document.getElementById('vt-ghost-row');
+  if (ghostRow) ghostRow.addEventListener('click', () => setTimeout(syncAria, 0));
+
+  applyInfoButtonA11y();
+  bindAllCollapses();
+  refreshAll();
+  bindScbFilter();
+
+  // SCB rows and info buttons are injected asynchronously — re-run once the
+  // layer list has rendered.
+  const scbContainer = document.getElementById('scb-layers-container');
+  if (scbContainer && typeof MutationObserver !== 'undefined') {
+    new MutationObserver(() => { applyInfoButtonA11y(); bindScbFilter(); refreshBadges(); })
+      .observe(scbContainer, { childList: true });
+  }
+
+  window.refreshSidebarState = refreshAll;
 })();
 
 let selectedBuilding = null;
@@ -221,6 +338,20 @@ async function showInfoPanel(b, idx) {
   document.getElementById('btn-pvgis').disabled   = false;
   document.getElementById('btn-sim').disabled     = false;
   document.getElementById('lp-no-selection').style.display = 'none';
+  // Name the selection on the section header and make sure the section is open,
+  // so the building's data and its tools are visible together.
+  const _bBadge = document.getElementById('building-badge');
+  if (_bBadge) {
+    const _label = b.address || b.all_addresses || 'Selected';
+    _bBadge.textContent = _label.length > 24 ? _label.slice(0, 23) + '…' : _label;
+    _bBadge.hidden = false;
+  }
+  const _bToggle  = document.getElementById('building-toggle');
+  const _bContent = document.getElementById('building-content');
+  if (_bToggle && _bContent) {
+    _bToggle.setAttribute('aria-expanded', 'true');
+    _bContent.classList.remove('collapsed');
+  }
   // Reset PVGIS result and saved badges when switching buildings
   const pvr = document.getElementById('pvgis-result');
   pvr.style.display = 'none'; pvr.innerHTML = '';
@@ -317,6 +448,8 @@ function hideInfoPanel() {
   document.getElementById('btn-pvgis').disabled   = true;
   document.getElementById('btn-sim').disabled     = true;
   document.getElementById('lp-no-selection').style.display = 'block';
+  const _bBadge = document.getElementById('building-badge');
+  if (_bBadge) _bBadge.hidden = true;
   if (typeof window.stopSimulationPolling === 'function') window.stopSimulationPolling();
 }
 
