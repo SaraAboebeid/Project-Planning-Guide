@@ -129,7 +129,6 @@ export default function WizardLayout() {
   const stepIndex = steps.findIndex((s) => s.path === location.pathname);
   const safeIndex = stepIndex < 0 ? 0 : stepIndex;
   const activeStep = steps[safeIndex]!;
-  const progress = Math.round((safeIndex / steps.length) * 100);
 
   const hasBuilding = (project.buildingPoints?.length ?? 0) > 0 || !!project.bboxStats;
   const componentsCount = project.renovationEnvelopeComponents?.length ?? 0;
@@ -243,15 +242,6 @@ export default function WizardLayout() {
             </div>
 
             <div style={{ flex: 1 }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{progress}%</span>
-              <div style={{ width: 100, height: 4, borderRadius: 999, background: "rgba(255,255,255,0.08)" }}>
-                <div style={{
-                  width: `${progress}%`, height: "100%", borderRadius: 999,
-                  background: "linear-gradient(to right,#721CB8,#96D74C)", transition: "width 0.5s",
-                }} />
-              </div>
-            </div>
           </div>
 
         </header>
