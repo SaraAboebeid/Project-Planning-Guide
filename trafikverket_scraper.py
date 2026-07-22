@@ -16,6 +16,7 @@ Register:  https://data.trafikverket.se/oauth2/Account/register
 
 import argparse
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -23,9 +24,15 @@ from pathlib import Path
 
 import requests
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except Exception:
+    pass
+
 # ── CONFIGURATION ─────────────────────────────────────────────────────────────
 
-API_KEY = "64e892805470459eb06323a1f29f86d2"   # <── paste your Trafikverket API key here
+API_KEY = os.environ.get("TRAFIKVERKET_API_KEY", "")   # set in .env (gitignored)
 
 API_URL = "https://api.trafikinfo.trafikverket.se/v2/data.json"
 DB_PATH = Path("trafikverket.db")

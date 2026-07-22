@@ -6,15 +6,15 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="uk_3d.css?v=20260722-viewer-fastboot">
-  <link rel="stylesheet" href="sidebar-theme.css?v=20260722-viewer-fastboot">
+  <link rel="stylesheet" href="uk_3d.css?v=20260722-120710">
+  <link rel="stylesheet" href="sidebar-theme.css?v=20260722-120710">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
        is stamped on <body> by bootstrap.js. */
     body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
   </style>
-  <script src="uk_3d.meta.js?v=20260722-viewer-fastboot" defer></script>
-  <script src="viewer/js/bootstrap.js?v=20260722-viewer-fastboot" defer></script>
+  <script src="uk_3d.meta.js?v=20260722-120710" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260722-120710" defer></script>
 </head>
 <body>
 
@@ -236,6 +236,54 @@
       </div>
     </div>
 
+    <!-- ─ Roads (Trafikverket — Sweden only) ──────────────────────────── -->
+    <div class="lp-divider se-only"></div>
+    <div class="collapse-head se-only">
+      <button class="collapse-toggle" id="tv-toggle" type="button" aria-expanded="false" aria-controls="tv-content">
+        <span class="collapse-chevron">&#9662;</span>
+        <span class="collapse-label">Roads &amp; Highways</span>
+        <span class="sec-badge" id="tv-badge" hidden></span>
+      </button>
+      <button class="info-btn" data-layer="trafikverket-road-layers"></button>
+    </div>
+    <div id="tv-content" class="collapse-content collapsed se-only">
+      <div class="overlay-group">
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-tv-cameras" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Traffic Cameras</span>
+            <span class="layer-pill">Live</span>
+          </button>
+          <button class="info-btn" data-layer="traffic-cameras"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-tv-flow" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Traffic Flow</span>
+            <span class="layer-pill">veh/h</span>
+          </button>
+          <button class="info-btn" data-layer="traffic-flow"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-tv-conditions" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Road Conditions</span>
+            <span class="layer-pill">TRV</span>
+          </button>
+          <button class="info-btn" data-layer="road-conditions"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-tv-parking" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Rest Stops &amp; Parking</span>
+            <span class="layer-pill">TRV</span>
+          </button>
+          <button class="info-btn" data-layer="road-parking"></button>
+        </div>
+      </div>
+      <div id="tv-status" style="display:none;font-size:10px;color:var(--muted);padding:4px 8px 0;line-height:1.5"></div>
+    </div>
+
     <!-- ─ Statistics (SCB — Sweden only) ──────────────────────────────── -->
     <div class="lp-divider se-only"></div>
     <div class="collapse-head se-only">
@@ -445,6 +493,15 @@
   </div>
   <div id="vt-park-title" style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px"></div>
   <div id="vt-park-detail"></div>
+</div>
+
+<!-- Trafikverket entity popup (camera image / flow / condition / parking) -->
+<div class="panel" id="tv-popup" style="display:none;position:fixed;z-index:40;width:268px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+    <span id="tv-popup-title" style="flex:1;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <button class="btn" id="btn-tv-popup-close" style="padding:2px 8px">&#x2715;</button>
+  </div>
+  <div id="tv-popup-body" style="font-size:12px"></div>
 </div>
 
 <!-- Cesium Ion Token panel -->

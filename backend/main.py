@@ -21,7 +21,7 @@ except ImportError:
 # ────────────────────────────────────────────────────────────────────────────
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 # Allow imports from the project root so existing modules work unchanged
@@ -39,6 +39,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _json_errors_with_cors(request, call_next):
+    """Turn an unhandled exception into a CORS-visible JSON 500.
+
+    Starlette's default 500 is produced above the CORS middleware, so it carries
+    no Access-Control-Allow-Origin header. The browser then refuses to expose the
+    response and `fetch` rejects with a bare network error — which is how a crash
+    inside one endpoint showed up in the viewer as "backend not reachable on
+    :8000" while the server was in fact running and healthy. Returning the error
+    ourselves, with the header attached, means the UI reports what actually
+    happened. The traceback still goes to the server log.
+    """
+    try:
+        return await call_next(request)
+    except Exception:
+        import traceback as _tb
+        _tb.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error — see the backend log for the traceback."},
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
 
 # Pre-load and gzip the buildings data once at startup
 
@@ -1818,13 +1842,166 @@ async def vt_parking_availability(lot_id: int):
         return {"available": None, "total": None, "lotId": lot_id}
     if r.status_code != 200:
         raise HTTPException(502, f"Västtrafik /availableCapacity failed: {r.status_code}")
-    data = r.json()
-    return {
-        "lotId":     lot_id,
-        "available": data.get("AvailableCapacity") or data.get("available"),
-        "total":     data.get("TotalCapacity")     or data.get("total"),
-        "updated":   data.get("LastUpdated")       or data.get("updated"),
-    }
+
+    # SPP v3 answers this endpoint with a BARE NUMBER (e.g. `54`), not an object.
+    # Calling .get() on that raised AttributeError -> unhandled 500, which the
+    # browser then reported as "backend not reachable" because an unhandled error
+    # response carries no CORS headers. Accept either shape.
+    try:
+        data = r.json()
+    except ValueError:
+        data = r.text.strip()
+
+    if isinstance(data, dict):
+        return {
+            "lotId":     lot_id,
+            "available": data.get("AvailableCapacity") or data.get("available"),
+            "total":     data.get("TotalCapacity")     or data.get("total"),
+            "updated":   data.get("LastUpdated")       or data.get("updated"),
+        }
+
+    try:
+        available = int(data)
+    except (TypeError, ValueError):
+        available = None
+    # No total/updated is available in the scalar form — say so rather than
+    # inventing one; the caller already knows the lot's capacity.
+    return {"lotId": lot_id, "available": available, "total": None, "updated": None}
+
+
+# ── Trafikverket live traffic proxy ──────────────────────────────────────────
+#
+# Register for a key at https://data.trafikverket.se/oauth2/Account/register and
+# put it in the project's .env file (loaded at startup):
+#
+#   TRAFIKVERKET_API_KEY=...
+#
+# .env is gitignored — never paste live credentials into this file.
+#
+# The viewer used to read a static assets/trafikverket_data.json produced by
+# trafikverket_scraper.py, so "live traffic" was only ever as fresh as the last
+# manual scrape. This proxy serves the same shape straight from the API, with a
+# short cache so panning the map doesn't hammer Trafikverket.
+# ---------------------------------------------------------------------------
+
+_TV_API_KEY = os.environ.get("TRAFIKVERKET_API_KEY", "")
+_TV_API_URL = "https://api.trafikinfo.trafikverket.se/v2/data.json"
+# Greater Gothenburg in SWEREF99TM: "min_e min_n, max_e max_n"
+_TV_BOX = "270000 6380000, 360000 6445000"
+_TV_CACHE: dict = {}          # { "data": {...}, "fetched_at": float }
+_TV_CACHE_TTL = 60.0          # seconds — flow/camera data updates every few minutes
+
+
+def _tv_lonlat(obj: dict):
+    """First (lon, lat) from a WGS84 WKT POINT/LINESTRING, or (None, None)."""
+    wkt = (obj.get("Geometry") or {}).get("WGS84")
+    if not wkt:
+        return None, None
+    m = _re.search(r"(-?\d+\.\d+)\s+(-?\d+\.\d+)", wkt)
+    return (float(m.group(1)), float(m.group(2))) if m else (None, None)
+
+
+async def _tv_query(client, objecttype: str, schema: str, limit: int, includes: list[str]) -> list:
+    inc = "".join(f"<INCLUDE>{i}</INCLUDE>" for i in includes)
+    xml = (
+        f'<REQUEST><LOGIN authenticationkey="{_TV_API_KEY}"/>'
+        f'<QUERY objecttype="{objecttype}" schemaversion="{schema}" limit="{limit}">'
+        f'<FILTER><WITHIN name="Geometry.SWEREF99TM" shape="box" value="{_TV_BOX}"/></FILTER>'
+        f"{inc}</QUERY></REQUEST>"
+    )
+    r = await client.post(_TV_API_URL, content=xml.encode("utf-8"),
+                          headers={"Content-Type": "text/xml"})
+    if r.status_code != 200:
+        # Never echo the request body back — it contains the API key.
+        raise HTTPException(502, f"Trafikverket {objecttype} query failed: HTTP {r.status_code}")
+    return (r.json().get("RESPONSE", {}).get("RESULT") or [{}])[0].get(objecttype, [])
+
+
+@app.get("/api/trafikverket/data")
+async def trafikverket_data(refresh: bool = False):
+    """Live cameras / traffic flow / road conditions / parking for Gothenburg.
+
+    Same JSON shape as the legacy assets/trafikverket_data.json so the viewer
+    layer can read either source.
+    """
+    if not _TV_API_KEY.strip():
+        raise HTTPException(503, "Trafikverket API key not configured. Register at "
+                                 "data.trafikverket.se, then add TRAFIKVERKET_API_KEY to the "
+                                 "project's .env file and restart the backend.")
+
+    now = _time.time()
+    if not refresh and _TV_CACHE.get("data") and now - _TV_CACHE.get("fetched_at", 0) < _TV_CACHE_TTL:
+        cached = dict(_TV_CACHE["data"])
+        cached["cached"] = True
+        return cached
+
+    import httpx
+    async with httpx.AsyncClient(timeout=30) as client:
+        cameras = await _tv_query(client, "Camera", "1", 1000, [
+            "Id", "Name", "Type", "Description", "PhotoUrl", "PhotoTime", "Active",
+            "Geometry.SWEREF99TM", "Geometry.WGS84"])
+        flow = await _tv_query(client, "TrafficFlow", "1.4", 2000, [])
+        conditions = await _tv_query(client, "RoadCondition", "1", 500, [
+            "Id", "ConditionCode", "ConditionText", "LocationText", "RoadNumber",
+            "Geometry.SWEREF99TM", "Geometry.WGS84"])
+        parking = await _tv_query(client, "Parking", "1.4", 500, [
+            "Id", "Name", "OpenStatus", "OperationStatus", "Description",
+            "UsageSenario", "Geometry.SWEREF99TM", "Geometry.WGS84"])
+
+    out = {"cameras": [], "traffic_flow": [], "road_conditions": [], "parking": []}
+
+    for c in cameras:
+        lon, lat = _tv_lonlat(c)
+        if lon is None:
+            continue
+        out["cameras"].append({
+            "id": c.get("Id"), "name": c.get("Name"), "type": c.get("Type"),
+            "description": c.get("Description"), "photo_url": c.get("PhotoUrl"),
+            "photo_time": c.get("PhotoTime"), "active": c.get("Active"),
+            "lon": lon, "lat": lat,
+        })
+
+    for f in flow:
+        lon, lat = _tv_lonlat(f)
+        if lon is None:
+            continue
+        out["traffic_flow"].append({
+            "id": f.get("Id"), "site_id": f.get("SiteId"),
+            "vehicle_type": f.get("VehicleType"), "lane": f.get("SpecificLane"),
+            "flow_rate": f.get("VehicleFlowRate"), "avg_speed": f.get("AverageVehicleSpeed"),
+            "time": f.get("MeasurementTime"), "lon": lon, "lat": lat,
+        })
+
+    for c in conditions:
+        lon, lat = _tv_lonlat(c)
+        if lon is None:
+            continue
+        out["road_conditions"].append({
+            "id": c.get("Id"), "condition_code": c.get("ConditionCode"),
+            "condition_text": c.get("ConditionText"), "location": c.get("LocationText"),
+            "road_number": c.get("RoadNumber"), "lon": lon, "lat": lat,
+        })
+
+    for p in parking:
+        lon, lat = _tv_lonlat(p)
+        if lon is None:
+            continue
+        out["parking"].append({
+            "id": p.get("Id"), "name": p.get("Name"),
+            "open_status": p.get("OpenStatus"), "operation_status": p.get("OperationStatus"),
+            "description": p.get("Description"), "usage": p.get("UsageSenario"),
+            "total_capacity": p.get("TotalCapacity"), "lon": lon, "lat": lat,
+        })
+
+    # Local import: this module binds `datetime` as the module (not the class)
+    # further down, so import the class explicitly rather than depending on
+    # which name happens to be bound at call time.
+    from datetime import datetime as _dt
+    out["fetched_at"] = _dt.now().isoformat(timespec="seconds")
+    out["cached"] = False
+    _TV_CACHE["data"] = out
+    _TV_CACHE["fetched_at"] = now
+    return out
 
 
 # ── Facade defect detection (ML model — PLACEHOLDER, not connected yet) ──────

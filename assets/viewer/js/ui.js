@@ -251,8 +251,10 @@ let lastHoverId = null;
 let hoverThrottle = 0;
 
 viewer.screenSpaceEventHandler.setInputAction(movement => {
-  // Suppress building hover card while ghost/transit mode is active
-  if (window._ghostModeOn) { hoverCard.style.display = 'none'; return; }
+  // Suppress building hover card while ghost/transit mode is active, or while
+  // the pointer is over a Trafikverket entity (which shows its own tooltip —
+  // without this both cards fight over the same pointer position).
+  if (window._ghostModeOn || window._tvHoverActive) { hoverCard.style.display = 'none'; return; }
 
   // Throttle to ~30fps
   const now = Date.now();
