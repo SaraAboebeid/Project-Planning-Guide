@@ -1,4 +1,4 @@
-const VIEWER_BUILD_VERSION = "20260721-115943";
+const VIEWER_BUILD_VERSION = "20260722-viewer-fastboot";
 const PERIOD_CARDS = {};
 const ECLASS_CARDS = {};
 const USE_CARDS = {};

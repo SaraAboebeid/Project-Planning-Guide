@@ -65,6 +65,11 @@ const viewer = new Cesium.Viewer('cesium-container', {
 });
 viewer.cesiumWidget.creditContainer.style.display = 'none';
 viewer.scene.skyAtmosphere = new Cesium.SkyAtmosphere();
+// Cesium's default globe base colour is a bright blue that shows through wherever
+// imagery/tiles haven't streamed yet - on first load that reads as "the app is
+// broken", not "the map is still loading". Match the viewer's own dark chrome so
+// any gap looks deliberate.
+viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0d1117');
 
 // Replace default imagery with CartoDB Positron (light/subtle — ideal for data overlays)
 viewer.imageryLayers.removeAll();
@@ -91,12 +96,12 @@ window.setBasemap = function(type) {
   } else {
     if (tilesEnabled) {
       tilesEnabled = false;
-      if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
+      if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; tilesGeometryReady = false; }
       // Recalibrate rather than reset to 0 outright: if OSM Buildings is still
       // on (the UK default), it's still real-world-elevation ground truth even
       // with Google tiles gone, and blindly zeroing the offset here would
       // un-align our buildings from it again.
-      refreshBuildingBaseOffsetFromTiles().then(() => { if (buildingPrimitive) rebuildBuildings(); });
+      refreshBuildingBaseOffsetFromTiles().then(() => { if (buildingPrimitives.length) rebuildBuildings(); });
       document.getElementById('btn-tiles').classList.remove('active');
     }
     viewer.imageryLayers.removeAll();
@@ -139,6 +144,9 @@ camCtrl.enableCollisionDetection = false;
 // ─────────────────────────────────────────────────────────────────
 let googleTileset = null;
 let tilesEnabled  = false;
+// Whether the tileset has actually rendered geometry (not merely been created) —
+// ground calibration has nothing to clamp against until it has.
+let tilesGeometryReady = false;
 let eubuccoVisible = true;
 let buildingBaseOffsetMeters = 0;
 let groundOffsetGrid = null;
@@ -186,7 +194,29 @@ function sampleGroundOffsetGrid(lon, lat) {
   return a * (1 - ty) + b * ty;
 }
 
-async function refreshBuildingBaseOffsetFromTiles() {
+// Resolves once the tileset has actually rendered some geometry (or the budget
+// runs out). Used both to time the imagery hand-off and to give ground
+// calibration a tileset worth sampling, instead of firing clampToHeightMostDetailed
+// at an empty scene and eating a full timeout for it.
+function waitForTilesetGeometry(tileset, budgetMs) {
+  if (!tileset) return Promise.resolve(false);
+  if (tileset.tilesLoaded) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok) => { if (settled) return; settled = true; clearTimeout(timer); resolve(ok); };
+    const timer = setTimeout(() => finish(false), budgetMs);
+    try {
+      tileset.initialTilesLoaded.addEventListener(() => finish(true));
+    } catch (_) {
+      finish(false);
+    }
+  });
+}
+
+// attempts/timeoutMs are parameterised so startup can take one short, bounded
+// shot at alignment (buildings on screen fast) while the slower retry budget
+// moves to a background pass — see the startup sequence.
+async function refreshBuildingBaseOffsetFromTiles({ attempts = 3, timeoutMs = 12000 } = {}) {
   if (calibrationInProgress) return;
   // Any loaded ground-truth massing (Google's photorealistic mesh, or Cesium OSM
   // Buildings) sits at real-world elevation, while our own extruded buildings are
@@ -243,15 +273,15 @@ async function refreshBuildingBaseOffsetFromTiles() {
     // permanently misaligned with it.
     let clamped = null;
     let lastErr = null;
-    for (let attempt = 1; attempt <= 3 && !clamped; attempt++) {
+    for (let attempt = 1; attempt <= attempts && !clamped; attempt++) {
       try {
         clamped = await Promise.race([
           viewer.scene.clampToHeightMostDetailed(points),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Ground calibration timeout')), 12000)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Ground calibration timeout')), timeoutMs)),
         ]);
       } catch (err) {
         lastErr = err;
-        if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
+        if (attempt < attempts) await new Promise(r => setTimeout(r, 1500));
       }
     }
     if (!clamped) throw lastErr || new Error('Ground calibration failed');
@@ -297,11 +327,17 @@ async function loadGoogleTiles(token, { skipAutoRebuild = false } = {}) {
   try {
     setLoading('Loading Google Photorealistic 3D Tiles...');
     Cesium.Ion.defaultAccessToken = token;
-    if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
+    if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; tilesGeometryReady = false; }
     // Exactly as per https://cesium.com/learn/cesiumjs-learn/cesiumjs-photorealistic-3d-tiles/
     googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
     viewer.scene.primitives.add(googleTileset);
-    viewer.imageryLayers.removeAll(); // tiles render the ground - imagery not needed
+    // The tileset object resolves as soon as its root is fetched - actual ground
+    // geometry is still streaming. Dropping the imagery here (as this used to do
+    // unconditionally) therefore replaced a working basemap with bare globe for
+    // however long the stream took. Hold the imagery until the first tiles have
+    // rendered, and if they never do, keep it: a flat map beats an empty planet.
+    tilesGeometryReady = await waitForTilesetGeometry(googleTileset, 6000);
+    if (googleTileset && tilesGeometryReady) viewer.imageryLayers.removeAll();
     tilesEnabled = true;
     ION_TOKEN = token;
     document.getElementById('btn-tiles').classList.add('active');
@@ -314,7 +350,7 @@ async function loadGoogleTiles(token, { skipAutoRebuild = false } = {}) {
       // Run calibration in background so the viewer is interactive immediately.
       (async () => {
         await refreshBuildingBaseOffsetFromTiles();
-        if (buildingPrimitive) await rebuildBuildings();
+        if (buildingPrimitives.length) await rebuildBuildings();
       })();
     }
   } catch(err) {
@@ -345,9 +381,9 @@ document.getElementById('btn-tiles').addEventListener('click', () => {
     else { document.getElementById('token-panel').style.display = 'block'; }
   } else {
     tilesEnabled = false;
-    if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
+    if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; tilesGeometryReady = false; }
     resetGroundCalibration();
-    if (buildingPrimitive) rebuildBuildings();
+    if (buildingPrimitives.length) rebuildBuildings();
     document.getElementById('btn-tiles').classList.remove('active');
     // Restore previous basemap if photo was active
     if (_currentBasemap === 'photo') {
@@ -368,15 +404,23 @@ document.getElementById('btn-tiles').addEventListener('click', () => {
 document.getElementById('btn-eubucco').addEventListener('click', () => {
   eubuccoVisible = !eubuccoVisible;
   document.getElementById('btn-eubucco').classList.toggle('active', eubuccoVisible);
-  if (buildingPrimitive) buildingPrimitive.show = eubuccoVisible;
+  for (const p of buildingPrimitives) p.show = eubuccoVisible;
 });
 
 // ─────────────────────────────────────────────────────────────────
-// Build extruded buildings — one batched Cesium.Primitive (memory-safe at
+// Build extruded buildings — batched Cesium.Primitives (memory-safe at
 // city scale; tessellated in web workers, picked via per-instance id)
+//
+// Split across several primitives rather than one: a single primitive holding
+// all ~93k buildings shows nothing at all until the last one has tessellated
+// (a minute-plus of empty map on a cold/software-GL machine). In chunks the
+// first buildings land within a couple of seconds and the rest fill in behind
+// them, so the map is readable and interactive almost immediately. The cost is
+// a handful of extra draw batches, which is not a measurable frame-rate change.
 // ─────────────────────────────────────────────────────────────────
+const BUILDING_CHUNK_SIZE = 12000;
 let colorMode = 'use';
-let buildingPrimitive = null;
+let buildingPrimitives = [];
 
 function getBuildingColor(b) {
   if (colorMode === 'eclass')
@@ -384,6 +428,35 @@ function getBuildingColor(b) {
   if (colorMode === 'year')
     return (b.tabula_period && PERIOD_COLORS[b.tabula_period]) ? PERIOD_COLORS[b.tabula_period] : Cesium.Color.fromBytes(60,60,70,140);
   return USE_COLORS[b.use_cat] || USE_COLORS.ovrigt;
+}
+
+// Chunks are drawn in the order this returns, so put what the camera is actually
+// looking at first: the dataset's own order is arbitrary, which made the first
+// chunk a scatter of buildings all over the city while the district on screen
+// stayed empty. Ordering by distance from the camera fills the visible area
+// almost immediately and leaves the far edges to stream in unnoticed.
+function buildingDrawOrder() {
+  const carto = viewer.camera.positionCartographic;
+  const camLon = Cesium.Math.toDegrees(carto.longitude);
+  const camLat = Cesium.Math.toDegrees(carto.latitude);
+  // Longitude degrees shrink with latitude; without this correction the "nearest"
+  // set is stretched east-west (~2x at Gothenburg's 57.7°N).
+  const lonScale = Math.cos(Cesium.Math.toRadians(camLat));
+
+  const order = new Array(DATA.length);
+  const dist = new Float64Array(DATA.length);
+  for (let i = 0; i < DATA.length; i++) {
+    order[i] = i;
+    // First vertex as a cheap stand-in for the centroid — this only decides
+    // draw order, so ring-accurate positioning would be wasted work.
+    const ring = DATA[i].coordinates && DATA[i].coordinates[0];
+    if (!ring || !ring.length) { dist[i] = Infinity; continue; }
+    const dx = (ring[0][0] - camLon) * lonScale;
+    const dy = ring[0][1] - camLat;
+    dist[i] = dx * dx + dy * dy;
+  }
+  order.sort((a, b) => dist[a] - dist[b]);
+  return order;
 }
 
 function ringCentroid(ring) {
@@ -396,6 +469,20 @@ function ringCentroid(ring) {
   return { lon: lon / n, lat: lat / n };
 }
 
+// Resolves when a primitive has finished tessellating (or the budget expires —
+// never leave the overlay up forever on a stall).
+function waitForPrimitive(primitive, budgetMs) {
+  return new Promise((resolve) => {
+    let waited = 0;
+    const tick = () => {
+      if (!primitive || primitive.isDestroyed() || primitive.ready || waited > budgetMs) { resolve(); return; }
+      waited += 16;
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+
 async function rebuildBuildings() {
   // A rebuild requested while one is already running (e.g. ground calibration
   // finishing mid-build) must not be silently dropped - that left buildings
@@ -405,68 +492,95 @@ async function rebuildBuildings() {
   if (rebuildInProgress) { rebuildPending = true; return; }
   rebuildInProgress = true;
   rebuildPending = false;
-  setLoading('Loading ' + DATA.length.toLocaleString() + ' buildings...');
+  const total = DATA.length;
+  // Hold the previous primitives on screen rather than removing them up front:
+  // a rebuild (colour mode, re-alignment) would otherwise blank the whole city
+  // and refill it chunk by chunk in front of the user. They're dropped as soon
+  // as the first replacement chunk is ready, so the extra GPU memory is one
+  // chunk's worth of overlap, not a second full copy. Declared outside the try so
+  // the finally can still clean them up if the build throws.
+  const stale = buildingPrimitives;
+  buildingPrimitives = [];
+  setLoading('Loading ' + total.toLocaleString() + ' buildings...');
   try {
-    // Remove the previous batched primitive (frees its GPU + worker memory).
-    if (buildingPrimitive) { viewer.scene.primitives.remove(buildingPrimitive); buildingPrimitive = null; }
 
     // One GeometryInstance per building — an extruded polygon (walls + roof +
-    // floor as a single solid) — all batched into ONE Cesium.Primitive. This
+    // floor as a single solid) — batched into a few Cesium.Primitives. This
     // draws ~93k buildings in a handful of GPU batches instead of ~186k Cesium
     // entities, which used to exhaust browser memory and crash the tab.
-    const instances = [];
     const VF = Cesium.PerInstanceColorAppearance.VERTEX_FORMAT;
-    for (let i = 0; i < DATA.length; i++) {
-      const b = DATA[i];
-      const ring = b.coordinates && b.coordinates[0];
-      if (!ring || ring.length < 3) continue;
-      const flat = [];
-      for (const [lo, la] of ring) { flat.push(lo, la); }
-      const h = Math.max(3, b.height || (b.floors ? b.floors * 3 : 6));
-      const c = ringCentroid(ring);
-      const baseH = window.getBuildingBaseOffset(c.lon, c.lat);
-      const col = getBuildingColor(b);
-      instances.push(new Cesium.GeometryInstance({
-        geometry: new Cesium.PolygonGeometry({
-          polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
-          height: baseH,
-          extrudedHeight: baseH + h,
-          vertexFormat: VF,
-        }),
-        attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(col) },
-        // Picked as h.id._dataIdx in ui.js — behaviour preserved.
-        id: { _dataIdx: i },
-      }));
-      // Yield periodically so building the instance list never freezes the UI.
-      if ((i & 8191) === 0) {
-        setLoading('Preparing ' + DATA.length.toLocaleString() + ' buildings... ' + Math.round(i / DATA.length * 100) + '%');
+    const chunkCount = Math.max(1, Math.ceil(total / BUILDING_CHUNK_SIZE));
+    const order = buildingDrawOrder();
+    let firstChunkShown = false;
+
+    for (let chunk = 0; chunk < chunkCount; chunk++) {
+      const start = chunk * BUILDING_CHUNK_SIZE;
+      const end = Math.min(total, start + BUILDING_CHUNK_SIZE);
+      const instances = [];
+
+      for (let n = start; n < end; n++) {
+        const i = order[n];
+        const b = DATA[i];
+        const ring = b.coordinates && b.coordinates[0];
+        if (!ring || ring.length < 3) continue;
+        const flat = [];
+        for (const [lo, la] of ring) { flat.push(lo, la); }
+        const h = Math.max(3, b.height || (b.floors ? b.floors * 3 : 6));
+        const c = ringCentroid(ring);
+        const baseH = window.getBuildingBaseOffset(c.lon, c.lat);
+        const col = getBuildingColor(b);
+        instances.push(new Cesium.GeometryInstance({
+          geometry: new Cesium.PolygonGeometry({
+            polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
+            height: baseH,
+            extrudedHeight: baseH + h,
+            vertexFormat: VF,
+          }),
+          attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(col) },
+          // Picked as h.id._dataIdx in ui.js — behaviour preserved.
+          id: { _dataIdx: i },
+        }));
+        // Yield periodically so building the instance list never freezes the UI.
+        if ((n & 4095) === 0) {
+          // Only while the overlay is still up: once the first chunk is on
+          // screen the map belongs to the user, and re-raising a loading screen
+          // over it for every later chunk would be worse than the wait it
+          // replaced.
+          if (!firstChunkShown) {
+            setLoading('Preparing ' + total.toLocaleString() + ' buildings... ' + Math.round(n / total * 100) + '%');
+          }
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise(r => setTimeout(r, 0));
+        }
+      }
+
+      const primitive = new Cesium.Primitive({
+        geometryInstances: instances,
+        appearance: new Cesium.PerInstanceColorAppearance({ closed: true, translucent: false }),
+        asynchronous: true,          // Cesium tessellates in web workers, off the main thread
+        releaseGeometryInstances: true,
+      });
+      primitive.show = eubuccoVisible;
+      viewer.scene.primitives.add(primitive);
+      buildingPrimitives.push(primitive);
+
+      // Take the overlay down as soon as the first chunk is actually on screen —
+      // the remaining chunks stream in behind a usable map rather than behind a
+      // loading screen.
+      if (!firstChunkShown) {
+        setLoading('Rendering buildings...');
         // eslint-disable-next-line no-await-in-loop
-        await new Promise(r => setTimeout(r, 0));
+        await waitForPrimitive(primitive, 20000);
+        for (const p of stale) viewer.scene.primitives.remove(p);
+        stale.length = 0;
+        firstChunkShown = true;
+        setLoading('');
       }
     }
-
-    setLoading('Rendering buildings...');
-    buildingPrimitive = new Cesium.Primitive({
-      geometryInstances: instances,
-      appearance: new Cesium.PerInstanceColorAppearance({ closed: true, translucent: false }),
-      asynchronous: true,          // Cesium tessellates in web workers, off the main thread
-      releaseGeometryInstances: true,
-    });
-    buildingPrimitive.show = eubuccoVisible;
-    viewer.scene.primitives.add(buildingPrimitive);
-
-    // Clear the loader once the primitive has finished tessellating.
-    await new Promise((resolve) => {
-      let waited = 0;
-      const tick = () => {
-        if (!buildingPrimitive || buildingPrimitive.ready || waited > 20000) { resolve(); return; }
-        waited += 16;
-        requestAnimationFrame(tick);
-      };
-      tick();
-    });
-    setLoading('');
   } finally {
+    // Safety net: if the loop bailed before the swap (empty dataset, a throw),
+    // the old primitives must still not be left in the scene alongside the new.
+    for (const p of stale) viewer.scene.primitives.remove(p);
     rebuildInProgress = false;
     if (rebuildPending) {
       rebuildPending = false;
@@ -478,9 +592,17 @@ async function rebuildBuildings() {
 // ─────────────────────────────────────────────────────────────────
 // Loading helper
 // ─────────────────────────────────────────────────────────────────
+// Until the startup sequence has actually put buildings on screen, no optional
+// stage is allowed to take the overlay down: loadGoogleTiles/toggleOsmBuildings
+// both finish with setLoading('') long before the buildings exist, which used to
+// uncover an empty globe for the whole calibrate+extrude stretch (~40s+). One
+// latch here covers every caller, present and future, instead of each having to
+// remember a flag.
+let startupComplete = false;
+
 function setLoading(msg) {
   const el = document.getElementById('loading');
-  if (!msg) { el.style.display = 'none'; return; }
+  if (!msg) { if (startupComplete) el.style.display = 'none'; return; }
   const safeMsg = String(msg)
     .replace(/\u2026/g, '...')
     .replace(/â€¦/g, '...')
@@ -523,7 +645,7 @@ async function toggleOsmBuildings(on, { skipAutoRebuild = false } = {}) {
     // mesh - recalibrate against whichever ground-truth layer(s) are now active so
     // our own extruded buildings don't end up floating below/above it.
     await refreshBuildingBaseOffsetFromTiles();
-    if (buildingPrimitive) await rebuildBuildings();
+    if (buildingPrimitives.length) await rebuildBuildings();
   }
 }
 window.toggleOsmBuildings = toggleOsmBuildings;
@@ -578,19 +700,62 @@ viewer.camera.flyTo({
   // (tiles not streamed in yet, slow GPU, offline). That rejection used to
   // propagate out of this IIFE and skip rebuildBuildings() altogether, so a
   // slow tile stream left a blank map with no buildings at all.
-  // buildingPrimitive is still null here, so calibrating first means the very first
-  // build is already correctly aligned - no misaligned flash on first load.
-  try {
-    await refreshBuildingBaseOffsetFromTiles();
-  } catch (err) {
-    console.warn('Ground calibration failed - extruding at ellipsoid height:', err && err.message);
+  //
+  // The full 3x12s retry budget also used to run BEFORE the first build, so a
+  // machine where clamping times out (software GL, cold tile cache, offline)
+  // stared at an empty globe for ~40s before extrusion even started. Take one
+  // short shot here - by now waitForTilesetGeometry has given the clamp real
+  // geometry to hit, so it usually lands - and move the patient retrying to a
+  // background pass that only pays for a re-extrude if it actually changes the
+  // alignment.
+  // With no ground truth actually on screen yet, that one shot is guaranteed to
+  // burn its whole timeout and return nothing — skip straight to the buildings
+  // and let the background pass align them if the tiles ever turn up.
+  const worthCalibratingNow = tilesGeometryReady || osmEnabled;
+  if (worthCalibratingNow) {
+    try {
+      setLoading('Aligning buildings to ground...');
+      await refreshBuildingBaseOffsetFromTiles({ attempts: 1, timeoutMs: 6000 });
+    } catch (err) {
+      console.warn('Ground calibration failed - extruding at ellipsoid height:', err && err.message);
+    }
   }
 
+  const calibratedOnFirstTry = groundOffsetGrid != null;
+
   try {
+    startupComplete = true;   // rebuildBuildings' own setLoading('') may now clear the overlay
     await rebuildBuildings();
   } catch (err) {
     console.error('Building render failed:', err);
+    startupComplete = true;
     setLoading('');
+  }
+
+  // Buildings are on screen and interactive from here on; anything below is a
+  // silent correction pass.
+  if (!calibratedOnFirstTry) {
+    (async () => {
+      const before = buildingBaseOffsetMeters;
+      try {
+        // Give the tiles a generous window to actually stream in first —
+        // clamping against a tileset that hasn't rendered anything just burns
+        // the retry budget on guaranteed timeouts, which is exactly how the old
+        // sequence used to spend 40s and still come back empty-handed.
+        if (googleTileset && !tilesGeometryReady) {
+          tilesGeometryReady = await waitForTilesetGeometry(googleTileset, 30000);
+        }
+        await refreshBuildingBaseOffsetFromTiles({ attempts: 2, timeoutMs: 12000 });
+      } catch (err) {
+        console.warn('Background ground calibration failed:', err && err.message);
+        return;
+      }
+      // Only worth a full re-extrude if the answer actually moved the buildings.
+      if (groundOffsetGrid && Math.abs(buildingBaseOffsetMeters - before) > 0.5) {
+        console.log('Ground calibration landed on retry - realigning buildings');
+        await rebuildBuildings();
+      }
+    })();
   }
 })();
 

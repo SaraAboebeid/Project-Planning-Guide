@@ -12,6 +12,49 @@
 
 const VT_API = 'http://localhost:8000/api/vasttrafik';
 
+// Every transit panel used to report a bare `Failed: HTTP 503`, which describes
+// the transport layer rather than the problem — the actual cause is almost
+// always "no Västtrafik API credentials configured", and the backend already
+// says so in the JSON {detail}. One helper so every panel reports the real
+// reason, and so a setup step stops looking like a broken viewer.
+window.VT_SETUP_HINT =
+  'Live transit needs Västtrafik API credentials. Register a free app at ' +
+  'developer.vasttrafik.se, add VASTTRAFIK_CLIENT_ID and VASTTRAFIK_CLIENT_SECRET ' +
+  'to the project .env, then restart the backend.';
+
+// Set once a request has established the service is unconfigured, so callers
+// can stop retrying something that cannot succeed until the backend restarts.
+window.vtUnavailable = null;
+
+async function vtFetchJson(path) {
+  let r;
+  try {
+    r = await fetch(`${VT_API}${path}`);
+  } catch (_) {
+    throw new Error('Backend not reachable on :8000 — is it running?');
+  }
+  if (r.ok) { window.vtUnavailable = null; return r.json(); }
+
+  let detail = '';
+  try { detail = (await r.json()).detail || ''; } catch (_) { /* non-JSON error body */ }
+
+  if (r.status === 503 && /credential/i.test(detail)) {
+    window.vtUnavailable = window.VT_SETUP_HINT;
+    throw new Error(window.VT_SETUP_HINT);
+  }
+  throw new Error(detail || `HTTP ${r.status}`);
+}
+window.vtFetchJson = vtFetchJson;
+
+// A missing setup step is not an error the user caused — render it as a note to
+// act on (amber, with the instructions) rather than a red failure.
+function _vtErrorHtml(err) {
+  const msg = (err && err.message) ? err.message : String(err);
+  const isSetup = msg === window.VT_SETUP_HINT;
+  return `<div style="color:${isSetup ? '#F5A623' : '#f87171'};font-size:11px;line-height:1.6">`
+       + (isSetup ? '⚙ ' : 'Failed: ') + msg + '</div>';
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ── LAYER 1: TRANSIT  ──────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════
@@ -88,9 +131,7 @@ function _vtHideLayer() {
 
 async function _vtLoadStops() {
   try {
-    const r = await fetch(`${VT_API}/stops`);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
+    const data = await vtFetchJson('/stops');
     for (const stop of (data.stops || [])) {
       const entity = viewer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(stop.lon, stop.lat, 2),
@@ -122,7 +163,8 @@ async function _vtLoadStops() {
     setTimeout(() => { if (_vtVisible) statusEl.style.display = 'none'; }, 2500);
   } catch (err) {
     console.error('[vasttrafik] stops error', err);
-    document.getElementById('vt-status').textContent = 'Could not load stops: ' + err.message;
+    document.getElementById('vt-status').textContent =
+      (err.message === window.VT_SETUP_HINT) ? err.message : ('Could not load stops: ' + err.message);
   }
 }
 
@@ -136,13 +178,11 @@ async function _vtShowDepartures(gid, name) {
     '<div style="color:var(--muted);padding:8px 0">Loading…</div>';
   panel.style.display = 'block';
   try {
-    const r = await fetch(`${VT_API}/departures/${encodeURIComponent(gid)}`);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
+    const data = await vtFetchJson(`/departures/${encodeURIComponent(gid)}`);
     _vtRenderDepartures(data.departures || []);
   } catch (err) {
     document.getElementById('vt-departures').innerHTML =
-      `<div style="color:#f87171;font-size:11px">Failed: ${err.message}</div>`;
+      _vtErrorHtml(err);
   }
 }
 
@@ -213,14 +253,12 @@ async function _vtShowDisruptionPanel() {
   listEl.innerHTML = '<div style="color:var(--muted);padding:8px 0">Loading disruptions…</div>';
   try {
     if (!_vtDisrData) {
-      const r = await fetch(`${VT_API}/disruptions`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      const data = await vtFetchJson('/disruptions');
       _vtDisrData = data.disruptions || [];
     }
     _vtRenderDisruptions(_vtDisrData);
   } catch (err) {
-    listEl.innerHTML = `<div style="color:#f87171;font-size:11px">Failed: ${err.message}</div>`;
+    listEl.innerHTML = _vtErrorHtml(err);
   }
 }
 
@@ -291,9 +329,7 @@ function toggleParking() {
 async function _vtShowParkingLayer() {
   if (!_vtParkData) {
     try {
-      const r = await fetch(`${VT_API}/parking`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
+      const data = await vtFetchJson('/parking');
       _vtParkData = data.lots || [];
     } catch (err) {
       console.error('[vasttrafik] parking error', err);
@@ -343,9 +379,7 @@ async function _vtShowParkingDetail(lotId, name, capacity) {
   detail.innerHTML = '<div style="color:var(--muted);padding:6px 0">Fetching availability…</div>';
   panel.style.display = 'block';
   try {
-    const r = await fetch(`${VT_API}/parking/${encodeURIComponent(lotId)}/availability`);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
+    const data = await vtFetchJson(`/parking/${encodeURIComponent(lotId)}/availability`);
     const avail = data.available;
     const total = data.total || capacity;
     const pct   = (avail != null && total > 0) ? Math.round(avail / total * 100) : null;
@@ -360,7 +394,7 @@ async function _vtShowParkingDetail(lotId, name, capacity) {
         </div>${bar}
         ${data.updated ? `<div style="color:var(--muted);font-size:10px;margin-top:4px">Updated ${_vtFormatTime(data.updated)}</div>` : ''}`;
   } catch (err) {
-    detail.innerHTML = `<div style="color:#f87171;font-size:11px">Failed: ${err.message}</div>`;
+    detail.innerHTML = _vtErrorHtml(err);
   }
 }
 

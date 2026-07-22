@@ -1362,8 +1362,13 @@ async def estimate_wwr(req: WWRRequest):
 
 # ── Västtrafik transit API proxy ─────────────────────────────────────────────
 #
-# Register an application at https://developer.vasttrafik.se/  and paste your
-# credentials below (or set the environment variables before starting uvicorn).
+# Register an application at https://developer.vasttrafik.se/ and put the
+# credentials in the project's .env file (loaded at startup):
+#
+#   VASTTRAFIK_CLIENT_ID=...
+#   VASTTRAFIK_CLIENT_SECRET=...
+#
+# .env is gitignored — never paste live credentials into this file.
 #
 #   Uses two APIs:
 #     • Geografi v3        (open, no auth required for stop area geography)
@@ -1375,8 +1380,8 @@ async def estimate_wwr(req: WWRRequest):
 #   Body: grant_type=client_credentials&client_id=…&client_secret=…
 # ---------------------------------------------------------------------------
 
-# Paste your credentials here — read directly (not via os.environ.setdefault,
-# which caches an empty string across --reload restarts).
+# Read directly (not via os.environ.setdefault, which caches an empty string
+# across --reload restarts).
 _VT_CLIENT_ID     = os.environ.get("VASTTRAFIK_CLIENT_ID", "")
 _VT_CLIENT_SECRET = os.environ.get("VASTTRAFIK_CLIENT_SECRET", "")
 
@@ -1394,8 +1399,10 @@ async def _vt_get_token() -> str:
     client_id     = _VT_CLIENT_ID.strip()
     client_secret = _VT_CLIENT_SECRET.strip()
     if not client_id or not client_secret:
-        raise HTTPException(503, "Västtrafik credentials not configured. "
-                                 "Set _VT_CLIENT_ID and _VT_CLIENT_SECRET in backend/main.py.")
+        raise HTTPException(503, "Västtrafik credentials not configured. Register an app at "
+                                 "developer.vasttrafik.se, then add VASTTRAFIK_CLIENT_ID and "
+                                 "VASTTRAFIK_CLIENT_SECRET to the project's .env file and restart "
+                                 "the backend.")
 
     now = _time.time()
     cached = _vt_token_cache

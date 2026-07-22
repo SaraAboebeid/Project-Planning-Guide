@@ -74,6 +74,11 @@
     },
   };
 
+  // Whether the "vehicle positions unavailable" reason has already been
+  // reported for this run — reset on start() so a retry after fixing the
+  // backend reports again.
+  let _positionsErrorShown = false;
+
   // ── Cesium coordinate projection ──────────────────────────────────────────
   // Handles both old wgs84ToWindowCoordinates and new worldToWindowCoordinates
   const _cesiumProject = (function () {
@@ -108,9 +113,15 @@
     try {
       // Fetch all vehicles for the full Gothenburg region — the backend
       // defaults to the city-wide bbox so no params are needed.
-      const r = await fetch(`${CONFIG.apiBase}/positions`);
-      if (!r.ok) return [];
-      const data = await r.json();
+      //
+      // vtFetchJson turns a failed response into a message that says WHY (most
+      // often: no API credentials). This used to `return []` on any non-OK
+      // response, so an unconfigured backend produced an empty map with no
+      // explanation anywhere and a poll every 5s forever against an endpoint
+      // that could not succeed.
+      const data = window.vtFetchJson
+        ? await window.vtFetchJson('/positions')
+        : await (await fetch(`${CONFIG.apiBase}/positions`)).json();
       return (data.vehicles || [])
         .filter(v => v.lat && v.lon)
         .map(v => ({
@@ -126,7 +137,15 @@
           } : null,
         }));
     } catch (err) {
-      console.warn('[trafik_canvas] fetch error', err.message);
+      // Report the reason once rather than once every poll, and stop polling an
+      // endpoint that cannot recover without a backend restart.
+      if (!_positionsErrorShown) {
+        _positionsErrorShown = true;
+        console.warn('[trafik_canvas] vehicle positions unavailable:', err.message);
+        const st = document.getElementById('vt-status');
+        if (st) { st.textContent = err.message; st.style.display = 'block'; }
+      }
+      if (window.vtUnavailable) stop();
       return [];
     }
   }
@@ -572,6 +591,7 @@
 
     isAnimating   = true;
     lastFetchTime = 0;   // force immediate fetch on first frame
+    _positionsErrorShown = false;
     trafikCanvas.style.display = 'block';
     resizeCanvas();
     animate();
