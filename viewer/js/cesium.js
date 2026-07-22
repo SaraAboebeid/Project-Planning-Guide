@@ -760,43 +760,6 @@ viewer.camera.flyTo({
 })();
 
 // ─────────────────────────────────────────────────────────────────
-// Ghost mode — WebGL post-process stage that converts the Cesium
-// scene to white/grey.  Transit vehicles (trafik-canvas DOM element)
-// are unaffected and remain fully colorful.
-// No entity iteration → instant, no freeze.
-// ─────────────────────────────────────────────────────────────────
-let _ghostStage  = null;
-let _ghostModeOn = false;
-
-function _ensureGhostStage() {
-  if (_ghostStage) return;
-  _ghostStage = new Cesium.PostProcessStage({
-    name: 'buildingGhost',
-    fragmentShader: `
-      uniform sampler2D colorTexture;
-      in vec2 v_textureCoordinates;
-      void main() {
-        vec4 c = texture(colorTexture, v_textureCoordinates);
-        // Convert to luminance then push strongly towards white
-        float lum   = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-        float ghost = mix(lum, 1.0, 0.72);
-        out_FragColor = vec4(ghost, ghost, ghost, c.a);
-      }
-    `,
-  });
-  _ghostStage.enabled = false;
-  viewer.scene.postProcessStages.add(_ghostStage);
-}
-
-function setBuildingGhostMode(enabled) {
-  _ghostModeOn = enabled;
-  window._ghostModeOn = enabled;
-  _ensureGhostStage();
-  if (_ghostStage) _ghostStage.enabled = enabled;
-}
-window.setBuildingGhostMode = setBuildingGhostMode;
-
-// ─────────────────────────────────────────────────────────────────
 // Color mode toggle
 // ─────────────────────────────────────────────────────────────────
 function setColorMode(mode) {

@@ -107,6 +107,7 @@ JS_FILES = [
     "trafik_canvas.js",
     "vasttrafik.js",
     "trafikverket.js",
+    "urban_analysis.js",
     "layers.js",
     "scb_layers.js",
     "city_switcher.js",

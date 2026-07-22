@@ -146,8 +146,6 @@
       b.setAttribute('aria-pressed', b.classList.contains('active') ? 'true' : 'false'));
     document.querySelectorAll('#lp-tabs .lp-tab').forEach(b =>
       b.setAttribute('aria-selected', b.classList.contains('active') ? 'true' : 'false'));
-    const ghost = document.getElementById('vt-ghost-toggle');
-    if (ghost) ghost.setAttribute('aria-checked', window._ghostModeOn ? 'true' : 'false');
   }
 
   // Re-entrancy guard: refreshAll writes into the very subtree the observer
@@ -195,11 +193,6 @@
     input.addEventListener('input', apply);
     apply();
   }
-
-  // Ghost mode is toggled by a listener on the whole row (vasttrafik.js), so
-  // mirror the resulting state onto the switch after it has run.
-  const ghostRow = document.getElementById('vt-ghost-row');
-  if (ghostRow) ghostRow.addEventListener('click', () => setTimeout(syncAria, 0));
 
   applyInfoButtonA11y();
   bindAllCollapses();
@@ -251,10 +244,10 @@ let lastHoverId = null;
 let hoverThrottle = 0;
 
 viewer.screenSpaceEventHandler.setInputAction(movement => {
-  // Suppress building hover card while ghost/transit mode is active, or while
-  // the pointer is over a Trafikverket entity (which shows its own tooltip —
-  // without this both cards fight over the same pointer position).
-  if (window._ghostModeOn || window._tvHoverActive) { hoverCard.style.display = 'none'; return; }
+  // Suppress the building hover card while the pointer is over a Trafikverket
+  // entity, which shows its own tooltip — without this both would fight over
+  // the same pointer position.
+  if (window._tvHoverActive) { hoverCard.style.display = 'none'; return; }
 
   // Throttle to ~30fps
   const now = Date.now();

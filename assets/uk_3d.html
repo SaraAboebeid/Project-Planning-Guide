@@ -6,15 +6,15 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="uk_3d.css?v=20260722-132551">
-  <link rel="stylesheet" href="sidebar-theme.css?v=20260722-132551">
+  <link rel="stylesheet" href="uk_3d.css?v=20260722-143626">
+  <link rel="stylesheet" href="sidebar-theme.css?v=20260722-143626">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
        is stamped on <body> by bootstrap.js. */
     body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
   </style>
-  <script src="uk_3d.meta.js?v=20260722-132551" defer></script>
-  <script src="viewer/js/bootstrap.js?v=20260722-132551" defer></script>
+  <script src="uk_3d.meta.js?v=20260722-143626" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260722-143626" defer></script>
 </head>
 <body>
 
@@ -263,14 +263,6 @@
       </div>
       <div id="tv-status" style="display:none;font-size:10px;color:var(--muted);padding:4px 8px 0;line-height:1.5"></div>
       <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:2px 8px 0"></div>
-      <div id="vt-ghost-row" style="padding:5px 10px 2px;">
-        <div class="switch-row">
-          <span class="switch-label" id="vt-ghost-label">Ghost mode</span>
-          <button type="button" id="vt-ghost-toggle" class="switch" role="switch" aria-checked="false" aria-labelledby="vt-ghost-label">
-            <span id="vt-ghost-knob" class="switch-knob"></span>
-          </button>
-        </div>
-      </div>
     </div>
 
     <!-- ─ Statistics (SCB — Sweden only) ──────────────────────────────── -->
@@ -292,8 +284,8 @@
     </div>
 
     <!-- ══ URBAN ANALYSIS ════════════════════════════════════════════════ -->
-    <div class="lp-divider"></div>
-    <div class="collapse-head">
+    <div class="lp-divider se-only"></div>
+    <div class="collapse-head se-only">
       <button class="collapse-toggle" id="urban-toggle" type="button" aria-expanded="false" aria-controls="urban-content">
         <span class="collapse-chevron">&#9662;</span>
         <span class="collapse-label">Urban Analysis</span>
@@ -301,7 +293,7 @@
       </button>
       <button class="info-btn" data-layer="urban-analysis-layers"></button>
     </div>
-    <div id="urban-content" class="collapse-content collapsed">
+    <div id="urban-content" class="collapse-content collapsed se-only">
       <div id="urban-analysis-section">
         <div class="overlay-group">
           <div class="overlay-row">

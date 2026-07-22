@@ -82,7 +82,7 @@
     'viewer/js/search.js',
     'viewer/js/roads.js',
     ...(profile.country === 'se'
-      ? ['viewer/js/trafik_canvas.js', 'viewer/js/vasttrafik.js', 'viewer/js/trafikverket.js']
+      ? ['viewer/js/trafik_canvas.js', 'viewer/js/vasttrafik.js', 'viewer/js/trafikverket.js', 'viewer/js/urban_analysis.js']
       : []),
     'viewer/js/layers.js',
     ...(profile.country === 'se' ? ['viewer/js/scb_layers.js'] : []),
