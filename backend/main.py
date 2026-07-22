@@ -954,6 +954,9 @@ def buildings_bbox_list(
             "lat":                  lat,
             "lon":                  lon,
             "building_use":         b.get("use_cat"),
+            # Named neighbourhood (Gothenburg primärområde) this building sits in —
+            # lets a drawn rectangle/polygon report WHERE it is, not just its centre.
+            "primary_area":         b.get("primary_area"),
             "year_built":           b.get("year"),
             "height_m":             b.get("height"),
             "floors":               b.get("floors"),

@@ -82,6 +82,65 @@ export default function RenovationReport() {
   const baseline = baselines[0] ?? null;
   const baselineEU = baseline?.energyUse ?? 0;
 
+  /* ── Where the project actually is ────────────────────────────────────────
+     A single street address is wrong for an area selection. Prefer the named
+     neighbourhood; otherwise give the centre of whatever shape was drawn, so
+     the report always states a locatable place rather than "Unknown location". */
+  const locationText = useMemo(() => {
+    const ll = (lat: number, lon: number) => `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+
+    // Centre of whatever was selected, and what that centre represents.
+    let centre: { text: string; what: string } | null = null;
+    if (project.selectionPolygon) {
+      // Drawn polygon → centroid of its vertices ("lon,lat;lon,lat;…")
+      const pts = project.selectionPolygon.split(";")
+        .map((p) => p.split(",").map(Number))
+        .filter((p) => p.length === 2 && p.every(Number.isFinite));
+      if (pts.length) {
+        const lon = pts.reduce((s, p) => s + p[0]!, 0) / pts.length;
+        const lat = pts.reduce((s, p) => s + p[1]!, 0) / pts.length;
+        centre = { text: ll(lat, lon), what: "centre of drawn area" };
+      }
+    }
+    if (!centre && project.currentBbox) {
+      const bb = project.currentBbox;
+      centre = { text: ll((bb.north + bb.south) / 2, (bb.east + bb.west) / 2), what: "centre of selected area" };
+    }
+    if (!centre && project.lat != null && project.lon != null) {
+      centre = { text: ll(project.lat, project.lon), what: "project location" };
+    }
+
+    // A drawn rectangle/polygon has no name of its own — but every building it
+    // caught is tagged with its primärområde, so name the area from what's
+    // actually inside it. Several neighbourhoods → name the dominant one and
+    // say how many others the shape spans, rather than implying it's one place.
+    let fromBuildings = "";
+    const areas = project.bboxRows
+      .map((r) => (r.primary_area || "").trim())
+      .filter(Boolean);
+    if (areas.length) {
+      const counts = new Map<string, number>();
+      areas.forEach((a) => counts.set(a, (counts.get(a) ?? 0) + 1));
+      const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+      fromBuildings = ranked.length > 1
+        ? `${ranked[0]![0]} +${ranked.length - 1} more`
+        : ranked[0]![0];
+    }
+
+    // A place name is the useful headline; the coordinates make it locatable.
+    const name = project.district
+      || (project.neighborhoodName?.trim() || "")
+      || fromBuildings
+      || (project.locationLabel?.trim() || "")
+      || (project.address?.trim() || "");
+
+    if (name && centre) return `${name} (${centre.text})`;
+    if (name) return name;
+    if (centre) return `${centre.text} (${centre.what})`;
+    return "Unknown location";
+  }, [project.district, project.neighborhoodName, project.selectionPolygon, project.bboxRows,
+      project.currentBbox, project.locationLabel, project.address, project.lat, project.lon]);
+
   /* ── Recommended packages ── */
   const bestEnergy  = simResults[0] ?? null;   // already sorted by saving desc
   const bestCost    = [...simResults].sort((a, b) => a.cost - b.cost)[0] ?? null;
@@ -192,7 +251,7 @@ export default function RenovationReport() {
   </div>
 
   <h1>${esc(project.projectName || "Renovation Report")}</h1>
-  <div class="sub">${esc(project.locationLabel || project.address || "Unknown location")} ·
+  <div class="sub">${esc(locationText)} ·
     ${buildings.length} building${buildings.length !== 1 ? "s" : ""} ·
     ${esc(components.join(", ") || "no components")}</div>
   <div class="sub">Generated ${new Date().toLocaleString("sv-SE")}</div>
@@ -244,7 +303,7 @@ export default function RenovationReport() {
       project: {
         name: project.projectName || "Unnamed Project",
         type: project.projectType,
-        location: project.locationLabel || project.address,
+        location: locationText,
         scale: project.scale,
         components,
         systems: project.systemsInScope,
@@ -340,7 +399,7 @@ export default function RenovationReport() {
             {project.projectName || "Renovation Report"}
           </h1>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
-            {project.locationLabel || project.address || "Unknown location"} · {buildings.length} building{buildings.length !== 1 ? "s" : ""} · {components.length} component{components.length !== 1 ? "s" : ""}
+            {locationText} · {buildings.length} building{buildings.length !== 1 ? "s" : ""} · {components.length} component{components.length !== 1 ? "s" : ""}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -387,7 +446,7 @@ export default function RenovationReport() {
           {[
             { label: "Project type",   value: project.projectType ?? "—" },
             { label: "Scale",          value: project.scale ?? "—" },
-            { label: "Location",       value: project.locationLabel || project.address || "—" },
+            { label: "Location",       value: locationText },
             { label: "Components",     value: components.length > 0 ? components.join(", ") : "—" },
             { label: "Systems in scope", value: project.systemsInScope.length > 0 ? project.systemsInScope.join(", ") : "—" },
             { label: "KPIs",           value: project.selectedKpis.length > 0 ? project.selectedKpis.join(", ") : "—" },

@@ -63,8 +63,18 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
         })}
       </div>
 
-      {/* Equations */}
-      <h3 style={{ fontSize: 13, fontWeight: 700, color: white(0.8), margin: "18px 0 8px 0" }}>Equations</h3>
+      {/* Equations — credited at the title, where the formulation is, rather
+          than in a footnote at the bottom of the section. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "18px 0 8px 0" }}>
+        <h3 style={{ fontSize: 13, fontWeight: 700, color: white(0.8), margin: 0 }}>Equations</h3>
+        <span style={{ fontSize: 10, color: white(0.35) }}>based on the work of</span>
+        {OPTIMIZER_ATTRIBUTION.names.map((n) => (
+          <span key={n} style={{
+            fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 99,
+            background: "rgba(78,205,196,0.12)", border: "1px solid rgba(78,205,196,0.35)", color: "#4ECDC4",
+          }}>{n}</span>
+        ))}
+      </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {EQUATIONS.map(eq => (
           <div key={eq.name} style={{
@@ -104,14 +114,6 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
         ))}
       </div>
 
-      {/* Attribution — Enerbäck & Strömberg */}
-      <div style={{
-        marginTop: 18, background: "rgba(78,205,196,0.06)", border: "1px solid rgba(78,205,196,0.22)",
-        borderRadius: 10, padding: "10px 14px",
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#4ECDC4", marginBottom: 3 }}>Model attribution</div>
-        <div style={{ fontSize: 11.5, color: white(0.6) }}>{OPTIMIZER_ATTRIBUTION.text}</div>
-      </div>
     </div>
   );
 }

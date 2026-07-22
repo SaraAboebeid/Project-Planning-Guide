@@ -83,6 +83,8 @@ export interface BuildingRecord {
   lat: number;
   lon: number;
   building_use: string | null;
+  /** Named neighbourhood (Gothenburg primärområde) this building falls in. */
+  primary_area?: string | null;
   year_built: number | null;
   height_m: number | null;
   floors: number | null;

@@ -161,8 +161,9 @@ export function assumptionsFor(country: Country): Assumption[] {
 
 /* ─── Methods ─────────────────────────────────────────────────────────────────
    Building-physics methods behind the numbers (distinct from the optimizer
-   equations above). Currently: how a component U-value is obtained when the
-   material catalogue has no manufacturer-supplied value. */
+   equations above): how a component U-value is obtained when the material
+   catalogue has no manufacturer-supplied value, and how facade condition is
+   assessed from UAV imagery by the deep-learning models. */
 
 export interface MethodDoc {
   name: string;
@@ -180,6 +181,24 @@ export const METHODS: MethodDoc[] = [
       "Where a catalogue material carries no manufacturer U-value, it is derived from the build-up: sum each layer's thermal resistance (thickness d ÷ design conductivity λ) plus the inside/outside surface resistances (R_si, R_se — walls 0.13/0.04, roofs 0.10/0.04, ground floors 0.17/~0). Timber-framed layers apply the ISO 6946 upper/lower-bound average so studs bypassing the insulation raise U realistically. The method was validated against the catalogue items that already carry a supplied U-value before being applied to the rest.",
     source: "EN ISO 6946:2017; design λ values from EN ISO 10456 / Swedish BBR",
     sourceUrl: "https://www.iso.org/standard/65708.html",
+  },
+  {
+    name: "Facade condition — defect detection (Faster R-CNN)",
+    latexish: "UAV image → Faster R-CNN (ResNet-50 FPN) → {crack, leakage, abscission, corrosion, bulge} + boxes",
+    explain:
+      "Facade condition is assessed from UAV imagery with a supervised object detector trained on the MBDD2025 dataset — 14,471 facade images annotated in PASCAL-VOC format with bounding boxes over five defect classes (crack, leakage, abscission, corrosion, bulge). The dataset is split image-wise 70/15/15 into 10,129 training, 2,170 validation and 2,172 test images under a fixed random seed, so no image appears in more than one split. Three configurations of Faster R-CNN with a ResNet-50 FPN backbone were trained: (1) a baseline initialised from random weights and trained for 10 epochs; (2) transfer learning from COCO-pretrained weights with the box predictor head replaced for six classes (five defects + background), fine-tuned for 20 epochs at a learning rate of 5×10⁻⁵; (3) an FPN-v2 backbone with data augmentation — random horizontal flip with matching box transform, plus photometric jitter of brightness, contrast and saturation (±0.3) and hue (±0.05) — trained for 30 epochs. All runs use AdamW with a batch size of 8, and the checkpoint with the best validation F1 is retained. Reported metrics are per-class and mean precision, recall and F1 on the held-out test split.",
+    source:
+      "MBDD2025 facade-defect dataset (UAV, PASCAL-VOC); Ren et al., Faster R-CNN; PyTorch 2.1.2 / torchvision 0.16.2 / CUDA 12.1 on NVIDIA A40, Chalmers C3SE Vera cluster",
+    sourceUrl: "https://arxiv.org/abs/1506.01497",
+  },
+  {
+    name: "Facade condition — defect segmentation (U-Net, RGB + IR)",
+    latexish: "concat(RGB₃, IR₁) → 4-channel U-Net → per-pixel defect mask   (mIoU, Dice)",
+    explain:
+      "Where the extent of a defect matters rather than just its presence, a segmentation model is trained on the BFDD dataset — 838 spatially aligned RGB and infrared image pairs with per-pixel defect masks — using the same image-wise 70/15/15 split and fixed seed as the detection stage. The RGB and IR channels are concatenated into a single 4-channel input so the thermal signature (moisture, thermal bridging, detachment behind an intact surface) is available to the network alongside the visible-light evidence. A U-Net is trained for 40 epochs, and performance is reported as mean intersection-over-union (mIoU) and Dice coefficient on the held-out test split. Training for both stages was executed on an NVIDIA A40 GPU on the Chalmers C3SE Vera cluster.",
+    source:
+      "BFDD RGB+IR facade-defect dataset (838 aligned pairs, per-pixel masks); Ronneberger et al., U-Net; PyTorch 2.1.2 / torchvision 0.16.2 / CUDA 12.1 on NVIDIA A40, Chalmers C3SE Vera cluster",
+    sourceUrl: "https://arxiv.org/abs/1505.04597",
   },
 ];
 
