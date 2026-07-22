@@ -88,12 +88,14 @@ let _currentBasemap = 'light';
 window.setBasemap = function(type) {
   _currentBasemap = type;
   if (type === 'photo') {
+    window.setPhotoMode(true);
     viewer.imageryLayers.removeAll();
     if (!tilesEnabled) {
       if (ION_TOKEN) loadGoogleTiles(ION_TOKEN);
       else document.getElementById('token-panel').style.display = 'block';
     }
   } else {
+    window.setPhotoMode(false);
     if (tilesEnabled) {
       tilesEnabled = false;
       if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; tilesGeometryReady = false; }
@@ -148,6 +150,39 @@ let tilesEnabled  = false;
 // ground calibration has nothing to clamp against until it has.
 let tilesGeometryReady = false;
 let eubuccoVisible = true;
+
+// ── Photorealistic mode ──────────────────────────────────────────────────────
+// On the photorealistic basemap the extruded EUBUCCO boxes are the wrong thing
+// to look at: they hide the very facades you came to see, and they were also
+// standing in front of the camera during a WWR capture, so the vision model was
+// photographing a flat coloured box instead of the building.
+//
+// They were only ever on screen because they are the pickable thing — the Google
+// mesh is one fused tileset with no per-building features or metadata. So in this
+// mode we stop drawing them entirely and identify buildings geometrically
+// instead: pickPosition gives the point under the cursor, and a footprint index
+// turns that into a building.
+//
+// Not "draw them fully transparent": Cesium drops alpha-0 geometry from the pick
+// pass (measured — 0.0 is unpickable, 0.004 is the first alpha that works), and a
+// translucent pass over 93k invisible buildings measured ~47% more frame time
+// than the opaque one. Hiding them costs nothing and picks just as well.
+let photoMode = false;
+
+function buildingsVisible() { return eubuccoVisible && !photoMode; }
+function applyBuildingVisibility() {
+  for (const p of buildingPrimitives) p.show = buildingsVisible();
+}
+window.isPhotoMode = () => photoMode;
+
+window.setPhotoMode = function setPhotoMode(on) {
+  if (photoMode === on) return;
+  photoMode = on;
+  applyBuildingVisibility();
+  if (!on) { _pinnedIdx = null; setBuildingHighlight(null); }
+  const hint = document.getElementById('photo-pick-hint');
+  if (hint) hint.style.display = on ? 'block' : 'none';
+};
 let buildingBaseOffsetMeters = 0;
 let groundOffsetGrid = null;
 let calibrationInProgress = false;
@@ -339,6 +374,10 @@ async function loadGoogleTiles(token, { skipAutoRebuild = false } = {}) {
     tilesGeometryReady = await waitForTilesetGeometry(googleTileset, 6000);
     if (googleTileset && tilesGeometryReady) viewer.imageryLayers.removeAll();
     tilesEnabled = true;
+    // Follow the tileset rather than only the basemap button — the startup
+    // sequence calls this directly, so hooking setBasemap() alone left the very
+    // first load in photorealistic view with the boxes still drawn.
+    window.setPhotoMode(true);
     ION_TOKEN = token;
     document.getElementById('btn-tiles').classList.add('active');
     document.getElementById('token-panel').style.display = 'none';
@@ -381,6 +420,7 @@ document.getElementById('btn-tiles').addEventListener('click', () => {
     else { document.getElementById('token-panel').style.display = 'block'; }
   } else {
     tilesEnabled = false;
+    window.setPhotoMode(false);
     if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; tilesGeometryReady = false; }
     resetGroundCalibration();
     if (buildingPrimitives.length) rebuildBuildings();
@@ -404,7 +444,7 @@ document.getElementById('btn-tiles').addEventListener('click', () => {
 document.getElementById('btn-eubucco').addEventListener('click', () => {
   eubuccoVisible = !eubuccoVisible;
   document.getElementById('btn-eubucco').classList.toggle('active', eubuccoVisible);
-  for (const p of buildingPrimitives) p.show = eubuccoVisible;
+  applyBuildingVisibility();
 });
 
 // ─────────────────────────────────────────────────────────────────
@@ -458,6 +498,160 @@ function buildingDrawOrder() {
   order.sort((a, b) => dist[a] - dist[b]);
   return order;
 }
+
+// ── Footprint index — resolve a map position to a building ──────────────────
+// Built once, lazily, the first time photorealistic picking needs it.
+const FP_CELL_DEG = 0.002;            // ~220 m lat / ~120 m lon at this latitude
+let _fpIndex = null;
+
+function fpKey(lon, lat) {
+  return Math.floor(lon / FP_CELL_DEG) + ':' + Math.floor(lat / FP_CELL_DEG);
+}
+
+function buildFootprintIndex() {
+  _fpIndex = new Map();
+  for (let i = 0; i < DATA.length; i++) {
+    const ring = DATA[i].coordinates && DATA[i].coordinates[0];
+    if (!ring || ring.length < 3) continue;
+    // Index by bounding box so a footprint spanning several cells is findable
+    // from any of them.
+    let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+    for (const [lo, la] of ring) {
+      if (lo < minLon) minLon = lo;
+      if (lo > maxLon) maxLon = lo;
+      if (la < minLat) minLat = la;
+      if (la > maxLat) maxLat = la;
+    }
+    for (let x = Math.floor(minLon / FP_CELL_DEG); x <= Math.floor(maxLon / FP_CELL_DEG); x++) {
+      for (let y = Math.floor(minLat / FP_CELL_DEG); y <= Math.floor(maxLat / FP_CELL_DEG); y++) {
+        const k = x + ':' + y;
+        let bucket = _fpIndex.get(k);
+        if (!bucket) { bucket = []; _fpIndex.set(k, bucket); }
+        bucket.push(i);
+      }
+    }
+  }
+}
+
+function pointInRing(lon, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+/** Building index at a lon/lat, or null. Exact containment first; if the point
+ *  falls just outside every footprint — which happens when you pick high on a
+ *  facade at an oblique angle — take the nearest footprint within a few metres
+ *  rather than reporting nothing. */
+function buildingIndexAtLonLat(lon, lat) {
+  if (!_fpIndex) buildFootprintIndex();
+  const cx = Math.floor(lon / FP_CELL_DEG), cy = Math.floor(lat / FP_CELL_DEG);
+  let nearest = null, nearestD2 = Infinity;
+  const NEAR_DEG = 0.00012;           // ~13 m — tolerance for the fallback
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const bucket = _fpIndex.get((cx + dx) + ':' + (cy + dy));
+      if (!bucket) continue;
+      for (const i of bucket) {
+        const ring = DATA[i].coordinates[0];
+        if (pointInRing(lon, lat, ring)) return i;
+        for (const [lo, la] of ring) {
+          const d2 = (lo - lon) * (lo - lon) + (la - lat) * (la - lat);
+          if (d2 < nearestD2) { nearestD2 = d2; nearest = i; }
+        }
+      }
+    }
+  }
+  return (nearestD2 < NEAR_DEG * NEAR_DEG) ? nearest : null;
+}
+
+/** Building index under a screen position, using the rendered surface (the
+ *  photorealistic mesh, or the globe where it hasn't streamed). */
+window.pickBuildingIndexAt = function pickBuildingIndexAt(windowPosition) {
+  // 1) Pick pass against the hidden boxes. Cesium renders picking into its own
+  //    framebuffer, separate from the frame you see, so flipping `show` around
+  //    the call makes them pickable without ever drawing them. This returns the
+  //    real instance id, so it is exact and — unlike reading back a depth value
+  //    — independent of camera angle.
+  if (buildingPrimitives.length) {
+    for (const pr of buildingPrimitives) pr.show = true;
+    try {
+      const hits = viewer.scene.drillPick(windowPosition, 10);
+      for (const h of hits) {
+        if (h && h.id && h.id._dataIdx !== undefined) return h.id._dataIdx;
+      }
+    } finally {
+      for (const pr of buildingPrimitives) pr.show = buildingsVisible();
+    }
+  }
+
+  // 2) Fall back to the rendered surface + footprint lookup. Reliable looking
+  //    straight down; at grazing angles the depth read-back loses precision, so
+  //    it is the backstop rather than the primary path.
+  if (!viewer.scene.pickPositionSupported) return null;
+  const cart = viewer.scene.pickPosition(windowPosition);
+  if (!Cesium.defined(cart)) return null;
+  const c = Cesium.Cartographic.fromCartesian(cart);
+  if (!c) return null;
+  return buildingIndexAtLonLat(Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude));
+};
+
+// ── Highlight ───────────────────────────────────────────────────────────────
+// With the boxes hidden there is nothing on screen to show which building the
+// cursor is over, so paint just that one. A single instance — negligible cost.
+let _highlightPrim = null;
+let _highlightIdx  = null;
+
+function setBuildingHighlight(idx, color) {
+  if (idx === _highlightIdx) return;
+  _highlightIdx = idx;
+  if (_highlightPrim) { viewer.scene.primitives.remove(_highlightPrim); _highlightPrim = null; }
+  if (idx == null || !DATA[idx]) return;
+
+  const ring = DATA[idx].coordinates && DATA[idx].coordinates[0];
+  if (!ring || ring.length < 3) return;
+  const flat = [];
+  for (const [lo, la] of ring) flat.push(lo, la);
+  const b = DATA[idx];
+  const h = Math.max(3, b.height || (b.floors ? b.floors * 3 : 6));
+  const c = ringCentroid(ring);
+  const baseH = window.getBuildingBaseOffset(c.lon, c.lat);
+
+  _highlightPrim = new Cesium.Primitive({
+    geometryInstances: new Cesium.GeometryInstance({
+      geometry: new Cesium.PolygonGeometry({
+        polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
+        height: baseH, extrudedHeight: baseH + h,
+        vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
+      }),
+      attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+        color || Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.42)) },
+      id: { _dataIdx: idx },
+    }),
+    appearance: new Cesium.PerInstanceColorAppearance({ closed: true, translucent: true }),
+    asynchronous: false,
+  });
+  viewer.scene.primitives.add(_highlightPrim);
+}
+window.setBuildingHighlight = setBuildingHighlight;
+
+// Hover paints violet; a clicked building pins teal and hovering elsewhere no
+// longer steals it, so "what is selected" stays legible while you move around.
+const HL_HOVER  = Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.40);
+const HL_SELECT = Cesium.Color.fromCssColorString('#4ECDC4').withAlpha(0.48);
+let _pinnedIdx = null;
+
+window.setSelectedBuilding = function (idx) {
+  _pinnedIdx = idx;
+  setBuildingHighlight(idx, HL_SELECT);
+};
+window.setHoverBuilding = function (idx) {
+  if (_pinnedIdx != null) return;          // a selection outranks a hover
+  setBuildingHighlight(idx, HL_HOVER);
+};
 
 function ringCentroid(ring) {
   let lon = 0, lat = 0;
@@ -560,7 +754,7 @@ async function rebuildBuildings() {
         asynchronous: true,          // Cesium tessellates in web workers, off the main thread
         releaseGeometryInstances: true,
       });
-      primitive.show = eubuccoVisible;
+      primitive.show = buildingsVisible();
       viewer.scene.primitives.add(primitive);
       buildingPrimitives.push(primitive);
 

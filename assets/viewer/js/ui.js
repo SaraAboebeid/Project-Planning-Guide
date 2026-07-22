@@ -213,15 +213,26 @@
 let selectedBuilding = null;
 let highlightEntity  = null;
 
+// Resolve the building under a screen position. Normally that means picking the
+// extruded boxes, which carry the index. On the photorealistic basemap they are
+// not drawn at all (see cesium.js), so fall back to picking the rendered surface
+// and looking the position up in the footprint index.
+function buildingIndexAt(windowPosition) {
+  const hits = viewer.scene.drillPick(windowPosition, 10);
+  for (const h of hits) {
+    if (h && h.id && h.id._dataIdx !== undefined) return h.id._dataIdx;
+  }
+  return window.pickBuildingIndexAt ? window.pickBuildingIndexAt(windowPosition) : null;
+}
+
 viewer.screenSpaceEventHandler.setInputAction(movement => {
-  const hits = viewer.scene.drillPick(movement.position, 10);
-  let found = null;
-  for (const h of hits) { if (h && h.id && h.id._dataIdx !== undefined) { found = h; break; } }
-  if (found) {
-    const b = DATA[found.id._dataIdx];
-    if (b) showInfoPanel(b, found.id._dataIdx);
+  const idx = buildingIndexAt(movement.position);
+  if (idx != null && DATA[idx]) {
+    showInfoPanel(DATA[idx], idx);
+    if (window.isPhotoMode && window.isPhotoMode()) window.setSelectedBuilding(idx);
   } else {
     hideInfoPanel();
+    if (window.isPhotoMode && window.isPhotoMode()) window.setSelectedBuilding(null);
   }
 }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -262,21 +273,20 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
   }
   hoverThrottle = now;
 
-  // drillPick pierces Google 3D tile mesh to reach EUBUCCO entities underneath
-  const hits = viewer.scene.drillPick(movement.endPosition, 10);
-  let found = null;
-  for (const h of hits) {
-    if (h && h.id && h.id._dataIdx !== undefined) { found = h; break; }
-  }
+  // drillPick pierces Google 3D tile mesh to reach EUBUCCO entities underneath;
+  // in photorealistic mode there are no boxes and this falls through to the
+  // footprint lookup instead.
+  const found = buildingIndexAt(movement.endPosition);
 
-  if (found) {
-    const idx = found.id._dataIdx;
+  if (found != null && DATA[found]) {
+    const idx = found;
     const x = movement.endPosition.x, y = movement.endPosition.y;
     hoverCard.style.left = Math.min(x + 18, window.innerWidth  - 300) + 'px';
     hoverCard.style.top  = Math.min(y - 10,  window.innerHeight - 200) + 'px';
 
     if (idx === lastHoverId) { hoverCard.style.display = 'block'; return; }
     lastHoverId = idx;
+    if (window.isPhotoMode && window.isPhotoMode()) window.setHoverBuilding(idx);
     const b = DATA[idx];
     const isResidential = RESIDENTIAL.has(b.use_cat);
     const eclassColor = b.eclass ? (ECLASS_COLORS_CSS[b.eclass] || '#94a3b8') : '#94a3b8';
