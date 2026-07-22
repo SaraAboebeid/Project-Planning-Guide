@@ -181,13 +181,58 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
 .tt-val { color:#0f172a; font-weight:500; text-align:right; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* facade inspector */
+/* ─── Facade inspector — compact, draggable bottom bar ───────────────────────
+   Was a 580px tall stack that covered a third of the map right where the
+   building being inspected is. Laid out horizontally instead, docked to the
+   bottom, and movable (see makeDraggable in ui.js) so it never sits on top of
+   the thing you are looking at. */
 #facade-panel {
-  bottom:80px; left:50%; transform:translateX(-50%);
-  width:580px; display:none;
+  bottom:16px; left:50%; transform:translateX(-50%);
+  width:auto; max-width:calc(100vw - 32px); display:none;
+  padding:8px 10px 9px;
 }
-#facade-views { display:flex; gap:8px; margin-top:10px; }
+/* Once dragged, JS pins left/top and clears the centring transform. */
+#facade-panel.fi-moved { transform:none; }
+
+.fi-head {
+  display:flex; align-items:baseline; gap:10px;
+  cursor:grab; user-select:none; margin-bottom:7px;
+}
+.fi-head:active { cursor:grabbing; }
+.fi-head h2  { margin:0; flex-shrink:0; }
+.fi-head .sub { margin:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fi-grip  { color:var(--faint); font-size:13px; letter-spacing:-2px; }
+.fi-close { padding:1px 7px; font-size:11px; line-height:1.4; }
+
+.fi-body { display:flex; align-items:stretch; gap:12px; }
+
+.fi-manual {
+  position:relative; width:190px; flex-shrink:0;
+  border-radius:8px; overflow:hidden; border:2px solid #a78bfa; background:#0d0d1a;
+}
+.fi-manual canvas { width:100%; height:100%; display:block; object-fit:contain; }
+#manual-label {
+  position:absolute; bottom:4px; left:50%; transform:translateX(-50%);
+  font-size:9px; font-weight:700; background:rgba(114,28,184,0.85);
+  color:#fff; padding:1px 8px; border-radius:4px; white-space:nowrap;
+}
+
+.fi-cardinals { display:flex; flex-direction:column; gap:3px; }
+.fi-cardinals-label { font-size:9px; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; }
+
+.fi-actions { display:flex; flex-direction:column; gap:4px; justify-content:center; min-width:150px; }
+.fi-actions .btn { padding:5px 10px; font-size:11px; white-space:nowrap; }
+.fi-primary { background:rgba(114,28,184,0.4); border-color:#a78bfa; color:#c4b5fd; font-weight:600; }
+.fi-defects { background:rgba(230,25,75,0.14); border-color:#e6194B; color:#f9a8b4; font-weight:600; }
+.fi-zoom { display:flex; align-items:center; gap:5px; justify-content:center; margin-top:1px; }
+.fi-zoom .btn { width:26px; height:24px; padding:0; font-size:15px; line-height:1; }
+#zoom-label { font-size:10px; color:var(--muted); min-width:30px; text-align:center; }
+#facade-defects-result { font-size:11px; color:var(--muted); }
+#facade-defects-result:not(:empty) { margin-top:7px; }
+
+#facade-views { display:flex; gap:5px; }
 .facade-thumb {
-  flex:1; aspect-ratio:4/3; border-radius:8px; overflow:hidden;
+  width:92px; height:70px; border-radius:6px; overflow:hidden;
   border:2px solid var(--border); cursor:pointer; position:relative;
 }
 .facade-thumb img    { width:100%; height:100%; object-fit:cover; }
@@ -265,6 +310,9 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
 
 /* WWR result panel */
 #wwr-panel { bottom:80px; right:16px; width:220px; display:none; }
+#wwr-panel.fi-moved { transform:none; }
+#wwr-panel h2 { cursor:grab; user-select:none; }
+#wwr-panel h2:active { cursor:grabbing; }
 .wwr-bar-wrap {
   margin:8px 0 4px; height:10px; border-radius:5px;
   background:rgba(0,0,0,0.08); overflow:hidden;

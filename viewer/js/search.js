@@ -6,6 +6,11 @@
 const searchInput   = document.getElementById('search-input');
 const searchBtn     = document.getElementById('search-btn');
 const searchResults = document.getElementById('search-results');
+// The button's own label from the markup, captured before the first search
+// overwrites it. It used to be restored as the literal string '&#128269;',
+// which textContent renders verbatim — so after one search the button read
+// "&#128269;" instead of "Search".
+const SEARCH_LABEL = searchBtn.textContent || 'Search';
 
 // Bias geocoding to the active city/country (set by bootstrap.js from the
 // build-time VIEWER_PROFILE) instead of hardcoding Gothenburg - so the UK
@@ -47,7 +52,7 @@ async function geocodeAddress() {
     searchResults.innerHTML = '<div class="result-item">Search failed</div>';
     searchResults.style.display = 'block';
   } finally {
-    searchBtn.textContent = '&#128269;';
+    searchBtn.textContent = SEARCH_LABEL;
   }
 }
 

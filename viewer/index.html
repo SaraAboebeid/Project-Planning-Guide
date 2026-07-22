@@ -351,43 +351,47 @@
 
 <!-- Facade inspector -->
 <div class="panel" id="facade-panel">
-  <h2>Facade Inspector</h2>
-  <div class="sub" id="facade-sub">Orbit freely to the angle you want, then click <b>Draw &amp; Capture</b> — or fly to a cardinal view below</div>
-
-  <!-- Manual capture slot (full-width, prominent) -->
-  <div style="margin-top:10px;position:relative;border-radius:8px;overflow:hidden;border:2px solid #a78bfa;background:#0d0d1a" id="manual-canvas-wrap">
-    <canvas id="canvas-manual" width="520" height="300" style="width:100%;height:auto;display:block;max-height:260px;object-fit:contain"></canvas>
-    <div id="manual-label" style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;background:rgba(114,28,184,0.85);color:#fff;padding:2px 10px;border-radius:4px">Manual View</div>
+  <!-- Drag handle: the whole header strip. Keeps every child id unchanged so
+       facade_inspector.js is untouched by the re-layout. -->
+  <div class="fi-head" id="facade-drag-handle">
+    <h2>Facade Inspector</h2>
+    <div class="sub" id="facade-sub">Orbit to the angle you want, then <b>Draw &amp; Capture</b></div>
+    <span class="fi-grip" title="Drag to move">⠿</span>
+    <button class="btn fi-close" id="btn-exit-inspect" title="Close">&#x2715;</button>
   </div>
 
-  <!-- Cardinal views row -->
-  <div style="font-size:10px;color:#64748b;margin:8px 0 4px">Cardinal views — click to fly &amp; capture:</div>
-  <div id="facade-views" style="display:flex;gap:6px">
-    <div class="facade-thumb" id="thumb-N" style="height:68px;aspect-ratio:auto"><canvas id="canvas-N" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">N</div></div>
-    <div class="facade-thumb" id="thumb-E" style="height:68px;aspect-ratio:auto"><canvas id="canvas-E" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">E</div></div>
-    <div class="facade-thumb" id="thumb-S" style="height:68px;aspect-ratio:auto"><canvas id="canvas-S" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">S</div></div>
-    <div class="facade-thumb" id="thumb-W" style="height:68px;aspect-ratio:auto"><canvas id="canvas-W" width="200" height="150" style="width:100%;height:100%"></canvas><div class="dir-label">W</div></div>
-  </div>
+  <div class="fi-body">
+    <!-- Manual capture slot -->
+    <div class="fi-manual" id="manual-canvas-wrap">
+      <canvas id="canvas-manual" width="520" height="300"></canvas>
+      <div id="manual-label">Manual</div>
+    </div>
 
-  <!-- Action buttons -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px">
-    <button class="btn" id="btn-manual-capture" style="background:rgba(114,28,184,0.4);border-color:#a78bfa;color:#c4b5fd;font-weight:600">Draw &amp; Capture</button>
-    <button class="btn" id="btn-capture-all">&#9654; Capture All (N/E/S/W)</button>
-    <button class="btn" id="btn-ai-wwr">&#129302; AI Estimate</button>
-    <button class="btn" id="btn-exit-inspect">&#x2715; Exit</button>
-  </div>
+    <!-- Cardinal views -->
+    <div class="fi-cardinals">
+      <div class="fi-cardinals-label">Cardinal views</div>
+      <div id="facade-views">
+        <div class="facade-thumb" id="thumb-N"><canvas id="canvas-N" width="200" height="150"></canvas><div class="dir-label">N</div></div>
+        <div class="facade-thumb" id="thumb-E"><canvas id="canvas-E" width="200" height="150"></canvas><div class="dir-label">E</div></div>
+        <div class="facade-thumb" id="thumb-S"><canvas id="canvas-S" width="200" height="150"></canvas><div class="dir-label">S</div></div>
+        <div class="facade-thumb" id="thumb-W"><canvas id="canvas-W" width="200" height="150"></canvas><div class="dir-label">W</div></div>
+      </div>
+    </div>
 
-  <!-- Facade defect detection (ML model — placeholder until connected via FACADE_MODEL_URL) -->
-  <button class="btn" id="btn-detect-defects" style="width:100%;margin-top:6px;background:rgba(230,25,75,0.14);border-color:#e6194B;color:#f9a8b4;font-weight:600">&#128269; Detect Facade Defects</button>
-  <div id="facade-defects-result" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
-
-  <!-- Zoom control -->
-  <div style="display:flex;align-items:center;gap:6px;margin-top:8px;justify-content:center">
-    <button class="btn" id="btn-zoom-out" style="width:32px;height:28px;padding:0;font-size:16px;line-height:1" title="Zoom out">&#x2212;</button>
-    <span id="zoom-label" style="font-size:11px;color:var(--muted);min-width:34px;text-align:center">1.0×</span>
-    <button class="btn" id="btn-zoom-in"  style="width:32px;height:28px;padding:0;font-size:16px;line-height:1" title="Zoom in">+</button>
-    <span style="font-size:10px;color:var(--faint);margin-left:4px">adjust camera distance</span>
+    <!-- Actions -->
+    <div class="fi-actions">
+      <button class="btn fi-primary" id="btn-manual-capture">Draw &amp; Capture</button>
+      <button class="btn" id="btn-capture-all">&#9654; Capture All</button>
+      <button class="btn" id="btn-ai-wwr">&#129302; AI Estimate</button>
+      <button class="btn fi-defects" id="btn-detect-defects">&#128269; Defects</button>
+      <div class="fi-zoom">
+        <button class="btn" id="btn-zoom-out" title="Zoom out">&#x2212;</button>
+        <span id="zoom-label">1.0×</span>
+        <button class="btn" id="btn-zoom-in" title="Zoom in">+</button>
+      </div>
+    </div>
   </div>
+  <div id="facade-defects-result"></div>
 </div>
 
 <!-- WWR result panel -->

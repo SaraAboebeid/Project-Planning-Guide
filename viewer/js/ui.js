@@ -459,3 +459,92 @@ function hideInfoPanel() {
 }
 
 document.getElementById('info-close').addEventListener('click', hideInfoPanel);
+
+// =============================================================
+// Draggable floating panels
+//
+// The facade inspector opens over the middle of the map — exactly where the
+// building being inspected is. Rather than guess a position that is always out
+// of the way, let it be moved, and remember where it was put.
+// =============================================================
+(function initDraggablePanels() {
+  const LS_KEY = 'ppg.viewer.panelPos';
+
+  function readPos() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (_e) { return {}; }
+  }
+  function writePos(all) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(all)); } catch (_e) { /* private mode */ }
+  }
+
+  // Keep at least this much of the panel on screen, so it can never be dragged
+  // somewhere it cannot be grabbed again.
+  const KEEP_VISIBLE = 60;
+
+  function clampToViewport(panel, left, top) {
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    return {
+      left: Math.min(Math.max(left, KEEP_VISIBLE - w), window.innerWidth - KEEP_VISIBLE),
+      top:  Math.min(Math.max(top, 0), window.innerHeight - KEEP_VISIBLE),
+    };
+  }
+
+  function place(panel, left, top) {
+    const c = clampToViewport(panel, left, top);
+    panel.classList.add('fi-moved');       // clears the centring transform
+    panel.style.left = c.left + 'px';
+    panel.style.top = c.top + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+
+  function makeDraggable(panel, handle, key) {
+    if (!panel || !handle) return;
+
+    const saved = readPos()[key];
+    if (saved) {
+      // Restore only once the panel has a size to clamp against.
+      const restore = () => { if (panel.offsetWidth) place(panel, saved.left, saved.top); };
+      if (panel.offsetWidth) restore(); else setTimeout(restore, 0);
+    }
+
+    handle.addEventListener('pointerdown', (e) => {
+      // Let the close button and any other control in the header still work.
+      if (e.target.closest('button')) return;
+      e.preventDefault();
+      const rect = panel.getBoundingClientRect();
+      const dx = e.clientX - rect.left, dy = e.clientY - rect.top;
+      handle.setPointerCapture(e.pointerId);
+
+      const onMove = (ev) => place(panel, ev.clientX - dx, ev.clientY - dy);
+      const onUp = () => {
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        const all = readPos();
+        all[key] = { left: parseInt(panel.style.left, 10), top: parseInt(panel.style.top, 10) };
+        writePos(all);
+      };
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+    });
+  }
+
+  makeDraggable(document.getElementById('facade-panel'),
+                document.getElementById('facade-drag-handle'), 'facade');
+  // The results panel is the facade inspector's other half — same treatment,
+  // dragged by its title.
+  const wwrPanel = document.getElementById('wwr-panel');
+  if (wwrPanel) makeDraggable(wwrPanel, wwrPanel.querySelector('h2'), 'wwr');
+
+  // A panel parked off-screen after a window resize would be unreachable.
+  window.addEventListener('resize', () => {
+    for (const id of ['facade-panel', 'wwr-panel']) {
+      const panel = document.getElementById(id);
+      if (panel && panel.classList.contains('fi-moved')) {
+        place(panel, parseInt(panel.style.left, 10) || 0, parseInt(panel.style.top, 10) || 0);
+      }
+    }
+  });
+
+  window.makeDraggablePanel = makeDraggable;
+})();
