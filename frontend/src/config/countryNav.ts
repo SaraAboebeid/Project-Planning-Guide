@@ -6,12 +6,24 @@
 
 export type CountryCode = "se" | "gb" | "be" | "ie";
 
-export const COUNTRIES: { id: CountryCode; name: string; cities: string[] }[] = [
-  { id: "se", name: "Sweden", cities: ["Stockholm", "Gothenburg", "Malmö"] },
-  { id: "gb", name: "United Kingdom", cities: ["London", "Rotherham"] },
+export const COUNTRIES: {
+  id: CountryCode; name: string; cities: string[];
+  /** City selected when this country is chosen. Not simply cities[0]: the list
+   *  is in geographic/alphabetical order, but only some cities have building
+   *  data, and that is the one the app should open on. */
+  defaultCity?: string;
+}[] = [
+  { id: "se", name: "Sweden", cities: ["Stockholm", "Gothenburg", "Malmö"], defaultCity: "Gothenburg" },
+  { id: "gb", name: "United Kingdom", cities: ["London", "Rotherham"], defaultCity: "London" },
   { id: "be", name: "Belgium", cities: [] },
   { id: "ie", name: "Ireland", cities: [] },
 ];
+
+/** The city a country opens on — its defaultCity, else the first listed. */
+export function defaultCityFor(country: CountryCode): string {
+  const c = COUNTRIES.find((x) => x.id === country);
+  return c?.defaultCity ?? c?.cities[0] ?? "";
+}
 
 // Map-centering data for the Step 1 location picker (LocationMap.tsx) - keyed
 // by exact city name from COUNTRIES[].cities, so a Sweden/Gothenburg project

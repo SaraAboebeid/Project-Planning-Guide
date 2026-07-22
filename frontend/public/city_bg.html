@@ -79,6 +79,15 @@
     }
 
     function loadFallbackMap() {
+      // The viewer is constructed with `globe: false`, and imagery layers belong
+      // to the globe — so viewer.imageryLayers is undefined here and this whole
+      // fallback threw instead of drawing anything. Give the scene a globe first
+      // so the dark basemap can actually render when Ion is unavailable (no
+      // token, rate-limited, or offline).
+      if (!viewer.scene.globe) {
+        viewer.scene.globe = new Cesium.Globe(Cesium.Ellipsoid.WGS84);
+        viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0d14');
+      }
       viewer.imageryLayers.addImageryProvider(
         new Cesium.UrlTemplateImageryProvider({
           url: 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',

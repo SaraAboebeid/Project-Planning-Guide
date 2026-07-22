@@ -31,6 +31,9 @@
   let _stale     = false;   // true when serving the on-disk snapshot
   let _camTimer  = null;
   let _flowTimer = null;
+  // Datum currently shown in the popup, so the hover tooltip can stand down
+  // for that one entity instead of stacking on top of its own popup.
+  let _popupFor  = null;
 
   // Read by ui.js to stand its building hover card down while the pointer is
   // over one of our entities. Defined up front so the contract is explicit
@@ -155,12 +158,21 @@
     (_data.traffic_flow || []).forEach(f => {
       if (!f.lon || !f.lat) return;
       const r = f.flow_rate || 0;
-      const sz = Math.max(12, Math.min(r / 30, 40));
+      // Screen-space points, not ground ellipses. The ellipses were 12–40 m
+      // discs laid at 5 m on the ellipsoid — i.e. *underneath* the Google
+      // photorealistic mesh, which sits at real terrain height — so the whole
+      // layer rendered inside the ground and nothing was visible. Points with
+      // the depth test disabled draw over the tiles, exactly like the camera,
+      // condition and parking layers already did.
+      const px = Math.max(8, Math.min(6 + r / 25, 26));
       _ents.flow.push(viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(f.lon, f.lat, 5),
-        ellipse: {
-          semiMajorAxis: sz, semiMinorAxis: sz, height: 5,
-          material: flowColor(r), outline: false,
+        position: Cesium.Cartesian3.fromDegrees(f.lon, f.lat, 12),
+        point: {
+          pixelSize: px,
+          color: flowColor(r),
+          outlineColor: Cesium.Color.WHITE.withAlpha(0.85),
+          outlineWidth: 1.5,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         properties: { _tv: 'flow', _tvd: f },
       }));
@@ -260,9 +272,14 @@
   // without displacing anyone else's.
   const _handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
 
+  // Only cameras open a popup on click. Flow, conditions and parking used to
+  // open one too, which duplicated the hover tooltip word-for-word — two panels
+  // showing the same four fields, one over the other. The tooltip already says
+  // everything those layers have; the camera is the only type with content a
+  // tooltip cannot carry (the live image and its refresh).
   _handler.setInputAction(function (click) {
     const hit = tvPick(click.position);
-    if (!hit) return;
+    if (!hit || hit.t !== 'camera') return;
     showPopup(hit.t, hit.d, click.position);
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -337,6 +354,13 @@
     }
 
     const hit = tvPick(move.endPosition);
+    // Don't tooltip the entity whose popup is already open — the pointer is
+    // still resting on the pin you just clicked, so the tooltip would sit on top
+    // of the popup showing the same thing twice.
+    if (hit && _popupFor && hit.d === _popupFor) {
+      _tt.style.display = 'none';
+      return;
+    }
     const html = hit ? _ttHtml(hit.t, hit.d) : '';
     if (html) {
       _tt.innerHTML = html;
@@ -368,11 +392,8 @@
     popup.style.left = Math.min(screenPos.x + 18, window.innerWidth - 290) + 'px';
     popup.style.top  = Math.max(screenPos.y - 50, 10) + 'px';
     popup.style.display = 'block';
+    _popupFor = data;
     if (_camTimer) { clearInterval(_camTimer); _camTimer = null; }
-
-    const row = (lbl, val, col) =>
-      `<div class="tt-row"><span class="tt-lbl">${lbl}</span>` +
-      `<span class="tt-val"${col ? ` style="color:${col}"` : ''}>${val}</span></div>`;
 
     if (type === 'camera') {
       title.textContent = data.name || data.id;
@@ -407,32 +428,6 @@
         }
       }, CAM_REFRESH_MS);
 
-    } else if (type === 'flow') {
-      title.textContent = 'Traffic Flow – site ' + (data.site_id || data.id);
-      const fc = data.flow_rate > 600 ? '#ef4444' : data.flow_rate > 200 ? '#f59e0b' : '#22c55e';
-      body.innerHTML =
-        row('Flow rate', data.flow_rate != null ? Math.round(data.flow_rate) + ' veh/h' : '—', fc) +
-        row('Avg speed', data.avg_speed != null ? Number(data.avg_speed).toFixed(1) + ' km/h' : '—') +
-        row('Lane', data.lane || '—') +
-        row('Vehicle type', data.vehicle_type || '—') +
-        row('Measured', data.time ? new Date(data.time).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '—');
-
-    } else if (type === 'condition') {
-      title.textContent = 'Road Condition';
-      body.innerHTML =
-        row('Condition', data.condition_text || '—') +
-        row('Road', data.road_number || '—') +
-        row('Location', data.location || '—') +
-        row('Code', data.condition_code != null ? data.condition_code : '—');
-
-    } else if (type === 'parking') {
-      title.textContent = data.name || 'Parking';
-      const sc = (data.open_status || '').toLowerCase().includes('open') ? '#059669' : '#9ca3af';
-      body.innerHTML =
-        row('Status', data.open_status || '—', sc) +
-        row('Operation', data.operation_status || '—') +
-        row('Capacity', data.total_capacity != null ? data.total_capacity + ' spaces' : '—') +
-        row('Usage', data.usage || '—');
     }
   }
 
@@ -444,6 +439,7 @@
   window.tvClosePopup = function () {
     const p = document.getElementById('tv-popup');
     if (p) p.style.display = 'none';
+    _popupFor = null;
     if (_camTimer) { clearInterval(_camTimer); _camTimer = null; }
   };
 

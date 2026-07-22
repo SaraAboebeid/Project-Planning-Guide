@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
-import { COUNTRIES, LIBRARY_TABS, tabPathFor, pathForCountry, type CountryCode } from "../config/countryNav";
+import TopBar from "../components/TopBar";
+import { COUNTRIES, countryCodeFromName, defaultCityFor, type CountryCode } from "../config/countryNav";
 import ChatWidget from "../components/ChatWidget";
 
 // ── Inline SVG icon set ────────────────────────────────────────────────────
@@ -176,12 +177,15 @@ const CITY_DESC: Record<string, string> = {
 // ── Main component ─────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const reset = useWizardStore((s) => s.reset);
   const setProject = useWizardStore((s) => s.setProject);
 
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode>("se");
-  const [selectedCity, setSelectedCity]       = useState("Gothenburg");
+  // Seeded from the shared selection so a country/city picked on any other page
+  // is still selected here — the top bar is one control, not one per page.
+  const storedProject = useWizardStore.getState().project;
+  const initialCountry = countryCodeFromName(storedProject.country);
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(initialCountry);
+  const [selectedCity, setSelectedCity]       = useState(storedProject.city ?? defaultCityFor(initialCountry));
   const [boplatsListings, setBoplatsListings] = useState<string>("-");
   const [ukStats, setUkStats] = useState<{ buildings: number; withEpc: number; estimated: number; districts: number } | null>(null);
   // Raw UK districts (with per-band counts) + Sweden's coarse class share, for
@@ -325,107 +329,20 @@ export default function LandingPage() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* ── Top header bar ─────────────────────────────────────────── */}
-        <header className="h-11 shrink-0 flex items-center gap-3 px-5 z-30"
-                style={{ background: "rgba(10,13,20,0.95)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-          {/* Branding */}
-          <div className="flex items-center gap-3">
-            <img src="/CTH_new_logo_white.png" alt="Chalmers" className="h-7 opacity-80" />
-            <span className="w-px h-4 bg-white/15" />
-            <img src="/CNL_new_logo_white.png"  alt="Chalmers Next Labs" className="h-7 opacity-80" />
-          </div>
-
-          {/* Library tabs */}
-          <div className="hidden lg:flex items-center gap-1 rounded-xl p-1"
-               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            {LIBRARY_TABS.map(tab => {
-              const targetPath = tabPathFor(tab, selectedCountry);
-              const isActive = location.pathname === tab.path || location.pathname === targetPath;
-              return (
-                <button
-                  key={tab.label}
-                  onClick={() => {
-                    navigate(targetPath);
-                  }}
-                  className="px-2.5 py-1 rounded-lg border-0 cursor-pointer text-[10px] font-semibold whitespace-nowrap transition-all"
-                  style={{
-                    background: isActive ? "rgba(114,28,184,0.35)" : "transparent",
-                    color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
-                  }}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Country + city selector */}
-          <div className="flex items-center gap-1" style={{ marginLeft: "auto" }}>
-            {/* Countries */}
-            <div className="flex items-center gap-0.5 rounded-xl p-0.5"
-                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              {COUNTRIES.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setSelectedCountry(c.id);
-                    setSelectedCity(c.cities[0] ?? "");
-                    // Already viewing a page with a per-country build (Data
-                    // Explorer, 3D Viewer)? Swap straight to this country's
-                    // version instead of leaving the pill and the page out of sync.
-                    const swap = pathForCountry(location.pathname, c.id);
-                    if (swap) navigate(swap);
-                  }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    padding: "4px 10px", borderRadius: 10, border: 0, cursor: "pointer",
-                    fontSize: 11, fontWeight: selectedCountry === c.id ? 700 : 500,
-                    background: selectedCountry === c.id ? "rgba(114,28,184,0.35)" : "transparent",
-                    color: selectedCountry === c.id ? "#fff" : "rgba(255,255,255,0.72)",
-                    transition: "all .15s",
-                  }}
-                >
-                  {c.name}
-                </button>
-              ))}
-            </div>
-
-            {/* City pills — only when country has cities */}
-            {country.cities.length > 0 && (
-              <>
-                <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 12, margin: "0 2px" }}>›</span>
-                <div className="flex items-center gap-0.5 rounded-xl p-0.5"
-                     style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  {country.cities.map(city => (
-                    <button
-                      key={city}
-                      onClick={() => setSelectedCity(city)}
-                      style={{
-                        padding: "4px 10px", borderRadius: 10, border: 0, cursor: "pointer",
-                        fontSize: 11, fontWeight: selectedCity === city ? 700 : 500,
-                        background: selectedCity === city ? "rgba(78,205,196,0.2)" : "transparent",
-                        color: selectedCity === city ? "#4ECDC4" : "rgba(255,255,255,0.72)",
-                        transition: "all .15s",
-                      }}
-                    >
-                      {city}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* User avatar */}
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#721CB8] to-[#421869]
-                            flex items-center justify-center text-white text-[11px] font-bold shadow">
-              SA
-            </div>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)">
-              <path d="M7 10l5 5 5-5z"/>
-            </svg>
-          </div>
-        </header>
+        {/* Shared with every other page — see components/TopBar.tsx. Kept
+            controlled here because the hero's 3D camera follows the same
+            country/city selection. */}
+        <TopBar
+          country={selectedCountry}
+          city={selectedCity}
+          onCountryChange={(id) => {
+            const city = defaultCityFor(id);
+            setSelectedCountry(id);
+            setSelectedCity(city);
+            setProject({ country: COUNTRIES.find((c) => c.id === id)?.name ?? null, city: city || null });
+          }}
+          onCityChange={(city) => { setSelectedCity(city); setProject({ city }); }}
+        />
 
         {/* ── Hero (3D background) ────────────────────────────────────── */}
         <div className="flex-1 relative overflow-hidden">

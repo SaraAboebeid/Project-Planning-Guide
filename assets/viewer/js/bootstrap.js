@@ -87,7 +87,6 @@
     'viewer/js/layers.js',
     ...(profile.country === 'se' ? ['viewer/js/scb_layers.js'] : []),
     'viewer/js/city_switcher.js',
-    'viewer/js/country_profile.js',
   ];
 
   for (const src of scripts) {

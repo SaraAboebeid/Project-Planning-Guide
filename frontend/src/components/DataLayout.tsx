@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { COUNTRIES, LIBRARY_TABS, tabPathFor, countryFromPath, pathForCountry } from "../config/countryNav";
+import TopBar from "./TopBar";
 
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
   return (
@@ -40,11 +40,8 @@ export default function DataLayout({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  // Derived from the URL rather than shared component state — each page's own
-  // path is the source of truth for which country it is displaying, so the
-  // header always matches what's on screen even after a hard refresh or a
-  // direct link to e.g. /viewer/uk.
-  const country = countryFromPath(location.pathname);
+  // The country/city selector moved into <TopBar/>, which derives the country
+  // from the URL itself — see that component.
 
   return (
     <div
@@ -143,104 +140,7 @@ export default function DataLayout({
       </aside>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
-        <header
-          style={{
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "0 24px",
-            minHeight: 56,
-            background: "#0d1117",
-            borderBottom: "1px solid rgba(255,255,255,0.07)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <img src="/CTH_new_logo_white.png" alt="Chalmers" style={{ height: 28, opacity: 0.8 }} />
-            <span style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)" }} />
-            <img src="/CNL_new_logo_white.png" alt="Chalmers Next Labs" style={{ height: 28, opacity: 0.8 }} />
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              marginLeft: 16,
-              padding: 4,
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
-          >
-            {LIBRARY_TABS.map((tab) => {
-              const targetPath = tabPathFor(tab, country);
-              const isActive = location.pathname === tab.path || location.pathname === targetPath;
-              return (
-                <button
-                  key={tab.label}
-                  onClick={() => navigate(targetPath)}
-                  style={{
-                    border: 0,
-                    borderRadius: 8,
-                    padding: "6px 10px",
-                    cursor: "pointer",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    whiteSpace: "nowrap",
-                    color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
-                    background: isActive ? "rgba(114,28,184,0.35)" : "transparent",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={{ flex: 1 }} />
-
-          {/* Country selector — same 4 countries as the landing page. Active
-              country is read from the URL, so it always reflects what's on
-              screen. Switching country while on a page with no per-country
-              build (Pathways, Analysis Tools, ...) is a no-op until that page
-              gets one. */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
-              padding: 4,
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
-          >
-            {COUNTRIES.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  const swap = pathForCountry(location.pathname, c.id);
-                  if (swap) navigate(swap);
-                }}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 8,
-                  border: 0,
-                  cursor: "pointer",
-                  fontSize: 11,
-                  fontWeight: country === c.id ? 700 : 500,
-                  background: country === c.id ? "rgba(114,28,184,0.35)" : "transparent",
-                  color: country === c.id ? "#fff" : "rgba(255,255,255,0.6)",
-                  transition: "all .15s",
-                }}
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-        </header>
+        <TopBar />
 
         <main style={{ flex: 1, overflowY: "auto", padding: "24px" }}>{children}</main>
       </div>

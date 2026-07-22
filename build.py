@@ -110,7 +110,6 @@ JS_FILES = [
     "layers.js",
     "scb_layers.js",
     "city_switcher.js",
-    "country_profile.js",
 ]
 
 # Construction eras. Sweden uses TABULA periods; the UK uses the English Housing
