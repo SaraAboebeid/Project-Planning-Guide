@@ -458,6 +458,12 @@ function hideInfoPanel() {
   if (typeof window.stopSimulationPolling === 'function') window.stopSimulationPolling();
 }
 
+/** The violet outline drawn around the selected building. Hidden during a
+ *  facade capture for the same reason as the fill highlight. */
+window.setSelectionOutlineVisible = function (visible) {
+  if (highlightEntity) highlightEntity.show = visible;
+};
+
 document.getElementById('info-close').addEventListener('click', hideInfoPanel);
 
 // =============================================================

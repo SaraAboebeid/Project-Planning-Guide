@@ -637,11 +637,20 @@ function setBuildingHighlight(idx, color) {
   viewer.scene.primitives.add(_highlightPrim);
 }
 window.setBuildingHighlight = setBuildingHighlight;
+/** Hide/show the highlight without discarding it — used to keep it out of
+ *  facade captures, which must photograph the building, not our overlay. */
+window.setHighlightVisible = function (visible) {
+  if (_highlightPrim) _highlightPrim.show = visible;
+};
 
 // Hover paints violet; a clicked building pins teal and hovering elsewhere no
 // longer steals it, so "what is selected" stays legible while you move around.
-const HL_HOVER  = Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.40);
-const HL_SELECT = Cesium.Color.fromCssColorString('#4ECDC4').withAlpha(0.48);
+// Kept deliberately faint: this sits ON the photorealistic facade, and anything
+// heavier both obscures the building and tints the image the WWR vision model is
+// asked to judge. (It is hidden outright during a capture — see
+// setHighlightVisible below.)
+const HL_HOVER  = Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.08);
+const HL_SELECT = Cesium.Color.fromCssColorString('#4ECDC4').withAlpha(0.10);
 let _pinnedIdx = null;
 
 window.setSelectedBuilding = function (idx) {

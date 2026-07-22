@@ -35,16 +35,16 @@ async function fetchPVGIS(b) {
     const mwh = (totalKwh / 1000).toFixed(1);
     lastPvgis = { lat: parseFloat(lat), lon: parseFloat(lon), kWp, Ey, totalKwh, mwh, b };
     el.innerHTML =
-      '<div style="color:#000000;font-weight:700;margin-bottom:4px">&#9728; Rooftop PV (PVGIS)</div>' +
-      '<div style="display:grid;grid-template-columns:1fr auto;gap:2px 8px;color:#000000">' +
-      '<span>System size</span><span style="font-weight:600">' + kWp + ' kWp</span>' +
-      '<span>Annual yield</span><span style="color:#16a34a;font-weight:700">' + mwh + ' MWh/yr</span>' +
-      '<span>Specific yield</span><span style="font-weight:600">' + Math.round(Ey) + ' kWh/kWp</span>' +
-      '<span>Usable roof</span><span style="font-weight:600">' + Math.round(b.footprint_m2 * 0.7) + ' m\u00b2</span>' +
+      '<div style="color:var(--map-sidebar-text);font-weight:700;margin-bottom:4px">&#9728; Rooftop PV (PVGIS)</div>' +
+      '<div style="display:grid;grid-template-columns:1fr auto;gap:2px 8px;color:var(--map-sidebar-muted)">' +
+      '<span>System size</span><span style="color:var(--map-sidebar-text);font-weight:600">' + kWp + ' kWp</span>' +
+      '<span>Annual yield</span><span style="color:#4ade80;font-weight:700">' + mwh + ' MWh/yr</span>' +
+      '<span>Specific yield</span><span style="color:var(--map-sidebar-text);font-weight:600">' + Math.round(Ey) + ' kWh/kWp</span>' +
+      '<span>Usable roof</span><span style="color:var(--map-sidebar-text);font-weight:600">' + Math.round(b.footprint_m2 * 0.7) + ' m\u00b2</span>' +
       '</div>' +
       '<button onclick="savePVGIS()" style="margin-top:8px;width:100%;padding:4px 8px;font-size:10px;' +
       'border-radius:6px;border:1px solid rgba(245,158,11,0.5);background:rgba(245,158,11,0.12);' +
-      'color:#92400e;cursor:pointer;font-family:inherit">&#128190; Save PV result</button>' +
+      'color:#fbbf24;cursor:pointer;font-family:inherit">&#128190; Save PV result</button>' +
       '<div id="pvgis-save-status" style="font-size:10px;color:var(--muted);margin-top:3px"></div>';
   } catch(e) {
     const _netErr = (e instanceof TypeError) || (e.message || '').toLowerCase().includes('fetch');

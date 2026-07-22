@@ -156,17 +156,35 @@ if (_btnZoomOut) _btnZoomOut.addEventListener('click', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────
+// Frame grab
+// The selected building carries two overlays — a translucent fill highlight and
+// a violet outline. Both are useful on the map and actively harmful here: the
+// capture is fed to a vision model that has to judge glazing against wall, and a
+// tint over the whole facade skews exactly that. Take them out of frame for the
+// grab, then put them back.
+// ─────────────────────────────────────────────────────────────────
+function grabViewerFrame(draw) {
+  if (window.setHighlightVisible) window.setHighlightVisible(false);
+  if (window.setSelectionOutlineVisible) window.setSelectionOutlineVisible(false);
+  try {
+    viewer.render();          // re-render without the overlays before reading pixels
+    draw(viewer.canvas);
+  } finally {
+    if (window.setHighlightVisible) window.setHighlightVisible(true);
+    if (window.setSelectionOutlineVisible) window.setSelectionOutlineVisible(true);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Capture facade — fly + auto-snapshot
 // ─────────────────────────────────────────────────────────────────
 function captureToCanvas(dir) {
   flyToFacade(dir);
   setTimeout(() => {
-    viewer.render();
-    const srcCanvas = viewer.canvas;
     const dstCanvas = document.getElementById('canvas-'+dir);
     const ctx = dstCanvas.getContext('2d');
-    ctx.drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height,
-                  0, 0, dstCanvas.width, dstCanvas.height);
+    grabViewerFrame(src => ctx.drawImage(src, 0, 0, src.width, src.height,
+                                         0, 0, dstCanvas.width, dstCanvas.height));
   }, 1400);
 }
 
@@ -193,11 +211,10 @@ document.getElementById('btn-capture-all').addEventListener('click', async () =>
     await new Promise(resolve => {
       flyToFacade(dir);
       setTimeout(() => {
-        viewer.render();
-        const src = viewer.canvas;
         const dst = document.getElementById('canvas-'+dir);
         const ctx = dst.getContext('2d');
-        ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, dst.width, dst.height);
+        grabViewerFrame(src => ctx.drawImage(src, 0, 0, src.width, src.height,
+                                             0, 0, dst.width, dst.height));
         const w = analyseCanvasWWR(dst);
         if (w !== null) visualWWRs.push(w);
         resolve();
@@ -297,17 +314,17 @@ for (const dir of DIRS) {
       document.getElementById('facade-sub').textContent = 'Selection too small — try again';
       return;
     }
-    viewer.render();
-    const src = viewer.canvas;
-    const scaleX = src.width  / window.innerWidth;
-    const scaleY = src.height / window.innerHeight;
-    const sx = x * scaleX, sy = y * scaleY;
-    const sw = w * scaleX, sh = h * scaleY;
     const dst = document.getElementById('canvas-manual');
-    dst.width  = Math.round(sw);
-    dst.height = Math.round(sh);
     const ctx = dst.getContext('2d');
-    ctx.drawImage(src, sx, sy, sw, sh, 0, 0, dst.width, dst.height);
+    grabViewerFrame(src => {
+      const scaleX = src.width  / window.innerWidth;
+      const scaleY = src.height / window.innerHeight;
+      const sx = x * scaleX, sy = y * scaleY;
+      const sw = w * scaleX, sh = h * scaleY;
+      dst.width  = Math.round(sw);
+      dst.height = Math.round(sh);
+      ctx.drawImage(src, sx, sy, sw, sh, 0, 0, dst.width, dst.height);
+    });
     const dispH = Math.min(260, Math.round(dst.height * (dst.parentElement.clientWidth / dst.width)));
     dst.style.maxHeight = dispH + 'px';
     document.getElementById('facade-sub').textContent = '✓ Area captured — click AI Estimate to analyse it';
