@@ -68,6 +68,7 @@ export const LIBRARY_TABS: {
   { label: "Analysis Tools", path: "/analysis" },
   { label: "3D Viewer", path: "/viewer", pathByCountry: { gb: "/viewer/uk" } },
   { label: "Sample Reports", path: "/reports" },
+  { label: "Project Team", path: "/team" },
 ];
 
 export function tabPathFor(tab: (typeof LIBRARY_TABS)[number], country: CountryCode): string {

@@ -104,27 +104,23 @@ function _pollSimulation(simulationId, b) {
 function _renderResults(results, b) {
   const el = document.getElementById('sim-result');
   el.style.display = 'block';
-  const compareRow = b.energy
-    ? '<span>Recorded (energideklaration)</span><span style="color:var(--map-sidebar-text);font-weight:600">' + b.energy + ' kWh/m²</span>'
-    : (b.tabula_kwh_m2_yr
-      ? '<span>TABULA estimate</span><span style="color:var(--map-sidebar-text);font-weight:600">' + b.tabula_kwh_m2_yr + ' kWh/m²</span>'
-      : '');
+  const U = 'kWh/m²/yr';
+  const R = window.arRow;   // shared row builder — identical formatting to the PV card
+  let grid =
+    R('Heating',   results.heating_kwh_m2_yr,   U, { color: '#f87171' }) +
+    R('Cooling',   results.cooling_kwh_m2_yr,   U) +
+    R('Lighting',  results.lighting_kwh_m2_yr,  U) +
+    R('Equipment', results.equipment_kwh_m2_yr, U) +
+    R('Total',     results.total_kwh_m2_yr,     U, { total: true });
+  if (b.energy)               grid += R('Recorded (EPC)', b.energy, 'kWh/m²');
+  else if (b.tabula_kwh_m2_yr) grid += R('TABULA est.',    b.tabula_kwh_m2_yr, 'kWh/m²');
+
   el.innerHTML =
-    // Colours come from the sidebar theme variables: this block was written with
-    // hardcoded #000000 for a white panel, and reads as invisible black-on-black
-    // now that the panel is dark. Labels muted, values bright.
-    '<div style="color:var(--map-sidebar-text);font-weight:700;margin-bottom:4px">&#9889; EnergyPlus Simulation</div>' +
-    '<div style="display:grid;grid-template-columns:1fr auto;gap:2px 8px;color:var(--map-sidebar-muted)">' +
-    '<span>Heating</span><span style="color:#f87171;font-weight:700">' + results.heating_kwh_m2_yr + ' kWh/m²/yr</span>' +
-    '<span>Cooling</span><span style="color:var(--map-sidebar-text);font-weight:600">' + results.cooling_kwh_m2_yr + ' kWh/m²/yr</span>' +
-    '<span>Lighting</span><span style="color:var(--map-sidebar-text);font-weight:600">' + results.lighting_kwh_m2_yr + ' kWh/m²/yr</span>' +
-    '<span>Equipment</span><span style="color:var(--map-sidebar-text);font-weight:600">' + results.equipment_kwh_m2_yr + ' kWh/m²/yr</span>' +
-    '<span style="border-top:1px solid rgba(255,255,255,0.15);margin-top:2px;padding-top:2px">Total</span>' +
-    '<span style="border-top:1px solid rgba(255,255,255,0.15);margin-top:2px;padding-top:2px;color:var(--map-sidebar-text);font-weight:700">' + results.total_kwh_m2_yr + ' kWh/m²/yr</span>' +
-    compareRow +
-    '</div>' +
-    '<div style="font-size:10px;color:var(--muted);margin-top:4px">Single-zone shoebox model, ' +
-    results.floors + ' floor' + (results.floors === 1 ? '' : 's') + ', ' + results.total_floor_area_m2 + ' m² total floor area</div>';
+    '<div class="ar-head">&#9889; EnergyPlus Simulation</div>' +
+    '<div class="ar-grid">' + grid + '</div>' +
+    '<div class="ar-note">Single-zone shoebox model, ' +
+    results.floors + ' floor' + (results.floors === 1 ? '' : 's') + ', ' +
+    results.total_floor_area_m2 + ' m² floor area</div>';
 }
 
 // Renders a simulation record found via /api/simulation-lookup when a

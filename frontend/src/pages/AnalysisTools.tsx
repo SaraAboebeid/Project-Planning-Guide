@@ -1,4 +1,4 @@
-import { ExternalLink, Sun, Eye, Layers, Zap, Wrench, Leaf, ChevronRight } from "lucide-react";
+import { ExternalLink, Sun, Eye, Layers, Zap, Wrench, Leaf, Target, ChevronRight } from "lucide-react";
 
 /* ── Tool definitions ─────────────────────────────────────────────── */
 
@@ -82,12 +82,44 @@ const TOOLS = [
     liveLink: "https://epsm.chalmers.se",
     liveLinkLabel: "Open EPSM",
     attribution: {
-      lead: "Sanjay Somanath",
-      pi: "Alexander Hollberg",
-      institution: "Chalmers University of Technology",
+      heading: "DEVELOPED AT",
+      headline: "Chalmers University of Technology",
+      roles: [
+        { role: "Lead Developer", name: "Sanjay Somanath" },
+        { role: "Principal Investigator", name: "Alexander Hollberg" },
+      ],
       contact: "sanjay.somanath@chalmers.se",
     },
     usedIn: ["Renovation Planning", "Energy Community Planning", "Renewable Energy Planning"],
+  },
+  {
+    id: "optimization",
+    title: "Optimization Model",
+    subtitle: "Multi-Objective Retrofit Package Optimisation",
+    color: "#B98BE8",
+    status: "integrated",
+    icon: Target,
+    description:
+      "A multi-objective mixed-integer linear programming (MILP) model that searches the full space of renovation package combinations on fast building physics, returns the Pareto-optimal trade-off front across cost, embodied carbon and energy, and hands the winning packages to EPSM for full EnergyPlus validation. Objectives are driven by the KPIs selected in the planning wizard.",
+    features: [
+      "MILP formulation over wall/roof/floor/window measure combinations",
+      "Pareto front across cost, carbon and energy objectives",
+      "Cost from Wikells Sektionsfakta, carbon from Boverket Klimatdatabas",
+      "Degree-day envelope physics for fast full-combination search",
+      "Winning packages validated in EPSM (EnergyPlus)",
+    ],
+    link: null,
+    linkLabel: null,
+    attribution: {
+      heading: "ADAPTED FROM",
+      headline: "Digital Twin for Positive Energy District",
+      sub: "Chalmers University of Technology",
+      roles: [
+        { role: "Model developed by", name: "Jenny Enerbäck & Ann-Brith Strömberg" },
+        { role: "Project lead", name: "Liane Thuvander" },
+      ],
+    },
+    usedIn: ["Renovation Planning", "Energy Community Planning"],
   },
   {
     id: "retrofit",
@@ -235,7 +267,9 @@ function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
           ))}
         </div>
 
-        {/* Attribution block (EPSM only) */}
+        {/* Attribution block — shared shape for every credited tool (EPSM,
+            Optimization Model, …). heading + bold headline + optional sub line
+            + a list of role/name rows + an optional contact email. */}
         {t.attribution && (
           <div style={{
             background: `${tool.color}0d`,
@@ -244,22 +278,31 @@ function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
             padding: "12px 14px",
           }}>
             <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: `${tool.color}aa`, marginBottom: 8 }}>
-              DEVELOPED AT
+              {t.attribution.heading}
             </div>
             <div style={{ fontSize: 13, color: "#f0f4ff", fontWeight: 600 }}>
-              {t.attribution.institution}
+              {t.attribution.headline}
             </div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: 4, lineHeight: 1.6 }}>
-              <span style={{ color: "rgba(255,255,255,0.75)" }}>Lead Developer:</span> {t.attribution.lead}
-              <br />
-              <span style={{ color: "rgba(255,255,255,0.75)" }}>Principal Investigator:</span> {t.attribution.pi}
+            {t.attribution.sub && (
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+                {t.attribution.sub}
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: 6, lineHeight: 1.6 }}>
+              {t.attribution.roles.map((r) => (
+                <div key={r.role}>
+                  <span style={{ color: "rgba(255,255,255,0.75)" }}>{r.role}:</span> {r.name}
+                </div>
+              ))}
             </div>
-            <a
-              href={`mailto:${t.attribution.contact}`}
-              style={{ fontSize: 11, color: tool.color, textDecoration: "none", marginTop: 6, display: "inline-block", opacity: 0.8 }}
-            >
-              {t.attribution.contact}
-            </a>
+            {t.attribution.contact && (
+              <a
+                href={`mailto:${t.attribution.contact}`}
+                style={{ fontSize: 11, color: tool.color, textDecoration: "none", marginTop: 6, display: "inline-block", opacity: 0.8 }}
+              >
+                {t.attribution.contact}
+              </a>
+            )}
           </div>
         )}
 
@@ -313,12 +356,13 @@ export default function AnalysisTools() {
           Below is a full catalogue of the analytical capabilities available.
         </p>
 
-        {/* Summary pill row */}
+        {/* Summary pill row — derived from TOOLS so the counts can't fall out of
+            sync with the catalogue when a tool is added or removed. */}
         <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
           {[
-            { label: "6 tools", sub: "total", color: "#4ECDC4" },
-            { label: "5", sub: "integrated", color: "#96D74C" },
-            { label: "1", sub: "external", color: "#721CB8" },
+            { label: `${TOOLS.length} tools`, sub: "total", color: "#4ECDC4" },
+            { label: `${TOOLS.filter(t => t.status === "integrated").length}`, sub: "integrated", color: "#96D74C" },
+            { label: `${TOOLS.filter(t => t.status === "external").length}`, sub: "external", color: "#721CB8" },
           ].map(p => (
             <div key={p.label} style={{
               display: "flex", alignItems: "center", gap: 8,

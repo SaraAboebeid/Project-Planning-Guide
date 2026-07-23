@@ -126,11 +126,30 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
   border-radius: 4px;
   background: linear-gradient(90deg,#7c3aed,#a78bfa);
 }
-#pvgis-result {
-  margin-top:2px; padding:8px;
-  background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25);
-  border-radius:6px; font-size:11px; line-height:1.6; display:none;
+/* Shared analysis-result card — Rooftop PV, EnergyPlus, and anything added
+   later render into this one style so they cannot drift apart again. The sim
+   result used to carry no styling at all, so it inherited the panel's large
+   default font while the PV card was a tidy 11px grid right above it. */
+.analysis-result {
+  margin-top:4px; padding:9px 11px;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.10);
+  border-radius:8px; font-size:11px; line-height:1.5; display:none;
 }
+.analysis-result .ar-head {
+  display:flex; align-items:center; gap:6px;
+  font-weight:700; color:var(--map-sidebar-text); margin-bottom:7px;
+}
+.analysis-result .ar-grid {
+  display:grid; grid-template-columns:1fr auto; gap:4px 10px; align-items:baseline;
+}
+.analysis-result .ar-label { color:var(--map-sidebar-muted); }
+.analysis-result .ar-val   { color:var(--map-sidebar-text); font-weight:600; text-align:right; white-space:nowrap; }
+.analysis-result .ar-unit  { color:var(--map-sidebar-muted); font-weight:400; font-size:10px; margin-left:3px; }
+.analysis-result .ar-label.ar-total,
+.analysis-result .ar-val.ar-total {
+  border-top:1px solid rgba(255,255,255,0.12); margin-top:3px; padding-top:5px; font-weight:700;
+}
+.analysis-result .ar-note { font-size:10px; color:var(--map-sidebar-muted); margin-top:7px; }
 #lp-no-selection {
   font-size:10px; color:var(--faint); display:none; padding:2px 0;
 }

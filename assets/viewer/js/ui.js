@@ -3,6 +3,19 @@
 // Depends on: cesium.js (viewer), facade_inspector.js (lastPvgis, lastWWR)
 // =============================================================
 
+// ── Shared analysis-result row builder ───────────────────────────────────
+// Used by pvgis.js and energy_sim.js so both cards format labels, values and
+// units identically. label | value <unit>, with an optional accent colour on
+// the value and a `total` flag for the ruled summary row.
+window.arRow = function (label, value, unit, opts) {
+  opts = opts || {};
+  const t = opts.total ? ' ar-total' : '';
+  const style = opts.color ? ' style="color:' + opts.color + '"' : '';
+  const u = unit ? '<span class="ar-unit">' + unit + '</span>' : '';
+  return '<span class="ar-label' + t + '">' + label + '</span>' +
+         '<span class="ar-val' + t + '"' + style + '>' + value + u + '</span>';
+};
+
 // ── Info-button tooltip (layer descriptions) ─────────────────────────────
 (function initInfoTooltip() {
   const tip = document.getElementById('info-tooltip');

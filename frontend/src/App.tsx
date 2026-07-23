@@ -17,6 +17,7 @@ import Timeline from "./pages/Timeline";
 import Budget from "./pages/Budget";
 import AnalysisTools from "./pages/AnalysisTools";
 import SampleReports from "./pages/SampleReports";
+import ProjectTeam from "./pages/ProjectTeam";
 import MapViewer from "./pages/MapViewer";
 import UKMapViewer from "./pages/UKMapViewer";
 import UKDataExplorer from "./pages/UKDataExplorer";
@@ -72,6 +73,7 @@ export default function App() {
       <Route path="/map"       element={<Navigate to="/viewer" replace />} />
       <Route path="/budget"    element={<DataLayout title="Planning & Cost" accentColor="#F59E0B" accentBadge="Cost Estimate"><Budget /></DataLayout>} />
       <Route path="/reports" element={<DataLayout title="Reports" accentColor="#96D74C" accentBadge="Examples"><SampleReports /></DataLayout>} />
+      <Route path="/team"    element={<DataLayout title="Project Team" accentColor="#B98BE8" accentBadge="About"><ProjectTeam /></DataLayout>} />
       <Route element={<WizardLayout />}>
         <Route path="/step/1" element={<DefineProject />} />
         <Route path="/step/2" element={<DataCoverage />} />
