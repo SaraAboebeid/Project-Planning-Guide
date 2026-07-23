@@ -102,6 +102,102 @@ def andamal_to_use(andamal: str) -> str:
     return "ovrigt"
 
 
+def _epc_fallback_points(gdf_3006, blank_idx):
+    """Locate Gothenburg EPCs that never reached a footprint (blank/unmatched
+    cadastral) and attach each to the nearest still-blank building.
+
+    Two accurate sources, no block-centroid (that measured ~266 m off):
+      • exact-cadastral footprint centroid — for EPCs whose own cadastral has a
+        footprint somewhere (tight parcel), and
+      • a cached address geocode (tools/se/geocode_epc.py) for the rest.
+    Returns a DataFrame indexed by the EUBUCCO building index with the same EPC
+    columns the main match fills, for buildings that had none.
+    """
+    import duckdb as _dd
+    con2 = _dd.connect("data/sensitivity/epc_sweden.duckdb", read_only=True)
+    con2.execute("INSTALL spatial; LOAD spatial;")
+    # One row per unlinked Göteborg EPC address, with energy + an exact-cadastral
+    # centroid where the cadastral has any footprint (else lon/lat NULL → geocode).
+    df = con2.execute(
+        """
+        WITH linked AS (SELECT DISTINCT FormularId FROM footprints WHERE FormularId IS NOT NULL),
+        cad_cent AS (
+            SELECT upper(fastighetsbeteckning) cad,
+                   AVG(ST_X(ST_Centroid(ST_GeomFromWKB(geom)))) lon,
+                   AVG(ST_Y(ST_Centroid(ST_GeomFromWKB(geom)))) lat
+            FROM footprints WHERE fastighetsbeteckning IS NOT NULL AND TRIM(fastighetsbeteckning)<>''
+            GROUP BY 1)
+        SELECT TRIM(e."IdAdr")                       AS address,
+               MIN(e."EgiSpecifikEnergianvandning")  AS energy_kwh_m2,
+               MIN(e."EgiEnergiklass")               AS energy_class,
+               MIN(e."EgenNybyggAr")                 AS year_built,
+               MAX(e."EgenAtemp")                    AS area_atemp,
+               MAX(e."EgenAntalPlan")                AS floors_epc,
+               MIN(e."IdFastBet")                    AS fastighet,
+               CASE
+                   WHEN MIN(e."EgenByggnadsKat") ILIKE '%flerbostad%' THEN 'Flerbostadshus'
+                   WHEN MIN(e."EgenByggnadsKat") ILIKE '%bostad%'     THEN 'Bostad småhus'
+                   WHEN MIN(e."EgenByggnadsKat") ILIKE '%lokal%'      THEN 'Verksamhet'
+                   WHEN MIN(e."EgenByggnadsKat") ILIKE '%industri%'   THEN 'Industri'
+                   WHEN MIN(e."EgenByggnadsKat") ILIKE '%special%'    THEN 'Samhälle'
+                   ELSE MIN(e."EgenByggnadsKat") END AS andamal1,
+               cc.lon, cc.lat
+        FROM epc e
+        LEFT JOIN cad_cent cc ON upper(TRIM(e."IdFastBet")) = cc.cad
+        WHERE e.IdKommun='Göteborg' AND e."EgiSpecifikEnergianvandning" IS NOT NULL
+          AND e."IdAdr" IS NOT NULL AND TRIM(e."IdAdr")<>''
+          AND e.FormularId NOT IN (SELECT FormularId FROM linked)
+        GROUP BY TRIM(e."IdAdr"), cc.lon, cc.lat
+        """
+    ).fetchdf()
+    con2.close()
+
+    # Fill the missing coordinates from the geocode cache.
+    cache_path = Path("data/epc_geocode_cache.json")
+    cache = {}
+    if cache_path.exists():
+        try:
+            cache = json.loads(cache_path.read_text(encoding="utf-8"))
+        except Exception:
+            cache = {}
+    need = df["lon"].isna()
+    if need.any():
+        gc = df.loc[need, "address"].map(lambda a: cache.get(a))
+        df.loc[need, "lon"] = gc.map(lambda v: v[0] if v else np.nan)
+        df.loc[need, "lat"] = gc.map(lambda v: v[1] if v else np.nan)
+
+    df = df.dropna(subset=["lon", "lat"]).reset_index(drop=True)
+    n_cad = int((~need).sum())
+    print(f"  EPC fallback candidates: {len(df):,}  (cadastral-centroid {n_cad:,}, geocoded {len(df)-n_cad:,})")
+    if df.empty:
+        return None
+
+    pts = gpd.GeoDataFrame(
+        df, geometry=gpd.points_from_xy(df["lon"], df["lat"]), crs="EPSG:4326"
+    ).to_crs("EPSG:3006")
+
+    # Attach to the nearest building that still has NO energy, within 40 m of the
+    # EPC point. Dedup both ways: each building keeps its single nearest EPC, and
+    # each EPC lands on only its single nearest building (never spread a
+    # certificate across neighbours — same rule as the primary match).
+    ATTACH_M = 40
+    blanks = gdf_3006.loc[gdf_3006.index.isin(blank_idx), ["geometry"]].reset_index().rename(columns={"index": "eubucco_idx"})
+    if blanks.empty:
+        return None
+    j = gpd.sjoin_nearest(blanks, pts, how="inner", max_distance=ATTACH_M, distance_col="d")
+    j = j.sort_values("d").drop_duplicates("eubucco_idx").drop_duplicates("index_right")
+
+    cols = ["andamal1", "fastighet", "year_built", "floors_epc", "area_atemp",
+            "energy_kwh_m2", "energy_class", "address"]
+    out = j.set_index("eubucco_idx")[cols].rename(columns={
+        "andamal1": "andamal1_epc", "fastighet": "fastighet_epc",
+        "year_built": "year_built_epc", "area_atemp": "area_atemp_epc",
+        "address": "address_epc"})
+    out["all_addresses"] = out["address_epc"]
+    out["formular_id"] = np.nan
+    return out
+
+
 def _load_tabula_lookup():
     with open(_TABULA_DIR / "tabula_swedish_data.json", encoding="utf-8") as f:
         envelope = json.load(f)
@@ -385,7 +481,28 @@ def process_data() -> dict:
                      "area_atemp_epc", "energy_kwh_m2", "energy_class", "address_epc",
                      "all_addresses", "formular_id"]])
     gdf = gdf.join(agg)
+    primary_matched = gdf["andamal1_epc"].notna().sum()
+
+    # ── Fallback: geocoded / cadastral-centroid EPCs for still-blank buildings ──
+    # The overlay above only reaches EPCs whose energy landed on a Lantmäteriet
+    # footprint. ~38% of Gothenburg EPC cadastrals never do (blank cadastral, a
+    # cadastral with no footprint, or only a garage), so those buildings stay
+    # blank despite having a real certificate. Attach them by location.
+    print("Attaching fallback EPCs (geocoded / cadastral-centroid) ...")
+    blank_idx = gdf.index[gdf["energy_kwh_m2"].isna()]
+    fb_epc = _epc_fallback_points(gdf_3006, set(blank_idx))
+    if fb_epc is not None and len(fb_epc):
+        fill = fb_epc.reindex(columns=[
+            "andamal1_epc", "fastighet_epc", "year_built_epc", "floors_epc",
+            "area_atemp_epc", "energy_kwh_m2", "energy_class", "address_epc",
+            "all_addresses", "formular_id"])
+        # Only fill rows that are still blank (never overwrite a primary match).
+        target = gdf.index.isin(fill.index) & gdf["energy_kwh_m2"].isna()
+        gdf.loc[target, fill.columns] = fill.loc[gdf.index[target], fill.columns].values
+        print(f"  fallback attached: {int(target.sum()):,} buildings")
+
     matched = gdf["andamal1_epc"].notna().sum()
+    print(f"  EPC-matched buildings: {primary_matched:,} primary + {matched - primary_matched:,} fallback = {matched:,}")
     gdf["use_cat"] = gdf["andamal1_epc"].apply(andamal_to_use)
 
     # ── TABULA matching ────────────────────────────────────────────────────

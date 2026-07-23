@@ -215,12 +215,20 @@ export default function RenovationReport() {
      Opens a self-contained, print-styled document and calls print(); the browser's
      "Save as PDF" produces the file. No PDF library, no server round-trip, and
      the output stays selectable text rather than a screenshot. */
-  function materialsOf(r: typeof simResults[0]): { component: string; desc: string; u?: number }[] {
+  function materialsOf(r: typeof simResults[0]): { component: string; desc: string; u?: number; buildup?: string }[] {
     return Object.entries(r.components ?? {}).map(([component, c]) => ({
       component: component.replace("VertExt::", "New "),
       desc: c.description || c.code,
       u: c.uValue,
+      buildup: layerText(c),
     }));
+  }
+
+  /** The full layer build-up as text (outside → inside), naming each material —
+   *  e.g. "145 mm Timber stud layer · 145 mm Mineral wool batt · 9 mm Windproof
+   *  board". Empty for catalogue assemblies (their description is already full). */
+  function layerText(c: { layers?: { name: string; thicknessMm: number }[] }): string {
+    return c.layers?.length ? c.layers.map((l) => `${l.thicknessMm} mm ${l.name}`).join(" · ") : "";
   }
 
   function downloadPdf() {
@@ -238,7 +246,7 @@ export default function RenovationReport() {
           <thead><tr><th>Component</th><th>Material / assembly</th><th>U-value</th></tr></thead>
           <tbody>
             ${mats.length
-              ? mats.map((m) => `<tr><td>${esc(m.component)}</td><td>${esc(m.desc)}</td><td>${m.u != null ? m.u.toFixed(2) + " W/m²K" : "—"}</td></tr>`).join("")
+              ? mats.map((m) => `<tr><td>${esc(m.component)}</td><td>${esc(m.desc)}${m.buildup ? `<br><span class="buildup">${esc(m.buildup)}</span>` : ""}</td><td>${m.u != null ? m.u.toFixed(2) + " W/m²K" : "—"}</td></tr>`).join("")
               : `<tr><td colspan="3" class="muted">No component detail recorded for this package.</td></tr>`}
           </tbody>
         </table>
@@ -268,6 +276,7 @@ export default function RenovationReport() {
   .best-h { font-weight:800; font-size:11pt; }
   .why { font-weight:500; color:#64748b; font-size:9pt; }
   .best-n { color:#64748b; font-size:9pt; margin-bottom:4px; }
+  .buildup { color:#475569; font-size:8pt; }
   .mat th { background:#f8fafc; }
   .kv { margin-top:7px; display:flex; gap:16px; flex-wrap:wrap; font-size:9.5pt; color:#334155; }
   .foot { margin-top:26px; padding-top:8px; border-top:1px solid #e2e8f0; color:#94a3b8; font-size:8.5pt; }
@@ -340,7 +349,7 @@ export default function RenovationReport() {
   <table><thead><tr><th>#</th><th>Materials</th><th>Energy</th><th>Saving</th><th>Cost</th><th>CO₂e saved</th></tr></thead><tbody>
   ${simResults.length ? simResults.map((r) => `<tr>
       <td>${r.packageIndex}</td>
-      <td>${esc(materialsOf(r).map((m) => `${m.component}: ${m.desc}`).join("; ") || "—")}</td>
+      <td>${esc(materialsOf(r).map((m) => `${m.component}: ${m.buildup || m.desc}`).join("; ") || "—")}</td>
       <td>${r.energyUse.toFixed(1)}</td><td>${r.saving.toFixed(1)}</td>
       <td>${sek(r.cost)}</td><td>${Math.round(r.carbonSaving).toLocaleString("sv-SE")}</td></tr>`).join("")
     : `<tr><td colspan="6" class="muted">No packages simulated.</td></tr>`}
@@ -422,10 +431,13 @@ export default function RenovationReport() {
         <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 8 }}>Package #{result.packageIndex}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {Object.entries(result.components).map(([comp, item]) => (
-            <div key={comp} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: COMP_COLORS[comp] ?? "#721CB8", flexShrink: 0 }} />
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", flex: 1 }}>{comp}</span>
-              <Badge color={COMP_COLORS[comp] ?? "#721CB8"}>{item.code}</Badge>
+            <div key={comp} style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: COMP_COLORS[comp] ?? "#721CB8", flexShrink: 0, alignSelf: "center" }} />
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", flexShrink: 0 }}>{comp}</span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.75)", flex: 1, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={layerText(item) || item.description}>
+                {item.description || item.code}
+              </span>
+              {item.uValue != null && <Badge color={COMP_COLORS[comp] ?? "#721CB8"}>U {item.uValue.toFixed(2)}</Badge>}
             </div>
           ))}
         </div>
@@ -666,11 +678,17 @@ export default function RenovationReport() {
                 border: `1px solid ${i === 0 ? "rgba(150,215,76,0.2)" : "rgba(255,255,255,0.05)"}`,
               }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? "#96D74C" : "rgba(255,255,255,0.2)" }}>{i === 0 ? "★" : `#${i + 1}`}</span>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {Object.entries(r.components).map(([comp, item]) => (
-                    <span key={comp} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 5, background: `${COMP_COLORS[comp] ?? "#721CB8"}22`, color: COMP_COLORS[comp] ?? "#721CB8", border: `1px solid ${COMP_COLORS[comp] ?? "#721CB8"}44` }}>
-                      {comp}: {item.code}
-                    </span>
+                    <div key={comp} style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 5 }}>
+                      <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 5, flexShrink: 0, background: `${COMP_COLORS[comp] ?? "#721CB8"}22`, color: COMP_COLORS[comp] ?? "#721CB8", border: `1px solid ${COMP_COLORS[comp] ?? "#721CB8"}44` }}>
+                        {comp}
+                      </span>
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>
+                        {layerText(item) || item.description || item.code}
+                        {item.uValue != null && <span style={{ color: "rgba(255,255,255,0.4)" }}> · U {item.uValue.toFixed(2)}</span>}
+                      </span>
+                    </div>
                   ))}
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.65)", textAlign: "right" }}>{kwh(r.energyUse)}</span>
@@ -701,7 +719,7 @@ export default function RenovationReport() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
               {Object.entries(bestBalanced.components).map(([comp, item]) => (
                 <span key={comp} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 7, background: `${COMP_COLORS[comp] ?? "#721CB8"}22`, color: COMP_COLORS[comp] ?? "#721CB8", border: `1px solid ${COMP_COLORS[comp] ?? "#721CB8"}44`, fontWeight: 600 }}>
-                  {comp}: {item.code} — {item.description}
+                  {comp}: {item.description}{layerText(item) ? ` (${layerText(item)})` : ""}
                 </span>
               ))}
             </div>

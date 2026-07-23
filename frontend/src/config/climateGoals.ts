@@ -82,11 +82,25 @@ export function goalTier(baselineEnergy: number, packageEnergy: number, goal: Cl
   return "worse";
 }
 
+/** One component's chosen assembly within a package, for the expandable
+ *  "what's in this package" breakdown in ClimateGoalPanel. */
+export interface GoalPackageMaterial {
+  component: string;   // e.g. "Walls", "Roof", "New walls"
+  material: string;    // the assembly's full name/description
+  u: number | null;    // its U-value, when known
+  /** The full layer build-up (outside → inside) for a layer-composed assembly,
+   *  so the breakdown/report can list every layer, not just the summary label. */
+  layers?: { name: string; thicknessMm: number; category?: string }[];
+}
+
 export interface GoalPackage {
   label: string;
   color?: string;
   /** The package's simulated total energy demand (kWh/m²·yr). */
   energyUse: number;
+  /** The materials this package applies, per component — optional so callers
+   *  that don't have selection detail (e.g. the report) still work. */
+  materials?: GoalPackageMaterial[];
 }
 
 export interface GoalRow extends GoalPackage {

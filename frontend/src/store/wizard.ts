@@ -33,7 +33,15 @@ export interface RenovationBaselineResult {
 
 export interface RenovationPackageResult {
   packageIndex: number;
-  components: Record<string, { code: string; description: string; costSEK: number; uValue?: number }>;
+  components: Record<string, {
+    code: string;
+    description: string;
+    costSEK: number;
+    uValue?: number;
+    /** Full layer build-up (outside → inside) for a layer-composed assembly, so
+     *  the Step-5 report can list every layer and its material. */
+    layers?: { name: string; thicknessMm: number; category?: string }[];
+  }>;
   energyUse: number;
   saving: number;
   carbonSaving: number;
@@ -66,6 +74,10 @@ export interface RenovationCalcSelection {
   customUValue?: number;
   /** Human label for the composed assembly, e.g. "145 stud + 300 mineral wool". */
   customLabel?: string;
+  /** The full layer build-up of a layer-composed assembly (outside → inside),
+   *  stored so the package breakdown and the Step-5 report can list every layer
+   *  and its material, not just the summary label. Structurally an AssemblyLayer. */
+  layers?: { materialId: string; thicknessMm: number }[];
 }
 
 /** One selected building's own simulation outcome within a package - a

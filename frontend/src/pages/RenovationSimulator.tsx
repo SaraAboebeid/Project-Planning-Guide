@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationCalcPackage, type RenovationCalcBuildingResult, type RenovationCalcSelection } from "../store/wizard";
 import { climateGoalFor, assessAgainstGoal } from "../config/climateGoals";
@@ -16,7 +16,7 @@ import { useWizardStepNav } from "../components/wizardNav";
 import OptimizerPanel from "../components/OptimizerPanel";
 import AssemblyBuilder from "../components/AssemblyBuilder";
 import { ASSUMPTIONS } from "../config/optimizationAssumptions";
-import { computeAssemblyU, type AssemblyLayer, type ComponentKind } from "../config/assemblyLayers";
+import { computeAssemblyU, MATERIAL_BY_ID, type AssemblyLayer, type ComponentKind } from "../config/assemblyLayers";
 import { computeAssemblyCarbon, nearestWikellsAssembly } from "../utils/assemblyCosting";
 import { parseAssemblyParts } from "../config/materialProperties";
 import type { OptimizeComponentInput, OptimizeParams, OptimizePoint } from "../api/client";
@@ -160,6 +160,54 @@ function overridesFromSeSelections(
   return overrides;
 }
 
+/** The envelope U-values a package actually applies to the shoebox, for display
+ *  in the results table. Surfacing these makes an uninsulated pick self-evident:
+ *  a "timber stud 95 M0" wall (U 1.75) or a bare "standing seam metal roof"
+ *  (U 2.86) is a WORSE envelope than the building already has, so its energy
+ *  goes UP — the override replaces the baseline U, it never adds to it. Without
+ *  this line a +130% result looks like a bug instead of the physics it is. */
+/** The per-component assembly a package applies, resolved to readable names +
+ *  U-values — feeds the expandable "what's in this package" breakdown so a wall
+ *  of look-alike truncated labels ("145 mm ins. · U 0.18 + 1…") can be opened. */
+function packageMaterials(
+  pkg: RenovationCalcPackage,
+  itemByCode: Record<string, WikellsItem>,
+): { component: string; material: string; u: number | null; layers?: { name: string; thicknessMm: number; category?: string }[] }[] {
+  const pretty = (key: string) =>
+    key.startsWith("VertExt::") ? `New ${key.slice("VertExt::".length).toLowerCase()}` : key;
+  return Object.entries(pkg.selections).map(([key, sel]) => {
+    const it = itemByCode[sel.wikellsCode];
+    // Layer-composed assemblies carry their full build-up; resolve each layer's
+    // material name + thickness so "which insulation?" is answered in full.
+    const layers = sel.layers?.length
+      ? sel.layers.map((l) => ({
+          name: MATERIAL_BY_ID[l.materialId]?.label ?? l.materialId,
+          thicknessMm: l.thicknessMm,
+          category: MATERIAL_BY_ID[l.materialId]?.category,
+        }))
+      : undefined;
+    return {
+      component: pretty(key),
+      material: sel.customLabel ?? it?.description ?? sel.wikellsCode,
+      u: sel.customUValue ?? it?.uValue ?? null,
+      layers,
+    };
+  });
+}
+
+function appliedUValues(
+  pkg: RenovationCalcPackage,
+  itemByCode: Record<string, WikellsItem>,
+): { label: string; u: number }[] {
+  const o = overridesFromSeSelections(pkg.selections, itemByCode);
+  return [
+    { label: "wall", u: o.u_wall_override },
+    { label: "roof", u: o.u_roof_override },
+    { label: "window", u: o.u_win_override },
+    { label: "floor", u: o.u_floor_override },
+  ].filter((x): x is { label: string; u: number } => x.u != null);
+}
+
 /* Baseline (as-built) U-values the shoebox falls back to when a building has no
    per-component U — mirrors tools/idf/defaults.py (DEFAULT_U_*). Maps a Sweden
    area-line-item key to the U-override component's baseline U-value; null means
@@ -200,9 +248,15 @@ function pkgAggregate(pkg: RenovationCalcPackage) {
   };
 }
 
-/* ─── Material picker for one area line item (single-select) ─────────────── */
+/* ─── Material picker for one area line item (single-select) ──────────────────
+   Two tiers: a short "Recommended for this building" shortlist (improvers that
+   match the project's KPIs, or the best U when no KPI is set), then the full
+   catalogue. Every row is scored against the building's own baseline U so an
+   assembly that would WORSEN the envelope (the M0 / bare-cladding trap that
+   produced the +130% result) is flagged red before it can be picked, not after
+   the simulation comes back. */
 function LineItemPicker({
-  item, items, selectedCodes, onToggle, recommendations, boverketResources,
+  item, items, selectedCodes, onToggle, recommendations, boverketResources, baselineU,
 }: {
   item: AreaLineItem;
   /** Codes already saved as configurations — the tick shows real state. */
@@ -211,90 +265,141 @@ function LineItemPicker({
   onToggle: (code: string) => void;
   recommendations: Record<string, KpiKey[]>;
   boverketResources: BoverketResource[];
+  /** The building's current U for this component; drives improve/worsen flags. */
+  baselineU: number | null;
 }) {
   const color = COMPONENT_COLORS[item.parentComponent] ?? "#721CB8";
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   if (items.length === 0) {
     return <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>No catalogue materials found for this item.</p>;
   }
+
+  // Recommended shortlist: whatever the KPI logic tagged (already filtered to
+  // improvers), plus — as a floor — the single best-U improver, so the section
+  // is never empty when a sensible upgrade exists.
+  const improvers = baselineU != null
+    ? items.filter((i) => i.uValue != null && i.uValue <= baselineU)
+    : items.filter((i) => i.uValue != null);
+  const bestImprover = improvers.length
+    ? [...improvers].sort((a, b) => (a.uValue! - b.uValue!))[0]
+    : null;
+  const recCodes = new Set(Object.keys(recommendations));
+  if (bestImprover) recCodes.add(bestImprover.code);
+  const recommended = items.filter((i) => recCodes.has(i.code)).sort((a, b) => (a.uValue ?? 99) - (b.uValue ?? 99));
+  const rest = items.filter((i) => !recCodes.has(i.code));
+
+  const Row = (it: WikellsItem) => {
+    const carbon = estimateCarbon(it, boverketResources);
+    const ul = uLabel(it.uValue);
+    const tags = recommendations[it.code] ?? [];
+    const p = parseAssemblyParts(it.description);
+    // Relative to THIS building: does the pick help or hurt? worsens is the guard.
+    const worsens = baselineU != null && it.uValue != null && it.uValue > baselineU;
+    const improves = baselineU != null && it.uValue != null && it.uValue <= baselineU;
+    const chips: { label: string; color: string }[] = [];
+    if (p.frame) chips.push({ label: p.frame, color: "#F59E0B" });
+    if (p.insulationMm != null) {
+      chips.push(p.insulationMm === 0
+        ? { label: "no insulation", color: "#EF4444" }
+        : { label: `${p.insulationMm} mm ${p.insulationType ?? "insulation"}`, color: "#4ECDC4" });
+    }
+    if (p.cladding) chips.push({ label: p.cladding, color: "#4A90E2" });
+    const hovered = hoveredCode === it.code;
+    const checked = selectedCodes.includes(it.code);
+    return (
+      // The tick means "saved as one of my configurations" — ticking creates
+      // it, unticking removes it.
+      <button
+        key={it.code}
+        onClick={() => onToggle(it.code)}
+        onMouseEnter={() => setHoveredCode(it.code)}
+        onMouseLeave={() => setHoveredCode(null)}
+        onFocus={() => setHoveredCode(it.code)}
+        onBlur={() => setHoveredCode(null)}
+        title={checked ? "Remove this configuration"
+          : worsens ? `${it.description}\n\n⚠ U ${it.uValue} is worse than the building's current ~${baselineU} — this would RAISE energy use.`
+          : it.description}
+        style={{
+          width: "100%", display: "grid",
+          gridTemplateColumns: "18px 34px minmax(0,1fr) 96px 58px 74px",
+          gap: 8, alignItems: "center", textAlign: "left",
+          padding: "6px 9px", borderRadius: 8, cursor: "pointer",
+          border: `1px solid ${checked ? "rgba(78,205,196,0.45)" : worsens ? "rgba(239,68,68,0.32)" : hovered ? `${color}55` : "transparent"}`,
+          background: checked ? "rgba(78,205,196,0.12)" : hovered ? `${color}18` : worsens ? "rgba(239,68,68,0.05)" : "rgba(255,255,255,0.02)",
+        }}
+      >
+        <span style={{
+          width: 15, height: 15, borderRadius: 4, display: "flex", alignItems: "center",
+          justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#0b1220",
+          border: `2px solid ${checked ? "#4ECDC4" : hovered ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.2)"}`,
+          background: checked ? "#4ECDC4" : "transparent",
+        }}>{checked ? "✓" : ""}</span>
+        <span style={{ fontSize: 9.5, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>{it.code}</span>
+
+        <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 11, color: hovered ? "#fff" : "rgba(255,255,255,0.7)", lineHeight: 1.25,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.description}</span>
+          <span style={{ display: "flex", gap: 3, overflow: "hidden", whiteSpace: "nowrap", alignItems: "center" }}>
+            {tags.map((t) => (
+              <span key={t} style={{ fontSize: 8.5, fontWeight: 800, color: "#96D74C", background: "rgba(150,215,76,0.14)",
+                border: "1px solid rgba(150,215,76,0.4)", borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>★ {t}</span>
+            ))}
+            {worsens && (
+              <span style={{ fontSize: 8.5, fontWeight: 800, color: "#EF4444", background: "rgba(239,68,68,0.14)",
+                border: "1px solid rgba(239,68,68,0.4)", borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>▲ raises energy</span>
+            )}
+            {improves && !tags.length && (
+              <span style={{ fontSize: 8.5, fontWeight: 700, color: "#4ECDC4", flexShrink: 0 }}>improves</span>
+            )}
+            {chips.map((c) => (
+              <span key={c.label} style={{
+                fontSize: 8.5, fontWeight: 700, color: c.color, background: `${c.color}1e`,
+                border: `1px solid ${c.color}44`, borderRadius: 6, padding: "0 4px", flexShrink: 0,
+              }}>{c.label}</span>
+            ))}
+          </span>
+        </span>
+
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>
+          {fmtSEK(it.costSEK)}/{item.quantityKind === "area" ? "m²" : "st"}
+        </span>
+        <span style={{ textAlign: "right" }}>
+          {ul && (
+            <span style={{ fontSize: 9, fontWeight: 700, color: worsens ? "#EF4444" : ul.color, background: `${worsens ? "#EF4444" : ul.color}22`, borderRadius: 7, padding: "1px 5px" }}>
+              U {it.uValue}
+            </span>
+          )}
+        </span>
+        <span style={{ fontSize: 9, fontWeight: 700, color: "#60a5fa", textAlign: "right" }}>
+          ~{carbon.value} kg
+        </span>
+      </button>
+    );
+  };
+
+  const SectionLabel = ({ children }: { children: ReactNode }) => (
+    <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "8px 2px 4px" }}>
+      {children}
+    </div>
+  );
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: 300, overflowY: "auto", overflowX: "hidden" }}>
-      {items.map((it) => {
-        const carbon = estimateCarbon(it, boverketResources);
-        const ul = uLabel(it.uValue);
-        const tags = recommendations[it.code] ?? [];
-        const p = parseAssemblyParts(it.description);
-        const chips: { label: string; color: string }[] = [];
-        if (p.frame) chips.push({ label: p.frame, color: "#F59E0B" });
-        if (p.insulationMm != null) {
-          chips.push(p.insulationMm === 0
-            ? { label: "no insulation", color: "#EF4444" }
-            : { label: `${p.insulationMm} mm ${p.insulationType ?? "insulation"}`, color: "#4ECDC4" });
-        }
-        if (p.cladding) chips.push({ label: p.cladding, color: "#4A90E2" });
-        const hovered = hoveredCode === it.code;
-        const checked = selectedCodes.includes(it.code);
-        return (
-          // The tick means "saved as one of my configurations" — ticking creates
-          // it, unticking removes it. That's real state, unlike the previous
-          // checkbox which could never tick.
-          <button
-            key={it.code}
-            onClick={() => onToggle(it.code)}
-            onMouseEnter={() => setHoveredCode(it.code)}
-            onMouseLeave={() => setHoveredCode(null)}
-            onFocus={() => setHoveredCode(it.code)}
-            onBlur={() => setHoveredCode(null)}
-            title={checked ? "Remove this configuration" : it.description}
-            style={{
-              width: "100%", display: "grid",
-              gridTemplateColumns: "18px 34px minmax(0,1fr) 96px 58px 74px",
-              gap: 8, alignItems: "center", textAlign: "left",
-              padding: "6px 9px", borderRadius: 8, cursor: "pointer",
-              border: `1px solid ${checked ? "rgba(78,205,196,0.45)" : hovered ? `${color}55` : "transparent"}`,
-              background: checked ? "rgba(78,205,196,0.12)" : hovered ? `${color}18` : "rgba(255,255,255,0.02)",
-            }}
-          >
-            <span style={{
-              width: 15, height: 15, borderRadius: 4, display: "flex", alignItems: "center",
-              justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#0b1220",
-              border: `2px solid ${checked ? "#4ECDC4" : hovered ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.2)"}`,
-              background: checked ? "#4ECDC4" : "transparent",
-            }}>{checked ? "✓" : ""}</span>
-            <span style={{ fontSize: 9.5, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>{it.code}</span>
-
-            <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-              <span style={{ fontSize: 11, color: hovered ? "#fff" : "rgba(255,255,255,0.7)", lineHeight: 1.25,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.description}</span>
-              {chips.length > 0 && (
-                <span style={{ display: "flex", gap: 3, overflow: "hidden", whiteSpace: "nowrap" }}>
-                  {chips.map((c) => (
-                    <span key={c.label} style={{
-                      fontSize: 8.5, fontWeight: 700, color: c.color, background: `${c.color}1e`,
-                      border: `1px solid ${c.color}44`, borderRadius: 6, padding: "0 4px", flexShrink: 0,
-                    }}>{c.label}</span>
-                  ))}
-                </span>
-              )}
-            </span>
-
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>
-              {fmtSEK(it.costSEK)}/{item.quantityKind === "area" ? "m²" : "st"}
-            </span>
-            <span style={{ textAlign: "right" }}>
-              {ul && (
-                <span style={{ fontSize: 9, fontWeight: 700, color: ul.color, background: `${ul.color}22`, borderRadius: 7, padding: "1px 5px" }}>
-                  U {it.uValue}
-                </span>
-              )}
-            </span>
-            <span style={{ fontSize: 9, fontWeight: 700, color: "#60a5fa", textAlign: "right" }}>
-              ~{carbon.value} kg
-              {tags.length > 0 && <span style={{ color: "#96D74C", marginLeft: 4 }}>★{tags.length}</span>}
-            </span>
-          </button>
-        );
-      })}
+    <div style={{ display: "flex", flexDirection: "column", maxHeight: 320, overflowY: "auto", overflowX: "hidden" }}>
+      {baselineU != null && (
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", margin: "0 2px 4px", lineHeight: 1.5 }}>
+          This building's current {item.label.toLowerCase()} ≈ <strong style={{ color: "#fff" }}>U {baselineU.toFixed(2)}</strong>.
+          {" "}<span style={{ color: "#4ECDC4" }}>Lower U = better.</span>{" "}
+          <span style={{ color: "#EF4444" }}>Red rows are worse than what's already there.</span>
+        </div>
+      )}
+      {recommended.length > 0 && (
+        <>
+          <SectionLabel>✦ Recommended for this building</SectionLabel>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>{recommended.map(Row)}</div>
+        </>
+      )}
+      <SectionLabel>All materials ({items.length})</SectionLabel>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>{rest.map(Row)}</div>
     </div>
   );
 }
@@ -441,7 +546,11 @@ export default function RenovationSimulator() {
      Named build-ups the user designs per component. Packages are the cartesian
      product across components that have at least one configuration. */
   const [configs, setConfigs] = useState<ComponentConfig[]>([]);
-  const [draftMode, setDraftMode] = useState<"catalogue" | "layers">("catalogue");
+  // Build-from-layers leads: composing an assembly from real layers (with a live
+  // U-value) is the honest way to design a retrofit; the catalogue is the "or
+  // pick a ready-made assembly" fallback. Windows/doors can't be layer-composed,
+  // so effectiveDraftMode below falls back to catalogue for them.
+  const [draftMode, setDraftMode] = useState<"layers" | "catalogue">("layers");
   const [draftLayers, setDraftLayers] = useState<AssemblyLayer[]>([]);
   const [draftName, setDraftName] = useState("");
   const [excludedCombos, setExcludedCombos] = useState<Set<string>>(new Set());
@@ -453,6 +562,11 @@ export default function RenovationSimulator() {
   const [livePriceSek, setLivePriceSek] = useState<number | null>(null);
   const [packageName, setPackageName] = useState("");
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
+  // Results can be read two ways: by package (portfolio aggregate per design) or
+  // by building (every address as a row, baseline next to each package so you can
+  // compare a single building across all designs). The matrix is what a user means
+  // by "show me each building by name and how each package changes it".
+  const [resultView, setResultView] = useState<"package" | "building">("package");
   // A ref, not state: React StrictMode double-invokes effects in dev without
   // an intervening re-render, so a useState guard here would let both
   // invocations see the same stale "not yet initialized" value and both
@@ -623,7 +737,7 @@ export default function RenovationSimulator() {
   const activeCatalogue = activeItem ? itemsForLineItem(activeItem) : [];
   const activeBoverket = activeItem ? (boverketByComponent[activeItem.boverketComponent] ?? []) : [];
   const activeRecommendations = useMemo(
-    () => (activeItem ? recommendationsForLineItem(activeCatalogue, activeBoverket, project.selectedKpis) : {}),
+    () => (activeItem ? recommendationsForLineItem(activeCatalogue, activeBoverket, project.selectedKpis, baselineUForKey(activeItem.key)) : {}),
     [activeItem, activeCatalogue, activeBoverket, project.selectedKpis]
   );
   const activeQuantity = activeItem && geometries[0] ? computeAreaForLineItem(activeItem, geometries[0], wwrByIndex[0] ?? null, manualOverrides) : null;
@@ -664,12 +778,17 @@ export default function RenovationSimulator() {
     // Cost is quoted from the nearest REAL Wikells assembly — Wikells prices
     // complete sections, never single layers, so a per-layer rate would be made up.
     const cost = nearestWikellsAssembly(u.uValue, kind, allItems);
-    const ins = draftLayers.find((l) => l.materialId.startsWith("mw_")
+    // Name the actual insulation (mineral wool, EPS, wood fibre …) not a generic
+    // "mm ins." — with look-alike U-values the material is what tells packages apart.
+    const insLayers = draftLayers.filter((l) => l.materialId.startsWith("mw_")
       || ["eps", "xps", "pir", "cellulose", "wood_fibre"].includes(l.materialId));
+    const insName = insLayers.length
+      ? insLayers.map((l) => `${l.thicknessMm} mm ${(MATERIAL_BY_ID[l.materialId]?.label ?? "insulation").toLowerCase()}`).join(" + ")
+      : "custom";
     setConfigs((cs) => [...cs, {
       id: `cfg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       componentKey: activeItem.key,
-      name: draftName.trim() || `${ins ? `${ins.thicknessMm} mm ins.` : "custom"} · U ${u.uValue?.toFixed(2) ?? "—"}`,
+      name: draftName.trim() || `${insName} · U ${u.uValue?.toFixed(2) ?? "—"}`,
       source: "layers", layers: draftLayers, uValue: u.uValue,
       costPerM2: cost?.costSEK ?? null, costFromCode: cost?.code, costDeltaU: cost?.deltaU,
       carbonPerM2: carbon.total, carbonUnmatched: carbon.unmatched,
@@ -800,7 +919,7 @@ export default function RenovationSimulator() {
           wikellsCode: cfg.wikellsCode ?? "",
           quantity: 0,
           ...(cfg.source === "layers" && cfg.uValue != null
-            ? { customUValue: cfg.uValue, customLabel: cfg.name }
+            ? { customUValue: cfg.uValue, customLabel: cfg.name, layers: cfg.layers }
             : {}),
         };
       });
@@ -897,10 +1016,10 @@ export default function RenovationSimulator() {
       .filter((p) => !p.isBaseline)
       .map((p) => ({ pkg: p, total: pkgAggregate(p).avgTotalKwhM2Yr }))
       .filter((x): x is { pkg: RenovationCalcPackage; total: number } => x.total != null)
-      .map(({ pkg, total }) => ({ label: pkg.name, color: pkg.color, energyUse: total }));
+      .map(({ pkg, total }) => ({ label: pkg.name, color: pkg.color, energyUse: total, materials: packageMaterials(pkg, itemByCode) }));
     if (!rows.length) return null;
     return assessAgainstGoal(climateGoal, baselineAgg.avgTotalKwhM2Yr, rows);
-  }, [climateGoal, baselineAgg?.avgTotalKwhM2Yr, packages]);
+  }, [climateGoal, baselineAgg?.avgTotalKwhM2Yr, packages, itemByCode]);
 
   /* ── Multi-objective optimizer input (Sweden) ────────────────────────────
      Build the per-component option matrix + economy/climate params from the
@@ -1013,7 +1132,22 @@ export default function RenovationSimulator() {
           packageIndex: i + 1,
           components: Object.fromEntries(Object.entries(p.selections).map(([k, s]) => {
             const it = itemByCode[s.wikellsCode];
-            return [k, { code: s.wikellsCode, description: it?.description ?? s.wikellsCode, costSEK: it?.costSEK ?? 0, uValue: it?.uValue }];
+            const layers = s.layers?.length
+              ? s.layers.map((l) => ({
+                  name: MATERIAL_BY_ID[l.materialId]?.label ?? l.materialId,
+                  thicknessMm: l.thicknessMm,
+                  category: MATERIAL_BY_ID[l.materialId]?.category,
+                }))
+              : undefined;
+            return [k, {
+              code: s.wikellsCode,
+              // Layer-composed assemblies carry their name/U on the selection, not
+              // in the Wikells catalogue — prefer those so the report isn't blank.
+              description: s.customLabel ?? it?.description ?? s.wikellsCode,
+              costSEK: it?.costSEK ?? 0,
+              uValue: s.customUValue ?? it?.uValue,
+              layers,
+            }];
           })),
           energyUse: total, saving, carbonSaving,
           cost: agg.totalCostSEK ?? 0,
@@ -1062,15 +1196,16 @@ export default function RenovationSimulator() {
       {/* ── Buildings & baseline performance + package target selector ── */}
       {geometries.length > 0 && (
         <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Buildings & baseline performance</span>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>baseline kWh/m²·yr</span>
             {geometries.length > 1 && (
               <>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>· new package applies to:</span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>· new package applies to:</span>
                 <button
                   onClick={() => setTargetIdx("all")}
                   style={{
-                    fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
+                    fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
                     border: `1px solid ${targetIdx === "all" ? "#96D74C" : "rgba(255,255,255,0.12)"}`,
                     background: targetIdx === "all" ? "rgba(150,215,76,0.15)" : "transparent",
                     color: targetIdx === "all" ? "#96D74C" : "rgba(255,255,255,0.6)",
@@ -1081,7 +1216,9 @@ export default function RenovationSimulator() {
               </>
             )}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 8 }}>
+          {/* Same compact pill language as Step 3's building picker — name + its
+              baseline energy inline; green when it's the package target. */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {geometries.map((g, i) => {
               const row = baselinePkg?.buildings[i];
               const total = row?.totalKwhM2Yr;
@@ -1091,22 +1228,22 @@ export default function RenovationSimulator() {
                 <button
                   key={`${g.lat}-${g.lon}-${i}`}
                   onClick={() => selectable && setTargetIdx(i)}
+                  title={selectable ? `Build a package just for ${g.address ?? `Building ${i + 1}`}` : undefined}
                   style={{
-                    textAlign: "left", padding: "10px 12px", borderRadius: 10,
+                    fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 8,
                     cursor: selectable ? "pointer" : "default",
-                    border: `1px solid ${selected ? "#96D74C55" : "rgba(255,255,255,0.08)"}`,
-                    background: selected ? "rgba(150,215,76,0.1)" : "rgba(255,255,255,0.02)",
+                    display: "inline-flex", alignItems: "center", gap: 6, maxWidth: 260,
+                    border: `1px solid ${selected ? "#96D74C" : "rgba(255,255,255,0.08)"}`,
+                    background: selected ? "rgba(150,215,76,0.14)" : "rgba(255,255,255,0.02)",
                   }}
                 >
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: selected ? "#fff" : "rgba(255,255,255,0.72)" }}>
                     {g.address ?? `Building ${i + 1}`}
-                  </div>
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-                    Baseline:{" "}
-                    <b style={{ color: total != null ? "#96D74C" : "rgba(255,255,255,0.4)" }}>
-                      {total != null ? `${total} kWh/m²/yr` : row?.status === "failed" ? "failed" : "running…"}
-                    </b>
-                  </div>
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 800, flexShrink: 0,
+                    color: total != null ? "#96D74C" : "rgba(255,255,255,0.35)" }}>
+                    {total != null ? total : row?.status === "failed" ? "—" : "…"}
+                  </span>
                 </button>
               );
             })}
@@ -1260,38 +1397,40 @@ export default function RenovationSimulator() {
                 {/* ── Design a new configuration ── */}
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-                    {(["catalogue", "layers"] as const).map((m) => {
-                      const disabled = m === "layers" && !kindForKey(activeItem.key);
-                      return (
-                        <button key={m} disabled={disabled} onClick={() => setDraftMode(m)}
-                          style={{ fontSize: 11, fontWeight: 700, padding: "4px 11px", borderRadius: 8,
-                            cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.35 : 1,
-                            border: `1px solid ${draftMode === m ? "rgba(78,205,196,0.6)" : "rgba(255,255,255,0.12)"}`,
-                            background: draftMode === m ? "rgba(78,205,196,0.16)" : "transparent",
-                            color: draftMode === m ? "#4ECDC4" : "rgba(255,255,255,0.55)" }}>
-                          {m === "catalogue" ? "Catalogue assembly" : "Build from layers"}
-                        </button>
-                      );
-                    })}
+                    {(() => {
+                      const canLayers = !!kindForKey(activeItem.key);
+                      const effective = draftMode === "layers" && !canLayers ? "catalogue" : draftMode;
+                      // Layers first — it's the primary way to design; catalogue is the fallback.
+                      return (["layers", "catalogue"] as const).map((m) => {
+                        const disabled = m === "layers" && !canLayers;
+                        const active = effective === m;
+                        return (
+                          <button key={m} disabled={disabled} onClick={() => setDraftMode(m)}
+                            title={disabled ? "Windows and doors are picked as whole units, not layer-composed" : undefined}
+                            style={{ fontSize: 11, fontWeight: 700, padding: "4px 11px", borderRadius: 8,
+                              cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.35 : 1,
+                              border: `1px solid ${active ? "rgba(78,205,196,0.6)" : "rgba(255,255,255,0.12)"}`,
+                              background: active ? "rgba(78,205,196,0.16)" : "transparent",
+                              color: active ? "#4ECDC4" : "rgba(255,255,255,0.55)" }}>
+                            {m === "catalogue" ? "Catalogue assembly" : "Build from layers"}
+                          </button>
+                        );
+                      });
+                    })()}
                     <input value={draftName} onChange={(e) => setDraftName(e.target.value)}
                       placeholder="Name (optional)"
                       style={{ marginLeft: "auto", width: 180, padding: "5px 10px", borderRadius: 8,
                         border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 11.5 }} />
                   </div>
 
-                  {draftMode === "catalogue" ? (
+                  {(draftMode === "layers" && kindForKey(activeItem.key)) ? (
                     <>
-                      <LineItemPicker
-                        item={activeItem}
-                        items={activeCatalogue}
-                        selectedCodes={activeCatalogueCodes}
-                        onToggle={toggleCatalogueConfig}
-                        recommendations={activeRecommendations}
-                        boverketResources={activeBoverket}
-                      />
-                    </>
-                  ) : (
-                    <>
+                      {baselineUForKey(activeItem.key) != null && (
+                        <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", marginBottom: 8, lineHeight: 1.5 }}>
+                          Compose the assembly layer by layer — the live U-value updates as you go.
+                          {" "}Aim <strong style={{ color: "#4ECDC4" }}>below U {baselineUForKey(activeItem.key)!.toFixed(2)}</strong> to improve this building's {activeItem.label.toLowerCase()}.
+                        </div>
+                      )}
                       <AssemblyBuilder
                         kind={kindForKey(activeItem.key)!}
                         layers={draftLayers}
@@ -1304,6 +1443,18 @@ export default function RenovationSimulator() {
                           border: "1px solid rgba(78,205,196,0.5)", background: "rgba(78,205,196,0.15)", color: "#4ECDC4" }}>
                         <Plus size={13} /> Save as configuration
                       </button>
+                    </>
+                  ) : (
+                    <>
+                      <LineItemPicker
+                        item={activeItem}
+                        items={activeCatalogue}
+                        selectedCodes={activeCatalogueCodes}
+                        onToggle={toggleCatalogueConfig}
+                        recommendations={activeRecommendations}
+                        boverketResources={activeBoverket}
+                        baselineU={baselineUForKey(activeItem.key)}
+                      />
                     </>
                   )}
                 </div>
@@ -1428,8 +1579,24 @@ export default function RenovationSimulator() {
               : "simulate a package to compare"}
             state={packages.filter((p) => !p.isBaseline).length ? "active" : "waiting"} />
 
-          {/* Comparison table - one row per package, portfolio aggregates, expandable per-building breakdown */}
+          {/* Two read-outs of the same batch: per-package aggregates, or a
+              per-building matrix (baseline vs every package, one row per address). */}
           <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "16px 18px" }}>
+            {(baselinePkg?.buildings.length ?? 0) > 1 && (
+              <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+                {([["package", "By package"], ["building", "By building"]] as const).map(([v, label]) => (
+                  <button key={v} onClick={() => setResultView(v)}
+                    style={{ padding: "5px 12px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                      border: `1px solid ${resultView === v ? "rgba(78,205,196,0.5)" : "rgba(255,255,255,0.12)"}`,
+                      background: resultView === v ? "rgba(78,205,196,0.14)" : "transparent",
+                      color: resultView === v ? "#4ECDC4" : "rgba(255,255,255,0.5)" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {resultView === "package" ? (
+            <>
             <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 8 }}>
               {[
                 { k: "exp", l: "" },
@@ -1472,6 +1639,34 @@ export default function RenovationSimulator() {
                     <span style={{ fontSize: 12, fontWeight: 600, color: pkg.isBaseline ? "rgba(255,255,255,0.5)" : "#fff" }}>
                       <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: pkg.color, marginRight: 6 }} />
                       {pkg.name}{agg.n > 1 ? ` (${agg.n} buildings)` : ""}
+                      {/* Applied envelope U-values — makes an uninsulated pick (which
+                          replaces, never adds to, the baseline U) explain its own result. */}
+                      {!pkg.isBaseline && !isUK && (() => {
+                        const us = appliedUValues(pkg, itemByCode);
+                        if (!us.length) return null;
+                        return (
+                          <span style={{ display: "block", fontSize: 9.5, marginTop: 3, color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>
+                            applies{" "}
+                            {us.map((x, i) => (
+                              <span key={x.label}>
+                                {i > 0 ? " · " : ""}{x.label} U{" "}
+                                <span style={{ fontWeight: 700, color: x.u > 0.4 ? "#EF4444" : x.u > 0.3 ? "#F59E0B" : "#96D74C" }}>
+                                  {x.u.toFixed(2)}
+                                </span>
+                              </span>
+                            ))}
+                          </span>
+                        );
+                      })()}
+                      {/* Worse-than-baseline guardrail: if the package's average total
+                          energy exceeds the as-built baseline, say why in plain terms. */}
+                      {!pkg.isBaseline && agg.avgTotalKwhM2Yr != null && baselineAgg?.avgTotalKwhM2Yr != null
+                        && agg.avgTotalKwhM2Yr > baselineAgg.avgTotalKwhM2Yr && (
+                        <span style={{ display: "block", fontSize: 9.5, marginTop: 3, color: "#EF4444", fontWeight: 600, lineHeight: 1.4 }}>
+                          ⚠ Less insulated than the current building — this raises energy use.
+                          Choose an assembly with insulation (e.g. M95 / M145 walls, or an insulated roof).
+                        </span>
+                      )}
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && agg.totalCostSEK != null ? "Synthetic placeholder - not a real UK cost source" : undefined}>
                       {agg.totalCostSEK == null ? "—" : isUK ? `${fmtGBP(agg.totalCostSEK)}*` : fmtSEK(agg.totalCostSEK)}
@@ -1527,6 +1722,63 @@ export default function RenovationSimulator() {
               <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
                 * Synthetic placeholder cost/carbon (not a real UK data source) - see ukPlaceholderCostCarbon.ts.
               </p>
+            )}
+            </>
+            ) : (
+              /* Per-building matrix — every address as a row, baseline total next
+                 to each package's total, so one building can be read across all
+                 designs (and a package that WORSENS a building shows red per row). */
+              <div style={{ overflowX: "auto" }}>
+                {(() => {
+                  const others = packages.filter((p) => !p.isBaseline);
+                  const rows = baselinePkg?.buildings ?? [];
+                  const cols = `minmax(150px,1.6fr) 92px ${others.map(() => "minmax(96px,1fr)").join(" ")}`;
+                  const findTotal = (pkg: RenovationCalcPackage, b: RenovationCalcBuildingResult) =>
+                    pkg.buildings.find((x) => x.address === b.address && x.lat === b.lat && x.lon === b.lon)?.totalKwhM2Yr ?? null;
+                  const delta = (v: number | null, base: number | null) => {
+                    if (v == null || base == null || base === 0) return null;
+                    const pct = Math.round(((v - base) / base) * 100);
+                    return (
+                      <span style={{ fontSize: 9, fontWeight: 700, marginLeft: 4, color: pct < 0 ? "#96D74C" : pct > 0 ? "#EF4444" : "rgba(255,255,255,0.35)" }}>
+                        {pct === 0 ? "±0%" : `${pct < 0 ? "▼" : "▲"}${Math.abs(pct)}%`}
+                      </span>
+                    );
+                  };
+                  const th = { fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: 1 };
+                  return (
+                    <div style={{ minWidth: 460 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: cols, gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 6 }}>
+                        <span style={{ ...th, color: "rgba(255,255,255,0.35)" }}>Building</span>
+                        <span style={{ ...th, color: "rgba(255,255,255,0.35)" }}>Baseline</span>
+                        {others.map((p) => (
+                          <span key={p.id} style={{ ...th, letterSpacing: 0.4, color: "rgba(255,255,255,0.55)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.name}>
+                            <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: p.color, marginRight: 5 }} />
+                            {p.name}
+                          </span>
+                        ))}
+                      </div>
+                      {rows.length === 0 && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>Run a package to compare buildings.</p>}
+                      {rows.map((b) => (
+                        <div key={`${b.address}-${b.lat}-${b.lon}`} style={{ display: "grid", gridTemplateColumns: cols, gap: 10, padding: "7px 4px", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <span style={{ fontSize: 11.5, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={b.address}>{b.address}</span>
+                          <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.55)" }}>{b.totalKwhM2Yr ?? "—"}</span>
+                          {others.map((p) => {
+                            const v = findTotal(p, b);
+                            return (
+                              <span key={p.id} style={{ fontSize: 11.5, color: "rgba(255,255,255,0.85)" }}>
+                                {v ?? "—"}{delta(v, b.totalKwhM2Yr)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ))}
+                      <p style={{ fontSize: 9.5, color: "rgba(255,255,255,0.3)", padding: "8px 4px 0", lineHeight: 1.5 }}>
+                        Total energy, kWh/m²·yr. <span style={{ color: "#96D74C" }}>▼ green</span> = less energy than as-built · <span style={{ color: "#EF4444" }}>▲ red</span> = more.
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
             )}
           </div>
 

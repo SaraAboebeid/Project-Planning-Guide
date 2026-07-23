@@ -80,24 +80,38 @@ export type KpiKey = "Environmental" | "Economic" | "Social" | "Performance / Te
 export function recommendationsForLineItem(
   items: WikellsItem[],
   boverketResources: BoverketResource[],
-  selectedKpis: string[]
+  selectedKpis: string[],
+  /** The building's current U for this component (from baselineUForKey). Only
+   * materials that IMPROVE on it are eligible to be recommended — otherwise the
+   * "cheapest" pick would happily surface an uninsulated assembly (e.g. timber
+   * stud 95 M0, U 1.75) that RAISES energy. Null (doors/balcony, no U notion)
+   * falls back to considering every item. */
+  baselineU?: number | null
 ): Record<string, KpiKey[]> {
   const out: Record<string, KpiKey[]> = {};
   const tag = (code: string, kpi: KpiKey) => { (out[code] ??= []).push(kpi); };
 
   if (!items.length) return out;
 
+  // Recommend only genuine improvers. If nothing beats the baseline (or there's
+  // no baseline to beat), fall back to the full list so a recommendation still
+  // appears rather than silently vanishing.
+  const improvers = baselineU != null
+    ? items.filter((i) => i.uValue != null && i.uValue <= baselineU)
+    : items;
+  const pool = improvers.length ? improvers : items;
+
   if (selectedKpis.includes("Economic")) {
-    const cheapest = items.reduce((a, b) => (a.costSEK <= b.costSEK ? a : b));
+    const cheapest = pool.reduce((a, b) => (a.costSEK <= b.costSEK ? a : b));
     tag(cheapest.code, "Economic");
   }
   if (selectedKpis.includes("Environmental")) {
-    const scored = items.map((i) => ({ code: i.code, v: estimateCarbon(i, boverketResources).value }));
+    const scored = pool.map((i) => ({ code: i.code, v: estimateCarbon(i, boverketResources).value }));
     const lowest = scored.reduce((a, b) => (a.v <= b.v ? a : b));
     tag(lowest.code, "Environmental");
   }
   if (selectedKpis.includes("Performance / Technical")) {
-    const withU = items.filter((i) => i.uValue != null);
+    const withU = pool.filter((i) => i.uValue != null);
     if (withU.length) {
       const best = withU.reduce((a, b) => (a.uValue! <= b.uValue! ? a : b));
       tag(best.code, "Performance / Technical");

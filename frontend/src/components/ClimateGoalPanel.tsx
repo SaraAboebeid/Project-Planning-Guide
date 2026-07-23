@@ -1,4 +1,5 @@
-import { Target, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { Target, CheckCircle2, ChevronRight, ChevronDown } from "lucide-react";
 import { type GoalAssessment } from "../config/climateGoals";
 
 /* Shows a city climate target and which renovation packages reach it. Used in
@@ -9,6 +10,16 @@ const MET = "#96D74C";     // green — meets the target
 const NEAR = "#F59E0B";    // amber — below the target
 const WORSE = "#EF4444";   // red — worse than baseline
 
+// Layer build-up chip colors by material category — insulation stands out (teal)
+// since it's the layer that answers "which insulation?".
+const LAYER_COLOR: Record<string, string> = {
+  insulation: "#4ECDC4",
+  structure: "#F59E0B",
+  board: "#9CA3AF",
+  cladding: "#4A90E2",
+  cavity: "#A78BFA",
+};
+
 function barColor(r: { meets: boolean; reductionPct: number | null }) {
   if (r.meets) return MET;
   if (r.reductionPct != null && r.reductionPct < 0) return WORSE;
@@ -17,6 +28,10 @@ function barColor(r: { meets: boolean; reductionPct: number | null }) {
 
 export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
   const { goal, rows, achievers, closest } = a;
+  // Which package row is expanded to show its materials. With many look-alike
+  // packages the truncated labels are indistinguishable — opening a row reveals
+  // exactly which assembly sits on each component.
+  const [openLabel, setOpenLabel] = useState<string | null>(null);
 
   // Scale the bars so the target line sits comfortably inside the track.
   const maxRed = Math.max(goal.reductionPct + 8, ...rows.map((r) => r.reductionPct ?? 0));
@@ -81,21 +96,69 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
           const red = r.reductionPct ?? 0;
           const w = Math.max(0, Math.min(red, scaleMax)) / scaleMax * 100;
           const c = barColor(r);
+          const hasMat = !!r.materials && r.materials.length > 0;
+          const open = openLabel === r.label;
           return (
-            <div key={r.label} style={{ display: "grid", gridTemplateColumns: "150px 1fr 96px", gap: 10, alignItems: "center" }}>
-              <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {r.color && <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: r.color, marginRight: 6 }} />}
-                {r.label}
-              </span>
-              {/* Track with the target marker */}
-              <div style={{ position: "relative", height: 10, borderRadius: 5, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-                <div style={{ position: "absolute", inset: 0, width: `${w}%`, background: c, borderRadius: 5, transition: "width .4s" }} />
-                <div style={{ position: "absolute", top: -2, bottom: -2, left: `${targetLeft}%`, width: 2, background: "rgba(255,255,255,0.55)" }} title={`Target −${goal.reductionPct}%`} />
+            <div key={r.label}>
+              <div
+                onClick={() => hasMat && setOpenLabel(open ? null : r.label)}
+                title={hasMat ? (open ? "Hide materials" : "Show the materials in this package") : undefined}
+                style={{ display: "grid", gridTemplateColumns: "150px 1fr 96px", gap: 10, alignItems: "center",
+                  cursor: hasMat ? "pointer" : "default", borderRadius: 6,
+                  background: open ? "rgba(255,255,255,0.04)" : "transparent" }}
+              >
+                <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center" }}>
+                  {hasMat && (open
+                    ? <ChevronDown size={12} style={{ marginRight: 2, flexShrink: 0, opacity: 0.5 }} />
+                    : <ChevronRight size={12} style={{ marginRight: 2, flexShrink: 0, opacity: 0.5 }} />)}
+                  {r.color && <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: r.color, marginRight: 6, flexShrink: 0 }} />}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</span>
+                </span>
+                {/* Track with the target marker */}
+                <div style={{ position: "relative", height: 10, borderRadius: 5, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", inset: 0, width: `${w}%`, background: c, borderRadius: 5, transition: "width .4s" }} />
+                  <div style={{ position: "absolute", top: -2, bottom: -2, left: `${targetLeft}%`, width: 2, background: "rgba(255,255,255,0.55)" }} title={`Target −${goal.reductionPct}%`} />
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: c, textAlign: "right" }}>
+                  {r.reductionPct == null ? "—" : `${red >= 0 ? "−" : "+"}${Math.abs(red).toFixed(0)}%`}
+                  {r.meets && <CheckCircle2 size={11} color={MET} style={{ marginLeft: 4, verticalAlign: "-1px" }} />}
+                </span>
               </div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: c, textAlign: "right" }}>
-                {r.reductionPct == null ? "—" : `${red >= 0 ? "−" : "+"}${Math.abs(red).toFixed(0)}%`}
-                {r.meets && <CheckCircle2 size={11} color={MET} style={{ marginLeft: 4, verticalAlign: "-1px" }} />}
-              </span>
+              {/* Expanded: the assembly on each component of this package */}
+              {open && hasMat && (
+                <div style={{ margin: "4px 0 6px 20px", padding: "8px 12px", borderRadius: 8,
+                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                  display: "flex", flexDirection: "column", gap: 8 }}>
+                  {r.materials!.map((m, i) => (
+                    <div key={`${m.component}-${i}`} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11 }}>
+                        <span style={{ minWidth: 78, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "capitalize" }}>{m.component}</span>
+                        <span style={{ flex: 1, color: "rgba(255,255,255,0.82)" }}>{m.material}</span>
+                        {m.u != null && (
+                          <span style={{ fontWeight: 700, color: m.u > 0.4 ? "#EF4444" : m.u > 0.3 ? "#F59E0B" : "#96D74C", flexShrink: 0 }}>
+                            U {m.u.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                      {/* Full build-up, outside → inside — names the exact insulation. */}
+                      {m.layers && m.layers.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingLeft: 86 }}>
+                          {m.layers.map((l, j) => (
+                            <span key={j} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10,
+                              padding: "1px 7px", borderRadius: 6,
+                              background: `${LAYER_COLOR[l.category ?? ""] ?? "#9CA3AF"}1e`,
+                              border: `1px solid ${LAYER_COLOR[l.category ?? ""] ?? "#9CA3AF"}40`,
+                              color: "rgba(255,255,255,0.8)" }}>
+                              <span style={{ fontWeight: 700, color: LAYER_COLOR[l.category ?? ""] ?? "#9CA3AF" }}>{l.thicknessMm} mm</span>
+                              {l.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
