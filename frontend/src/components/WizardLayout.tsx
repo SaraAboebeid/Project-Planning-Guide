@@ -2,6 +2,7 @@ import { useRef, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import { wizardNav } from "./wizardNav";
+import { LIBRARY_TABS, tabPathFor, countryCodeFromName } from "../config/countryNav";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
@@ -54,13 +55,10 @@ function SideNavItem({
 
 const STEP_ICONS = [IC.project, IC.map, IC.database, IC.layers, IC.timeline];
 
-const LIBRARY_TABS = [
-  { label: "Pathways", path: "/pathways" },
-  { label: "Data Explorer", path: "/data" },
-  { label: "Analysis Tools", path: "/analysis" },
-  { label: "3D Viewer", path: "/viewer" },
-  { label: "Sample Reports", path: "/reports" },
-];
+// Library tabs come from the shared config (countryNav.ts) — the same list the
+// landing page and DataLayout render through <TopBar/> — so the wizard header
+// can't drift from them again (it used to have its own hardcoded copy that was
+// missing Project Team and the per-country routing).
 
 const PT_LABEL: Record<string, string> = {
   renovation:       "Renovation Planning",
@@ -217,11 +215,12 @@ export default function WizardLayout() {
               border: "1px solid rgba(255,255,255,0.08)",
             }}>
               {LIBRARY_TABS.map((tab) => {
-                const isActive = location.pathname === tab.path;
+                const targetPath = tabPathFor(tab, countryCodeFromName(project.country));
+                const isActive = location.pathname === tab.path || location.pathname === targetPath;
                 return (
                   <button
                     key={tab.label}
-                    onClick={() => navigate(tab.path)}
+                    onClick={() => navigate(targetPath)}
                     style={{
                       border: 0,
                       borderRadius: 8,

@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationCalcPackage, type RenovationCalcBuildingResult, type RenovationCalcSelection } from "../store/wizard";
+import { climateGoalFor, assessAgainstGoal } from "../config/climateGoals";
+import ClimateGoalPanel from "../components/ClimateGoalPanel";
 import { api } from "../api/client";
 import { lineItemsFor, type AreaLineItem } from "../config/componentAreaLineItems";
 import { resolveBuildingGeometry, computeAreaForLineItem, quantityUnitLabel, type ResolvedBuildingGeometry } from "../utils/componentAreas";
@@ -885,6 +887,21 @@ export default function RenovationSimulator() {
   const baselinePkg = packages.find((p) => p.isBaseline);
   const baselineAgg = baselinePkg ? pkgAggregate(baselinePkg) : null;
 
+  // City climate target (Gothenburg: −30% by 2030). Scored against the baseline
+  // energy demand once packages have completed results — same helper the Step 5
+  // report uses, so the two never disagree.
+  const climateGoal = climateGoalFor(project.city, project.country);
+  const goalAssessment = useMemo(() => {
+    if (!climateGoal || baselineAgg?.avgTotalKwhM2Yr == null) return null;
+    const rows = packages
+      .filter((p) => !p.isBaseline)
+      .map((p) => ({ pkg: p, total: pkgAggregate(p).avgTotalKwhM2Yr }))
+      .filter((x): x is { pkg: RenovationCalcPackage; total: number } => x.total != null)
+      .map(({ pkg, total }) => ({ label: pkg.name, color: pkg.color, energyUse: total }));
+    if (!rows.length) return null;
+    return assessAgainstGoal(climateGoal, baselineAgg.avgTotalKwhM2Yr, rows);
+  }, [climateGoal, baselineAgg?.avgTotalKwhM2Yr, packages]);
+
   /* ── Multi-objective optimizer input (Sweden) ────────────────────────────
      Build the per-component option matrix + economy/climate params from the
      already-resolved geometry, cost, carbon and EPSM baseline. The optimizer
@@ -1512,6 +1529,9 @@ export default function RenovationSimulator() {
               </p>
             )}
           </div>
+
+          {/* City climate target — which package reaches Gothenburg's −30% by 2030 */}
+          {goalAssessment && <ClimateGoalPanel a={goalAssessment} />}
 
         </>
       )}

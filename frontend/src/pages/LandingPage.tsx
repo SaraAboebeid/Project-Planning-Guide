@@ -92,12 +92,15 @@ const STEP_STATUS_STYLE: Record<StepStatus, { dot: string; text: string }> = {
 };
 
 // ── Data ───────────────────────────────────────────────────────────────────
+// The real Renovation Planning wizard steps — each card matches the page it
+// links to (Define Project → Building & Site Data → Baseline → Calculator →
+// Report), so the home page describes what actually happens in the flow.
 const WORKFLOW_STEPS = [
   {
     n: 1,
     shortLabel: "Step 1",
-    name: "Project Brief",
-    desc: "Define goals, scope, KPIs and location.",
+    name: "Define Project",
+    desc: "Set the project type, systems in scope, KPIs and location.",
     status: "not-started" as StepStatus,
     path: "/step/1",
     icon: IC.deliverable,
@@ -105,38 +108,38 @@ const WORKFLOW_STEPS = [
   {
     n: 2,
     shortLabel: "Step 2",
-    name: "Site Intelligence",
-    desc: "Explore context, constraints and opportunities.",
-    status: "in-progress" as StepStatus,
+    name: "Building & Site Data",
+    desc: "Load open building data (EUBUCCO + Boverket EPC) and select the buildings to renovate.",
+    status: "not-started" as StepStatus,
     path: "/step/2",
-    icon: IC.layers,
+    icon: IC.map,
   },
   {
     n: 3,
     shortLabel: "Step 3",
-    name: "Data Confidence",
-    desc: "Assess data quality, gaps and uncertainty.",
-    status: "review" as StepStatus,
+    name: "Baseline Simulation",
+    desc: "Run an EnergyPlus baseline for the selected buildings — the as-built energy demand.",
+    status: "not-started" as StepStatus,
     path: "/step/3",
     icon: IC.database,
   },
   {
     n: 4,
     shortLabel: "Step 4",
-    name: "Scenario Outputs",
-    desc: "Compare alternatives and expected outcomes.",
+    name: "Calculator",
+    desc: "Design envelope build-ups, combine them into packages, and simulate or optimise each against the baseline.",
     status: "not-started" as StepStatus,
     path: "/step/4",
-    icon: IC.report,
+    icon: IC.layers,
   },
   {
     n: 5,
     shortLabel: "Step 5",
-    name: "Roadmap and Budget",
-    desc: "Plan timeline, resources and estimated cost.",
+    name: "Report",
+    desc: "Recommended packages, cost, carbon, the city climate target, and a downloadable report.",
     status: "not-started" as StepStatus,
     path: "/step/5",
-    icon: IC.timeline,
+    icon: IC.report,
   },
 ];
 

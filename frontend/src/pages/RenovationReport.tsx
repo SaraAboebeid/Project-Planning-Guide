@@ -1,10 +1,13 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
+import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal } from "../config/climateGoals";
+import ClimateGoalPanel from "../components/ClimateGoalPanel";
+import ClimateGoalBuildingTable from "../components/ClimateGoalBuildingTable";
 import type { BuildingLookup, BuildingRecord } from "../types";
 import {
   Building2, Leaf, DollarSign, Zap, CheckCircle2, Download,
-  Award, TrendingDown, Package, FileText, AlertTriangle,
+  Award, TrendingDown, Package, FileText, AlertTriangle, Target,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell,
@@ -141,6 +144,33 @@ export default function RenovationReport() {
   }, [project.district, project.neighborhoodName, project.selectionPolygon, project.bboxRows,
       project.currentBbox, project.locationLabel, project.address, project.lat, project.lon]);
 
+  /* ── City climate target (Gothenburg: −30% by 2030) ────────────────────────
+     Same helper Step 4 uses, so the report can't contradict what was shown when
+     the packages were simulated. */
+  const climateGoal = climateGoalFor(project.city, project.country);
+  // simResults[].energyUse is a PORTFOLIO AVERAGE across buildings, so the goal
+  // panel must measure it against the portfolio-average baseline — not
+  // baselines[0] (one building), which made the panel disagree with the
+  // per-building table on multi-building projects.
+  const climateBaselineEU = baselines.length
+    ? baselines.reduce((s, b) => s + b.energyUse, 0) / baselines.length
+    : baselineEU;
+  const goalAssessment = useMemo(() => {
+    if (!climateGoal || !climateBaselineEU || !simResults.length) return null;
+    return assessAgainstGoal(
+      climateGoal,
+      climateBaselineEU,
+      simResults.map((r) => ({ label: `Package ${r.packageIndex}`, energyUse: r.energyUse })),
+    );
+  }, [climateGoal, climateBaselineEU, simResults]);
+
+  // Per-building goal detail — each building's own target and how each package
+  // lands against it. Uses the per-building results kept in renovationCalcPackages.
+  const buildingGoal = useMemo(() => {
+    if (!climateGoal) return null;
+    return assessBuildingsAgainstGoal(climateGoal, project.renovationCalcPackages ?? []);
+  }, [climateGoal, project.renovationCalcPackages]);
+
   /* ── Recommended packages ── */
   const bestEnergy  = simResults[0] ?? null;   // already sorted by saving desc
   const bestCost    = [...simResults].sort((a, b) => a.cost - b.cost)[0] ?? null;
@@ -263,6 +293,42 @@ export default function RenovationReport() {
       <td>${b.energyUse.toFixed(1)} kWh/m²·yr</td><td>${b.heating.toFixed(1)} kWh/m²·yr</td></tr>`).join("")
     : `<tr><td colspan="4" class="muted">No baseline simulation recorded.</td></tr>`}
   </tbody></table>
+
+  ${goalAssessment ? `
+  <h2>${esc(goalAssessment.goal.city)} climate target</h2>
+  <p class="sub">Target: reduce the as-built baseline energy demand by ${goalAssessment.goal.reductionPct}% by ${goalAssessment.goal.targetYear}. ${esc(goalAssessment.goal.source)}.</p>
+  <p style="font-weight:700;margin:2px 0 6px;color:${goalAssessment.achievers.length ? "#15803d" : "#b45309"}">
+    ${goalAssessment.achievers.length
+      ? `✓ ${esc(goalAssessment.achievers[0]!.label)} reaches −${goalAssessment.achievers[0]!.reductionPct!.toFixed(0)}%, meeting the target${goalAssessment.achievers.length > 1 ? ` (${goalAssessment.achievers.length} packages meet it)` : ""}.`
+      : goalAssessment.closest && goalAssessment.closest.reductionPct != null
+        ? `No package reaches the −${goalAssessment.goal.reductionPct}% target yet — closest is ${esc(goalAssessment.closest.label)} at −${goalAssessment.closest.reductionPct.toFixed(0)}%.`
+        : ""}
+  </p>
+  <table><thead><tr><th>Package</th><th>Energy use</th><th>Reduction vs baseline</th><th>Meets −${goalAssessment.goal.reductionPct}% target</th></tr></thead><tbody>
+  ${goalAssessment.rows.map((r) => `<tr>
+      <td>${esc(r.label)}</td>
+      <td>${r.energyUse.toFixed(1)} kWh/m²·yr</td>
+      <td>${r.reductionPct == null ? "—" : `${r.reductionPct >= 0 ? "−" : "+"}${Math.abs(r.reductionPct).toFixed(0)}%`}</td>
+      <td>${r.meets ? "✓ Yes" : "No"}</td></tr>`).join("")}
+  </tbody></table>
+  ${buildingGoal ? `
+  <h3 style="font-size:10.5pt;margin:14px 0 4px">Per-building goal — each building's own −${buildingGoal.goal.reductionPct}% target</h3>
+  <table><thead><tr><th>Building</th><th>Baseline</th><th>Goal −${buildingGoal.goal.reductionPct}%</th>${buildingGoal.columns.map((c) => `<th>${esc(c.label)}<br><span style="font-weight:400;color:#64748b">${c.met}/${c.total} meet</span></th>`).join("")}</tr></thead><tbody>
+  ${buildingGoal.rows.map((r) => `<tr>
+      <td>${esc(r.address)}</td>
+      <td>${r.baselineEnergy.toFixed(0)}</td>
+      <td>≤ ${r.targetEnergy.toFixed(0)}</td>
+      ${r.cells.map((cell) => {
+        const met = cell.tier === "meets" || cell.tier === "exceeds";
+        const col = met ? "#15803d" : cell.tier === "below" ? "#b45309" : cell.tier === "worse" ? "#b91c1c" : "#64748b";
+        const pct = cell.reductionPct == null ? "—"
+          : cell.tier === "worse" ? `+${Math.abs(Math.round(cell.reductionPct))}%`
+          : cell.tier === "below" ? `−${Math.round(cell.reductionPct)}% (${buildingGoal.goal.reductionPct - Math.round(cell.reductionPct)}pp short)`
+          : `−${Math.round(cell.reductionPct)}%`;
+        return `<td style="color:${col}">${cell.energy == null ? "—" : cell.energy.toFixed(0)}${met ? " ✓" : ""}<br><span style="font-size:8pt">${pct}</span></td>`;
+      }).join("")}</tr>`).join("")}
+  </tbody></table>
+  <p class="sub" style="margin-top:4px">Values in kWh/m²·yr · pp = percentage points short of the −${buildingGoal.goal.reductionPct}% target.</p>` : ""}` : ""}
 
   <h2>Recommended packages — and what they are made of</h2>
   ${bestBlock("Best energy saving", bestEnergy, "largest reduction in energy use")}
@@ -458,6 +524,22 @@ export default function RenovationReport() {
           ))}
         </div>
       </Card>
+
+      {/* ── City climate target ── */}
+      {goalAssessment && (
+        <Card>
+          <SectionTitle icon={<Target size={15} color="#96D74C" />} title="City climate target" />
+          <ClimateGoalPanel a={goalAssessment} />
+          {buildingGoal && (
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>
+                Per-building goal
+              </div>
+              <ClimateGoalBuildingTable a={buildingGoal} />
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* ── 2. Buildings ── */}
       {buildings.length > 0 && (
