@@ -1,8 +1,53 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import { wizardNav } from "./wizardNav";
 import { LIBRARY_TABS, tabPathFor, countryCodeFromName } from "../config/countryNav";
+
+// ── Confetti ─────────────────────────────────────────────────────────────────
+// Tiny self-contained canvas burst (no dependency) fired once when the user
+// lands on the final step. Cleans itself up after ~2.6 s.
+function fireConfetti() {
+  if (typeof document === "undefined") return;
+  const canvas = document.createElement("canvas");
+  canvas.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9999";
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) { canvas.remove(); return; }
+  const dpr = window.devicePixelRatio || 1;
+  const W = (canvas.width = window.innerWidth * dpr);
+  const H = (canvas.height = window.innerHeight * dpr);
+  const COLORS = ["#96D74C", "#4ECDC4", "#721CB8", "#F59E0B", "#EF4444", "#60a5fa", "#B98BE8"];
+  const parts = Array.from({ length: 170 }, () => ({
+    x: W / 2 + (Math.random() - 0.5) * W * 0.35,
+    y: H * 0.32 + (Math.random() - 0.5) * 60 * dpr,
+    vx: (Math.random() - 0.5) * 15 * dpr,
+    vy: (Math.random() * -9 - 5) * dpr,
+    size: (5 + Math.random() * 6) * dpr,
+    rot: Math.random() * Math.PI,
+    vr: (Math.random() - 0.5) * 0.35,
+    color: COLORS[(Math.random() * COLORS.length) | 0]!,
+  }));
+  const start = performance.now();
+  const g = 0.34 * dpr;
+  function frame(now: number) {
+    const t = now - start;
+    ctx!.clearRect(0, 0, W, H);
+    for (const p of parts) {
+      p.vy += g; p.x += p.vx; p.y += p.vy; p.vx *= 0.99; p.rot += p.vr;
+      ctx!.save();
+      ctx!.translate(p.x, p.y);
+      ctx!.rotate(p.rot);
+      ctx!.globalAlpha = Math.max(0, 1 - t / 2600);
+      ctx!.fillStyle = p.color;
+      ctx!.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.62);
+      ctx!.restore();
+    }
+    if (t < 2600) requestAnimationFrame(frame);
+    else canvas.remove();
+  }
+  requestAnimationFrame(frame);
+}
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
@@ -32,23 +77,26 @@ const IC = {
 function SideNavItem({
   iconD,
   label,
+  title,
   active = false,
   onClick,
 }: {
   iconD: string;
   label: string;
+  /** Full name shown on hover; defaults to the visible label. */
+  title?: string;
   active?: boolean;
   onClick?: () => void;
 }) {
   return (
-    <button onClick={onClick} title={label}
+    <button onClick={onClick} title={title ?? label}
             className={`group flex flex-col items-center gap-1 w-full py-2.5 rounded-lg transition-all cursor-pointer border-0 ${
               active
                 ? "bg-white/12 text-white"
                 : "text-white/40 hover:text-white/80 hover:bg-white/8"
             }`}>
       <Icon d={iconD} size={19} />
-      <span className="text-[9px] tracking-wide font-medium leading-none">{label}</span>
+      <span className="text-[9px] tracking-wide font-medium leading-none text-center px-0.5">{label}</span>
     </button>
   );
 }
@@ -127,6 +175,22 @@ export default function WizardLayout() {
   const stepIndex = steps.findIndex((s) => s.path === location.pathname);
   const safeIndex = stepIndex < 0 ? 0 : stepIndex;
   const activeStep = steps[safeIndex]!;
+  const isLastStep = safeIndex === steps.length - 1;
+
+  // Arrival splash on the final step (Report): a full-screen message appears with
+  // a confetti burst, then fades out to reveal the report behind it.
+  //   "in"   → shown (text animates in, confetti fires)
+  //   "out"  → fading away (report becomes visible behind)
+  //   "gone" → removed
+  const [splash, setSplash] = useState<"in" | "out" | "gone">("gone");
+  useEffect(() => {
+    if (!isLastStep) { setSplash("gone"); return; }
+    setSplash("in");
+    const tC = window.setTimeout(fireConfetti, 350);
+    const tOut = window.setTimeout(() => setSplash("out"), 2100);
+    const tGone = window.setTimeout(() => setSplash("gone"), 3000);
+    return () => { window.clearTimeout(tC); window.clearTimeout(tOut); window.clearTimeout(tGone); };
+  }, [isLastStep]);
 
   const hasBuilding = (project.buildingPoints?.length ?? 0) > 0 || !!project.bboxStats;
   const componentsCount = project.renovationEnvelopeComponents?.length ?? 0;
@@ -151,6 +215,32 @@ export default function WizardLayout() {
     <div className="wizard-shell flex h-screen overflow-hidden"
          style={{ background: "#0a0d14", fontFamily: "'Inter', system-ui, sans-serif", color: "#fff" }}>
 
+      {/* ── Final-step arrival splash — fades out to reveal the Report behind ── */}
+      {splash !== "gone" && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9998,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          textAlign: "center", padding: 24,
+          background: "radial-gradient(circle at 50% 42%, rgba(24,20,44,0.90) 0%, rgba(8,11,18,0.95) 70%)",
+          opacity: splash === "out" ? 0 : 1,
+          transition: "opacity 0.85s ease",
+          pointerEvents: splash === "out" ? "none" : "auto",
+        }}>
+          <div style={{ animation: "splashIn 0.7s cubic-bezier(0.16,1,0.3,1) both" }}>
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, textTransform: "uppercase", color: "#B98BE8", marginBottom: 16 }}>
+              Step {activeStep.number} · {activeStep.label}
+            </div>
+            <div style={{ fontSize: 46, fontWeight: 900, color: "#fff", lineHeight: 1.1, marginBottom: 14 }}>
+              You've reached the final step 🎉
+            </div>
+            <div style={{ fontSize: 16, color: "rgba(255,255,255,0.62)", maxWidth: 540, lineHeight: 1.6, margin: "0 auto" }}>
+              Your renovation plan is ready — review the report, download it, and share.
+            </div>
+          </div>
+          <style>{`@keyframes splashIn{from{opacity:0;transform:translateY(18px) scale(0.96)}to{opacity:1;transform:none}}`}</style>
+        </div>
+      )}
+
       {/* ── LEFT SIDEBAR ────────────────────────────────────────────────── */}
       <aside className="w-[62px] shrink-0 flex flex-col items-center py-3 gap-0.5 z-30"
              style={{ background: "#0a0d14", borderRight: "1px solid rgba(255,255,255,0.07)" }}>
@@ -166,6 +256,7 @@ export default function WizardLayout() {
             key={step.path}
             iconD={STEP_ICONS[i] ?? IC.project}
             label={`Step ${step.number}`}
+            title={step.label}
             active={location.pathname === step.path}
             onClick={() => navigate(step.path)}
           />
@@ -269,15 +360,18 @@ export default function WizardLayout() {
             <Icon d={IC.arrowL} size={16} /> Back
           </button>
           <div style={{ flex: 1 }} />
-          <button onClick={() => (wizardNav.onNext ? wizardNav.onNext() : goNext())} style={{
-            display: "flex", alignItems: "center", gap: 8, padding: "8px 24px",
-            borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#fff",
-            background: "linear-gradient(135deg,#721CB8,#421869)",
-            boxShadow: "0 4px 14px rgba(114,28,184,0.45)", border: 0,
-            cursor: "pointer", transition: "all 0.15s",
-          }}>
-            Continue <Icon d={IC.arrowR} size={16} />
-          </button>
+          {/* No Continue on the final step (Report) — nothing comes after it. */}
+          {!isLastStep && (
+            <button onClick={() => (wizardNav.onNext ? wizardNav.onNext() : goNext())} style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "8px 24px",
+              borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#fff",
+              background: "linear-gradient(135deg,#721CB8,#421869)",
+              boxShadow: "0 4px 14px rgba(114,28,184,0.45)", border: 0,
+              cursor: "pointer", transition: "all 0.15s",
+            }}>
+              Continue <Icon d={IC.arrowR} size={16} />
+            </button>
+          )}
         </footer>
 
       </div>

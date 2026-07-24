@@ -1044,9 +1044,15 @@ export default function RenovationSimulator() {
       if (baseU == null) continue; // not a U-override component
       const area = computeAreaForLineItem(li, repGeo, wwrByIndex[repIdx] ?? null, manualOverrides);
       if (area == null || area <= 0) continue;
-      const draft = draftSelection[li.key] ?? [];
-      let cands = itemsForLineItem(li).filter((it) => it.uValue != null);
-      if (draft.length) cands = cands.filter((it) => draft.includes(it.code)); // scope the search to picked materials
+      // Only vary components the user has actually picked catalogue materials
+      // for (their saved configs). The search is scoped to exactly those picks,
+      // so the curve reflects — and narrows live with — their selections, and we
+      // avoid a heavy full-matrix search before anything is chosen.
+      const picked = configs
+        .filter((c) => c.componentKey === li.key && c.source === "catalogue" && c.wikellsCode)
+        .map((c) => c.wikellsCode!);
+      if (picked.length === 0) continue;
+      const cands = itemsForLineItem(li).filter((it) => it.uValue != null && picked.includes(it.code));
       const options = cands.map((it) => ({
         code: it.code,
         label: matShort(it),
@@ -1058,7 +1064,7 @@ export default function RenovationSimulator() {
       comps.push({ key: li.key, area_m2: Math.round(area), baseline_u: baseU, options });
     }
     if (comps.length === 0)
-      return { input: null, disabledReason: "No catalogue materials with U-values for these components — pick some in the builder above." };
+      return { input: null, disabledReason: "Pick catalogue materials in the builder above — the trade-off curve appears here and updates as you go." };
 
     const params: OptimizeParams = {
       f_dh: (24 * (assumptionValue("SE", "degree_days") ?? 3300)) / 1000,
@@ -1070,7 +1076,7 @@ export default function RenovationSimulator() {
       baseline_total_kwh_m2_yr: baseTotal,
     };
     return { input: { components: comps, params } };
-  }, [isUK, targetIdx, geometries, baselinePkg, lineItems, draftSelection, wwrByIndex, manualOverrides, boverketAll, livePriceSek]);
+  }, [isUK, targetIdx, geometries, baselinePkg, lineItems, configs, wwrByIndex, manualOverrides, boverketAll, livePriceSek]);
 
   // Which optimizer picks are already validated (as a package) — keyed by the
   // touched (non-"keep") component→material selections, matching the panel.
@@ -1547,13 +1553,13 @@ export default function RenovationSimulator() {
             </div>
           )}
 
-          {/* The optimizer is an ALTERNATIVE to simulating everything, not a
-              sibling step — labelled so you can tell which tool you want. */}
+          {/* The trade-off curve now updates live from the same picks, so it's a
+              companion view (not a separate "run this instead" tool). */}
           {!isUK && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 -4px" }}>
               <span style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
               <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>
-                or, if there are too many to run
+                live pareto optimization
               </span>
               <span style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
             </div>

@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import WizardLayout from "./components/WizardLayout";
 import DataLayout from "./components/DataLayout";
 import LandingPage from "./pages/LandingPage";
+import WorkspaceSelect from "./pages/WorkspaceSelect";
+import { type ProjectType } from "./config/projectConfig";
 import DefineProject from "./pages/DefineProject";
 import DataCoverage from "./pages/DataCoverage";
 import DataAssumptions from "./pages/DataAssumptions";
@@ -29,25 +31,26 @@ function ScrollToTop() {
   return null;
 }
 
+// Renovation is the default track (the only enabled project type for now), so
+// the routers render the renovation pages unless an EC/RE type is EXPLICITLY set.
+// This keeps the wizard on the renovation flow even before Step 1 is filled in,
+// and still routes EC/RE to their own pages when those types are re-enabled.
+const isEcOrRe = (t: ProjectType | null) =>
+  t === "Energy Community Planning" || t === "Renewable Energy Planning";
+
 function Step3Router() {
   const projectType = useWizardStore(s => s.project.projectType);
-  return projectType === "Renovation Planning"
-    ? <BaselineSetup />
-    : <DataAssumptions />;
+  return isEcOrRe(projectType) ? <DataAssumptions /> : <BaselineSetup />;
 }
 
 function Step4Router() {
   const projectType = useWizardStore(s => s.project.projectType);
-  return projectType === "Renovation Planning"
-    ? <RenovationSimulator />
-    : <StepScenarios />;
+  return isEcOrRe(projectType) ? <StepScenarios /> : <RenovationSimulator />;
 }
 
 function Step5Router() {
   const projectType = useWizardStore(s => s.project.projectType);
-  return projectType === "Renovation Planning"
-    ? <RenovationReport />
-    : <ResultsBudget />;
+  return isEcOrRe(projectType) ? <ResultsBudget /> : <RenovationReport />;
 }
 
 /**
@@ -64,6 +67,9 @@ export default function App() {
       <ScrollToTop />
       <Routes>
       <Route path="/" element={<LandingPage />} />
+      {/* New workspace/toolbox-select entry — parked here (NOT the entry) while its
+          design is reviewed; visit /workspace to preview it. */}
+      <Route path="/workspace" element={<WorkspaceSelect />} />
       <Route path="/data"      element={<DataLayout><DataExplorer /></DataLayout>} />
       <Route path="/data/uk"   element={<DataLayout title="Data Explorer" accentColor="#4A90E2" accentBadge="United Kingdom Data"><UKDataExplorer /></DataLayout>} />
       <Route path="/pathways"  element={<DataLayout title="Pathways"       accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />

@@ -44,6 +44,24 @@
   window.VIEW_CENTER = { lon: city.lon, lat: city.lat };
   window.VIEW_HEIGHT = city.camera_height || 800;
 
+  // Optional focus from the caller (e.g. Step 2's "3D view" button passes the
+  // bounding box of the selected buildings / neighborhood / area) — open the
+  // camera there instead of the city default. ?bbox=north,south,east,west
+  const bboxParam = params.get('bbox');
+  if (bboxParam) {
+    const [north, south, east, west] = bboxParam.split(',').map(Number);
+    if ([north, south, east, west].every(Number.isFinite) && north !== south && east !== west) {
+      const midLat = (north + south) / 2, midLon = (east + west) / 2;
+      const latM = Math.abs(north - south) * 111320;
+      const lonM = Math.abs(east - west) * 111320 * Math.cos(midLat * Math.PI / 180);
+      const span = Math.max(latM, lonM, 120);
+      window.VIEW_CENTER = { lon: midLon, lat: midLat };
+      // Frame the whole selection: taller camera for a bigger area, clamped.
+      window.VIEW_HEIGHT = Math.min(6000, Math.max(400, span * 1.5));
+      window.FOCUS_BBOX = { north, south, east, west };
+    }
+  }
+
   // Country gates the Sweden-only layers (Västtrafik, SCB) via CSS.
   document.body.setAttribute('data-country', profile.country);
 

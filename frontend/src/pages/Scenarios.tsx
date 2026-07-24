@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
-import RenovationPackages from "./RenovationPackages";
 import { Hammer, Zap, Sun, Cpu, Users, BarChart2, Layers, TrendingUp } from "lucide-react";
 
 /* ─── Project flow diagram ─────────────────────────────────────────── */
@@ -1071,11 +1070,10 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
 export default function Scenarios() {
   const { project } = useWizardStore();
 
-  /* Renovation Planning has its own rich cost-estimator UI */
-  if (project.projectType === "Renovation Planning") {
-    return <RenovationPackages />;
-  }
-
-  /* All other types (EC, RE, or no selection) → show the roadmap */
+  /* The Pathways tab always shows the pathway roadmap, for every project type.
+     (Renovation Planning used to divert here to RenovationPackages — a
+     wizard-style "Step 4 – Deliverables" page that didn't belong on a
+     standalone nav tab; the real renovation calculator is the wizard's Step 4,
+     RenovationSimulator.) */
   return <ToolRoadmap activeType={project.projectType} />;
 }

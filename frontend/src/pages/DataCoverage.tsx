@@ -749,9 +749,16 @@ function sortByCol(a: BuildingRecord, b: BuildingRecord, colKey: keyof BuildingR
   if (av == null && bv == null) return 0;
   if (av == null) return 1;
   if (bv == null) return -1;
-  const diff = colKey === "epc_class"
-    ? (EPC_ORDER[String(av).toUpperCase()] ?? 99) - (EPC_ORDER[String(bv).toUpperCase()] ?? 99)
-    : (Number(av) || 0) - (Number(bv) || 0);
+  let diff: number;
+  if (colKey === "epc_class") {
+    diff = (EPC_ORDER[String(av).toUpperCase()] ?? 99) - (EPC_ORDER[String(bv).toUpperCase()] ?? 99);
+  } else {
+    const an = Number(av), bn = Number(bv);
+    // Numeric columns compare numerically; text columns (e.g. address) alphabetically.
+    diff = (!Number.isNaN(an) && !Number.isNaN(bn) && av !== "" && bv !== "")
+      ? an - bn
+      : String(av).localeCompare(String(bv));
+  }
   return asc ? diff : -diff;
 }
 
@@ -814,6 +821,8 @@ function BboxDataBanner({
   const [selected, setSelected]       = useState<Set<number>>(new Set());
   const [compareOpen, setCompareOpen] = useState(false);
   const [sortCol, setSortCol]         = useState<keyof BuildingRecord>("energy_kwh_m2");
+  // Sort for the main building table (click a header). Null = original order.
+  const [tableSort, setTableSort]     = useState<{ key: keyof BuildingRecord; asc: boolean } | null>(null);
   const PAGE_SIZE = 50;
 
   // In district mode there are no precomputed aggregate stats, so derive them
@@ -921,11 +930,44 @@ function BboxDataBanner({
     });
   }
 
-  const pagedRows      = rows ? rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : [];
+  // Rows carry their ORIGINAL index (selection is keyed by that), then optionally
+  // sorted by the clicked column — so sorting reorders the view without ever
+  // scrambling which buildings are selected.
+  const orderedRows: { r: BuildingRecord; idx: number }[] = rows
+    ? (() => {
+        const withIdx = rows.map((r, idx) => ({ r, idx }));
+        if (tableSort) withIdx.sort((a, b) => sortByCol(a.r, b.r, tableSort.key, tableSort.asc));
+        return withIdx;
+      })()
+    : [];
+  const pagedRows      = orderedRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const totalPages     = rows ? Math.ceil(rows.length / PAGE_SIZE) : 0;
-  const pageIdxs       = pagedRows.map((_, i) => page * PAGE_SIZE + i);
+  const pageIdxs       = pagedRows.map(p => p.idx);
   const pageAllChecked = pageIdxs.length > 0 && pageIdxs.every(i => selected.has(i));
   const pagePartial    = !pageAllChecked && pageIdxs.some(i => selected.has(i));
+
+  // Click a header to sort by it; click the same header again to flip asc/desc.
+  const toggleSort = (key: keyof BuildingRecord) =>
+    setTableSort(s => (s && s.key === key ? { key, asc: !s.asc } : { key, asc: true }));
+
+  // Open the 3D viewer focused on the current Step-1 selection — the bounding box
+  // of the selected buildings, or of every building in scope when none are ticked,
+  // falling back to the drawn area. Works for a single building, many buildings, a
+  // neighborhood/district, or a drawn area alike.
+  const viewer3dUrl = (() => {
+    const src: BuildingRecord[] = selected.size > 0
+      ? [...selected].map(i => rows?.[i]).filter((r): r is BuildingRecord => !!r)
+      : (rows ?? []);
+    const lats = src.map(r => r.lat).filter((n): n is number => typeof n === "number");
+    const lons = src.map(r => r.lon).filter((n): n is number => typeof n === "number");
+    let box = "";
+    if (lats.length && lons.length) {
+      box = [Math.max(...lats), Math.min(...lats), Math.max(...lons), Math.min(...lons)].join(",");
+    } else if (bbox) {
+      box = [bbox.north, bbox.south, bbox.east, bbox.west].join(",");
+    }
+    return `http://127.0.0.1:8765/gothenburg_3d.html?bbox=${box}`;
+  })();
 
   function togglePageAll() {
     setSelected(prev => {
@@ -971,8 +1013,9 @@ function BboxDataBanner({
             <Download className="w-3 h-3" /> Export
           </button>
           <a
-            href={`http://127.0.0.1:8765/gothenburg_3d.html?bbox=${bbox ? [bbox.north,bbox.south,bbox.east,bbox.west].join(',') : ''}`}
+            href={viewer3dUrl}
             target="_blank" rel="noopener noreferrer"
+            title={selected.size > 0 ? `Open the 3D viewer on the ${selected.size} selected building${selected.size === 1 ? "" : "s"}` : "Open the 3D viewer on this selection"}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-purple-400 hover:bg-purple-900/30 whitespace-nowrap transition"
           >
             <Globe2 className="w-3 h-3" /> 3D view
@@ -1061,20 +1104,28 @@ function BboxDataBanner({
                       title="Select / deselect all on this page"
                     />
                   </th>
-                  {BBOX_CSV_COLS.map(c => (
-                    <th key={c.key} className="px-2 py-1 text-left font-semibold text-white/60 border-b border-white/10 whitespace-nowrap">
-                      {c.label}
-                    </th>
-                  ))}
+                  {BBOX_CSV_COLS.map(c => {
+                    const active = tableSort?.key === c.key;
+                    return (
+                      <th key={c.key}
+                          onClick={() => toggleSort(c.key)}
+                          title="Sort by this column (click again to reverse)"
+                          className={`px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap cursor-pointer select-none hover:text-white ${active ? "text-white" : "text-white/60"}`}>
+                        {c.label}
+                        <span className="ml-1 text-[9px]" style={{ opacity: active ? 1 : 0.3 }}>
+                          {active ? (tableSort!.asc ? "▲" : "▼") : "↕"}
+                        </span>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {pagedRows.map((r, i) => {
-                  const globalIdx  = page * PAGE_SIZE + i;
+                {pagedRows.map(({ r, idx: globalIdx }) => {
                   const isSelected = selected.has(globalIdx);
                   return (
                     <tr
-                      key={i}
+                      key={globalIdx}
                       onClick={() => toggleRow(globalIdx)}
                       className={`cursor-pointer border-b border-white/8 transition-colors ${
                         isSelected ? "bg-purple-900/30 hover:bg-purple-900/40" : "hover:bg-white/5"

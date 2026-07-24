@@ -113,7 +113,6 @@ export const ENVELOPE_COMPONENTS = [
 export const UNIVERSAL_KPIS = [
   "Environmental",
   "Economic",
-  "Social",
   "Performance / Technical",
 ];
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api, type OptimizeComponentInput, type OptimizeParams, type OptimizePoint, type OptimizeResponse } from "../api/client";
 import { Loader2, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import ParetoChart, { axesFromKpis, OBJECTIVES } from "./ParetoChart";
@@ -28,7 +28,7 @@ export default function OptimizerPanel({
   selectedKpis: string[];
 }) {
   const axes = axesFromKpis(selectedKpis);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OptimizeResponse | null>(null);
@@ -55,6 +55,17 @@ export default function OptimizerPanel({
     }
   }
 
+  // Live: recompute the trade-off curve whenever the picked materials / building
+  // change — no manual "optimize" click. The search is the fast degree-day
+  // physics (no EnergyPlus), so it's cheap to re-run on every selection change;
+  // debounced so rapid ticking doesn't fire a request per keystroke.
+  useEffect(() => {
+    if (!canRun) { setResult(null); return; }
+    const t = setTimeout(() => { run(); }, 450);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input]);
+
   const pareto = result ? [...result.pareto].sort((a, b) => a[sort] - b[sort]) : [];
   const baseEnergy = result?.baseline.energy_kwh_m2_yr ?? null;
   // Match RenovationSimulator's validatedKeys: touched components only (a
@@ -64,8 +75,8 @@ export default function OptimizerPanel({
 
   return (
     <div style={{ borderRadius: 14, background: "rgba(114,28,184,0.06)", border: "1px solid rgba(114,28,184,0.28)", overflow: "hidden" }}>
-      {/* The run action stays reachable whether or not the panel is expanded —
-          it used to be hidden inside the collapsed body. */}
+      {/* No "optimize" button — the curve recomputes live as materials are
+          picked (see the effect above). The header just shows status. */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px" }}>
         <button
           onClick={() => setOpen((o) => !o)}
@@ -75,28 +86,13 @@ export default function OptimizerPanel({
           }}
         >
           <Sparkles size={16} color="#B98BE8" />
-          <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Optimizer — best cost / carbon / energy trade-offs</span>
-          {result && !open && (
+          <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Optimization · Pareto curve — updates live as you pick materials</span>
+          {loading && <Loader2 size={13} color="#B98BE8" style={{ animation: "spin 1s linear infinite" }} />}
+          {result && !loading && (
             <span style={{ fontSize: 11, color: white(0.45) }}>
               {result.pareto_count} optimal of {result.combinations_total.toLocaleString()}
             </span>
           )}
-        </button>
-
-        <button
-          onClick={() => { setOpen(true); run(); }}
-          disabled={!canRun || loading}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 15px", borderRadius: 9,
-            fontSize: 12, fontWeight: 800, flexShrink: 0,
-            cursor: canRun && !loading ? "pointer" : "not-allowed",
-            background: canRun ? "rgba(114,28,184,0.35)" : "rgba(255,255,255,0.05)",
-            border: `1px solid ${canRun ? "rgba(114,28,184,0.6)" : "rgba(255,255,255,0.1)"}`,
-            color: canRun ? "#fff" : white(0.4),
-          }}
-        >
-          {loading && <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />}
-          {result ? "Re-run" : "Run optimization"}
         </button>
 
         <button onClick={() => setOpen((o) => !o)}
@@ -112,10 +108,10 @@ export default function OptimizerPanel({
       {open && (
         <div style={{ padding: "0 18px 18px" }}>
           <p style={{ fontSize: 12, color: white(0.5), margin: "0 0 12px", lineHeight: 1.6 }}>
-            Searches <b>every material combination</b> across your components and scores each on the fast
-            degree-day physics (no EnergyPlus), then returns the <b>Pareto-optimal</b> set — the packages where
-            you can't improve one objective without sacrificing another. Pick any winner to validate its real
-            energy in EPSM. Model after Enerbäck &amp; Strömberg.
+            As you pick materials, this scores <b>every combination</b> of your picks on the fast degree-day
+            physics (no EnergyPlus) and plots the <b>Pareto-optimal</b> set live — the packages where you can't
+            improve one objective without sacrificing another. Pick any winner to validate its real energy in
+            EPSM. Model after Enerbäck &amp; Strömberg.
           </p>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
@@ -130,6 +126,15 @@ export default function OptimizerPanel({
 
           {error && (
             <div style={{ fontSize: 12, color: "#EF4444", marginBottom: 10 }}>Optimization failed: {error}</div>
+          )}
+
+          {/* Empty / computing states so the panel isn't blank before any pick */}
+          {!result && !error && !disabledReason && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: white(0.4), padding: "8px 0" }}>
+              {loading
+                ? (<><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Computing trade-off curve…</>)
+                : "Pick one or more materials per component in the builder above — the curve appears here and updates as you go."}
+            </div>
           )}
 
           {result && pareto.length > 0 && (

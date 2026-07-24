@@ -26,6 +26,7 @@ import {
 import L from "leaflet";
 import type { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { MapPin, Search, Square, PenTool, X } from "lucide-react";
 import { countryCodeFromName, mapCenterFor } from "../config/countryNav";
 
 // ── Fix Leaflet default icon paths broken by Vite bundling ──────────────────
@@ -40,6 +41,24 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
+
+// ── Location modes (Building scale): the one clear choice a user makes ────────
+type LocationMode = "addresses" | "area" | "bbox" | "polygon";
+const LOCATION_MODES: {
+  key: LocationMode;
+  label: string;
+  icon: typeof MapPin;
+  desc: string;
+}[] = [
+  { key: "addresses", label: "Address", icon: MapPin,
+    desc: "Pin one or more specific buildings by address." },
+  { key: "area", label: "Street / Area", icon: Search,
+    desc: "Search a whole street or neighborhood — selects every building inside it." },
+  { key: "bbox", label: "Draw box", icon: Square,
+    desc: "Drag a rectangle on the map to grab everything inside it." },
+  { key: "polygon", label: "Draw shape", icon: PenTool,
+    desc: "Click points on the map to outline any shape around your area." },
+];
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,16 +96,22 @@ interface BboxCoords {
 function useNominatim(query: string, countryCode = "se") {
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [loading, setLoading] = useState(false);
+  // Distinguish "searched, nothing matched" from "the search call failed"
+  // (Nominatim rate-limits at 1 req/s and returns 429/503) so the UI can say
+  // which — silently swallowing the error is what made search look "broken".
+  const [error, setError] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (query.trim().length < 3) {
       setResults([]);
+      setError(false);
       return;
     }
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       setLoading(true);
+      setError(false);
       try {
         const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
           query
@@ -94,10 +119,12 @@ function useNominatim(query: string, countryCode = "se") {
         const res = await fetch(url, {
           headers: { "Accept-Language": "en" },
         });
+        if (!res.ok) throw new Error(`Nominatim ${res.status}`);
         const data = await res.json();
         setResults(data as NominatimResult[]);
       } catch {
         setResults([]);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -107,7 +134,7 @@ function useNominatim(query: string, countryCode = "se") {
     };
   }, [query, countryCode]);
 
-  return { results, loading };
+  return { results, loading, error };
 }
 
 // ── Map: auto-fit to markers / bbox ──────────────────────────────────────────
@@ -239,8 +266,9 @@ function AddressInput({
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<number | null>(null);
-  const { results, loading } = useNominatim(query, countryCode);
+  const { results, loading, error } = useNominatim(query, countryCode);
   const containerRef = useRef<HTMLDivElement>(null);
+  const trimmed = query.trim();
 
   // Sync external value changes (e.g. when parent resets)
   useEffect(() => {
@@ -268,56 +296,91 @@ function AddressInput({
     setOpen(false);
   }
 
+  // A message row shows under the input for every non-result state, so the
+  // search never just silently does nothing (which read as "broken").
+  const showPanel = open && trimmed.length >= 3;
+  const hasResults = results.length > 0;
+
   return (
     <div ref={containerRef} className="relative flex-1">
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          onChange(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => {
-          if (results.length > 0) setOpen(true);
-        }}
-        placeholder={placeholder ?? "Type an address in Sweden…"}
-        autoComplete="off"
-        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal"
-      />
-      {loading && (
-        <span className="absolute right-3 top-2.5 text-xs text-gray-400 pointer-events-none">
-          Searching…
-        </span>
-      )}
-      {open && results.length > 0 && (
-        // Explicit colours: the light-theme utility classes this used to carry
-        // rendered as near-invisible text floating over the map.
-        <ul
-          className="absolute z-[10000] w-full mt-1 rounded-lg text-sm max-h-56 overflow-auto"
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            // Enter picks the top hit — so the search feels like a search box,
+            // not only a hover-and-click dropdown.
+            if (e.key === "Enter" && hasResults) {
+              e.preventDefault();
+              handleSelect(results[0]!);
+            } else if (e.key === "Escape") {
+              setOpen(false);
+            }
+          }}
+          placeholder={placeholder ?? "Type an address in Sweden…"}
+          autoComplete="off"
+          className="w-full rounded-lg border border-white/15 bg-white/5 text-white placeholder:text-white/40 pl-9 pr-9 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal"
+        />
+        {loading ? (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 border-gray-300 border-t-teal animate-spin pointer-events-none" />
+        ) : query ? (
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); setQuery(""); onChange(""); setOpen(false); }}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            title="Clear"
+          >
+            <X size={15} />
+          </button>
+        ) : null}
+      </div>
+
+      {showPanel && (hasResults || error || (!loading && trimmed.length >= 3)) && (
+        <div
+          className="absolute z-[10000] w-full mt-1 rounded-lg text-sm overflow-hidden"
           style={{
-            backgroundColor: "#11161d",
-            border: "1px solid rgba(255,255,255,0.14)",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.55)",
+            backgroundColor: "#fff",
+            border: "1px solid #e5e7eb",
+            boxShadow: "0 12px 32px rgba(15,23,42,0.18)",
           }}
         >
-          {results.map((r, i) => (
-            <li
-              key={r.place_id}
-              onMouseDown={() => handleSelect(r)}
-              onMouseEnter={() => setHovered(i)}
-              onMouseLeave={() => setHovered(null)}
-              className="px-4 py-2 cursor-pointer leading-snug"
-              style={{
-                color: hovered === i ? "#fff" : "rgba(255,255,255,0.82)",
-                background: hovered === i ? "rgba(114,28,184,0.35)" : "transparent",
-                borderBottom: i < results.length - 1 ? "1px solid rgba(255,255,255,0.07)" : "none",
-              }}
-            >
-              {r.display_name}
-            </li>
-          ))}
-        </ul>
+          {hasResults ? (
+            <ul className="max-h-56 overflow-auto">
+              {results.map((r, i) => (
+                <li
+                  key={r.place_id}
+                  onMouseDown={() => handleSelect(r)}
+                  onMouseEnter={() => setHovered(i)}
+                  onMouseLeave={() => setHovered(null)}
+                  className="flex items-start gap-2 px-3 py-2 cursor-pointer leading-snug"
+                  style={{
+                    color: hovered === i ? "#111827" : "#374151",
+                    background: hovered === i ? "rgba(114,28,184,0.08)" : "transparent",
+                    borderBottom: i < results.length - 1 ? "1px solid #f1f5f9" : "none",
+                  }}
+                >
+                  <MapPin size={14} className="mt-0.5 flex-shrink-0" style={{ color: "#721CB8" }} />
+                  <span>{r.display_name}</span>
+                </li>
+              ))}
+            </ul>
+          ) : error ? (
+            <div className="px-3 py-2.5 text-xs text-amber-700 bg-amber-50">
+              Search is temporarily unavailable (rate-limited). Wait a moment and try again.
+            </div>
+          ) : loading ? null : (
+            <div className="px-3 py-2.5 text-xs text-gray-500">
+              No matches for “{trimmed}”. Try a street or area name, or add the city.
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -516,51 +579,34 @@ export default function LocationMap({
 
   return (
     <div className="space-y-3 mt-2">
-      {/* Mode toggle — Building(s): pick by address, or draw a rectangle / any
-          shape to grab a group of buildings. (Neighborhood uses the district
-          list; City = the whole city — so no area drawing there.) */}
+      {/* Mode picker — one clear choice: search by address, search a whole
+          street/area, or draw a box / any shape. A segmented control (not four
+          loose buttons) + a one-line description of the active mode. */}
       {isBuilding && (
-        <div className="flex gap-2">
-          <button
-            onClick={() => setLocationMode("addresses")}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-              locationMode === "addresses"
-                ? "bg-navy text-white border-navy"
-                : "bg-white border-gray-300 hover:border-gray-400"
-            }`}
-          >
-            Addresses
-          </button>
-          <button
-            onClick={() => setLocationMode("area")}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-              locationMode === "area"
-                ? "bg-navy text-white border-navy"
-                : "bg-white border-gray-300 hover:border-gray-400"
-            }`}
-          >
-            Street / Area
-          </button>
-          <button
-            onClick={() => setLocationMode("bbox")}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-              locationMode === "bbox"
-                ? "bg-navy text-white border-navy"
-                : "bg-white border-gray-300 hover:border-gray-400"
-            }`}
-          >
-            Draw Rectangle
-          </button>
-          <button
-            onClick={() => setLocationMode("polygon")}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-              locationMode === "polygon"
-                ? "bg-navy text-white border-navy"
-                : "bg-white border-gray-300 hover:border-gray-400"
-            }`}
-          >
-            Draw Any Shape
-          </button>
+        <div>
+          <div className="inline-flex flex-wrap gap-1 p-1 rounded-xl bg-gray-100 border border-gray-200">
+            {LOCATION_MODES.map((m) => {
+              const active = locationMode === m.key;
+              const Icon = m.icon;
+              return (
+                <button
+                  key={m.key}
+                  onClick={() => setLocationMode(m.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                    active
+                      ? "bg-white text-navy shadow-sm border border-gray-200"
+                      : "text-gray-500 hover:text-gray-800 border border-transparent"
+                  }`}
+                >
+                  <Icon size={15} className={active ? "text-purple-600" : ""} />
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-500 mt-1.5">
+            {LOCATION_MODES.find((m) => m.key === locationMode)?.desc}
+          </p>
         </div>
       )}
 
@@ -576,7 +622,7 @@ export default function LocationMap({
             placeholder="Search a street or area, e.g. Jättestensgatan or Lindholmen…"
           />
           {areaLabel ? (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 flex items-center gap-3 flex-wrap">
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 flex items-center gap-3 flex-wrap">
               <span>
                 ✓ <strong>{areaLabel}</strong> — every building inside its bounds is selected.
               </span>
@@ -584,13 +630,13 @@ export default function LocationMap({
                 onClick={() => {
                   setAreaLabel(null); setBbox(null); setBboxDone(false); onBboxChange?.(null);
                 }}
-                className="ml-auto px-2.5 py-1 rounded-md border border-gray-300 text-xs font-medium hover:border-gray-400"
+                className="ml-auto px-2.5 py-1 rounded-md border border-white/15 text-white/70 text-xs font-medium hover:border-white/30"
               >
                 Clear
               </button>
             </div>
           ) : (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-white/50">
               Picks the whole street or area, not a single building. Fine-tune afterwards by
               unticking buildings in Step 2.
             </p>
@@ -600,7 +646,7 @@ export default function LocationMap({
 
       {/* Polygon draw controls */}
       {isBuilding && locationMode === "polygon" && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 flex items-center gap-3 flex-wrap">
+        <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 flex items-center gap-3 flex-wrap">
           <span>
             {polyDone
               ? `✓ Shape with ${polyVerts.length} points — buildings inside are selected.`
@@ -615,7 +661,7 @@ export default function LocationMap({
               </button>
             )}
             {polyVerts.length > 0 && (
-              <button onClick={clearPolygon} className="px-2.5 py-1 rounded-md border border-gray-300 text-xs font-medium hover:border-gray-400">
+              <button onClick={clearPolygon} className="px-2.5 py-1 rounded-md border border-white/15 text-white/70 text-xs font-medium hover:border-white/30">
                 Clear
               </button>
             )}
@@ -650,7 +696,7 @@ export default function LocationMap({
               {addressInputs.length > 1 && (
                 <button
                   onClick={() => removeAddress(i)}
-                  className="mt-0.5 px-2.5 py-2 rounded-lg border border-gray-300 text-gray-500 hover:text-red-500 hover:border-red-300 text-sm"
+                  className="mt-0.5 px-2.5 py-2 rounded-lg border border-white/15 text-white/50 hover:text-red-400 hover:border-red-400/50 text-sm"
                 >
                   ✕
                 </button>
@@ -672,7 +718,7 @@ export default function LocationMap({
 
       {/* Bbox draw instructions */}
       {isBuilding && locationMode === "bbox" && (
-        <div className="flex items-center gap-2 text-xs text-gray-600 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-white/80 bg-[#721CB8]/15 border border-[#721CB8]/35 rounded-lg px-3 py-2">
           <span>🖱️</span>
           <span>
             {bboxDone
@@ -697,7 +743,7 @@ export default function LocationMap({
 
       {/* Bbox coordinates summary — only when finalized */}
       {isBuilding && locationMode === "bbox" && bboxDone && bbox && (
-        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2.5">
+        <div className="grid grid-cols-2 gap-2 text-xs text-white/70 bg-white/5 border border-white/10 rounded-lg px-3 py-2.5">
           <div><span className="font-medium">North:</span> {bbox.north.toFixed(5)}°</div>
           <div><span className="font-medium">South:</span> {bbox.south.toFixed(5)}°</div>
           <div><span className="font-medium">East:</span> {bbox.east.toFixed(5)}°</div>

@@ -71,12 +71,10 @@ export function estimateCarbon(
   return { value: 30, confidence: "fallback" };
 }
 
-export type KpiKey = "Environmental" | "Economic" | "Social" | "Performance / Technical";
+export type KpiKey = "Environmental" | "Economic" | "Performance / Technical";
 
 /** One "Recommended for: X" tag per selected KPI, per item code. A material
- * can be recommended for more than one KPI. "Social" is intentionally never
- * scored - no material-level proxy exists in either catalogue for it; it
- * stays a project-level KPI with no effect on material choice here. */
+ * can be recommended for more than one KPI. */
 export function recommendationsForLineItem(
   items: WikellsItem[],
   boverketResources: BoverketResource[],

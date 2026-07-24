@@ -30,25 +30,6 @@ const IC = {
   wind:        "M3.76 16.88C4.41 16.95 5 16.45 5 15.79v-.38C5 14.63 4.37 14 3.59 14c-1.19 0-1.78 1.42-.94 2.27.19.2.6.57 1.11.61zm9.71-15C12.22 1.31 11 2.44 11 3.78c0 .89.49 1.71 1.28 2.15l.72.41c.39.22.63.64.63 1.09C13.63 8.28 13 8.93 12.21 8.98c-.44.03-.82-.2-1.07-.52l-.82.82C10.79 9.82 11.36 10.12 12 10.12c1.33 0 2.41-1.08 2.41-2.42 0-.89-.49-1.71-1.28-2.15l-.72-.41A1.23 1.23 0 0 1 11.78 4c0-.41.2-.78.52-1.01l-.83-.11zm-5 3C7.22 4.31 6 5.44 6 6.78c0 .89.49 1.71 1.28 2.15l.72.41c.39.22.63.64.63 1.09C8.63 11.28 8 11.93 7.21 11.98c-.44.03-.82-.2-1.07-.52l-.82.82C5.79 12.82 6.36 13.12 7 13.12c1.33 0 2.41-1.08 2.41-2.42 0-.89-.49-1.71-1.28-2.15l-.72-.41A1.23 1.23 0 0 1 6.78 7c0-.41.2-.78.52-1.01l-.83-.11z",
 };
 
-// ── Nav sidebar item ────────────────────────────────────────────────────────
-function NavItem({
-  iconPath, label, active = false, onClick,
-}: { iconPath: string; label: string; active?: boolean; onClick?: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      title={label}
-      className={`group flex flex-col items-center gap-1 w-full py-2.5 rounded-lg transition-all cursor-pointer border-0
-        ${active
-          ? "bg-white/12 text-white"
-          : "text-white/40 hover:text-white/80 hover:bg-white/8"}`}
-    >
-      <Icon d={iconPath} size={19} />
-      <span className="text-[9px] tracking-wide font-medium leading-none">{label}</span>
-    </button>
-  );
-}
-
 // ── Stat pill (top-right overlay) ────────────────────────────────────────────
 function StatCard({ label, value, unit, barColor }: {
   label: string; value: string; unit?: string; bar?: number; barColor?: string;
@@ -262,27 +243,8 @@ export default function LandingPage() {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#0a0d14", fontFamily: "'Inter', system-ui, sans-serif" }}>
 
-      {/* ══ LEFT SIDEBAR ══════════════════════════════════════════════════ */}
-      <aside className="w-[62px] shrink-0 flex flex-col items-center py-3 gap-0.5 z-30"
-             style={{ background: "#0a0d14", borderRight: "1px solid rgba(255,255,255,0.07)" }}>
-        {/* Logo mark */}
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#721CB8] to-[#421869] flex items-center justify-center mb-3 shadow-lg">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-        </div>
-
-        {WORKFLOW_STEPS.map((step) => (
-          <NavItem
-            key={step.n}
-            iconPath={step.icon}
-            label={step.shortLabel}
-            onClick={() => startAt(step.path)}
-          />
-        ))}
-
-        {/* Push settings to bottom */}
-        <div className="flex-1" />
-        <NavItem iconPath={IC.settings} label="Settings" />
-      </aside>
+      {/* The step rail lives only inside the wizard (WizardLayout) — the home
+          page is the landing hero, so no left sidebar here. */}
 
       {/* ══ MAIN AREA ════════════════════════════════════════════════════ */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -340,7 +302,7 @@ export default function LandingPage() {
                 <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-white/90
                                  bg-[#721CB8]/40 border border-[#721CB8]/50 backdrop-blur-sm
                                  px-2.5 py-1 rounded-md">
-                  {(selectedCity || country.name)} Digital Twin
+                  {(selectedCity || country.name)} 3D Viewer
                 </span>
                 <span className="flex items-center gap-1.5 text-[10px] text-white/60">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#96D74C] animate-pulse" />
@@ -367,15 +329,6 @@ export default function LandingPage() {
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                   Start Planning
-                </button>
-                <button
-                  onClick={() => navigate("/viewer")}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold
-                             text-white/80 cursor-pointer transition-all hover:text-white hover:border-white/30"
-                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}
-                >
-                  <Icon d={IC.globe} size={14} />
-                  Open 3D Viewer
                 </button>
               </div>
 

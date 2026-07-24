@@ -54,6 +54,15 @@ function Card({
   );
 }
 
+/* Project types temporarily switched off. They (and every EC/RE page) are kept
+   for future use — this just makes them non-selectable in Step 1, so no EC/RE
+   project can be created and their downstream pages stay unreachable. To bring
+   one back, remove it from this set. */
+const DISABLED_PROJECT_TYPES = new Set<string>([
+  "Energy Community Planning",
+  "Renewable Energy Planning",
+]);
+
 /* ════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ════════════════════════════════════════════════════════════════════ */
@@ -61,6 +70,17 @@ function Card({
 export default function DefineProject() {
   const { project, setProject, setStep } = useWizardStore();
   const navigate = useNavigate();
+
+  // Renovation is the only enabled track for now, so default to it — and coerce
+  // any unset or since-disabled (EC/RE) persisted type to it, so Step 1 shows it
+  // selected and the wizard renders the renovation pages. Runs once.
+  useEffect(() => {
+    if (!project.projectType || DISABLED_PROJECT_TYPES.has(project.projectType)) {
+      setProject({ projectType: "Renovation Planning" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [buildingLoading, setBuildingLoading] = useState(false);
   const lookupDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -351,7 +371,8 @@ export default function DefineProject() {
         <Label required>Project Type</Label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
           {PROJECT_TYPES.map((t) => {
-            const selected = pt === t;
+            const disabled = DISABLED_PROJECT_TYPES.has(t);
+            const selected = pt === t && !disabled;
             const ICONS: Record<string, React.ReactNode> = {
               "Energy Community Planning": (
                 <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
@@ -386,14 +407,17 @@ export default function DefineProject() {
             return (
               <button
                 key={t}
-                onClick={() => handleTypeChange(t)}
+                onClick={() => { if (!disabled) handleTypeChange(t); }}
+                disabled={disabled}
+                title={disabled ? "Coming soon — not available yet" : undefined}
                 style={{
                   background: selected ? "rgba(78,205,196,0.10)" : "rgba(13,17,40,0.85)",
                   border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.10)"}`,
                   borderRadius: 16,
                   padding: "24px 20px",
                   textAlign: "center",
-                  cursor: "pointer",
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  opacity: disabled ? 0.5 : 1,
                   position: "relative",
                   transition: "all 0.18s",
                   display: "flex",
@@ -403,26 +427,36 @@ export default function DefineProject() {
                   boxShadow: selected ? "0 0 0 1px #4ECDC4, 0 4px 20px rgba(78,205,196,0.25)" : "none",
                 }}
                 onMouseEnter={e => {
-                  if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(78,205,196,0.35)";
+                  if (!selected && !disabled) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(78,205,196,0.35)";
                 }}
                 onMouseLeave={e => {
-                  if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.10)";
+                  if (!selected && !disabled) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.10)";
                 }}
               >
-                {/* Indicator top-right */}
-                <div style={{
-                  position: "absolute", top: 12, right: 12,
-                  width: 22, height: 22, borderRadius: "50%",
-                  border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.25)"}`,
-                  background: selected ? "#4ECDC4" : "transparent",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  {selected && (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
-                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                    </svg>
-                  )}
-                </div>
+                {/* Indicator top-right — a "Soon" pill for disabled types */}
+                {disabled ? (
+                  <span style={{
+                    position: "absolute", top: 12, right: 12,
+                    fontSize: 9, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase",
+                    padding: "3px 8px", borderRadius: 999,
+                    background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.55)",
+                    border: "1px solid rgba(255,255,255,0.14)",
+                  }}>Soon</span>
+                ) : (
+                  <div style={{
+                    position: "absolute", top: 12, right: 12,
+                    width: 22, height: 22, borderRadius: "50%",
+                    border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.25)"}`,
+                    background: selected ? "#4ECDC4" : "transparent",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {selected && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                      </svg>
+                    )}
+                  </div>
+                )}
 
                 {/* Icon */}
                 {ICONS[t]}
