@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import TopBar from "../components/TopBar";
@@ -68,21 +68,6 @@ function StatCard({ label, value, unit, barColor }: {
   );
 }
 
-// ── Shortcut button ────────────────────────────────────────────────────────
-function Shortcut({ iconPath, label, onClick }: { iconPath: string; label: string; onClick?: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl border border-white/10
-                 bg-white/5 hover:bg-[#721CB8]/20 hover:border-[#721CB8]/50 text-white/50
-                 hover:text-white transition-all cursor-pointer"
-    >
-      <Icon d={iconPath} size={16} />
-      <span className="text-[10px] font-medium leading-none whitespace-nowrap">{label}</span>
-    </button>
-  );
-}
-
 type StepStatus = "not-started" | "in-progress" | "review";
 
 const STEP_STATUS_STYLE: Record<StepStatus, { dot: string; text: string }> = {
@@ -147,7 +132,7 @@ const WORKFLOW_STEPS = [
 // per city so Sweden and the UK never show the same skyline.
 type BgView = { lat: number; lon: number; height: number; heading: number };
 const CITY_BG: Record<string, BgView> = {
-  Gothenburg: { lat: 57.704348, lon: 11.955460, height: 750, heading: 340 },
+  Gothenburg: { lat: 57.698500, lon: 11.957000, height: 360, heading: 45 }, // Feskekôrka — from across the Rosenlund canal (SW) looking NE at the church
   Stockholm:  { lat: 59.325100, lon: 18.071100, height: 700, heading: 30 },
   "Malmö":    { lat: 55.605000, lon: 13.003800, height: 650, heading: 20 },
   London:     { lat: 51.503300, lon: -0.078500, height: 700, heading: 345 },
@@ -167,16 +152,6 @@ function bgUrlFor(country: CountryCode, city: string): string {
   return `/city_bg.html?${p.toString()}`;
 }
 
-// Short descriptor shown in the hero location pill, per city.
-const CITY_DESC: Record<string, string> = {
-  Gothenburg: "Lindholmen District · Mixed-use redevelopment",
-  Stockholm:  "City Centre",
-  "Malmö":    "City Centre",
-  London:     "City of London · Financial district",
-  Rotherham:  "Town Centre · Regeneration area",
-};
-
-
 // ── Main component ─────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -191,40 +166,21 @@ export default function LandingPage() {
   const [selectedCity, setSelectedCity]       = useState(storedProject.city ?? defaultCityFor(initialCountry));
   const [boplatsListings, setBoplatsListings] = useState<string>("-");
   const [ukStats, setUkStats] = useState<{ buildings: number; withEpc: number; estimated: number; districts: number } | null>(null);
-  // Raw UK districts (with per-band counts) + Sweden's coarse class share, for
-  // the "Retrofit Opportunity" card (share of buildings rated E-G).
-  const [ukCities, setUkCities] = useState<{ name: string; band_distribution?: Record<string, number> }[]>([]);
-  const [seShare, setSeShare] = useState<{ A_B: number; C_D: number; E_G: number } | null>(null);
+  // Live Sweden KPI counts from /api/country-profile (buildings / epc_match /
+  // tabula_match), so the hero pills track the current buildings.json instead of
+  // going stale after every pipeline rebuild. Falls back to the last-known values.
+  const [seKpis, setSeKpis] = useState<Record<string, number> | null>(null);
 
   const country = COUNTRIES.find(c => c.id === selectedCountry)!;
-
-  // Buildings rated E-G (worst performers = renovation candidates) for the
-  // selected country/city. UK: summed per-band counts across the selected
-  // city's districts. Sweden: the coarse A_B / C_D / E_G share (Gothenburg
-  // only - the other Swedish cities have no building dataset yet).
-  const retrofit = useMemo(() => {
-    if (selectedCountry === "gb") {
-      const districts = ukCities.filter(c => c.name === selectedCity);
-      const bd: Record<string, number> = {};
-      for (const c of districts) {
-        for (const k of ["A", "B", "C", "D", "E", "F", "G"]) bd[k] = (bd[k] ?? 0) + ((c.band_distribution ?? {})[k] ?? 0);
-      }
-      const total = ["A", "B", "C", "D", "E", "F", "G"].reduce((s, k) => s + (bd[k] ?? 0), 0);
-      if (!total) return null;
-      const poor = (bd.E ?? 0) + (bd.F ?? 0) + (bd.G ?? 0);
-      const eff = (bd.A ?? 0) + (bd.B ?? 0) + (bd.C ?? 0);
-      const mid = bd.D ?? 0;
-      return { poorCount: poor, total, poorPct: Math.round((100 * poor) / total), effPct: (100 * eff) / total, midPct: (100 * mid) / total, ratedLabel: "with an energy rating" };
-    }
-    if (selectedCountry === "se" && selectedCity === "Gothenburg" && seShare) {
-      return { poorCount: null, total: null, poorPct: seShare.E_G, effPct: seShare.A_B, midPct: seShare.C_D, ratedLabel: "of the building stock" };
-    }
-    return null;
-  }, [selectedCountry, selectedCity, ukCities, seShare]);
 
   // Stat pills are country-specific: Sweden shows the Gothenburg dataset totals,
   // the UK shows the summed totals across its built districts (from
   // /api/uk/cities) so the hero numbers match the selected country.
+  // Live count from the country-profile KPIs, falling back to the last-known
+  // value when the backend is unreachable so a pill never shows a bare "—".
+  const seVal = (key: string, fallback: string) =>
+    seKpis && seKpis[key] != null ? seKpis[key]!.toLocaleString("en-US") : fallback;
+
   const statCards = selectedCountry === "gb"
     ? [
         { label: "buildings",      value: ukStats ? ukStats.buildings.toLocaleString("en-US") : "—", color: "#4A90E2" },
@@ -233,10 +189,10 @@ export default function LandingPage() {
         { label: "districts",      value: ukStats ? String(ukStats.districts) : "—",                 color: "#721CB8" },
       ]
     : [
-        { label: "3D buildings",     value: "92,973",        color: "#4A90E2" },
-        { label: "EPC matched",      value: "84,349",        color: "#96D74C" },
-        { label: "TABULA matched",   value: "17,346",        color: "#4ECDC4" },
-        { label: "Boplats listings", value: boplatsListings, color: "#721CB8" },
+        { label: "3D buildings",     value: seVal("buildings", "92,973"),     color: "#4A90E2" },
+        { label: "EPC matched",      value: seVal("epc_match", "85,670"),     color: "#96D74C" },
+        { label: "TABULA matched",   value: seVal("tabula_match", "26,257"),  color: "#4ECDC4" },
+        { label: "Boplats listings", value: boplatsListings,                  color: "#721CB8" },
       ];
 
   useEffect(() => {
@@ -277,16 +233,16 @@ export default function LandingPage() {
         const cities = d.cities ?? [];
         const sum = (k: string) => cities.reduce((a, c) => a + (Number(c[k]) || 0), 0);
         setUkStats({ buildings: sum("buildings"), withEpc: sum("with_epc"), estimated: sum("estimated_from_ehs"), districts: cities.length });
-        setUkCities(cities.map(c => ({ name: c.name, band_distribution: c.band_distribution })));
       })
       .catch(() => { /* stat pills fall back to "—" for the UK */ });
 
     fetch("/api/country-profile?country=se")
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then((d: { viewer?: { energy_class_share?: { A_B: number; C_D: number; E_G: number } } }) => {
-        if (active && d.viewer?.energy_class_share) setSeShare(d.viewer.energy_class_share);
+      .then((d: { viewer?: { kpis?: { key: string; value: number }[] } }) => {
+        if (!active) return;
+        if (d.viewer?.kpis) setSeKpis(Object.fromEntries(d.viewer.kpis.map((k) => [k.key, k.value])));
       })
-      .catch(() => { /* retrofit card shows a placeholder for SE if absent */ });
+      .catch(() => { /* SE stat pills fall back to last-known values if absent */ });
     return () => { active = false; };
   }, []);
 
@@ -423,20 +379,12 @@ export default function LandingPage() {
                 </button>
               </div>
 
-              {/* Location pill — reflects the selected city */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg w-fit"
-                   style={{ background: "rgba(10,13,20,0.45)", border: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(8px)" }}>
-                <span style={{ fontSize: 10 }}>📍</span>
-                <span className="text-[10px] text-white/45">
-                  {CITY_DESC[selectedCity] ?? (selectedCity || country.name)}
-                </span>
-              </div>
-
             </div>
           </div>
 
-          {/* ── Step overview strip (desktop) ────────────────────────── */}
-          <div className="absolute bottom-4 left-4 right-4 z-10 hidden xl:flex gap-2.5">
+          {/* ── Step overview strip (desktop) — sits above the "Ask the data"
+              chat button (fixed bottom-5 right-5) so step 5 isn't clipped. ── */}
+          <div className="absolute bottom-20 left-4 right-4 z-10 hidden xl:flex gap-2.5">
             {WORKFLOW_STEPS.map((step) => {
               const statusStyle = STEP_STATUS_STYLE[step.status];
               return (
@@ -472,62 +420,6 @@ export default function LandingPage() {
           </div>
 
         </div>{/* end hero */}
-
-        {/* ══ BOTTOM INFO STRIP ════════════════════════════════════════ */}
-        <div className="shrink-0 flex gap-3 px-5 py-3 z-30"
-             style={{ background: "rgba(10,13,20,0.97)", borderTop: "1px solid rgba(255,255,255,0.07)", minHeight: "120px" }}>
-
-          {/* Retrofit Opportunity — share of buildings rated E–G (worst
-              performers = highest-impact renovation candidates), from real
-              EPC/energy-class data for the selected city */}
-          <div className="flex-[2] rounded-xl px-4 py-3"
-               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <div className="text-[9px] text-white/30 uppercase tracking-widest mb-2">
-              Retrofit Opportunity · {selectedCity || country.name}
-            </div>
-            {retrofit ? (
-              <>
-                <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-[28px] font-bold leading-none" style={{ color: "#EF4444" }}>{retrofit.poorPct}%</span>
-                  <span className="text-[11px] text-white/55">
-                    rated <b className="text-white/80">E–G</b>
-                    {retrofit.poorCount != null ? ` · ${retrofit.poorCount.toLocaleString("en-US")} buildings` : ""} {retrofit.ratedLabel}
-                  </span>
-                </div>
-                <div className="text-[10px] text-white/35 mb-2">Worst-performing stock — the highest-impact renovation candidates.</div>
-                {/* Efficient (A–C) / mid (D) / poor (E–G) split */}
-                <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                  <div style={{ width: `${retrofit.effPct}%`, background: "#96D74C" }} />
-                  <div style={{ width: `${retrofit.midPct}%`, background: "#F59E0B" }} />
-                  <div style={{ width: `${Math.max(0, 100 - retrofit.effPct - retrofit.midPct)}%`, background: "#EF4444" }} />
-                </div>
-                <div className="flex gap-4 mt-1.5">
-                  {[["#96D74C", "A–C efficient"], ["#F59E0B", "D average"], ["#EF4444", "E–G poor"]].map(([c, l]) => (
-                    <span key={l} className="flex items-center gap-1.5 text-[10px] text-white/45">
-                      <span className="w-2 h-2 rounded-sm" style={{ background: c }} /> {l}
-                    </span>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="text-[11px] text-white/40 py-4">
-                Building-stock energy ratings aren't available for {selectedCity || country.name} yet.
-              </div>
-            )}
-          </div>
-
-          {/* Quick start */}
-          <div className="flex-[1.4] rounded-xl px-4 py-3"
-               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <div className="text-[9px] text-white/30 uppercase tracking-widest mb-2">Quick start</div>
-            <div className="flex gap-2">
-              <Shortcut iconPath={IC.import}   label="Import Data"        onClick={() => startAt("/step/2")} />
-              <Shortcut iconPath={IC.compare}  label="Compare Scenarios"  onClick={() => startAt("/pathways")} />
-              <Shortcut iconPath={IC.generate} label="Generate Report"    onClick={() => startAt("/analysis")} />
-            </div>
-          </div>
-
-        </div>{/* end bottom strip */}
 
       </div>{/* end main area */}
 
