@@ -966,7 +966,7 @@ function BboxDataBanner({
     } else if (bbox) {
       box = [bbox.north, bbox.south, bbox.east, bbox.west].join(",");
     }
-    return `http://127.0.0.1:8765/gothenburg_3d.html?bbox=${box}`;
+    return `/gothenburg_3d.html?bbox=${box}`;
   })();
 
   function togglePageAll() {
@@ -1347,7 +1347,7 @@ function BuildingDataBanner({
   projectType: string | null;
 }) {
   const critical = projectType ? (BUILDING_CRITICAL[projectType] ?? new Set<keyof BuildingLookup>()) : new Set<keyof BuildingLookup>();
-  const viewerUrl = `http://127.0.0.1:8765/gothenburg_3d.html?lat=${building.lat}&lon=${building.lon}&zoom=17`;
+  const viewerUrl = `/gothenburg_3d.html?lat=${building.lat}&lon=${building.lon}&zoom=17`;
 
   const fields: { key: keyof BuildingLookup; label: string }[] = [
     { key: "use_cat",       label: "Use" },

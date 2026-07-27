@@ -1,0 +1,28 @@
+# Production web image — builds the React SPA and serves it + the 3D viewer
+# assets from a single nginx origin (which also proxies /api to the backend).
+#
+# Big data files (buildings.json, dtcc_vegetation.json, the DuckDB, EPW) are NOT
+# baked — they're bind-mounted at runtime by docker-compose.prod.yml, so the
+# image stays small and the data can be updated without a rebuild.
+
+# ── Stage 1: build the SPA ───────────────────────────────────────────────────
+FROM node:20-alpine AS build
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install --no-audit --no-fund
+COPY frontend/ ./
+# Use vite build directly (not `npm run build`, which also runs `tsc -b`): the
+# app has a known non-zero type-check baseline, and esbuild transpiles fine
+# regardless — this produces the exact same runtime bundle.
+RUN npx vite build
+
+# ── Stage 2: nginx serving the SPA + viewer assets on one origin ─────────────
+FROM nginx:1.27-alpine
+# Built SPA
+COPY --from=build /app/frontend/dist /usr/share/nginx/html
+# Viewer assets (gothenburg_3d.html, css, meta.js, viewer/js/*, uk/*, sidebar-theme.css…)
+# merged into the same web root. Big JSON + Cesium.js are excluded via
+# .dockerignore (mounted / served from CDN) — see docker-compose.prod.yml.
+COPY assets/ /usr/share/nginx/html/
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 8080

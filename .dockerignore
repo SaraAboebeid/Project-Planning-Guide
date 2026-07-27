@@ -22,6 +22,17 @@
 data/eubucco
 data/sensitivity/archive
 data/sensitivity/*.duckdb
+data/sensitivity/*.duckdb.zip
+data/dtcc/pointcloud
+**/*.laz
+**/*.gpkg
+**/*.parquet
+assets/buildings.json
+assets/dtcc_vegetation.json
+assets/*.backup-*.json
+frontend/public/buildings.json
+frontend/public/dtcc_vegetation.json
+frontend/public/*.backup-*.json
 boplats_images
 assets/boplats_images
 assets/Cesium.js

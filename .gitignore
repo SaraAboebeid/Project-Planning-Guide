@@ -70,6 +70,12 @@ Thumbs.db
 *.backup
 
 data/sensitivity/*.duckdb
+data/sensitivity/*.duckdb.zip
+
+# Raw LiDAR point clouds (huge; regenerated from the DTCC API, not shipped)
+data/dtcc/pointcloud/
+*.laz
+*.laz.part
 
 # Large archive data files (EUBUCCO downloads)
 data/sensitivity/archive/

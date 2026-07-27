@@ -132,7 +132,7 @@
     // The backend may serve a richer profile; if it is not running, derive the
     // active country's figures locally rather than showing another country's.
     try {
-      const res = await fetch('http://localhost:8000/api/country-profile?country=' + encodeURIComponent(countryCode), {
+      const res = await fetch('/api/country-profile?country=' + encodeURIComponent(countryCode), {
         cache: 'no-store'
       });
       if (res.ok) {

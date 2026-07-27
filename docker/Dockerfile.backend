@@ -1,0 +1,23 @@
+# Backend image — FastAPI + the geo stack (geopandas / shapely / pyproj / duckdb).
+#
+# Dev-oriented: installs dependencies only. The application code is bind-mounted
+# by docker-compose at runtime, so `uvicorn --reload` picks up your edits live and
+# nothing in the existing scripts has to change. (For a locked production image
+# you'd add `COPY . /app` below and drop the reload flag.)
+FROM python:3.12-slim
+
+# System libs a few geo/loader wheels dlopen at runtime. The pinned
+# geopandas/shapely/pyproj/duckdb wheels bundle GEOS/PROJ, so this stays small.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates libexpat1 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python deps first so this layer caches across code changes.
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+EXPOSE 8000
+# Overridden by docker-compose, but sensible as a standalone default.
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

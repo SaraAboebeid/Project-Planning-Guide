@@ -1,0 +1,63 @@
+# Project Planning Guide — PRODUCTION / shareable stack.
+#
+# Single origin, no dev servers: nginx serves the pre-built React SPA + the 3D
+# viewer assets and proxies /api to the FastAPI backend. This is the one to use
+# when sharing with someone else or deploying to a server — the whole tool is
+# reachable on ONE port and works the same locally or behind a domain.
+#
+#   Whole app : http://localhost:8080   (or  http://<server-ip>:8080)
+#
+#   Build + start :  docker compose -f docker-compose.prod.yml up --build -d
+#   Stop          :  docker compose -f docker-compose.prod.yml down
+#   Rebuild after code changes (SPA/viewer/backend deps):  add --build
+#
+# What is baked into the images vs. mounted:
+#   - Baked   : Python deps, the built SPA, viewer HTML/CSS/JS, app code.
+#   - Mounted : the big data files (buildings.json, dtcc_vegetation.json) and the
+#               data/ folder (DuckDB, EPW, sim DB). They travel WITH the project
+#               folder, so recipients update data without rebuilding an image.
+#
+# Cesium is loaded from its CDN by the viewer, so no Cesium files are shipped.
+# EPSM (energy simulation) is a separate stack (docker-compose.epsm.yml); if it
+# isn't running, the endpoints that use it degrade gracefully.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    image: ppg-backend:prod
+    working_dir: /app
+    # Make sure the optional EPC register is unpacked/fetched before serving.
+    command: sh -lc "python scripts/fetch_epc_db.py; uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+    env_file:
+      - path: .env          # optional — missing keys just disable their feature
+        required: false
+    environment:
+      EPSM_BASE_URL: "http://host.docker.internal:8010"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Code + data travel in the project folder and are mounted (not baked) so
+      # the same image works for anyone who has the folder, and data can be
+      # refreshed without a rebuild. The backend reads many paths across the tree
+      # (frontend/public/buildings.json, frontend/public/uk/, boplats_apartments.db,
+      # data/, assets/) and writes to data/ (sim DB, saves), so the whole project
+      # is mounted — same model as the dev stack, just without --reload.
+      - ./:/app
+    expose:
+      - "8000"                          # internal only — nginx reaches it, host doesn't need it
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    image: ppg-web:prod
+    ports:
+      - "8080:8080"                     # the single public port for the whole tool
+    volumes:
+      # Big JSON is excluded from the image (.dockerignore) and served from here.
+      - ./frontend/public/buildings.json:/usr/share/nginx/html/buildings.json:ro
+      - ./frontend/public/dtcc_vegetation.json:/usr/share/nginx/html/dtcc_vegetation.json:ro
+    depends_on:
+      - backend

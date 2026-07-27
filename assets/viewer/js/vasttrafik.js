@@ -7,10 +7,10 @@
 //
 // Depends on:
 //   • Cesium viewer  (global `viewer`)
-//   • FastAPI backend on http://localhost:8000
+//   • FastAPI backend on 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const VT_API = 'http://localhost:8000/api/vasttrafik';
+const VT_API = '/api/vasttrafik';
 
 // Every transit panel used to report a bare `Failed: HTTP 503`, which describes
 // the transport layer rather than the problem — the actual cause is almost

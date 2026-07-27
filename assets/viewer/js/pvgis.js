@@ -25,7 +25,7 @@ async function fetchPVGIS(b) {
   el.style.display = 'block';
   el.innerHTML = '<span style="color:#94a3b8">Fetching PVGIS\u2026</span>';
   try {
-    const url = `http://localhost:8000/api/pvgis?lat=${lat}&lon=${lon}&peakpower=${kWp}&loss=14&angle=35&aspect=0`;
+    const url = `/api/pvgis?lat=${lat}&lon=${lon}&peakpower=${kWp}&loss=14&angle=35&aspect=0`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -62,7 +62,7 @@ async function savePVGIS() {
   const statusEl = document.getElementById('pvgis-save-status');
   if (statusEl) statusEl.textContent = 'Saving…';
   try {
-    await fetch('http://localhost:8000/api/pvgis-save', {
+    await fetch('/api/pvgis-save', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({

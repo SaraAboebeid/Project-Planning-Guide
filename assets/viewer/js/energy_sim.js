@@ -46,7 +46,7 @@ async function submitSimulation(b) {
   stopSimulationPolling();
 
   try {
-    const res = await fetch('http://localhost:8000/api/simulation-submit', {
+    const res = await fetch('/api/simulation-submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -78,12 +78,12 @@ function _pollSimulation(simulationId, b) {
     // A newer poll (different building/simulation) has taken over - stop.
     if (simPollBuildingKey !== key) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/simulation-status/${simulationId}`);
+      const res = await fetch(`/api/simulation-status/${simulationId}`);
       const status = await res.json();
       if (simPollBuildingKey !== key) return;
       if (status.status === 'completed') {
         stopSimulationPolling();
-        const resultsRes = await fetch(`http://localhost:8000/api/simulation-results/${simulationId}`);
+        const resultsRes = await fetch(`/api/simulation-results/${simulationId}`);
         const results = await resultsRes.json();
         _renderResults(results, b);
       } else if (status.status === 'failed') {

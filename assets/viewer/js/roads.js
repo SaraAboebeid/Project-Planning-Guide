@@ -5,7 +5,7 @@
 //  Fetches the GeoJSON from /api/osm/roads and renders polylines in Cesium.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ROADS_API = 'http://localhost:8000/api/osm/roads';
+const ROADS_API = '/api/osm/roads';
 
 // Per-class visual styling
 const ROAD_STYLE = {

@@ -3085,6 +3085,16 @@ _EPC_ROWS_CACHE: int | None = None
 
 def _epc_con():
     import duckdb
+    # The national EPC register (~461 MB) is an optional asset — the core tool
+    # runs without it (EPC facts per building live in buildings.json). Only the
+    # AI-chat "ask about the national dataset" tools need it; give a clear
+    # message when it isn't present in this deployment (caught by _run_tool).
+    if not _EPC_DB_PATH.exists():
+        raise FileNotFoundError(
+            "The national EPC register (data/sensitivity/epc_sweden.duckdb) is not "
+            "available in this deployment, so dataset-wide EPC questions can't be "
+            "answered here. Per-building EPC data is still available."
+        )
     return duckdb.connect(str(_EPC_DB_PATH), read_only=True)
 
 

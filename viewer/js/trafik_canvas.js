@@ -33,7 +33,7 @@
 
   // ── Configuration ─────────────────────────────────────────────────────────
   const CONFIG = {
-    apiBase:             'http://localhost:8000/api/vasttrafik',
+    apiBase:             '/api/vasttrafik',
     fetchIntervalMs:     5000,    // fetch new positions every 5 s (city-wide)
     vehicleSize:         22,      // radius of vehicle circle
     glowRadius:          42,

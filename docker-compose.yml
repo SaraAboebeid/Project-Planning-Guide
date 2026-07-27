@@ -1,16 +1,64 @@
+# Project Planning Guide — DEV stack (hot reload).
+#
+# Runs the whole tool from ONE origin: Vite serves the React app AND the 3D
+# viewer (it already has middleware for gothenburg_3d.html / viewer JS / the big
+# JSON) and proxies /api to the backend. All the app + viewer URLs are now
+# origin-relative, so nothing hardcodes a host.
+#
+#   App + viewer : http://localhost:5180
+#                  (viewer directly at http://localhost:5180/gothenburg_3d.html)
+#   Backend API  : http://localhost:8000
+#
+# Code + data are bind-mounted → editing .py / .tsx / viewer JS hot-reloads live
+# (uvicorn --reload + Vite HMR). Only changing requirements.txt / package.json
+# needs `docker compose up --build`.
+#
+#   docker compose up            # start (dev)
+#   docker compose down          # stop
+#
+# For a shareable / server deployment (nginx, single origin, works remotely too)
+# use docker-compose.prod.yml instead.
+
 services:
-  app:
+  backend:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: project-planning-guide:latest
-    container_name: ppg-app
-    ports:
-      - "8000:8000"
+      dockerfile: docker/Dockerfile.backend
+    image: ppg-backend:dev
+    working_dir: /app
+    # Make sure the optional EPC register is unpacked/fetched before serving.
+    command: sh -lc "python scripts/fetch_epc_db.py; uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
     env_file:
-      - .env
+      - path: .env          # optional — missing keys just disable their feature
+        required: false
+    environment:
+      # EPSM (energy sim) runs as its own compose on the host; endpoints that use
+      # it degrade gracefully if it isn't running.
+      EPSM_BASE_URL: "http://host.docker.internal:8010"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      # Mount large datasets read-only — keeps the image small
-      - ./data:/app/data:ro
-      - ./frontend/public/buildings.json:/app/frontend/public/buildings.json:ro
-    restart: unless-stopped
+      - ./:/app                       # code + data + assets, live-reloaded
+    ports:
+      - "8000:8000"                   # backend API
+
+  frontend:
+    image: node:20
+    working_dir: /app/frontend
+    # Vite proxies /api to the backend by its compose DNS name (robust from the
+    # host browser, unlike sharing the backend's network namespace).
+    environment:
+      VITE_API_PROXY_TARGET: "http://backend:8000"
+    command: sh -lc "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5180"
+    volumes:
+      - ./:/app
+      - frontend_node_modules:/app/frontend/node_modules   # container-native deps, not the host's
+    ports:
+      # Host 5180 (not Vite's default 5173) so this can run alongside another
+      # local project's dev server. Same port inside/out keeps HMR simple.
+      - "5180:5180"                   # Vite (app + viewer) — the single origin
+    depends_on:
+      - backend
+
+volumes:
+  frontend_node_modules:

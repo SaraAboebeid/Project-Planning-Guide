@@ -14,13 +14,13 @@
 //
 // Depends on:
 //   • Cesium viewer (global `viewer`)
-//   • FastAPI backend on http://localhost:8000 (live data; falls back to the
+//   • FastAPI backend on  (live data; falls back to the
 //     static snapshot in assets/trafikverket_data.json when the backend or the
 //     API key is unavailable)
 // ─────────────────────────────────────────────────────────────────────────────
 
 (function () {
-  const TV_API          = 'http://localhost:8000/api/trafikverket/data';
+  const TV_API          = '/api/trafikverket/data';
   const TV_STATIC       = 'trafikverket_data.json';   // legacy snapshot fallback
   const FLOW_REFRESH_MS = 5 * 60 * 1000;   // 5 min
   const CAM_REFRESH_MS  = 30 * 1000;       // 30 s while a camera popup is open

@@ -386,9 +386,9 @@ async function showInfoPanel(b, idx) {
     const bLon = (bRing.reduce((s,c) => s+c[0], 0) / bRing.length).toFixed(5);
     try {
       const [pvRes, wwrRes, simRes] = await Promise.all([
-        fetch(`http://localhost:8000/api/pvgis-lookup?lat=${bLat}&lon=${bLon}`).then(r=>r.json()),
-        fetch(`http://localhost:8000/api/wwr-lookup?lat=${bLat}&lon=${bLon}`).then(r=>r.json()),
-        fetch(`http://localhost:8000/api/simulation-lookup?lat=${bLat}&lon=${bLon}`).then(r=>r.json()),
+        fetch(`/api/pvgis-lookup?lat=${bLat}&lon=${bLon}`).then(r=>r.json()),
+        fetch(`/api/wwr-lookup?lat=${bLat}&lon=${bLon}`).then(r=>r.json()),
+        fetch(`/api/simulation-lookup?lat=${bLat}&lon=${bLon}`).then(r=>r.json()),
       ]);
       if (pvRes.found) {
         const r = pvRes.record;

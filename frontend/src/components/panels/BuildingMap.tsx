@@ -5,7 +5,7 @@ export default function BuildingMapPanel() {
   const buildingPoints = useWizardStore((s) => s.project.buildingPoints);
 
   const cesiumUrl = (() => {
-    const base = "http://127.0.0.1:8765/gothenburg_3d.html";
+    const base = "/gothenburg_3d.html";
     if (buildingPoints.length === 0) return base;
     const pts = buildingPoints
       .map((p) => `${p.lat.toFixed(6)},${p.lon.toFixed(6)}`)

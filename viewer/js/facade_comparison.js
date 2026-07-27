@@ -587,7 +587,7 @@ document.getElementById('btn-analyze-ai')?.addEventListener('click', async () =>
     let totalDefects = 0;
     for (const { building, buildingId, key, facadeData } of jobs) {
       const imageBase64 = facadeData[key].imageData.split(',')[1];
-      const response = await fetch('http://localhost:8000/api/facade-defects', {
+      const response = await fetch('/api/facade-defects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

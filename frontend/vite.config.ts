@@ -110,7 +110,10 @@ export default defineConfig({
     fs: { strict: false },
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        // Defaults to the local backend for native dev; Docker dev sets
+        // VITE_API_PROXY_TARGET=http://backend:8000 (service DNS on the compose
+        // network), which is the robust way to reach it from the host browser.
+        target: process.env.VITE_API_PROXY_TARGET || "http://localhost:8000",
         changeOrigin: true,
       },
     },

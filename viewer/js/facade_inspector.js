@@ -504,7 +504,7 @@ document.getElementById('btn-ai-wwr').addEventListener('click', async () => {
       const srcCanvas = dir === 'Manual' ? canvas : cropFacadeCanvas(canvas);
       const imageBase64 = srcCanvas.toDataURL('image/jpeg', 0.82).split(',')[1];
       try {
-        const resp = await fetch('http://localhost:8000/api/estimate-wwr', {
+        const resp = await fetch('/api/estimate-wwr', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image_base64: imageBase64, direction: dir, building_info: buildingInfo }),
@@ -620,7 +620,7 @@ document.getElementById('btn-detect-defects')?.addEventListener('click', async (
     const perFacade = [];
     for (const { canvas, dir } of toSend) {
       const imageBase64 = canvas.toDataURL('image/jpeg', 0.82).split(',')[1];
-      const resp = await fetch('http://localhost:8000/api/facade-defects', {
+      const resp = await fetch('/api/facade-defects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_base64: imageBase64, direction: dir, building_info: buildingInfo }),
@@ -672,7 +672,7 @@ document.getElementById('btn-wwr-save').addEventListener('click', async () => {
   saveBtn.disabled = true;
   statusEl.textContent = 'Saving…';
   try {
-    const resp = await fetch('http://localhost:8000/api/wwr-save', {
+    const resp = await fetch('/api/wwr-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
