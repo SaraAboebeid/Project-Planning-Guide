@@ -103,6 +103,7 @@
       ? ['viewer/js/trafik_canvas.js', 'viewer/js/vasttrafik.js', 'viewer/js/trafikverket.js', 'viewer/js/urban_analysis.js']
       : []),
     'viewer/js/layers.js',
+    'viewer/js/vegetation.js',   // DTCC LiDAR-derived trees & shrubs (data is Gothenburg-only; no-ops elsewhere)
     ...(profile.country === 'se' ? ['viewer/js/scb_layers.js'] : []),
     'viewer/js/city_switcher.js',
   ];
