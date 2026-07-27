@@ -71,12 +71,13 @@ export default function DefineProject() {
   const { project, setProject, setStep } = useWizardStore();
   const navigate = useNavigate();
 
-  // Renovation is the only enabled track for now, so default to it — and coerce
-  // any unset or since-disabled (EC/RE) persisted type to it, so Step 1 shows it
-  // selected and the wizard renders the renovation pages. Runs once.
+  // Leave the type unselected so Step 1 reveals questions sequentially (user
+  // picks it first). Only clear a since-disabled (EC/RE) persisted type, so an
+  // old project doesn't stay stuck on a track that can no longer be created —
+  // the user then re-picks from the enabled options. Runs once.
   useEffect(() => {
-    if (!project.projectType || DISABLED_PROJECT_TYPES.has(project.projectType)) {
-      setProject({ projectType: "Renovation Planning" });
+    if (project.projectType && DISABLED_PROJECT_TYPES.has(project.projectType)) {
+      setProject({ projectType: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -84,6 +85,10 @@ export default function DefineProject() {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [buildingLoading, setBuildingLoading] = useState(false);
   const lookupDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // For auto-scrolling to each newly revealed question.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const didMountRef = useRef(false);
+  const prevRevealRef = useRef(0);
 
   /* ── Named neighborhoods (Gothenburg primärområden) for the picker ─── */
   const [districts, setDistricts] = useState<{ name: string; count: number }[]>([]);
@@ -301,7 +306,13 @@ export default function DefineProject() {
   const showBuildingDevType  = needsBuildingDevType;
   const showSystems          = !!pt && pt !== "Renovation Planning" && !!project.buildingDevelopmentType;
   const showEcFocus        = pt === "Energy Community Planning" && project.systemsInScope.length > 0;
-  const showExploration    = !!pt && project.systemsInScope.length > 0
+  // "Systems answered" for the reveal chain. For Renovation the coarse envelope
+  // system is auto-selected (above) for downstream use, so gate on the user's own
+  // component picks instead — otherwise the next question would appear instantly.
+  const systemsChosen      = pt === "Renovation Planning"
+                              ? project.renovationEnvelopeComponents.length > 0
+                              : project.systemsInScope.length > 0;
+  const showExploration    = !!pt && systemsChosen
                               && (pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0);
   const showKpis           = showExploration && project.explorationApproaches.length > 0;
   const showScale          = showKpis && project.selectedKpis.length > 0;
@@ -311,6 +322,26 @@ export default function DefineProject() {
   const showProjectName    = showScale && !!project.scale;
   const showLocation       = showProjectName;
 
+  /* ── auto-scroll to each newly revealed question ──────────────── */
+  // Count how many follow-up questions are currently revealed; when that grows,
+  // smoothly bring the newest one (the last .animate-fadeIn card) into view.
+  const revealCount =
+    (showBuildingDevType ? 1 : 0) +
+    (pt === "Renovation Planning" || showSystems ? 1 : 0) +
+    (showEcFocus ? 1 : 0) +
+    (showExploration ? 1 : 0) +
+    (showKpis ? 1 : 0) +
+    (showScale ? 1 : 0) +
+    (showProjectName ? 1 : 0);
+  useEffect(() => {
+    if (didMountRef.current && revealCount > prevRevealRef.current && rootRef.current) {
+      const cards = rootRef.current.querySelectorAll<HTMLElement>(".animate-fadeIn");
+      cards[cards.length - 1]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    prevRevealRef.current = revealCount;
+    didMountRef.current = true;
+  }, [revealCount]);
+
   /* ── progress tracker ──────────────────────────────────────── */
   // Each entry: [label, isDone]
   const progressSteps: [string, boolean][] = [
@@ -318,7 +349,7 @@ export default function DefineProject() {
     ...(needsBuildingDevType
       ? [["Building type", !!project.buildingDevelopmentType] as [string, boolean]]
       : []),
-    ["Systems in scope",   project.systemsInScope.length > 0],
+    [pt === "Renovation Planning" ? "Components" : "Systems in scope", systemsChosen],
     ...(pt === "Energy Community Planning"
       ? [["Energy focus", project.ecEnergyFocus.length > 0] as [string, boolean]]
       : []),
@@ -339,7 +370,7 @@ export default function DefineProject() {
      ════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="space-y-2">
+    <div ref={rootRef} className="space-y-2">
 
       {/* ── PROJECT TYPE (with slim inline progress hint) ── */}
       <Card>

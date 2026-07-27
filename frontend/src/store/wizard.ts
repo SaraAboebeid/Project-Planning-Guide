@@ -190,10 +190,11 @@ interface WizardState {
 }
 
 const DEFAULT_PROJECT: ProjectState = {
-  // Renovation Planning is the only enabled track for now, so it's the default —
-  // the wizard shows the renovation pages out of the box (EC/RE are disabled in
-  // Step 1). Change back to null when those tracks are re-enabled.
-  projectType: "Renovation Planning",
+  // Start unselected so Step 1 reveals its questions one at a time — the user
+  // picks the project type first, then each following question appears. Downstream
+  // pages treat a null type as Renovation (the only enabled track; see App.tsx's
+  // isEcOrRe router), so nothing breaks before the type is chosen.
+  projectType: null,
   buildingDevelopmentType: null,
   projectName: "",
   neighborhoodName: "",

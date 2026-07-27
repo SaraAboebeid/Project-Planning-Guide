@@ -644,31 +644,6 @@ export default function LocationMap({
         </div>
       )}
 
-      {/* Polygon draw controls */}
-      {isBuilding && locationMode === "polygon" && (
-        <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 flex items-center gap-3 flex-wrap">
-          <span>
-            {polyDone
-              ? `✓ Shape with ${polyVerts.length} points — buildings inside are selected.`
-              : polyVerts.length === 0
-              ? "Click on the map to drop each corner of your area."
-              : `${polyVerts.length} point${polyVerts.length > 1 ? "s" : ""} added${polyVerts.length >= 3 ? " — click “Finish shape” to close it." : " (need at least 3)."}`}
-          </span>
-          <span className="flex gap-2 ml-auto">
-            {!polyDone && polyVerts.length >= 3 && (
-              <button onClick={finishPolygon} className="px-2.5 py-1 rounded-md bg-teal text-white text-xs font-semibold hover:brightness-110">
-                Finish shape
-              </button>
-            )}
-            {polyVerts.length > 0 && (
-              <button onClick={clearPolygon} className="px-2.5 py-1 rounded-md border border-white/15 text-white/70 text-xs font-medium hover:border-white/30">
-                Clear
-              </button>
-            )}
-          </span>
-        </div>
-      )}
-
       {/* Address inputs — the default for every scale; at Building(s) they hide
           when the user switches to a draw mode. */}
       {(!isBuilding || locationMode === "addresses") && (
@@ -751,8 +726,9 @@ export default function LocationMap({
         </div>
       )}
 
-      {/* Leaflet Map */}
-      <div className="h-64 rounded-xl overflow-hidden border border-gray-200">
+      {/* Leaflet Map — with the polygon draw controls docked to its bottom edge */}
+      <div className="rounded-xl overflow-hidden border border-gray-200">
+        <div className="h-64">
         <MapContainer
           center={defaultCenter}
           zoom={mapCenter.zoom}
@@ -811,6 +787,33 @@ export default function LocationMap({
                 pathOptions={{ color: "#0d9488", fillColor: "#fff", fillOpacity: 1, weight: 2 }} />
             ))}
         </MapContainer>
+        </div>
+
+        {/* Docked polygon draw controls — sit right where you finish drawing,
+            attached under the map and just above the wizard's Continue. */}
+        {isBuilding && locationMode === "polygon" && (
+          <div className="border-t border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 flex items-center gap-3 flex-wrap">
+            <span>
+              {polyDone
+                ? `✓ Shape with ${polyVerts.length} points — buildings inside are selected.`
+                : polyVerts.length === 0
+                ? "Click on the map to drop each corner of your area."
+                : `${polyVerts.length} point${polyVerts.length > 1 ? "s" : ""} added${polyVerts.length >= 3 ? " — click “Finish shape” to close it." : " (need at least 3)."}`}
+            </span>
+            <span className="flex gap-2 ml-auto">
+              {!polyDone && polyVerts.length >= 3 && (
+                <button onClick={finishPolygon} className="px-2.5 py-1 rounded-md bg-teal text-white text-xs font-semibold hover:brightness-110">
+                  Finish shape
+                </button>
+              )}
+              {polyVerts.length > 0 && (
+                <button onClick={clearPolygon} className="px-2.5 py-1 rounded-md border border-white/15 text-white/70 text-xs font-medium hover:border-white/30">
+                  Clear
+                </button>
+              )}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

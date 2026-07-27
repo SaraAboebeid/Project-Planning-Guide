@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import { wizardNav } from "./wizardNav";
 import { LIBRARY_TABS, tabPathFor, countryCodeFromName } from "../config/countryNav";
+import CountryCitySelector from "./CountryCitySelector";
 
 // ── Confetti ─────────────────────────────────────────────────────────────────
 // Tiny self-contained canvas burst (no dependency) fired once when the user
@@ -332,6 +333,10 @@ export default function WizardLayout() {
             </div>
 
             <div style={{ flex: 1 }} />
+
+            {/* Country → city selector + account — same as every other page's
+                TopBar, so it stays visible (and editable) inside the steps. */}
+            <CountryCitySelector />
           </div>
 
         </header>

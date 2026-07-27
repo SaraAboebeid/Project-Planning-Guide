@@ -1084,7 +1084,8 @@ function BboxDataBanner({
       {viewOpen && rows && (
         <div className="border-t border-white/10">
           {/* Row count */}
-          <div className="flex items-center px-4 pt-2 pb-1 text-[10px] text-white/40">
+          <div className="flex items-center gap-2 px-4 pt-2 pb-1 text-[10px] text-white/40">
+            <span className="text-white/45">↕ Tip: click a column header to sort — click again to flip high ↔ low.</span>
             <span className="ml-auto text-gray-400">
               Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)} of {rows.length}
             </span>
@@ -1109,10 +1110,10 @@ function BboxDataBanner({
                     return (
                       <th key={c.key}
                           onClick={() => toggleSort(c.key)}
-                          title="Sort by this column (click again to reverse)"
-                          className={`px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap cursor-pointer select-none hover:text-white ${active ? "text-white" : "text-white/60"}`}>
+                          title="Sort by this column (click again to flip high ↔ low)"
+                          className={`px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap cursor-pointer select-none transition-colors hover:bg-white/10 hover:text-white ${active ? "text-white" : "text-white/60"}`}>
                         {c.label}
-                        <span className="ml-1 text-[9px]" style={{ opacity: active ? 1 : 0.3 }}>
+                        <span className="ml-1 text-[9px]" style={{ opacity: active ? 1 : 0.55 }}>
                           {active ? (tableSort!.asc ? "▲" : "▼") : "↕"}
                         </span>
                       </th>
@@ -1179,18 +1180,13 @@ function BboxDataBanner({
               >Next →</button>
             </div>
           )}
-          {/* Compare / Clear — shown after table rows */}
+          {/* Selection actions — shown after table rows. */}
           {selected.size > 0 && (
-            <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-blue-100">
-              <button
-                onClick={() => { setCompareOpen(v => !v); }}
-                className="px-2.5 py-0.5 rounded-full bg-violet-600 text-white text-[10px] font-semibold hover:bg-violet-700 transition"
-              >
-                Compare {selected.size}
-              </button>
+            <div className="flex items-center justify-end gap-3 px-4 py-2 border-t border-white/10 text-[10px]">
+              <span className="text-white/40">{selected.size} selected</span>
               <button
                 onClick={() => { setSelected(new Set()); setCompareOpen(false); }}
-                className="text-gray-400 hover:text-red-500 transition text-[10px]"
+                className="text-gray-400 hover:text-red-500 transition"
                 title="Clear selection"
               >
                 ✕ Clear

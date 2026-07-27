@@ -98,9 +98,14 @@
     }
 
     function startSlowRotation() {
-      let t = 0;
+      let t = 0, last = performance.now();
       viewer.scene.postRender.addEventListener(() => {
-        t += 0.00008;
+        // Time-based, not per-frame: the pan speed stays the same even if the
+        // frame rate drops (e.g. under Docker/host load). 0.0000048/ms ≈ the
+        // old 0.00008/frame at 60 fps.
+        const now = performance.now();
+        t += (now - last) * 0.0000048;
+        last = now;
         const lon = CITY.lon + Math.sin(t) * 0.012;
         const lat = CITY.lat + Math.cos(t * 0.6) * 0.004;
         viewer.camera.setView({

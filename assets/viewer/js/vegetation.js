@@ -13,8 +13,10 @@ let _treeGrid = null, _shrubGrid = null, _refreshTimer = null, _lastKey = '';
 const _TRUNK = '#6b4a2f';
 const _CROWNS = ['#2f9e4f', '#3fa65a', '#4bb567', '#358a46'];
 const _SHRUB = ['#7d9440', '#8aa34b'];
-const R_M = 1100;            // render trees within this radius of the camera
+const R_M = 1100;            // min render radius (close-up) around the view centre
+const R_MAX = 7000;          // max render radius when zoomed out, so trees show city-wide
 const MAX_TREES = 12000;     // hard cap on rendered trees (subsample beyond)
+const MAX_SHRUBS = 6000;     // hard cap on rendered shrubs
 const GRID_DEG = 0.005;      // ~350 m spatial-index cell
 
 function _vegGround(lon, lat) {
@@ -46,6 +48,22 @@ function _camGround() {
   return { lon: Cesium.Math.toDegrees(cc.longitude), lat: Cesium.Math.toDegrees(cc.latitude) };
 }
 
+// The ground point the camera is LOOKING at (screen centre), not the point under
+// the camera — so trees render where you're looking, even at an oblique/zoomed view.
+function _viewCenterGround() {
+  try {
+    const canvas = viewer.scene.canvas;
+    const px = new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2);
+    const ell = (viewer.scene.globe && viewer.scene.globe.ellipsoid) || Cesium.Ellipsoid.WGS84;
+    const hit = viewer.camera.pickEllipsoid(px, ell);
+    if (hit) {
+      const c = Cesium.Cartographic.fromCartesian(hit);
+      return { lon: Cesium.Math.toDegrees(c.longitude), lat: Cesium.Math.toDegrees(c.latitude) };
+    }
+  } catch (e) { /* fall through to point under the camera */ }
+  return _camGround();
+}
+
 function _clear() {
   [_vegTrunks, _vegCrowns, _vegShrubs].forEach(p => { if (p) viewer.scene.primitives.remove(p); });
   _vegTrunks = _vegCrowns = _vegShrubs = null;
@@ -53,20 +71,27 @@ function _clear() {
 
 function _refresh(force) {
   if (!_vegData || !_vegVisible) return;
-  const cam = _camGround();
-  const key = cam.lon.toFixed(3) + ',' + cam.lat.toFixed(3);
+  const cam = _viewCenterGround();
+  // Grow the render radius with altitude so trees stay visible when zoomed out;
+  // MAX_TREES then keeps the tallest across the whole visible area.
+  const camH = (viewer.camera.positionCartographic && viewer.camera.positionCartographic.height) || 800;
+  const R = Math.max(R_M, Math.min(R_MAX, camH * 1.4));
+  const key = cam.lon.toFixed(3) + ',' + cam.lat.toFixed(3) + ',' + Math.round(R / 100);
   if (!force && key === _lastKey) return;
   _lastKey = key;
-  const radDeg = R_M / 111320;
+  const radDeg = R / 111320;
   const mPerLon = 111320 * Math.cos(cam.lat * Math.PI / 180);
   const within = (o) => {
     const dx = (o.lon - cam.lon) * mPerLon, dy = (o.lat - cam.lat) * 111320;
-    return dx * dx + dy * dy <= R_M * R_M;
+    return dx * dx + dy * dy <= R * R;
   };
   let trees = _near(_treeGrid, cam.lon, cam.lat, radDeg).filter(within);
-  const shrubs = _near(_shrubGrid, cam.lon, cam.lat, radDeg).filter(within);
+  let shrubs = _near(_shrubGrid, cam.lon, cam.lat, radDeg).filter(within);
   if (trees.length > MAX_TREES) {              // keep the tallest when overloaded
     trees = trees.sort((a, b) => b.h - a.h).slice(0, MAX_TREES);
+  }
+  if (shrubs.length > MAX_SHRUBS) {            // keep the tallest shrubs too
+    shrubs = shrubs.sort((a, b) => b.h - a.h).slice(0, MAX_SHRUBS);
   }
   _clear();
   const col = (hex) => Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.fromCssColorString(hex));
@@ -118,6 +143,11 @@ async function vegetationInit() {
 function vegetationShow() { _vegVisible = true; _refresh(true); }
 function vegetationHide() { _vegVisible = false; _clear(); viewer.scene.requestRender && viewer.scene.requestRender(); }
 function vegetationIsVisible() { return _vegVisible; }
+
+// Force a re-ground/redraw — called when the basemap switch changes the building
+// base offset (e.g. photorealistic → flat map), so trees drop onto the new ground
+// immediately instead of waiting for the next camera move.
+window.vegetationReground = function () { _refresh(true); };
 
 function _injectVegToggle() {
   const group = document.querySelector('#buildings-content .overlay-group');

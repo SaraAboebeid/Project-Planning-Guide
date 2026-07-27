@@ -99,12 +99,25 @@ window.setBasemap = function(type) {
     if (tilesEnabled) {
       tilesEnabled = false;
       if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; tilesGeometryReady = false; }
-      // Recalibrate rather than reset to 0 outright: if OSM Buildings is still
-      // on (the UK default), it's still real-world-elevation ground truth even
-      // with Google tiles gone, and blindly zeroing the offset here would
-      // un-align our buildings from it again.
-      refreshBuildingBaseOffsetFromTiles().then(() => { if (buildingPrimitives.length) rebuildBuildings(); });
       document.getElementById('btn-tiles').classList.remove('active');
+      // Flat basemaps (light/dark/satellite) are drawn at ellipsoid height 0, so
+      // put our buildings + trees back onto that flat ground — otherwise they
+      // stay at the real elevation they were calibrated to against the Google
+      // mesh and float high above the map. Reset the offset DIRECTLY here (not via
+      // the calibration-guarded refresh, which a still-running background pass can
+      // make a no-op) so this always lands. If OSM Buildings is still on (the UK
+      // default) it remains real-elevation ground truth, so recalibrate to it
+      // instead of zeroing.
+      if (osmEnabled) {
+        refreshBuildingBaseOffsetFromTiles().then(() => {
+          if (buildingPrimitives.length) rebuildBuildings();
+          if (window.vegetationReground) window.vegetationReground();
+        });
+      } else {
+        resetGroundCalibration();
+        if (buildingPrimitives.length) rebuildBuildings();
+        if (window.vegetationReground) window.vegetationReground();
+      }
     }
     viewer.imageryLayers.removeAll();
     const tileUrls = {
@@ -862,7 +875,9 @@ if (_osmBtn) _osmBtn.addEventListener('click', () => toggleOsmBuildings(!osmEnab
 // the build-time default and only used if the profile is missing.
 // ─────────────────────────────────────────────────────────────────
 const VIEW_AT = window.VIEW_CENTER || MAP_CENTER;
-const VIEW_ALT = window.VIEW_HEIGHT || 800;
+// Pull the default city "first shot" back a bit for a wider establishing view;
+// a bbox-focused entry (?bbox=) keeps its own tighter framing.
+const VIEW_ALT = (window.VIEW_HEIGHT || 800) * (window.FOCUS_BBOX ? 1 : 1.7);
 
 viewer.camera.flyTo({
   destination: Cesium.Cartesian3.fromDegrees(VIEW_AT.lon, VIEW_AT.lat, VIEW_ALT),

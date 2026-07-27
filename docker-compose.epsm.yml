@@ -80,7 +80,10 @@ services:
     environment:
       DJANGO_SECRET_KEY: local-dev-only-not-for-production-0e9f8a7b6c5d4e3f2a1b
       DEBUG: "True"
-      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      # Include host.docker.internal: the Dockerized FastAPI backend reaches EPSM
+      # via http://host.docker.internal:8010, so Django sees that Host header and
+      # would otherwise reject the request with DisallowedHost (HTTP 400).
+      ALLOWED_HOSTS: "localhost,127.0.0.1,host.docker.internal,epsm-backend"
       DB_NAME: epsm_db
       DB_USER: epsm_user
       DB_PASSWORD: epsm_local_dev_password
