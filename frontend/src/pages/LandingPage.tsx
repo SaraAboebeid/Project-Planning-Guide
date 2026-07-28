@@ -320,8 +320,9 @@ export default function LandingPage() {
                 Digital ToolBox
               </h1>
               <p className="text-[13px] text-white/50 leading-relaxed mb-7 max-w-[380px]">
-                Explore site data, uncertainty, scenarios, deliverables,
-                timeline, and cost through an interactive 3D workflow.
+                A decision-support tool for building renovation planning — explore
+                real building and energy data and compare retrofit packages by
+                energy, cost, and carbon.
               </p>
 
               {/* CTA buttons */}

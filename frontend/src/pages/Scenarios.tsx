@@ -83,26 +83,28 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 3, label: "Data Overview", color: "#4ECDC4",
+        n: 3, label: "Baseline Simulation", color: "#4ECDC4",
         subNodes: [
-          { label: "OAT Sensitivity analysis", type: "engine" },
-          { label: "Data readiness: 74%", type: "output" },
-          { label: "Model confidence: 69%", type: "output" },
+          { label: "EnergyPlus baseline via EPSM", type: "engine" },
+          { label: "As-built heating / cooling / total", type: "output" },
+          { label: "Per-building shoebox model", type: "engine" },
         ],
       },
       {
-        n: 4, label: "Scenarios", color: "#F59E0B", isHere: true,
+        n: 4, label: "Calculator", color: "#F59E0B", isHere: true,
         subNodes: [
-          { label: "A — Light refurbishment", type: "scenario" },
-          { label: "B — Medium package (EPC D\u2192B)", type: "scenario" },
-          { label: "C — Deep renovation + PV", type: "scenario" },
+          { label: "Build envelope packages (layers + materials)", type: "input" },
+          { label: "Cost (Wikells) + carbon (Boverket)", type: "db" },
+          { label: "Energy simulation per package (EPSM)", type: "engine" },
+          { label: "Live curve vs baseline + Pareto", type: "output" },
         ],
       },
       {
-        n: 5, label: "Timeline & Cost", color: "#96D74C",
+        n: 5, label: "Report", color: "#96D74C",
         subNodes: [
-          { label: "18-month phased plan", type: "output" },
-          { label: "CAPEX: 3,200\u20138,500 SEK/m\u00b2", type: "output" },
+          { label: "Recommended packages", type: "output" },
+          { label: "Energy, cost & carbon savings", type: "output" },
+          { label: "City climate target", type: "output" },
           { label: "Renovation Report (PDF)", type: "output" },
         ],
       },
@@ -149,7 +151,6 @@ const FLOW_DATA: Record<string, {
         n: 5, label: "Timeline & Cost", color: "#96D74C",
         subNodes: [
           { label: "9-month installation plan", type: "output" },
-          { label: "CAPEX: 180K\u2013420K SEK", type: "output" },
           { label: "RE Feasibility Report (PDF)", type: "output" },
         ],
       },
@@ -176,7 +177,7 @@ const SUB_LABELS: Record<SubNodeType, string> = {
 };
 
 const PHASE_LABELS = [
-  "1. DEFINE", "2. COLLECT DATA", "3. ANALYSE", "4. SCENARIOS", "5. PLAN & DELIVER",
+  "1. DEFINE", "2. BUILDING DATA", "3. BASELINE", "4. CALCULATE", "5. REPORT",
 ];
 
 const GRID9 = "1fr 28px 1fr 28px 1fr 28px 1fr 28px 1fr";
@@ -186,6 +187,10 @@ const TAB_COLORS: Record<string, string> = {
   "Renovation Planning":       "#721CB8",
   "Renewable Energy Planning": "#96D74C",
 };
+
+/* Pathways kept for later but not yet selectable — shown greyed, consistent with
+   Step 1 where Energy Community / Renewable Energy are disabled project types. */
+const DISABLED_PATHWAYS = new Set(["Energy Community Planning", "Renewable Energy Planning"]);
 
 /* ─── Flow Diagram component ──────────────────────────────────────────── */
 function ProjectFlowDiagram({ activeType, onTypeChange }: {
@@ -215,16 +220,22 @@ function ProjectFlowDiagram({ activeType, onTypeChange }: {
           {tabs.map(t => {
             const col = TAB_COLORS[t];
             const on = t === activeType;
+            const disabled = DISABLED_PATHWAYS.has(t);
             return (
-              <button key={t} onClick={() => onTypeChange(t)} style={{
+              <button key={t}
+                onClick={disabled ? undefined : () => onTypeChange(t)}
+                disabled={disabled}
+                title={disabled ? "Coming soon — not available yet" : undefined}
+                style={{
                 padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                cursor: "pointer",
-                border: `1px solid ${on ? col : "rgba(255,255,255,0.10)"}`,
-                background: on ? `${col}22` : "transparent",
-                color: on ? col : "rgba(255,255,255,0.38)",
+                cursor: disabled ? "not-allowed" : "pointer",
+                border: `1px solid ${on && !disabled ? col : "rgba(255,255,255,0.10)"}`,
+                background: on && !disabled ? `${col}22` : "transparent",
+                color: disabled ? "rgba(255,255,255,0.24)" : on ? col : "rgba(255,255,255,0.38)",
+                opacity: disabled ? 0.6 : 1,
                 transition: "all 0.15s",
               }}>
-                {t.replace(" Planning", "")}
+                {t.replace(" Planning", "")}{disabled ? " · soon" : ""}
               </button>
             );
           })}
@@ -965,11 +976,13 @@ function DownArrow() {
 
 /* ─── Roadmap ───────────────────────────────────────────────────────── */
 function ToolRoadmap({ activeType }: { activeType: string | null }) {
-  const navigate = useNavigate();
   const { project } = useWizardStore();
-  const [activeFlowType, setActiveFlowType] = useState<string>(
-    project.projectType ?? "Energy Community Planning"
-  );
+  const [activeFlowType, setActiveFlowType] = useState<string>(() => {
+    // Open on the user's type, but never on a disabled pathway (EC/RE) — default
+    // to Renovation, the only enabled track.
+    const t = project.projectType ?? "Renovation Planning";
+    return DISABLED_PATHWAYS.has(t) ? "Renovation Planning" : t;
+  });
 
   return (
     <div style={{ paddingBottom: 32 }}>
@@ -1046,22 +1059,6 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
         </div>
       )}
 
-      {/* Nav */}
-      <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 24, paddingBottom: 8 }}>
-        <button onClick={() => navigate("/step/3")} style={{
-          display: "flex", alignItems: "center", gap: 8, padding: "8px 18px",
-          borderRadius: 10, fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.60)",
-          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
-          cursor: "pointer",
-        }}>← Back</button>
-        <button onClick={() => navigate("/step/5")} style={{
-          display: "flex", alignItems: "center", gap: 8, padding: "8px 20px",
-          borderRadius: 10, fontSize: 13, fontWeight: 600, color: "#fff",
-          background: "linear-gradient(135deg,#721CB8,#421869)",
-          border: "1px solid rgba(114,28,184,0.5)", cursor: "pointer",
-          boxShadow: "0 4px 14px rgba(114,28,184,0.35)",
-        }}>Continue →</button>
-      </div>
     </div>
   );
 }
