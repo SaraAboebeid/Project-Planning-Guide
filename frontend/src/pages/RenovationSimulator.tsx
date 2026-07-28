@@ -1525,7 +1525,7 @@ export default function RenovationSimulator() {
                       fontSize: 12.5, fontWeight: 800,
                       border: "1px solid rgba(150,215,76,0.45)", background: "rgba(150,215,76,0.14)", color: "#96D74C",
                       cursor: activeCombos.length ? "pointer" : "not-allowed", opacity: activeCombos.length ? 1 : 0.45 }}>
-                    <Plus size={14} /> Simulate {activeCombos.length} package{activeCombos.length === 1 ? "" : "s"}
+                    <Plus size={14} /> Run energy simulation (EPSM) · {activeCombos.length} package{activeCombos.length === 1 ? "" : "s"}
                     {geometries.length > 1 && targetIdx === "all" ? ` × ${geometries.length} buildings` : ""}
                   </button>
                   <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", maxWidth: 460, lineHeight: 1.5 }}>

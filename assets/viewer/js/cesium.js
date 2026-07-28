@@ -88,6 +88,7 @@ let _currentBasemap = 'light';
 window.setBasemap = function(type) {
   _currentBasemap = type;
   if (type === 'photo') {
+    _flatGroundMode = false;   // real Google-mesh elevation applies again
     window.setPhotoMode(true);
     viewer.imageryLayers.removeAll();
     if (!tilesEnabled) {
@@ -96,28 +97,29 @@ window.setBasemap = function(type) {
     }
   } else {
     window.setPhotoMode(false);
+    const wasPhoto = tilesEnabled;
     if (tilesEnabled) {
       tilesEnabled = false;
       if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; tilesGeometryReady = false; }
       document.getElementById('btn-tiles').classList.remove('active');
-      // Flat basemaps (light/dark/satellite) are drawn at ellipsoid height 0, so
-      // put our buildings + trees back onto that flat ground — otherwise they
-      // stay at the real elevation they were calibrated to against the Google
-      // mesh and float high above the map. Reset the offset DIRECTLY here (not via
-      // the calibration-guarded refresh, which a still-running background pass can
-      // make a no-op) so this always lands. If OSM Buildings is still on (the UK
-      // default) it remains real-elevation ground truth, so recalibrate to it
-      // instead of zeroing.
-      if (osmEnabled) {
-        refreshBuildingBaseOffsetFromTiles().then(() => {
-          if (buildingPrimitives.length) rebuildBuildings();
-          if (window.vegetationReground) window.vegetationReground();
-        });
-      } else {
-        resetGroundCalibration();
+    }
+    // Flat basemaps (light/dark/satellite/terrain) draw at ellipsoid height 0.
+    // _flatGroundMode makes getBuildingBaseOffset return 0 (hard override), so the
+    // buildings + trees + roofs sit ON the map and no background calibration can
+    // re-float them. OSM Buildings (UK) stays real-elevation ground truth instead.
+    const wasFlat = _flatGroundMode;
+    _flatGroundMode = !osmEnabled;
+    if (osmEnabled) {
+      if (wasPhoto) refreshBuildingBaseOffsetFromTiles().then(() => {
         if (buildingPrimitives.length) rebuildBuildings();
         if (window.vegetationReground) window.vegetationReground();
-      }
+        if (window.roofsRebuild) window.roofsRebuild();
+      });
+    } else if (wasPhoto || !wasFlat) {
+      resetGroundCalibration();
+      if (buildingPrimitives.length) rebuildBuildings();
+      if (window.vegetationReground) window.vegetationReground();
+      if (window.roofsRebuild) window.roofsRebuild();
     }
     viewer.imageryLayers.removeAll();
     const tileUrls = {
@@ -130,13 +132,31 @@ window.setBasemap = function(type) {
       dark:      '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
       satellite: 'Esri, DigitalGlobe, GeoEye',
     };
-    if (tileUrls[type]) {
+    if (type === 'terrain') {
+      _addTerrainImagery();
+    } else if (tileUrls[type]) {
       viewer.imageryLayers.addImageryProvider(
         new Cesium.UrlTemplateImageryProvider({ url: tileUrls[type], credit: credits[type] })
       );
     }
   }
 };
+
+// Drape the LiDAR shaded-relief terrain image over its WGS84 rectangle (a single
+// georeferenced PNG built by tools/se/dtcc_terrain_water.py).
+async function _addTerrainImagery() {
+  try {
+    const meta = await (await fetch('terrain_meta.json', { cache: 'default' })).json();
+    const [w, s, e, n] = meta.rect;
+    const prov = await Cesium.SingleTileImageryProvider.fromUrl('terrain_hillshade.png', {
+      rectangle: Cesium.Rectangle.fromDegrees(w, s, e, n),
+      credit: 'Terrain from Lantmäteriet LiDAR (DTCC)',
+    });
+    viewer.imageryLayers.addImageryProvider(prov);
+  } catch (err) {
+    console.warn('[terrain] load failed:', err && err.message);
+  }
+}
 
 // Maps-style camera controls
 // Scroll = zoom · Drag = pan · Right-drag / Ctrl+drag = tilt/rotate
@@ -195,14 +215,23 @@ window.setPhotoMode = function setPhotoMode(on) {
   if (!on) { _pinnedIdx = null; setBuildingHighlight(null); }
   const hint = document.getElementById('photo-pick-hint');
   if (hint) hint.style.display = on ? 'block' : 'none';
+  // Trees & shrubs double up with Google's photorealistic mesh — auto-hide them
+  // on photorealistic, restore the user's choice when leaving it.
+  if (window.vegetationSetPhotoForced) window.vegetationSetPhotoForced(on);
 };
 let buildingBaseOffsetMeters = 0;
 let groundOffsetGrid = null;
 let calibrationInProgress = false;
 let rebuildInProgress = false;
 let rebuildPending = false;
+// Flat basemaps (light/dark/satellite/terrain) draw at ellipsoid height 0. Force
+// buildings + trees onto that plane there — a hard override so no stray/background
+// calibration pass can re-float them to the Google-mesh real elevation. Only the
+// photorealistic (and OSM-Buildings) basemaps carry real ground truth.
+let _flatGroundMode = false;
 
 window.getBuildingBaseOffset = function getBuildingBaseOffset(lon, lat) {
+  if (_flatGroundMode) return 0;
   if (groundOffsetGrid && Number.isFinite(lon) && Number.isFinite(lat)) {
     return sampleGroundOffsetGrid(lon, lat);
   }
@@ -1005,3 +1034,43 @@ document.getElementById('btn-reset').addEventListener('click', () => {
     duration: 1.5,
   });
 });
+
+// ─────────────────────────────────────────────────────────────────
+// Map navigation — compass (click to point north) + top-down view
+// ─────────────────────────────────────────────────────────────────
+(function initMapNav() {
+  const rose = document.getElementById('compass-rose');
+  const btnNorth = document.getElementById('btn-north');
+  const btnTop = document.getElementById('btn-topview');
+  if (!rose || !btnNorth || !btnTop) return;
+
+  // Ground point at screen centre (what the camera looks at) so rotations orbit
+  // the view centre rather than the camera position.
+  function centerPoint() {
+    const canvas = viewer.scene.canvas;
+    const px = new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2);
+    const ell = (viewer.scene.globe && viewer.scene.globe.ellipsoid) || Cesium.Ellipsoid.WGS84;
+    return viewer.camera.pickEllipsoid(px, ell) || viewer.camera.positionWC;
+  }
+  function flyAround(heading, pitch) {
+    const c = centerPoint();
+    const range = Math.max(50, Cesium.Cartesian3.distance(viewer.camera.positionWC, c));
+    viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(c, 0), {
+      offset: new Cesium.HeadingPitchRange(heading, pitch, range),
+      duration: 0.8,
+    });
+  }
+  btnNorth.addEventListener('click', () => flyAround(0, viewer.camera.pitch));
+  btnTop.addEventListener('click', () => flyAround(0, Cesium.Math.toRadians(-90)));
+
+  // Keep the compass rose pointing to true north, and light up the top-view
+  // button when the camera is (nearly) straight down.
+  function syncNav() {
+    rose.setAttribute('transform', 'rotate(' + (-Cesium.Math.toDegrees(viewer.camera.heading)) + ' 20 20)');
+    btnTop.classList.toggle('active', Cesium.Math.toDegrees(viewer.camera.pitch) < -80);
+  }
+  viewer.camera.percentageChanged = 0.01;
+  viewer.camera.changed.addEventListener(syncNav);
+  viewer.scene.postRender.addEventListener(syncNav);   // smooth during fly/rotate
+  syncNav();
+})();

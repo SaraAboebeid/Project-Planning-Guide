@@ -8,6 +8,9 @@
 
 let _vegTrunks = null, _vegCrowns = null, _vegShrubs = null;
 let _vegVisible = true, _vegData = null;
+// _userVisible = the user's toggle intent; _photoForced = auto-hidden because the
+// photorealistic 3D basemap is on (Google's mesh already includes trees).
+let _photoForced = false, _userVisible = true;
 let _treeGrid = null, _shrubGrid = null, _refreshTimer = null, _lastKey = '';
 
 const _TRUNK = '#6b4a2f';
@@ -133,7 +136,9 @@ async function vegetationInit() {
   _shrubGrid = _index(_vegData.shrubs || []);
   console.log(`[vegetation] ${(_vegData.trees || []).length} trees + ${(_vegData.shrubs || []).length} shrubs indexed; rendering near camera`);
   _injectVegToggle();
-  _refresh(true);
+  // If the viewer opened straight into photorealistic 3D, start hidden.
+  if (window.isPhotoMode && window.isPhotoMode()) window.vegetationSetPhotoForced(true);
+  else _refresh(true);
   viewer.camera.moveEnd.addEventListener(() => {
     clearTimeout(_refreshTimer); _refreshTimer = setTimeout(() => _refresh(false), 350);
   });
@@ -157,16 +162,45 @@ function _injectVegToggle() {
   row.innerHTML =
     '<button class="overlay-btn active" id="btn-overlay-vegetation" aria-pressed="true">' +
       '<span class="overlay-check"></span><span class="base-name">Trees &amp; shrubs</span>' +
-      '<span class="layer-pill">DTCC LiDAR</span></button>';
+      '<span class="layer-pill">Lantmäteriet LiDAR</span></button>';
   group.appendChild(row);
   const btn = row.querySelector('#btn-overlay-vegetation');
   btn.addEventListener('click', () => {
+    if (_photoForced) return;   // disabled while photorealistic 3D is on
     const on = !vegetationIsVisible();
+    _userVisible = on;
     on ? vegetationShow() : vegetationHide();
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', String(on));
   });
 }
+
+// Auto-hide trees & shrubs on the photorealistic 3D basemap (Google's mesh
+// already includes real trees, so ours would double up). Restores the user's
+// previous choice when leaving photorealistic. Called from cesium.js setPhotoMode.
+window.vegetationSetPhotoForced = function (forced) {
+  _photoForced = !!forced;
+  const btn = document.getElementById('btn-overlay-vegetation');
+  if (forced) {
+    vegetationHide();
+    if (btn) {
+      btn.classList.remove('active');
+      btn.setAttribute('aria-pressed', 'false');
+      btn.style.opacity = '0.45';
+      btn.style.cursor = 'not-allowed';
+      btn.title = "Hidden on photorealistic 3D — Google's mesh already includes trees";
+    }
+  } else {
+    if (btn) {
+      btn.style.opacity = '';
+      btn.style.cursor = '';
+      btn.removeAttribute('title');
+      btn.classList.toggle('active', _userVisible);
+      btn.setAttribute('aria-pressed', String(_userVisible));
+    }
+    if (_userVisible) vegetationShow(); else vegetationHide();
+  }
+};
 
 if (typeof window !== 'undefined') {
   window.vegetationShow = vegetationShow;

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 export default function MapViewer() {
   // Keep iframe src stable during component re-renders; only bump `v=` when needed.
-  const viewerUrl = useMemo(() => `/gothenburg_3d.html?v=20260710-v12`, []);
+  const viewerUrl = useMemo(() => `/gothenburg_3d.html?v=20260728-lidar`, []);
 
   return (
     <div style={{ height: "calc(100vh - 128px)", minHeight: 520 }}>

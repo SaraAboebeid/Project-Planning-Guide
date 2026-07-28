@@ -59,5 +59,7 @@ services:
       # Big JSON is excluded from the image (.dockerignore) and served from here.
       - ./frontend/public/buildings.json:/usr/share/nginx/html/buildings.json:ro
       - ./frontend/public/dtcc_vegetation.json:/usr/share/nginx/html/dtcc_vegetation.json:ro
+      # Mounted (not baked) so the daily Boplats refresh shows up live — no rebuild.
+      - ./frontend/public/boplats_data.json:/usr/share/nginx/html/boplats_data.json:ro
     depends_on:
       - backend

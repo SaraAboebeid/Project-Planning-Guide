@@ -6,15 +6,15 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="gothenburg_3d.css?v=20260723-184547">
-  <link rel="stylesheet" href="sidebar-theme.css?v=20260723-184547">
+  <link rel="stylesheet" href="gothenburg_3d.css?v=20260728-lidar">
+  <link rel="stylesheet" href="sidebar-theme.css?v=20260728-lidar">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
        is stamped on <body> by bootstrap.js. */
     body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
   </style>
-  <script src="gothenburg_3d.meta.js?v=20260723-184547" defer></script>
-  <script src="viewer/js/bootstrap.js?v=20260723-184547" defer></script>
+  <script src="gothenburg_3d.meta.js?v=20260728-lidar" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260728-lidar" defer></script>
 </head>
 <body>
 
@@ -134,6 +134,14 @@
           <span class="layer-pill">Esri</span>
         </button>
         <button class="info-btn" data-layer="satellite-imagery"></button>
+      </div>
+      <div class="base-row">
+        <button class="base-btn" id="btn-base-terrain" role="radio" aria-checked="false">
+          <span class="base-indicator"></span>
+          <span class="base-name">Terrain relief</span>
+          <span class="layer-pill">Lantmäteriet LiDAR</span>
+        </button>
+        <button class="info-btn" data-layer="terrain-lidar"></button>
       </div>
       <div class="base-row">
         <button class="base-btn active" id="btn-base-photo" role="radio" aria-checked="true">
@@ -501,6 +509,33 @@
   <h2 id="perf-title">Performance</h2>
   <div class="sub" id="perf-sub"></div>
   <div id="perf-content" style="margin-top:10px;overflow-y:auto;flex:1"></div>
+</div>
+
+<!-- Map navigation: compass (click = point north) + top-down view -->
+<style>
+  #map-nav { position:absolute; top:16px; right:16px; z-index:20; display:flex; flex-direction:column; gap:8px; }
+  .map-nav-btn { width:40px; height:40px; border-radius:10px; background:rgba(13,17,23,0.82);
+    border:1px solid rgba(255,255,255,0.14); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; padding:0; transition:border-color .15s, background .15s; }
+  .map-nav-btn:hover { border-color:rgba(255,255,255,0.4); background:rgba(13,17,23,0.95); }
+  .map-nav-btn.active { border-color:#4ECDC4; }
+  #compass-rose { transition: transform .1s linear; }
+</style>
+<div id="map-nav" aria-label="Map navigation">
+  <button id="btn-north" class="map-nav-btn" type="button" title="Point north (reset rotation)" aria-label="Point north">
+    <svg viewBox="0 0 40 40" width="30" height="30">
+      <g id="compass-rose">
+        <polygon points="20,7 14,22 20,18 26,22" fill="#e5484d"/>
+        <polygon points="20,33 14,18 20,22 26,18" fill="rgba(255,255,255,0.5)"/>
+        <text x="20" y="6" text-anchor="middle" font-size="8" fill="#fff" font-weight="700" font-family="sans-serif">N</text>
+      </g>
+    </svg>
+  </button>
+  <button id="btn-topview" class="map-nav-btn" type="button" title="Top-down view" aria-label="Top-down view">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.6">
+      <rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M9 4v16"/>
+    </svg>
+  </button>
 </div>
 
 <div id="ppg-brand">PPG &middot; Chalmers / Boverket</div>

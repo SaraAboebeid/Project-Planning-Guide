@@ -7,7 +7,7 @@
 
 function layersInit() {
   // ── Base Map selector ────────────────────────────────────────────────────
-  ['light', 'dark', 'satellite', 'photo'].forEach(type => {
+  ['light', 'dark', 'satellite', 'terrain', 'photo'].forEach(type => {
     document.getElementById('btn-base-' + type).addEventListener('click', () => {
       document.querySelectorAll('.base-btn').forEach(b => b.classList.remove('active'));
       document.getElementById('btn-base-' + type).classList.add('active');

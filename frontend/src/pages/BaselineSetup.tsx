@@ -549,7 +549,7 @@ export default function BaselineSetup() {
           }}
         >
           {simRunning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={14} />}
-          {simRunning ? "Running…" : `${project.baselineStatus === "done" ? "Re-run" : "Run"} baseline for ${runList.length} building${runList.length !== 1 ? "s" : ""} in EPSM`}
+          {simRunning ? "Running…" : `${project.baselineStatus === "done" ? "Re-run" : "Run"} baseline energy simulation (EPSM) for ${runList.length} building${runList.length !== 1 ? "s" : ""}`}
         </button>
       </div>
 
