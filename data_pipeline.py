@@ -26,9 +26,39 @@ from shapely import wkb as shapely_wkb
 PARQUET_PATH = "data/eubucco/SE23.parquet"
 GPKG_PATH    = r"C:\Users\saraabo\Desktop\Project Planning Guide\data\eubucco\SE23.gpkg"
 
-# Central Gothenburg bounding box (EPSG:4326)
+# Working bounding box (EPSG:4326) — defaults to Gothenburg; _apply_city() below
+# repoints all of these to another city from tools/se/se_cities.py.
 LON_MIN, LON_MAX = 11.85, 12.10
 LAT_MIN, LAT_MAX = 57.62, 57.80
+
+# Municipality scoping for EPC cadastral matching (set per-city by _apply_city).
+_KOMMUN = "Göteborg"
+_REGION_KOMMUNS = ["Göteborg", "Mölndal", "Partille", "Härryda", "Kungälv", "Ale",
+                   "Lerum", "Öckerö", "Kungsbacka", "Stenungsund", "Tjörn",
+                   "Lilla Edet", "Alingsås", "Bollebygd"]
+
+
+def _region_in() -> str:
+    """SQL IN-list fragment of region municipalities (trusted config, not user input)."""
+    return "'" + "','".join(_REGION_KOMMUNS) + "'"
+
+
+def _apply_city(city_key: str):
+    """Repoint the module config (paths, bbox, municipalities) at a registered city."""
+    global PARQUET_PATH, GPKG_PATH, LON_MIN, LON_MAX, LAT_MIN, LAT_MAX, _KOMMUN, _REGION_KOMMUNS
+    import sys as _sys
+    from pathlib import Path as _P
+    _sys.path.insert(0, str(_P(__file__).resolve().parent / "tools" / "se"))
+    from se_cities import get_city
+    c = get_city(city_key)
+    root = _P(__file__).resolve().parent
+    PARQUET_PATH = str(root / c["eubucco"].replace(".gpkg", ".parquet"))
+    GPKG_PATH = str(root / c["eubucco"])
+    LON_MIN, LAT_MIN, LON_MAX, LAT_MAX = c["bbox4326"]
+    _KOMMUN = c["kommun"]
+    _REGION_KOMMUNS = c["region_kommuns"]
+    print(f"[city] {c['name']}  bbox={c['bbox4326']}  eubucco={c['eubucco']}", flush=True)
+    return c
 
 USE_COLORS = {
     "bostad_enfamilj":   [255, 165,  50, 210],
@@ -144,7 +174,7 @@ def _epc_fallback_points(gdf_3006, blank_idx):
                cc.lon, cc.lat
         FROM epc e
         LEFT JOIN cad_cent cc ON upper(TRIM(e."IdFastBet")) = cc.cad
-        WHERE e.IdKommun='Göteborg' AND e."EgiSpecifikEnergianvandning" IS NOT NULL
+        WHERE e.IdKommun='""" + _KOMMUN + """' AND e."EgiSpecifikEnergianvandning" IS NOT NULL
           AND e."IdAdr" IS NOT NULL AND TRIM(e."IdAdr")<>''
           AND e.FormularId NOT IN (SELECT FormularId FROM linked)
         GROUP BY TRIM(e."IdAdr"), cc.lon, cc.lat
@@ -269,8 +299,13 @@ def _sanitize(obj):
 # ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
-def process_data() -> dict:
-    """Run the full data pipeline and return all data needed by build.py."""
+def process_data(city_key: str = "gothenburg") -> dict:
+    """Run the full data pipeline and return all data needed by build.py.
+
+    city_key selects the city config (paths, bbox, municipalities) from
+    tools/se/se_cities.py — defaults to Gothenburg for backward compatibility.
+    """
+    _apply_city(city_key)
 
     # ── Load ──────────────────────────────────────────────────────────────
     print("Loading building data ...")
@@ -313,9 +348,7 @@ def process_data() -> dict:
                 WHERE IdFastBet IS NOT NULL AND TRIM(IdFastBet) != ''
                   AND IdAdr IS NOT NULL AND TRIM(IdAdr) != ''
                   AND EgiSpecifikEnergianvandning IS NOT NULL
-                  AND IdKommun IN ('Göteborg','Mölndal','Partille','Härryda','Kungälv','Ale',
-                                   'Lerum','Öckerö','Kungsbacka','Stenungsund','Tjörn','Lilla Edet',
-                                   'Alingsås','Bollebygd')
+                  AND IdKommun IN (""" + _region_in() + """)
                 GROUP BY UPPER(TRIM(IdFastBet)), FormularId
             ) WHERE rn = 1
         )

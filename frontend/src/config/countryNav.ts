@@ -12,8 +12,12 @@ export const COUNTRIES: {
    *  is in geographic/alphabetical order, but only some cities have building
    *  data, and that is the one the app should open on. */
   defaultCity?: string;
+  /** Cities that actually have data and are selectable. If set, every other
+   *  listed city is shown greyed-out / "coming soon" and is not clickable. */
+  enabledCities?: string[];
 }[] = [
-  { id: "se", name: "Sweden", cities: ["Stockholm", "Gothenburg", "Malmö"], defaultCity: "Gothenburg" },
+  { id: "se", name: "Sweden", cities: ["Stockholm", "Gothenburg", "Malmö"],
+    defaultCity: "Gothenburg", enabledCities: ["Gothenburg"] },
   { id: "gb", name: "United Kingdom", cities: ["London", "Rotherham"], defaultCity: "London" },
   { id: "be", name: "Belgium", cities: [] },
   { id: "ie", name: "Ireland", cities: [] },
@@ -23,6 +27,14 @@ export const COUNTRIES: {
 export function defaultCityFor(country: CountryCode): string {
   const c = COUNTRIES.find((x) => x.id === country);
   return c?.defaultCity ?? c?.cities[0] ?? "";
+}
+
+/** Whether a city is selectable (has data). Cities not in a country's
+ *  enabledCities list are shown greyed-out and disabled (e.g. Stockholm, Malmö). */
+export function cityEnabled(country: CountryCode, city: string): boolean {
+  const c = COUNTRIES.find((x) => x.id === country);
+  if (!c || !c.enabledCities) return true;
+  return c.enabledCities.includes(city);
 }
 
 // Map-centering data for the Step 1 location picker (LocationMap.tsx) - keyed

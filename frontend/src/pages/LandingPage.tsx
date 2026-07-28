@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import TopBar from "../components/TopBar";
-import { COUNTRIES, countryCodeFromName, defaultCityFor, type CountryCode } from "../config/countryNav";
+import { COUNTRIES, countryCodeFromName, defaultCityFor, cityEnabled, type CountryCode } from "../config/countryNav";
 import ChatWidget from "../components/ChatWidget";
 
 // ── Inline SVG icon set ────────────────────────────────────────────────────
@@ -144,7 +144,12 @@ export default function LandingPage() {
   const storedProject = useWizardStore.getState().project;
   const initialCountry = countryCodeFromName(storedProject.country);
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>(initialCountry);
-  const [selectedCity, setSelectedCity]       = useState(storedProject.city ?? defaultCityFor(initialCountry));
+  const [selectedCity, setSelectedCity]       = useState(() => {
+    // Fall back to the enabled default (e.g. Gothenburg) if a stale/disabled city
+    // (Stockholm, Malmö) was persisted — never open on a greyed-out city.
+    const c = storedProject.city ?? defaultCityFor(initialCountry);
+    return cityEnabled(initialCountry, c) ? c : defaultCityFor(initialCountry);
+  });
   const [boplatsListings, setBoplatsListings] = useState<string>("-");
   const [ukStats, setUkStats] = useState<{ buildings: number; withEpc: number; estimated: number; districts: number } | null>(null);
   // Live Sweden KPI counts from /api/country-profile (buildings / epc_match /

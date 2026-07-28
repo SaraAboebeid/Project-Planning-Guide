@@ -2,6 +2,7 @@ import {
   COUNTRIES,
   countryCodeFromName,
   defaultCityFor,
+  cityEnabled,
   type CountryCode,
 } from "../config/countryNav";
 import { useWizardStore } from "../store/wizard";
@@ -16,7 +17,8 @@ export default function CountryCitySelector() {
 
   const country: CountryCode = countryCodeFromName(project.country);
   const countryDef = COUNTRIES.find((c) => c.id === country) ?? COUNTRIES[0]!;
-  const city = project.city ?? defaultCityFor(country);
+  const _city = project.city ?? defaultCityFor(country);
+  const city = cityEnabled(country, _city) ? _city : defaultCityFor(country);
 
   function selectCountry(id: CountryCode) {
     const def = COUNTRIES.find((c) => c.id === id);
@@ -67,26 +69,33 @@ export default function CountryCitySelector() {
         <>
           <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 12, margin: "0 2px" }}>›</span>
           <div style={pill}>
-            {countryDef.cities.map((name) => (
+            {countryDef.cities.map((name) => {
+              const enabled = cityEnabled(country, name);
+              return (
               <button
                 key={name}
-                onClick={() => selectCity(name)}
+                onClick={enabled ? () => selectCity(name) : undefined}
+                disabled={!enabled}
+                title={enabled ? undefined : "Coming soon — not available yet"}
                 style={{
                   padding: "4px 10px",
                   borderRadius: 8,
                   border: 0,
-                  cursor: "pointer",
+                  cursor: enabled ? "pointer" : "not-allowed",
                   fontSize: 11,
                   fontWeight: city === name ? 700 : 500,
                   background: city === name ? "rgba(78,205,196,0.2)" : "transparent",
-                  color: city === name ? "#4ECDC4" : "rgba(255,255,255,0.72)",
+                  color: !enabled ? "rgba(255,255,255,0.32)"
+                        : city === name ? "#4ECDC4" : "rgba(255,255,255,0.72)",
+                  opacity: enabled ? 1 : 0.6,
                   transition: "all .15s",
                   whiteSpace: "nowrap",
                 }}
               >
                 {name}
               </button>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
