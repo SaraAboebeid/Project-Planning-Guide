@@ -1,20 +1,25 @@
 // sunhours.js — direct sun-hours analysis. Turn it on, click a point, and the
-// ground disc around it shows the sun. Two views of the same result:
-//   • Hour  — sun/shade at one instant; drag the slider through the day (winter
-//             days are short, shadows long — the seasonal difference is obvious).
-//   • Full day — total sunlit hours per spot, blue (shaded) → yellow (open sky).
-// One backend call returns the whole day's frames; the slider scrubs them
-// client-side (no re-fetch). Backend does the astronomy + raytraced shadow map.
+// ground disc around it shows the sun. One backend call returns the whole day's
+// per-timestep shadow frames; the slider scrubs them client-side (no re-fetch).
+// Two views of the same result:
+//   • Sun hours (heatmap) — cumulative sunlit hours up to the chosen time, blue
+//     (shaded) → yellow (full sun). Slider at the end = the whole-day total.
+//   • Shadow at time — sun/shade at that one instant (gold = sun, blue = shade).
+//
+// Geometry is built once per result and, in photorealistic mode, clamped to the
+// Google mesh per-point so the disc follows the real terrain (and isn't buried
+// under it). Slider/mode changes only recolour the existing points.
 
 let _shActive = false;
-let _shPrims = null;
+let _shPrims = null;          // Cesium.PointPrimitiveCollection
+let _shRefs = [];             // per-cell PointPrimitive, parallel to _shData.points
 let _shHandler = null;
 let _shDate = "2026-06-21";
 let _shRadius = 150;
 let _shBusy = false;
-let _shData = null;      // last backend result (points + frames + cumulative hours)
-let _shHourIdx = 0;      // selected timestep in _shData.frames
-let _shMode = "hour";    // "hour" (instant) | "day" (cumulative)
+let _shData = null;           // last backend result (points + frames + cumulative)
+let _shHourIdx = 0;           // selected timestep in _shData.frames
+let _shMode = "hours";        // "hours" (cumulative heatmap) | "shadow" (instant)
 
 const _SH_DATES = [
   ["2026-06-21", "Jun (summer)"],
@@ -22,47 +27,116 @@ const _SH_DATES = [
   ["2026-12-21", "Dec (winter)"],
 ];
 
-// cumulative-hours ramp: shaded (low) → blue; sunny (high) → yellow/orange
+// heatmap ramp: shaded (low) → blue; sunny (high) → yellow/orange
 function _shColorHours(h, maxh) {
   const t = Math.max(0, Math.min(1, h / Math.max(0.5, maxh)));
-  return Cesium.Color.fromHsl(0.66 - t * 0.57, 0.95, 0.5, 0.95);
+  return Cesium.Color.fromHsl(0.66 - t * 0.57, 0.95, 0.5, 0.98);
 }
 // instant view: two flat colours so the shadow pattern reads as one surface
-const _SH_LIT = Cesium.Color.fromCssColorString("#FFC83D").withAlpha(0.95);
-const _SH_SHADE = Cesium.Color.fromCssColorString("#274690").withAlpha(0.9);
+const _SH_LIT = Cesium.Color.fromCssColorString("#FFC83D").withAlpha(0.98);
+const _SH_SHADE = Cesium.Color.fromCssColorString("#1E3A8A").withAlpha(0.95);
 
 function _shBaseTz() {
   return (window.VIEWER_COUNTRY === "uk") ? 0.0 : 1.0;  // DST added server-side
 }
 
-function _shClear() {
-  if (_shPrims) { try { viewer.scene.primitives.remove(_shPrims); } catch (_) {} _shPrims = null; }
+// True while the Google photorealistic tiles are the basemap — the only view
+// with real per-point terrain worth clamping to.
+function _shPhotoMode() {
+  try { if (typeof _flatGroundMode !== "undefined" && _flatGroundMode) return false; } catch (_) {}
+  try { if (typeof tilesEnabled !== "undefined") return !!tilesEnabled; } catch (_) {}
+  return false;
 }
 
-// Rebuild the disc from the cached result using the CURRENT ground offsets, so it
-// stays glued to whatever basemap is active (photorealistic mesh or flat map).
+function _shClear() {
+  if (_shPrims) { try { viewer.scene.primitives.remove(_shPrims); } catch (_) {} _shPrims = null; }
+  _shRefs = [];
+}
+
+// Cumulative sunlit hours per cell through the selected timestep (heatmap value).
+function _shCumThrough(idx) {
+  const frames = _shData.frames || [];
+  const M = _shData.points.length;
+  const cum = new Float32Array(M);
+  if (!frames.length) return cum;
+  const stepH = (_shData.possible_hours || 0) / frames.length;
+  for (let k = 0; k <= idx && k < frames.length; k++) {
+    const lit = frames[k].lit;
+    for (let i = 0; i < M; i++) if (lit[i]) cum[i] += stepH;
+  }
+  return cum;
+}
+
+// Recolour existing points for the current mode/hour — cheap, runs on every
+// slider drag. No geometry rebuild, no clamp, no re-fetch.
+function _shApplyColors() {
+  if (!_shData || !_shRefs.length) return;
+  const M = _shData.points.length;
+  if (_shMode === "shadow" && _shData.frames && _shData.frames.length) {
+    const lit = _shData.frames[Math.max(0, Math.min(_shData.frames.length - 1, _shHourIdx))].lit;
+    for (let i = 0; i < M; i++) _shRefs[i].color = lit[i] ? _SH_LIT : _SH_SHADE;
+  } else {
+    const maxh = _shData.possible_hours || _shData.max_hours || 1;
+    const cum = _shCumThrough(_shHourIdx);
+    for (let i = 0; i < M; i++) _shRefs[i].color = _shColorHours(cum[i], maxh);
+  }
+  viewer.scene.requestRender && viewer.scene.requestRender();
+}
+
+// Snap the disc onto the real photorealistic mesh, per-point, so it follows the
+// terrain instead of floating on (or sinking under) one averaged elevation.
+async function _shClampToMesh() {
+  if (!_shPrims || !_shRefs.length) return;
+  if (typeof viewer.scene.clampToHeightMostDetailed !== "function") return;
+  const carts = _shRefs.map(p => p.position);
+  const token = _shData;                 // bail if a new analysis started meanwhile
+  let clamped;
+  try { clamped = await viewer.scene.clampToHeightMostDetailed(carts); }
+  catch (_) { return; }
+  if (_shData !== token || !clamped) return;
+  const pts = _shData.points;
+  const carto = new Cesium.Cartographic();
+  // A cell that clamps well above the local ground didn't land on ground — it
+  // landed on a roof, wall, or tree (our footprints don't line up perfectly with
+  // Google's mesh). Hide those; keep the cells that sit on real ground.
+  const ROOF_MARGIN = 3.0;
+  for (let i = 0; i < _shRefs.length; i++) {
+    const c = clamped[i];
+    if (!c) { _shRefs[i].show = true; continue; }   // clamp failed → leave on coarse ground
+    Cesium.Cartographic.fromCartesian(c, undefined, carto);
+    const ground = window.getBuildingBaseOffset ? window.getBuildingBaseOffset(pts[i][0], pts[i][1]) : 0;
+    if (carto.height - ground > ROOF_MARGIN) { _shRefs[i].show = false; continue; }
+    _shRefs[i].show = true;
+    carto.height += 1.5;                 // sit just above the surface, avoid z-fight
+    _shRefs[i].position = Cesium.Cartographic.toCartesian(carto);
+  }
+  viewer.scene.requestRender && viewer.scene.requestRender();
+}
+
+// Build the disc geometry from the cached result using CURRENT ground offsets,
+// then colour it and (in photo mode) clamp to the mesh.
 function _shRenderFrame() {
   if (!_shData) return;
   _shClear();
   const pts = _shData.points;
-  const frame = (_shMode === "hour" && _shData.frames && _shData.frames.length)
-    ? _shData.frames[Math.max(0, Math.min(_shData.frames.length - 1, _shHourIdx))]
-    : null;
-  const maxh = _shData.possible_hours || _shData.max_hours || 1;
   const pc = new Cesium.PointPrimitiveCollection();
+  _shRefs = new Array(pts.length);
   for (let i = 0; i < pts.length; i++) {
     const plon = pts[i][0], plat = pts[i][1];
     const base = window.getBuildingBaseOffset ? window.getBuildingBaseOffset(plon, plat) : 0;
-    const color = frame
-      ? (frame.lit[i] ? _SH_LIT : _SH_SHADE)
-      : _shColorHours(pts[i][2], maxh);
-    pc.add({
+    _shRefs[i] = pc.add({
       position: Cesium.Cartesian3.fromDegrees(plon, plat, base + 0.6),
-      color, pixelSize: 8, disableDepthTestDistance: 0,
+      color: Cesium.Color.GRAY, pixelSize: 10,
+      // Depth-tested: a ground cell hidden behind a building must stay hidden,
+      // otherwise cells in the streets/courtyards behind a row paint over its
+      // roofs. Points are clamped to the mesh + lifted a couple of metres below,
+      // so they sit on the street and occlude correctly.
+      disableDepthTestDistance: 0,
     });
   }
   _shPrims = viewer.scene.primitives.add(pc);
-  viewer.scene.requestRender && viewer.scene.requestRender();
+  _shApplyColors();
+  if (_shPhotoMode()) _shClampToMesh();
 }
 
 async function _shRun(lon, lat) {
@@ -76,16 +150,13 @@ async function _shRun(lon, lat) {
     });
     const d = await r.json();
     _shData = d;
-    // start the slider at solar noon (highest sun) — the most legible frame
-    _shHourIdx = 0;
-    if (d.frames && d.frames.length) {
-      let best = -90;
-      d.frames.forEach((f, i) => { if (f.alt > best) { best = f.alt; _shHourIdx = i; } });
-    }
+    // default the slider to the end of day → the full-day heatmap on first sight
+    _shHourIdx = (d.frames && d.frames.length) ? d.frames.length - 1 : 0;
     _shBuildHourSlider();
     _shRenderFrame();
     _shStatus(`${d.n_cells} cells · ${d.n_context_buildings} buildings · click again to move.`);
     _shSyncView();
+    _shHint(false);   // a point has been chosen — drop the prompt
   } catch (err) {
     _shStatus("Sun-hours failed: " + (err && err.message));
   } finally {
@@ -118,9 +189,33 @@ function sunHoursSetActive(on) {
       _shHandler.setInputAction(_shClick, Cesium.ScreenSpaceEventType.LEFT_CLICK);
     }
     _shStatus("Click a point on the map to analyse the sun around it.");
+    _shHint(!_shData);   // show the on-map prompt until a point has been chosen
   } else {
     if (_shHandler) { _shHandler.destroy(); _shHandler = null; }
     _shClear();
+    _shHint(false);
+  }
+}
+
+// Floating prompt over the map telling the user to click where to run it.
+function _shHint(show) {
+  let el = document.getElementById("sunhours-hint");
+  if (show) {
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "sunhours-hint";
+      el.style.cssText =
+        "position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:30;" +
+        "background:rgba(17,24,39,0.88);color:#fff;padding:9px 16px;border-radius:20px;" +
+        "font:13px/1.3 Inter,system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.35);" +
+        "pointer-events:none;display:flex;align-items:center;gap:8px;white-space:nowrap";
+      el.innerHTML = '<span style="font-size:15px">☀️</span>' +
+        '<span>Click anywhere on the map to run the sun analysis there</span>';
+      ((viewer && viewer.container) || document.body).appendChild(el);
+    }
+    el.style.display = "flex";
+  } else if (el) {
+    el.style.display = "none";
   }
 }
 
@@ -129,15 +224,11 @@ function _shStatus(msg) {
   if (el) el.textContent = msg;
 }
 
-// Update the mode buttons, hour-slider row, and legend for the current view.
 function _shSyncView() {
-  const hourRow = document.getElementById("sunhours-hourrow");
-  const haveFrames = _shData && _shData.frames && _shData.frames.length;
-  if (hourRow) hourRow.style.display = (_shMode === "hour" && haveFrames) ? "block" : "none";
   document.querySelectorAll(".sh-mode-btn").forEach(b => {
-    const on = b.dataset.mode === _shMode;
-    b.style.background = on ? "rgba(245,158,11,0.25)" : "transparent";
+    b.style.background = (b.dataset.mode === _shMode) ? "rgba(245,158,11,0.25)" : "transparent";
   });
+  _shUpdateHourLabel();
   _shLegend();
 }
 
@@ -155,13 +246,16 @@ function _shUpdateHourLabel() {
   const lbl = document.getElementById("sunhours-hourlbl");
   if (!lbl || !_shData || !_shData.frames || !_shData.frames.length) return;
   const f = _shData.frames[_shHourIdx];
-  lbl.textContent = `${f.t} · sun ${Math.round(f.alt)}° high`;
+  const last = _shHourIdx >= _shData.frames.length - 1;
+  lbl.textContent = (_shMode === "shadow")
+    ? `${f.t} · sun ${Math.round(f.alt)}° high`
+    : (last ? `whole day (through ${f.t})` : `sun collected up to ${f.t}`);
 }
 
 function _shLegend() {
   const el = document.getElementById("sunhours-legend");
   if (!el) return;
-  if (_shMode === "hour") {
+  if (_shMode === "shadow") {
     const lit = `rgb(${Math.round(_SH_LIT.red*255)},${Math.round(_SH_LIT.green*255)},${Math.round(_SH_LIT.blue*255)})`;
     const sh = `rgb(${Math.round(_SH_SHADE.red*255)},${Math.round(_SH_SHADE.green*255)},${Math.round(_SH_SHADE.blue*255)})`;
     el.innerHTML =
@@ -182,17 +276,19 @@ function _shLegend() {
 }
 
 function _injectSunHours() {
-  const group = document.querySelector("#buildings-content .overlay-group");
+  // Live under the "Analysis" section (formerly Urban Analysis), alongside the
+  // other spatial analyses; fall back to the Buildings panel if that section
+  // isn't present (e.g. a non-SE viewer profile).
+  const group = document.querySelector("#urban-analysis-section .overlay-group")
+             || document.querySelector("#buildings-content .overlay-group");
   if (!group || document.getElementById("btn-overlay-sunhours")) return;
-  // toggle row
   const row = document.createElement("div");
   row.className = "overlay-row";
   row.innerHTML =
     '<button class="overlay-btn" id="btn-overlay-sunhours" aria-pressed="false">' +
     '<span class="overlay-check"></span><span class="base-name">Sun-hours</span>' +
-    '<span class="layer-pill">Analysis</span></button>';
-  group.appendChild(row);
-  // control panel (hidden until active)
+    '<span class="layer-pill">Sun</span></button>';
+  group.insertBefore(row, group.firstChild);   // most prominent analysis first
   const panel = document.createElement("div");
   panel.id = "sunhours-panel";
   panel.style.cssText = "display:none;padding:8px 10px;margin:4px 0 8px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)";
@@ -202,13 +298,11 @@ function _injectSunHours() {
     '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:4px">Radius: <span id="sunhours-rval">150</span> m</div>' +
     '<input id="sunhours-radius" type="range" min="60" max="400" step="10" value="150" style="width:100%">' +
     '<div style="display:flex;gap:4px;margin:10px 0 6px">' +
-      '<button class="sh-mode-btn" data-mode="hour" style="flex:1;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:rgba(245,158,11,0.25);color:rgba(255,255,255,0.85)">Hour of day</button>' +
-      '<button class="sh-mode-btn" data-mode="day" style="flex:1;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.85)">Full day</button>' +
+      '<button class="sh-mode-btn" data-mode="hours" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:rgba(245,158,11,0.25);color:rgba(255,255,255,0.85)">Sun hours</button>' +
+      '<button class="sh-mode-btn" data-mode="shadow" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.85)">Shadow at time</button>' +
     '</div>' +
-    '<div id="sunhours-hourrow" style="display:none">' +
-      '<div id="sunhours-hourlbl" style="font-size:10px;color:rgba(255,255,255,0.7);margin-bottom:2px;text-align:center">—</div>' +
-      '<input id="sunhours-hour" type="range" min="0" max="1" step="1" value="0" style="width:100%">' +
-    '</div>' +
+    '<div id="sunhours-hourlbl" style="font-size:10px;color:rgba(255,255,255,0.7);margin-bottom:2px;text-align:center">—</div>' +
+    '<input id="sunhours-hour" type="range" min="0" max="1" step="1" value="0" style="width:100%">' +
     '<div id="sunhours-legend" style="margin-top:8px"></div>' +
     '<div id="sunhours-status" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.4"></div>';
   row.after(panel);
@@ -224,7 +318,6 @@ function _injectSunHours() {
       _shDate = val;
       panel.querySelectorAll(".sh-date-btn").forEach(x => x.style.background = "transparent");
       b.style.background = "rgba(245,158,11,0.25)";
-      // recompute for the new day if a point is already chosen
       if (_shData && _shData.center) _shRun(_shData.center[0], _shData.center[1]);
     };
     dates.appendChild(b);
@@ -233,18 +326,12 @@ function _injectSunHours() {
   const rad = panel.querySelector("#sunhours-radius");
   rad.oninput = () => { _shRadius = +rad.value; panel.querySelector("#sunhours-rval").textContent = rad.value; };
 
-  // mode buttons — swap the view of the already-computed result (no re-fetch)
   panel.querySelectorAll(".sh-mode-btn").forEach(b => {
-    b.onclick = () => { _shMode = b.dataset.mode; _shSyncView(); _shRenderFrame(); };
+    b.onclick = () => { _shMode = b.dataset.mode; _shSyncView(); _shApplyColors(); };
   });
 
-  // hour slider — scrub the cached frames instantly
   const hour = panel.querySelector("#sunhours-hour");
-  hour.oninput = () => {
-    _shHourIdx = +hour.value;
-    _shUpdateHourLabel();
-    _shRenderFrame();
-  };
+  hour.oninput = () => { _shHourIdx = +hour.value; _shUpdateHourLabel(); _shApplyColors(); };
 
   const btn = row.querySelector("#btn-overlay-sunhours");
   btn.addEventListener("click", () => {
@@ -257,13 +344,13 @@ function _injectSunHours() {
 
 // Keep the disc glued to the ground: buildings rebuild whenever the basemap
 // switches (photorealistic mesh ⇄ flat map), which changes ground offsets — so
-// re-render the disc from the cached result right after every rebuild.
+// rebuild the disc from the cached result right after every rebuild.
 function _shHookBasemap() {
   const orig = window.rebuildBuildings;
   if (typeof orig === "function" && !orig._shWrapped) {
     const wrapped = function () {
       const p = orig.apply(this, arguments);
-      Promise.resolve(p).then(() => { if (_shData) _shRenderFrame(); }).catch(() => {});
+      Promise.resolve(p).then(() => { if (_shData && _shActive) _shRenderFrame(); }).catch(() => {});
       return p;
     };
     wrapped._shWrapped = true;

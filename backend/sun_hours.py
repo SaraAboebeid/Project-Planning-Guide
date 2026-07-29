@@ -142,7 +142,9 @@ def compute_sun_hours(lat: float, lon: float, radius_m: float, grid_m: float,
         sub[block] = h
         H[r0:r1 + 1, c0:c1 + 1] = sub
 
-    # study cells (inside the study radius)
+    # study cells (inside the study radius). Skip cells that fall inside a
+    # building footprint — that ground is occupied by the building, not open
+    # ground to stand on, and drawing a cell there would ride up onto the roof.
     s = int(math.ceil(2 * radius_m / grid_m))
     xs, ys, cell_lonlat = [], [], []
     for j in range(s):
@@ -150,6 +152,9 @@ def compute_sun_hours(lat: float, lon: float, radius_m: float, grid_m: float,
         for i in range(s):
             xx = -radius_m + (i + 0.5) * grid_m
             if xx * xx + yy * yy <= radius_m * radius_m:
+                ci = int((xx - origin) / grid_m); ri = int((yy - origin) / grid_m)
+                if 0 <= ci < n and 0 <= ri < n and H[ri, ci] > 0.5:
+                    continue  # inside a building footprint
                 xs.append(xx); ys.append(yy)
                 cell_lonlat.append((lon + xx / m_per_lon, lat + yy / m_per_lat))
     xs = np.asarray(xs); ys = np.asarray(ys)
