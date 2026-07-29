@@ -105,6 +105,7 @@
     'viewer/js/layers.js',
     'viewer/js/vegetation.js',   // DTCC LiDAR-derived trees & shrubs (data is Gothenburg-only; no-ops elsewhere)
     'viewer/js/roofs.js',        // DTCC LiDAR-derived pitched roof caps (Gothenburg-only; no-ops elsewhere)
+    'viewer/js/sunhours.js',     // direct sun-hours analysis (click a point → coloured disc)
     ...(profile.country === 'se' ? ['viewer/js/scb_layers.js'] : []),
     'viewer/js/city_switcher.js',
   ];

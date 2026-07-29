@@ -368,15 +368,38 @@ def year_to_band(year) -> str | None:
     return band
 
 
+# England & Wales EPC / RdSAP construction-age-band CODES → representative year.
+# The EPC feed gives the band as a single letter (e.g. 'J'), not the full range
+# string, so decode it here — this is what lets the real EPC construction age
+# drive the TABULA archetype (like Boverket's EgenNybyggAr does for Sweden).
+_EPC_BAND_CODE_YEAR = {
+    "A": 1890,  # before 1900
+    "B": 1915,  # 1900-1929
+    "C": 1940,  # 1930-1949
+    "D": 1958,  # 1950-1966
+    "E": 1971,  # 1967-1975
+    "F": 1979,  # 1976-1982
+    "G": 1987,  # 1983-1990
+    "H": 1993,  # 1991-1995
+    "I": 1999,  # 1996-2002
+    "J": 2005,  # 2003-2006
+    "K": 2009,  # 2007-2011
+    "L": 2014,  # 2012 onwards
+}
+
+
 def epc_age_to_year(age_band: str | None):
     """
-    'England and Wales: 1950-1966' -> 1958.
+    'England and Wales: 1950-1966' -> 1958, or an RdSAP band code 'J' -> 2005.
 
     EPC construction-age bands are ranges; take the midpoint so the building can be
     bucketed into an EHS band and coloured by the viewer's year mode.
     """
     if not age_band:
         return None
+    code = str(age_band).strip().upper()
+    if len(code) == 1 and code in _EPC_BAND_CODE_YEAR:
+        return _EPC_BAND_CODE_YEAR[code]
     years = [int(y) for y in __import__("re").findall(r"(1[89]\d{2}|20\d{2})", str(age_band))]
     if not years:
         return None

@@ -110,26 +110,26 @@
     {
       "id": "rotherham",
       "name": "Rotherham",
-      "district": "Town Centre",
+      "district": "Rotherham (S60/S61/S65)",
       "region": "Yorkshire and the Humber",
       "lat": 53.4302,
       "lon": -1.3568,
-      "radius_m": 1200,
-      "buildings": 2515,
-      "with_epc": 138,
-      "estimated_from_ehs": 1689,
-      "no_band": 688,
+      "radius_m": 4000,
+      "buildings": 14483,
+      "with_epc": 575,
+      "estimated_from_ehs": 11543,
+      "no_band": 2365,
       "band_distribution": {
-        "A": 3,
-        "B": 61,
-        "C": 830,
-        "D": 742,
-        "E": 147,
-        "F": 31,
-        "G": 13
+        "A": 7,
+        "B": 338,
+        "C": 5808,
+        "D": 4913,
+        "E": 756,
+        "F": 209,
+        "G": 87
       },
-      "eubucco_matched": 2499,
-      "tabula_matched": 1822,
+      "eubucco_matched": 14381,
+      "tabula_matched": 12112,
       "data_file": "uk/buildings_rotherham.json"
     }
   ]

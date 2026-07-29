@@ -3431,6 +3431,26 @@ async def energy_price(country: str = Query("se"), zone: str = Query("SE3")):
     }
 
 
+# ── Environmental analysis: direct sun-hours (MIT-clean; backend/sun_hours.py) ─
+class SunHoursRequest(BaseModel):
+    lat: float
+    lon: float
+    radius_m: float = 150
+    grid_m: float = 5
+    date: str = "2026-06-21"
+    base_tz: float = 1.0   # standard UTC offset for clock labels (SE=1, UK=0); DST added server-side
+
+
+@app.post("/api/analysis/sun-hours")
+def api_sun_hours(req: SunHoursRequest):
+    """Direct sun-hours over a ground disc of radius_m around (lat, lon) for one
+    day, shaded by the surrounding buildings. Returns the cumulative sun-hours
+    grid plus per-timestep lit/shaded `frames` for the hour-of-day slider."""
+    from backend.sun_hours import compute_sun_hours
+    return compute_sun_hours(req.lat, req.lon, req.radius_m, req.grid_m,
+                             _get_buildings_list(), req.date, base_tz=req.base_tz)
+
+
 # -- Static frontend (built React SPA + standalone 3D maps) -----------------
 # Only mounted when the build output exists; harmless during local API-only dev.
 _FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"

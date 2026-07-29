@@ -87,11 +87,11 @@ CITIES = [
     {
         "id": "rotherham",
         "name": "Rotherham",
-        "district": "Town Centre",
+        "district": "Rotherham (S60/S61/S65)",
         "region": "Yorkshire and the Humber",
         "lat": 53.4302,
         "lon": -1.3568,
-        "radius_m": 1200,
+        "radius_m": 4000,   # widened from 1200 m to reach the S61/S65 stock ~3.8 km out
         "local_authority": "Rotherham",
         "eubucco_file": "UKE3.parquet",  # South Yorkshire (NUTS2)
     },
