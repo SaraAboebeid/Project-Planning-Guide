@@ -109,6 +109,7 @@ async function _shClampToMesh() {
     _shRefs[i].show = true;
     carto.height += 1.5;                 // sit just above the surface, avoid z-fight
     _shRefs[i].position = Cesium.Cartographic.toCartesian(carto);
+    _shRefs[i].disableDepthTestDistance = 0;   // now on the mesh → depth-correct
   }
   viewer.scene.requestRender && viewer.scene.requestRender();
 }
@@ -121,17 +122,17 @@ function _shRenderFrame() {
   const pts = _shData.points;
   const pc = new Cesium.PointPrimitiveCollection();
   _shRefs = new Array(pts.length);
+  // Photorealistic: start always-on-top so the disc shows the instant it's drawn;
+  // the mesh-clamp below flips each point to depth-correct once tiles are sampled.
+  // Depth-tested keeps ground cells behind a building row hidden (no roof-painting).
+  const onTop = _shPhotoMode() ? Number.POSITIVE_INFINITY : 0;
   for (let i = 0; i < pts.length; i++) {
     const plon = pts[i][0], plat = pts[i][1];
     const base = window.getBuildingBaseOffset ? window.getBuildingBaseOffset(plon, plat) : 0;
     _shRefs[i] = pc.add({
       position: Cesium.Cartesian3.fromDegrees(plon, plat, base + 0.6),
       color: Cesium.Color.GRAY, pixelSize: 10,
-      // Depth-tested: a ground cell hidden behind a building must stay hidden,
-      // otherwise cells in the streets/courtyards behind a row paint over its
-      // roofs. Points are clamped to the mesh + lifted a couple of metres below,
-      // so they sit on the street and occlude correctly.
-      disableDepthTestDistance: 0,
+      disableDepthTestDistance: onTop,
     });
   }
   _shPrims = viewer.scene.primitives.add(pc);
@@ -325,6 +326,8 @@ function _injectSunHours() {
 
   const rad = panel.querySelector("#sunhours-radius");
   rad.oninput = () => { _shRadius = +rad.value; panel.querySelector("#sunhours-rval").textContent = rad.value; };
+  // Re-run for the chosen point when the slider is released so the disc resizes.
+  rad.onchange = () => { if (_shData && _shData.center) _shRun(_shData.center[0], _shData.center[1]); };
 
   panel.querySelectorAll(".sh-mode-btn").forEach(b => {
     b.onclick = () => { _shMode = b.dataset.mode; _shSyncView(); _shApplyColors(); };

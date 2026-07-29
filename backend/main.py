@@ -3451,6 +3451,29 @@ def api_sun_hours(req: SunHoursRequest):
                              _get_buildings_list(), req.date, base_tz=req.base_tz)
 
 
+# ── Environmental analysis: incident radiation (MIT clean-room; EPW-driven) ────
+class IncidentRadiationRequest(BaseModel):
+    lat: float
+    lon: float
+    radius_m: float = 150
+    grid_m: float = 5
+    city_id: str = "gothenburg"   # selects the EPW weather file via CITY_TO_EPW
+
+
+@app.post("/api/analysis/incident-radiation")
+def api_incident_radiation(req: IncidentRadiationRequest):
+    """Cumulative incident solar radiation (kWh/m²) over a ground disc around
+    (lat, lon), from an EPW cumulative sky matrix, shaded by the surrounding
+    buildings. Returns per-season grids (year/summer/equinox/winter)."""
+    epw_name = CITY_TO_EPW.get(req.city_id or "gothenburg") or CITY_TO_EPW["gothenburg"]
+    epw_path = EPW_DIR / epw_name
+    if not epw_path.exists():
+        raise HTTPException(500, f"Weather file missing on server: {epw_path.name}")
+    from backend.incident_radiation import compute_incident
+    return compute_incident(req.lat, req.lon, req.radius_m, req.grid_m,
+                            _get_buildings_list(), str(epw_path))
+
+
 # -- Static frontend (built React SPA + standalone 3D maps) -----------------
 # Only mounted when the build output exists; harmless during local API-only dev.
 _FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
