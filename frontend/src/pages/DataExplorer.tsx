@@ -42,6 +42,7 @@ interface DataSource {
   fields: string[];
   sampleFn: () => Promise<Record<string, unknown>[]>;
   renderPreview?: () => React.ReactNode;
+  liveCountUrl?: string;   // address-keyed JSON to fetch a live listing count from
 }
 
 // ── Data sources definition ──────────────────────────────────────────────────
@@ -144,6 +145,7 @@ const SOURCES: DataSource[] = [
     count: "297",
     countLabel: "active listings",
     status: "live",
+    liveCountUrl: "/boplats_data.json",
     fields: ["address", "rent_sek", "area_m2", "rooms", "floor", "image_url", "last_seen"],
     sampleFn: async () => {
       const r = await fetch("/boplats_data.json");
@@ -155,6 +157,32 @@ const SOURCES: DataSource[] = [
           if (entries.length >= 5) break;
         }
         if (entries.length >= 5) break;
+      }
+      return entries;
+    },
+  },
+  {
+    id: "booli",
+    name: "Booli Listings (sold · for sale · coming)",
+    description: "Booli.se property data across Gothenburg — sold prices, active for-sale, and upcoming listings. Weekly scrape via Apify. Captures price, price/m², floor, rooms, living area, construction year, tenure, energy class, developer/BRF/agency owner, and all ad images (full raw ad stored too).",
+    iconD: IC.boplats,
+    accent: "#EC4899",
+    count: "—",
+    countLabel: "listings",
+    status: "live",
+    liveCountUrl: "/booli_data.json",
+    fields: ["status", "address", "list_price", "sold_price", "developer", "association", "agency_name", "rooms", "living_area_m2", "floor", "construction_year", "energy_class", "images"],
+    sampleFn: async () => {
+      const r = await fetch("/booli_data.json");
+      const data = await r.json() as Record<string, unknown[]>;
+      const entries: Record<string, unknown>[] = [];
+      for (const [addr, listings] of Object.entries(data)) {
+        for (const l of listings as Record<string, unknown>[]) {
+          const { raw, images, ...rest } = l as Record<string, unknown>;
+          entries.push({ address: addr, ...rest, images: Array.isArray(images) ? images.length : 0 });
+          if (entries.length >= 6) break;
+        }
+        if (entries.length >= 6) break;
       }
       return entries;
     },
@@ -414,10 +442,10 @@ function SourceCard({
   useEffect(() => {
     let active = true;
 
-    async function loadBoplatsCount() {
-      if (source.id !== "boplats") return;
+    async function loadLiveCount() {
+      if (!source.liveCountUrl) return;
       try {
-        const res = await fetch(`/boplats_data.json?t=${Date.now()}`, { cache: "no-store" });
+        const res = await fetch(`${source.liveCountUrl}?t=${Date.now()}`, { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json() as Record<string, unknown[]>;
@@ -431,9 +459,9 @@ function SourceCard({
       }
     }
 
-    loadBoplatsCount();
+    loadLiveCount();
     return () => { active = false; };
-  }, [source.id]);
+  }, [source.liveCountUrl]);
 
   async function loadSample() {
     if (source.renderPreview) { setExpanded(e => !e); return; }

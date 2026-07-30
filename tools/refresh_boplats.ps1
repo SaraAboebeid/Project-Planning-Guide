@@ -11,7 +11,13 @@ $log  = Join-Path $proj 'tools\boplats_refresh.log'
 Set-Location $proj
 ("`n===== {0} : refresh start =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')) | Add-Content $log
 
-& $py boplats_scraper.py   *>> $log
-& $py boplats_to_assets.py *>> $log
+& $py boplats_scraper.py   *>> $log ; $scrapeExit = $LASTEXITCODE
+& $py boplats_to_assets.py *>> $log ; $exportExit = $LASTEXITCODE
 
-("===== {0} : refresh done (exit {1}) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $LASTEXITCODE) | Add-Content $log
+("===== {0} : refresh done (scraper exit {1}, exporter exit {2}) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $scrapeExit, $exportExit) | Add-Content $log
+
+if ($scrapeExit -ne 0 -or $exportExit -ne 0) {
+    $tail = (Get-Content $log -Tail 25 -ErrorAction SilentlyContinue) -join "`n"
+    $body = "The boplats REFRESH run failed at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') (scraper exit $scrapeExit, exporter exit $exportExit).`n`nLast log lines:`n$tail"
+    & $py boplats_notify.py "Boplats refresh FAILED" $body *>> $log
+}

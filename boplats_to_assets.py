@@ -39,7 +39,8 @@ def main():
     print(f'Images: {copied} synced to {OUT_IMG_DIR_ASSETS} and {OUT_IMG_DIR_FRONTEND}  ({len(list(OUT_IMG_DIR_ASSETS.glob("*.jpg")))} total)')
 
     # ── Read DB ──────────────────────────────────────────────────────────────
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.execute("PRAGMA busy_timeout=5000")   # wait out a concurrent scrape write
     rows = conn.execute(
         'SELECT id, address, rooms, size_m2, rent_sek, '
         'floor_current, floor_total, floorplan_image_path, last_seen '

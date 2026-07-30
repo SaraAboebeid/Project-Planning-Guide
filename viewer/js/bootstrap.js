@@ -87,6 +87,23 @@
   // Keep a single in-memory copy; avoid re-serializing a very large payload.
   window.DATA = records;
 
+  // Live data-summary counts: fill any #lp-stats element carrying a data-stat
+  // attribute from the actual loaded buildings, so the summary is always accurate
+  // for the current city (and self-updates when the data changes). Opt-in via the
+  // attribute, so viewers without it (e.g. Gothenburg's fixed banner) are untouched.
+  try {
+    const statFns = {
+      epc:    (r) => r.reduce((a, b) => a + (b.has_epc ? 1 : 0), 0),
+      tabula: (r) => r.reduce((a, b) => a + (b.tabula_u_wall != null ? 1 : 0), 0),
+      year:   (r) => r.reduce((a, b) => a + (b.year != null ? 1 : 0), 0),
+      total:  (r) => r.length,
+    };
+    document.querySelectorAll('#lp-stats [data-stat]').forEach((el) => {
+      const fn = statFns[el.getAttribute('data-stat')];
+      if (fn) el.textContent = fn(records).toLocaleString('en-US');
+    });
+  } catch (_) { /* stats are cosmetic; never block the viewer */ }
+
   // Västtrafik and SCB are Swedish services with no UK equivalent, so they are
   // only loaded for Sweden rather than left to fail at runtime.
   const scripts = [

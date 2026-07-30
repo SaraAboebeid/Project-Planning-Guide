@@ -60,8 +60,38 @@ def get_session() -> requests.Session:
 
 # ── database ──────────────────────────────────────────────────────────────────
 
+def _connect(db_path) -> sqlite3.Connection:
+    """Open the DB resiliently. WAL journalling avoids the rollback-journal that
+    can jam an entire run if a commit is interrupted mid-write (a crashed run
+    self-recovers on next open instead of leaving a stuck hot journal). The busy
+    timeout waits out a momentary lock from antivirus / backup / the indexer
+    rather than immediately raising a disk-I/O error."""
+    conn = sqlite3.connect(db_path, timeout=30)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA synchronous=NORMAL")
+    except sqlite3.OperationalError:
+        pass
+    return conn
+
+
+def _commit_with_retry(conn, attempts: int = 5, base_delay: float = 0.4) -> None:
+    """Commit, retrying transient disk-I/O / lock errors with linear backoff so a
+    brief filesystem hiccup can't abort the run and leave the DB jammed."""
+    import time
+    for i in range(attempts):
+        try:
+            conn.commit()
+            return
+        except sqlite3.OperationalError:
+            if i == attempts - 1:
+                raise
+            time.sleep(base_delay * (i + 1))
+
+
 def init_db(db_path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    conn = _connect(db_path)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS apartments (
             id                   TEXT PRIMARY KEY,
@@ -81,7 +111,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             last_seen            TEXT NOT NULL
         )
     """)
-    conn.commit()
+    _commit_with_retry(conn)
     return conn
 
 
@@ -110,7 +140,7 @@ def upsert_apartment(conn: sqlite3.Connection, apt: dict, now: str) -> bool:
             first_seen, now,
         ),
     )
-    conn.commit()
+    _commit_with_retry(conn)
     return is_new
 
 
@@ -321,7 +351,7 @@ def export_json():
     if not DB_PATH.exists():
         print("No database found. Run a scrape first.")
         return
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     rows = conn.execute("SELECT * FROM apartments ORDER BY first_seen DESC").fetchall()
     out = [dict(r) for r in rows]

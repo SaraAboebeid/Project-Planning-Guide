@@ -32,6 +32,12 @@ try {
 }
 catch {
     Write-Log "ERROR: $($_.Exception.Message)"
+    # Email an alert so a broken pipeline doesn't sit silent for a day.
+    try {
+        $tail = (Get-Content $LogPath -Tail 25 -ErrorAction SilentlyContinue) -join "`n"
+        $body = "The boplats DAILY run failed at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss').`n`nError: $($_.Exception.Message)`n`nLast log lines:`n$tail"
+        & $PythonExe "boplats_notify.py" "Boplats daily pipeline FAILED" $body 2>&1 | Out-File -FilePath $LogPath -Append -Encoding utf8
+    } catch { Write-Log "ERROR: alert email step failed: $($_.Exception.Message)" }
     throw
 }
 finally {

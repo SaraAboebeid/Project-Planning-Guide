@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 export default function UKMapViewer() {
-  const viewerUrl = useMemo(() => `/uk_3d.html?v=20260713-v1`, []);
+  const viewerUrl = useMemo(() => `/uk_3d.html?v=20260730-epc`, []);
 
   return (
     <div style={{ height: "calc(100vh - 128px)", minHeight: 520 }}>
