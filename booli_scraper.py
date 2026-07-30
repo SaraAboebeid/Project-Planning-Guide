@@ -222,13 +222,13 @@ def to_row(item, status):
         "object_type": _pick(item, "objectType"),
         "tenure": _pick(item, "tenureForm"),
         "construction_year": _num(_pick(item, "constructionYear")),
-        "rooms": _pick(item, "rooms") or rooms,
-        "living_area_m2": _num(_pick(item, "livingArea")) or area,
-        "floor": _pick(item, "floor"),
-        "list_price": _num(_pick(item, "listPrice")),
-        "sold_price": _num(_pick(item, "soldPrice")),
+        "rooms": _pick(item, "rooms.raw", "rooms") or rooms,
+        "living_area_m2": _pick(item, "livingArea.raw") or _num(_pick(item, "livingArea")) or area,
+        "floor": _pick(item, "buildingFloors", "floor"),
+        "list_price": _num(_pick(item, "listPrice.raw", "listPrice")),
+        "sold_price": _num(_pick(item, "soldPrice.raw", "soldPrice")),
         "sold_date": _pick(item, "soldDate", "soldSoldDate", "datesold"),
-        "monthly_fee": _num(_pick(item, "rent", "monthlyPayment")),
+        "monthly_fee": _num(_pick(item, "rent.raw", "operatingCost.raw", "rent", "monthlyPayment")),
         "sqm_price": _num(_pick(item, "listSqmPrice", "soldSqmPrice", "sqmPrice")),
         "energy_class": _pick(item, "energyClass"),
         "agency_name": _pick(item, "agency.name"),
@@ -305,6 +305,26 @@ def scrape(session, area, status, max_items, max_pages, delay):
     return out[:max_items]
 
 
+def fetch_detail(session, url):
+    """The listing detail page carries the rich fields (constructionYear,
+    buildingFloors, rooms/livingArea/rent .raw, energyClass) that the search
+    pages lack. Returns the resolved Listing/SoldProperty entity, or {}."""
+    if not url:
+        return {}
+    try:
+        html = _fetch(session, url if url.startswith("http") else BASE + url)
+        apollo = _next_data(html)["props"]["pageProps"].get("__APOLLO_STATE__", {})
+    except Exception:
+        return {}
+    best, best_score = None, -1
+    for k, v in apollo.items():
+        if isinstance(v, dict) and (k.startswith("Listing:") or k.startswith("SoldProperty:")):
+            score = len(v) + (100 if any("constructionyear" in kk.lower() for kk in v) else 0)
+            if score > best_score:
+                best_score, best = score, v
+    return _resolve(apollo, best) if best else {}
+
+
 def main() -> int:
     args = sys.argv[1:]
     env = _load_env()
@@ -340,9 +360,10 @@ def main() -> int:
               "from the URL). Or use --test <areaId> to validate parsing.")
         return 1
 
+    details_on = env.get("BOOLI_DETAILS", "1").strip() not in ("0", "false", "no", "")
     conn = init_db()
     now = datetime.now(timezone.utc).isoformat()
-    total = new = imgs = 0
+    total = new = imgs = ndet = 0
     for area in area_ids:
         for status in statuses:
             print(f"\n=== area {area} · {status} ===")
@@ -355,12 +376,18 @@ def main() -> int:
             for it in ents:
                 try:
                     actual = "upcoming" if (status == "for_sale" and it.get("upcomingSale")) else status
+                    if details_on:
+                        det = fetch_detail(session, it.get("url"))   # rich fields incl. construction year
+                        if det:
+                            it = {**it, **det}; ndet += 1
+                        time.sleep(delay)
                     if upsert_listing(conn, it, now, actual):
                         new += 1
                     imgs += download_images(it)
                 except Exception as e:  # noqa: BLE001
                     print(f"    [skip] {e}")
     conn.close()
+    print(f"    (fetched details for {ndet} listings)")
     print(f"\nDone: {total} listings ({new} new), {imgs} images in {IMG_DIR}/")
     return 0
 

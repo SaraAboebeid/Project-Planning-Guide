@@ -1,4 +1,4 @@
-const VIEWER_BUILD_VERSION = "20260730-epc2";
+const VIEWER_BUILD_VERSION = "20260730-defects";
 const PERIOD_CARDS = {};
 const ECLASS_CARDS = {};
 const USE_CARDS = {};

@@ -191,6 +191,13 @@ function _tcClick(movement) {
   _tcRunCurrent(Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude));
 }
 
+function _tcKeydown(e) { if (e.key === "Escape") _tcExit(); }
+function _tcExit() {
+  thermalComfortSetActive(false);
+  const tb = document.getElementById("btn-overlay-comfort");
+  if (tb) { tb.classList.remove("active"); tb.setAttribute("aria-pressed", "false"); }
+}
+
 function thermalComfortSetActive(on) {
   _tcActive = on;
   const panel = document.getElementById("comfort-panel");
@@ -203,10 +210,12 @@ function thermalComfortSetActive(on) {
     _tcStatus("Click a point on the map to analyse outdoor comfort around it.");
     _tcHint(!_tcActiveData());
     _tcSyncView();
+    document.addEventListener("keydown", _tcKeydown);
   } else {
     if (_tcHandler) { _tcHandler.destroy(); _tcHandler = null; }
     _tcClear();
     _tcHint(false);
+    document.removeEventListener("keydown", _tcKeydown);
   }
 }
 
@@ -352,8 +361,10 @@ function _injectComfort() {
     '<div id="comfort-readout" style="font-size:11px;color:rgba(255,255,255,0.9);text-align:center;margin-top:6px;font-weight:600"></div>' +
     '<div id="comfort-legend" style="margin-top:8px"></div>' +
     '<div id="comfort-status" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.4"></div>' +
-    '<div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:6px;line-height:1.4">UTCI from EPW climate. Longwave MRT from sky temperature × sky-view; solar gain (SolarCal) orientation-averaged. Wind = EPW 10 m (UTCI standard). Season % = share of daytime hours in the no-stress band (9–26 °C).</div>';
+    '<div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:6px;line-height:1.4">UTCI from EPW climate. Longwave MRT from sky temperature × sky-view; solar gain (SolarCal) orientation-averaged. Wind = EPW 10 m (UTCI standard). Season % = share of daytime hours in the no-stress band (9–26 °C).</div>' +
+    '<button id="comfort-exit" style="width:100%;margin-top:8px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid rgba(239,68,68,0.45);background:rgba(239,68,68,0.15);color:#fca5a5">✕ Exit analysis</button>';
   btn.after(panel);
+  panel.querySelector("#comfort-exit").onclick = _tcExit;
 
   const dates = panel.querySelector("#comfort-dates");
   _TC_DATES.forEach(([val, label]) => {

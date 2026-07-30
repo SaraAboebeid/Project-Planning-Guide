@@ -183,6 +183,13 @@ function _shClick(movement) {
   _shRun(Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude));
 }
 
+function _shKeydown(e) { if (e.key === "Escape") _shExit(); }
+function _shExit() {
+  sunHoursSetActive(false);
+  const tb = document.getElementById("btn-overlay-sunhours");
+  if (tb) { tb.classList.remove("active"); tb.setAttribute("aria-pressed", "false"); }
+}
+
 function sunHoursSetActive(on) {
   _shActive = on;
   const panel = document.getElementById("sunhours-panel");
@@ -194,10 +201,12 @@ function sunHoursSetActive(on) {
     }
     _shStatus("Click a point on the map to analyse the sun around it.");
     _shHint(!_shData);   // show the on-map prompt until a point has been chosen
+    document.addEventListener("keydown", _shKeydown);
   } else {
     if (_shHandler) { _shHandler.destroy(); _shHandler = null; }
     _shClear();
     _shHint(false);
+    document.removeEventListener("keydown", _shKeydown);
   }
 }
 
@@ -317,8 +326,10 @@ function _injectSunHours() {
     '<div id="sunhours-hourlbl" style="font-size:10px;color:rgba(255,255,255,0.7);margin-bottom:2px;text-align:center">—</div>' +
     '<input id="sunhours-hour" type="range" min="0" max="1" step="1" value="0" style="width:100%">' +
     '<div id="sunhours-legend" style="margin-top:8px"></div>' +
-    '<div id="sunhours-status" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.4"></div>';
+    '<div id="sunhours-status" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.4"></div>' +
+    '<button id="sunhours-exit" style="width:100%;margin-top:8px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid rgba(239,68,68,0.45);background:rgba(239,68,68,0.15);color:#fca5a5">✕ Exit analysis</button>';
   btn.after(panel);
+  panel.querySelector("#sunhours-exit").onclick = _shExit;
 
   const dates = panel.querySelector("#sunhours-dates");
   _SH_DATES.forEach(([val, label]) => {

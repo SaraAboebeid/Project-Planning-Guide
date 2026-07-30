@@ -19,7 +19,7 @@ try:
 except ImportError:
     pass
 # ────────────────────────────────────────────────────────────────────────────
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -3491,6 +3491,48 @@ def api_incident_radiation(req: IncidentRadiationRequest):
     from backend.incident_radiation import compute_incident
     return compute_incident(req.lat, req.lon, req.radius_m, req.grid_m,
                             _analysis_buildings(req.country, req.city_id), str(epw_path))
+
+
+class IncidentSurfacesRequest(BaseModel):
+    lat: float
+    lon: float
+    radius_m: float = 90
+    grid_m: float = 5
+    country: str = "se"
+    city_id: str = "gothenburg"
+
+
+@app.post("/api/analysis/incident-surfaces")
+def api_incident_surfaces(req: IncidentSurfacesRequest):
+    """Incident solar radiation (kWh/m²) on building ROOFS and FACADES within the
+    radius, shaded by surrounding buildings (opaque) + tree crowns (semi-transparent,
+    SE only). Returns per-surface-cell quads with per-season values."""
+    epw_path = _analysis_epw_path(req.city_id)
+    buildings = _analysis_buildings(req.country, req.city_id)
+    veg = (PROJECT_ROOT / "frontend" / "public" / "dtcc_vegetation.json") if (req.country or "se") != "gb" else None
+    from backend.incident_radiation import compute_incident_surfaces
+    return compute_incident_surfaces(req.lat, req.lon, req.radius_m, req.grid_m, buildings,
+                                     str(epw_path), str(veg) if veg and veg.exists() else "")
+
+
+# ── Facade defect detection (proxy to the on-host ML inference service) ────────
+FACADE_ML_URL = os.environ.get("FACADE_ML_URL", "http://host.docker.internal:8020")
+
+
+@app.post("/api/facade-detect")
+async def facade_detect(request: Request, threshold: float = 0.5):
+    """Forward a captured facade image to the on-host ML service and return the
+    detected defects (crack/leakage/abscission/corrosion/bulge) as boxes."""
+    import httpx
+    body = await request.body()
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            r = await client.post(f"{FACADE_ML_URL}/detect", params={"threshold": threshold},
+                                  content=body, headers={"content-type": "application/octet-stream"})
+        return JSONResponse(r.json(), status_code=r.status_code)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(503, f"Facade ML service unreachable at {FACADE_ML_URL}. Start it with "
+                                 f"`python tools/ml/facade_detect_service.py`. ({type(e).__name__})")
 
 
 # ── Environmental analysis: outdoor thermal comfort (UTCI + solar MRT) ─────────

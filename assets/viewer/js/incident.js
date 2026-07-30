@@ -13,6 +13,9 @@ let _irRadius = 150;
 let _irBusy = false;
 let _irData = null;        // last backend result (points + per-season radiation)
 let _irSeason = "year";    // year | summer | equinox | winter
+let _irMode = "ground";    // "ground" | "surfaces" (roofs & facades)
+let _irSurf = null;        // surfaces result (roof/facade quads + per-season values)
+let _irSurfPrim = null;    // Cesium Primitive holding the coloured surface quads
 
 const _IR_SEASONS = [
   ["year", "Full year"],
@@ -42,9 +45,13 @@ function _irClear() {
   if (_irPrims) { try { viewer.scene.primitives.remove(_irPrims); } catch (_) {} _irPrims = null; }
   _irRefs = [];
 }
+function _irClearSurf() {
+  if (_irSurfPrim) { try { viewer.scene.primitives.remove(_irSurfPrim); } catch (_) {} _irSurfPrim = null; }
+}
 
 function _irMax() {
-  return (_irData && _irData.max && _irData.max[_irSeason]) || 1;
+  const src = _irMode === "surfaces" ? _irSurf : _irData;
+  return (src && src.max && src.max[_irSeason]) || 1;
 }
 
 // Recolour existing points for the current season — cheap, no geometry rebuild.
@@ -129,6 +136,60 @@ async function _irRun(lon, lat) {
   }
 }
 
+async function _irRunSurfaces(lon, lat) {
+  if (_irBusy) return;
+  _irBusy = true;
+  _irStatus(`Analysing roofs & facades (r=${Math.min(_irRadius, 250)} m)…`);
+  try {
+    const r = await fetch("/api/analysis/incident-surfaces", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ lat, lon, radius_m: Math.min(_irRadius, 250), grid_m: 5,
+                             country: _irCountry(), city_id: _irCityId() }),
+    });
+    const d = await r.json();
+    if (!d.cells) throw new Error(d.detail || "no result");
+    _irSurf = d;
+    _irRenderSurfaces();
+    _irStatus(`${d.n_cells} surface cells · ${d.n_context_buildings} buildings · click again to move.`);
+    _irSyncView();
+    _irHint(false);
+  } catch (err) {
+    _irStatus("Surface analysis failed: " + (err && err.message));
+  } finally {
+    _irBusy = false;
+  }
+}
+
+// Colour each roof/facade cell as a CoplanarPolygon quad (handles both the flat
+// roof cells and the vertical wall cells). Rebuilt on season change.
+function _irRenderSurfaces() {
+  _irClearSurf();
+  if (!_irSurf || !_irSurf.cells.length) return;
+  const maxv = _irMax();
+  const VF = Cesium.PerInstanceColorAppearance.VERTEX_FORMAT;
+  const inst = [];
+  for (const cell of _irSurf.cells) {
+    const cs = cell.c;
+    const base = window.getBuildingBaseOffset ? window.getBuildingBaseOffset(cs[0][0], cs[0][1]) : 0;
+    const eps = cell.k === "roof" ? 0.15 : 0.05;   // lift off the surface a touch
+    const positions = cs.map(p => Cesium.Cartesian3.fromDegrees(p[0], p[1], base + p[2] + eps));
+    const col = _irColor(cell.v[_irSeason], maxv);
+    inst.push(new Cesium.GeometryInstance({
+      geometry: new Cesium.CoplanarPolygonGeometry({
+        polygonHierarchy: new Cesium.PolygonHierarchy(positions),
+        vertexFormat: VF,
+      }),
+      attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(col) },
+    }));
+  }
+  _irSurfPrim = viewer.scene.primitives.add(new Cesium.Primitive({
+    geometryInstances: inst,
+    appearance: new Cesium.PerInstanceColorAppearance({ translucent: false, flat: true }),
+    asynchronous: false,
+  }));
+  viewer.scene.requestRender && viewer.scene.requestRender();
+}
+
 function _irClick(movement) {
   let cart = null;
   try { cart = viewer.scene.pickPosition(movement.position); } catch (_) {}
@@ -141,7 +202,18 @@ function _irClick(movement) {
   }
   if (!cart) return;
   const c = Cesium.Cartographic.fromCartesian(cart);
-  _irRun(Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude));
+  const lo = Cesium.Math.toDegrees(c.longitude), la = Cesium.Math.toDegrees(c.latitude);
+  if (_irMode === "surfaces") _irRunSurfaces(lo, la); else _irRun(lo, la);
+}
+
+function _irKeydown(e) { if (e.key === "Escape") _irExit(); }
+
+// Fully exit: clear the disc/surfaces, drop the click handler, un-press the tool
+// button. Called by the Exit button, the Esc key, or toggling the tool off.
+function _irExit() {
+  incidentSetActive(false);
+  const tb = document.getElementById("btn-overlay-incident");
+  if (tb) { tb.classList.remove("active"); tb.setAttribute("aria-pressed", "false"); }
 }
 
 function incidentSetActive(on) {
@@ -155,10 +227,13 @@ function incidentSetActive(on) {
     }
     _irStatus("Click a point on the map to analyse radiation around it.");
     _irHint(!_irData);
+    document.addEventListener("keydown", _irKeydown);
   } else {
     if (_irHandler) { _irHandler.destroy(); _irHandler = null; }
     _irClear();
+    _irClearSurf();
     _irHint(false);
+    document.removeEventListener("keydown", _irKeydown);
   }
 }
 
@@ -191,6 +266,9 @@ function _irHint(show) {
 function _irSyncView() {
   document.querySelectorAll(".ir-season-btn").forEach(b => {
     b.style.background = (b.dataset.season === _irSeason) ? "rgba(245,158,11,0.25)" : "transparent";
+  });
+  document.querySelectorAll(".ir-mode-btn").forEach(b => {
+    b.style.background = (b.dataset.mode === _irMode) ? "rgba(245,158,11,0.25)" : "transparent";
   });
   _irLegend();
 }
@@ -227,14 +305,36 @@ function _injectIncident() {
   panel.id = "incident-panel";
   panel.style.cssText = "display:none;padding:8px 10px;margin:4px 0 8px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)";
   panel.innerHTML =
+    '<div style="display:flex;gap:4px;margin-bottom:8px">' +
+      '<button class="ir-mode-btn" data-mode="ground" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:rgba(245,158,11,0.25);color:rgba(255,255,255,0.85)">Ground</button>' +
+      '<button class="ir-mode-btn" data-mode="surfaces" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.85)">Roofs &amp; facades</button>' +
+    '</div>' +
     '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:6px">Period</div>' +
     '<div id="incident-seasons" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"></div>' +
     '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:4px">Radius: <span id="incident-rval">150</span> m</div>' +
     '<input id="incident-radius" type="range" min="60" max="350" step="10" value="150" style="width:100%">' +
     '<div id="incident-legend" style="margin-top:8px"></div>' +
     '<div id="incident-status" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.4"></div>' +
-    '<div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:6px;line-height:1.4">Cumulative solar radiation on the ground, from an EPW typical-year sky matrix. Ground only for now — roofs &amp; facades next.</div>';
+    '<div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:6px;line-height:1.4">Cumulative solar radiation from an EPW typical-year sky matrix. Ground disc, or roofs &amp; facades of nearby buildings. Shaded by buildings + trees (semi-transparent, Gothenburg).</div>' +
+    '<button id="incident-exit" style="width:100%;margin-top:8px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid rgba(239,68,68,0.45);background:rgba(239,68,68,0.15);color:#fca5a5">✕ Exit analysis</button>';
   btn.after(panel);
+  panel.querySelector("#incident-exit").onclick = _irExit;
+
+  panel.querySelectorAll(".ir-mode-btn").forEach(b => {
+    b.onclick = () => {
+      _irMode = b.dataset.mode;
+      _irSyncView();
+      if (_irMode === "surfaces") {
+        _irClear();
+        if (_irSurf) _irRenderSurfaces();
+        else if (_irData && _irData.center) _irRunSurfaces(_irData.center[0], _irData.center[1]);
+      } else {
+        _irClearSurf();
+        if (_irData) _irRenderFrame();
+        else if (_irSurf && _irSurf.center) _irRun(_irSurf.center[0], _irSurf.center[1]);
+      }
+    };
+  });
 
   const seasons = panel.querySelector("#incident-seasons");
   _IR_SEASONS.forEach(([val, label]) => {
@@ -244,14 +344,17 @@ function _injectIncident() {
     b.dataset.season = val;
     b.style.cssText = "padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:" +
       (val === _irSeason ? "rgba(245,158,11,0.25)" : "transparent") + ";color:rgba(255,255,255,0.8)";
-    b.onclick = () => { _irSeason = val; _irSyncView(); _irApplyColors(); };
+    b.onclick = () => { _irSeason = val; _irSyncView(); if (_irMode === "surfaces") _irRenderSurfaces(); else _irApplyColors(); };
     seasons.appendChild(b);
   });
 
   const rad = panel.querySelector("#incident-radius");
   rad.oninput = () => { _irRadius = +rad.value; panel.querySelector("#incident-rval").textContent = rad.value; };
-  // Re-run for the chosen point when the slider is released so the disc resizes.
-  rad.onchange = () => { if (_irData && _irData.center) _irRun(_irData.center[0], _irData.center[1]); };
+  // Re-run for the chosen point when the slider is released so it resizes.
+  rad.onchange = () => {
+    if (_irMode === "surfaces") { if (_irSurf && _irSurf.center) _irRunSurfaces(_irSurf.center[0], _irSurf.center[1]); }
+    else if (_irData && _irData.center) _irRun(_irData.center[0], _irData.center[1]);
+  };
 
   btn.addEventListener("click", () => {
     const on = !_irActive;
@@ -266,7 +369,11 @@ function _irHookBasemap() {
   if (typeof orig === "function" && !orig._irWrapped) {
     const wrapped = function () {
       const p = orig.apply(this, arguments);
-      Promise.resolve(p).then(() => { if (_irData && _irActive) _irRenderFrame(); }).catch(() => {});
+      Promise.resolve(p).then(() => {
+        if (!_irActive) return;
+        if (_irMode === "surfaces") { if (_irSurf) _irRenderSurfaces(); }
+        else if (_irData) _irRenderFrame();
+      }).catch(() => {});
       return p;
     };
     wrapped._irWrapped = true;

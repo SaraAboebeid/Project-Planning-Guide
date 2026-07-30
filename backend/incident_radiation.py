@@ -21,6 +21,7 @@ fabricated irradiance.
 from __future__ import annotations
 
 import math
+import os
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -245,6 +246,177 @@ def compute_incident(lat: float, lon: float, radius_m: float, grid_m: float,
         "n_context_buildings": n_ctx,
         "center": [lon, lat],
     }
+
+
+_TREE_CACHE: dict[str, list] = {}
+
+
+def _load_trees(veg_path: str) -> list:
+    """[(lon, lat, h, crown)] from dtcc_vegetation.json (cached; Gothenburg-only)."""
+    if not veg_path or not os.path.exists(veg_path):
+        return []
+    if veg_path in _TREE_CACHE:
+        return _TREE_CACHE[veg_path]
+    import json as _json
+    d = _json.loads(open(veg_path, "r", encoding="utf-8").read())
+    out = [(t["lon"], t["lat"], float(t.get("h") or 0), float(t.get("crown") or 2.0))
+           for t in d.get("trees", []) if t.get("h")]
+    _TREE_CACHE[veg_path] = out
+    return out
+
+
+def compute_incident_surfaces(lat: float, lon: float, radius_m: float, grid_m: float,
+                              buildings: list, epw_path: str, veg_path: str = "",
+                              tree_transmittance: float = 0.3) -> dict:
+    """Incident solar radiation (kWh/m²) on building ROOFS and FACADES within the
+    radius, shaded by surrounding buildings (opaque) and tree crowns (semi-
+    transparent). Returns per-surface-cell quads with per-season values."""
+    import os as _os
+    radius_m = float(max(20, min(250, radius_m)))
+    grid_m = float(max(2, min(10, grid_m)))
+    alts, azs, omg = _tregenza_dome()
+    pvec = _patch_vectors(alts, azs)   # (P,3) East/North/Up
+    sky = {s: _sky_matrix(epw_path, s, alts, azs, omg) for s in SEASON_ORDER}
+
+    m_per_lat = 110540.0
+    m_per_lon = 111320.0 * math.cos(math.radians(lat))
+
+    # buildings near the point in a local metre frame
+    ctx_scan = radius_m + 400
+    polys, heights, max_h = [], [], 3.0
+    for b in buildings:
+        c = b.get("coordinates") or []
+        ring = c[0] if c and isinstance(c[0][0], (list, tuple)) else c
+        if not ring or len(ring) < 3:
+            continue
+        clon = sum(p[0] for p in ring) / len(ring); clat = sum(p[1] for p in ring) / len(ring)
+        if ((clon - lon) * m_per_lon) ** 2 + ((clat - lat) * m_per_lat) ** 2 > (ctx_scan + 60) ** 2:
+            continue
+        h = b.get("height"); h = float(h) if h else float(b.get("floors") or 2) * 3.0
+        pts = [((p[0] - lon) * m_per_lon, (p[1] - lat) * m_per_lat) for p in ring]
+        try:
+            poly = Polygon(pts)
+            if not poly.is_valid or poly.area <= 0:
+                continue
+        except Exception:
+            continue
+        polys.append((poly, pts)); heights.append(h); max_h = max(max_h, h)
+
+    ctx_r = radius_m + min(400.0, max_h / math.tan(math.radians(12)) + 20)
+    n = int(math.ceil(2 * ctx_r / grid_m)); origin = -ctx_r
+    Hb = np.zeros((n, n), dtype="float32")     # opaque buildings
+    Ht = np.zeros((n, n), dtype="float32")     # semi-transparent tree tops
+    for (poly, _pts), h in zip(polys, heights):
+        minx, miny, maxx, maxy = poly.bounds
+        c0 = max(0, int((minx - origin) / grid_m)); c1 = min(n - 1, int((maxx - origin) / grid_m) + 1)
+        r0 = max(0, int((miny - origin) / grid_m)); r1 = min(n - 1, int((maxy - origin) / grid_m) + 1)
+        if c1 < c0 or r1 < r0:
+            continue
+        cols = np.arange(c0, c1 + 1); rows = np.arange(r0, r1 + 1)
+        gx, gy = np.meshgrid(origin + (cols + 0.5) * grid_m, origin + (rows + 0.5) * grid_m)
+        inside = _contains(poly, _points(gx.ravel(), gy.ravel())).reshape(gy.shape)
+        sub = Hb[r0:r1 + 1, c0:c1 + 1]; sub[inside & (sub < h)] = h; Hb[r0:r1 + 1, c0:c1 + 1] = sub
+    # tree crowns → Ht (max tree top over each cell it covers)
+    for tlon, tlat, th, tcr in _load_trees(veg_path):
+        tx = (tlon - lon) * m_per_lon; ty = (tlat - lat) * m_per_lat
+        if tx * tx + ty * ty > (ctx_scan + 20) ** 2:
+            continue
+        rr = max(grid_m, tcr)
+        c0 = max(0, int((tx - rr - origin) / grid_m)); c1 = min(n - 1, int((tx + rr - origin) / grid_m))
+        r0 = max(0, int((ty - rr - origin) / grid_m)); r1 = min(n - 1, int((ty + rr - origin) / grid_m))
+        for rc in range(r0, r1 + 1):
+            for cc in range(c0, c1 + 1):
+                if Ht[rc, cc] < th:
+                    Ht[rc, cc] = th
+
+    # ── build surface cells (roofs + facades) for buildings within the radius ──
+    cx, cy, cz, nx, ny, nz, quads, kinds = [], [], [], [], [], [], [], []
+    r2 = radius_m * radius_m
+    for (poly, pts), h in zip(polys, heights):
+        ce = poly.centroid
+        if ce.x * ce.x + ce.y * ce.y > (radius_m + 30) ** 2:
+            continue
+        # ROOF: grid cells inside the footprint at z=h, normal up
+        minx, miny, maxx, maxy = poly.bounds
+        ii = np.arange(minx + grid_m / 2, maxx, grid_m); jj = np.arange(miny + grid_m / 2, maxy, grid_m)
+        for yy in jj:
+            for xx in ii:
+                if xx * xx + yy * yy > r2 or not poly.contains(_points([xx], [yy])[0]):
+                    continue
+                cx.append(xx); cy.append(yy); cz.append(h); nx.append(0.0); ny.append(0.0); nz.append(1.0)
+                g = grid_m / 2
+                quads.append([(xx - g, yy - g, h), (xx + g, yy - g, h), (xx + g, yy + g, h), (xx - g, yy + g, h)])
+                kinds.append("roof")
+        # FACADES: per edge, grid horizontally × vertically, outward normal
+        ring = pts if pts[0] == pts[-1] else pts + [pts[0]]
+        for a, bb in zip(ring[:-1], ring[1:]):
+            ex, ey = bb[0] - a[0], bb[1] - a[1]; L = math.hypot(ex, ey)
+            if L < 0.5:
+                continue
+            ux, uy = ex / L, ey / L
+            nrx, nry = uy, -ux                      # perpendicular
+            mx, my = (a[0] + bb[0]) / 2, (a[1] + bb[1]) / 2
+            if (mx + nrx) ** 2 + (my + nry) ** 2 < mx * mx + my * my:  # point outward
+                nrx, nry = -nrx, -nry
+            n_h = max(1, int(math.ceil(L / grid_m))); n_v = max(1, int(math.ceil(h / grid_m)))
+            sh, sv = L / n_h, h / n_v
+            for i in range(n_h):
+                for j in range(n_v):
+                    px = a[0] + (i + 0.5) * sh * ux + nrx * 0.1
+                    py = a[1] + (i + 0.5) * sh * uy + nry * 0.1
+                    z = (j + 0.5) * sv
+                    if px * px + py * py > r2:
+                        continue
+                    cx.append(px); cy.append(py); cz.append(z); nx.append(nrx); ny.append(nry); nz.append(0.0)
+                    hx, hy = ux * sh / 2, uy * sh / 2; vz = sv / 2
+                    quads.append([(px - hx, py - hy, z - vz), (px + hx, py + hy, z - vz),
+                                  (px + hx, py + hy, z + vz), (px - hx, py - hy, z + vz)])
+                    kinds.append("facade")
+
+    M = len(cx)
+    cxa = np.asarray(cx); cya = np.asarray(cy); cza = np.asarray(cz)
+    nxa = np.asarray(nx); nya = np.asarray(ny); nza = np.asarray(nz)
+    incident = {s: np.zeros(M, dtype="float32") for s in SEASON_ORDER}
+    K = int(math.ceil(ctx_r / grid_m))
+    for pi in range(len(alts)):
+        alt = float(alts[pi]); tan_alt = math.tan(alt)
+        px, py, pz = float(pvec[pi, 0]), float(pvec[pi, 1]), float(pvec[pi, 2])
+        cos_inc = np.clip(nxa * px + nya * py + nza * pz, 0.0, None)
+        active = cos_inc > 1e-6
+        if not active.any():
+            continue
+        blocked = np.zeros(M, dtype=bool); canopy = np.zeros(M, dtype=bool)
+        if tan_alt > 1e-6:
+            dxu, dyu = math.sin(azs[pi]), math.cos(azs[pi])
+            steps = min(K, int(math.ceil((max_h / tan_alt) / grid_m)) + 1)
+            for k in range(1, steps + 1):
+                dist = k * grid_m
+                col = ((cxa + dist * dxu - origin) / grid_m).astype(np.int32)
+                row = ((cya + dist * dyu - origin) / grid_m).astype(np.int32)
+                inb = (col >= 0) & (col < n) & (row >= 0) & (row < n)
+                idx = np.where(inb & active & ~blocked)[0]
+                if not idx.size:
+                    break
+                rh = cza[idx] + dist * tan_alt
+                hb = Hb[row[idx], col[idx]]; ht = Ht[row[idx], col[idx]]
+                blocked[idx[hb > rh]] = True
+                canopy[idx[(ht > rh) & (hb <= rh)]] = True
+        vis = np.where(blocked, 0.0, np.where(canopy, tree_transmittance, 1.0)) * active
+        contrib = cos_inc * vis
+        for s in SEASON_ORDER:
+            incident[s] += float(sky[s][pi]) * contrib
+
+    # emit cells with lon/lat/z quad corners
+    out_cells = []
+    for i in range(M):
+        corners = [[round(lon + q[0] / m_per_lon, 6), round(lat + q[1] / m_per_lat, 6), round(q[2], 2)]
+                   for q in quads[i]]
+        out_cells.append({"c": corners, "k": kinds[i],
+                          "v": {s: round(float(incident[s][i]), 1) for s in SEASON_ORDER}})
+    maxima = {s: round(float(incident[s].max()) if M else 0, 1) for s in SEASON_ORDER}
+    return {"cells": out_cells, "seasons": SEASON_ORDER, "max": maxima,
+            "n_cells": M, "n_context_buildings": len(polys), "center": [lon, lat],
+            "radius_m": radius_m, "grid_m": grid_m}
 
 
 if __name__ == "__main__":

@@ -703,3 +703,58 @@ document.getElementById('btn-wwr-save').addEventListener('click', async () => {
     saveBtn.disabled = false;
   }
 });
+
+// ── Facade defect detection (ML) ─────────────────────────────────────────────
+// Sends the captured facade (canvas-manual) to the on-host detector via the
+// backend proxy, draws the returned boxes, and lists the issues found.
+(function () {
+  const btn = document.getElementById('btn-detect-defects');
+  if (!btn) return;
+  const COL = { crack: '#e6194B', leakage: '#4363d8', abscission: '#f58231', corrosion: '#3cb44b', bulge: '#911eb4' };
+
+  function drawDefects(canvas, d) {
+    const ctx = canvas.getContext('2d');
+    const sx = canvas.width / (d.width || canvas.width), sy = canvas.height / (d.height || canvas.height);
+    ctx.lineWidth = Math.max(2, canvas.width * 0.004);
+    ctx.font = Math.max(12, Math.round(canvas.width * 0.02)) + 'px Inter, system-ui, sans-serif';
+    ctx.textBaseline = 'top';
+    for (const det of (d.detections || [])) {
+      const x1 = det.box[0] * sx, y1 = det.box[1] * sy, x2 = det.box[2] * sx, y2 = det.box[3] * sy;
+      const c = COL[det.label] || '#ffe119';
+      ctx.strokeStyle = c; ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      const cap = det.label + ' ' + Math.round(det.score * 100) + '%';
+      const w = ctx.measureText(cap).width + 8, ty = Math.max(0, y1 - 18);
+      ctx.fillStyle = c; ctx.fillRect(x1, ty, w, 18);
+      ctx.fillStyle = '#fff'; ctx.fillText(cap, x1 + 3, ty + 1);
+    }
+  }
+  function summarise(dets) {
+    const sub = document.getElementById('facade-sub');
+    if (!sub) return;
+    if (!dets || !dets.length) { sub.textContent = 'No defects detected (≥50% confidence).'; return; }
+    const counts = {};
+    dets.forEach(d => { counts[d.label] = (counts[d.label] || 0) + 1; });
+    sub.innerHTML = '<b>Issues found:</b> ' +
+      Object.entries(counts).map(([k, v]) => v + '× ' + k).join(' · ');
+  }
+
+  btn.addEventListener('click', () => {
+    const canvas = document.getElementById('canvas-manual');
+    if (!canvas) return;
+    const sub = document.getElementById('facade-sub');
+    if (sub) sub.textContent = 'Detecting facade defects…';
+    btn.disabled = true;
+    canvas.toBlob((blob) => {
+      if (!blob) { btn.disabled = false; return; }
+      fetch('/api/facade-detect?threshold=0.5', { method: 'POST', body: blob })
+        .then(r => r.json().then(d => ({ ok: r.ok, d })))
+        .then(({ ok, d }) => {
+          if (!ok || d.detail || d.error) throw new Error(d.detail || d.error || 'service error');
+          drawDefects(canvas, d);
+          summarise(d.detections);
+        })
+        .catch(err => { if (sub) sub.textContent = 'Defect detection failed: ' + (err && err.message); })
+        .finally(() => { btn.disabled = false; });
+    }, 'image/jpeg', 0.92);
+  });
+})();
