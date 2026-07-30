@@ -3431,6 +3431,24 @@ async def energy_price(country: str = Query("se"), zone: str = Query("SE3")):
     }
 
 
+# ── Environmental analysis: shared helpers ────────────────────────────────────
+def _analysis_buildings(country: str, city_id: str) -> list:
+    """Building set to shade an analysis: UK city buildings for 'gb', else the
+    Swedish (Gothenburg) set. Keeps every site analysis correct per country."""
+    if (country or "").lower() == "gb":
+        return _get_uk_buildings_list(city_id or "")
+    return _get_buildings_list()
+
+
+def _analysis_epw_path(city_id: str) -> "Path":
+    """EPW weather file for a city_id (SE or UK), via CITY_TO_EPW."""
+    epw_name = CITY_TO_EPW.get(city_id or "gothenburg") or CITY_TO_EPW["gothenburg"]
+    epw_path = EPW_DIR / epw_name
+    if not epw_path.exists():
+        raise HTTPException(500, f"Weather file missing on server: {epw_path.name}")
+    return epw_path
+
+
 # ── Environmental analysis: direct sun-hours (MIT-clean; backend/sun_hours.py) ─
 class SunHoursRequest(BaseModel):
     lat: float
@@ -3439,6 +3457,8 @@ class SunHoursRequest(BaseModel):
     grid_m: float = 5
     date: str = "2026-06-21"
     base_tz: float = 1.0   # standard UTC offset for clock labels (SE=1, UK=0); DST added server-side
+    country: str = "se"    # "se" | "gb" — selects which city's buildings shade the disc
+    city_id: str = "gothenburg"
 
 
 @app.post("/api/analysis/sun-hours")
@@ -3448,7 +3468,8 @@ def api_sun_hours(req: SunHoursRequest):
     grid plus per-timestep lit/shaded `frames` for the hour-of-day slider."""
     from backend.sun_hours import compute_sun_hours
     return compute_sun_hours(req.lat, req.lon, req.radius_m, req.grid_m,
-                             _get_buildings_list(), req.date, base_tz=req.base_tz)
+                             _analysis_buildings(req.country, req.city_id), req.date,
+                             base_tz=req.base_tz)
 
 
 # ── Environmental analysis: incident radiation (MIT clean-room; EPW-driven) ────
@@ -3457,6 +3478,7 @@ class IncidentRadiationRequest(BaseModel):
     lon: float
     radius_m: float = 150
     grid_m: float = 5
+    country: str = "se"           # "se" | "gb"
     city_id: str = "gothenburg"   # selects the EPW weather file via CITY_TO_EPW
 
 
@@ -3465,13 +3487,40 @@ def api_incident_radiation(req: IncidentRadiationRequest):
     """Cumulative incident solar radiation (kWh/m²) over a ground disc around
     (lat, lon), from an EPW cumulative sky matrix, shaded by the surrounding
     buildings. Returns per-season grids (year/summer/equinox/winter)."""
-    epw_name = CITY_TO_EPW.get(req.city_id or "gothenburg") or CITY_TO_EPW["gothenburg"]
-    epw_path = EPW_DIR / epw_name
-    if not epw_path.exists():
-        raise HTTPException(500, f"Weather file missing on server: {epw_path.name}")
+    epw_path = _analysis_epw_path(req.city_id)
     from backend.incident_radiation import compute_incident
     return compute_incident(req.lat, req.lon, req.radius_m, req.grid_m,
-                            _get_buildings_list(), str(epw_path))
+                            _analysis_buildings(req.country, req.city_id), str(epw_path))
+
+
+# ── Environmental analysis: outdoor thermal comfort (UTCI + solar MRT) ─────────
+# MIT clean-room + the MIT-licensed pythermalcomfort library (no Ladybug code).
+class ThermalComfortRequest(BaseModel):
+    lat: float
+    lon: float
+    radius_m: float = 150
+    grid_m: float = 5
+    date: str = "2026-06-21"
+    mode: str = "hourly"          # "hourly" (a day's frames) | "seasonal" (comfort %)
+    country: str = "se"           # "se" | "gb"
+    city_id: str = "gothenburg"
+
+
+@app.post("/api/analysis/thermal-comfort")
+def api_thermal_comfort(req: ThermalComfortRequest):
+    """Outdoor UTCI over a ground disc. mode='hourly' → per-hour frames for the
+    given day (UTCI + stress category per cell). mode='seasonal' → per-cell share
+    of daytime hours in the comfortable band, for each season. EPW climate +
+    SolarCal solar MRT, shaded by the surrounding buildings."""
+    epw_path = _analysis_epw_path(req.city_id)
+    buildings = _analysis_buildings(req.country, req.city_id)
+    if req.mode == "seasonal":
+        from backend.thermal_comfort import compute_comfort_seasons
+        return compute_comfort_seasons(req.lat, req.lon, req.radius_m, req.grid_m,
+                                       buildings, str(epw_path))
+    from backend.thermal_comfort import compute_comfort
+    return compute_comfort(req.lat, req.lon, req.radius_m, req.grid_m,
+                           buildings, str(epw_path), req.date)
 
 
 # -- Static frontend (built React SPA + standalone 3D maps) -----------------

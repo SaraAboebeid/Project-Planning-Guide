@@ -36,6 +36,7 @@ function _irPhotoMode() {
 function _irCityId() {
   return (window.VIEWER_CITY && window.VIEWER_CITY.id) || "gothenburg";
 }
+function _irCountry() { return window.VIEWER_COUNTRY || "se"; }
 
 function _irClear() {
   if (_irPrims) { try { viewer.scene.primitives.remove(_irPrims); } catch (_) {} _irPrims = null; }
@@ -112,7 +113,7 @@ async function _irRun(lon, lat) {
   try {
     const r = await fetch("/api/analysis/incident-radiation", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lat, lon, radius_m: _irRadius, grid_m: 5, city_id: _irCityId() }),
+      body: JSON.stringify({ lat, lon, radius_m: _irRadius, grid_m: 5, country: _irCountry(), city_id: _irCityId() }),
     });
     const d = await r.json();
     if (!d.points) throw new Error(d.detail || "no result");
@@ -209,18 +210,18 @@ function _irLegend() {
 }
 
 function _injectIncident() {
-  const group = document.querySelector("#urban-analysis-section .overlay-group")
+  const group = document.querySelector(".analysis-tools-group")
+             || document.querySelector("#urban-analysis-section .overlay-group")
              || document.querySelector("#buildings-content .overlay-group");
   if (!group || document.getElementById("btn-overlay-incident")) return;
-  const row = document.createElement("div");
-  row.className = "overlay-row";
-  row.innerHTML =
-    '<button class="overlay-btn" id="btn-overlay-incident" aria-pressed="false">' +
-    '<span class="overlay-check"></span><span class="base-name">Incident radiation</span>' +
-    '<span class="layer-pill">Sun</span></button>';
+  const btn = document.createElement("button");
+  btn.className = "tool-btn";
+  btn.id = "btn-overlay-incident";
+  btn.setAttribute("aria-pressed", "false");
+  btn.textContent = "☀️ Incident radiation";
   // place right after the Sun-hours control (keep the sun analyses together)
   const shPanel = document.getElementById("sunhours-panel");
-  if (shPanel) shPanel.after(row); else group.insertBefore(row, group.firstChild);
+  if (shPanel) shPanel.after(btn); else group.appendChild(btn);
 
   const panel = document.createElement("div");
   panel.id = "incident-panel";
@@ -233,7 +234,7 @@ function _injectIncident() {
     '<div id="incident-legend" style="margin-top:8px"></div>' +
     '<div id="incident-status" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.4"></div>' +
     '<div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:6px;line-height:1.4">Cumulative solar radiation on the ground, from an EPW typical-year sky matrix. Ground only for now — roofs &amp; facades next.</div>';
-  row.after(panel);
+  btn.after(panel);
 
   const seasons = panel.querySelector("#incident-seasons");
   _IR_SEASONS.forEach(([val, label]) => {
@@ -252,7 +253,6 @@ function _injectIncident() {
   // Re-run for the chosen point when the slider is released so the disc resizes.
   rad.onchange = () => { if (_irData && _irData.center) _irRun(_irData.center[0], _irData.center[1]); };
 
-  const btn = row.querySelector("#btn-overlay-incident");
   btn.addEventListener("click", () => {
     const on = !_irActive;
     incidentSetActive(on);

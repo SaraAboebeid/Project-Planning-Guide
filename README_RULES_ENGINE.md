@@ -356,7 +356,7 @@ See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## 📄 License
 
-MIT License - See [LICENSE](LICENSE)
+Proprietary and confidential — © 2026 Project Planning Guide, all rights reserved. See [LICENSE](LICENSE).
 
 ---
 

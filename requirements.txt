@@ -20,6 +20,7 @@ pyproj==3.7.2
 requests==2.32.5
 httpx==0.28.1
 Jinja2==3.1.6
+pythermalcomfort==2.10.0
 
 # Note: Install all dependencies with:
 # pip install -r requirements.txt

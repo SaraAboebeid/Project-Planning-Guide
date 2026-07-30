@@ -37,8 +37,10 @@ const _SH_LIT = Cesium.Color.fromCssColorString("#FFC83D").withAlpha(0.98);
 const _SH_SHADE = Cesium.Color.fromCssColorString("#1E3A8A").withAlpha(0.95);
 
 function _shBaseTz() {
-  return (window.VIEWER_COUNTRY === "uk") ? 0.0 : 1.0;  // DST added server-side
+  return (window.VIEWER_COUNTRY === "gb") ? 0.0 : 1.0;  // DST added server-side
 }
+function _shCountry() { return window.VIEWER_COUNTRY || "se"; }
+function _shCityId() { return (window.VIEWER_CITY && window.VIEWER_CITY.id) || "gothenburg"; }
 
 // True while the Google photorealistic tiles are the basemap — the only view
 // with real per-point terrain worth clamping to.
@@ -147,7 +149,8 @@ async function _shRun(lon, lat) {
   try {
     const r = await fetch("/api/analysis/sun-hours", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lat, lon, radius_m: _shRadius, grid_m: 5, date: _shDate, base_tz: _shBaseTz() }),
+      body: JSON.stringify({ lat, lon, radius_m: _shRadius, grid_m: 5, date: _shDate,
+                             base_tz: _shBaseTz(), country: _shCountry(), city_id: _shCityId() }),
     });
     const d = await r.json();
     _shData = d;
@@ -280,16 +283,25 @@ function _injectSunHours() {
   // Live under the "Analysis" section (formerly Urban Analysis), alongside the
   // other spatial analyses; fall back to the Buildings panel if that section
   // isn't present (e.g. a non-SE viewer profile).
-  const group = document.querySelector("#urban-analysis-section .overlay-group")
+  // Live in the analysis tools group (with WWR / PV / Energy Simulation); fall
+  // back to the old locations if that group isn't present.
+  const group = document.querySelector(".analysis-tools-group")
+             || document.querySelector("#urban-analysis-section .overlay-group")
              || document.querySelector("#buildings-content .overlay-group");
   if (!group || document.getElementById("btn-overlay-sunhours")) return;
-  const row = document.createElement("div");
-  row.className = "overlay-row";
-  row.innerHTML =
-    '<button class="overlay-btn" id="btn-overlay-sunhours" aria-pressed="false">' +
-    '<span class="overlay-check"></span><span class="base-name">Sun-hours</span>' +
-    '<span class="layer-pill">Sun</span></button>';
-  group.insertBefore(row, group.firstChild);   // most prominent analysis first
+  if (!document.getElementById("site-analysis-label")) {
+    const lbl = document.createElement("div");
+    lbl.id = "site-analysis-label";
+    lbl.textContent = "Site analysis · click a point";
+    lbl.style.cssText = "font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 2px 4px";
+    group.appendChild(lbl);
+  }
+  const btn = document.createElement("button");
+  btn.className = "tool-btn";
+  btn.id = "btn-overlay-sunhours";
+  btn.setAttribute("aria-pressed", "false");
+  btn.textContent = "☀️ Sun-hours";
+  group.appendChild(btn);
   const panel = document.createElement("div");
   panel.id = "sunhours-panel";
   panel.style.cssText = "display:none;padding:8px 10px;margin:4px 0 8px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)";
@@ -306,7 +318,7 @@ function _injectSunHours() {
     '<input id="sunhours-hour" type="range" min="0" max="1" step="1" value="0" style="width:100%">' +
     '<div id="sunhours-legend" style="margin-top:8px"></div>' +
     '<div id="sunhours-status" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.4"></div>';
-  row.after(panel);
+  btn.after(panel);
 
   const dates = panel.querySelector("#sunhours-dates");
   _SH_DATES.forEach(([val, label]) => {
@@ -336,7 +348,6 @@ function _injectSunHours() {
   const hour = panel.querySelector("#sunhours-hour");
   hour.oninput = () => { _shHourIdx = +hour.value; _shUpdateHourLabel(); _shApplyColors(); };
 
-  const btn = row.querySelector("#btn-overlay-sunhours");
   btn.addEventListener("click", () => {
     const on = !_shActive;
     sunHoursSetActive(on);
