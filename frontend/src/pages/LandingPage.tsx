@@ -217,8 +217,14 @@ export default function LandingPage() {
       .then((d: { cities?: (Record<string, number> & { name: string; band_distribution?: Record<string, number> })[] }) => {
         if (!active) return;
         const cities = d.cities ?? [];
-        const sum = (k: string) => cities.reduce((a, c) => a + (Number(c[k]) || 0), 0);
-        setUkStats({ buildings: sum("buildings"), withEpc: sum("with_epc"), estimated: sum("estimated_from_ehs"), districts: cities.length });
+        // Show the SELECTED city's own numbers, not the UK total. Match by id
+        // prefix: "Rotherham" -> the rotherham district, "London" -> the
+        // london_* districts (summed). Falls back to all if nothing matches.
+        const key = (selectedCity || "").toLowerCase();
+        const sel = key ? cities.filter((c) => String((c as { id?: string }).id || "").toLowerCase().startsWith(key)) : [];
+        const use = sel.length ? sel : cities;
+        const sum = (k: string) => use.reduce((a, c) => a + (Number(c[k]) || 0), 0);
+        setUkStats({ buildings: sum("buildings"), withEpc: sum("with_epc"), estimated: sum("estimated_from_ehs"), districts: use.length });
       })
       .catch(() => { /* stat pills fall back to "—" for the UK */ });
 
@@ -230,7 +236,7 @@ export default function LandingPage() {
       })
       .catch(() => { /* SE stat pills fall back to last-known values if absent */ });
     return () => { active = false; };
-  }, []);
+  }, [selectedCity]);
 
   // Country/city are chosen once here on the landing page (the top-bar
   // pickers below), not asked again in the wizard - Step 1 used to have its

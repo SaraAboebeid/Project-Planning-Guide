@@ -43,7 +43,7 @@ def _images_for(listing_id: str) -> list:
     d = IMG_SRC / listing_id
     if not d.exists():
         return []
-    files = sorted(d.glob("*.jpg"), key=lambda p: int(p.stem) if p.stem.isdigit() else 0)
+    files = sorted(d.glob("*.webp"), key=lambda p: int(p.stem) if p.stem.isdigit() else 0)
     return [f"/booli_images/{listing_id}/{f.name}" for f in files]
 
 
@@ -51,7 +51,7 @@ def _copy_images():
     for dst in IMG_DST:
         dst.mkdir(parents=True, exist_ok=True)
     copied = 0
-    for src in IMG_SRC.glob("*/*.jpg") if IMG_SRC.exists() else []:
+    for src in IMG_SRC.glob("*/*.webp") if IMG_SRC.exists() else []:
         rel = src.relative_to(IMG_SRC)
         for dst in IMG_DST:
             target = dst / rel

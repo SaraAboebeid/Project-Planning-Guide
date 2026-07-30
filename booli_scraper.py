@@ -46,7 +46,7 @@ DB_PATH = Path("booli_listings.db")
 IMG_DIR = Path("booli_images")
 BASE = "https://www.booli.se"
 IMG_CDN = "https://bcdn.se/images/cache/{id}_1280x0.webp"
-STATUS_PATH = {"for_sale": "till-salu", "sold": "slutpriser", "upcoming": "kommande"}
+STATUS_PATH = {"for_sale": "till-salu", "sold": "slutpriser"}  # upcoming is derived from the upcomingSale flag on till-salu
 HEADERS = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"),
@@ -289,8 +289,12 @@ def scrape(session, area, status, max_items, max_pages, delay):
         url = f"{BASE}/sok/{path}?areaIds={area}&page={page}"
         html = _fetch(session, url)
         apollo = _next_data(html)["props"]["pageProps"].get("__APOLLO_STATE__", {})
+        # A slutpriser page is SoldProperty entities; a till-salu page is Listing
+        # entities (each page also carries the *other* type as comparison data, so
+        # take only the type that matches this status or they overwrite each other).
+        prefix = "SoldProperty:" if status == "sold" else "Listing:"
         ents = [_resolve(apollo, v) for k, v in apollo.items()
-                if (k.startswith("Listing:") or k.startswith("SoldProperty:")) and isinstance(v, dict)]
+                if k.startswith(prefix) and isinstance(v, dict)]
         if not ents:
             break
         out.extend(ents)
@@ -307,7 +311,7 @@ def main() -> int:
     delay = float(env.get("BOOLI_DELAY", "1.5") or "1.5")
     max_items = int(env.get("BOOLI_MAX_ITEMS", "200") or "200")
     max_pages = int(env.get("BOOLI_MAX_PAGES", "20") or "20")
-    statuses = [s.strip() for s in env.get("BOOLI_STATUSES", "for_sale,sold,upcoming").split(",") if s.strip()]
+    statuses = [s.strip() for s in env.get("BOOLI_STATUSES", "for_sale,sold").split(",") if s.strip()]
     session = requests.Session(); session.headers.update(HEADERS)
 
     if "--sample" in args:
@@ -350,7 +354,8 @@ def main() -> int:
             total += len(ents)
             for it in ents:
                 try:
-                    if upsert_listing(conn, it, now, status):
+                    actual = "upcoming" if (status == "for_sale" and it.get("upcomingSale")) else status
+                    if upsert_listing(conn, it, now, actual):
                         new += 1
                     imgs += download_images(it)
                 except Exception as e:  # noqa: BLE001

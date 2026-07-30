@@ -116,8 +116,8 @@
       "lon": -1.3568,
       "radius_m": 4000,
       "buildings": 14483,
-      "with_epc": 575,
-      "estimated_from_ehs": 11543,
+      "with_epc": 7824,
+      "estimated_from_ehs": 4414,
       "no_band": 2365,
       "band_distribution": {
         "A": 7,

@@ -94,6 +94,34 @@ const UK_SOURCES: Source[] = [
     },
   },
   {
+    id: "epc_register",
+    name: "EPC Register — matched certificates (Rotherham)",
+    description:
+      "Real Energy Performance Certificates from the MHCLG register, matched to buildings by UPRN via OS Open UPRN. " +
+      "For Rotherham this anchors 7,824 of 14,483 buildings (54%) with real EPC band, construction year, SAP and " +
+      "heating — validated against ground-truth surveys at 91% exact / 100% within one band.",
+    accent: "#96D74C",
+    iconD: IC.epc,
+    status: "live",
+    fields: ["eclass", "year", "sap", "heating", "tabula_period", "epc_n_certs", "epc_source", "postcode"],
+    sampleFn: async () => {
+      const rows = await fetchJson<Record<string, unknown>[]>("/api/uk/buildings/rotherham");
+      return rows
+        .filter((r) => r.has_epc)
+        .slice(0, 8)
+        .map((r) => ({
+          eclass: r.eclass,
+          year: r.year,
+          sap: r.sap,
+          heating: r.heating,
+          tabula_period: r.tabula_period,
+          epc_n_certs: r.epc_n_certs,
+          epc_source: r.epc_source,
+          postcode: r.postcode,
+        }));
+    },
+  },
+  {
     id: "epc_band_priors",
     name: "EPC Band Priors (English Housing Survey)",
     description:
