@@ -273,6 +273,15 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
   // the same pointer position.
   if (window._tvHoverActive) { hoverCard.style.display = 'none'; return; }
 
+  // Also suppress it while a site-analysis tool (sun-hours / incident radiation /
+  // thermal comfort) is active — you're picking a ground point there, so the
+  // building data hover just gets in the way.
+  if (window._shActive || window._irActive || window._tcActive) {
+    hoverCard.style.display = 'none';
+    lastHoverId = null;
+    return;
+  }
+
   // Throttle to ~30fps
   const now = Date.now();
   if (now - hoverThrottle < 33) {

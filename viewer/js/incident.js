@@ -218,6 +218,7 @@ function _irExit() {
 
 function incidentSetActive(on) {
   _irActive = on;
+  window._irActive = on;   // read by ui.js to suppress the building hover card
   const panel = document.getElementById("incident-panel");
   if (panel) panel.style.display = on ? "block" : "none";
   if (on) {

@@ -8,9 +8,11 @@
 function layersInit() {
   // ── Base Map selector ────────────────────────────────────────────────────
   ['light', 'dark', 'satellite', 'terrain', 'photo'].forEach(type => {
-    document.getElementById('btn-base-' + type).addEventListener('click', () => {
+    const btn = document.getElementById('btn-base-' + type);
+    if (!btn) return;   // e.g. the UK viewer has no "terrain" basemap button
+    btn.addEventListener('click', () => {
       document.querySelectorAll('.base-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById('btn-base-' + type).classList.add('active');
+      btn.classList.add('active');
       window.setBasemap(type);
     });
   });

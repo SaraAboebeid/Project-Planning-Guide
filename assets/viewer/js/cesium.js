@@ -108,14 +108,13 @@ window.setBasemap = function(type) {
     // buildings + trees + roofs sit ON the map and no background calibration can
     // re-float them. OSM Buildings (UK) stays real-elevation ground truth instead.
     const wasFlat = _flatGroundMode;
-    _flatGroundMode = !osmEnabled;
-    if (osmEnabled) {
-      if (wasPhoto) refreshBuildingBaseOffsetFromTiles().then(() => {
-        if (buildingPrimitives.length) rebuildBuildings();
-        if (window.vegetationReground) window.vegetationReground();
-        if (window.roofsRebuild) window.roofsRebuild();
-      });
-    } else if (wasPhoto || !wasFlat) {
+    // Flat imagery is at height 0, so everything sits on that plane. The grey OSM
+    // mesh is georeferenced at real elevation and can't be flattened, so it's
+    // hidden on flat basemaps (it would float) and only shown in photorealistic
+    // view. Its toggle state is remembered and it reappears there.
+    _flatGroundMode = true;
+    if (osmBuildings) osmBuildings.show = false;
+    if (wasPhoto || !wasFlat) {
       resetGroundCalibration();
       if (buildingPrimitives.length) rebuildBuildings();
       if (window.vegetationReground) window.vegetationReground();
@@ -215,6 +214,10 @@ window.setPhotoMode = function setPhotoMode(on) {
   if (!on) { _pinnedIdx = null; setBuildingHighlight(null); }
   const hint = document.getElementById('photo-pick-hint');
   if (hint) hint.style.display = on ? 'block' : 'none';
+  // The grey OSM Buildings mesh only sits correctly on the real Google ground, so
+  // reveal it when entering photorealistic (if the user has it toggled on) and
+  // hide it when leaving — that's what stops it floating over flat basemaps.
+  if (osmBuildings) osmBuildings.show = on && osmEnabled;
   // Coloured building surfaces are invisible under Google's photorealistic mesh,
   // so hide the "Colour buildings by" control there — only useful on the flat
   // basemaps (light / dark / satellite / terrain).
@@ -242,6 +245,7 @@ window.getBuildingBaseOffset = function getBuildingBaseOffset(lon, lat) {
   }
   return buildingBaseOffsetMeters;
 };
+
 
 function resetGroundCalibration() {
   buildingBaseOffsetMeters = 0;
@@ -891,13 +895,15 @@ async function toggleOsmBuildings(on, { skipAutoRebuild = false } = {}) {
     }
   }
   osmEnabled = on;
-  if (osmBuildings) osmBuildings.show = on;
+  // Only show the grey mesh in photorealistic view — on flat basemaps it floats
+  // (real elevation vs height-0 imagery), so hide it there. The toggle stays
+  // "on" so it reappears when you switch to Photorealistic 3D.
+  if (osmBuildings) osmBuildings.show = on && photoMode;
   if (btn) btn.classList.toggle('active', on);
 
-  if (!skipAutoRebuild) {
-    // OSM Buildings sits at real-world elevation, same as Google's photorealistic
-    // mesh - recalibrate against whichever ground-truth layer(s) are now active so
-    // our own extruded buildings don't end up floating below/above it.
+  // Recalibrate the extruded buildings against ground truth only when there IS
+  // some (photorealistic). On flat basemaps everything stays flat, so no rebuild.
+  if (!skipAutoRebuild && photoMode) {
     await refreshBuildingBaseOffsetFromTiles();
     if (buildingPrimitives.length) await rebuildBuildings();
   }

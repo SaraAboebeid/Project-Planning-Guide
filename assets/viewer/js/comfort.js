@@ -200,6 +200,7 @@ function _tcExit() {
 
 function thermalComfortSetActive(on) {
   _tcActive = on;
+  window._tcActive = on;   // read by ui.js to suppress the building hover card
   const panel = document.getElementById("comfort-panel");
   if (panel) panel.style.display = on ? "block" : "none";
   if (on) {

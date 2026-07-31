@@ -1,4 +1,4 @@
-const VIEWER_BUILD_VERSION = "20260731-sse4";
+const VIEWER_BUILD_VERSION = "20260731-hover";
 const PERIOD_CARDS = {};
 const ECLASS_CARDS = {};
 const USE_CARDS = {};

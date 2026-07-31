@@ -192,6 +192,7 @@ function _shExit() {
 
 function sunHoursSetActive(on) {
   _shActive = on;
+  window._shActive = on;   // read by ui.js to suppress the building hover card
   const panel = document.getElementById("sunhours-panel");
   if (panel) panel.style.display = on ? "block" : "none";
   if (on) {
