@@ -4,8 +4,14 @@ Exports boplats SQLite data → assets/boplats_data.json
 and copies floor plan images   → assets/boplats_images/
 Run whenever new scrape data is available.
 """
-import json, re, shutil, sqlite3
+import json, re, shutil, sqlite3, sys
 from pathlib import Path
+
+# Force UTF-8 output on Windows so a stray non-ASCII char in a print can't crash
+# a scheduled run whose stdout is redirected to a cp1252 file.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 DB_PATH     = Path('boplats_apartments.db')
 IMG_SRC_DIR = Path('boplats_images')
@@ -38,8 +44,12 @@ def main():
             copied += 1
     print(f'Images: {copied} synced to {OUT_IMG_DIR_ASSETS} and {OUT_IMG_DIR_FRONTEND}  ({len(list(OUT_IMG_DIR_ASSETS.glob("*.jpg")))} total)')
 
-    # ── Read DB ──────────────────────────────────────────────────────────────
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    # ── Read DB (read-only) ──────────────────────────────────────────────────
+    # Open in read-only URI mode: the exporter only ever SELECTs, and a plain
+    # read-write connect uses rollback-journal mode, which can leave a hot
+    # `.db-journal` behind that jams the next scraper run with a disk-I/O error.
+    # `mode=ro` guarantees we never create a journal at all.
+    conn = sqlite3.connect(f"file:{DB_PATH.as_posix()}?mode=ro", uri=True, timeout=30)
     conn.execute("PRAGMA busy_timeout=5000")   # wait out a concurrent scrape write
     rows = conn.execute(
         'SELECT id, address, rooms, size_m2, rent_sek, '

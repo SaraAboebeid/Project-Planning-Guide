@@ -21,6 +21,15 @@ function stopSimulationPolling() {
 }
 window.stopSimulationPolling = stopSimulationPolling;
 
+// Dismiss an analysis result card (Run Energy Simulation / Rooftop PV). Hides
+// and clears it; for the sim card it also stops any in-flight polling so a
+// closed window can't pop back open when the run finishes.
+window.closeAnalysis = function closeAnalysis(id) {
+  const el = document.getElementById(id);
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+  if (id === 'sim-result') stopSimulationPolling();
+};
+
 function _buildingCentroid(b) {
   const ring = b.coordinates && b.coordinates[0];
   if (!ring || !ring.length) return null;
@@ -116,8 +125,12 @@ function _renderResults(results, b) {
   else if (b.tabula_kwh_m2_yr) grid += R('TABULA est.',    b.tabula_kwh_m2_yr, 'kWh/m²');
 
   el.innerHTML =
-    '<div class="ar-head">&#9889; EnergyPlus Simulation</div>' +
+    '<div class="ar-head">&#9889; EnergyPlus Simulation' +
+    '<button class="ar-close" title="Close" onclick="closeAnalysis(\'sim-result\')">&#x2715;</button></div>' +
     '<div class="ar-grid">' + grid + '</div>' +
+    '<div class="ar-note">Total = heating + cooling + lighting + equipment. The recorded EPC ' +
+    'figure counts only regulated energy (≈ heating); tenant lighting &amp; equipment are ' +
+    'excluded, so Total reads higher.</div>' +
     '<div class="ar-note">Single-zone shoebox model, ' +
     results.floors + ' floor' + (results.floors === 1 ? '' : 's') + ', ' +
     results.total_floor_area_m2 + ' m² floor area</div>';

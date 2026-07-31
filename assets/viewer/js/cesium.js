@@ -215,6 +215,11 @@ window.setPhotoMode = function setPhotoMode(on) {
   if (!on) { _pinnedIdx = null; setBuildingHighlight(null); }
   const hint = document.getElementById('photo-pick-hint');
   if (hint) hint.style.display = on ? 'block' : 'none';
+  // Coloured building surfaces are invisible under Google's photorealistic mesh,
+  // so hide the "Colour buildings by" control there — only useful on the flat
+  // basemaps (light / dark / satellite / terrain).
+  const colourGroup = document.getElementById('colour-by-group');
+  if (colourGroup) colourGroup.style.display = on ? 'none' : 'block';
   // Trees & shrubs double up with Google's photorealistic mesh — auto-hide them
   // on photorealistic, restore the user's choice when leaving it.
   if (window.vegetationSetPhotoForced) window.vegetationSetPhotoForced(on);
@@ -407,6 +412,10 @@ async function loadGoogleTiles(token, { skipAutoRebuild = false } = {}) {
     if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; tilesGeometryReady = false; }
     // Exactly as per https://cesium.com/learn/cesiumjs-learn/cesiumjs-photorealistic-3d-tiles/
     googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
+    // Sharper mesh: default screen-space error is 16; lower = finer tiles pulled
+    // in, at higher tile bandwidth + GPU. 4 ≈ maximum useful detail. Raise back
+    // toward 12–16 if loading feels slow.
+    googleTileset.maximumScreenSpaceError = 4;
     viewer.scene.primitives.add(googleTileset);
     // The tileset object resolves as soon as its root is fetched - actual ground
     // geometry is still streaming. Dropping the imagery here (as this used to do

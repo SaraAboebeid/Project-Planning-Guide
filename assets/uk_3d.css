@@ -150,6 +150,14 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
   border-top:1px solid rgba(255,255,255,0.12); margin-top:3px; padding-top:5px; font-weight:700;
 }
 .analysis-result .ar-note { font-size:10px; color:var(--map-sidebar-muted); margin-top:7px; }
+.analysis-result .ar-close {
+  margin-left:auto; width:18px; height:18px; padding:0; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:5px; border:1px solid rgba(255,255,255,0.18);
+  background:rgba(255,255,255,0.06); color:var(--map-sidebar-muted);
+  cursor:pointer; font-size:11px; font-family:inherit;
+}
+.analysis-result .ar-close:hover { background:rgba(255,255,255,0.14); color:var(--map-sidebar-text); }
 #lp-no-selection {
   font-size:10px; color:var(--faint); display:none; padding:2px 0;
 }

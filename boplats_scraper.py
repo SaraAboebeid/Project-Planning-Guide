@@ -90,6 +90,20 @@ def _commit_with_retry(conn, attempts: int = 5, base_delay: float = 0.4) -> None
             time.sleep(base_delay * (i + 1))
 
 
+def _exec_retry(conn, sql: str, params: tuple = (), attempts: int = 5, base_delay: float = 0.4):
+    """Run a single statement, retrying transient 'database is locked' / disk-I/O
+    errors. `_commit_with_retry` only guarded the commit, but a locked SELECT or
+    INSERT raises here too — uncaught, that crashes the whole scheduled run."""
+    import time
+    for i in range(attempts):
+        try:
+            return conn.execute(sql, params)
+        except sqlite3.OperationalError:
+            if i == attempts - 1:
+                raise
+            time.sleep(base_delay * (i + 1))
+
+
 def init_db(db_path: Path) -> sqlite3.Connection:
     conn = _connect(db_path)
     conn.execute("""
@@ -117,13 +131,14 @@ def init_db(db_path: Path) -> sqlite3.Connection:
 
 def upsert_apartment(conn: sqlite3.Connection, apt: dict, now: str) -> bool:
     """Insert or update apartment. Returns True if this is a new record."""
-    row = conn.execute(
-        "SELECT first_seen FROM apartments WHERE id = ?", (apt["id"],)
+    row = _exec_retry(
+        conn, "SELECT first_seen FROM apartments WHERE id = ?", (apt["id"],)
     ).fetchone()
     first_seen = row[0] if row else now
     is_new = row is None
 
-    conn.execute(
+    _exec_retry(
+        conn,
         """
         INSERT OR REPLACE INTO apartments
           (id, url, address, area_name, rooms, size_m2,
@@ -312,7 +327,8 @@ def run_scrape():
             continue
 
         # Only download floor plan if we don't have it yet
-        existing = conn.execute(
+        existing = _exec_retry(
+            conn,
             "SELECT floorplan_image_path, floorplan_image_url FROM apartments WHERE id = ?",
             (apt_id,),
         ).fetchone()
