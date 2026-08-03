@@ -273,18 +273,6 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
   // the same pointer position.
   if (window._tvHoverActive) { hoverCard.style.display = 'none'; return; }
 
-  // Suppress the building hover card while any analytical overlay is active:
-  // environmental analysis (sun-hours / incident radiation / thermal comfort),
-  // the urban analysis layers (green index / heat island / green accessibility),
-  // or a statistics (SCB) layer. In those modes the map is read as data and the
-  // per-building card just gets in the way.
-  if (window._shActive || window._irActive || window._tcActive ||
-      window._urbanActive || window._scbActive) {
-    hoverCard.style.display = 'none';
-    lastHoverId = null;
-    return;
-  }
-
   // Throttle to ~30fps
   const now = Date.now();
   if (now - hoverThrottle < 33) {
@@ -303,7 +291,14 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
   // footprint lookup instead.
   const found = buildingIndexAt(movement.endPosition);
 
-  if (found != null && DATA[found]) {
+  // Hide ONLY the building data card while an analytical overlay is active
+  // (environmental analysis / urban analysis / statistics). We still fall through
+  // to the else branch so the layer's own hover card — e.g. the SCB population-grid
+  // cell — keeps working.
+  const suppressBuilding = window._shActive || window._irActive || window._tcActive ||
+      window._urbanActive || window._scbActive;
+
+  if (found != null && DATA[found] && !suppressBuilding) {
     const idx = found;
     const x = movement.endPosition.x, y = movement.endPosition.y;
     hoverCard.style.left = Math.min(x + 18, window.innerWidth  - 300) + 'px';
