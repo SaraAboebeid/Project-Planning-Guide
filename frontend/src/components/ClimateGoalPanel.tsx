@@ -28,21 +28,26 @@ function barColor(r: { meets: boolean; reductionPct: number | null }) {
 
 export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
   const { goal, rows, achievers, closest } = a;
-  // Which package row is expanded to show its materials. With many look-alike
-  // packages the truncated labels are indistinguishable — opening a row reveals
-  // exactly which assembly sits on each component.
-  const [openLabel, setOpenLabel] = useState<string | null>(null);
+  // Which package row is expanded to show its materials. Keyed by ROW INDEX, not
+  // label: look-alike packages share the same truncated label, so keying on the
+  // label opened (and React-reconciled) every matching row at once.
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   // Scale the bars so the target line sits comfortably inside the track.
   const maxRed = Math.max(goal.reductionPct + 8, ...rows.map((r) => r.reductionPct ?? 0));
   const scaleMax = Math.max(maxRed, 10);
   const targetLeft = (goal.reductionPct / scaleMax) * 100;
 
+  // A reduction is positive when energy drops. Format with the right sign so a
+  // package that's WORSE than baseline reads "+76% (worse)" not "−-76%".
+  const fmtRed = (r: number) =>
+    r >= 0 ? `−${r.toFixed(0)}%` : `+${Math.abs(r).toFixed(0)}% (worse than baseline)`;
+
   const headline = achievers.length
     ? `${achievers[0]!.label} reaches −${achievers[0]!.reductionPct!.toFixed(0)}%, meeting the target`
     + (achievers.length > 1 ? ` (${achievers.length} packages meet it)` : "")
     : closest && closest.reductionPct != null
-      ? `No package reaches the target yet — closest is ${closest.label} at −${closest.reductionPct.toFixed(0)}%`
+      ? `No package reaches the target yet — closest is ${closest.label} at ${fmtRed(closest.reductionPct)}`
       : "Simulate a package to measure it against the target";
 
   const accent = achievers.length ? MET : NEAR;
@@ -92,16 +97,16 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
 
       {/* Per-package bars toward the target */}
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-        {rows.map((r) => {
+        {rows.map((r, i) => {
           const red = r.reductionPct ?? 0;
           const w = Math.max(0, Math.min(red, scaleMax)) / scaleMax * 100;
           const c = barColor(r);
           const hasMat = !!r.materials && r.materials.length > 0;
-          const open = openLabel === r.label;
+          const open = openIdx === i;
           return (
-            <div key={r.label}>
+            <div key={i}>
               <div
-                onClick={() => hasMat && setOpenLabel(open ? null : r.label)}
+                onClick={() => hasMat && setOpenIdx(open ? null : i)}
                 title={hasMat ? (open ? "Hide materials" : "Show the materials in this package") : undefined}
                 style={{ display: "grid", gridTemplateColumns: "150px 1fr 96px", gap: 10, alignItems: "center",
                   cursor: hasMat ? "pointer" : "default", borderRadius: 6,

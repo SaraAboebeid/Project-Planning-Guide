@@ -234,6 +234,10 @@ export default function RenovationReport() {
   function downloadPdf() {
     const esc = (s: unknown) => String(s ?? "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]!));
     const sek = (n: number) => Math.round(n).toLocaleString("sv-SE") + " SEK";
+    // Absolute origin so the logos resolve from the Blob-URL document (relative
+    // paths there point at the blob, not the app). Logos are white → dark banner.
+    const origin = window.location.origin;
+    const team = "Sara Abouebeid · Holger Wallbaum · Liane Thuvander · Elena Malakhatka";
 
     const bestBlock = (label: string, r: typeof simResults[0] | null | undefined, why: string) => {
       if (!r) return "";
@@ -264,7 +268,7 @@ export default function RenovationReport() {
 <style>
   @page { size: A4; margin: 16mm; }
   * { box-sizing: border-box; }
-  body { font-family: Inter, system-ui, sans-serif; color:#0f172a; margin:0; font-size:11pt; line-height:1.5; }
+  body { font-family: Inter, system-ui, sans-serif; color:#0f172a; margin:0; font-size:11pt; line-height:1.5; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   h1 { font-size:20pt; margin:0 0 4px; }
   h2 { font-size:12pt; margin:22px 0 8px; padding-bottom:4px; border-bottom:2px solid #4ECDC4; }
   .sub { color:#64748b; font-size:10pt; margin-bottom:4px; }
@@ -282,6 +286,15 @@ export default function RenovationReport() {
   .foot { margin-top:26px; padding-top:8px; border-top:1px solid #e2e8f0; color:#94a3b8; font-size:8.5pt; }
   .no-print { margin-bottom:14px; }
   @media print { .no-print { display:none; } }
+  .cover { background:#0d1117; color:#fff; border-radius:10px; padding:26px 30px; margin-bottom:14px; }
+  .cover-logos { display:flex; align-items:center; gap:26px; margin-bottom:20px; }
+  .cover-logos img { height:30px; width:auto; }
+  .cover-kicker { font-size:9pt; letter-spacing:2px; text-transform:uppercase; color:#4ECDC4; font-weight:800; }
+  .cover-title { font-size:23pt; font-weight:800; margin:5px 0 9px; line-height:1.12; }
+  .cover-meta { font-size:9.5pt; color:#94a3b8; }
+  .prepared { font-size:9pt; color:#475569; margin:0 0 18px; }
+  .prepared b { color:#0f172a; }
+  .prepared .lbl { text-transform:uppercase; letter-spacing:.08em; font-size:7.5pt; color:#94a3b8; margin-right:8px; }
 </style></head><body>
   <div class="no-print">
     <button onclick="window.print()" style="padding:9px 18px;font-size:13px;font-weight:700;border-radius:8px;border:1px solid #4ECDC4;background:#e6fffb;cursor:pointer">
@@ -289,11 +302,16 @@ export default function RenovationReport() {
     </button>
   </div>
 
-  <h1>${esc(project.projectName || "Renovation Report")}</h1>
-  <div class="sub">${esc(locationText)} ·
-    ${buildings.length} building${buildings.length !== 1 ? "s" : ""} ·
-    ${esc(components.join(", ") || "no components")}</div>
-  <div class="sub">Generated ${new Date().toLocaleString("sv-SE")}</div>
+  <div class="cover">
+    <div class="cover-logos">
+      <img src="${origin}/CTH_new_logo_white.png" alt="Chalmers University of Technology" />
+      <img src="${origin}/CNL_new_logo_white.png" alt="Chalmers Next Labs" />
+    </div>
+    <div class="cover-kicker">Building Renovation Analysis</div>
+    <div class="cover-title">${esc(project.projectName || "Renovation Report")}</div>
+    <div class="cover-meta">${esc(locationText)} · ${buildings.length} building${buildings.length !== 1 ? "s" : ""} · ${esc(components.join(", ") || "no components")} · Generated ${new Date().toLocaleString("sv-SE")}</div>
+  </div>
+  <div class="prepared"><span class="lbl">Prepared by</span><b>Chalmers Next Labs</b> — ${esc(team)}</div>
 
   <h2>Baseline (as-built)</h2>
   <table><thead><tr><th>Building</th><th>Energy class</th><th>Energy use</th><th>Heating</th></tr></thead><tbody>
@@ -310,7 +328,7 @@ export default function RenovationReport() {
     ${goalAssessment.achievers.length
       ? `✓ ${esc(goalAssessment.achievers[0]!.label)} reaches −${goalAssessment.achievers[0]!.reductionPct!.toFixed(0)}%, meeting the target${goalAssessment.achievers.length > 1 ? ` (${goalAssessment.achievers.length} packages meet it)` : ""}.`
       : goalAssessment.closest && goalAssessment.closest.reductionPct != null
-        ? `No package reaches the −${goalAssessment.goal.reductionPct}% target yet — closest is ${esc(goalAssessment.closest.label)} at −${goalAssessment.closest.reductionPct.toFixed(0)}%.`
+        ? `No package reaches the −${goalAssessment.goal.reductionPct}% target yet — closest is ${esc(goalAssessment.closest.label)} at ${goalAssessment.closest.reductionPct >= 0 ? "−" : "+"}${Math.abs(goalAssessment.closest.reductionPct).toFixed(0)}%${goalAssessment.closest.reductionPct < 0 ? " (worse than baseline)" : ""}.`
         : ""}
   </p>
   <table><thead><tr><th>Package</th><th>Energy use</th><th>Reduction vs baseline</th><th>Meets −${goalAssessment.goal.reductionPct}% target</th></tr></thead><tbody>
@@ -361,14 +379,17 @@ export default function RenovationReport() {
     baseline energy class from Boverket EPC. Cooling is not reported: the single-zone model
     does not reach the cooling setpoint.
   </div>
+  <script>window.addEventListener('load',function(){setTimeout(function(){try{window.print();}catch(e){}},400);});</script>
 </body></html>`;
 
-    const w = window.open("", "_blank");
-    if (!w) { alert("Allow pop-ups for this site to generate the PDF."); return; }
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 350);
+    // Render via a Blob URL rather than window.open("") + document.write — the
+    // latter renders a blank page in modern browsers. A Blob URL loads as a real
+    // document; the inline script above opens the print / Save-as-PDF dialog once
+    // it has loaded, and the "Save as PDF" button in the page is the fallback.
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    const w = window.open(url, "_blank");
+    if (!w) { alert("Allow pop-ups for this site to generate the PDF."); URL.revokeObjectURL(url); return; }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
   /* ── Download report as JSON ── */

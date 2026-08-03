@@ -1824,6 +1824,78 @@ out body;
     return result
 
 
+# ── Urban analysis · space syntax (spatial-network centrality) ────────────────
+# Method A: pure-Python (networkx) space-syntax measures on the OSM street
+# network. The compute lives in backend/space_syntax.py; this endpoint just
+# fetches the bbox's highways and hands them over. The response is a GeoJSON
+# FeatureCollection with a per-segment `value`/`value_norm` for the viewer to
+# colour. Method B (SMoG's Pstalgo) can later replace the compute behind this
+# same endpoint without changing the viewer.
+_OSM_HW_CACHE: dict = {}   # rounded-bbox tuple → (nodes dict, way elements)
+
+
+async def _fetch_osm_highways(south: float, north: float, west: float, east: float):
+    """Fetch OSM highway ways + their nodes for a bbox; returns (nodes, ways) with
+    the raw topology (shared node ids = intersections) the graph analysis needs."""
+    import httpx
+    key = (round(south, 3), round(north, 3), round(west, 3), round(east, 3))
+    if key in _OSM_HW_CACHE:
+        return _OSM_HW_CACHE[key]
+    query = f"""
+[out:json][timeout:25];
+(
+  way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|service|pedestrian|cycleway|footway|path|living_street|unclassified)$"]
+    ({south},{west},{north},{east});
+);
+(._;>;);
+out body;
+"""
+    # The main overpass-api.de instance rate-limits hard (often 406/429); try it,
+    # then fall back to public mirrors. A descriptive User-Agent is requested by
+    # the Overpass usage policy and some instances reject requests without one.
+    mirrors = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    ]
+    headers = {"User-Agent": "PPG-UrbanAnalysis/1.0 (space-syntax; saraabo@chalmers.se)"}
+    osm = None
+    last = None
+    async with httpx.AsyncClient(timeout=40, headers=headers) as client:
+        for url in mirrors:
+            try:
+                r = await client.post(url, data={"data": query})
+            except Exception as exc:
+                last = str(exc); continue
+            if r.status_code == 200:
+                osm = r.json(); break
+            last = f"{url.split('/')[2]} → {r.status_code}"
+    if osm is None:
+        raise HTTPException(502, f"Overpass unavailable (last: {last})")
+    nodes = {e["id"]: (e["lon"], e["lat"]) for e in osm.get("elements", []) if e.get("type") == "node"}
+    ways = [e for e in osm.get("elements", []) if e.get("type") == "way"]
+    _OSM_HW_CACHE[key] = (nodes, ways)
+    return nodes, ways
+
+
+@app.get("/api/urban/space-syntax")
+async def urban_space_syntax(
+    south: float = Query(...), north: float = Query(...),
+    west: float = Query(...), east: float = Query(...),
+    metric: str = Query("betweenness", description="betweenness | integration | reach"),
+    radius: float = Query(1000.0, description="reach radius in metres (reach metric only)"),
+):
+    """Street-network centrality of the OSM highways in a bbox (method A: networkx).
+    Colours the viewer's 'Urban analysis' layer. See backend/space_syntax.py."""
+    import anyio
+    from backend import space_syntax
+    nodes, ways = await _fetch_osm_highways(south, north, west, east)
+    if len(ways) > 9000:
+        raise HTTPException(413, "Street network too large for this view — zoom in to run the analysis.")
+    # networkx is CPU-bound; run it off the event loop so it can't block other requests.
+    return await anyio.to_thread.run_sync(space_syntax.compute, nodes, ways, metric, radius)
+
+
 @app.get("/api/vasttrafik/parking/{lot_id}/availability")
 async def vt_parking_availability(lot_id: int):
     """
