@@ -340,7 +340,10 @@ function captureFacadeForComparison(building, direction) {
   const center = getBuildingCenter(building);
   const radius = getBuildingRadius(building);
   const bldH = Math.max(5, building.height || 10);
-  const terrainBase = building._groundH || building._terrainH || 0;
+  // Ground reference = where the building is really drawn. Prefer _groundH (set by the
+  // facade inspector by sampling the Google mesh on photoreal); else the calibrated base.
+  const terrainBase = building._groundH
+    ?? (window.getBuildingBaseOffset ? window.getBuildingBaseOffset(center.lon, center.lat) : 0);
   
   const DIR_HEADINGS = { N:0, E:90, S:180, W:270 };
   const dist = Math.max(bldH * 1.1, radius * 1.4);

@@ -56,22 +56,26 @@ function getBuildingRadius(b) {
   return Math.max(15, maxDeg * 111320 * Math.cos(c.lat * Math.PI / 180));
 }
 
-// Shoot a ray upward from well below the building to find true ground altitude.
+// True ground altitude the building is actually DRAWN at. On Photorealistic 3D the
+// EUBUCCO box calibration can read ~0 while the Google mesh sits tens of metres
+// higher — which left the facade camera under the floating mesh. So on photoreal we
+// sample the REAL rendered surface at the building centre (its rooftop) and subtract
+// the building height to get the ground; on flat basemaps (no mesh) we use the
+// calibrated base offset (0 in flat-ground mode).
 function getGroundAlt(building) {
   const c = getBuildingCenter(building);
-  const rough = building._terrainH || 50;
-  const bldH  = Math.max(5, building.height || 10);
-  const startAlt = rough - bldH - 30;
-  const startPos = Cesium.Cartesian3.fromDegrees(c.lon, c.lat, startAlt);
-  const up = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(
-    Cesium.Cartesian3.fromDegrees(c.lon, c.lat), new Cesium.Cartesian3());
-  try {
-    const hit = viewer.scene.pickFromRay(new Cesium.Ray(startPos, up));
-    if (hit && hit.position) {
-      return Cesium.Cartographic.fromCartesian(hit.position).height;
-    }
-  } catch (_) {}
-  return rough - bldH;
+  const bldH = Math.max(5, building.height || 10);
+  if (window.isPhotoMode && window.isPhotoMode() && viewer.scene.sampleHeightSupported) {
+    try {
+      const surf = viewer.scene.sampleHeight(Cesium.Cartographic.fromDegrees(c.lon, c.lat));
+      if (Number.isFinite(surf)) return surf - bldH;   // rooftop − height ≈ ground
+    } catch (_) {}
+  }
+  if (window.getBuildingBaseOffset) {
+    const off = window.getBuildingBaseOffset(c.lon, c.lat);
+    if (Number.isFinite(off)) return off;
+  }
+  return 0;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -120,15 +124,26 @@ function flyToFacade(dir) {
   const r = getBuildingRadius(facadeBuilding);
   _currentFacadeDir = dir;
   const bldH = Math.max(5, facadeBuilding.height || 10);
-  const terrainBase = facadeBuilding._groundH ?? facadeBuilding._terrainH ?? 0;
   // Cesium default vertical FOV ≈ 60°. Fit full building height with 15% margin.
   const distForHeight = bldH * 1.1;
   const distForWidth  = r * 1.4;
   const dist = Math.max(distForHeight, distForWidth) / _facadeZoom;
-  const camAlt = terrainBase + bldH * 0.5;
   const h = DIR_HEADINGS[dir] * Math.PI / 180;
   const offsetLon = Math.sin(h) * dist / (111320 * Math.cos(c.lat * Math.PI / 180));
   const offsetLat = Math.cos(h) * dist / 111320;
+  // Ground reference = where the building is really drawn (getGroundAlt samples the
+  // Google mesh on photoreal). On photoreal, re-sample the mesh at the camera's own
+  // standpoint (open ground beside the building) for an even better match; fall back
+  // to the entry estimate so we never end up under the floating mesh.
+  let terrainBase = facadeBuilding._groundH ?? 0;
+  if (window.isPhotoMode && window.isPhotoMode() && viewer.scene.sampleHeightSupported) {
+    try {
+      const g = viewer.scene.sampleHeight(
+        Cesium.Cartographic.fromDegrees(c.lon + offsetLon, c.lat + offsetLat));
+      if (Number.isFinite(g)) terrainBase = g;
+    } catch (_) {}
+  }
+  const camAlt = terrainBase + bldH * 0.5;
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(c.lon + offsetLon, c.lat + offsetLat, camAlt),
     orientation: {
