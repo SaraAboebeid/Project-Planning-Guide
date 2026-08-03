@@ -96,7 +96,10 @@ function _ssRender(gj) {
           color: Cesium.Color.fromBytes(rr, gg, bb, 235),
           outlineColor: Cesium.Color.BLACK.withAlpha(0.35), outlineWidth: 0.6,
         }),
-        clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN,
+        // NOT ground-clamped: terrain-classified lines get buried under the Google
+        // Photorealistic 3D mesh. depthFailMaterial keeps them visible through it,
+        // on every basemap. Best read top-down (the analysis is 2D).
+        depthFailMaterial: Cesium.Color.fromBytes(rr, gg, bb, 205),
       },
       properties: { type: 'space-syntax', metric: _ssMetric, value: f.properties.value, value_norm: v, name: f.properties.name },
     }));

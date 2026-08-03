@@ -416,6 +416,9 @@
       console.error('[UrbanAnalysis]', key, err);
     } finally {
       _loading = false;
+      // Flag for ui.js: suppress the per-building hover card while an urban
+      // analysis layer (green index / heat island / green accessibility) is on.
+      window._urbanActive = Object.values(LAYERS).some((l) => l.active);
     }
   }
 

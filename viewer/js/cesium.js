@@ -1058,15 +1058,26 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 // in the UK viewer.
 window.viewTopDown = function viewTopDown() {
   if (typeof viewer === 'undefined' || !viewer) return;
-  const canvas = viewer.scene.canvas;
-  const px = new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2);
-  const ell = (viewer.scene.globe && viewer.scene.globe.ellipsoid) || Cesium.Ellipsoid.WGS84;
-  const c = viewer.camera.pickEllipsoid(px, ell) || viewer.camera.positionWC;
-  const range = Math.max(50, Cesium.Cartesian3.distance(viewer.camera.positionWC, c));
-  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(c, 0), {
-    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-90), range),
-    duration: 0.8,
+  const c = window.VIEW_CENTER || (typeof MAP_CENTER !== 'undefined' ? MAP_CENTER : { lat: 57.70, lon: 11.96 });
+  // Straight down AND zoomed out to frame the whole city, so city-wide analytical
+  // overlays (green index, statistics, space syntax…) read at a glance.
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(c.lon, c.lat, 20000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
+    duration: 1.0,
   });
+};
+
+// Translucent classified overlays (the SCB grids) render BLACK on the Google
+// Photorealistic 3D basemap — classification onto the mesh drops the alpha. When
+// such a layer activates, drop to a flat basemap (Satellite) so it renders
+// correctly. No-op if already on a flat basemap. Returns true if it switched.
+window.ensureFlatBasemap = function ensureFlatBasemap() {
+  const photo = document.getElementById('btn-base-photo');
+  if (!photo || !photo.classList.contains('active')) return false;
+  const sat = document.getElementById('btn-base-satellite');
+  if (sat) { sat.click(); return true; }
+  return false;
 };
 
 // Map navigation — compass (click to point north) + top-down view

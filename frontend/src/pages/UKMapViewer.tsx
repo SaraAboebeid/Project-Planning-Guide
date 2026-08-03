@@ -19,7 +19,7 @@ export default function UKMapViewer() {
   // Include the city in the URL and key the iframe on it, so switching city in the
   // nav remounts the viewer at the new location instead of silently doing nothing.
   const viewerUrl = useMemo(
-    () => `/uk_3d.html?v=20260803-env5&city=${cityId}`,
+    () => `/uk_3d.html?v=20260803-env6&city=${cityId}`,
     [cityId],
   );
 

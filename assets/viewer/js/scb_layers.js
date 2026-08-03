@@ -21,13 +21,13 @@
 
   // Population heatmap — 7 colour stops (0 people → transparent)
   const HEAT = [
-    col(  0,   0,   0,   0),   // 0
-    col( 49, 130, 189,  90),   // 1–49
-    col(116, 196, 118, 110),   // 50–149
-    col(255, 237,  74, 130),   // 150–299
-    col(253, 141,  60, 150),   // 300–599
-    col(214,  60,  35, 165),   // 600–999
-    col(152,  10,  10, 185),   // 1000+
+    col(  0,   0,   0,   0),   // 0 (transparent — no cell drawn)
+    col( 69, 140, 199,  65),   // 1–49
+    col(120, 198, 130,  80),   // 50–149
+    col(250, 224, 110,  95),   // 150–299
+    col(245, 155,  80, 110),   // 300–599
+    col(222,  95,  60, 125),   // 600–999
+    col(170,  45,  45, 145),   // 1000+
   ];
   function heatColor(bef) {
     if (!bef || bef <=    0) return HEAT[0];
@@ -334,13 +334,20 @@
     const s = _state[id];
     const g = _byId[id];
     s.active = !s.active;
+    // Flag for ui.js: suppress the per-building hover card while any SCB layer is on.
+    window._scbActive = Object.values(_state).some((x) => x.active);
 
     document.getElementById('scb-btn-'+id).classList.toggle('active', s.active);
     const sub = document.getElementById('scb-sub-'+id);
     if (sub) sub.style.display = s.active ? 'flex' : 'none';
 
-    if (s.active) { if (window.viewTopDown) window.viewTopDown(); await loadLayer(g.tn(s.year), g); }
-    else          hideLayer(g.tn(s.year));
+    if (s.active) {
+      // Translucent grids can't classify onto the Photorealistic 3D mesh (they go
+      // black), so drop to a flat basemap first; then frame the city top-down.
+      if (window.ensureFlatBasemap) window.ensureFlatBasemap();
+      if (window.viewTopDown) window.viewTopDown();
+      await loadLayer(g.tn(s.year), g);
+    } else hideLayer(g.tn(s.year));
   }
 
   // ── Switch to a different year ────────────────────────────────────────────────

@@ -19,16 +19,18 @@ let _snLastKey  = null;      // avoid re-fetching the same (rounded) bbox
 let _snMoveHooked = false;
 let _snRefreshTimer = null;
 
-// Subtle white lines; slightly thicker/brighter for bigger roads.
+// Bright cyan lines with a dark outline so they read clearly over aerial imagery
+// and the Photorealistic 3D mesh; thicker/more opaque for bigger roads.
+const SN_CSS = '#22d3ee';
 function _snStyle(roadClass) {
   switch (roadClass) {
-    case 'major':     return { width: 2.2, alpha: 0.70 };
-    case 'primary':   return { width: 1.9, alpha: 0.62 };
-    case 'secondary': return { width: 1.5, alpha: 0.52 };
+    case 'major':     return { width: 3.4, alpha: 0.95 };
+    case 'primary':   return { width: 3.0, alpha: 0.92 };
+    case 'secondary': return { width: 2.4, alpha: 0.88 };
     case 'service':
     case 'pedestrian':
-    case 'cycling':   return { width: 0.9, alpha: 0.32 };
-    default:          return { width: 1.1, alpha: 0.42 };   // local / unclassified
+    case 'cycling':   return { width: 1.4, alpha: 0.70 };
+    default:          return { width: 1.9, alpha: 0.80 };   // local / unclassified
   }
 }
 
@@ -75,6 +77,7 @@ async function _snFetch(force) {
 
 function _snRender(gj) {
   _snClear();
+  const base = Cesium.Color.fromCssColorString(SN_CSS);
   for (const f of (gj.features || [])) {
     const coords = f.geometry && f.geometry.coordinates;
     if (!coords || coords.length < 2) continue;
@@ -83,9 +86,14 @@ function _snRender(gj) {
       polyline: {
         positions: Cesium.Cartesian3.fromDegreesArray(coords.flat()),
         width: st.width,
-        material: Cesium.Color.WHITE.withAlpha(st.alpha),
-        clampToGround: true,
-        classificationType: Cesium.ClassificationType.TERRAIN,
+        material: new Cesium.PolylineOutlineMaterialProperty({
+          color: base.withAlpha(st.alpha),
+          outlineColor: Cesium.Color.BLACK.withAlpha(0.45),
+          outlineWidth: 1.0,
+        }),
+        // NOT ground-clamped: keeps the lines visible over the Google
+        // Photorealistic 3D mesh (which buries terrain-clamped lines).
+        depthFailMaterial: base.withAlpha(st.alpha * 0.85),
       },
       properties: { type: 'street-network', name: (f.properties && f.properties.name) || '', highway: f.properties && f.properties.highway },
     }));

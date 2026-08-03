@@ -273,10 +273,13 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
   // the same pointer position.
   if (window._tvHoverActive) { hoverCard.style.display = 'none'; return; }
 
-  // Also suppress it while a site-analysis tool (sun-hours / incident radiation /
-  // thermal comfort) is active — you're picking a ground point there, so the
-  // building data hover just gets in the way.
-  if (window._shActive || window._irActive || window._tcActive) {
+  // Suppress the building hover card while any analytical overlay is active:
+  // environmental analysis (sun-hours / incident radiation / thermal comfort),
+  // the urban analysis layers (green index / heat island / green accessibility),
+  // or a statistics (SCB) layer. In those modes the map is read as data and the
+  // per-building card just gets in the way.
+  if (window._shActive || window._irActive || window._tcActive ||
+      window._urbanActive || window._scbActive) {
     hoverCard.style.display = 'none';
     lastHoverId = null;
     return;
