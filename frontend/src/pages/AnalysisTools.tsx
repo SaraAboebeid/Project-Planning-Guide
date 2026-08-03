@@ -1,4 +1,4 @@
-import { ExternalLink, Sun, Eye, Layers, Zap, Wrench, Leaf, Target, ChevronRight } from "lucide-react";
+import { ExternalLink, Sun, Eye, Zap, Wrench, Leaf, Target, ChevronRight, Network, ScanSearch } from "lucide-react";
 
 /* ── Tool definitions ─────────────────────────────────────────────── */
 
@@ -44,20 +44,20 @@ const TOOLS = [
     usedIn: ["Renovation Planning", "Energy Community Planning"],
   },
   {
-    id: "facade",
-    title: "Facade Inspection",
-    subtitle: "Building Envelope Quality Assessment",
-    color: "#4A90E2",
+    id: "facade-defects",
+    title: "Facade Defect Detection",
+    subtitle: "AI Vision — Envelope Defect Detection",
+    color: "#E6194B",
     status: "integrated",
-    icon: Layers,
+    icon: ScanSearch,
     description:
-      "Automated visual assessment of building facade condition and material classification using street-level imagery. Produces a renovation urgency score and highlights degraded zones to support prioritisation across a building stock.",
+      "A deep-learning object detector (MBDD2025 · Faster R-CNN ResNet50-FPN) that locates and classifies visible facade defects in imagery captured from the 3D viewer. Runs from the Facade Inspector's “Defects” button and returns per-facade defect counts to support renovation prioritisation across a building stock.",
     features: [
-      "Material classification (brick, concrete, render, cladding)",
-      "Condition rating per facade segment (0–100)",
-      "Renovation urgency scoring with thresholds",
-      "Crack, staining, and weathering detection",
-      "Exportable facade quality report per building",
+      "Five defect classes: crack, leakage, abscission, corrosion, bulge",
+      "Faster R-CNN ResNet50-FPN object detector (best score 0.77)",
+      "Runs on facade images captured in the 3D viewer",
+      "Per-facade defect counts (N / E / S / W) with confidence",
+      "On-host torch service, proxied single-origin through the backend",
     ],
     link: null,
     linkLabel: null,
@@ -160,6 +160,34 @@ const TOOLS = [
     link: null,
     linkLabel: null,
     usedIn: ["Renovation Planning", "Energy Community Planning", "Renewable Energy Planning"],
+  },
+  {
+    id: "space-syntax",
+    title: "Space Syntax",
+    subtitle: "Street-Network Centrality (SMoG)",
+    color: "#38BDF8",
+    status: "integrated",
+    icon: Network,
+    description:
+      "Space-syntax analysis of the street network — quantifying how each street contributes to movement and accessibility across the city. Computed live on the OpenStreetMap street graph and rendered as colour-graded streets directly in the 3D viewer's Urban Analysis. Method after the Spatial Morphology Group (SMoG), Chalmers.",
+    features: [
+      "Betweenness (choice) — through-movement potential",
+      "Integration (closeness) — how central / accessible a street is",
+      "Reach — extent of network reachable within a radius",
+      "Computed live on the OSM street graph (networkx engine)",
+      "Colour-graded street network rendered in the 3D viewer",
+    ],
+    link: null,
+    linkLabel: null,
+    attribution: {
+      heading: "METHOD AFTER",
+      headline: "Spatial Morphology Group (SMoG)",
+      sub: "Chalmers University of Technology",
+      roles: [
+        { role: "Reference toolkit", name: "PST / Pstalgo (space-syntax analysis)" },
+      ],
+    },
+    usedIn: ["Energy Community Planning", "Renovation Planning"],
   },
 ];
 
