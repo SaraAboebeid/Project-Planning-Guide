@@ -2126,26 +2126,25 @@ async def trafikverket_data(refresh: bool = False):
     return out
 
 
-# ── Facade defect detection (ML model — PLACEHOLDER, not connected yet) ──────
-# A facade-defect ML model is being trained separately (see the ML repo:
-# BFDD RGB-IR segmentation + MBDD2025 Faster R-CNN object detection). It is
-# NOT wired in yet. This endpoint defines the integration contract now so the
-# real model is a drop-in later, and returns a clearly-labelled placeholder
-# ("model_connected": false) until then.
+# ── Facade defect detection (MBDD2025 Faster R-CNN) — CONNECTED ─────────────
+# Proxies to the on-host torch service (tools/ml/facade_detect_service.py) via
+# FACADE_MODEL_URL. In prod that is set to http://host.docker.internal:8020 in
+# docker-compose.prod.yml (same host-gateway pattern as EPSM). If FACADE_MODEL_URL
+# is unset OR the service is down, it falls back to a clearly-labelled placeholder
+# ("model_connected": false) so the UI degrades gracefully.
 #
-# Real model I/O contract (from the ML repo's scripts/demo_app.py):
-#   input : one RGB facade image
-#   output: boxes [[x1,y1,x2,y2], ...], labels [1..5], scores [0..1]
-#   5 defect classes (label index 1..5), in order:
+# Service I/O contract (tools/ml/facade_detect_service.py):
+#   POST /detect?threshold=  body: raw image bytes
+#   -> {detections: [{box:[x1,y1,x2,y2], label, score}], width, height}
+#   5 defect classes:
 FACADE_DEFECT_CLASSES = ["crack", "leakage", "abscission", "corrosion", "bulge"]
 FACADE_DEFECT_CLASS_COLORS = {
     "crack": "#e6194B", "leakage": "#4363d8", "abscission": "#f58231",
     "corrosion": "#3cb44b", "bulge": "#911eb4",
 }
-# To connect the real model later: serve it as a small HTTP service exposing
-# POST /predict that takes {"image_base64": "..."} and returns
-# {"boxes": [...], "labels": [...], "scores": [...]}, then set the env var
-# FACADE_MODEL_URL to its base URL (mirrors how EPSM is wired via EPSM_BASE_URL).
+# Base URL of the on-host model service (see tools/ml/facade_detect_service.py).
+# Set via docker-compose.prod.yml → http://host.docker.internal:8020. Empty = the
+# service isn't wired (returns the placeholder).
 FACADE_MODEL_URL = os.environ.get("FACADE_MODEL_URL", "").strip()
 
 
@@ -2184,12 +2183,22 @@ async def facade_defects(req: FacadeDefectRequest):
             ),
         }
 
-    import httpx
+    import base64, binascii, httpx
+    # The frontend sends raw base64 (no data: prefix) of a JPEG; the on-host model
+    # service (tools/ml/facade_detect_service.py) takes raw image BYTES at
+    # POST /detect?threshold= and returns {detections:[{box,label,score}], width, height}.
+    try:
+        img_bytes = base64.b64decode(req.image_base64)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(400, f"image_base64 is not valid base64: {exc}")
+
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             r = await client.post(
-                f"{FACADE_MODEL_URL}/predict",
-                json={"image_base64": req.image_base64},
+                f"{FACADE_MODEL_URL}/detect",
+                params={"threshold": req.threshold},
+                content=img_bytes,
+                headers={"Content-Type": "application/octet-stream"},
             )
         r.raise_for_status()
         raw = r.json()
@@ -2198,26 +2207,23 @@ async def facade_defects(req: FacadeDefectRequest):
     except Exception as exc:
         raise HTTPException(502, f"Facade model returned an unusable response: {exc}")
 
-    boxes = raw.get("boxes") or []
-    labels = raw.get("labels") or []
-    scores = raw.get("scores") or []
     defects = []
-    for box, lbl, score in zip(boxes, labels, scores):
+    for d in (raw.get("detections") or []):
+        score = d.get("score")
         if score is None or float(score) < req.threshold:
             continue
-        idx = int(lbl)
-        name = FACADE_DEFECT_CLASSES[idx - 1] if 1 <= idx <= len(FACADE_DEFECT_CLASSES) else f"class_{idx}"
         defects.append({
-            "class": name,
+            "class": d.get("label") or "unknown",
             "confidence": round(float(score), 3),
-            "box": [float(v) for v in box],
+            "box": [float(v) for v in (d.get("box") or [])],
         })
-    defects.sort(key=lambda d: d["confidence"], reverse=True)
+    defects.sort(key=lambda x: x["confidence"], reverse=True)
     return {
         **base,
         "model_connected": True,
-        "source": raw.get("source", "facade-model"),
+        "source": "mbdd2025",
         "defects": defects,
+        "image_size": {"width": raw.get("width"), "height": raw.get("height")},
     }
 
 
