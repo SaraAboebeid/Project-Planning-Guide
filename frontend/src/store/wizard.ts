@@ -80,6 +80,10 @@ export interface RenovationCalcSelection {
    *  stored so the package breakdown and the Step-5 report can list every layer
    *  and its material, not just the summary label. Structurally an AssemblyLayer. */
   layers?: { materialId: string; thicknessMm: number }[];
+  /** The id of the ComponentConfig this selection came from, when built in the
+   *  Step-4 calculator. Lets the optimizer round-trip an assembly pick (whose
+   *  identity isn't a single Wikells code) back to its exact build-up. */
+  configId?: string;
 }
 
 /** One selected building's own simulation outcome within a package - a

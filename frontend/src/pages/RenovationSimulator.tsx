@@ -918,6 +918,7 @@ export default function RenovationSimulator() {
         selections[cfg.componentKey] = {
           wikellsCode: cfg.wikellsCode ?? "",
           quantity: 0,
+          configId: cfg.id,
           ...(cfg.source === "layers" && cfg.uValue != null
             ? { customUValue: cfg.uValue, customLabel: cfg.name, layers: cfg.layers }
             : {}),
@@ -1044,27 +1045,24 @@ export default function RenovationSimulator() {
       if (baseU == null) continue; // not a U-override component
       const area = computeAreaForLineItem(li, repGeo, wwrByIndex[repIdx] ?? null, manualOverrides);
       if (area == null || area <= 0) continue;
-      // Only vary components the user has actually picked catalogue materials
-      // for (their saved configs). The search is scoped to exactly those picks,
-      // so the curve reflects — and narrows live with — their selections, and we
-      // avoid a heavy full-matrix search before anything is chosen.
-      const picked = configs
-        .filter((c) => c.componentKey === li.key && c.source === "catalogue" && c.wikellsCode)
-        .map((c) => c.wikellsCode!);
-      if (picked.length === 0) continue;
-      const cands = itemsForLineItem(li).filter((it) => it.uValue != null && picked.includes(it.code));
-      const options = cands.map((it) => ({
-        code: it.code,
-        label: matShort(it),
-        u_value: it.uValue!,
-        cost: Math.round(it.costSEK * area),
-        carbon: Math.round(estimateCarbon(it, boverketAll).value * area),
+      // Vary over EVERY saved configuration for this component — both single
+      // catalogue rows AND layer-composed assemblies — exactly the same set that
+      // the packages are built from, so the optimizer evaluates all combinations
+      // (3 walls × 5 roofs = 15), not just the catalogue subset. Each config
+      // already carries its own U / cost / carbon (per m²), computed when saved.
+      const compConfigs = configs.filter((c) => c.componentKey === li.key && c.uValue != null);
+      if (compConfigs.length === 0) continue;
+      const options = compConfigs.map((c) => ({
+        code: c.id,                         // config id — unique; assemblies have no single Wikells code
+        label: c.name,
+        u_value: c.uValue!,
+        cost: Math.round((c.costPerM2 ?? 0) * area),
+        carbon: Math.round((c.carbonPerM2 ?? 0) * area),
       }));
-      if (options.length === 0) continue;
       comps.push({ key: li.key, area_m2: Math.round(area), baseline_u: baseU, options });
     }
     if (comps.length === 0)
-      return { input: null, disabledReason: "Pick catalogue materials in the builder above — the trade-off curve appears here and updates as you go." };
+      return { input: null, disabledReason: "Save build-ups per component in the builder above — the trade-off curve appears here and updates as you go." };
 
     const params: OptimizeParams = {
       f_dh: (24 * (assumptionValue("SE", "degree_days") ?? 3300)) / 1000,
@@ -1080,12 +1078,14 @@ export default function RenovationSimulator() {
 
   // Which optimizer picks are already validated (as a package) — keyed by the
   // touched (non-"keep") component→material selections, matching the panel.
+  // Key a validated package by the config ids it used (matching the optimizer
+  // option codes) so the panel can flag which Pareto points are already run.
   const validatedKeys = useMemo(
     () => new Set(
       packages.filter((p) => !p.isBaseline).map((p) =>
         Object.entries(p.selections)
           .filter(([k]) => baselineUForKey(k) != null)
-          .map(([k, s]) => `${k}=${s.wikellsCode}`)
+          .map(([k, s]) => `${k}=${s.configId ?? s.wikellsCode}`)
           .sort()
           .join("|")
       )
@@ -1094,27 +1094,40 @@ export default function RenovationSimulator() {
   );
 
   // Turn one Pareto winner into a real package + EPSM run (drops into the
-  // comparison table below alongside any hand-built packages).
+  // comparison table below alongside any hand-built packages). The optimizer's
+  // option codes are ComponentConfig ids, so resolve each back to its saved
+  // build-up (single Wikells row OR layer-composed assembly).
   function validateOptimizerPick(point: OptimizePoint) {
     if (geometries.length === 0) return;
-    const touched = Object.entries(point.selections).filter(([, code]) => code !== "__keep__");
+    const cfgById = new Map(configs.map((c) => [c.id, c]));
+    const touched = Object.entries(point.selections)
+      .filter(([, code]) => code !== "__keep__")
+      .map(([key, code]) => [key, cfgById.get(code)] as const)
+      .filter((e): e is readonly [string, ComponentConfig] => !!e[1]);
     if (touched.length === 0) return;
     const selections: Record<string, RenovationCalcSelection> = Object.fromEntries(
-      touched.map(([key, code]) => [key, { wikellsCode: code, quantity: 0 } as RenovationCalcSelection])
+      touched.map(([key, cfg]) => [key, {
+        wikellsCode: cfg.wikellsCode ?? "",
+        quantity: 0,
+        configId: cfg.id,
+        ...(cfg.source === "layers" && cfg.uValue != null
+          ? { customUValue: cfg.uValue, customLabel: cfg.name, layers: cfg.layers }
+          : {}),
+      } as RenovationCalcSelection])
     );
-    const autoName = touched.map(([, code]) => matShort(itemByCode[code])).join(" + ");
+    const autoName = touched.map(([, cfg]) => cfg.name).join(" + ");
     const name = `Optimal · ${autoName}` + targetSuffix();
     const existing = packages.filter((p) => !p.isBaseline).length;
     const color = PACKAGE_COLORS[existing % PACKAGE_COLORS.length]!;
     const buildingRows = makeBuildingRows(targetEntries, (g, i) => {
       let costSEK = 0, carbonKgCO2e = 0, any = false;
-      for (const [key] of touched) {
+      for (const [key, cfg] of touched) {
         const li = lineItems.find((l) => l.key === key);
         if (!li) continue;
         const quantity = computeAreaForLineItem(li, g, wwrByIndex[i] ?? null, manualOverrides);
         if (quantity == null) continue;
-        const it = itemByCode[selections[key]!.wikellsCode];
-        if (it) { any = true; costSEK += it.costSEK * quantity; carbonKgCO2e += estimateCarbon(it, boverketAll).value * quantity; }
+        if (cfg.costPerM2 != null) { costSEK += cfg.costPerM2 * quantity; any = true; }
+        if (cfg.carbonPerM2 != null) { carbonKgCO2e += cfg.carbonPerM2 * quantity; any = true; }
       }
       return any ? { costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e) } : { costSEK: null, carbonKgCO2e: null };
     });
