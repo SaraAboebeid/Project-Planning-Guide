@@ -84,6 +84,7 @@ function getGroundAlt(building) {
 document.getElementById('btn-inspect').addEventListener('click', () => {
   if (!selectedBuilding) return;
   facadeBuilding = selectedBuilding;
+  window._facadeInspectActive = true;   // ui.js: suppress the building hover card here
   facadeBuilding._groundH = getGroundAlt(facadeBuilding);
   _facadeZoom = 1.0;
   const zl = document.getElementById('zoom-label');
@@ -118,8 +119,11 @@ document.getElementById('btn-inspect').addEventListener('click', () => {
 let _facadeZoom = 1.0;
 let _currentFacadeDir = 'N';
 
+// Returns a Promise that resolves once the camera has actually ARRIVED and been
+// locked to the facade orientation — captures must await this, otherwise the first
+// grab fires mid-flight / with a stale heading and lands on the wrong facade.
 function flyToFacade(dir) {
-  if (!facadeBuilding) return;
+  if (!facadeBuilding) return Promise.resolve();
   const c = getBuildingCenter(facadeBuilding);
   const r = getBuildingRadius(facadeBuilding);
   _currentFacadeDir = dir;
@@ -144,17 +148,22 @@ function flyToFacade(dir) {
     } catch (_) {}
   }
   const camAlt = terrainBase + bldH * 0.5;
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(c.lon + offsetLon, c.lat + offsetLat, camAlt),
-    orientation: {
-      heading: Cesium.Math.toRadians(DIR_HEADINGS[dir] + 180),
-      pitch:   0,
-      roll:    0,
-    },
-    duration: 1.2,
-  });
+  const destination = Cesium.Cartesian3.fromDegrees(c.lon + offsetLon, c.lat + offsetLat, camAlt);
+  const orientation = { heading: Cesium.Math.toRadians(DIR_HEADINGS[dir] + 180), pitch: 0, roll: 0 };
   for (const d of DIRS) document.getElementById('thumb-'+d).classList.remove('active');
   document.getElementById('thumb-'+dir).classList.add('active');
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return; done = true;
+      // Hard-lock the exact facade view: flyTo toward a near-identical destination
+      // can complete WITHOUT fully applying the heading, which left the first
+      // capture on the previous facade (e.g. East instead of North).
+      viewer.camera.setView({ destination, orientation });
+      resolve();
+    };
+    viewer.camera.flyTo({ destination, orientation, duration: 1.2, complete: finish, cancel: finish });
+  });
 }
 
 const _btnZoomIn  = document.getElementById('btn-zoom-in');
@@ -194,13 +203,16 @@ function grabViewerFrame(draw) {
 // Capture facade — fly + auto-snapshot
 // ─────────────────────────────────────────────────────────────────
 function captureToCanvas(dir) {
-  flyToFacade(dir);
-  setTimeout(() => {
-    const dstCanvas = document.getElementById('canvas-'+dir);
-    const ctx = dstCanvas.getContext('2d');
-    grabViewerFrame(src => ctx.drawImage(src, 0, 0, src.width, src.height,
-                                         0, 0, dstCanvas.width, dstCanvas.height));
-  }, 1400);
+  // Wait for the camera to actually reach & lock the facade, then a short settle
+  // for tiles/render, before grabbing — so the image matches the slot.
+  flyToFacade(dir)
+    .then(() => new Promise(r => setTimeout(r, 250)))
+    .then(() => {
+      const dstCanvas = document.getElementById('canvas-'+dir);
+      const ctx = dstCanvas.getContext('2d');
+      grabViewerFrame(src => ctx.drawImage(src, 0, 0, src.width, src.height,
+                                           0, 0, dstCanvas.width, dstCanvas.height));
+    });
 }
 
 // Visual WWR from canvas pixel analysis (used by Capture All blended)
@@ -223,18 +235,14 @@ document.getElementById('btn-capture-all').addEventListener('click', async () =>
   document.getElementById('facade-sub').textContent = 'Capturing all 4 facades…';
   const visualWWRs = [];
   for (const dir of DIRS) {
-    await new Promise(resolve => {
-      flyToFacade(dir);
-      setTimeout(() => {
-        const dst = document.getElementById('canvas-'+dir);
-        const ctx = dst.getContext('2d');
-        grabViewerFrame(src => ctx.drawImage(src, 0, 0, src.width, src.height,
-                                             0, 0, dst.width, dst.height));
-        const w = analyseCanvasWWR(dst);
-        if (w !== null) visualWWRs.push(w);
-        resolve();
-      }, 1500);
-    });
+    await flyToFacade(dir);                          // wait for arrival + orientation lock
+    await new Promise(r => setTimeout(r, 300));      // brief settle for tiles/render
+    const dst = document.getElementById('canvas-'+dir);
+    const ctx = dst.getContext('2d');
+    grabViewerFrame(src => ctx.drawImage(src, 0, 0, src.width, src.height,
+                                         0, 0, dst.width, dst.height));
+    const w = analyseCanvasWWR(dst);
+    if (w !== null) visualWWRs.push(w);
   }
   document.getElementById('facade-sub').textContent = 'Capture complete';
   const hWWR = heuristicWWR(facadeBuilding);
@@ -423,6 +431,7 @@ document.getElementById('btn-exit-inspect').addEventListener('click', () => {
   document.getElementById('facade-panel').style.display = 'none';
   document.getElementById('wwr-panel').style.display    = 'none';
   facadeBuilding = null;
+  window._facadeInspectActive = false;
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(
       (window.VIEW_CENTER || MAP_CENTER).lon,

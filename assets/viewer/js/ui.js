@@ -296,7 +296,7 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
   // to the else branch so the layer's own hover card — e.g. the SCB population-grid
   // cell — keeps working.
   const suppressBuilding = window._shActive || window._irActive || window._tcActive ||
-      window._urbanActive || window._scbActive;
+      window._urbanActive || window._scbActive || window._facadeInspectActive;
 
   if (found != null && DATA[found] && !suppressBuilding) {
     const idx = found;
