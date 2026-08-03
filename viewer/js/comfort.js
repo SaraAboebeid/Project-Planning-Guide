@@ -327,15 +327,16 @@ function _tcLegend() {
 }
 
 function _injectComfort() {
-  const group = document.querySelector(".analysis-tools-group")
+  const group = document.getElementById("environmental-tools")
+             || document.querySelector(".analysis-tools-group")
              || document.querySelector("#urban-analysis-section .overlay-group")
              || document.querySelector("#buildings-content .overlay-group");
   if (!group || document.getElementById("btn-overlay-comfort")) return;
   const btn = document.createElement("button");
-  btn.className = "tool-btn";
+  btn.className = "overlay-btn";
   btn.id = "btn-overlay-comfort";
   btn.setAttribute("aria-pressed", "false");
-  btn.textContent = "🌡️ Thermal comfort (UTCI)";
+  btn.innerHTML = '<span class="overlay-check"></span><span class="base-name">Thermal comfort</span><span class="layer-pill">UTCI</span>';
   const anchor = document.getElementById("incident-panel") || document.getElementById("sunhours-panel");
   if (anchor) anchor.after(btn); else group.appendChild(btn);
 

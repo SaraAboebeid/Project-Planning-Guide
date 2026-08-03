@@ -1756,37 +1756,14 @@ async def osm_roads(
     FeatureCollection suitable for Cesium polyline rendering.
     Results are cached in memory per bbox (rounded to 3 dp).
     """
-    import httpx
-
     # Round bbox to 3 dp for cache key
     key = (round(south, 3), round(north, 3), round(west, 3), round(east, 3))
     if key in _OSM_ROAD_CACHE:
         return _OSM_ROAD_CACHE[key]
 
-    OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-    # Fetch all highway ways + their nodes
-    query = f"""
-[out:json][timeout:25];
-(
-  way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|service|pedestrian|cycleway|footway|path|living_street|unclassified)$"]
-    ({south},{west},{north},{east});
-);
-(._;>;);
-out body;
-"""
-
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(OVERPASS_URL, data={"data": query})
-    if r.status_code != 200:
-        raise HTTPException(502, f"Overpass query failed: {r.status_code}")
-
-    osm = r.json()
-
-    # Build node lookup
-    nodes: dict[int, tuple[float, float]] = {}
-    for elem in osm.get("elements", []):
-        if elem["type"] == "node":
-            nodes[elem["id"]] = (elem["lon"], elem["lat"])
+    # Reuse the resilient highway fetcher (mirror fallback + User-Agent + shared
+    # bbox cache) so this endpoint isn't 406-rate-limited on the main instance.
+    nodes, ways = await _fetch_osm_highways(south, north, west, east)
 
     # Road type → display priority / colour hint
     ROAD_CLASS = {
@@ -1798,9 +1775,7 @@ out body;
     }
 
     features = []
-    for elem in osm.get("elements", []):
-        if elem["type"] != "way":
-            continue
+    for elem in ways:
         coords = [nodes[n] for n in elem.get("nodes", []) if n in nodes]
         if len(coords) < 2:
             continue
@@ -1822,6 +1797,81 @@ out body;
     result = {"type": "FeatureCollection", "features": features, "count": len(features)}
     _OSM_ROAD_CACHE[key] = result
     return result
+
+
+# ── OSM green spaces (city-agnostic) ──────────────────────────────────────────
+# Same shape as the pre-baked gothenburg_greenspaces.json ({lon,lat,type,area,
+# name}) but fetched live from Overpass for any bbox, so the Urban Analysis
+# green-index / green-accessibility layers work for UK cities too (real OSM data,
+# not Gothenburg's). Cached per rounded bbox.
+_OSM_GREEN_CACHE: dict = {}
+
+
+@app.get("/api/urban/green-areas")
+async def osm_green_areas(
+    south: float = Query(..., description="Bounding box south lat"),
+    north: float = Query(..., description="Bounding box north lat"),
+    west:  float = Query(..., description="Bounding box west lon"),
+    east:  float = Query(..., description="Bounding box east lon"),
+):
+    import httpx
+
+    key = (round(south, 3), round(north, 3), round(west, 3), round(east, 3))
+    if key in _OSM_GREEN_CACHE:
+        return _OSM_GREEN_CACHE[key]
+
+    query = f"""
+[out:json][timeout:30];
+(
+  way["leisure"~"^(park|garden|nature_reserve|recreation_ground)$"]({south},{west},{north},{east});
+  way["landuse"~"^(recreation_ground|grass|forest|meadow|village_green|greenfield)$"]({south},{west},{north},{east});
+  way["natural"~"^(wood|scrub|grassland|heath)$"]({south},{west},{north},{east});
+);
+out geom;
+"""
+    mirrors = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    ]
+    headers = {"User-Agent": "PPG-UrbanAnalysis/1.0 (green-index; saraabo@chalmers.se)"}
+    osm = None
+    last = None
+    async with httpx.AsyncClient(timeout=45, headers=headers) as client:
+        for url in mirrors:
+            try:
+                r = await client.post(url, data={"data": query})
+            except Exception as exc:
+                last = str(exc); continue
+            if r.status_code == 200:
+                osm = r.json(); break
+            last = f"{url.split('/')[2]} → {r.status_code}"
+    if osm is None:
+        raise HTTPException(502, f"Overpass unavailable (last: {last})")
+
+    out = []
+    for elem in osm.get("elements", []):
+        geom = elem.get("geometry")
+        if not geom or len(geom) < 3:
+            continue
+        ring = [[g["lon"], g["lat"]] for g in geom]
+        area = _shoelace_m2([ring])
+        if not area or area < 100:
+            continue
+        c_lat, c_lon = _polygon_centroid([ring])
+        tags = elem.get("tags", {})
+        # First matching green tag → "key=value" type string (matches MIN_AREA keys)
+        tag_type = ""
+        for k in ("leisure", "landuse", "natural"):
+            if k in tags:
+                tag_type = f"{k}={tags[k]}"; break
+        out.append({
+            "lon": round(c_lon, 6), "lat": round(c_lat, 6),
+            "type": tag_type, "area": round(area), "name": tags.get("name", ""),
+        })
+
+    _OSM_GREEN_CACHE[key] = out
+    return out
 
 
 # ── Urban analysis · space syntax (spatial-network centrality) ────────────────

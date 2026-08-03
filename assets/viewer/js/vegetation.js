@@ -164,6 +164,11 @@ function _injectVegToggle() {
       '<span class="overlay-check"></span><span class="base-name">Trees &amp; shrubs</span>' +
       '<span class="layer-pill">Lantmäteriet LiDAR</span></button>';
   group.appendChild(row);
+  const note = document.createElement('div');
+  note.id = 'veg-photo-note';
+  note.textContent = "Not available in Photorealistic 3D — Google's mesh already includes trees.";
+  note.style.cssText = "display:none;font-size:9.5px;color:var(--muted);padding:2px 12px 6px;line-height:1.4;font-style:italic";
+  group.appendChild(note);
   const btn = row.querySelector('#btn-overlay-vegetation');
   btn.addEventListener('click', () => {
     if (_photoForced) return;   // disabled while photorealistic 3D is on
@@ -181,6 +186,8 @@ function _injectVegToggle() {
 window.vegetationSetPhotoForced = function (forced) {
   _photoForced = !!forced;
   const btn = document.getElementById('btn-overlay-vegetation');
+  const note = document.getElementById('veg-photo-note');
+  if (note) note.style.display = forced ? 'block' : 'none';
   if (forced) {
     vegetationHide();
     if (btn) {

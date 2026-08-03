@@ -295,7 +295,8 @@ function _injectSunHours() {
   // isn't present (e.g. a non-SE viewer profile).
   // Live in the analysis tools group (with WWR / PV / Energy Simulation); fall
   // back to the old locations if that group isn't present.
-  const group = document.querySelector(".analysis-tools-group")
+  const group = document.getElementById("environmental-tools")
+             || document.querySelector(".analysis-tools-group")
              || document.querySelector("#urban-analysis-section .overlay-group")
              || document.querySelector("#buildings-content .overlay-group");
   if (!group || document.getElementById("btn-overlay-sunhours")) return;
@@ -307,10 +308,10 @@ function _injectSunHours() {
     group.appendChild(lbl);
   }
   const btn = document.createElement("button");
-  btn.className = "tool-btn";
+  btn.className = "overlay-btn";
   btn.id = "btn-overlay-sunhours";
   btn.setAttribute("aria-pressed", "false");
-  btn.textContent = "☀️ Sun-hours";
+  btn.innerHTML = '<span class="overlay-check"></span><span class="base-name">Sun-hours</span><span class="layer-pill">hours</span>';
   group.appendChild(btn);
   const panel = document.createElement("div");
   panel.id = "sunhours-panel";

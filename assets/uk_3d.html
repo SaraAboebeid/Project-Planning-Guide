@@ -6,15 +6,15 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="uk_3d.css?v=20260731-hover">
-  <link rel="stylesheet" href="sidebar-theme.css?v=20260731-hover">
+  <link rel="stylesheet" href="uk_3d.css?v=20260803-env5">
+  <link rel="stylesheet" href="sidebar-theme.css?v=20260803-env5">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
        is stamped on <body> by bootstrap.js. */
     body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
   </style>
-  <script src="uk_3d.meta.js?v=20260731-hover" defer></script>
-  <script src="viewer/js/bootstrap.js?v=20260731-hover" defer></script>
+  <script src="uk_3d.meta.js?v=20260803-env5" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260803-env5" defer></script>
 </head>
 <body>
 
@@ -75,7 +75,7 @@
   <div class="collapse-head">
     <button class="collapse-toggle" id="building-toggle" type="button" aria-expanded="true" aria-controls="building-content">
       <span class="collapse-chevron">&#9662;</span>
-      <span class="collapse-label">Selected Building</span>
+      <span class="collapse-label">Building Analysis</span>
       <span class="sec-badge" id="building-badge" hidden></span>
     </button>
     <button class="info-btn" data-layer="selected-building"></button>
@@ -90,7 +90,7 @@
     <div class="analysis-tools-group">
       <button class="tool-btn" id="btn-inspect" disabled>Facade Inspection</button>
       <div class="analysis-note" id="inspect-saved-badge" style="display:none"></div>
-      <button class="tool-btn pvgis-btn" id="btn-pvgis" disabled>Rooftop PV Estimate</button>
+      <button class="tool-btn" id="btn-pvgis" disabled>Rooftop PV Estimate</button>
       <div class="analysis-note" id="pvgis-saved-badge" style="display:none"></div>
       <div id="pvgis-result" class="analysis-result"></div>
       <button class="tool-btn" id="btn-sim" disabled>Run Energy Simulation</button>
@@ -154,7 +154,7 @@
     <div class="collapse-head">
       <button class="collapse-toggle" id="buildings-toggle" type="button" aria-expanded="true" aria-controls="buildings-content">
         <span class="collapse-chevron">&#9662;</span>
-        <span class="collapse-label">Buildings</span>
+        <span class="collapse-label">Additional Layers</span>
         <span class="sec-badge" id="buildings-badge" hidden></span>
       </button>
       <button class="info-btn" data-layer="building-layers" data-source="OpenStreetMap · EPB Register (MHCLG) · English Housing Survey 2024-25"></button>
@@ -288,8 +288,8 @@
     </div>
 
     <!-- ══ URBAN ANALYSIS ════════════════════════════════════════════════ -->
-    <div class="lp-divider se-only"></div>
-    <div class="collapse-head se-only">
+    <div class="lp-divider"></div>
+    <div class="collapse-head">
       <button class="collapse-toggle" id="urban-toggle" type="button" aria-expanded="false" aria-controls="urban-content">
         <span class="collapse-chevron">&#9662;</span>
         <span class="collapse-label">Urban Analysis</span>
@@ -297,7 +297,7 @@
       </button>
       <button class="info-btn" data-layer="urban-analysis-layers"></button>
     </div>
-    <div id="urban-content" class="collapse-content collapsed se-only">
+    <div id="urban-content" class="collapse-content collapsed">
       <div id="urban-analysis-section">
         <div class="overlay-group">
           <div class="overlay-row">
@@ -308,7 +308,7 @@
             </button>
             <button class="info-btn" data-layer="street-green-index"></button>
           </div>
-          <div class="overlay-row">
+          <div class="overlay-row se-only">
             <button class="overlay-btn" id="btn-urban-uhi" aria-pressed="false">
               <span class="overlay-check"></span>
               <span class="base-name">Heat Island Proxy</span>
@@ -324,7 +324,28 @@
             </button>
             <button class="info-btn" data-layer="green-space-accessibility"></button>
           </div>
+          <div class="overlay-row">
+            <button class="overlay-btn" id="btn-urban-spacesyntax" aria-pressed="false">
+              <span class="overlay-check"></span>
+              <span class="base-name">Space Syntax</span>
+              <span class="layer-pill">SMoG &middot; OSM</span>
+            </button>
+            <button class="info-btn" data-title="Space syntax" data-desc="Street-network centrality (space syntax) on the OSM street network: betweenness (through-movement / choice), integration (closeness / how central), and reach. HOW TO USE: pan/zoom to a neighbourhood, tick this layer, pick a measure below, then press ↻ Recompute for current view. Streets colour blue→red = low→high. Method after SMoG — Spatial Morphology Group, Chalmers." data-source="OpenStreetMap · networkx (space-syntax, method A)"></button>
+          </div>
         </div>
+        <div id="ss-controls" style="display:none;padding:2px 12px 6px">
+          <div style="font-size:10px;color:var(--muted);line-height:1.45;margin-bottom:6px">
+            <b>1.</b> Pan/zoom to a neighbourhood &nbsp;<b>2.</b> Pick a measure &nbsp;<b>3.</b> Press <b>↻ Recompute</b>.<br>Streets colour <span style="color:#4a66dc">blue</span>→<span style="color:#e05a23">red</span> = low→high.
+          </div>
+          <div id="ss-tabs" role="tablist" style="display:flex;gap:4px;margin-bottom:5px">
+            <button class="lp-tab active" id="ss-tab-betweenness" role="tab">Betweenness</button>
+            <button class="lp-tab" id="ss-tab-integration" role="tab">Integration</button>
+            <button class="lp-tab" id="ss-tab-reach" role="tab">Reach</button>
+          </div>
+          <button class="btn" id="ss-refresh" style="width:100%;font-size:10px;padding:5px">&#8635; Recompute for current view</button>
+        </div>
+        <div id="ss-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
+        <div id="ss-legend" style="display:none;padding:4px 12px 8px"></div>
         <div id="urban-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
         <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:11px;color:var(--text)"></div>
       </div>

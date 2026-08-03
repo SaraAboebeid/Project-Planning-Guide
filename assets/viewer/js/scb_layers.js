@@ -339,7 +339,7 @@
     const sub = document.getElementById('scb-sub-'+id);
     if (sub) sub.style.display = s.active ? 'flex' : 'none';
 
-    if (s.active) await loadLayer(g.tn(s.year), g);
+    if (s.active) { if (window.viewTopDown) window.viewTopDown(); await loadLayer(g.tn(s.year), g); }
     else          hideLayer(g.tn(s.year));
   }
 

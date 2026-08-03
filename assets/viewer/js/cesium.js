@@ -1051,6 +1051,24 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────
+// Fly straight down (nadir) over whatever is at screen centre. Exposed globally
+// so the plan-view analytical overlays (statistics, green index, heat-island,
+// green accessibility) can auto-orient the camera top-down when activated — they
+// read as maps, not 3D scenes. Independent of the nav-button UI so it also works
+// in the UK viewer.
+window.viewTopDown = function viewTopDown() {
+  if (typeof viewer === 'undefined' || !viewer) return;
+  const canvas = viewer.scene.canvas;
+  const px = new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2);
+  const ell = (viewer.scene.globe && viewer.scene.globe.ellipsoid) || Cesium.Ellipsoid.WGS84;
+  const c = viewer.camera.pickEllipsoid(px, ell) || viewer.camera.positionWC;
+  const range = Math.max(50, Cesium.Cartesian3.distance(viewer.camera.positionWC, c));
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(c, 0), {
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-90), range),
+    duration: 0.8,
+  });
+};
+
 // Map navigation — compass (click to point north) + top-down view
 // ─────────────────────────────────────────────────────────────────
 (function initMapNav() {

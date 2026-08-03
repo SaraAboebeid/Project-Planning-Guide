@@ -29,9 +29,17 @@
     access: { ds: null, active: false, btnId: 'btn-urban-access', label: 'Green Accessibility' },
   };
 
-  // Analysis extent — greater Gothenburg. The green-space payload and these
-  // bounds are city-specific, which is why the layer is Sweden-only.
-  const LAT0 = 57.60, LAT1 = 57.83, LON0 = 11.79, LON1 = 12.15;
+  // Analysis extent + geometry. Gothenburg keeps its tuned bounds and pre-baked
+  // green-space file; any other city derives a city-sized box around the viewer
+  // centre and pulls green spaces live from OSM (/api/urban/green-areas). Green
+  // Index & Green Accessibility are OSM-only so both work anywhere; Heat Island
+  // still needs Swedish building-energy data and stays SE-only in the UI.
+  const _ctr  = window.VIEW_CENTER || { lat: 57.70, lon: 11.96 };
+  const _isSE = (window.VIEWER_COUNTRY === 'se');
+  const LAT0 = _isSE ? 57.60 : _ctr.lat - 0.090;
+  const LAT1 = _isSE ? 57.83 : _ctr.lat + 0.090;
+  const LON0 = _isSE ? 11.79 : _ctr.lon - 0.140;
+  const LON1 = _isSE ? 12.15 : _ctr.lon + 0.140;
 
   let _greenProxies = null;   // null = not loaded; [] = fallback; [...] = OSM data
   let _greenSource  = 'building-proxy';
@@ -61,7 +69,7 @@
 
   // ── Geometry ────────────────────────────────────────────────────────────────
   const M_PER_DEG_LAT = 111320;
-  const LON_SCALE     = 0.536;            // cos(57.7°)
+  const LON_SCALE     = Math.cos(_ctr.lat * Math.PI / 180);   // cos(city latitude)
   const M_PER_DEG_LON = M_PER_DEG_LAT * LON_SCALE;
 
   function distM(lon1, lat1, lon2, lat2) {
@@ -98,7 +106,10 @@
   async function loadGreenProxies() {
     if (_greenProxies !== null) return _greenProxies;
     try {
-      const res = await fetch('gothenburg_greenspaces.json');
+      const url = _isSE
+        ? 'gothenburg_greenspaces.json'
+        : `/api/urban/green-areas?south=${LAT0.toFixed(4)}&north=${LAT1.toFixed(4)}&west=${LON0.toFixed(4)}&east=${LON1.toFixed(4)}`;
+      const res = await fetch(url);
       if (res.ok) {
         const raw = await res.json();
         _greenProxies = raw.filter((f) =>
@@ -394,6 +405,8 @@
       } else {
         layer.active = true;
         updateBtn(key);
+        // These grid/street overlays read as maps — orient the camera top-down.
+        if (window.viewTopDown) window.viewTopDown();
         await BUILD[key]();
       }
     } catch (err) {

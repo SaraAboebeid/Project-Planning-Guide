@@ -294,6 +294,25 @@
   color: rgba(255, 255, 255, 0.65) !important;
 }
 
+/* Building Analysis action buttons: flatten from boxed "cards" to the same
+   flat rows as the layer toggles — identical typography (12px / 500 / --sb-text),
+   they simply have no checkbox. */
+.analysis-tools-group .tool-btn {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 0 !important;
+  padding: 7px 12px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  letter-spacing: normal !important;
+  color: var(--sb-text) !important;
+}
+.analysis-tools-group .tool-btn:hover:not(:disabled) {
+  background: rgba(114, 28, 184, 0.2) !important;
+  color: #fff !important;
+}
+
 /* Search */
 #search-input {
   background: var(--sb-surface) !important;
