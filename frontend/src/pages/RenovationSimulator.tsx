@@ -1097,7 +1097,7 @@ export default function RenovationSimulator() {
   // comparison table below alongside any hand-built packages). The optimizer's
   // option codes are ComponentConfig ids, so resolve each back to its saved
   // build-up (single Wikells row OR layer-composed assembly).
-  function validateOptimizerPick(point: OptimizePoint) {
+  function validateOptimizerPick(point: OptimizePoint, opts?: { auto?: boolean }) {
     if (geometries.length === 0) return;
     const cfgById = new Map(configs.map((c) => [c.id, c]));
     const touched = Object.entries(point.selections)
@@ -1132,8 +1132,11 @@ export default function RenovationSimulator() {
       return any ? { costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e) } : { costSEK: null, carbonKgCO2e: null };
     });
     const id = `pkg-opt-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    const pkg: RenovationCalcPackage = { id, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows };
-    setProject({ renovationCalcPackages: [...packages, pkg] });
+    const pkg: RenovationCalcPackage = { id, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows, ...(opts?.auto ? { auto: true } : {}) };
+    // Auto picks REPLACE the previous auto-package so exploring the curve doesn't
+    // pile up dozens of near-identical "Optimal" runs; manual picks always add.
+    const kept = opts?.auto ? packages.filter((p) => !p.auto) : packages;
+    setProject({ renovationCalcPackages: [...kept, pkg] });
     submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
   }
 
@@ -1597,6 +1600,31 @@ export default function RenovationSimulator() {
               ? `${packages.filter((p) => !p.isBaseline).length} package${packages.filter((p) => !p.isBaseline).length === 1 ? "" : "s"} vs baseline`
               : "simulate a package to compare"}
             state={packages.filter((p) => !p.isBaseline).length ? "active" : "waiting"} />
+
+          {/* Prominent "EnergyPlus is running" banner so it's obvious a simulation
+              is in flight and results will appear on their own (no click needed). */}
+          {(() => {
+            let running = 0, done = 0, total = 0;
+            for (const p of packages) for (const b of p.buildings) {
+              total++;
+              if (b.status === "completed" || b.status === "failed") done++;
+              if (b.status === "queued" || b.status === "running") running++;
+            }
+            if (running === 0) return null;
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 11, margin: "0 0 12px", padding: "11px 14px", borderRadius: 10,
+                background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.32)" }}>
+                <span style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(245,158,11,0.3)",
+                  borderTopColor: "#F59E0B", display: "inline-block", animation: "spin 0.9s linear infinite", flexShrink: 0 }} />
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#F59E0B" }}>
+                  Running EnergyPlus simulations… {done}/{total} buildings done.
+                  <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.6)", marginLeft: 6 }}>
+                    This can take a minute — results fill in below automatically, no need to click.
+                  </span>
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Two read-outs of the same batch: per-package aggregates, or a
               per-building matrix (baseline vs every package, one row per address). */}

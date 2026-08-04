@@ -113,6 +113,7 @@ export interface RenovationCalcPackage {
   selections: Record<string, RenovationCalcSelection>; // key = AreaLineItem.key
   batchId: string | null;   // the shared EPSM batch_id polled for every building below
   buildings: RenovationCalcBuildingResult[];
+  auto?: boolean;           // auto-created from the optimizer's best pick; replaced (not stacked) on re-run
 }
 
 /* ── State shape ── */

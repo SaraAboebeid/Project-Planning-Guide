@@ -301,7 +301,7 @@ export default function ParetoChart({
                     border: `1px solid ${isVal ? "rgba(150,215,76,0.5)" : "rgba(78,205,196,0.55)"}`,
                     background: isVal ? "rgba(150,215,76,0.14)" : "rgba(78,205,196,0.18)",
                     color: isVal ? "#96D74C" : "#4ECDC4" }}>
-                  {isVal ? "✓ Validated in EPSM" : "Validate in EPSM →"}
+                  {isVal ? "✓ Running in EPSM" : "Run this pick in EPSM →"}
                 </button>
                 <button onClick={() => setPinned(null)}
                   style={{ background: "transparent", border: 0, cursor: "pointer", color: white(0.4), fontSize: 16, lineHeight: 1 }}

@@ -2,21 +2,26 @@
   {
     "lat": 0.0,
     "lon": 0.0,
-    "address": "Fagottgatan 4",
-    "average_wwr": 35,
+    "address": "Gullbergs Strandgata 3",
+    "average_wwr": 95,
     "per_facade": [
-      35
+      95
     ],
     "directions": [
       "Manual"
     ],
     "source": "gpt-4.1-vision",
     "building_info": {
-      "address": "Fagottgatan 4",
-      "year": 1962,
-      "use": "bostad_flerfamilj",
-      "eclass": "E"
+      "address": "Gullbergs Strandgata 3",
+      "year": 2022,
+      "use": "verksamhet",
+      "eclass": "B"
     },
-    "saved_at": "2026-05-13T11:37:48.872433Z"
+    "balcony_count_total": 0,
+    "balcony_area_m2_total": 0.0,
+    "per_facade_balcony_count": [
+      0
+    ],
+    "saved_at": "2026-08-04T07:25:46.824491Z"
   }
 ]

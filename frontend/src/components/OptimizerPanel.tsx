@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api, type OptimizeComponentInput, type OptimizeParams, type OptimizePoint, type OptimizeResponse } from "../api/client";
 import { Loader2, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import ParetoChart, { axesFromKpis, OBJECTIVES } from "./ParetoChart";
@@ -21,7 +21,7 @@ export default function OptimizerPanel({
   input, onValidate, disabledReason, currency, validatedKeys, selectedKpis,
 }: {
   input: { components: OptimizeComponentInput[]; params: OptimizeParams } | null;
-  onValidate: (point: OptimizePoint) => void;
+  onValidate: (point: OptimizePoint, opts?: { auto?: boolean }) => void;
   disabledReason?: string;
   currency: "SEK" | "GBP";
   validatedKeys: Set<string>;
@@ -73,6 +73,25 @@ export default function OptimizerPanel({
   const pointKey = (pt: OptimizePoint) =>
     Object.entries(pt.selections).filter(([, v]) => v !== "__keep__").sort().map(([k, v]) => `${k}=${v}`).join("|");
 
+  // Auto-run the lowest-energy Pareto pick in EPSM once the curve settles, so the
+  // Results table and the Step-5 report fill in WITHOUT any manual click. Debounced
+  // and de-duped by point key so it fires once per settled best pick; the page
+  // replaces the previous auto-package, so exploring never piles up runs.
+  const lastAutoKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (!result || result.pareto.length === 0) return;
+    const best = [...result.pareto].sort((a, b) => a.energy_kwh_m2_yr - b.energy_kwh_m2_yr)[0];
+    if (!best) return;
+    const key = pointKey(best);
+    if (key === "" || lastAutoKey.current === key || validatedKeys.has(key)) return;
+    const t = setTimeout(() => {
+      lastAutoKey.current = key;
+      onValidate(best, { auto: true });
+    }, 1600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, validatedKeys]);
+
   return (
     <div style={{ borderRadius: 14, background: "rgba(114,28,184,0.06)", border: "1px solid rgba(114,28,184,0.28)", overflow: "hidden" }}>
       {/* No "optimize" button — the curve recomputes live as materials are
@@ -110,8 +129,9 @@ export default function OptimizerPanel({
           <p style={{ fontSize: 12, color: white(0.5), margin: "0 0 12px", lineHeight: 1.6 }}>
             As you pick materials, this scores <b>every combination</b> of your picks on the fast degree-day
             physics (no EnergyPlus) and plots the <b>Pareto-optimal</b> set live — the packages where you can't
-            improve one objective without sacrificing another. Pick any winner to validate its real energy in
-            EPSM. Model after Enerbäck &amp; Strömberg.
+            improve one objective without sacrificing another. The best pick <b>runs automatically</b> in
+            EnergyPlus (EPSM) so the Results table and the report fill in on their own — or pin any other
+            point on the chart to run that one too. Model after Enerbäck &amp; Strömberg.
           </p>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
@@ -176,7 +196,6 @@ export default function OptimizerPanel({
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Energy</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Cost (life-cycle)</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Carbon (life-cycle)</th>
-                      <th style={{ padding: "6px 8px", fontWeight: 600 }}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -189,8 +208,6 @@ export default function OptimizerPanel({
                       <td />
                     </tr>
                     {pareto.map((pt, i) => {
-                      const key = pointKey(pt);
-                      const validated = validatedKeys.has(key);
                       const deltaPct = baseEnergy ? Math.round(((baseEnergy - pt.energy_kwh_m2_yr) / baseEnergy) * 100) : null;
                       const touched = Object.entries(pt.selection_labels).filter(([, v]) => v !== "Keep as-built");
                       return (
@@ -225,21 +242,6 @@ export default function OptimizerPanel({
                           </td>
                           <td style={{ padding: "8px", whiteSpace: "nowrap", color: white(0.8) }}>{fmtMoney(pt.total_cost)}</td>
                           <td style={{ padding: "8px", whiteSpace: "nowrap", color: white(0.8) }}>{Math.round(pt.total_carbon).toLocaleString()} kg</td>
-                          <td style={{ padding: "8px" }}>
-                            <button
-                              onClick={() => onValidate(pt)}
-                              disabled={validated}
-                              style={{
-                                fontSize: 11, fontWeight: 700, padding: "5px 11px", borderRadius: 8, whiteSpace: "nowrap",
-                                cursor: validated ? "default" : "pointer",
-                                border: `1px solid ${validated ? "rgba(150,215,76,0.5)" : "rgba(78,205,196,0.5)"}`,
-                                background: validated ? "rgba(150,215,76,0.12)" : "rgba(78,205,196,0.12)",
-                                color: validated ? "#96D74C" : "#4ECDC4",
-                              }}
-                            >
-                              {validated ? "✓ In EPSM" : "Validate in EPSM →"}
-                            </button>
-                          </td>
                         </tr>
                       );
                     })}
