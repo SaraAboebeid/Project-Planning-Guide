@@ -3097,9 +3097,15 @@ async def optimize_renovation(req: OptimizeRequest):
         for c in cloud_src
     ] if req.cloud_cap else []
 
+    # Every evaluated package WITH its material selections (not just the Pareto
+    # subset), so the UI can offer a "show all packages" view — but only when the
+    # count is small enough to list/plot usefully; large runs keep just the front.
+    all_points = points if len(points) <= 400 else []
+
     return {
         "baseline": baseline_point,
         "pareto": pareto,
+        "all_points": all_points,
         "cloud": cloud,
         "evaluated": evaluated,
         "unique_points": len(points),

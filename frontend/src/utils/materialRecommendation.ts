@@ -72,9 +72,13 @@ export function estimateCarbon(
 }
 
 export type KpiKey = "Environmental" | "Economic" | "Performance / Technical";
+/** Recommendation tags = the three KPIs, plus a synthesised "Balanced" pick that
+ *  trades the selected KPIs off against each other (only when ≥2 are selected). */
+export type RecTag = KpiKey | "Balanced";
 
 /** One "Recommended for: X" tag per selected KPI, per item code. A material
- * can be recommended for more than one KPI. */
+ * can be recommended for more than one KPI, and — when two or more KPIs are
+ * selected — for best overall Balance across them. */
 export function recommendationsForLineItem(
   items: WikellsItem[],
   boverketResources: BoverketResource[],
@@ -85,19 +89,21 @@ export function recommendationsForLineItem(
    * stud 95 M0, U 1.75) that RAISES energy. Null (doors/balcony, no U notion)
    * falls back to considering every item. */
   baselineU?: number | null
-): Record<string, KpiKey[]> {
-  const out: Record<string, KpiKey[]> = {};
-  const tag = (code: string, kpi: KpiKey) => { (out[code] ??= []).push(kpi); };
+): Record<string, RecTag[]> {
+  const out: Record<string, RecTag[]> = {};
+  const tag = (code: string, kpi: RecTag) => { (out[code] ??= []).push(kpi); };
 
   if (!items.length) return out;
 
-  // Recommend only genuine improvers. If nothing beats the baseline (or there's
-  // no baseline to beat), fall back to the full list so a recommendation still
-  // appears rather than silently vanishing.
-  const improvers = baselineU != null
+  // Guiding principle: NEVER recommend an assembly that would make the building
+  // worse. We only ever pick from genuine improvers — those whose U beats the
+  // building's current U for this component. If nothing beats the baseline we
+  // recommend NOTHING (return empty) rather than surfacing a worse assembly.
+  // (When baselineU is null — doors/balcony, no U notion — every item is eligible.)
+  const pool = baselineU != null
     ? items.filter((i) => i.uValue != null && i.uValue <= baselineU)
     : items;
-  const pool = improvers.length ? improvers : items;
+  if (!pool.length) return out;
 
   if (selectedKpis.includes("Economic")) {
     const cheapest = pool.reduce((a, b) => (a.costSEK <= b.costSEK ? a : b));
@@ -113,6 +119,45 @@ export function recommendationsForLineItem(
     if (withU.length) {
       const best = withU.reduce((a, b) => (a.uValue! <= b.uValue! ? a : b));
       tag(best.code, "Performance / Technical");
+    }
+  }
+
+  // When two or more KPIs are in play, single-axis winners tend to be extreme
+  // (the best-U wall is also the priciest/highest-carbon). Also surface the
+  // assembly that best BALANCES the selected KPIs: min-max normalise each
+  // selected metric across the pool (cost, carbon, U — all "lower is better"),
+  // give them equal weight, and pick the lowest combined score.
+  const activeKpis = (["Economic", "Environmental", "Performance / Technical"] as KpiKey[])
+    .filter((k) => selectedKpis.includes(k));
+  if (activeKpis.length >= 2) {
+    const wantPerf = activeKpis.includes("Performance / Technical");
+    // Performance needs a U-value; require one only when that KPI is active.
+    const cand = pool.filter((i) => !wantPerf || i.uValue != null);
+    if (cand.length) {
+      const metrics = cand.map((i) => ({
+        code: i.code,
+        cost: i.costSEK,
+        carbon: estimateCarbon(i, boverketResources).value,
+        u: i.uValue ?? 0,
+      }));
+      const costs = metrics.map((m) => m.cost);
+      const carbons = metrics.map((m) => m.carbon);
+      const us = metrics.map((m) => m.u);
+      const nrm = (v: number, arr: number[]) => {
+        const lo = Math.min(...arr), hi = Math.max(...arr);
+        return hi > lo ? (v - lo) / (hi - lo) : 0;
+      };
+      let bestCode: string | null = null;
+      let bestScore = Infinity;
+      for (const m of metrics) {
+        const parts: number[] = [];
+        if (activeKpis.includes("Economic")) parts.push(nrm(m.cost, costs));
+        if (activeKpis.includes("Environmental")) parts.push(nrm(m.carbon, carbons));
+        if (wantPerf) parts.push(nrm(m.u, us));
+        const score = parts.reduce((a, b) => a + b, 0) / (parts.length || 1);
+        if (score < bestScore) { bestScore = score; bestCode = m.code; }
+      }
+      if (bestCode) tag(bestCode, "Balanced");
     }
   }
   return out;

@@ -87,7 +87,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
       >
         <span className="p-1.5 rounded-lg bg-amber-500/15 text-amber-300"><ListOrdered className="w-4 h-4" /></span>
         <span className="flex-1">
-          <span className="block text-sm font-semibold text-white">Retrofit prioritization — MCDA ranking</span>
+          <span className="block text-sm font-semibold text-white">Retrofit prioritization</span>
           <span className="block text-[11px] text-white/40">
             Ranks {items.length} building{items.length === 1 ? "" : "s"} by a weighted score of energy, façade condition,
             characteristics &amp; retrofit potential — which to retrofit first.

@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import FacadeDefectPanel, { type FacadeBuilding } from "../components/FacadeDefectPanel";
 import RetrofitPriorityPanel from "../components/RetrofitPriorityPanel";
-import type { PriorityInput } from "../utils/retrofitPriority";
+import { makeBuildingKeys, type PriorityInput } from "../utils/retrofitPriority";
 import {
   ChevronUp,
   Download, Upload, Plus, Pencil, MapPin, Building2, Loader2, Layers, Globe2, Database,
@@ -1776,17 +1776,14 @@ export default function DataCoverage() {
     const rows = activeCovRows.length ? activeCovRows : bboxRows;
     const src: { address: string | null; cadastral_id?: string | null }[] =
       rows.length ? rows : buildings.map(b => ({ address: b.address }));
-    const seen = new Set<string>();
+    const keys = makeBuildingKeys(src);
     return src.map((b, i) => {
       const nice = isCadastralId(b.address, b.cadastral_id) ? null : formatAddress(b.address);
-      let key = (b.cadastral_id && b.cadastral_id.trim()) || _normKey(b.address ?? "") || `bldg-${i}`;
-      while (seen.has(key)) key = `${key}-${i}`;
-      seen.add(key);
-      return { key, label: nice || `Building ${i + 1}` };
+      return { key: keys[i]!, label: nice || `Building ${i + 1}` };
     });
   }, [activeCovRows, bboxRows, buildings]);
 
-  // MCDA prioritization operates on the real building rows (bbox / neighborhood
+  // Retrofit prioritization operates on the real building rows (bbox / neighborhood
   // selection), aligned 1:1 with facadeBuildings so façade summaries map by key.
   const priorityItems = useMemo<PriorityInput[]>(() => {
     const source = activeCovRows.length ? activeCovRows : bboxRows;
@@ -2000,7 +1997,7 @@ export default function DataCoverage() {
       {/* Facade condition — AI defect detection on user-uploaded facade photos */}
       {facadeBuildings.length > 0 && <FacadeDefectPanel buildings={facadeBuildings} />}
 
-      {/* Retrofit prioritization — MCDA ranking of the buildings in scope */}
+      {/* Retrofit prioritization — ranking of the buildings in scope */}
       {priorityItems.length > 0 && <RetrofitPriorityPanel items={priorityItems} />}
 
     </div>

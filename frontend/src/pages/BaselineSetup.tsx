@@ -1,9 +1,9 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationBaselineResult } from "../store/wizard";
 import { api } from "../api/client";
 import type { BuildingLookup, BuildingRecord } from "../types";
-import { Building2, FileJson, Upload, Zap, X, Loader2, BarChart2, Thermometer, Droplets, Download } from "lucide-react";
+import { Building2, Zap, Loader2, BarChart2, Thermometer, Droplets, Download } from "lucide-react";
 
 /** Normalise a bbox BuildingRecord into the same shape as BuildingLookup */
 function recordToLookup(r: BuildingRecord, idx: number): BuildingLookup {
@@ -79,11 +79,10 @@ export default function BaselineSetup() {
     return [];
   }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows]);
 
+  // Any data the user filled in Step 2 already lives in the building rows; this
+  // per-building override map stays only as a harmless (usually empty) fallback.
   const supplementary = project.supplementaryData ?? {};
 
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const [simRunning, setSimRunning] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
   const [simError, setSimError] = useState<string | null>(null);
@@ -210,72 +209,6 @@ export default function BaselineSetup() {
   // run always completes. No need to gate on "all fields present" anymore.
   const canRunBaseline = runList.length > 0;
 
-  /* ── JSON upload handler ── */
-  function handleFile(file: File) {
-    setUploadError(null);
-    setUploadSuccess(false);
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const raw = JSON.parse(e.target!.result as string);
-        let entries: Record<string, unknown>[] = [];
-        if (Array.isArray(raw)) entries = raw;
-        else if (raw.buildings && Array.isArray(raw.buildings)) entries = raw.buildings;
-        else entries = [raw];
-        if (entries.length === 0) throw new Error("No entries found in file.");
-
-        const next: Record<string, Record<string, unknown>> = { ...supplementary };
-
-        if (entries.length === 1 && buildings.length === 1) {
-          // single building — map by position
-          const k = bKey(buildings[0], 0);
-          next[k] = { ...(next[k] ?? {}), ...entries[0] };
-        } else {
-          for (const entry of entries) {
-            const addr = String(entry.address ?? "");
-            const matched = buildings.find((b, i) => {
-              const bAddr = (b.address ?? `Building ${i + 1}`).toLowerCase();
-              return bAddr.includes(addr.toLowerCase()) || addr.toLowerCase().includes(bAddr);
-            });
-            if (matched) {
-              const k = bKey(matched, buildings.indexOf(matched));
-              next[k] = { ...(next[k] ?? {}), ...entry };
-            } else if (addr) {
-              next[addr] = { ...(next[addr] ?? {}), ...entry };
-            }
-          }
-        }
-        setProject({ supplementaryData: next });
-        setUploadSuccess(true);
-      } catch (err) {
-        setUploadError(`Parse error: ${(err as Error).message}`);
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  /* ── Example JSON snippet ── */
-  const exampleJson = useMemo(() => {
-    if (buildings.length === 0) {
-      return JSON.stringify({ height: 12.5, floors: 4, area_atemp: 850, footprint_m2: 215, use_cat: "Residential", year: 1968, tabula_period: "1961-1980", tabula_u_wall: 0.5, tabula_u_win: 2.8 }, null, 2);
-    }
-    if (buildings.length === 1) {
-      return JSON.stringify({ height: 12.5, floors: 4, area_atemp: 850, footprint_m2: 215, use_cat: "Residential", year: 1968, tabula_period: "1961-1980", tabula_u_wall: 0.5, tabula_u_win: 2.8 }, null, 2);
-    }
-    return JSON.stringify({
-      buildings: buildings.slice(0, 3).map((b, i) => ({
-        address: b.address ?? `Building ${i + 1}`,
-        height: null,
-        floors: null,
-        area_atemp: null,
-        use_cat: null,
-        year: null,
-        tabula_u_wall: null,
-        tabula_u_win: null,
-      })),
-    }, null, 2);
-  }, [buildings]);
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1000 }}>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -344,83 +277,6 @@ export default function BaselineSetup() {
           </div>
         </div>
       )}
-
-      {/* ── Optional: supplementary data upload (collapsed - data coverage
-             itself was already reviewed in Step 2) ── */}
-      <details style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
-        <summary style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none", listStyle: "none" }}>
-          <FileJson size={14} color="#4ECDC4" />
-          <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>Optional: upload supplementary data</span>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>fill any gaps as JSON ▾</span>
-        </summary>
-        <div style={{ marginTop: 14 }}>
-        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 14px", lineHeight: 1.55 }}>
-          Provide any missing field values as a <strong style={{ color: "rgba(255,255,255,0.6)" }}>.json</strong> file.
-          Fields are matched to buildings by <code style={{ fontSize: 11 }}>address</code> (or by position for a single building).
-          {Object.keys(supplementary).length > 0 && (
-            <button
-              onClick={() => { setProject({ supplementaryData: {} }); setUploadSuccess(false); }}
-              style={{ marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "rgba(255,255,255,0.4)", background: "transparent", border: 0, cursor: "pointer" }}
-            >
-              <X size={11} /> Clear uploads
-            </button>
-          )}
-        </p>
-
-        {/* Drop zone */}
-        <div
-          onClick={() => fileRef.current?.click()}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
-          style={{
-            border: "2px dashed rgba(78,205,196,0.3)", borderRadius: 12,
-            padding: "24px 20px", textAlign: "center", cursor: "pointer",
-            background: "rgba(78,205,196,0.04)", marginBottom: 12,
-          }}
-        >
-          <Upload size={20} color="rgba(78,205,196,0.55)" style={{ margin: "0 auto 8px", display: "block" }} />
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 3px" }}>Drop a JSON file here, or click to browse</p>
-          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", margin: 0 }}>.json only</p>
-          <input
-            ref={fileRef} type="file" accept=".json,application/json"
-            style={{ display: "none" }}
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
-          />
-        </div>
-
-        {uploadError && (
-          <div style={{ borderRadius: 8, padding: "10px 14px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: "#fca5a5" }}>⚠ {uploadError}</span>
-          </div>
-        )}
-        {uploadSuccess && (
-          <div style={{ borderRadius: 8, padding: "10px 14px", background: "rgba(150,215,76,0.08)", border: "1px solid rgba(150,215,76,0.22)", marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: "#96D74C" }}>✓ Data merged successfully.</span>
-          </div>
-        )}
-
-        {/* Format hint */}
-        <details>
-          <summary style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", cursor: "pointer", userSelect: "none" }}>
-            Show expected JSON format
-          </summary>
-          <pre style={{
-            marginTop: 10, padding: "12px 14px", borderRadius: 10,
-            fontSize: 10.5, lineHeight: 1.65,
-            background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)",
-            color: "rgba(255,255,255,0.5)", overflowX: "auto", margin: "10px 0 0",
-          }}>
-            {exampleJson}
-          </pre>
-          {buildings.length > 1 && (
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 8 }}>
-              For multiple buildings, wrap in <code style={{ fontSize: 10 }}>{`{"buildings": [...]}`}</code> and include an <code style={{ fontSize: 10 }}>address</code> field in each entry to match buildings.
-              For a single building, just supply the fields at the top level.
-            </p>
-          )}
-        </details>
-        </div>
-      </details>
 
       {/* ── Baseline simulation ── */}
       <div style={{

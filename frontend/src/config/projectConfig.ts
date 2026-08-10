@@ -102,9 +102,7 @@ export const ENVELOPE_COMPONENTS = [
   "Walls",
   "Windows",
   "Doors",
-  "Floor",
   "Roof",
-  "Balcony",
   "Vertical Extension (New Floor)",
 ];
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { api, type OptimizeComponentInput, type OptimizeParams, type OptimizePoint, type OptimizeResponse } from "../api/client";
 import { Loader2, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import ParetoChart, { axesFromKpis, OBJECTIVES } from "./ParetoChart";
+import ParallelCoordinates from "./ParallelCoordinates";
 
 /* The "pick the Pareto-optimal packages" step of the hybrid optimizer.
  * RenovationSimulator gathers the option matrix + economy/climate params from
@@ -67,6 +68,13 @@ export default function OptimizerPanel({
   }, [input]);
 
   const pareto = result ? [...result.pareto].sort((a, b) => a[sort] - b[sort]) : [];
+  // "Show all" reveals every evaluated package (not just the Pareto-optimal front)
+  // when the run is small enough that the backend returned them all.
+  const [showAll, setShowAll] = useState(false);
+  const canShowAll = !!result && (result.all_points?.length ?? 0) > result.pareto.length;
+  const shown = (showAll && result?.all_points?.length ? [...result.all_points] : (result?.pareto ?? []))
+    .sort((a, b) => a[sort] - b[sort]);
+  const pcPoints = showAll && result?.all_points?.length ? result.all_points : (result?.pareto ?? []);
   const baseEnergy = result?.baseline.energy_kwh_m2_yr ?? null;
   // Match RenovationSimulator's validatedKeys: touched components only (a
   // "__keep__" pick isn't part of the package that gets submitted to EPSM).
@@ -159,24 +167,49 @@ export default function OptimizerPanel({
 
           {result && pareto.length > 0 && (
             <>
-              {/* Animated Pareto frontier — axes follow the KPIs picked in Step 1 */}
+              {/* Two complementary views side by side: the 2-D Pareto frontier
+                  (cost×GWP, colour = energy) and a parallel-coordinates plot that
+                  shows every dimension — material choices + all three KPIs — at once. */}
               <div style={{ marginBottom: 6, fontSize: 11, color: white(0.45) }}>
                 Axes from your Step-1 KPIs: <b style={{ color: "#fff" }}>{OBJECTIVES[axes.x].label}</b> ×{" "}
                 <b style={{ color: "#fff" }}>{OBJECTIVES[axes.y].label}</b>, coloured by <b style={{ color: "#fff" }}>{OBJECTIVES[axes.color].label}</b>.
               </div>
-              <ParetoChart
-                cloud={result.cloud}
-                pareto={result.pareto}
-                baseline={result.baseline}
-                axes={axes}
-                currency={currency}
-                evaluated={result.unique_points}
-                onValidate={onValidate}
-                validatedKeys={validatedKeys}
-                pointKey={pointKey}
-              />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "flex-start" }}>
+                <div style={{ flex: "1 1 360px", minWidth: 300 }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: white(0.4), textTransform: "uppercase", marginBottom: 6 }}>
+                    Pareto frontier
+                  </div>
+                  <ParetoChart
+                    cloud={result.cloud}
+                    pareto={result.pareto}
+                    baseline={result.baseline}
+                    axes={axes}
+                    currency={currency}
+                    evaluated={result.unique_points}
+                    onValidate={onValidate}
+                    validatedKeys={validatedKeys}
+                    pointKey={pointKey}
+                  />
+                </div>
+                <div style={{ flex: "1.25 1 440px", minWidth: 320 }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: white(0.4), textTransform: "uppercase", marginBottom: 6 }}>
+                    Parallel coordinates · materials → KPIs
+                  </div>
+                  {/* Spacer matching the Pareto column's Replay button + scrubber row,
+                      so both plot areas start at the same vertical level. */}
+                  <div aria-hidden style={{ height: 50 }} />
+                  <ParallelCoordinates
+                    pareto={pcPoints}
+                    currency={currency}
+                    colorBy={axes.color}
+                    onValidate={onValidate}
+                    validatedKeys={validatedKeys}
+                    pointKey={pointKey}
+                  />
+                </div>
+              </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, marginTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, marginTop: 16, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 11, color: white(0.4) }}>Sort by:</span>
                 {([["energy_kwh_m2_yr", "Energy"], ["total_cost", "Cost"], ["total_carbon", "Carbon"]] as const).map(([k, lbl]) => (
                   <button key={k} onClick={() => setSort(k)} style={{
@@ -186,7 +219,26 @@ export default function OptimizerPanel({
                     color: sort === k ? "#fff" : white(0.55),
                   }}>{lbl}</button>
                 ))}
+                {canShowAll && (
+                  <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: white(0.4) }}>Show:</span>
+                    {([[false, `Pareto-optimal (${result.pareto.length})`], [true, `All packages (${result.all_points!.length})`]] as const).map(([v, lbl]) => (
+                      <button key={String(v)} onClick={() => setShowAll(v)} style={{
+                        fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
+                        border: `1px solid ${showAll === v ? "rgba(78,205,196,0.6)" : "rgba(255,255,255,0.12)"}`,
+                        background: showAll === v ? "rgba(78,205,196,0.16)" : "transparent",
+                        color: showAll === v ? "#4ECDC4" : white(0.55),
+                      }}>{lbl}</button>
+                    ))}
+                  </span>
+                )}
               </div>
+              {showAll && canShowAll && (
+                <div style={{ fontSize: 10.5, color: white(0.35), marginBottom: 8 }}>
+                  Showing every evaluated package. Rows without a <span style={{ color: "#4ECDC4" }}>tag</span> are
+                  <b> dominated</b> — another package is better on cost, carbon <i>and</i> energy at once, so it's never the smart pick.
+                </div>
+              )}
 
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -207,7 +259,7 @@ export default function OptimizerPanel({
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{Math.round(result.baseline.total_carbon).toLocaleString()} kg</td>
                       <td />
                     </tr>
-                    {pareto.map((pt, i) => {
+                    {shown.map((pt, i) => {
                       const deltaPct = baseEnergy ? Math.round(((baseEnergy - pt.energy_kwh_m2_yr) / baseEnergy) * 100) : null;
                       const touched = Object.entries(pt.selection_labels).filter(([, v]) => v !== "Keep as-built");
                       return (
@@ -249,11 +301,6 @@ export default function OptimizerPanel({
                 </table>
               </div>
 
-              <p style={{ fontSize: 10.5, color: white(0.35), marginTop: 10, lineHeight: 1.6 }}>
-                Energy, cost and carbon here are the fast analytic estimate (Q = Q_fixed + H_tr·F_dh, discounted over{" "}
-                {result.params_used.study_period_yr} yr). Validating a package runs the real EnergyPlus simulation and
-                adds it to the comparison table below — the physics estimate and the EPSM result may differ slightly.
-              </p>
             </>
           )}
         </div>

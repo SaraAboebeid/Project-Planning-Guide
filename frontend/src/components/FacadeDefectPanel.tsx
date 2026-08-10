@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
-  ScanSearch, Upload, Loader2, X, ChevronDown, ChevronUp, ImageOff, Cpu,
+  ScanSearch, Upload, Loader2, X, ChevronDown, ChevronUp, ImageOff,
   Building2, Check, Sparkles, Maximize2,
 } from "lucide-react";
 import { api, type FacadeDetectResponse, type FacadeDetection } from "../api/client";
@@ -373,16 +373,6 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
 
       {open && (
         <div className="px-4 pb-4 space-y-3 border-t border-white/8 pt-3">
-          {/* Model attribution */}
-          <div className="flex items-start gap-2 text-[10px] text-white/40 bg-black/20 border border-white/8 rounded-md px-2.5 py-1.5">
-            <Cpu className="w-3.5 h-3.5 text-violet-300 shrink-0 mt-0.5" />
-            <span>
-              <b className="text-violet-300">Solid boxes</b> = your trained <b className="text-violet-300">MBDD2025 model</b> (local Faster R-CNN).
-              {aiAssist && <> <b className="text-sky-300">Dashed boxes</b> = <b className="text-sky-300">AI vision second opinion</b> (GPT-4o) catching what ML misses.</>}
-              {" "}Click any photo to enlarge. Photos are downscaled to {MAX_UPLOAD_DIM}px for speed.
-            </span>
-          </div>
-
           {/* Upload target + AI + sensitivity */}
           <div className="flex items-center gap-2 flex-wrap">
             <label className="text-[11px] text-white/45">Upload to:</label>

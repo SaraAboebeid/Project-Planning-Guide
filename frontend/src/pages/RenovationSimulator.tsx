@@ -3,10 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationCalcPackage, type RenovationCalcBuildingResult, type RenovationCalcSelection } from "../store/wizard";
 import { climateGoalFor, assessAgainstGoal } from "../config/climateGoals";
 import ClimateGoalPanel from "../components/ClimateGoalPanel";
+import ComponentScopePanel from "../components/ComponentScopePanel";
+import DecisionAnalysisPanel from "../components/DecisionAnalysisPanel";
+import { computeRegret, annuityFactor, type RegretOptionInput } from "../utils/regretAnalysis";
 import { api } from "../api/client";
 import { lineItemsFor, type AreaLineItem } from "../config/componentAreaLineItems";
 import { resolveBuildingGeometry, computeAreaForLineItem, quantityUnitLabel, type ResolvedBuildingGeometry } from "../utils/componentAreas";
-import { itemsForLineItem, estimateCarbon, recommendationsForLineItem, type KpiKey } from "../utils/materialRecommendation";
+import { itemsForLineItem, estimateCarbon, recommendationsForLineItem, type RecTag } from "../utils/materialRecommendation";
+import { computePriorities, makeBuildingKeys, DEFAULT_WEIGHTS } from "../utils/retrofitPriority";
 import {
   loadUkArchetypes, findUkArchetype, REFURB_TIERS,
   type TabulaArchetypeGB, type RefurbTierKey,
@@ -263,7 +267,7 @@ function LineItemPicker({
   selectedCodes: string[];
   items: WikellsItem[];
   onToggle: (code: string) => void;
-  recommendations: Record<string, KpiKey[]>;
+  recommendations: Record<string, RecTag[]>;
   boverketResources: BoverketResource[];
   /** The building's current U for this component; drives improve/worsen flags. */
   baselineU: number | null;
@@ -285,8 +289,13 @@ function LineItemPicker({
     : null;
   const recCodes = new Set(Object.keys(recommendations));
   if (bestImprover) recCodes.add(bestImprover.code);
+  const worsensOf = (i: WikellsItem) =>
+    (baselineU != null && i.uValue != null && i.uValue > baselineU ? 1 : 0);
   const recommended = items.filter((i) => recCodes.has(i.code)).sort((a, b) => (a.uValue ?? 99) - (b.uValue ?? 99));
-  const rest = items.filter((i) => !recCodes.has(i.code));
+  // Improvers first (by U), then the worse-than-baseline "red" rows pushed to the
+  // very end — you never want a worsening option sitting above a genuine upgrade.
+  const rest = items.filter((i) => !recCodes.has(i.code))
+    .sort((a, b) => worsensOf(a) - worsensOf(b) || (a.uValue ?? 99) - (b.uValue ?? 99));
 
   const Row = (it: WikellsItem) => {
     const carbon = estimateCarbon(it, boverketResources);
@@ -306,6 +315,7 @@ function LineItemPicker({
     if (p.cladding) chips.push({ label: p.cladding, color: "#4A90E2" });
     const hovered = hoveredCode === it.code;
     const checked = selectedCodes.includes(it.code);
+    const isRec = recCodes.has(it.code);
     return (
       // The tick means "saved as one of my configurations" — ticking creates
       // it, unticking removes it.
@@ -324,8 +334,8 @@ function LineItemPicker({
           gridTemplateColumns: "18px 34px minmax(0,1fr) 96px 58px 74px",
           gap: 8, alignItems: "center", textAlign: "left",
           padding: "6px 9px", borderRadius: 8, cursor: "pointer",
-          border: `1px solid ${checked ? "rgba(78,205,196,0.45)" : worsens ? "rgba(239,68,68,0.32)" : hovered ? `${color}55` : "transparent"}`,
-          background: checked ? "rgba(78,205,196,0.12)" : hovered ? `${color}18` : worsens ? "rgba(239,68,68,0.05)" : "rgba(255,255,255,0.02)",
+          border: `1px solid ${checked ? "rgba(78,205,196,0.45)" : worsens ? "rgba(239,68,68,0.32)" : isRec ? "rgba(150,215,76,0.4)" : hovered ? `${color}55` : "transparent"}`,
+          background: checked ? "rgba(78,205,196,0.12)" : hovered ? `${color}18` : worsens ? "rgba(239,68,68,0.06)" : isRec ? "rgba(150,215,76,0.07)" : "rgba(255,255,255,0.02)",
         }}
       >
         <span style={{
@@ -340,10 +350,14 @@ function LineItemPicker({
           <span style={{ fontSize: 11, color: hovered ? "#fff" : "rgba(255,255,255,0.7)", lineHeight: 1.25,
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.description}</span>
           <span style={{ display: "flex", gap: 3, overflow: "hidden", whiteSpace: "nowrap", alignItems: "center" }}>
-            {tags.map((t) => (
-              <span key={t} style={{ fontSize: 8.5, fontWeight: 800, color: "#96D74C", background: "rgba(150,215,76,0.14)",
-                border: "1px solid rgba(150,215,76,0.4)", borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>★ {t}</span>
-            ))}
+            {tags.map((t) => {
+              const bal = t === "Balanced";
+              const c = bal ? "#E9B949" : "#96D74C";
+              return (
+                <span key={t} style={{ fontSize: 8.5, fontWeight: 800, color: c, background: `${c}24`,
+                  border: `1px solid ${c}66`, borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>★ {t}</span>
+              );
+            })}
             {worsens && (
               <span style={{ fontSize: 8.5, fontWeight: 800, color: "#EF4444", background: "rgba(239,68,68,0.14)",
                 border: "1px solid rgba(239,68,68,0.4)", borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>▲ raises energy</span>
@@ -518,12 +532,20 @@ export default function RenovationSimulator() {
     : ["Walls", "Roof", "Windows"];
   const lineItems = useMemo(() => lineItemsFor(components), [components]);
 
-  /* Every building selected in Step 2 - not just the first one. */
+  /* Every building selected in Step 2 - not just the first one. For a bbox /
+     neighbourhood selection they are ordered by MCDA retrofit priority (energy +
+     façade condition + characteristics + potential) so EPSM runs — and results
+     list — the highest-priority buildings first. */
   const buildings = useMemo(() => {
     if (project.lookedUpBuildings.length > 0) return project.lookedUpBuildings;
     if (project.lookedUpBuilding) return [project.lookedUpBuilding];
-    return project.bboxRows;
-  }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows]);
+    const rows = project.bboxRows;
+    if (rows.length <= 1) return rows;
+    const keys = makeBuildingKeys(rows);
+    const items = rows.map((row, i) => ({ row, key: keys[i]!, label: row.address || `Building ${i + 1}` }));
+    const ranked = computePriorities(items, project.facadeDefects ?? {}, DEFAULT_WEIGHTS);
+    return ranked.map(r => r.row);
+  }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows, project.facadeDefects]);
 
   const geometries = useMemo(
     () => buildings.map((b) => resolveBuildingGeometry(b)).filter((g): g is ResolvedBuildingGeometry => g !== null),
@@ -550,7 +572,7 @@ export default function RenovationSimulator() {
   // U-value) is the honest way to design a retrofit; the catalogue is the "or
   // pick a ready-made assembly" fallback. Windows/doors can't be layer-composed,
   // so effectiveDraftMode below falls back to catalogue for them.
-  const [draftMode, setDraftMode] = useState<"layers" | "catalogue">("layers");
+  const [draftMode, setDraftMode] = useState<"layers" | "catalogue">("catalogue");
   const [draftLayers, setDraftLayers] = useState<AssemblyLayer[]>([]);
   const [draftName, setDraftName] = useState("");
   const [excludedCombos, setExcludedCombos] = useState<Set<string>>(new Set());
@@ -1030,6 +1052,49 @@ export default function RenovationSimulator() {
     return assessAgainstGoal(climateGoal, baselineAgg.avgTotalKwhM2Yr, rows);
   }, [climateGoal, baselineAgg?.avgTotalKwhM2Yr, packages, itemByCode]);
 
+  /* ── Regret / robustness decision analysis (Step 4 → Step 5 report) ──────────
+     Score each package + the do-nothing baseline by its 30-yr net benefit under
+     Low/Medium/High energy-price scenarios, then rank by minimax regret, range
+     and Hurwicz. Uncertain future prices → no single "best"; these rules help. */
+  const [regretAlpha, setRegretAlpha] = useState(0.5);
+  const [regretPrices, setRegretPrices] = useState<number[]>([0.5, 1.0, 2.0]); // SEK/kWh Low/Med/High
+  const totalFloorAreaM2 = useMemo(
+    () => geometries.reduce((a, g) => a + (g.footprintM2 ?? 0) * Math.max(1, Math.round((g.height ?? 3.2) / 3.2)), 0),
+    [geometries],
+  );
+  const regretOptions = useMemo<RegretOptionInput[]>(() => {
+    const base = baselineAgg?.avgTotalKwhM2Yr;
+    if (base == null) return [];
+    const opts: RegretOptionInput[] = [{ id: "baseline", label: "Keep as-built (do nothing)", energyKwhM2: base, investmentSek: 0, isBaseline: true }];
+    for (const p of packages) {
+      if (p.isBaseline) continue;
+      const agg = pkgAggregate(p);
+      if (agg.avgTotalKwhM2Yr == null) continue; // only options that have an energy result
+      opts.push({ id: p.id, label: p.name, energyKwhM2: agg.avgTotalKwhM2Yr, investmentSek: agg.totalCostSEK ?? 0 });
+    }
+    return opts;
+  }, [packages, baselineAgg?.avgTotalKwhM2Yr]);
+  const regretResult = useMemo(() => {
+    if (isUK || regretOptions.length < 2 || baselineAgg?.avgTotalKwhM2Yr == null || totalFloorAreaM2 <= 0) return null;
+    const scenarios = [
+      { key: "low", label: "Low", priceSek: regretPrices[0]! },
+      { key: "med", label: "Medium", priceSek: regretPrices[1]! },
+      { key: "high", label: "High", priceSek: regretPrices[2]! },
+    ];
+    const af = annuityFactor(assumptionValue("SE", "discount_rate") ?? 0.03, 30);
+    return computeRegret(regretOptions, scenarios,
+      { baselineEnergyKwhM2: baselineAgg.avgTotalKwhM2Yr, totalFloorAreaM2, annuityFactor: af }, regretAlpha, 30, "");
+  }, [isUK, regretOptions, baselineAgg?.avgTotalKwhM2Yr, totalFloorAreaM2, regretPrices, regretAlpha]);
+  // Persist to the store for the Step-5 report — only when the content changes.
+  const regretSigRef = useRef<string>("");
+  useEffect(() => {
+    if (!regretResult) return;
+    const sig = JSON.stringify(regretResult);
+    if (sig === regretSigRef.current) return;
+    regretSigRef.current = sig;
+    setProject({ regretAnalysis: { ...regretResult, generatedAt: new Date().toISOString() } });
+  }, [regretResult, setProject]);
+
   /* ── Multi-objective optimizer input (Sweden) ────────────────────────────
      Build the per-component option matrix + economy/climate params from the
      already-resolved geometry, cost, carbon and EPSM baseline. The optimizer
@@ -1205,7 +1270,7 @@ export default function RenovationSimulator() {
           {isUK
             ? "Pick a TABULA refurbishment tier and compare real EnergyPlus performance against the as-built baseline."
             : <>Design build-ups per component, combine them into packages, and simulate each in EnergyPlus against the as-built baseline
-               {geometries.length > 1 ? ` — across all ${geometries.length} buildings from Step 2.` : "."}</>}
+               {geometries.length > 1 ? ` — across all ${geometries.length} buildings from Step 2, ordered by their retrofit priority (highest first).` : "."}</>}
         </p>
       </div>
 
@@ -1213,6 +1278,16 @@ export default function RenovationSimulator() {
         <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
           <p style={{ fontSize: 12, color: "#F59E0B", margin: 0 }}>No buildings resolved yet — go back to Step 1/2 and select a location.</p>
         </div>
+      )}
+
+      {/* Renovation scope — add/remove components to test; nudges when the
+          climate target isn't reached by the current (envelope-subset) scope. */}
+      {!isUK && geometries.length > 0 && (
+        <ComponentScopePanel
+          components={components}
+          onChange={(next) => setProject({ renovationEnvelopeComponents: next })}
+          goalAssessment={goalAssessment}
+        />
       )}
 
       {geometries.length > 0 && (
@@ -1460,8 +1535,9 @@ export default function RenovationSimulator() {
                     {(() => {
                       const canLayers = !!kindForKey(activeItem.key);
                       const effective = draftMode === "layers" && !canLayers ? "catalogue" : draftMode;
-                      // Layers first — it's the primary way to design; catalogue is the fallback.
-                      return (["layers", "catalogue"] as const).map((m) => {
+                      // Catalogue first — pick a ready-made assembly to start, then
+                      // switch to Build-from-layers to compose one from real layers.
+                      return (["catalogue", "layers"] as const).map((m) => {
                         const disabled = m === "layers" && !canLayers;
                         const active = effective === m;
                         return (
@@ -1869,6 +1945,17 @@ export default function RenovationSimulator() {
 
           {/* City climate target — which package reaches Gothenburg's −30% by 2030 */}
           {goalAssessment && <ClimateGoalPanel a={goalAssessment} />}
+
+          {/* Regret / robustness decision analysis under uncertain energy prices */}
+          {regretResult && regretResult.options.length >= 2 && (
+            <DecisionAnalysisPanel
+              result={regretResult}
+              alpha={regretAlpha}
+              setAlpha={setRegretAlpha}
+              prices={regretPrices}
+              setPrices={setRegretPrices}
+            />
+          )}
 
         </>
       )}

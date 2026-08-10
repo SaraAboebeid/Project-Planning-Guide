@@ -166,6 +166,20 @@ export function normalizeWeights(w: CriterionWeights): CriterionWeights {
 
 export interface PriorityInput { key: string; label: string; row: BuildingRecord; }
 
+/** Stable per-building key (cadastral id, else normalised address, else index),
+ *  de-duplicated. MUST match the key the façade panel writes `facadeDefects` under
+ *  so the F criterion picks up each building's inspection. */
+export function makeBuildingKeys(rows: { address: string | null; cadastral_id?: string | null }[]): string[] {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const seen = new Set<string>();
+  return rows.map((b, i) => {
+    let key = (b.cadastral_id && b.cadastral_id.trim()) || norm(b.address ?? "") || `bldg-${i}`;
+    while (seen.has(key)) key = `${key}-${i}`;
+    seen.add(key);
+    return key;
+  });
+}
+
 export function computePriorities(
   items: PriorityInput[],
   facadeDefects: Record<string, FacadeDefectSummary>,

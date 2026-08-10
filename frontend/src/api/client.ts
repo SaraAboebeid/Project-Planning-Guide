@@ -45,6 +45,8 @@ export interface OptimizeCloudPoint { energy_kwh_m2_yr: number; total_cost: numb
 export interface OptimizeResponse {
   baseline: { energy_kwh_m2_yr: number; total_cost: number; total_carbon: number; htr_w_per_k: number };
   pareto: OptimizePoint[];
+  /** Every evaluated package with its selections (only for small runs); powers the "show all" view. */
+  all_points?: OptimizePoint[];
   cloud: OptimizeCloudPoint[];
   evaluated: number; unique_points: number; combinations_total: number; pareto_count: number; truncated: boolean;
   params_used: { annuity_factor: number; q_fixed_kwh_yr: number; study_period_yr: number };

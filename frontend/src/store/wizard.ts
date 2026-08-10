@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { RegretResult } from "../utils/regretAnalysis";
 import type { ProjectType, BuildingDevelopmentType } from "../config/projectConfig";
 import type { BuildingLookup, BboxStats, WWRRecord, BuildingRecord } from "../types";
 
@@ -190,6 +191,9 @@ interface ProjectState {
      Only a lightweight summary is persisted (images stay in-component memory to keep
      sessionStorage small). */
   facadeDefects: Record<string, FacadeDefectSummary>;
+  /* Step 4 — regret-based decision analysis (minimax regret / range / Hurwicz over
+     retrofit options under future energy-price scenarios); rendered in the Step 5 report. */
+  regretAnalysis: RegretResult | null;
 }
 
 export interface FacadeDefectSummary {
@@ -259,6 +263,7 @@ const DEFAULT_PROJECT: ProjectState = {
   renovationBaselineResults: [],
   renovationSimResults: [],
   facadeDefects: {},
+  regretAnalysis: null,
 };
 
 /* sessionStorage wrapper that never throws — if storage is disabled or over
