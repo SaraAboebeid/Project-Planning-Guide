@@ -3308,6 +3308,57 @@ async def recommend_retrofit_endpoint(address: str = Query(...), validate: bool 
     return await _recommend_retrofit_impl(address, validate)
 
 
+# ── SCB household economy — median disposable income per DeSO neighborhood ────
+# Tabular income (SCB statistikdatabasen table TAB6684) joined in the 3D viewer
+# to the DeSO zone geometry. Keyed by DeSO code (e.g. 0114A0010) so the viewer's
+# DeSO layer can colour each neighborhood. Cached in memory (data updates yearly).
+_SCB_INCOME_CACHE: dict = {}
+
+
+@app.get("/api/scb/deso-income")
+async def scb_deso_income(year: str = Query("2024")):
+    """Median equivalised disposable income (SEK thousands) per DeSO, from SCB
+    TAB6684. Returns {income_by_deso: {desokod: median_tkr}, min, max, ...}."""
+    if year in _SCB_INCOME_CACHE:
+        return _SCB_INCOME_CACHE[year]
+    import httpx
+    params = {
+        "lang": "en",
+        "valueCodes[ContentsCode]": "000008AB",   # Median value, SEK thousands
+        "valueCodes[Tid]": year,
+        "valueCodes[Region]": "*",
+        "outputFormat": "json-stat2",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=90) as client:
+            r = await client.get("https://api.scb.se/OV0104/v2beta/api/v2/tables/TAB6684/data", params=params)
+        r.raise_for_status()
+        js = r.json()
+    except Exception as exc:
+        raise HTTPException(502, f"SCB income API unavailable: {exc}")
+
+    index = (((js.get("dimension") or {}).get("Region") or {}).get("category") or {}).get("index") or {}
+    values = js.get("value") or []
+    out: dict[str, float] = {}
+    for code, pos in index.items():
+        if not code.endswith("_DeSO2025"):
+            continue  # recent years are reported on the 2025 DeSO vintage
+        v = values[pos] if isinstance(pos, int) and pos < len(values) else None
+        if v is None:
+            continue
+        out[code[:-len("_DeSO2025")]] = round(float(v), 1)
+    vals = list(out.values())
+    result = {
+        "indicator": "Median equivalised disposable income",
+        "source": "SCB · statistikdatabasen TAB6684 · CC0 1.0",
+        "year": year, "unit": "tkr (SEK thousands / yr)", "count": len(out),
+        "min": min(vals) if vals else None, "max": max(vals) if vals else None,
+        "income_by_deso": out,
+    }
+    _SCB_INCOME_CACHE[year] = result
+    return result
+
+
 # ── Home-page chatbot (bilingual EN/SV, grounded in the real building data) ──
 #
 # Claude answers questions about the Gothenburg building/EPC dataset using the

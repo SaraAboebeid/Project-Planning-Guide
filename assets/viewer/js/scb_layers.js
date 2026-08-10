@@ -39,6 +39,40 @@
     return HEAT[6];
   }
 
+  // ── Household economy: median income per DeSO (from /api/scb/deso-income) ──────
+  let _incomeData = null;   // { desokod: median income, tkr/yr }
+  let _incomeMeta = null;   // { min, max, year }
+  async function _ensureIncome() {
+    if (_incomeData) return;
+    try {
+      const r = await fetch('/api/scb/deso-income?year=2024');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      _incomeData = j.income_by_deso || {};
+      _incomeMeta = { min: j.min, max: j.max, year: j.year };
+    } catch (e) {
+      console.error('[SCB income]', e);
+      _incomeData = {}; _incomeMeta = { min: 0, max: 1 };
+    }
+  }
+  // RdYlGn: low income red → mid yellow → high income green.
+  const _INC_STOPS = [[0, [215, 48, 39]], [0.5, [254, 224, 139]], [1, [26, 152, 80]]];
+  function _incomeColor(v) {
+    const lo = (_incomeMeta && _incomeMeta.min) || 100;
+    const hi = (_incomeMeta && _incomeMeta.max) || 500;
+    let t = (v - lo) / ((hi - lo) || 1); t = Math.max(0, Math.min(1, t));
+    let rgb = _INC_STOPS[_INC_STOPS.length - 1][1];
+    for (let i = 1; i < _INC_STOPS.length; i++) {
+      if (t <= _INC_STOPS[i][0]) {
+        const a = _INC_STOPS[i - 1], b = _INC_STOPS[i];
+        const f = (t - a[0]) / ((b[0] - a[0]) || 1);
+        rgb = [0, 1, 2].map(k => Math.round(a[1][k] + (b[1][k] - a[1][k]) * f));
+        break;
+      }
+    }
+    return col(rgb[0], rgb[1], rgb[2], 175);
+  }
+
   // ── Layer group definitions ───────────────────────────────────────────────────
   const GROUPS = [
     {
@@ -60,6 +94,22 @@
           + `Total: <b>${c(p.beftotalt).toLocaleString()}</b>`
           + `&nbsp;&nbsp;👨 ${c(p.man).toLocaleString()} 👩 ${c(p.kvinna).toLocaleString()}<br>`
           + `Age 0–14: ${a0} &nbsp; 15–64: ${a15} &nbsp; 65+: ${a65}`;
+      },
+    },
+    {
+      id:     'income',
+      label:  'Household Income',
+      icon:   '💰',
+      pill:   'DeSO · median',
+      desc:   'Median equivalised disposable household income per DeSO neighbourhood (SEK thousands/yr, 2024). Red = lower, green = higher. From SCB statistikdatabasen (TAB6684).',
+      source: 'SCB – Statistics Sweden · CC0 1.0',
+      years:  [''],
+      tn:     () => 'stat:DeSO_2025',
+      style:  'income',
+      tip(p) {
+        const v = _incomeData && _incomeData[p.desokod];
+        return `<b>DeSO ${p.desokod || ''}</b><br>`
+          + (v != null ? `Median income: <b>${Math.round(v)}</b> tkr/yr` : 'No income data for this area');
       },
     },
     {
@@ -264,6 +314,17 @@
     for (const e of ds.entities.values) {
       _entMap.set(e, g.id);
 
+      if (g.style === 'income') {
+        if (!e.polygon) continue;
+        let deso = null;
+        try { deso = e.properties.desokod.getValue(); } catch (_) {}
+        const v = (deso && _incomeData) ? _incomeData[deso] : null;
+        e.polygon.material           = (v != null) ? _incomeColor(v) : col(255, 255, 255, 8);
+        e.polygon.outline            = false;
+        e.polygon.heightReference    = Cesium.HeightReference.CLAMP_TO_GROUND;
+        e.polygon.classificationType = Cesium.ClassificationType.BOTH;   // drapes on photorealistic 3D tiles
+        continue;
+      }
       if (g.style === 'heatmap') {
         if (!e.polygon) continue;
         const bef = (() => {
@@ -293,13 +354,15 @@
 
   // ── Load and cache a WFS layer ────────────────────────────────────────────────
   async function loadLayer(typeName, g) {
-    if (_cache[typeName]) {
-      if (!viewer.dataSources.contains(_cache[typeName]))
-        await viewer.dataSources.add(_cache[typeName]);
+    const key = g.id + '::' + typeName;   // group-scoped so the DeSO geometry can back both 'deso' zones and 'income'
+    if (_cache[key]) {
+      if (!viewer.dataSources.contains(_cache[key]))
+        await viewer.dataSources.add(_cache[key]);
       return;
     }
-    _cache[typeName] = null;   // loading sentinel
+    _cache[key] = null;   // loading sentinel
     setStatus(g.id, '⏳ Loading…');
+    if (g.style === 'income') await _ensureIncome();   // per-DeSO income before styling
 
     let ds;
     try {
@@ -310,21 +373,23 @@
       });
     } catch (err) {
       console.error('[SCB] Failed to load', typeName, err);
-      delete _cache[typeName];
+      delete _cache[key];
       setStatus(g.id, '⚠ Load failed');
       return;
     }
 
-    ds.name = 'scb::' + typeName;
+    ds.name = 'scb::' + key;
     applyStyle(ds, g);
-    _cache[typeName] = ds;
+    _cache[key] = ds;
     await viewer.dataSources.add(ds);
-    setStatus(g.id, '');
+    setStatus(g.id, (g.style === 'income' && _incomeMeta)
+      ? `Median income ${Math.round(_incomeMeta.min)}–${Math.round(_incomeMeta.max)} tkr · red→green`
+      : '');
   }
 
   // ── Hide a layer (keep in cache for re-use) ───────────────────────────────────
-  function hideLayer(typeName) {
-    const ds = _cache[typeName];
+  function hideLayer(typeName, g) {
+    const ds = _cache[(g ? g.id + '::' : '') + typeName];
     if (ds && viewer.dataSources.contains(ds))
       viewer.dataSources.remove(ds, false);   // false = keep in memory
   }
@@ -347,7 +412,7 @@
       if (window.ensureFlatBasemap) window.ensureFlatBasemap();
       if (window.viewTopDown) window.viewTopDown();
       await loadLayer(g.tn(s.year), g);
-    } else hideLayer(g.tn(s.year));
+    } else hideLayer(g.tn(s.year), g);
   }
 
   // ── Switch to a different year ────────────────────────────────────────────────
@@ -357,7 +422,7 @@
     const oldTn = g.tn(s.year);
     s.year = year;
     if (s.active) {
-      hideLayer(oldTn);
+      hideLayer(oldTn, g);
       await loadLayer(g.tn(year), g);
     }
   }
