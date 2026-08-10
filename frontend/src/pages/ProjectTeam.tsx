@@ -19,7 +19,7 @@ const TEAM: Member[] = [
     name: "Sara Abouebeid",
     role: "Lead Developer",
     roleColor: "#4ECDC4",
-    bio: "Leads the design and development of the platform — the data pipelines, the building-energy analysis engine, the 3D digital-twin viewer and the planning wizard that ties them together. Responsible for turning the research models into a working, end-to-end tool.",
+    bio: "Leads the design and development of the platform — the data pipelines, the building-energy analysis engine, the 3D viewer and the planning wizard that ties them together. Responsible for turning the research models into a working, end-to-end tool.",
     link: { href: "mailto:saraabo@chalmers.se", label: "saraabo@chalmers.se", kind: "email" },
   },
   {
@@ -33,7 +33,7 @@ const TEAM: Member[] = [
     name: "Liane Thuvander",
     role: "Project Lead",
     roleColor: "#B98BE8",
-    bio: "Project lead, guiding the methodology and the link between the digital-twin approach and real renovation and energy-district decision-making. Anchors the platform in applied research on the existing building stock.",
+    bio: "Project lead, guiding the methodology and the link between the 3D viewer approach and real renovation and energy-district decision-making. Anchors the platform in applied research on the existing building stock.",
     link: { href: "mailto:liane.thuvander@chalmers.se", label: "liane.thuvander@chalmers.se", kind: "email" },
   },
   {
@@ -119,7 +119,7 @@ export default function ProjectTeam() {
         </div>
         <h1 style={{ fontSize: 26, fontWeight: 800, color: "#f0f4ff", margin: 0, lineHeight: 1.2 }}>Project Team</h1>
         <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", marginTop: 8, lineHeight: 1.6 }}>
-          The team behind the platform — research leadership, development and business development working together to bring the digital twin from research into practice.
+          The team behind the platform — research leadership, development and business development working together to bring the toolbox from research into practice.
         </p>
       </div>
 

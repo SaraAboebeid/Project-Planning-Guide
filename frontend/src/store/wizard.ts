@@ -186,6 +186,17 @@ interface ProjectState {
   renovationBaselineResults: RenovationBaselineResult[];
   /* Step 4 Renovation — saved package simulation results */
   renovationSimResults: RenovationPackageResult[];
+  /* Step 2 — ML facade defect detection summary per building (address / cadastral id).
+     Only a lightweight summary is persisted (images stay in-component memory to keep
+     sessionStorage small). */
+  facadeDefects: Record<string, FacadeDefectSummary>;
+}
+
+export interface FacadeDefectSummary {
+  imageCount: number;
+  defectCount: number;
+  byClass: Record<string, number>;   // e.g. { crack: 3, corrosion: 1 }
+  checkedAt: string;                  // ISO timestamp
 }
 
 interface WizardState {
@@ -247,6 +258,7 @@ const DEFAULT_PROJECT: ProjectState = {
   baselineStatus: "idle",
   renovationBaselineResults: [],
   renovationSimResults: [],
+  facadeDefects: {},
 };
 
 /* sessionStorage wrapper that never throws — if storage is disabled or over

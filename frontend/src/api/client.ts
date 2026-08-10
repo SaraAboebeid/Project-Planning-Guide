@@ -194,4 +194,31 @@ export const api = {
         error: string | null;
       }>;
     }>(`/simulation-batch-status/${batchId}`),
+
+  /* ── Facade defect detection (ML) — POST raw image bytes to the on-host model ── */
+  facadeDetect: async (blob: Blob, threshold = 0.5): Promise<FacadeDetectResponse> => {
+    const res = await fetch(`${BASE}/facade-detect?threshold=${threshold}`, { method: "POST", body: blob });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.detail || d.error) {
+      throw new Error(d.detail || d.error || `Facade model error (${res.status})`);
+    }
+    return d as FacadeDetectResponse;
+  },
+
+  /* ── Facade defect second opinion — general vision-language model (GPT-4o/Claude) ── */
+  facadeVision: async (blob: Blob, threshold = 0.3): Promise<FacadeDetectResponse> => {
+    const res = await fetch(`${BASE}/facade-vision?threshold=${threshold}`, { method: "POST", body: blob });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.detail) throw new Error(d.detail || `Vision model error (${res.status})`);
+    return d as FacadeDetectResponse;
+  },
 };
+
+export interface FacadeDetection {
+  label: string; score: number; box: [number, number, number, number];
+  source?: "ml" | "ai"; note?: string;
+}
+export interface FacadeDetectResponse {
+  detections: FacadeDetection[]; width: number; height: number;
+  model?: string | null; normalized?: boolean;
+}

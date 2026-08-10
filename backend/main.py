@@ -4091,6 +4091,129 @@ async def facade_detect(request: Request, threshold: float = 0.5):
                                  f"`python tools/ml/facade_detect_service.py`. ({type(e).__name__})")
 
 
+_VISION_DEFECT_CLASSES = ("crack", "leakage", "abscission", "corrosion", "bulge")
+
+
+@app.post("/api/facade-vision")
+async def facade_vision(request: Request, threshold: float = 0.3):
+    """Second-opinion facade defect detection using a general vision-language model
+    (GPT-4o / Claude) to catch defects the specialised MBDD2025 detector may miss.
+
+    Returns `{detections:[{box,label,score,source,note}], normalized:true, model}`
+    where boxes are NORMALISED 0-1 (top-left origin). The frontend scales them into
+    the ML detector's pixel space (it already knows the image dimensions) and merges
+    the two, so the backend needs no image-decoding dependency."""
+    import base64, re as _re, httpx  # noqa: F401
+
+    body = await request.body()
+    if not body:
+        raise HTTPException(400, "Empty image body")
+
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not anthropic_key and not openai_key:
+        return {"detections": [], "normalized": True, "model": None,
+                "message": "No vision API key configured (set OPENAI_API_KEY or ANTHROPIC_API_KEY)."}
+
+    b64 = base64.b64encode(body).decode()
+    prompt = (
+        "You are a building-facade condition inspector. Examine this facade photograph and "
+        "identify visible DEFECTS, acting as a second opinion to a specialised detector.\n"
+        "Defect types:\n"
+        "- crack: cracks/fractures in render, masonry or concrete\n"
+        "- leakage: water staining, damp patches, efflorescence, streaking, biological growth\n"
+        "- abscission: spalling, flaking, delamination, missing render/plaster/tiles/brick\n"
+        "- corrosion: rust stains, corroded metal, exposed/corroding rebar\n"
+        "- bulge: bulging, deformation, detachment of the facade surface\n\n"
+        "Return ONLY a JSON object, no prose:\n"
+        '{"defects":[{"label":"crack|leakage|abscission|corrosion|bulge",'
+        '"box":[x0,y0,x1,y1],"confidence":0.0-1.0,"note":"few words"}]}\n'
+        "box coordinates are NORMALISED 0-1 with a top-left origin (x0,y0 = top-left, "
+        "x1,y1 = bottom-right) and must tightly bound each defect. Report only genuine, "
+        "clearly visible defects; if there are none return {\"defects\":[]}."
+    )
+
+    content_text: Optional[str] = None
+    model_used: Optional[str] = None
+
+    if anthropic_key:
+        try:
+            payload = {
+                "model": "claude-sonnet-4-5", "max_tokens": 900,
+                "messages": [{"role": "user", "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
+                    {"type": "text", "text": prompt},
+                ]}],
+            }
+            async with httpx.AsyncClient(timeout=45) as client:
+                r = await client.post("https://api.anthropic.com/v1/messages",
+                    headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01",
+                             "content-type": "application/json"}, json=payload)
+                r.raise_for_status()
+                content_text = r.json()["content"][0]["text"].strip()
+                model_used = "claude-sonnet-4-5-vision"
+        except Exception as exc:  # noqa: BLE001
+            print(f"[facade-vision] Anthropic call failed: {exc}")
+
+    if content_text is None and openai_key:
+        try:
+            payload = {
+                "model": "gpt-4o", "max_tokens": 900,
+                "messages": [{"role": "user", "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}},
+                ]}],
+            }
+            async with httpx.AsyncClient(timeout=45) as client:
+                r = await client.post("https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {openai_key}"}, json=payload)
+                r.raise_for_status()
+                content_text = r.json()["choices"][0]["message"]["content"].strip()
+                model_used = "gpt-4o-vision"
+        except Exception as exc:  # noqa: BLE001
+            print(f"[facade-vision] OpenAI call failed: {exc}")
+
+    detections: list[dict] = []
+    if content_text:
+        m = _re.search(r'\{.*\}', content_text, _re.DOTALL)
+        if m:
+            try:
+                for d in (json.loads(m.group()).get("defects") or []):
+                    try:
+                        conf = float(d.get("confidence", 0.5))
+                        if conf < threshold:
+                            continue
+                        box = d.get("box") or []
+                        if len(box) != 4:
+                            continue
+                        x0, y0, x1, y1 = (float(v) for v in box)
+                        # Coerce whatever scale the model used to normalised 0-1:
+                        # 0-1 already, 0-100, or 0-1000 are all common.
+                        mx = max(abs(x0), abs(y0), abs(x1), abs(y1))
+                        div = 1.0
+                        if mx > 1.5:
+                            div = 100.0 if mx <= 100 else (1000.0 if mx <= 1000 else mx)
+                        clamp = lambda v: max(0.0, min(1.0, v / div))
+                        xa, xb = sorted((clamp(x0), clamp(x1)))
+                        ya, yb = sorted((clamp(y0), clamp(y1)))
+                        if xb - xa < 0.005 or yb - ya < 0.005:   # drop degenerate boxes
+                            continue
+                        label = str(d.get("label", "other")).lower().strip()
+                        if label not in _VISION_DEFECT_CLASSES:
+                            label = "other"
+                        detections.append({
+                            "label": label, "score": round(conf, 3),
+                            "box": [round(xa, 4), round(ya, 4), round(xb, 4), round(yb, 4)],
+                            "source": "ai", "note": str(d.get("note", ""))[:80],
+                        })
+                    except (TypeError, ValueError):
+                        continue
+            except json.JSONDecodeError:
+                pass
+
+    return {"detections": detections, "normalized": True, "model": model_used}
+
+
 # ── Environmental analysis: outdoor thermal comfort (UTCI + solar MRT) ─────────
 # MIT clean-room + the MIT-licensed pythermalcomfort library (no Ladybug code).
 class ThermalComfortRequest(BaseModel):
