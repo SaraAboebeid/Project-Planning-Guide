@@ -734,7 +734,13 @@ export default function RenovationSimulator() {
 
   /* ── derived: items/areas/recommendations for the active line item (Sweden only) ── */
   const activeItem = lineItems.find((li) => li.key === activeItemKey) ?? lineItems[0];
-  const activeCatalogue = activeItem ? itemsForLineItem(activeItem) : [];
+  // Supplier discount the owner gets off catalogue material prices — deducted from
+  // every material cost downstream (picker display, saved configs, packages, optimizer)
+  // because we discount the catalogue at the source here.
+  const discountMul = 1 - Math.min(90, Math.max(0, project.supplierDiscountPct || 0)) / 100;
+  const discountItems = (items: WikellsItem[]) =>
+    project.supplierDiscountPct ? items.map((it) => ({ ...it, costSEK: it.costSEK != null ? it.costSEK * discountMul : it.costSEK })) : items;
+  const activeCatalogue = activeItem ? discountItems(itemsForLineItem(activeItem)) : [];
   const activeBoverket = activeItem ? (boverketByComponent[activeItem.boverketComponent] ?? []) : [];
   const activeRecommendations = useMemo(
     () => (activeItem ? recommendationsForLineItem(activeCatalogue, activeBoverket, project.selectedKpis, baselineUForKey(activeItem.key)) : {}),
@@ -743,9 +749,11 @@ export default function RenovationSimulator() {
   const activeQuantity = activeItem && geometries[0] ? computeAreaForLineItem(activeItem, geometries[0], wwrByIndex[0] ?? null, manualOverrides) : null;
 
   const itemByCode = useMemo(() => {
-    const all = lineItems.flatMap((li) => itemsForLineItem(li));
+    const mul = 1 - Math.min(90, Math.max(0, project.supplierDiscountPct || 0)) / 100;
+    const all = lineItems.flatMap((li) =>
+      itemsForLineItem(li).map((it) => ({ ...it, costSEK: it.costSEK != null ? it.costSEK * mul : it.costSEK })));
     return Object.fromEntries(all.map((i) => [i.code, i]));
-  }, [lineItems]);
+  }, [lineItems, project.supplierDiscountPct]);
 
   const boverketAll = useMemo(() => Object.values(boverketByComponent).flat(), [boverketByComponent]);
 
@@ -1295,6 +1303,36 @@ export default function RenovationSimulator() {
               ? configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" · ")
               : "save one or more build-ups per component"}
             state={configs.length ? "done" : "active"} />
+
+          {/* Supplier discount — the % the property owner gets off catalogue material
+              prices; deducted from every material cost (Wikells is Sweden-only). */}
+          {!isUK && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "0 0 14px",
+              padding: "11px 14px", borderRadius: 10, background: "rgba(150,215,76,0.07)", border: "1px solid rgba(150,215,76,0.22)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#f0f4ff" }}>Supplier discount</span>
+                <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)" }}>
+                  If the owner has a supplier discount, enter it — it's deducted from every catalogue material price (cost only; carbon unaffected).
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                <input
+                  type="number" min={0} max={90} step={1}
+                  value={project.supplierDiscountPct || 0}
+                  onChange={(e) => setProject({ supplierDiscountPct: Math.min(90, Math.max(0, Number(e.target.value) || 0)) })}
+                  style={{ width: 72, padding: "6px 8px", borderRadius: 8, textAlign: "right",
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: 13, fontWeight: 700 }}
+                />
+                <span style={{ fontSize: 14, fontWeight: 800, color: "#96D74C" }}>%</span>
+              </div>
+              {(project.supplierDiscountPct || 0) > 0 && (
+                <span style={{ fontSize: 10.5, color: "#96D74C", fontWeight: 700, width: "100%" }}>
+                  ✓ Material prices are net of −{project.supplierDiscountPct}%. Re-pick materials / rebuild packages to apply it to existing ones.
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Component tabs + material picker (quantities shown are for building 1; each
               building's own quantity is computed at submission time from its own geometry) */}
           <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }}>

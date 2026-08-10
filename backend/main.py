@@ -3122,6 +3122,192 @@ async def optimize_renovation(req: OptimizeRequest):
     }
 
 
+# ── Agentic retrofit recommender ─────────────────────────────────────────────
+# One question in ("best retrofit for <address>"), one answer out: resolve the
+# building, assemble the SAME optimizer inputs the wizard builds (component areas,
+# TABULA baseline U, EPC baseline energy, Wikells cost catalogue), run the
+# degree-day optimizer, return three picks (cheapest / lowest-energy / best
+# cost-energy balance), and validate the top pick in EnergyPlus (EPSM).
+_WIKELLS_CAT_CACHE: Optional[dict] = None
+
+
+def _wikells_catalogue() -> dict:
+    global _WIKELLS_CAT_CACHE
+    if _WIKELLS_CAT_CACHE is None:
+        p = PROJECT_ROOT / "data" / "wikells_catalogue.json"
+        try:
+            _WIKELLS_CAT_CACHE = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            _WIKELLS_CAT_CACHE = {}
+    return _WIKELLS_CAT_CACHE
+
+
+def _resolve_building_by_address(query: str) -> Optional[dict]:
+    q = (query or "").strip().lower()
+    if not q:
+        return None
+    best, best_score = None, -1
+    for b in _get_buildings_list():
+        addrs = (b.get("all_addresses") or b.get("address") or "")
+        if q in addrs.lower():
+            score = (2 if b.get("energy") else 0) + (1 if b.get("coordinates") else 0)
+            if score > best_score:
+                best, best_score = b, score
+    return best
+
+
+async def _epsm_validate_once(lat: float, lon: float, address: str, u_over: dict) -> Optional[float]:
+    """Run ONE building through EPSM with the given per-component U-overrides;
+    return its total kWh/m²·yr, or None if EPSM is unavailable/failed."""
+    import anyio
+    try:
+        req = SimulationBatchSubmitRequest(
+            country="se",
+            buildings=[BatchBuildingSpec(lat=lat, lon=lon, address=address)],
+            package_id="recommend",
+            u_wall_override=u_over.get("Walls"),
+            u_roof_override=u_over.get("Roof"),
+            u_win_override=u_over.get("Windows"),
+            u_floor_override=u_over.get("Floor"),
+        )
+        r = await submit_simulation_batch(req)
+        bid = r.get("batch_id")
+        if not bid:
+            return None
+        for _ in range(45):
+            s = await simulation_batch_status(bid)
+            if s.get("overall_status") in ("completed", "failed"):
+                for bb in s.get("buildings", []):
+                    res = bb.get("results") or {}
+                    if res.get("total_kwh_m2_yr") is not None:
+                        return float(res["total_kwh_m2_yr"])
+                return None
+            await anyio.sleep(2)
+    except Exception:
+        return None
+    return None
+
+
+async def _recommend_retrofit_impl(address: str, validate_epsm: bool = True) -> dict:
+    from tools.idf import defaults as _D
+    b = _resolve_building_by_address(address)
+    if not b:
+        return {"error": f"No Gothenburg building found matching address '{address}'."}
+    coords = b.get("coordinates") or []
+    if not coords:
+        return {"error": f"Building '{address}' has no geometry to analyse."}
+    c_lat, c_lon = _polygon_centroid(coords)
+    footprint = b.get("footprint_m2") or _shoelace_m2(coords) or 0.0
+    perimeter = _ring_perimeter_m(coords) or 0.0
+    floors = b.get("floors") or 0
+    height = b.get("height") or (floors * 3 if floors else 9)
+    if not floors:
+        floors = max(1, round(height / 3))
+    wall_gross = (perimeter * height) if (perimeter and height) else footprint * 0.6
+    WWR = 0.20
+    areas = {
+        "Walls":   max(1.0, wall_gross * (1 - WWR)),
+        "Windows": max(1.0, wall_gross * WWR),
+        "Roof":    max(1.0, footprint),
+        "Floor":   max(1.0, footprint),
+    }
+    heated_floor = b.get("area") or (footprint * floors) or footprint or 1.0
+    period = b.get("tabula_period") or _period_from_year(b.get("year"))
+    d_wall, d_win = _derive_u_values(b.get("use_cat"), period)
+    base_u = {
+        "Walls":   b.get("tabula_u_wall") or d_wall or _D.DEFAULT_U_WALL,
+        "Windows": b.get("tabula_u_win") or d_win or _D.DEFAULT_U_WIN,
+        "Roof":    b.get("tabula_u_roof") or _D.DEFAULT_U_ROOF,
+        "Floor":   _D.DEFAULT_U_FLOOR,
+    }
+    baseline_energy = b.get("energy")
+    baseline_source = "EPC (energideklaration)"
+    if not baseline_energy or baseline_energy <= 0:
+        baseline_energy = await _epsm_validate_once(c_lat, c_lon, b.get("address") or address, {})
+        baseline_source = "EPSM baseline run"
+    if not baseline_energy or baseline_energy <= 0:
+        return {"error": f"Could not establish a baseline energy for '{address}'."}
+    baseline_energy = float(baseline_energy)
+
+    cat = _wikells_catalogue()
+    components = []
+    for comp in ("Walls", "Roof", "Windows", "Floor"):
+        opts = []
+        for it in cat.get(comp, []):
+            if it["u_value"] > base_u[comp]:
+                continue  # only options that actually IMPROVE the component
+            opts.append(OptimizeOption(code=f"{comp}:{it['code']}", label=it["description"][:60],
+                                       u_value=it["u_value"], cost=round(it["cost_sek_m2"] * areas[comp]), carbon=0.0))
+        if opts:
+            components.append(OptimizeComponent(key=comp, area_m2=round(areas[comp]),
+                                                baseline_u=float(base_u[comp]), options=opts))
+    if not components:
+        return {"error": f"'{address}' already meets or beats the catalogue U-values on every component."}
+
+    params = OptimizeParams(f_dh=24 * 3300 / 1000, energy_price=0.8, carbon_factor_heat=0.022,
+                            discount_rate=0.03, study_period_yr=30,
+                            floor_area_m2=round(heated_floor, 1), baseline_total_kwh_m2_yr=round(baseline_energy, 1))
+    opt = await optimize_renovation(OptimizeRequest(components=components, params=params, max_results=40))
+    front = opt.get("pareto") or []
+    if not front:
+        return {"error": "Optimizer returned no packages for this building."}
+
+    def describe(pt: dict) -> dict:
+        measures = []
+        for comp, val in pt.get("selections", {}).items():
+            if not val or val.endswith("__keep__"):
+                continue
+            code = val.split(":", 1)[-1]
+            it = next((x for x in cat.get(comp, []) if x["code"] == code), None)
+            if it:
+                measures.append({"component": comp, "material": it["description"], "u_value": it["u_value"]})
+        red = round((baseline_energy - pt["energy_kwh_m2_yr"]) / baseline_energy * 100)
+        return {"measures": measures, "energy_kwh_m2_yr": pt["energy_kwh_m2_yr"],
+                "energy_reduction_pct": red, "life_cycle_cost_sek": pt["total_cost"],
+                "upfront_cost_sek": pt["initial_cost"]}
+
+    improving = [z for z in front if z["energy_kwh_m2_yr"] < baseline_energy - 0.5]
+    pool = improving or front
+    eff = lambda z: (baseline_energy - z["energy_kwh_m2_yr"]) / max(1, z["initial_cost"])
+    cheapest = min(pool, key=lambda z: z["total_cost"])
+    lowest_energy = min(front, key=lambda z: z["energy_kwh_m2_yr"])
+    balanced = max(pool, key=eff)
+
+    result = {
+        "address": b.get("address"), "all_addresses": b.get("all_addresses"),
+        "baseline_energy_kwh_m2_yr": round(baseline_energy, 1), "baseline_source": baseline_source,
+        "building": {"year": b.get("year"), "use": b.get("use_cat"), "floors": floors,
+                     "heated_area_m2": round(heated_floor), "wall_area_m2": round(areas["Walls"]),
+                     "roof_area_m2": round(areas["Roof"])},
+        "objective": "cost + energy",
+        "options": {"cheapest": describe(cheapest), "lowest_energy": describe(lowest_energy),
+                    "best_balance": describe(balanced)},
+        "note": "Energy/cost are degree-day optimizer estimates; the best-balance pick is validated in EnergyPlus (EPSM).",
+    }
+
+    if validate_epsm:
+        u_over = {}
+        for comp, val in balanced.get("selections", {}).items():
+            if not val or val.endswith("__keep__"):
+                continue
+            it = next((x for x in cat.get(comp, []) if x["code"] == val.split(":", 1)[-1]), None)
+            if it:
+                u_over[comp] = it["u_value"]
+        epsm_energy = await _epsm_validate_once(c_lat, c_lon, b.get("address") or address, u_over)
+        if epsm_energy is not None:
+            result["options"]["best_balance"]["epsm_validated_kwh_m2_yr"] = round(epsm_energy, 1)
+            result["options"]["best_balance"]["epsm_reduction_pct"] = round((baseline_energy - epsm_energy) / baseline_energy * 100)
+    return result
+
+
+@app.get("/api/recommend-retrofit")
+async def recommend_retrofit_endpoint(address: str = Query(...), validate: bool = Query(True)):
+    """Agentic 'best retrofit package for <address>' — resolves the building,
+    runs the optimizer over the Wikells catalogue, returns 3 options, validates
+    the balanced pick in EPSM. Sweden/Gothenburg only (cost data is Wikells)."""
+    return await _recommend_retrofit_impl(address, validate)
+
+
 # ── Home-page chatbot (bilingual EN/SV, grounded in the real building data) ──
 #
 # Claude answers questions about the Gothenburg building/EPC dataset using the
@@ -3291,6 +3477,155 @@ def _chat_tool_search_epc_fields(args: dict) -> dict:
     return {"keyword": kw, "total_epc_records": rows, "matched_columns": out}
 
 
+def _chat_median(xs):
+    xs = sorted(x for x in xs if x is not None)
+    if not xs:
+        return None
+    n = len(xs); m = n // 2
+    return xs[m] if n % 2 else round((xs[m - 1] + xs[m]) / 2)
+
+
+def _addr_building(a: str) -> str:
+    """Collapse an address to its street + house number (drop the entrance letter),
+    so 'Stockholmsgatan 40R' and 'Stockholmsgatan 40B' count as one building."""
+    import re
+    a = (a or "").strip().lower()
+    mt = re.match(r"^(.*?\d+)", a)
+    return mt.group(1).strip() if mt else a
+
+
+def _chat_tool_booli_sales(args: dict) -> dict:
+    """Booli housing SALES market (for-sale / sold / upcoming) for Gothenburg."""
+    import sqlite3
+    path = PROJECT_ROOT / "booli_listings.db"
+    if not path.exists():
+        return {"error": "Booli sales data is not available in this deployment."}
+    area = (args.get("area") or "").strip().lower()
+    con = sqlite3.connect(str(path)); con.row_factory = sqlite3.Row
+    try:
+        rows = con.execute("SELECT * FROM listings").fetchall()
+    finally:
+        con.close()
+    if area:
+        rows = [r for r in rows if area in ((r["area_name"] or "").lower())]
+    if not rows:
+        return {"source": "Booli housing sales (Gothenburg)", "area_filter": area or None,
+                "total_listings": 0,
+                "note": (f"No Booli listings match area '{area}'." if area else "No Booli listings.")}
+    col = lambda k: [r[k] for r in rows if r[k] is not None]
+    status = {}
+    for r in rows:
+        status[r["status"]] = status.get(r["status"], 0) + 1
+    areas: dict = {}
+    for r in rows:
+        areas[r["area_name"] or "?"] = areas.get(r["area_name"] or "?", 0) + 1
+    sold_prices = col("sold_price"); list_prices = col("list_price"); sqm = col("sqm_price")
+    dates = [r["sold_date"] for r in rows if r["sold_date"]]
+    avg = lambda xs: round(sum(xs) / len(xs)) if xs else None
+    return {
+        "source": "Booli — housing FOR-SALE / SOLD / UPCOMING listings in Gothenburg (weekly scrape)",
+        "area_filter": area or None,
+        "total_listings": len(rows),
+        "distinct_buildings": len({_addr_building(r["address"]) for r in rows}),
+        "distinct_addresses": len({(r["address"] or "").strip().lower() for r in rows}),
+        "status_breakdown": status,
+        "sold_count": len(sold_prices),
+        "avg_sold_price_sek": avg(sold_prices), "median_sold_price_sek": _chat_median(sold_prices),
+        "avg_list_price_sek": avg(list_prices),
+        "avg_price_per_m2_sek": avg(sqm),
+        "avg_living_area_m2": round(sum(col("living_area_m2")) / len(col("living_area_m2")), 1) if col("living_area_m2") else None,
+        "sold_date_range": [min(dates), max(dates)] if dates else None,
+        "top_areas": sorted(areas.items(), key=lambda x: -x[1])[:8],
+        "note": "Each listing is one apartment/property; distinct_buildings = unique street+number addresses.",
+    }
+
+
+def _chat_tool_boplats_rentals(args: dict) -> dict:
+    """Boplats first-hand RENTAL market (Gothenburg municipal queue)."""
+    import sqlite3
+    path = PROJECT_ROOT / "boplats_apartments.db"
+    if not path.exists():
+        return {"error": "Boplats rental data is not available in this deployment."}
+    area = (args.get("area") or "").strip().lower()
+    con = sqlite3.connect(str(path)); con.row_factory = sqlite3.Row
+    try:
+        rows = con.execute("SELECT * FROM apartments").fetchall()
+    finally:
+        con.close()
+    if area:
+        rows = [r for r in rows if area in ((r["area_name"] or "").lower()) or area in ((r["address"] or "").lower())]
+    if not rows:
+        return {"source": "Boplats rentals (Gothenburg)", "area_filter": area or None, "total_listings": 0,
+                "note": (f"No Boplats listings match '{area}'." if area else "No Boplats listings.")}
+    col = lambda k: [r[k] for r in rows if r[k] is not None]
+    rents = col("rent_sek"); sizes = col("size_m2")
+    rpm = [r["rent_sek"] / r["size_m2"] for r in rows if r["rent_sek"] and r["size_m2"]]
+    rooms: dict = {}
+    for r in rows:
+        rooms[r["rooms"]] = rooms.get(r["rooms"], 0) + 1
+    avg = lambda xs: round(sum(xs) / len(xs)) if xs else None
+    return {
+        "source": "Boplats — first-hand RENTAL listings in Gothenburg (daily scrape)",
+        "area_filter": area or None,
+        "total_listings": len(rows),
+        "distinct_addresses": len({(r["address"] or "").strip().lower() for r in rows}),
+        "avg_rent_sek_month": avg(rents), "median_rent_sek_month": _chat_median(rents),
+        "avg_size_m2": round(sum(sizes) / len(sizes), 1) if sizes else None,
+        "avg_rent_per_m2_month": avg(rpm),
+        "rooms_distribution": {str(k): v for k, v in sorted(rooms.items(), key=lambda x: (x[0] is None, x[0]))},
+        "note": "Boplats is the municipal first-hand rental queue for Gothenburg.",
+    }
+
+
+def _chat_tool_list_datasets(_args: dict) -> dict:
+    return {
+        "datasets": [
+            {"name": "Buildings & EPC", "desc": "~92,973 mapped Gothenburg buildings; ~17,300 with Boverket EPC (energy class, kWh/m²/yr, area, year).",
+             "tools": ["get_city_overview", "get_district_stats", "list_districts", "find_buildings_by_address", "get_epc_dataset_info", "search_epc_fields"]},
+            {"name": "Booli — housing sales", "desc": "For-sale / sold / upcoming apartment & house listings from Booli (prices, price/m², area, rooms, sold date).",
+             "tools": ["get_booli_sales"]},
+            {"name": "Boplats — rentals", "desc": "First-hand rental listings from Gothenburg's municipal queue (rent, size, rooms, area).",
+             "tools": ["get_boplats_rentals"]},
+            {"name": "Neighborhoods (primärområden)", "desc": "Official Gothenburg neighborhoods with building counts.",
+             "tools": ["list_districts", "get_district_stats"]},
+            {"name": "SCB — Statistics Sweden", "desc": "Statistical map layers: population grid (by age/sex), DeSO/RegSO zones, urban/small settlements, green areas, workplace/business/retail zones, holiday cottages, 1 km reference grid.",
+             "tools": ["get_scb_datasets"]},
+        ],
+        "note": "Traffic and urban analysis / space syntax are explored on the 3D map, not via this chat yet.",
+    }
+
+
+def _chat_tool_scb_datasets(_args: dict) -> dict:
+    """Describe the Statistics Sweden (SCB) statistical map layers. Per-cell/zone
+    VALUES are served live from the SCB WFS and viewed on the 3D map; this lists
+    what datasets exist and their coverage."""
+    return {
+        "source": "Statistics Sweden (SCB) · CC0 1.0 · geodata.scb.se (live WFS)",
+        "how_to_view": "3D viewer → Statistics section → toggle a layer; hover a cell/zone for its values.",
+        "note": "Individual per-cell VALUES (e.g. one grid cell's population) are fetched live from SCB and shown on the map. This chat lists the datasets and their coverage; it does not compute individual cell values yet.",
+        "layers": [
+            {"name": "Population Grid (Befolkning)", "unit": "1×1 km grid", "contains": "Population totals by sex and five-year age bands (0–4 … 100+), all Sweden.", "years": "2015–2025"},
+            {"name": "DeSO Zones", "unit": "~5,900 areas", "contains": "Demographic Statistical Areas — Sweden's primary socioeconomic unit.", "years": "2018, 2025"},
+            {"name": "RegSO Zones", "contains": "Regional Statistical Areas (aggregated DeSO) for regional comparison.", "years": "2020, 2025"},
+            {"name": "Urban Areas (Tätorter)", "contains": "Built-up areas ≥200 inhabitants; population + area.", "years": "1980–2023"},
+            {"name": "Small Settlements (Småorter)", "contains": "Built-up areas 50–199 inhabitants.", "years": "1990–2023"},
+            {"name": "Green Areas", "contains": "Urban parks/forests/recreation within tätort; size in hectares.", "years": "2010–2020"},
+            {"name": "Workplace Zones", "contains": "Zones around workplace concentrations (commuting / labour market).", "years": "2000–2010"},
+            {"name": "Business Zones (Verksamhetsområden)", "contains": "Industrial / commercial activity areas.", "years": "2015–2020"},
+            {"name": "Retail Zones (Handelsområden)", "contains": "Concentrated retail areas / shopping centres.", "years": "2015–2020"},
+            {"name": "Holiday Cottages (Fritidshusområden)", "contains": "Seasonal / holiday dwelling concentrations.", "years": "2000–2020"},
+            {"name": "Statistical Grid (1 km)", "contains": "SWEREF99TM 1×1 km reference grid — framework for all SCB grid statistics.", "years": "current"},
+        ],
+    }
+
+
+async def _chat_tool_recommend_retrofit(args: dict) -> dict:
+    address = (args.get("address") or "").strip()
+    if not address:
+        return {"error": "address required"}
+    return await _recommend_retrofit_impl(address, validate_epsm=True)
+
+
 _CHAT_TOOLS = [
     {"name": "get_city_overview",
      "description": "Overall statistics for all mapped buildings in central Gothenburg: total count, EPC-rated count and coverage, average specific energy use, energy-class distribution, average build year and heated area.",
@@ -3310,6 +3645,21 @@ _CHAT_TOOLS = [
     {"name": "search_epc_fields",
      "description": "Check whether the EPC dataset contains a given kind of field and how many records populate it. Give a keyword/concept (e.g. 'owner name', 'ventilation', 'radon', 'cooling', 'energy class'); returns the matching EPC columns with their record counts and coverage %, or states clearly that no such field exists. Use this to answer 'how many EPCs have X' or 'do EPCs include X' questions.",
      "input_schema": {"type": "object", "properties": {"keyword": {"type": "string", "description": "Field concept to look for, e.g. 'owner name', 'ventilation', 'radon'"}}, "required": ["keyword"]}},
+    {"name": "get_booli_sales",
+     "description": "Housing SALES market from Booli for Gothenburg: for-sale / sold / upcoming apartment & house listings — counts, sold vs list prices, price per m², living area, and top neighborhoods. Optional 'area' filters to one neighborhood (e.g. Majorna, Johanneberg, Kviberg). Use for ANY question about property prices, sales, what's for sale, or the housing market.",
+     "input_schema": {"type": "object", "properties": {"area": {"type": "string", "description": "Optional neighborhood/area name to filter by"}}, "required": []}},
+    {"name": "get_boplats_rentals",
+     "description": "Rental market from Boplats (Gothenburg's municipal first-hand rental queue): listing count, average/median monthly rent, rent per m², apartment size, room distribution, by area. Optional 'area' filter. Use for ANY question about rents, rentals, or the rental market.",
+     "input_schema": {"type": "object", "properties": {"area": {"type": "string", "description": "Optional neighborhood/area name to filter by"}}, "required": []}},
+    {"name": "get_scb_datasets",
+     "description": "List the Statistics Sweden (SCB) statistical map layers available: population grid (by sex/age), DeSO/RegSO zones, urban & small settlements, green areas, workplace/business/retail zones, holiday cottages, and the 1 km reference grid — with what each contains, coverage years and source. Use for questions about SCB statistics, demographics, population, settlements, land use, or what statistical layers exist. NOTE: individual per-cell VALUES are viewed live on the 3D map, not computed here.",
+     "input_schema": {"type": "object", "properties": {}, "required": []}},
+    {"name": "recommend_retrofit",
+     "description": "Recommend the BEST renovation / retrofit package for a building by street address in Gothenburg, optimizing cost and energy. Resolves the building, searches the Wikells material catalogue with the degree-day optimizer, and returns THREE options — cheapest, lowest-energy (deepest), and best cost-energy balance — each with its measures, U-values, energy-reduction % and cost; the balanced pick is validated in EnergyPlus (EPSM). Use for ANY 'what is the best retrofit / renovation package for <address>' question. Takes ~15–30 s (runs a real simulation). Sweden/Gothenburg only.",
+     "input_schema": {"type": "object", "properties": {"address": {"type": "string", "description": "Street address, e.g. 'Mandolingatan 22' or just 'Mandolingatan'"}}, "required": ["address"]}},
+    {"name": "list_datasets",
+     "description": "List every dataset this assistant can query (buildings/EPC, Booli housing sales, Boplats rentals, neighborhoods, SCB statistics) and which tool answers each. Use when the user asks what data is available or what you can answer.",
+     "input_schema": {"type": "object", "properties": {}, "required": []}},
 ]
 
 _CHAT_TOOL_IMPL = {
@@ -3319,6 +3669,11 @@ _CHAT_TOOL_IMPL = {
     "find_buildings_by_address": _chat_tool_find_address,
     "get_epc_dataset_info":      _chat_tool_epc_dataset_info,
     "search_epc_fields":         _chat_tool_search_epc_fields,
+    "get_booli_sales":           _chat_tool_booli_sales,
+    "get_boplats_rentals":       _chat_tool_boplats_rentals,
+    "get_scb_datasets":          _chat_tool_scb_datasets,
+    "recommend_retrofit":        _chat_tool_recommend_retrofit,
+    "list_datasets":             _chat_tool_list_datasets,
 }
 
 _CHAT_SYSTEM = (
@@ -3336,7 +3691,21 @@ _CHAT_SYSTEM = (
     "- The underlying national Boverket EPC register (~1.88M records) can be inspected for "
     "which FIELDS it contains and their coverage (get_epc_dataset_info, search_epc_fields). "
     "It has energy, class, area, year, address, cadastral and technical fields, but NO "
-    "owner-name or personal-data fields.\n\n"
+    "owner-name or personal-data fields.\n"
+    "- Booli housing SALES: apartment & house listings scraped from Booli (for-sale / sold / "
+    "upcoming) with prices, price per m², area, rooms and sold date — query with get_booli_sales.\n"
+    "- Boplats RENTALS: first-hand rental listings from Gothenburg's municipal queue (monthly "
+    "rent, size, rooms, area) — query with get_boplats_rentals.\n"
+    "- SCB (Statistics Sweden) statistical layers: population grid (by sex/age), DeSO/RegSO "
+    "zones, urban & small settlements, green areas, workplace/business/retail zones, holiday "
+    "cottages, the 1 km reference grid — describe them with get_scb_datasets (individual "
+    "per-cell values are viewed live on the 3D map, not computed in chat).\n"
+    "- Retrofit recommendation: for 'best renovation / retrofit package for <address>' questions, "
+    "use recommend_retrofit — it resolves the building, runs the optimizer over the Wikells "
+    "material catalogue and returns THREE options (cheapest / lowest-energy / best cost-energy "
+    "balance), with the balanced pick validated in EnergyPlus. Present ALL THREE with each one's "
+    "energy reduction % and cost, and note which is EPSM-validated.\n"
+    "- Call list_datasets if you're unsure which datasets exist.\n\n"
     "Rules:\n"
     "- ALWAYS use the tools to get real numbers. NEVER invent or guess statistics.\n"
     "- For questions about what an EPC/energideklaration contains, which fields exist, or "
@@ -3346,8 +3715,10 @@ _CHAT_SYSTEM = (
     "a Swedish question gets a Swedish answer, an English question gets an English answer.\n"
     "- Be concise and friendly; give numbers with brief context.\n"
     "- If a neighborhood is not found, offer the closest matches the tool suggests.\n"
-    "- You only answer about this Gothenburg building/energy dataset and how to use the "
-    "dashboard. For unrelated questions, politely say so in the user's language."
+    "- You answer about this Gothenburg dataset — the building/energy stock, the Booli housing-"
+    "sales market, the Boplats rental market, and its neighborhoods — plus how to use the "
+    "dashboard. If you're unsure whether something is covered, call list_datasets rather than "
+    "declining. For questions truly outside this data, politely say so in the user's language."
 )
 
 
@@ -3360,10 +3731,16 @@ class ChatRequest(BaseModel):
     messages: list[ChatTurn]
 
 
-def _run_tool(name: str, args: dict) -> dict:
+async def _run_tool(name: str, args: dict) -> dict:
+    import inspect
     impl = _CHAT_TOOL_IMPL.get(name)
+    if not impl:
+        return {"error": "unknown tool"}
     try:
-        return impl(args) if impl else {"error": "unknown tool"}
+        res = impl(args)
+        if inspect.isawaitable(res):   # async tools (e.g. recommend_retrofit) are awaited
+            res = await res
+        return res
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)}
 
@@ -3394,7 +3771,7 @@ async def _chat_openai(turns: list, key: str) -> dict:
                     except Exception:  # noqa: BLE001
                         a = {}
                     msgs.append({"role": "tool", "tool_call_id": tc["id"],
-                                 "content": json.dumps(_run_tool(fn, a), ensure_ascii=False)})
+                                 "content": json.dumps(await _run_tool(fn, a), ensure_ascii=False)})
                 continue
             return {"configured": True, "reply": (msg.get("content") or "…").strip()}
     return {"configured": True, "reply": "Sorry, I couldn't complete that — please try rephrasing."}
@@ -3417,7 +3794,7 @@ async def _chat_anthropic(turns: list, key: str) -> dict:
             conv.append({"role": "assistant", "content": content})
             if data.get("stop_reason") == "tool_use":
                 results = [{"type": "tool_result", "tool_use_id": b.get("id"),
-                            "content": json.dumps(_run_tool(b.get("name"), b.get("input", {})), ensure_ascii=False)}
+                            "content": json.dumps(await _run_tool(b.get("name"), b.get("input", {})), ensure_ascii=False)}
                            for b in content if b.get("type") == "tool_use"]
                 conv.append({"role": "user", "content": results})
                 continue

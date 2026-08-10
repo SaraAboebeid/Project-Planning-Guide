@@ -175,6 +175,9 @@ interface ProjectState {
      driven packages with an EPSM comparison, separate from the legacy
      renovationPackages field above */
   renovationCalcPackages: RenovationCalcPackage[];
+  /* Step 3 Renovation — supplier discount (%) the owner gets off catalogue material
+     prices; deducted from every material cost (catalogue, configs, packages, optimizer). */
+  supplierDiscountPct: number;
   /* Step 3 Renovation — supplementary data uploaded by user to fill data gaps */
   supplementaryData: Record<string, Record<string, unknown>>; // building address → field overrides
   /* Step 3 Renovation — baseline EPSM simulation status */
@@ -239,6 +242,7 @@ const DEFAULT_PROJECT: ProjectState = {
   renovationPackages: [],
   selectedPackageId: null,
   renovationCalcPackages: [],
+  supplierDiscountPct: 0,
   supplementaryData: {},
   baselineStatus: "idle",
   renovationBaselineResults: [],
