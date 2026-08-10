@@ -767,23 +767,30 @@ export default function RenovationReport() {
         </Card>
       )}
 
-      {/* ── 8. Decision under uncertainty (regret & robustness) ── */}
+      {/* ── 8. Compare options across future energy prices ── */}
       {project.regretAnalysis && project.regretAnalysis.options.length >= 2 && (() => {
         const ra = project.regretAnalysis!;
         const fmtM = (v: number) => `${v < 0 ? "−" : ""}${(Math.abs(v) / 1e6).toFixed(2)}M`;
+        const scenarioHint = (label: string, index: number) => {
+          const l = label.toLowerCase();
+          if (l.includes("low")) return "cheap energy future";
+          if (l.includes("medium")) return "middle-price future";
+          if (l.includes("high")) return "expensive energy future";
+          return ["cheap energy future", "middle-price future", "expensive energy future"][index] ?? "price scenario";
+        };
         const PICKS: Record<string, { fg: string; label: string; tip: string }> = {
-          minimaxRegret: { fg: "#4ECDC4", label: "Minimax regret", tip: "smallest worst-case regret — safest against choosing wrong" },
-          hurwicz:       { fg: "#B98BE8", label: `Hurwicz (α=${ra.alpha.toFixed(2)})`, tip: "best α-weighted mix of best & worst case" },
-          mostRobust:    { fg: "#96D74C", label: "Most robust", tip: "smallest spread across scenarios" },
+          minimaxRegret: { fg: "#4ECDC4", label: "Safety-first", tip: "Chooses the option with the smallest worst-case disappointment" },
+          hurwicz:       { fg: "#B98BE8", label: `Balanced choice (alpha=${ra.alpha.toFixed(2)})`, tip: "Blends worst and best case using your decision-style slider" },
+          mostRobust:    { fg: "#96D74C", label: "Most stable", tip: "Smallest difference between low and high price outcomes" },
         };
         const th: React.CSSProperties = { padding: "6px 8px", fontWeight: 600, color: "rgba(255,255,255,0.45)", textAlign: "right", whiteSpace: "nowrap" };
         const td: React.CSSProperties = { padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap", color: "rgba(255,255,255,0.8)" };
         return (
           <Card accent="#4ECDC4">
-            <SectionTitle icon={<Award size={15} color="#4ECDC4" />} title="Decision Under Uncertainty — Regret & Robustness" />
+            <SectionTitle icon={<Award size={15} color="#4ECDC4" />} title="Compare Retrofit Choices Across Future Energy Prices" />
             <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.7, margin: "0 0 12px" }}>
-              Because future energy prices are uncertain, each option is scored by its {ra.studyPeriodYr}-yr net benefit under
-              Low / Medium / High price scenarios, then ranked by three decision rules that don't require guessing the future.
+              Each retrofit option is tested in three possible futures: Low (cheap energy), Medium (middle prices), and High (expensive energy).
+              We then compare outcomes with three simple decision styles so you can choose without guessing one exact future.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
               {(["minimaxRegret", "hurwicz", "mostRobust"] as const).map((k) => {
@@ -792,7 +799,7 @@ export default function RenovationReport() {
                 return (
                   <div key={k} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 12.5, color: "rgba(255,255,255,0.7)" }}>
                     <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 99, color: PICKS[k].fg, background: `${PICKS[k].fg}22`, whiteSpace: "nowrap" }}>★ {PICKS[k].label}</span>
-                    <span><strong style={{ color: "#fff" }}>{opt.label}</strong> — {PICKS[k].tip}.</span>
+                    <span><strong style={{ color: "#fff" }}>{opt.label}</strong> - {PICKS[k].tip}.</span>
                   </div>
                 );
               })}
@@ -802,10 +809,16 @@ export default function RenovationReport() {
                 <thead>
                   <tr>
                     <th style={{ ...th, textAlign: "left" }}>Retrofit option</th>
-                    {ra.scenarios.map((s) => <th key={s.key} style={th}>{s.label}<br /><span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>{s.priceSek} SEK/kWh</span></th>)}
-                    <th style={th}>Range</th>
-                    <th style={th}>Max regret</th>
-                    <th style={th}>Hurwicz</th>
+                    {ra.scenarios.map((s, i) => (
+                      <th key={s.key} style={th} title={scenarioHint(s.label, i)}>
+                        {s.label}
+                        <br />
+                        <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>{scenarioHint(s.label, i)} · {s.priceSek} SEK/kWh</span>
+                      </th>
+                    ))}
+                    <th style={th} title="Best minus worst across scenarios">Outcome spread</th>
+                    <th style={th} title="Worst miss compared with the best option in each scenario">Worst miss vs best</th>
+                    <th style={th} title="alpha x best + (1 - alpha) x worst">Balanced score</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -813,20 +826,20 @@ export default function RenovationReport() {
                     <tr key={o.id} style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
                       <td style={{ padding: "6px 8px", color: o.isBaseline ? "rgba(255,255,255,0.5)" : "#fff", fontStyle: o.isBaseline ? "italic" : undefined, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>{o.label}</td>
                       {o.benefits.map((b, si) => {
-                        const best = b === ra.bestPerScenario[si];
-                        return <td key={si} style={{ ...td, color: best ? "#96D74C" : b < 0 ? "#fca5a5" : "rgba(255,255,255,0.8)", fontWeight: best ? 800 : 400 }}>{fmtM(b)}</td>;
+                        const best = !o.isBaseline && b === ra.bestPerScenario[si];
+                        return <td key={si} style={{ ...td, color: best ? "#96D74C" : o.isBaseline ? "rgba(255,255,255,0.4)" : b < 0 ? "#fca5a5" : "rgba(255,255,255,0.8)", fontWeight: best ? 800 : 400 }}>{fmtM(b)}</td>;
                       })}
-                      <td style={td}>{fmtM(o.range)}</td>
-                      <td style={{ ...td, color: o.id === ra.picks.minimaxRegret ? "#4ECDC4" : "rgba(255,255,255,0.6)", fontWeight: o.id === ra.picks.minimaxRegret ? 800 : 400 }}>{fmtM(o.maxRegret)}</td>
-                      <td style={{ ...td, color: o.id === ra.picks.hurwicz ? "#B98BE8" : "rgba(255,255,255,0.6)", fontWeight: o.id === ra.picks.hurwicz ? 800 : 400 }}>{fmtM(o.hurwicz)}</td>
+                      <td style={td}>{o.isBaseline ? "—" : fmtM(o.range)}</td>
+                      <td style={{ ...td, color: o.id === ra.picks.minimaxRegret ? "#4ECDC4" : "rgba(255,255,255,0.6)", fontWeight: o.id === ra.picks.minimaxRegret ? 800 : 400 }}>{o.isBaseline ? "—" : fmtM(o.maxRegret)}</td>
+                      <td style={{ ...td, color: o.id === ra.picks.hurwicz ? "#B98BE8" : "rgba(255,255,255,0.6)", fontWeight: o.id === ra.picks.hurwicz ? 800 : 400 }}>{o.isBaseline ? "—" : fmtM(o.hurwicz)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", marginTop: 10, lineHeight: 1.6 }}>
-              Values are {ra.studyPeriodYr}-yr net present benefit (SEK, millions). Negative = the investment isn't repaid by energy
-              savings under that scenario. Regret = best-in-scenario − chosen; a low max regret means the option rarely leaves much on the table.
+              Values are {ra.studyPeriodYr}-year net present benefit (SEK, millions). Negative means the investment is not repaid by energy savings
+              in that future. "Balanced score" is the Hurwicz method shown in plain language.
             </p>
           </Card>
         );

@@ -79,7 +79,14 @@ export function computeRegret(
     return { o, benefits, best: Math.max(...benefits), worst: Math.min(...benefits) };
   });
 
-  const bestPerScenario = scenarios.map((_, si) => Math.max(...rows.map((r) => r.benefits[si]!)));
+  // The decision is which RETROFIT to choose — "do nothing" is only a reference,
+  // not a candidate. So "best in scenario", regret and every pick are measured
+  // among the retrofit options; the baseline is shown but never wins. (Otherwise,
+  // when retrofits don't pay back on energy alone, do-nothing trivially wins all
+  // three rules and the analysis tells you nothing about which retrofit to pick.)
+  const retrofitRows = rows.filter((r) => !r.o.isBaseline);
+  const rankRows = retrofitRows.length ? retrofitRows : rows;
+  const bestPerScenario = scenarios.map((_, si) => Math.max(...rankRows.map((r) => r.benefits[si]!)));
 
   const results: RegretOptionResult[] = rows.map((r) => {
     const regrets = r.benefits.map((b, si) => bestPerScenario[si]! - b);
@@ -91,8 +98,10 @@ export function computeRegret(
     };
   });
 
+  const pool = results.filter((r) => !r.isBaseline);
+  const rankable = pool.length ? pool : results;
   const pickBy = (better: (a: RegretOptionResult, b: RegretOptionResult) => boolean) =>
-    results.reduce((a, b) => (better(b, a) ? b : a)).id;
+    rankable.reduce((a, b) => (better(b, a) ? b : a)).id;
 
   return {
     scenarios,

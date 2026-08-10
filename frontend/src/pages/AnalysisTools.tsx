@@ -1,4 +1,12 @@
-import { ExternalLink, Sun, Eye, Zap, Wrench, Leaf, Target, ChevronRight, Network, ScanSearch } from "lucide-react";
+import { ExternalLink, Sun, Eye, Zap, Wrench, Leaf, Target, ChevronRight, Network, ScanSearch, ListOrdered, Scale } from "lucide-react";
+
+/* Optional "method & equations" block for tools that document a formal model. */
+interface Methodology {
+  criteria?: { key: string; name: string; weight: string; vars: string; rule: string }[];
+  equations: { label: string; tex: string }[];
+  note: string;
+  sources?: { label: string; cite: string; url?: string }[];
+}
 
 /* ── Tool definitions ─────────────────────────────────────────────── */
 
@@ -122,6 +130,72 @@ const TOOLS = [
     usedIn: ["Renovation Planning", "Energy Community Planning"],
   },
   {
+    id: "mcda",
+    title: "Retrofit Prioritization (MCDA)",
+    subtitle: "Multi-Criteria Ranking — which buildings first",
+    color: "#F59E0B",
+    status: "integrated",
+    icon: ListOrdered,
+    description:
+      "A hybrid expert-rule + Multi-Criteria Decision Analysis (MCDA) model that ranks a building stock by retrofit priority. Each building is scored 0–100 under four criterion groups, combined into one weighted priority score. Weights are set directly or derived from expert pairwise judgements via the Analytic Hierarchy Process (AHP). Lives in Step 2; the top-ranked buildings are the ones carried into EPSM simulation first.",
+    features: [
+      "Four criteria: energy performance, façade condition, building characteristics, retrofit potential",
+      "Transparent 0–100 expert-rule sub-scores, each with a per-building data confidence",
+      "Weights via sliders/presets or AHP pairwise comparison (with a consistency check)",
+      "Façade (F) uses the AI defect inspection — excluded until a building is inspected",
+      "Ranking orders which buildings enter the EPSM simulation first",
+    ],
+    methodology: {
+      criteria: [
+        { key: "E", name: "Energy performance", weight: "0.35", vars: "Energy class, kWh/m²·yr, heating demand, CO₂", rule: "kWh/m²·yr benchmarked 60→250 (or EPC class when unmetered)" },
+        { key: "F", name: "Façade / envelope condition", weight: "0.30", vars: "Cracks, spalling, leakage, corrosion, bulges", rule: "AI defect load, severity-weighted & saturating; excluded until inspected" },
+        { key: "C", name: "Building characteristics", weight: "0.15", vars: "Age, construction type, façade / floor area", rule: "0.6 × vintage + 0.4 × size percentile" },
+        { key: "R", name: "Retrofit potential", weight: "0.20", vars: "Expected saving, cost, payback, feasibility", rule: "Energy headroom above target + U-value poorness + scale" },
+      ],
+      equations: [
+        { label: "Weighted priority score", tex: "Pᵢ = w_E·Eᵢ + w_F·Fᵢ + w_C·Cᵢ + w_R·Rᵢ" },
+        { label: "Default weights (Σw = 1)", tex: "P = 0.35·E + 0.30·F + 0.15·C + 0.20·R" },
+        { label: "AHP weights — geometric-mean priority", tex: "wₖ = (∏ⱼ aₖⱼ)^(1/n) ⁄ Σᵢ (∏ⱼ aᵢⱼ)^(1/n)" },
+        { label: "AHP consistency ratio", tex: "CR = CI ⁄ RI,   CI = (λmax − n)/(n − 1),   RI = 0.90 (n = 4);   consistent if CR ≤ 0.10" },
+      ],
+      note: "Every sub-score carries a data-confidence; a criterion without data (e.g. an un-inspected façade) is dropped and its weight re-normalised across the remaining criteria, so the composite stays comparable.",
+    },
+    usedIn: ["Renovation Planning", "Energy Community Planning"],
+  },
+  {
+    id: "regret",
+    title: "Decision Under Uncertainty",
+    subtitle: "Regret · Robustness · Hurwicz",
+    color: "#4ECDC4",
+    status: "integrated",
+    icon: Scale,
+    description:
+      "When the future is unknown, a single 'best' package doesn't exist. This model scores each retrofit option (and the do-nothing baseline) by its multi-year net benefit under Low / Medium / High energy-price scenarios, then ranks the options with three classic decision rules that need no forecast: minimax regret, uncertainty range, and the Hurwicz criterion. Lives in Step 4 and is saved into the Step 5 report.",
+    features: [
+      "Options scored under Low / Medium / High energy-price futures",
+      "Minimax regret — smallest worst-case 'wish I'd chosen the other' loss",
+      "Uncertainty range (best − worst) — flags the most robust, least price-sensitive option",
+      "Hurwicz criterion with an adjustable optimism weight α",
+      "Do-nothing kept as a reference; the decision is made among the retrofits",
+    ],
+    methodology: {
+      equations: [
+        { label: "Net benefit of an option in a scenario", tex: "benefit = (energy saved × area) × price × annuity − investment" },
+        { label: "Regret (opportunity loss)", tex: "regretᵢ,ₛ = maxⱼ(benefitⱼ,ₛ) − benefitᵢ,ₛ" },
+        { label: "Minimax regret rule", tex: "choose i that minimises  maxₛ regretᵢ,ₛ" },
+        { label: "Uncertainty range (sensitivity)", tex: "rangeᵢ = maxₛ benefitᵢ,ₛ − minₛ benefitᵢ,ₛ" },
+        { label: "Hurwicz criterion", tex: "Hᵢ = α · (best case) + (1 − α) · (worst case)" },
+      ],
+      note: "α is your risk attitude: α = 0 weighs only the worst case (cautious), α = 1 only the best case (optimistic), α = 0.5 balances them. A small range means the option is robust to price uncertainty; a small max regret means it's safe against choosing wrong.",
+      sources: [
+        { label: "Energy price — today's reference (SE3, Gothenburg)", cite: "Nord Pool day-ahead spot, fetched live via elprisetjustnu.se (spot only, excl. VAT / grid fee / energy tax); 0.8 SEK/kWh fallback if the feed is down. Low/Medium/High are user-set scenarios around it.", url: "https://www.elprisetjustnu.se" },
+        { label: "Real discount rate — 3%", cite: "EU cost-optimal framework (Delegated Reg. 244/2012), societal real rate used by Boverket for building energy LCC", url: "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32012R0244" },
+        { label: "Study period — 30 years", cite: "Net-present-value horizon; annuity factor = Σ 1/(1+r)^t over the period" },
+      ],
+    },
+    usedIn: ["Renovation Planning", "Energy Community Planning"],
+  },
+  {
     id: "retrofit",
     title: "Retrofit Scenario Analyser",
     subtitle: "Renovation Measure Comparison & Optimisation",
@@ -214,6 +288,7 @@ function StatusBadge({ status }: { status: string }) {
 function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
   const Icon = tool.icon;
   const t = tool as typeof TOOLS[3]; // cast for optional fields
+  const meth = (tool as { methodology?: Methodology }).methodology;
 
   return (
     <div style={{
@@ -280,6 +355,69 @@ function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
             ))}
           </ul>
         </div>
+
+        {/* Method & equations (tools that document a formal model) */}
+        {meth && (
+          <div style={{
+            background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: "12px 14px",
+            border: `1px solid ${tool.color}22`,
+          }}>
+            <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: `${tool.color}aa`, marginBottom: 12 }}>
+              METHOD &amp; EQUATIONS
+            </div>
+            {/* Criteria hierarchy */}
+            {meth.criteria && <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+              {meth.criteria.map((c) => (
+                <div key={c.key} style={{ display: "flex", gap: 9 }}>
+                  <span style={{ width: 16, flexShrink: 0, fontWeight: 800, color: tool.color, fontSize: 12 }}>{c.key}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12 }}>
+                      <span style={{ color: "#f0f4ff", fontWeight: 600 }}>{c.name}</span>
+                      <span style={{ color: tool.color, marginLeft: 6 }}>w = {c.weight}</span>
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>{c.vars}</div>
+                    <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.55)", marginTop: 1 }}>Score: {c.rule}</div>
+                  </div>
+                </div>
+              ))}
+            </div>}
+            {/* Equations */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {meth.equations.map((eq) => (
+                <div key={eq.label}>
+                  <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.4)", marginBottom: 3 }}>{eq.label}</div>
+                  <div style={{
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11.5, color: "#f0f4ff",
+                    background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "7px 10px", overflowX: "auto",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                  }}>{eq.tex}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.42)", marginTop: 11, lineHeight: 1.55 }}>{meth.note}</div>
+            {meth.sources && (
+              <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 10 }}>
+                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>
+                  SOURCES &amp; ASSUMPTIONS
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {meth.sources.map((s) => (
+                    <div key={s.label} style={{ fontSize: 10, lineHeight: 1.5 }}>
+                      <span style={{ color: "#f0f4ff", fontWeight: 600 }}>{s.label}</span>
+                      <span style={{ color: "rgba(255,255,255,0.45)" }}> — {s.cite}</span>
+                      {s.url && (
+                        <>
+                          {" "}
+                          <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: tool.color, textDecoration: "none" }}>↗</a>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Used in tags */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>

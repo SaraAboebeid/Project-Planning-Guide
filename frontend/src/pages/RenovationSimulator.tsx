@@ -1954,6 +1954,7 @@ export default function RenovationSimulator() {
               setAlpha={setRegretAlpha}
               prices={regretPrices}
               setPrices={setRegretPrices}
+              currentPrice={livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8}
             />
           )}
 
