@@ -6,15 +6,15 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="uk_3d.css?v=20260803-scb1">
-  <link rel="stylesheet" href="sidebar-theme.css?v=20260803-scb1">
+  <link rel="stylesheet" href="uk_3d.css?v=20260803-scb2">
+  <link rel="stylesheet" href="sidebar-theme.css?v=20260803-scb2">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
        is stamped on <body> by bootstrap.js. */
     body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
   </style>
-  <script src="uk_3d.meta.js?v=20260803-scb1" defer></script>
-  <script src="viewer/js/bootstrap.js?v=20260803-scb1" defer></script>
+  <script src="uk_3d.meta.js?v=20260803-scb2" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260803-scb2" defer></script>
 </head>
 <body>
 
@@ -73,14 +73,14 @@
        together, so selecting → inspecting → running a tool needs no scrolling. -->
   <div class="lp-divider"></div>
   <div class="collapse-head">
-    <button class="collapse-toggle" id="building-toggle" type="button" aria-expanded="true" aria-controls="building-content">
+    <button class="collapse-toggle" id="building-toggle" type="button" aria-expanded="false" aria-controls="building-content">
       <span class="collapse-chevron">&#9662;</span>
       <span class="collapse-label">Building Analysis</span>
       <span class="sec-badge" id="building-badge" hidden></span>
     </button>
     <button class="info-btn" data-layer="selected-building"></button>
   </div>
-  <div id="building-content" class="collapse-content">
+  <div id="building-content" class="collapse-content collapsed">
     <div id="lp-no-selection">Click a building on the map to see its data and enable the analysis tools.</div>
     <div class="panel" id="info-panel">
       <button class="close-btn" id="info-close" aria-label="Clear selection">&#x2715;</button>
@@ -102,14 +102,14 @@
   <!-- ══ BASE MAP ═══════════════════════════════════════════════════════ -->
   <div class="lp-divider"></div>
   <div class="collapse-head">
-    <button class="collapse-toggle" id="basemap-toggle" type="button" aria-expanded="true" aria-controls="basemap-content">
+    <button class="collapse-toggle" id="basemap-toggle" type="button" aria-expanded="false" aria-controls="basemap-content">
       <span class="collapse-chevron">&#9662;</span>
       <span class="collapse-label">Base Map</span>
       <span class="sec-badge" id="basemap-badge" hidden></span>
     </button>
     <button class="info-btn" data-layer="base-map"></button>
   </div>
-  <div id="basemap-content" class="collapse-content">
+  <div id="basemap-content" class="collapse-content collapsed">
     <div class="basemap-group" role="radiogroup" aria-label="Base map" style="padding:0 0 4px">
       <div class="base-row">
         <button class="base-btn" id="btn-base-light" role="radio" aria-checked="false">
@@ -152,14 +152,14 @@
     <!-- ─ Buildings ───────────────────────────────────────────────────── -->
     <div class="lp-divider"></div>
     <div class="collapse-head">
-      <button class="collapse-toggle" id="buildings-toggle" type="button" aria-expanded="true" aria-controls="buildings-content">
+      <button class="collapse-toggle" id="buildings-toggle" type="button" aria-expanded="false" aria-controls="buildings-content">
         <span class="collapse-chevron">&#9662;</span>
         <span class="collapse-label">Additional Layers</span>
         <span class="sec-badge" id="buildings-badge" hidden></span>
       </button>
       <button class="info-btn" data-layer="building-layers" data-source="OpenStreetMap · EPB Register (MHCLG) · English Housing Survey 2024-25"></button>
     </div>
-    <div id="buildings-content" class="collapse-content">
+    <div id="buildings-content" class="collapse-content collapsed">
       <div class="overlay-group">
         <div class="overlay-row">
           <button class="overlay-btn active" id="btn-overlay-buildings" aria-pressed="true">

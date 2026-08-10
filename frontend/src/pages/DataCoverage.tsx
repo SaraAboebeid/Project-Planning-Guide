@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import {
   ChevronUp,
-  Download, MapPin, Building2, Loader2, Layers, Globe2, Database,
+  Download, Upload, Plus, Pencil, MapPin, Building2, Loader2, Layers, Globe2, Database,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────
@@ -701,6 +701,80 @@ const BBOX_CSV_COLS: { key: keyof BuildingRecord; label: string }[] = [
   { key: "boplats_avg_rent_per_m2_sek", label: "Rent/m² (SEK)" },
 ];
 
+/* ─────────────────────────────────────────────
+   User data import (CSV / JSON) — merge the user's own data onto the loaded
+   buildings, overwriting existing values or filling missing ones. Rows are
+   matched by Address (or Cadastral ID). Columns are matched either by the
+   export labels above or by the raw BuildingRecord field name.
+───────────────────────────────────────────── */
+const NUMERIC_FIELDS = new Set<string>([
+  "year_built", "height_m", "floors", "footprint_m2", "energy_kwh_m2",
+  "u_wall", "u_window", "u_roof", "lat", "lon", "atemp",
+  "boplats_listings", "boplats_avg_rent_sek", "boplats_avg_rent_per_m2_sek",
+]);
+const _normKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const IMPORT_FIELD_MAP: Record<string, keyof BuildingRecord> = (() => {
+  const m: Record<string, keyof BuildingRecord> = {};
+  const add = (label: string, field: keyof BuildingRecord) => { m[_normKey(label)] = field; };
+  add("Address", "address"); add("Cadastral ID", "cadastral_id"); add("Use", "building_use");
+  add("Year", "year_built"); add("Height (m)", "height_m"); add("Floors", "floors");
+  add("Footprint (m²)", "footprint_m2"); add("Energy (kWh/m²)", "energy_kwh_m2"); add("EPC", "epc_class");
+  add("TABULA Period", "tabula_period"); add("U-Wall", "u_wall"); add("U-Window", "u_window");
+  add("U-Roof", "u_roof"); add("Latitude", "lat"); add("Longitude", "lon"); add("Has EPC", "has_epc");
+  add("Boplats #", "boplats_listings"); add("Rent/m² (SEK)", "boplats_avg_rent_per_m2_sek");
+  add("Avg Rent (SEK)", "boplats_avg_rent_sek");
+  (["address", "cadastral_id", "building_use", "year_built", "height_m", "floors", "footprint_m2",
+    "energy_kwh_m2", "epc_class", "tabula_period", "u_wall", "u_window", "u_roof", "lat", "lon",
+    "has_epc", "atemp", "boplats_listings", "boplats_avg_rent_sek", "boplats_avg_rent_per_m2_sek",
+  ] as (keyof BuildingRecord)[]).forEach(k => { m[_normKey(k)] = k; });
+  return m;
+})();
+
+// Minimal RFC-4180-ish CSV parser (handles quoted fields, embedded commas, "" escapes).
+function parseCSV(text: string): Record<string, string>[] {
+  const rows: string[][] = [];
+  let cur: string[] = [], val = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { val += '"'; i++; } else inQ = false; }
+      else val += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ",") { cur.push(val); val = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; cur.push(val); rows.push(cur); cur = []; val = ""; }
+    else val += c;
+  }
+  if (val !== "" || cur.length) { cur.push(val); rows.push(cur); }
+  const nonEmpty = rows.filter(r => r.some(c => c.trim() !== ""));
+  if (nonEmpty.length < 2) return [];
+  const header = nonEmpty[0];
+  return nonEmpty.slice(1).map(r => Object.fromEntries(header.map((h, i) => [h, r[i] ?? ""])));
+}
+
+// Turn uploaded records into {matchKey -> {field: value}} + the set of fields seen.
+function normalizeImport(records: Record<string, unknown>[]): {
+  byKey: Map<string, Record<string, unknown>>; fields: Set<string>;
+} {
+  const byKey = new Map<string, Record<string, unknown>>();
+  const fields = new Set<string>();
+  for (const rec of records) {
+    const mapped: Record<string, unknown> = {};
+    let key: string | null = null;
+    for (const [rawCol, rawVal] of Object.entries(rec)) {
+      const field = IMPORT_FIELD_MAP[_normKey(rawCol)];
+      if (!field) continue;
+      let v: unknown = typeof rawVal === "string" ? rawVal.trim() : rawVal;
+      if (v === "" || v === null || v === undefined) continue;
+      if (NUMERIC_FIELDS.has(field)) { const n = Number(v); if (Number.isNaN(n)) continue; v = n; }
+      mapped[field] = v;
+      fields.add(field);
+      if ((field === "address" || field === "cadastral_id") && !key) key = _normKey(String(v));
+    }
+    if (key && Object.keys(mapped).length) byKey.set(key, { ...(byKey.get(key) || {}), ...mapped });
+  }
+  return { byKey, fields };
+}
+
 const EPC_ORDER: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6, G: 7 };
 
 const COMPARE_COLS: {
@@ -823,6 +897,11 @@ function BboxDataBanner({
   const [sortCol, setSortCol]         = useState<keyof BuildingRecord>("energy_kwh_m2");
   // Sort for the main building table (click a header). Null = original order.
   const [tableSort, setTableSort]     = useState<{ key: keyof BuildingRecord; asc: boolean } | null>(null);
+  const [importMsg, setImportMsg]     = useState<string | null>(null);
+  const [fillMissingOnly, setFillMissingOnly] = useState(false);
+  const [addOpen, setAddOpen]         = useState(false);   // paste-JSON/CSV panel
+  const [pasteText, setPasteText]     = useState("");
+  const [editing, setEditing]         = useState(false);   // inline table cell editing
   const PAGE_SIZE = 50;
 
   // In district mode there are no precomputed aggregate stats, so derive them
@@ -922,6 +1001,73 @@ function BboxDataBanner({
     URL.revokeObjectURL(url);
   }
 
+  // Parse CSV/JSON TEXT (from a file OR pasted) and merge it onto the loaded
+  // buildings — matched by Address (or Cadastral ID), overwriting existing values
+  // or (fill-missing mode) only filling blanks. Flows downstream via onRowsChange.
+  function applyImportText(text: string, sourceName: string) {
+    try {
+      const trimmed = text.trim();
+      if (!trimmed) { setImportMsg("Nothing to apply — paste CSV/JSON or choose a file."); return; }
+      let records: Record<string, unknown>[];
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        const j = JSON.parse(text);
+        if (Array.isArray(j)) records = j as Record<string, unknown>[];
+        else if (j && typeof j === "object") records = Object.entries(j).map(([k, v]) => ({ address: k, ...(v as object) }));
+        else records = [];
+      } else {
+        records = parseCSV(text);
+      }
+      if (!records.length) { setImportMsg("No rows found."); return; }
+      const { byKey, fields } = normalizeImport(records);
+      if (!byKey.size) { setImportMsg("No usable rows — need an Address (or Cadastral ID) column plus data columns (e.g. Energy, Year, U-Wall)."); return; }
+      let matched = 0, changed = 0;
+      setRows(prev => {
+        if (!prev) return prev;
+        return prev.map(r => {
+          const keys = [_normKey(String(r.address ?? "")), _normKey(String(r.cadastral_id ?? ""))].filter(Boolean);
+          const upd = keys.map(k => byKey.get(k)).find(Boolean);
+          if (!upd) return r;
+          matched++;
+          const merged: Record<string, unknown> = { ...r };
+          for (const [f, v] of Object.entries(upd)) {
+            const ex = merged[f];
+            const isMissing = ex === null || ex === undefined || ex === "" || ex === false;
+            if (fillMissingOnly && !isMissing) continue;
+            if (merged[f] !== v) { merged[f] = v; changed++; }
+          }
+          return merged as BuildingRecord;
+        });
+      });
+      const dataFields = [...fields].filter(f => f !== "address" && f !== "cadastral_id");
+      setImportMsg(matched === 0
+        ? `⚠ ${sourceName}: matched 0 buildings — check that the Address / Cadastral ID values match the table.`
+        : `✓ ${sourceName}: matched ${matched} building${matched === 1 ? "" : "s"}, ${changed} value${changed === 1 ? "" : "s"} ${fillMissingOnly ? "filled" : "updated"}${dataFields.length ? " (" + dataFields.join(", ") + ")" : ""}.`);
+    } catch (e) {
+      setImportMsg("Import failed: " + (e as Error).message);
+    }
+  }
+
+  async function handleImportFile(file: File) {
+    setImportMsg("Reading…");
+    try { applyImportText(await file.text(), `"${file.name}"`); }
+    catch (e) { setImportMsg("Import failed: " + (e as Error).message); }
+  }
+
+  // Inline table editing: write one cell back into its row (numeric fields coerced,
+  // empty → null). Same rows state → same downstream propagation as an import.
+  function updateCell(globalIdx: number, field: keyof BuildingRecord, raw: string) {
+    setRows(prev => {
+      if (!prev) return prev;
+      const next = prev.slice();
+      const r: Record<string, unknown> = { ...next[globalIdx] };
+      if (raw.trim() === "") r[field] = null;
+      else if (NUMERIC_FIELDS.has(field)) { const n = Number(raw); r[field] = Number.isNaN(n) ? raw : n; }
+      else r[field] = raw;
+      next[globalIdx] = r as BuildingRecord;
+      return next;
+    });
+  }
+
   function toggleRow(idx: number) {
     setSelected(prev => {
       const next = new Set(prev);
@@ -1012,6 +1158,26 @@ function BboxDataBanner({
           >
             <Download className="w-3 h-3" /> Export
           </button>
+          <label
+            title="Upload your own CSV or JSON to overwrite or fill missing data — matched to these buildings by Address or Cadastral ID"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 whitespace-nowrap transition cursor-pointer"
+          >
+            <Upload className="w-3 h-3" /> Import
+            <input
+              type="file" accept=".csv,.json,text/csv,application/json"
+              style={{ display: "none" }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.currentTarget.value = ""; }}
+            />
+          </label>
+          <button
+            onClick={() => setAddOpen(o => !o)}
+            title="Add or edit data: paste CSV/JSON, or edit the table cells directly"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold whitespace-nowrap transition ring-1 ${addOpen
+              ? "bg-violet-600 text-white ring-violet-400 shadow-lg shadow-violet-900/40"
+              : "bg-violet-600/20 text-violet-200 ring-violet-500/60 hover:bg-violet-600/35 hover:text-white"}`}
+          >
+            <Plus className="w-3.5 h-3.5" /> Add / Edit
+          </button>
           <a
             href={viewer3dUrl}
             target="_blank" rel="noopener noreferrer"
@@ -1070,6 +1236,52 @@ function BboxDataBanner({
           <div className="text-xs font-bold text-white/75 mt-0.5">{Math.round(bboxStats.with_floors/bboxStats.count*100)}% <span className="font-normal text-white/30">({bboxStats.with_floors}/{bboxStats.count})</span></div>
         </div>
       </div>
+
+      {/* Import your own data — overwrite or fill gaps for these buildings */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2 border-t border-white/8 text-[11px]">
+        <span className="flex items-center gap-1.5 text-white/40"><Upload className="w-3 h-3" /> Add your own data via <b className="text-white/60">Import</b> (CSV/JSON, matched by Address / Cadastral ID)</span>
+        <label className="flex items-center gap-1.5 text-white/45 cursor-pointer select-none" title="When on, only blank fields are filled; existing values are kept unchanged.">
+          <input type="checkbox" checked={fillMissingOnly} onChange={e => setFillMissingOnly(e.target.checked)} className="w-3 h-3 accent-violet-600 cursor-pointer" />
+          Fill missing only
+        </label>
+        {importMsg && (
+          <span className={`ml-auto ${importMsg.startsWith("✓") ? "text-emerald-400" : importMsg.startsWith("⚠") ? "text-amber-400" : importMsg.startsWith("Import failed") ? "text-red-400" : "text-white/40"}`}>
+            {importMsg}
+          </span>
+        )}
+      </div>
+
+      {/* Add / edit panel — inline cell editing + paste CSV/JSON */}
+      {addOpen && (
+        <div className="border-t border-white/8 bg-white/[0.02] px-4 py-3 space-y-2.5">
+          <div className="text-[10px] text-white/40 bg-violet-950/20 border border-violet-800/30 rounded-md px-2.5 py-1.5 leading-relaxed">
+            <b className="text-violet-300">Where do my edits go?</b> Changes are kept in <b className="text-white/60">your browser session</b> and
+            become the numbers Steps 3–4 (simulation &amp; results) use. They are <b className="text-white/60">not written back</b> to the
+            cadastral / EUBUCCO / EPC source data, and don&apos;t affect other users. Closing the tab clears them.
+          </div>
+          <label className="flex items-center gap-2 text-[11px] text-white/65 cursor-pointer select-none w-fit">
+            <input type="checkbox" checked={editing} onChange={e => setEditing(e.target.checked)} className="w-3.5 h-3.5 accent-violet-600 cursor-pointer" />
+            <Pencil className="w-3 h-3" /> Edit table cells directly — click any cell below and type (numbers are parsed, blank clears)
+          </label>
+          <div className="text-[10px] text-white/35">Or paste CSV / JSON (same columns as Export; rows matched by Address / Cadastral ID):</div>
+          <textarea
+            value={pasteText}
+            onChange={e => setPasteText(e.target.value)}
+            placeholder={'Address,Energy (kWh/m²),U-Wall\nHerkulesgatan 38,90,0.30\n\n— or —\n[{"address":"Herkulesgatan 38","energy_kwh_m2":90,"u_wall":0.30}]'}
+            rows={5}
+            className="w-full rounded-md bg-[#0d1117] border border-white/12 px-3 py-2 text-[11px] text-white/80 font-mono resize-y focus:outline-none focus:border-violet-500/60"
+          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => applyImportText(pasteText, "pasted data")}
+              disabled={!pasteText.trim()}
+              className="px-3 py-1.5 rounded-md text-[11px] font-semibold bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition"
+            >Apply pasted data</button>
+            <button onClick={() => setPasteText("")} className="px-3 py-1.5 rounded-md text-[11px] text-white/45 hover:bg-white/8 transition">Clear</button>
+            <span className="text-[10px] text-white/30 ml-1">Respects the “Fill missing only” toggle above.</span>
+          </div>
+        </div>
+      )}
 
       {/* Prominent loading state while the buildings list is being fetched */}
       {loading && !rows && (
@@ -1153,8 +1365,16 @@ function BboxDataBanner({
                           ? (isCadastralId(val as string, r.cadastral_id) ? "—" : formatAddress(val as string))
                           : present ? String(val) : "—";
                         return (
-                          <td key={c.key} className={`px-2 py-1 ${cell} whitespace-nowrap`}>
-                            {display}
+                          <td key={c.key}
+                              className={`px-2 py-1 ${editing ? "" : cell} whitespace-nowrap`}
+                              onClick={editing ? (e => e.stopPropagation()) : undefined}>
+                            {editing ? (
+                              <input
+                                value={present ? String(val) : ""}
+                                onChange={e => updateCell(globalIdx, c.key, e.target.value)}
+                                className="w-full min-w-[64px] bg-[#0d1117] border border-white/12 rounded px-1 py-0.5 text-[10px] text-white/85 focus:outline-none focus:border-violet-500/60"
+                              />
+                            ) : display}
                           </td>
                         );
                       })}
@@ -1669,7 +1889,9 @@ export default function DataCoverage() {
         <p className="text-sm text-white/45 mt-1">
           What data is available for each building, and what is missing — from the cadastral register (Lantmäteriet),
           EUBUCCO and the Boverket EPC. An empty cell means that value simply doesn&apos;t exist for that building.
-          Select the buildings you want to carry into the analysis.
+          Select the buildings you want to carry into the analysis. Missing or wrong values? Use{" "}
+          <b className="text-violet-300">＋ Add / Edit</b> on the buildings panel below to fix cells inline or paste
+          your own CSV/JSON — your edits stay in this session and feed Steps 3–4 (the source datasets are never changed).
         </p>
       </div>
 
