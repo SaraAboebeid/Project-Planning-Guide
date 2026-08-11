@@ -23,7 +23,7 @@ import {
 } from "../../config/projectConfig";
 
 import LocationMap from "../../components/LocationMap";
-import { useWizardStepNav } from "../../components/wizardNav";
+import { useWizardStepNav, setWizardCanNext } from "../../components/wizardNav";
 
 /* ── tiny reusable bits ─────────────────────────────────────────── */
 
@@ -83,6 +83,8 @@ export default function DefineProject() {
   }, []);
 
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  // Location validity (e.g. address outside the Gothenburg municipality) → gates Continue.
+  const [locationValid, setLocationValid] = useState(true);
   const [buildingLoading, setBuildingLoading] = useState(false);
   const lookupDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   // For auto-scrolling to each newly revealed question.
@@ -281,6 +283,7 @@ export default function DefineProject() {
       setValidationErrors(missing);
       return;
     }
+    if (!locationValid) return; // address outside the covered area — blocked
     setValidationErrors([]);
     setStep(2);
     navigate("/step/2");
@@ -288,6 +291,13 @@ export default function DefineProject() {
 
   // The wizard footer's Continue runs this page's validation + advance.
   useWizardStepNav({ onNext: handleContinue });
+
+  // Gate the footer Continue button while the location is invalid; always
+  // re-enable it when leaving Step 1.
+  useEffect(() => {
+    setWizardCanNext(locationValid);
+    return () => setWizardCanNext(true);
+  }, [locationValid]);
 
   /* ── follow-up helpers ───────────────────────────────────────── */
   const followUps = (pt && FOLLOW_UP_SYSTEMS[pt]) || {};
@@ -1007,6 +1017,7 @@ export default function DefineProject() {
             onPointsChange={(pts) => setProject({ buildingPoints: pts })}
             onBboxChange={handleBboxChange}
             onPolygonChange={handlePolygonChange}
+            onLocationValidityChange={(valid) => setLocationValid(valid)}
           />
 
           {/* Building lookup status */}

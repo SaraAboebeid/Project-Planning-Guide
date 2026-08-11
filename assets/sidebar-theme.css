@@ -591,3 +591,38 @@
   border-radius: 4px !important;
   background: linear-gradient(90deg, #7c3aed, #a78bfa) !important;
 }
+
+/* ── Global clickability affordance (matches the React app) ─────────────────
+   Every clickable element in the viewer shows a pointer (hand) cursor, and any
+   clickable that doesn't already define its own :hover still brightens on hover.
+   The existing .tool-btn/.overlay-btn/etc. hovers remain the primary highlight;
+   this is a safety net so nothing clickable looks inert. */
+button:not(:disabled),
+a[href],
+[role="button"],
+[onclick],
+.tool-btn:not(:disabled),
+.overlay-btn,
+.base-btn,
+.btn,
+.sub-btn,
+.info-btn,
+.lp-tab,
+.result-item,
+.collapse-toggle {
+  cursor: pointer !important;
+}
+
+button:disabled,
+.tool-btn:disabled,
+[disabled],
+[aria-disabled="true"] {
+  cursor: not-allowed !important;
+}
+
+button:not(:disabled):hover,
+a[href]:hover,
+[onclick]:hover {
+  filter: brightness(1.12);
+  transition: filter 0.15s ease;
+}

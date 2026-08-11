@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
-import { wizardNav } from "./wizardNav";
+import { wizardNav, useWizardCanNext } from "./wizardNav";
 import { LIBRARY_TABS, tabPathFor, countryCodeFromName } from "../config/countryNav";
 import CountryCitySelector from "./CountryCitySelector";
 
@@ -170,6 +170,7 @@ function DataNeededRow({ label, status }: {
 // ── Main layout ────────────────────────────────────────────────────────────
 export default function WizardLayout() {
   const navigate = useNavigate();
+  const canNext = useWizardCanNext();
   const location = useLocation();
   const { steps, project } = useWizardStore();
 
@@ -367,13 +368,19 @@ export default function WizardLayout() {
           <div style={{ flex: 1 }} />
           {/* No Continue on the final step (Report) — nothing comes after it. */}
           {!isLastStep && (
-            <button onClick={() => (wizardNav.onNext ? wizardNav.onNext() : goNext())} style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "8px 24px",
-              borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#fff",
-              background: "linear-gradient(135deg,#721CB8,#421869)",
-              boxShadow: "0 4px 14px rgba(114,28,184,0.45)", border: 0,
-              cursor: "pointer", transition: "all 0.15s",
-            }}>
+            <button
+              onClick={() => { if (canNext) (wizardNav.onNext ? wizardNav.onNext() : goNext()); }}
+              disabled={!canNext}
+              title={canNext ? undefined : "Fix the highlighted issue to continue"}
+              className="no-hover-shadow"
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "8px 24px",
+                borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#fff",
+                background: canNext ? "linear-gradient(135deg,#721CB8,#421869)" : "rgba(255,255,255,0.10)",
+                boxShadow: canNext ? "0 4px 14px rgba(114,28,184,0.45)" : "none", border: 0,
+                cursor: canNext ? "pointer" : "not-allowed",
+                opacity: canNext ? 1 : 0.55, transition: "all 0.15s",
+              }}>
               Continue <Icon d={IC.arrowR} size={16} />
             </button>
           )}

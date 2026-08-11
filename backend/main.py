@@ -830,6 +830,7 @@ def buildings_bbox_stats(
         "common_use":     common_val("use_cat"),
     }
 _DISTRICTS_CACHE: dict | None = None
+_GBG_BOUNDARY_CACHE: dict | None = None
 
 
 @app.get("/api/districts")
@@ -869,6 +870,32 @@ def list_districts(country: str = Query("se")):
         districts.sort(key=lambda x: x["name"])
         _DISTRICTS_CACHE = {"country": "se", "districts": districts}
     return _DISTRICTS_CACHE
+
+
+@app.get("/api/se/gothenburg-boundary")
+def gothenburg_boundary():
+    """Dissolved outer boundary of Göteborg municipality (union of the primärområden
+    polygons), simplified, as a GeoJSON Feature. Powers the Step-1 map highlight and
+    the "is this address inside the municipality?" check. Cached in memory."""
+    global _GBG_BOUNDARY_CACHE
+    if _GBG_BOUNDARY_CACHE is None:
+        from shapely.geometry import shape, mapping
+        from shapely.ops import unary_union
+        path = PROJECT_ROOT / "data" / "districts" / "gbg_primaromraden.geojson"
+        if not path.exists():
+            raise HTTPException(404, "Gothenburg boundary data not found")
+        fc = json.loads(path.read_text(encoding="utf-8"))
+        geoms = [shape(f["geometry"]) for f in fc.get("features", []) if f.get("geometry")]
+        if not geoms:
+            raise HTTPException(500, "No boundary geometries")
+        merged = unary_union(geoms).buffer(0)          # dissolve + heal slivers
+        merged = merged.simplify(0.0003, preserve_topology=True)   # ~30 m, small payload
+        _GBG_BOUNDARY_CACHE = {
+            "type": "Feature",
+            "properties": {"name": "Göteborgs kommun"},
+            "geometry": mapping(merged),
+        }
+    return _GBG_BOUNDARY_CACHE
 
 
 @app.get("/api/buildings/bbox/list")

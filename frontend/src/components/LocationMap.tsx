@@ -20,6 +20,7 @@ import {
   Rectangle,
   Polygon,
   CircleMarker,
+  GeoJSON,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -41,6 +42,32 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
+
+// ── Municipality boundary (Gothenburg) — highlight + inside/outside test ─────
+type Ring = [number, number][];                       // [lon, lat] pairs
+interface BoundaryGeom { type: "Polygon" | "MultiPolygon"; coordinates: Ring[] | Ring[][]; }
+interface BoundaryFeature { type: "Feature"; properties?: Record<string, unknown>; geometry: BoundaryGeom; }
+
+function pointInRing(lat: number, lon: number, ring: Ring): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i]![0], yi = ring[i]![1];
+    const xj = ring[j]![0], yj = ring[j]![1];
+    const hit = (yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (hit) inside = !inside;
+  }
+  return inside;
+}
+function pointInPoly(lat: number, lon: number, poly: Ring[]): boolean {
+  if (!poly.length || !pointInRing(lat, lon, poly[0]!)) return false;
+  for (let k = 1; k < poly.length; k++) if (pointInRing(lat, lon, poly[k]!)) return false; // in a hole
+  return true;
+}
+/** Is (lat, lon) inside the boundary geometry (Polygon or MultiPolygon)? */
+function pointInBoundary(lat: number, lon: number, geom: BoundaryGeom): boolean {
+  if (geom.type === "Polygon") return pointInPoly(lat, lon, geom.coordinates as Ring[]);
+  return (geom.coordinates as Ring[][]).some((poly) => pointInPoly(lat, lon, poly));
+}
 
 // ── Location modes (Building scale): the one clear choice a user makes ────────
 type LocationMode = "addresses" | "area" | "bbox" | "polygon";
@@ -165,6 +192,19 @@ function MapFitBounds({
       map.fitBounds(bounds, { padding: [40, 40] });
     }
   }, [points, bbox, map]);
+  return null;
+}
+
+// Fit the view to the municipality boundary (once it loads, before any address
+// is picked) so the highlighted area is visible on first render.
+function FitToBoundary({ boundary }: { boundary: BoundaryFeature }) {
+  const map = useMap();
+  useEffect(() => {
+    try {
+      const b = L.geoJSON(boundary as never).getBounds();
+      if (b.isValid()) map.fitBounds(b, { padding: [16, 16] });
+    } catch { /* ignore */ }
+  }, [boundary, map]);
   return null;
 }
 
@@ -405,6 +445,9 @@ interface LocationMapProps {
     polygon: string | null,
     bbox: { north: number; south: number; east: number; west: number } | null,
   ) => void;
+  /** Fires when the selected location's validity changes (e.g. an address falls
+   *  outside the Gothenburg municipality). `valid=false` should block Continue. */
+  onLocationValidityChange?: (valid: boolean, message: string | null) => void;
 }
 
 export default function LocationMap({
@@ -415,10 +458,15 @@ export default function LocationMap({
   onPointsChange,
   onBboxChange,
   onPolygonChange,
+  onLocationValidityChange,
 }: LocationMapProps) {
   const isBuilding = scale === "Building";
   const countryCode = countryCodeFromName(country);
   const mapCenter = mapCenterFor(countryCode, city);
+  // Boundary highlight + address validation only apply to Gothenburg (SE).
+  const isGothenburg = countryCode === "se" && (city ?? "").toLowerCase().includes("gothenburg");
+  const [boundary, setBoundary] = useState<BoundaryFeature | null>(null);
+  const [outsideMsg, setOutsideMsg] = useState<string | null>(null);
 
   const [locationMode, setLocationMode] = useState<"addresses" | "area" | "bbox" | "polygon">(
     "addresses"
@@ -452,6 +500,37 @@ export default function LocationMap({
     onPolygonChange?.(null, null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scale]);
+
+  // Fetch the Gothenburg municipality boundary once (for the map highlight +
+  // the "inside the area?" check). Other cities: no boundary, no restriction.
+  useEffect(() => {
+    if (!isGothenburg) { setBoundary(null); return; }
+    let alive = true;
+    fetch("/api/se/gothenburg-boundary")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => { if (alive && b?.geometry) setBoundary(b as BoundaryFeature); })
+      .catch(() => { /* boundary optional — no restriction if it fails */ });
+    return () => { alive = false; };
+  }, [isGothenburg]);
+
+  // Whenever the geocoded points or the boundary change, re-check that every
+  // address is inside the municipality; report validity up so Continue can gate.
+  useEffect(() => {
+    if (!isGothenburg || !boundary) { setOutsideMsg(null); onLocationValidityChange?.(true, null); return; }
+    const pts = geoPoints.filter((p): p is GeoPoint => !!p && typeof p.lat === "number");
+    const outside = pts.filter((p) => !pointInBoundary(p.lat, p.lon, boundary.geometry));
+    if (outside.length > 0) {
+      const msg = pts.length > 1
+        ? `${outside.length} of ${pts.length} addresses are outside the Gothenburg municipality area.`
+        : "This address is outside the Gothenburg municipality area.";
+      setOutsideMsg(msg);
+      onLocationValidityChange?.(false, msg);
+    } else {
+      setOutsideMsg(null);
+      onLocationValidityChange?.(true, null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geoPoints, boundary, isGothenburg]);
 
   /* Street / area search → select every building inside the feature's bounds.
      Nominatim returns a boundingbox for each hit: for "Jättestensgatan" that is
@@ -726,6 +805,17 @@ export default function LocationMap({
         </div>
       )}
 
+      {/* Out-of-area warning — the picked address is outside the municipality */}
+      {outsideMsg && (
+        <div className="flex items-start gap-2 rounded-lg px-3 py-2 mb-2"
+          style={{ background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.35)" }}>
+          <X className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#f87171" }} />
+          <span className="text-[12px]" style={{ color: "#fca5a5" }}>
+            <b>{outsideMsg}</b> This tool currently covers <b>Gothenburg</b> only — pick an address inside the highlighted area to continue.
+          </span>
+        </div>
+      )}
+
       {/* Leaflet Map — with the polygon draw controls docked to its bottom edge */}
       <div className="rounded-xl overflow-hidden border border-gray-200">
         <div className="h-64">
@@ -739,6 +829,17 @@ export default function LocationMap({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+
+          {/* Gothenburg municipality boundary — highlights the working area */}
+          {boundary && (
+            <GeoJSON
+              key="gbg-boundary"
+              data={boundary as never}
+              interactive={false}
+              style={() => ({ color: "#4ECDC4", weight: 2, opacity: 0.9, fillColor: "#4ECDC4", fillOpacity: 0.07, dashArray: "5 4" })}
+            />
+          )}
+          {boundary && validPoints.length === 0 && !bbox && <FitToBoundary boundary={boundary} />}
 
           {/* Auto-fit bounds when points or bbox changes */}
           <MapFitBounds points={validPoints} bbox={bbox} />

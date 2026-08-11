@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useReducer } from "react";
 
 type NavHandler = () => void;
 
@@ -16,10 +16,14 @@ type NavHandler = () => void;
  * effect, so navigating between steps leaves the singleton holding only the
  * newly-mounted page's handlers (or none).
  */
-export const wizardNav: { onNext: NavHandler | null; onBack: NavHandler | null } = {
-  onNext: null,
-  onBack: null,
-};
+export const wizardNav: {
+  onNext: NavHandler | null;
+  onBack: NavHandler | null;
+  /** When false, the footer's Continue is disabled (a step page can gate it,
+   *  e.g. Step 1 blocks continuing while the address is outside the area). */
+  canNext: boolean;
+  _listeners: Set<() => void>;
+} = { onNext: null, onBack: null, canNext: true, _listeners: new Set() };
 
 export function useWizardStepNav(handlers: { onNext?: NavHandler; onBack?: NavHandler }) {
   const { onNext, onBack } = handlers;
@@ -31,4 +35,24 @@ export function useWizardStepNav(handlers: { onNext?: NavHandler; onBack?: NavHa
       wizardNav.onBack = null;
     };
   }, [onNext, onBack]);
+}
+
+/** Enable/disable the footer Continue button from a step page. Always reset to
+ *  true when the gating page unmounts. */
+export function setWizardCanNext(v: boolean) {
+  if (wizardNav.canNext !== v) {
+    wizardNav.canNext = v;
+    wizardNav._listeners.forEach((l) => l());
+  }
+}
+
+/** Subscribe the footer to canNext changes so it re-renders when a page gates it. */
+export function useWizardCanNext(): boolean {
+  const [, force] = useReducer((x) => x + 1, 0);
+  useEffect(() => {
+    const l = () => force();
+    wizardNav._listeners.add(l);
+    return () => { wizardNav._listeners.delete(l); };
+  }, []);
+  return wizardNav.canNext;
 }
