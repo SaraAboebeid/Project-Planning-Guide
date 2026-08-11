@@ -830,14 +830,24 @@ export default function LocationMap({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {/* Gothenburg municipality boundary — highlights the working area */}
+          {/* Gothenburg municipality boundary — highlights the working area.
+              Two layers: a soft white halo under a bold purple line so the outline
+              reads clearly over the map's greens/greys, plus a light fill. */}
           {boundary && (
-            <GeoJSON
-              key="gbg-boundary"
-              data={boundary as never}
-              interactive={false}
-              style={() => ({ color: "#4ECDC4", weight: 2, opacity: 0.9, fillColor: "#4ECDC4", fillOpacity: 0.07, dashArray: "5 4" })}
-            />
+            <>
+              <GeoJSON
+                key="gbg-halo"
+                data={boundary as never}
+                interactive={false}
+                style={() => ({ color: "#ffffff", weight: 7, opacity: 0.7, fill: false })}
+              />
+              <GeoJSON
+                key="gbg-boundary"
+                data={boundary as never}
+                interactive={false}
+                style={() => ({ color: "#721CB8", weight: 3.5, opacity: 1, fillColor: "#721CB8", fillOpacity: 0.10 })}
+              />
+            </>
           )}
           {boundary && validPoints.length === 0 && !bbox && <FitToBoundary boundary={boundary} />}
 
