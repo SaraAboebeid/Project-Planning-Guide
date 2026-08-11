@@ -76,10 +76,11 @@ const FLOW_DATA: Record<string, {
       {
         n: 2, label: "Building & Site Data", color: "#4A90E2",
         subNodes: [
-          { label: "EUBUCCO footprint + floors", type: "db" },
+          { label: "EUBUCCO footprint + floors, EPC class", type: "db" },
           { label: "TABULA archetype match", type: "db" },
-          { label: "EPC energy class (register)", type: "db" },
-          { label: "WWR estimate (proxy)", type: "estimate" },
+          { label: "Add / import own data (CSV / JSON / inline)", type: "input" },
+          { label: "Facade defect detection — MBDD2025 + AI vision", type: "engine" },
+          { label: "MCDA retrofit prioritization (E/F/C/R + AHP)", type: "output" },
         ],
       },
       {
@@ -93,18 +94,19 @@ const FLOW_DATA: Record<string, {
       {
         n: 4, label: "Calculator", color: "#F59E0B", isHere: true,
         subNodes: [
-          { label: "Build envelope packages (layers + materials)", type: "input" },
+          { label: "Build packages (catalogue + layers)", type: "input" },
           { label: "Cost (Wikells) + carbon (Boverket)", type: "db" },
+          { label: "Multi-objective optimizer — Pareto + parallel coords", type: "engine" },
           { label: "Energy simulation per package (EPSM)", type: "engine" },
-          { label: "Live curve vs baseline + Pareto", type: "output" },
+          { label: "Regret / robustness decision analysis", type: "output" },
         ],
       },
       {
         n: 5, label: "Report", color: "#96D74C",
         subNodes: [
-          { label: "Recommended packages", type: "output" },
+          { label: "Recommended packages + climate target", type: "output" },
           { label: "Energy, cost & carbon savings", type: "output" },
-          { label: "City climate target", type: "output" },
+          { label: "Decision under uncertainty (regret)", type: "output" },
           { label: "Renovation Report (PDF)", type: "output" },
         ],
       },
@@ -443,11 +445,11 @@ const PATHWAYS = [
     borderActive: "#721CB8",
     Icon: Hammer,
     outputs: [
-      { n: "01", text: "Package cost estimate (SEK/m²)" },
-      { n: "02", text: "Embodied carbon (kg CO₂e)" },
-      { n: "03", text: "EPC energy class forecast" },
-      { n: "04", text: "Simple payback period" },
-      { n: "05", text: "Phased vs. full comparison" },
+      { n: "01", text: "Retrofit priority ranking (MCDA)" },
+      { n: "02", text: "Pareto-optimal package trade-offs" },
+      { n: "03", text: "EnergyPlus energy · cost · carbon per package" },
+      { n: "04", text: "City climate-target reduction (%)" },
+      { n: "05", text: "Robust choice under price uncertainty" },
     ],
   },
   {
@@ -485,12 +487,16 @@ const PATHWAYS = [
 ] as const;
 
 const ENGINE_TAGS = [
-  { label: "Sensitivity OAT",    color: "#4A90E2" },
-  { label: "Global SA",          color: "#4A90E2" },
-  { label: "Model Confidence",   color: "#F59E0B" },
-  { label: "Data Coverage",      color: "#96D74C" },
-  { label: "TABULA Archetypes",  color: "#4ECDC4" },
-  { label: "Wikells Cost DB",    color: "#721CB8" },
+  { label: "EnergyPlus / EPSM",     color: "#4ECDC4" },
+  { label: "MCDA + AHP",            color: "#F59E0B" },
+  { label: "Facade ML (MBDD2025)",  color: "#E6194B" },
+  { label: "Pareto optimizer",      color: "#B98BE8" },
+  { label: "Regret / Hurwicz",      color: "#4A90E2" },
+  { label: "Sensitivity OAT",       color: "#4A90E2" },
+  { label: "TABULA Archetypes",     color: "#4ECDC4" },
+  { label: "Wikells Cost DB",       color: "#721CB8" },
+  { label: "Boverket Klimatdb",     color: "#96D74C" },
+  { label: "Nord Pool spot price",  color: "#4A90E2" },
 ];
 
 /* ─── Per-project-type OAT sensitivity data ─────────────────────────── */
@@ -511,7 +517,7 @@ const OAT_BY_TYPE: Record<string, { metric: string; unit: string; params: OatPar
       { key: "floors_total",         label: "Number of Floors",      category: "Geometry",    rangeKwh: 72158,  status: "available", insight: "Floor count confirmed via EUBUCCO 3D model. Low residual uncertainty." },
       { key: "footprint_length",     label: "Building Length",       category: "Geometry",    rangeKwh: 63753,  status: "available", insight: "Footprint from EUBUCCO polygon — length measured automatically." },
       { key: "footprint_width",      label: "Building Width",        category: "Geometry",    rangeKwh: 52824,  status: "available", insight: "Footprint from EUBUCCO polygon — width measured automatically." },
-      { key: "window_to_wall_ratio", label: "Window-to-Wall Ratio",  category: "Envelope",    rangeKwh: 30601,  status: "partial",   insight: "WWR estimated from street-level imagery analysis — facade survey would reduce this uncertainty." },
+      { key: "window_to_wall_ratio", label: "Window-to-Wall Ratio",  category: "Envelope",    rangeKwh: 30601,  status: "partial",   insight: "WWR estimated from imagery; the in-app Facade Inspector (WWR + MBDD2025 defect detection) on uploaded photos tightens this." },
       { key: "glazing_package",      label: "Glazing Quality",       category: "Envelope",    rangeKwh: 23350,  status: "partial",   insight: "Double-glazed assumed for pre-1990 stock; triple-glazing present in some post-renovation units." },
     ],
   },
