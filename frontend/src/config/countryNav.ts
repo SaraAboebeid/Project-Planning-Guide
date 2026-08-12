@@ -37,6 +37,15 @@ export function cityEnabled(country: CountryCode, city: string): boolean {
   return c.enabledCities.includes(city);
 }
 
+/** Whether a whole country is selectable — true only if it has at least one
+ *  available city. Countries with no cities yet (Belgium, Ireland) are greyed
+ *  out and unclickable, like the coming-soon cities. */
+export function countryEnabled(country: CountryCode): boolean {
+  const c = COUNTRIES.find((x) => x.id === country);
+  if (!c) return false;
+  return c.cities.some((city) => cityEnabled(country, city));
+}
+
 // Map-centering data for the Step 1 location picker (LocationMap.tsx) - keyed
 // by exact city name from COUNTRIES[].cities, so a Sweden/Gothenburg project
 // centers and geocodes differently from a Sweden/Stockholm one, or a UK/London

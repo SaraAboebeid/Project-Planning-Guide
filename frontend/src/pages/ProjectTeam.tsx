@@ -38,10 +38,17 @@ const TEAM: Member[] = [
   },
   {
     name: "Elena Malakhatka",
-    role: "Business Development & Sales",
+    role: "Business Development",
     roleColor: "#F59E0B",
-    bio: "Leads business development and sales, connecting the platform with building owners, municipalities and industry partners. Translates the tool's capabilities into real-world adoption and long-term impact.",
+    bio: "Leads business development, connecting the platform with building owners, municipalities and industry partners. Translates the tool's capabilities into real-world adoption and long-term impact.",
     link: { href: "mailto:elenamal@chalmers.se", label: "elenamal@chalmers.se", kind: "email" },
+  },
+  {
+    name: "Taz Lodder",
+    role: "Deployment & Technical Support",
+    roleColor: "#4A90E2",
+    bio: "Set up the web server and deployment, taking the platform from a local prototype to a live, hosted website. Provides the infrastructure and ongoing technical support that keep the tool online and running reliably.",
+    link: { href: "mailto:taz.lodder@chalmers.se", label: "taz.lodder@chalmers.se", kind: "email" },
   },
 ];
 

@@ -7,7 +7,7 @@ import ClimateGoalBuildingTable from "../components/ClimateGoalBuildingTable";
 import type { BuildingLookup, BuildingRecord } from "../types";
 import {
   Building2, Leaf, DollarSign, Zap, CheckCircle2, Download,
-  Award, TrendingDown, Package, FileText, AlertTriangle, Target,
+  Award, TrendingDown, Package, FileText, AlertTriangle, Target, Flame,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell,
@@ -840,6 +840,68 @@ export default function RenovationReport() {
             <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", marginTop: 10, lineHeight: 1.6 }}>
               Values are {ra.studyPeriodYr}-year net present benefit (SEK, millions). Negative means the investment is not repaid by energy savings
               in that future. "Balanced score" is the Hurwicz method shown in plain language.
+            </p>
+          </Card>
+        );
+      })()}
+
+      {/* ── 9. Heating system (HVAC) ── */}
+      {project.heatingAnalysis && project.heatingAnalysis.results.length > 0 && (() => {
+        const ha = project.heatingAnalysis!;
+        const sel = ha.results.find((r) => r.id === ha.selectedId) ?? ha.results.find((r) => r.isBaseline) ?? ha.results[0];
+        if (!sel) return null;
+        const fsek = (v: number) => { const a = Math.abs(v); return a >= 1e6 ? `${(v / 1e6).toFixed(2)} M` : a >= 1e4 ? `${Math.round(v / 1e3)} k` : `${Math.round(v).toLocaleString("sv-SE")}`; };
+        const th2: React.CSSProperties = { padding: "6px 8px", fontWeight: 600, color: "rgba(255,255,255,0.45)", textAlign: "right", whiteSpace: "nowrap" };
+        const td2: React.CSSProperties = { padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap", color: "rgba(255,255,255,0.8)" };
+        return (
+          <Card accent="#F59E0B">
+            <SectionTitle icon={<Flame size={15} color="#F59E0B" />} title="Heating System (HVAC)" />
+            <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.65)", lineHeight: 1.7, margin: "0 0 12px" }}>
+              On the building's <strong style={{ color: "#fff" }}>{Math.round(ha.heatingDemandKwhM2Yr)} kWh/m²·yr</strong> heat demand, the chosen system is{" "}
+              <strong style={{ color: "#F59E0B" }}>{sel.name}</strong>{sel.isBaseline ? " (the as-built baseline)" : ""} — delivering{" "}
+              <strong style={{ color: "#fff" }}>{sel.deliveredKwhM2Yr} kWh/m²·yr</strong> at{" "}
+              <strong style={{ color: "#fff" }}>{fsek(sel.operatingCostYrSek)} SEK/yr</strong> and{" "}
+              <strong style={{ color: "#60a5fa" }}>{fsek(sel.carbonYrKg)} kg CO₂e/yr</strong>
+              {sel.vsBaseline && !sel.isBaseline && <> ({sel.vsBaseline.opCostPct > 0 ? "+" : ""}{sel.vsBaseline.opCostPct}% cost, {sel.vsBaseline.carbonPct > 0 ? "+" : ""}{sel.vsBaseline.carbonPct}% carbon vs district heating)</>}.
+            </p>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...th2, textAlign: "left" }}>System</th>
+                    <th style={th2}>SPF/eff.</th>
+                    <th style={th2}>Delivered<br /><span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>kWh/m²·yr</span></th>
+                    <th style={th2}>Op. cost/yr</th>
+                    <th style={th2}>Carbon/yr<br /><span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>kg CO₂e</span></th>
+                    <th style={th2}>Install</th>
+                    <th style={th2}>{ha.results[0] ? "30-yr LCC" : "LCC"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ha.results.map((s) => {
+                    const isSel = s.id === ha.selectedId;
+                    return (
+                      <tr key={s.id} style={{ borderTop: "1px solid rgba(255,255,255,0.07)", background: isSel ? "rgba(78,205,196,0.10)" : s.isBaseline ? "rgba(245,158,11,0.05)" : undefined, boxShadow: isSel ? "inset 3px 0 0 #4ECDC4" : undefined }}>
+                        <td style={{ padding: "6px 8px", color: "#fff" }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color }} />
+                            {s.shortName}{isSel && <span style={{ fontSize: 8.5, color: "#4ECDC4", fontWeight: 800 }}>✓ chosen</span>}{s.isBaseline && <span style={{ fontSize: 8.5, color: "#F59E0B" }}>baseline</span>}
+                          </span>
+                        </td>
+                        <td style={td2}>{s.spf.toFixed(s.spf >= 1.5 ? 1 : 2)}</td>
+                        <td style={td2}>{s.deliveredKwhM2Yr}</td>
+                        <td style={td2}>{fsek(s.operatingCostYrSek)}</td>
+                        <td style={td2}>{fsek(s.carbonYrKg)}</td>
+                        <td style={td2}>{fsek(s.capexSek)}</td>
+                        <td style={{ ...td2, color: s.id === ha.picks.lowestLcc ? "#96D74C" : "#fff", fontWeight: s.id === ha.picks.lowestLcc ? 800 : 400 }}>{fsek(s.lccSek)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", marginTop: 10, lineHeight: 1.6 }}>
+              Heat demand from EnergyPlus (EPSM); system economics are a supply-side layer (delivered = demand ÷ SPF). Values are Swedish defaults — see the tool's Heating-system panel for sources.
             </p>
           </Card>
         );

@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import { wizardNav, useWizardCanNext } from "./wizardNav";
+import SettingsModal from "./SettingsModal";
 import { LIBRARY_TABS, tabPathFor, countryCodeFromName } from "../config/countryNav";
 import CountryCitySelector from "./CountryCitySelector";
 
@@ -173,6 +174,7 @@ export default function WizardLayout() {
   const canNext = useWizardCanNext();
   const location = useLocation();
   const { steps, project } = useWizardStore();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const stepIndex = steps.findIndex((s) => s.path === location.pathname);
   const safeIndex = stepIndex < 0 ? 0 : stepIndex;
@@ -265,7 +267,7 @@ export default function WizardLayout() {
         ))}
 
         <div className="flex-1" />
-        <SideNavItem iconD={IC.settings} label="Settings" />
+        <SideNavItem iconD={IC.settings} label="Settings" onClick={() => setSettingsOpen(true)} />
       </aside>
 
       {/* ── MAIN COLUMN ─────────────────────────────────────────────────── */}
@@ -387,6 +389,7 @@ export default function WizardLayout() {
         </footer>
 
       </div>
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

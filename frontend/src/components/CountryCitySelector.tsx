@@ -3,6 +3,7 @@ import {
   countryCodeFromName,
   defaultCityFor,
   cityEnabled,
+  countryEnabled,
   type CountryCode,
 } from "../config/countryNav";
 import { useWizardStore } from "../store/wizard";
@@ -42,26 +43,33 @@ export default function CountryCitySelector() {
     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
       {/* Country */}
       <div style={pill}>
-        {COUNTRIES.map((c) => (
+        {COUNTRIES.map((c) => {
+          const enabled = countryEnabled(c.id);
+          return (
           <button
             key={c.id}
-            onClick={() => selectCountry(c.id)}
+            onClick={enabled ? () => selectCountry(c.id) : undefined}
+            disabled={!enabled}
+            title={enabled ? undefined : "Coming soon — not available yet"}
             style={{
               padding: "4px 10px",
               borderRadius: 8,
               border: 0,
-              cursor: "pointer",
+              cursor: enabled ? "pointer" : "not-allowed",
               fontSize: 11,
               fontWeight: country === c.id ? 700 : 500,
               background: country === c.id ? "rgba(114,28,184,0.35)" : "transparent",
-              color: country === c.id ? "#fff" : "rgba(255,255,255,0.72)",
+              color: !enabled ? "rgba(255,255,255,0.32)"
+                    : country === c.id ? "#fff" : "rgba(255,255,255,0.72)",
+              opacity: enabled ? 1 : 0.6,
               transition: "all .15s",
               whiteSpace: "nowrap",
             }}
           >
             {c.name}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* City */}

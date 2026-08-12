@@ -101,8 +101,9 @@ export const EC_FOCUS_OPTIONS = ["Electricity", "Heating", "Cooling"];
 export const ENVELOPE_COMPONENTS = [
   "Walls",
   "Windows",
-  "Doors",
   "Roof",
+  "Floor",
+  "Heating system",
   "Vertical Extension (New Floor)",
 ];
 

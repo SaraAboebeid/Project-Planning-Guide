@@ -5,6 +5,7 @@ import { climateGoalFor, assessAgainstGoal } from "../config/climateGoals";
 import ClimateGoalPanel from "../components/ClimateGoalPanel";
 import ComponentScopePanel from "../components/ComponentScopePanel";
 import DecisionAnalysisPanel from "../components/DecisionAnalysisPanel";
+import HeatingSystemPanel from "../components/HeatingSystemPanel";
 import { computeRegret, annuityFactor, type RegretOptionInput } from "../utils/regretAnalysis";
 import { api } from "../api/client";
 import { lineItemsFor, type AreaLineItem } from "../config/componentAreaLineItems";
@@ -531,6 +532,15 @@ export default function RenovationSimulator() {
     ? project.renovationEnvelopeComponents
     : ["Walls", "Roof", "Windows"];
   const lineItems = useMemo(() => lineItemsFor(components), [components]);
+
+  /* What's actually in scope decides which Step-4 sections render. "Heating
+     system" has no envelope line item, so a heating-only scope has an empty
+     lineItems — in that case we hide the whole envelope flow (design configs,
+     packages, Pareto optimizer, results) and show only the HVAC comparison.
+     Conversely the HVAC panel appears only when heating is in scope (whether
+     picked in Step 1 or added here in Step 4). */
+  const hasEnvelope = lineItems.length > 0;
+  const hasHeating  = components.includes("Heating system");
 
   /* Every building selected in Step 2 - not just the first one. For a bbox /
      neighbourhood selection they are ordered by MCDA retrofit priority (energy +
@@ -1371,7 +1381,7 @@ export default function RenovationSimulator() {
         </div>
       )}
 
-      {geometries.length > 0 && !isUK && (
+      {geometries.length > 0 && !isUK && hasEnvelope && (
         <>
           <StageHeader n={2} title="Design configurations"
             hint={configs.length
@@ -1603,14 +1613,14 @@ export default function RenovationSimulator() {
       {geometries.length > 0 && (
         <>
           {/* ══ PACKAGES — the product of your configurations ══════════════ */}
-          {!isUK && (
+          {!isUK && hasEnvelope && (
             <StageHeader n={3} title="Packages"
               hint={packageCombosList.length
                 ? `${activeCombos.length} selected of ${packageCombosList.length}`
                 : "needs at least one configuration"}
               state={packageCombosList.length ? "active" : "waiting"} />
           )}
-          {!isUK && (
+          {!isUK && hasEnvelope && (
             <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Packages</span>
@@ -1685,7 +1695,7 @@ export default function RenovationSimulator() {
 
           {/* The trade-off curve now updates live from the same picks, so it's a
               companion view (not a separate "run this instead" tool). */}
-          {!isUK && (
+          {!isUK && hasEnvelope && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 -4px" }}>
               <span style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
               <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>
@@ -1698,7 +1708,7 @@ export default function RenovationSimulator() {
           {/* Multi-objective optimizer (Sweden) — Pareto front over the fast
               degree-day physics; each validated winner runs in EPSM and drops
               into the comparison table below. */}
-          {!isUK && (
+          {!isUK && hasEnvelope && (
             <OptimizerPanel
               input={optimizerInput.input}
               disabledReason={optimizerInput.disabledReason}
@@ -1709,6 +1719,7 @@ export default function RenovationSimulator() {
             />
           )}
 
+          {(isUK || hasEnvelope) && (<>
           <StageHeader n={4} title="Results"
             hint={packages.filter((p) => !p.isBaseline).length
               ? `${packages.filter((p) => !p.isBaseline).length} package${packages.filter((p) => !p.isBaseline).length === 1 ? "" : "s"} vs baseline`
@@ -1943,8 +1954,20 @@ export default function RenovationSimulator() {
             )}
           </div>
 
+          </>)}
+
           {/* City climate target — which package reaches Gothenburg's −30% by 2030 */}
-          {goalAssessment && <ClimateGoalPanel a={goalAssessment} />}
+          {(isUK || hasEnvelope) && goalAssessment && <ClimateGoalPanel a={goalAssessment} />}
+
+          {/* Heating-system (HVAC source) comparison on the baseline heat demand.
+              Shown only when heating is in scope (Step 1 or added in Step 4). */}
+          {!isUK && hasHeating && baselineAgg?.avgHeatingKwhM2Yr != null && totalFloorAreaM2 > 0 && (
+            <HeatingSystemPanel
+              heatingDemandKwhM2Yr={baselineAgg.avgHeatingKwhM2Yr}
+              floorAreaM2={totalFloorAreaM2}
+              discountRate={assumptionValue("SE", "discount_rate") ?? 0.03}
+            />
+          )}
 
           {/* Regret / robustness decision analysis under uncertain energy prices */}
           {regretResult && regretResult.options.length >= 2 && (

@@ -114,6 +114,36 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/status")
+async def status():
+    """Live status of the optional integrations, for the Settings → Connections
+    panel: whether an AI key is configured, and whether EPSM (energy simulation)
+    and the on-host façade-ML service are reachable."""
+    import httpx
+    openai_on = bool(os.environ.get("OPENAI_API_KEY", "").strip())
+    anthropic_on = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
+    epsm_url = os.environ.get("EPSM_BASE_URL", "http://localhost:8010").strip()
+    facade_url = (os.environ.get("FACADE_MODEL_URL", "").strip()
+                  or os.environ.get("FACADE_ML_URL", "http://host.docker.internal:8020").strip())
+
+    async def reachable(url: str) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                r = await client.get(url)
+                return r.status_code < 500
+        except Exception:
+            return False
+
+    return {
+        "ai": {
+            "configured": openai_on or anthropic_on,
+            "provider": "anthropic" if anthropic_on else ("openai" if openai_on else None),
+        },
+        "epsm": {"reachable": await reachable(epsm_url) if epsm_url else False, "url": epsm_url},
+        "facade_ml": {"reachable": await reachable(f"{facade_url}/health") if facade_url else False, "url": facade_url},
+    }
+
+
 # ── UK data (English Housing Survey 2024-25 + OSM/EPC city buildings) ───────
 _UK_DIR = PROJECT_ROOT / "frontend" / "public" / "uk"
 
@@ -3506,6 +3536,87 @@ def _epc_cols_rows():
         finally:
             con.close()
     return _EPC_COLS_CACHE, _EPC_ROWS_CACHE
+
+
+# Current heating system per building, inferred from the EPC's delivered-energy-
+# per-carrier columns (the dominant carrier wins). Maps EPC column groups → a
+# friendly system name that matches the HVAC catalogue in the renovation step.
+_HEATING_GROUPS: dict[str, list[str]] = {
+    "District heating":        ["EgiFjarrvarme"],
+    "Ground-source heat pump": ["EgiPumpMark"],
+    "Air-water heat pump":     ["EgiPumpLuftVatten"],
+    "Air-air heat pump":       ["EgiPumpLuftLuft"],
+    "Exhaust-air heat pump":   ["EgiPumpFranluft"],
+    "Direct electric":         ["EgiElDirekt", "EgiElVatten", "EgiElLuft"],
+    "Wood / biofuel":          ["EgiVed", "EgiFlis", "EgiOvrBiobransle"],
+    "Oil":                     ["EgiOlja"],
+    "Gas":                     ["EgiGas"],
+    "Solar thermal":           ["EgiSolvarme"],
+}
+
+
+class EpcHeatingRequest(BaseModel):
+    addresses: list[str]
+
+
+@app.post("/api/epc/heating")
+def epc_heating(req: EpcHeatingRequest):
+    """Infer each building's CURRENT heating system from the Boverket EPC
+    (energideklaration): the dominant delivered-energy carrier. Joined by street
+    address (Gothenburg). Returns { address: {system} | null }. Degrades to empty
+    when the national EPC register isn't present in this deployment."""
+    import re as _re
+    norm = lambda s: _re.sub(r"\s+", "", (s or "").lower())
+    wanted: dict[str, str] = {}
+    for a in (req.addresses or []):
+        n = norm(a)
+        if n:
+            wanted.setdefault(n, a)
+    if not wanted:
+        return {"results": {}, "available": True}
+    try:
+        con = _epc_con()
+    except FileNotFoundError:
+        return {"results": {}, "available": False}
+
+    all_cols = [c for cols in _HEATING_GROUPS.values() for c in cols]
+    col_sql = ", ".join(f'"{c}"' for c in all_cols)
+    keys = list(wanted.keys())
+    placeholders = ", ".join(["?"] * len(keys))
+    sql = (
+        f"SELECT lower(regexp_replace(IdAdr, '\\s+', '', 'g')) AS k, {col_sql} "
+        f"FROM epc WHERE _kommunkod_4digit = '1480' "
+        f"AND lower(regexp_replace(IdAdr, '\\s+', '', 'g')) IN ({placeholders})"
+    )
+    try:
+        rows = con.execute(sql, keys).fetchall()
+    finally:
+        con.close()
+
+    idx = {c: i + 1 for i, c in enumerate(all_cols)}  # row[0] is the normalised key
+    best: dict[str, tuple[str, float]] = {}
+    for row in rows:
+        k = row[0]
+        group_energy: dict[str, float] = {}
+        for label, cols in _HEATING_GROUPS.items():
+            tot = 0.0
+            for c in cols:
+                v = row[idx[c]]
+                try:
+                    tot += float(v) if v is not None else 0.0
+                except (TypeError, ValueError):
+                    pass
+            if tot > 0:
+                group_energy[label] = tot
+        if not group_energy:
+            continue
+        label = max(group_energy, key=lambda x: group_energy[x])
+        energy = group_energy[label]
+        if k not in best or energy > best[k][1]:  # keep the record with the most heat energy
+            best[k] = (label, energy)
+
+    results = {orig: ({"system": best[n][0]} if n in best else None) for n, orig in wanted.items()}
+    return {"results": results, "available": True}
 
 
 def _chat_tool_epc_dataset_info(_args: dict) -> dict:

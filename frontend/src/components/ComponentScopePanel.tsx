@@ -7,7 +7,7 @@ import type { GoalAssessment } from "../config/climateGoals";
  * envelope measures on a subset of components physically cap the reachable
  * reduction (walls+roof alone rarely hit −30%). */
 
-const ADDABLE = ["Walls", "Roof", "Windows", "Doors"] as const;
+const ADDABLE = ["Walls", "Roof", "Windows", "Floor", "Heating system"] as const;
 
 export default function ComponentScopePanel({ components, onChange, goalAssessment }: {
   components: string[];

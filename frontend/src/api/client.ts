@@ -197,6 +197,10 @@ export const api = {
       }>;
     }>(`/simulation-batch-status/${batchId}`),
 
+  /* ── Current heating system per building, inferred from the Boverket EPC ── */
+  epcHeating: (addresses: string[]) =>
+    post<{ results: Record<string, { system: string } | null>; available: boolean }>("/epc/heating", { addresses }),
+
   /* ── Facade defect detection (ML) — POST raw image bytes to the on-host model ── */
   facadeDetect: async (blob: Blob, threshold = 0.5): Promise<FacadeDetectResponse> => {
     const res = await fetch(`${BASE}/facade-detect?threshold=${threshold}`, { method: "POST", body: blob });

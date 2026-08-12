@@ -412,11 +412,11 @@ function AddressInput({
               ))}
             </ul>
           ) : error ? (
-            <div className="px-3 py-2.5 text-xs text-amber-700 bg-amber-50">
+            <div className="px-3 py-2.5 text-xs" style={{ color: "#b45309", background: "#fffbeb" }}>
               Search is temporarily unavailable (rate-limited). Wait a moment and try again.
             </div>
           ) : loading ? null : (
-            <div className="px-3 py-2.5 text-xs text-gray-500">
+            <div className="px-3 py-2.5 text-xs" style={{ color: "#6b7280" }}>
               No matches for “{trimmed}”. Try a street or area name, or add the city.
             </div>
           )}

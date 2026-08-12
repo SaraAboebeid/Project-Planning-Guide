@@ -905,7 +905,20 @@ function BboxDataBanner({
   const [addOpen, setAddOpen]         = useState(false);   // paste-JSON/CSV panel
   const [pasteText, setPasteText]     = useState("");
   const [editing, setEditing]         = useState(false);   // inline table cell editing
+  // Current heating system per building (from the Boverket EPC), keyed by address.
+  const [heating, setHeating]         = useState<Record<string, { system: string } | null>>({});
   const PAGE_SIZE = 50;
+
+  // Look up the current heating system for the loaded buildings (Gothenburg EPC).
+  useEffect(() => {
+    const addrs = Array.from(new Set(
+      (rows ?? []).map(r => r.address).filter((a): a is string => !!a && !isCadastralId(a)),
+    ));
+    if (!addrs.length) { setHeating({}); return; }
+    let alive = true;
+    api.epcHeating(addrs).then(res => { if (alive) setHeating(res.results ?? {}); }).catch(() => { if (alive) setHeating({}); });
+    return () => { alive = false; };
+  }, [rows]);
 
   // In district mode there are no precomputed aggregate stats, so derive them
   // from the fetched rows once they load.
@@ -1334,6 +1347,9 @@ function BboxDataBanner({
                       </th>
                     );
                   })}
+                  <th className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60" title="Current heating system, inferred from the Boverket EPC (energideklaration)">
+                    Current heating
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1381,6 +1397,16 @@ function BboxDataBanner({
                           </td>
                         );
                       })}
+                      {(() => {
+                        const h = r.address ? heating[r.address] : null;
+                        const sys = h?.system ?? null;
+                        return (
+                          <td className={`px-2 py-1 whitespace-nowrap ${isSelected ? "" : sys ? "bg-sky-900/15 text-sky-300" : "bg-white/[0.02] text-white/25"}`}
+                              onClick={editing ? (e => e.stopPropagation()) : undefined}>
+                            {sys ?? "—"}
+                          </td>
+                        );
+                      })()}
                     </tr>
                   );
                 })}
@@ -1565,6 +1591,12 @@ function BuildingDataBanner({
   building: BuildingLookup;
   projectType: string | null;
 }) {
+  const setProject      = useWizardStore(s => s.setProject);
+  const storeBuildings  = useWizardStore(s => s.project.lookedUpBuildings);
+  const [editing, setEditing] = useState(false);
+  // Current heating system for this building (inferred from the Boverket EPC).
+  const [heating, setHeating] = useState<{ system: string } | null>(null);
+
   const critical = projectType ? (BUILDING_CRITICAL[projectType] ?? new Set<keyof BuildingLookup>()) : new Set<keyof BuildingLookup>();
   const viewerUrl = `/gothenburg_3d.html?lat=${building.lat}&lon=${building.lon}&zoom=17`;
 
@@ -1579,10 +1611,35 @@ function BuildingDataBanner({
     { key: "tabula_u_wall", label: "U-wall (W/m²K)" },
     { key: "tabula_u_win",  label: "U-win (W/m²K)" },
   ];
+  // Numeric fields get coerced back to numbers on edit; the rest stay strings.
+  const NUMERIC = new Set<string>(["year", "floors", "height", "footprint_m2", "energy", "tabula_u_wall", "tabula_u_win"]);
 
   const missingCritical = fields.filter(
     f => critical.has(f.key) && (building[f.key] === null || building[f.key] === undefined)
   );
+
+  // Look up the current heating system for this address (skip cadastral-only IDs).
+  useEffect(() => {
+    const addr = building.address;
+    if (!addr || isCadastralId(addr)) { setHeating(null); return; }
+    let alive = true;
+    api.epcHeating([addr])
+      .then(res => { if (alive) setHeating(res.results?.[addr] ?? null); })
+      .catch(() => { if (alive) setHeating(null); });
+    return () => { alive = false; };
+  }, [building.address]);
+
+  // Write an edited field back into the store so Steps 3-4 (which read
+  // lookedUpBuilding / lookedUpBuildings) pick up the override.
+  const updateField = (key: keyof BuildingLookup, raw: string) => {
+    let val: string | number | null = raw;
+    if (raw.trim() === "") val = null;
+    else if (NUMERIC.has(String(key))) { const n = Number(raw); if (Number.isFinite(n)) val = n; }
+    const nextSingle = { ...building, [key]: val } as BuildingLookup;
+    const list = (storeBuildings ?? []).slice();
+    if (list.length) list[0] = { ...list[0], [key]: val };
+    setProject({ lookedUpBuilding: nextSingle, lookedUpBuildings: list });
+  };
 
   return (
     <div className="rounded-xl border border-purple-700/40 bg-[#0d1117] overflow-hidden">
@@ -1596,29 +1653,60 @@ function BuildingDataBanner({
             <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span>
           )}
         </div>
-        {building.address && !isCadastralId(building.address) && <span className="text-[10px] text-purple-400/70 truncate max-w-[200px]">{formatAddress(building.address)}</span>}
+        <div className="flex items-center gap-2">
+          {building.address && !isCadastralId(building.address) && <span className="text-[10px] text-purple-400/70 truncate max-w-[160px]">{formatAddress(building.address)}</span>}
+          <button
+            onClick={() => setEditing(e => !e)}
+            title="Add or correct this building's data — overrides feed Steps 3-4 (stored for this session only, never written back to the source data)."
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition ring-1 ${editing
+              ? "bg-violet-600/30 text-violet-200 ring-violet-500/60"
+              : "bg-white/5 text-white/70 ring-white/15 hover:bg-white/10 hover:text-white"}`}>
+            <Plus className="w-3.5 h-3.5" /> {editing ? "Done" : "Add / Edit"}
+          </button>
+        </div>
       </div>
 
-      {/* Fields grid */}
+      {editing && (
+        <div className="mx-3 mt-3 -mb-1 rounded-lg bg-violet-900/20 border border-violet-700/30 px-3 py-2 text-[10.5px] text-violet-200/80">
+          Editing overrides for <b className="text-violet-100">this session only</b> — they feed the simulation and prioritisation in Steps 3-4 and are never written back to the source datasets. Leave a field blank to clear it.
+        </div>
+      )}
+
+      {/* Fields grid — read-only chips, or editable inputs when Add / Edit is on */}
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 p-3">
         {fields.map(f => (
-          <FieldChip
-            key={String(f.key)}
-            label={f.label}
-            value={building[f.key] as string | number | null}
-            critical={critical.has(f.key)}
-          />
+          editing ? (
+            <EditableChip
+              key={String(f.key)}
+              label={f.label}
+              value={building[f.key] as string | number | null}
+              critical={critical.has(f.key)}
+              onChange={v => updateField(f.key, v)}
+            />
+          ) : (
+            <FieldChip
+              key={String(f.key)}
+              label={f.label}
+              value={building[f.key] as string | number | null}
+              critical={critical.has(f.key)}
+            />
+          )
         ))}
+        {/* Current heating system — inferred from the EPC, read-only */}
+        <div className={`flex flex-col px-2.5 py-2 rounded-lg border text-[11px] ${heating ? "bg-sky-900/25 border-sky-700/50 text-sky-300" : "bg-white/5 border-white/10 text-white/30"}`}>
+          <span className="font-semibold leading-tight">{heating?.system ?? "—"}</span>
+          <span className="text-[10px] opacity-70 mt-0.5">Current heating</span>
+        </div>
       </div>
 
       {/* Missing critical data warning */}
-      {missingCritical.length > 0 && (
+      {missingCritical.length > 0 && !editing && (
         <div className="mx-3 mb-3 flex items-start gap-2 rounded-lg bg-red-900/30 border border-red-700/40 px-3 py-2 text-xs text-red-400">
           <span className="text-sm mt-0.5">⚠️</span>
           <span>
             <span className="font-semibold">Missing critical data for {projectType}:</span>{" "}
             {missingCritical.map(f => f.label).join(", ")}.
-            {" "}Check the starred (★) rows below and toggle them off for fallback options.
+            {" "}Click <b>Add / Edit</b> above to fill these in, or check the starred (★) rows below for fallback options.
           </span>
         </div>
       )}
@@ -1630,6 +1718,25 @@ function BuildingDataBanner({
           📷 Open Gothenburg 3D →
         </a>
       </div>
+    </div>
+  );
+}
+
+/* Editable variant of FieldChip — an inline input that writes back on change. */
+function EditableChip({
+  label, value, critical, onChange,
+}: { label: string; value: string | number | null | undefined; critical: boolean; onChange: (v: string) => void }) {
+  const hasVal = value !== null && value !== undefined;
+  return (
+    <div className={`flex flex-col px-2.5 py-2 rounded-lg border text-[11px] ${
+      critical ? "bg-purple-900/20 border-purple-700/50" : "bg-white/5 border-white/12"}`}>
+      <input
+        value={hasVal ? String(value) : ""}
+        onChange={e => onChange(e.target.value)}
+        placeholder="—"
+        className="w-full bg-[#0d1117] border border-white/12 rounded px-1 py-0.5 text-[11px] text-white/90 focus:outline-none focus:border-violet-500/60"
+      />
+      <span className="text-[10px] opacity-70 mt-1 text-white/50">{label}{critical && " ★"}</span>
     </div>
   );
 }
@@ -1647,6 +1754,15 @@ function MultiBuildingDataBanner({
   const [expanded, setExpanded] = useState(false);
   const withEpc = buildings.filter(b => b.has_epc).length;
   const shownBuildings = expanded ? buildings : buildings.slice(0, 3);
+  // Current heating system per building, inferred from the Boverket EPC.
+  const [heating, setHeating] = useState<Record<string, { system: string } | null>>({});
+  useEffect(() => {
+    const addrs = Array.from(new Set(buildings.map(b => b.address).filter((a): a is string => !!a && !isCadastralId(a))));
+    if (!addrs.length) { setHeating({}); return; }
+    let alive = true;
+    api.epcHeating(addrs).then(res => { if (alive) setHeating(res.results ?? {}); }).catch(() => { if (alive) setHeating({}); });
+    return () => { alive = false; };
+  }, [buildings]);
 
   return (
     <div className="rounded-xl border border-purple-700/40 bg-[#0d1117] overflow-hidden">
@@ -1680,6 +1796,9 @@ function MultiBuildingDataBanner({
                 {b.floors     && <span>{b.floors} floors</span>}
                 {b.eclass     && <span>Class {b.eclass}</span>}
                 {b.tabula_u_wall && <span>U-wall {b.tabula_u_wall} W/m²K</span>}
+                {b.address && heating[b.address]?.system && (
+                  <span className="text-sky-300">🔥 {heating[b.address]!.system}</span>
+                )}
               </div>
             </div>
             {b.has_epc && (

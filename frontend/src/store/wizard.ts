@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { RegretResult } from "../utils/regretAnalysis";
+import type { HvacOutcome } from "../utils/hvacAnalysis";
 import type { ProjectType, BuildingDevelopmentType } from "../config/projectConfig";
 import type { BuildingLookup, BboxStats, WWRRecord, BuildingRecord } from "../types";
 
@@ -194,6 +195,11 @@ interface ProjectState {
   /* Step 4 — regret-based decision analysis (minimax regret / range / Hurwicz over
      retrofit options under future energy-price scenarios); rendered in the Step 5 report. */
   regretAnalysis: RegretResult | null;
+  /* Step 4 — chosen heating system (HVAC source), id from hvacSystems.ts.
+     Default "dh_keep" = keep district heating (the as-built baseline). */
+  heatingSystemId: string;
+  /* Step 4 — computed heating-system comparison + the picked system, for Step 5. */
+  heatingAnalysis: (HvacOutcome & { selectedId: string; heatingDemandKwhM2Yr: number }) | null;
 }
 
 export interface FacadeDefectSummary {
@@ -264,6 +270,8 @@ const DEFAULT_PROJECT: ProjectState = {
   renovationSimResults: [],
   facadeDefects: {},
   regretAnalysis: null,
+  heatingSystemId: "dh_keep",
+  heatingAnalysis: null,
 };
 
 /* sessionStorage wrapper that never throws — if storage is disabled or over

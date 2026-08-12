@@ -571,6 +571,10 @@ export default function DefineProject() {
                 "Roof": {
                   icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M4 14L14 4l10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><rect x="7" y="14" width="14" height="10" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><line x1="14" y1="14" x2="14" y2="24" stroke="currentColor" strokeWidth="1.5"/></svg>
                 },
+                "Heating system": {
+                  subtitle: "HVAC",
+                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 4c1.8 2 2 3.6 1 5.2-1.1 1.8-1 3.2.2 4.8 1.6-1 2.4-2.6 2.2-4.6 1.8 1.4 2.9 3.6 2.9 6.1a6.3 6.3 0 11-12.6 0c0-3 1.6-5.7 4.1-7.4-.3 1.6.1 2.8 1.1 3.6.8-2.4.7-5-1-7.7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>
+                },
                 "Floor": {
                   icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="8" width="20" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="4" y="14" width="20" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="4" y="20" width="20" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>
                 },
