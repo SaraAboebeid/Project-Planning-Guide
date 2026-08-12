@@ -329,6 +329,16 @@ a[href]:focus-visible,
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
+/* Primary "Start Planning" CTA on the landing page: it sets an inline
+   box-shadow (which would block the generic hover ring), so give it its own
+   growing purple glow on hover / press — !important to beat the inline style. */
+.ppg-start-cta:hover {
+  box-shadow: 0 10px 34px rgba(114, 28, 184, 0.7) !important;
+}
+.ppg-start-cta:active {
+  box-shadow: 0 3px 12px rgba(114, 28, 184, 0.5) !important;
+}
+
 /* Disabled / non-clickable: clearly NOT interactive. */
 button:disabled,
 [role="button"][aria-disabled="true"],

@@ -85,8 +85,8 @@ export const LIBRARY_TABS: {
   pathByCountry?: Partial<Record<CountryCode, string>>;
 }[] = [
   { label: "Pathways", path: "/pathways" },
-  { label: "Data Explorer", path: "/data", pathByCountry: { gb: "/data/uk" } },
   { label: "Analysis Tools", path: "/analysis" },
+  { label: "Data Explorer", path: "/data", pathByCountry: { gb: "/data/uk" } },
   { label: "3D Viewer", path: "/viewer", pathByCountry: { gb: "/viewer/uk" } },
   { label: "Sample Reports", path: "/reports" },
   { label: "Project Team", path: "/team" },

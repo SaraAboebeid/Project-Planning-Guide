@@ -145,21 +145,6 @@ const TOOLS = [
       "Façade (F) uses the AI defect inspection — excluded until a building is inspected",
       "Ranking orders which buildings enter the EPSM simulation first",
     ],
-    methodology: {
-      criteria: [
-        { key: "E", name: "Energy performance", weight: "0.35", vars: "Energy class, kWh/m²·yr, heating demand, CO₂", rule: "kWh/m²·yr benchmarked 60→250 (or EPC class when unmetered)" },
-        { key: "F", name: "Façade / envelope condition", weight: "0.30", vars: "Cracks, spalling, leakage, corrosion, bulges", rule: "AI defect load, severity-weighted & saturating; excluded until inspected" },
-        { key: "C", name: "Building characteristics", weight: "0.15", vars: "Age, construction type, façade / floor area", rule: "0.6 × vintage + 0.4 × size percentile" },
-        { key: "R", name: "Retrofit potential", weight: "0.20", vars: "Expected saving, cost, payback, feasibility", rule: "Energy headroom above target + U-value poorness + scale" },
-      ],
-      equations: [
-        { label: "Weighted priority score", tex: "Pᵢ = w_E·Eᵢ + w_F·Fᵢ + w_C·Cᵢ + w_R·Rᵢ" },
-        { label: "Default weights (Σw = 1)", tex: "P = 0.35·E + 0.30·F + 0.15·C + 0.20·R" },
-        { label: "AHP weights — geometric-mean priority", tex: "wₖ = (∏ⱼ aₖⱼ)^(1/n) ⁄ Σᵢ (∏ⱼ aᵢⱼ)^(1/n)" },
-        { label: "AHP consistency ratio", tex: "CR = CI ⁄ RI,   CI = (λmax − n)/(n − 1),   RI = 0.90 (n = 4);   consistent if CR ≤ 0.10" },
-      ],
-      note: "Every sub-score carries a data-confidence; a criterion without data (e.g. an un-inspected façade) is dropped and its weight re-normalised across the remaining criteria, so the composite stays comparable.",
-    },
     usedIn: ["Renovation Planning", "Energy Community Planning"],
   },
   {
@@ -178,21 +163,6 @@ const TOOLS = [
       "Hurwicz criterion with an adjustable optimism weight α",
       "Do-nothing kept as a reference; the decision is made among the retrofits",
     ],
-    methodology: {
-      equations: [
-        { label: "Net benefit of an option in a scenario", tex: "benefit = (energy saved × area) × price × annuity − investment" },
-        { label: "Regret (opportunity loss)", tex: "regretᵢ,ₛ = maxⱼ(benefitⱼ,ₛ) − benefitᵢ,ₛ" },
-        { label: "Minimax regret rule", tex: "choose i that minimises  maxₛ regretᵢ,ₛ" },
-        { label: "Uncertainty range (sensitivity)", tex: "rangeᵢ = maxₛ benefitᵢ,ₛ − minₛ benefitᵢ,ₛ" },
-        { label: "Hurwicz criterion", tex: "Hᵢ = α · (best case) + (1 − α) · (worst case)" },
-      ],
-      note: "α is your risk attitude: α = 0 weighs only the worst case (cautious), α = 1 only the best case (optimistic), α = 0.5 balances them. A small range means the option is robust to price uncertainty; a small max regret means it's safe against choosing wrong.",
-      sources: [
-        { label: "Energy price — today's reference (SE3, Gothenburg)", cite: "Nord Pool day-ahead spot, fetched live via elprisetjustnu.se (spot only, excl. VAT / grid fee / energy tax); 0.8 SEK/kWh fallback if the feed is down. Low/Medium/High are user-set scenarios around it.", url: "https://www.elprisetjustnu.se" },
-        { label: "Real discount rate — 3%", cite: "EU cost-optimal framework (Delegated Reg. 244/2012), societal real rate used by Boverket for building energy LCC", url: "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32012R0244" },
-        { label: "Study period — 30 years", cite: "Net-present-value horizon; annuity factor = Σ 1/(1+r)^t over the period" },
-      ],
-    },
     usedIn: ["Renovation Planning", "Energy Community Planning"],
   },
   {

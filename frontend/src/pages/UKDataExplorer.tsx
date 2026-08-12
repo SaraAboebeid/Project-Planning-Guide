@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import OptimizationAssumptions from "../components/OptimizationAssumptions";
+import MethodEquationsPanel from "../components/MethodEquationsPanel";
 
 function Icon({ d, size = 16 }: { d: string; size?: number }) {
   return (
@@ -457,6 +458,7 @@ export default function UKDataExplorer() {
       </div>
 
       {/* Optimization assumptions + equations + sources (defaults to UK) */}
+      <MethodEquationsPanel />
       <OptimizationAssumptions country="UK" />
 
       <div style={{ marginTop: 24, fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>

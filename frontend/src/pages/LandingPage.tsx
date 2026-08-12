@@ -51,12 +51,6 @@ function StatCard({ label, value, unit, barColor }: {
 
 type StepStatus = "not-started" | "in-progress" | "review";
 
-const STEP_STATUS_STYLE: Record<StepStatus, { dot: string; text: string }> = {
-  "not-started": { dot: "rgba(255,255,255,0.45)", text: "rgba(255,255,255,0.68)" },
-  "in-progress": { dot: "#37D39A", text: "#37D39A" },
-  "review": { dot: "#5FA5FF", text: "#5FA5FF" },
-};
-
 // ── Data ───────────────────────────────────────────────────────────────────
 // The real Renovation Planning wizard steps — each card matches the page it
 // links to (Define Project → Building & Site Data → Baseline → Calculator →
@@ -312,7 +306,7 @@ export default function LandingPage() {
               <div className="flex items-center gap-3 mb-5">
                 <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-white/90
                                  bg-[#721CB8]/40 border border-[#721CB8]/50 backdrop-blur-sm
-                                 px-2.5 py-1 rounded-md">
+                                 px-2.5 py-1 rounded-md pointer-events-none select-none no-hover-shadow">
                   {(selectedCity || country.name)} 3D Viewer
                 </span>
                 <span className="flex items-center gap-1.5 text-[10px] text-white/60">
@@ -335,8 +329,9 @@ export default function LandingPage() {
               <div className="flex items-center gap-3 mb-8">
                 <button
                   onClick={handleStart}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold
-                             text-white cursor-pointer border-0 transition-all hover:opacity-90 shadow-lg"
+                  className="ppg-start-cta flex items-center gap-2 px-6 py-3 rounded-xl text-[13px] font-bold
+                             text-white cursor-pointer border-0 transition-all duration-150
+                             hover:-translate-y-0.5 hover:brightness-115 active:translate-y-0 active:brightness-95"
                   style={{ background: "linear-gradient(135deg, #421869 0%, #721CB8 100%)", boxShadow: "0 4px 20px rgba(114,28,184,0.45)" }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -351,12 +346,10 @@ export default function LandingPage() {
               chat button (fixed bottom-5 right-5) so step 5 isn't clipped. ── */}
           <div className="absolute bottom-20 left-4 right-4 z-10 hidden xl:flex gap-2.5">
             {WORKFLOW_STEPS.map((step) => {
-              const statusStyle = STEP_STATUS_STYLE[step.status];
               return (
-                <button
+                <div
                   key={step.n}
-                  onClick={() => startAt(step.path)}
-                  className="flex-1 rounded-2xl p-3 text-left border transition-all cursor-pointer"
+                  className="flex-1 rounded-2xl p-3 text-left border no-hover-shadow"
                   style={{
                     background: "rgba(13,17,40,0.82)",
                     borderColor: "rgba(114,28,184,0.34)",
@@ -364,7 +357,7 @@ export default function LandingPage() {
                     backdropFilter: "blur(12px)",
                   }}
                 >
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-1.5">
                     <span className="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold"
                           style={{ background: "rgba(114,28,184,0.38)", border: "1px solid rgba(114,28,184,0.7)", color: "#fff" }}>
                       {step.n}
@@ -372,14 +365,8 @@ export default function LandingPage() {
                     <span style={{ color: "#8FF0E8" }}><Icon d={step.icon} size={15} /></span>
                     <span className="text-[11px] font-semibold text-white">{step.name}</span>
                   </div>
-                  <p className="text-[10px] leading-relaxed text-white/60 mb-2.5">{step.desc}</p>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ background: statusStyle.dot }} />
-                    <span className="text-[10px] font-medium" style={{ color: statusStyle.text }}>
-                      {step.status === "not-started" ? "Not started" : step.status === "in-progress" ? "In progress" : "Review"}
-                    </span>
-                  </div>
-                </button>
+                  <p className="text-[10px] leading-relaxed text-white/60">{step.desc}</p>
+                </div>
               );
             })}
           </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { WIKELLS_CHAPTERS, wikellsStats } from "../config/wikellsData";
 import OptimizationAssumptions from "../components/OptimizationAssumptions";
+import MethodEquationsPanel from "../components/MethodEquationsPanel";
 
 // ── Icon helper ──────────────────────────────────────────────────────────────
 function Icon({ d, size = 16 }: { d: string; size?: number }) {
@@ -753,7 +754,9 @@ export default function DataExplorer() {
         ))}
       </div>
 
-      {/* Optimization assumptions + equations + sources */}
+      {/* All analysis methods & equations live here — the tool's single
+          reference place for assumptions + equations. */}
+      <MethodEquationsPanel />
       <OptimizationAssumptions country="SE" />
     </div>
   );
