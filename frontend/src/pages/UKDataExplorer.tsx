@@ -36,10 +36,10 @@ const STATUS_LABEL: Record<Status, string> = {
   placeholder: "Placeholder",
 };
 const STATUS_COLOR: Record<Status, string> = {
-  live: "#96D74C",
+  live: "#2FB477",
   cached: "#4A90E2",
-  estimated: "#F59E0B",
-  placeholder: "#EF4444",
+  estimated: "#E8880C",
+  placeholder: "#E2483B",
 };
 
 async function fetchJson<T>(path: string): Promise<T> {
@@ -100,7 +100,7 @@ const UK_SOURCES: Source[] = [
       "Real Energy Performance Certificates from the MHCLG register, matched to buildings by UPRN via OS Open UPRN. " +
       "For Rotherham this anchors 7,824 of 14,483 buildings (54%) with real EPC band, construction year, SAP and " +
       "heating — validated against ground-truth surveys at 91% exact / 100% within one band.",
-    accent: "#96D74C",
+    accent: "#2FB477",
     iconD: IC.epc,
     status: "live",
     fields: ["eclass", "year", "sap", "heating", "tabula_period", "epc_n_certs", "epc_source", "postcode"],
@@ -127,7 +127,7 @@ const UK_SOURCES: Source[] = [
     description:
       "P(EPC band | dwelling age) derived from the EHS 2024-25 national distribution. Used to estimate a building's " +
       "band when no certificate is matched to it.",
-    accent: "#96D74C",
+    accent: "#2FB477",
     iconD: IC.epc,
     status: "cached",
     fields: ["dwelling_age", "band_A", "band_B", "band_C", "band_D", "band_E", "band_F", "band_G"],
@@ -165,7 +165,7 @@ const UK_SOURCES: Source[] = [
     description:
       "Headline national indicators — mean SAP rating, EPC band shares, and the cost to lift a dwelling to band C — " +
       "from MHCLG's 2024-25 headline report annex tables.",
-    accent: "#F59E0B",
+    accent: "#E8880C",
     iconD: IC.survey,
     status: "live",
     fields: ["label", "value", "unit", "year"],
@@ -203,7 +203,7 @@ const UK_SOURCES: Source[] = [
       "data for per-package costing. Until a properly-licensed UK cost/carbon source is wired in, the renovation " +
       "calculator shows flat SYNTHETIC placeholder £/m² and kg CO₂e/m² rates per refurbishment " +
       "tier — round, made-up numbers used only to test the pipeline end-to-end, not for real decisions.",
-    accent: "#EF4444",
+    accent: "#E2483B",
     iconD: IC.tabula,
     status: "placeholder",
     fields: ["tier", "cost_gbp_per_m2", "carbon_kgco2e_per_m2", "note"],
@@ -319,7 +319,7 @@ function SourceCard({ source }: { source: Source }) {
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "14px 18px" }}>
           {loading && <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>Loading...</div>}
           {!loading && error && (
-            <div style={{ color: "#f87171", fontSize: 12 }}>
+            <div style={{ color: "#E2483B", fontSize: 12 }}>
               {error} — is the backend running? (<code>uvicorn backend.main:app --port 8000</code>)
             </div>
           )}
@@ -404,9 +404,9 @@ export default function UKDataExplorer() {
             fontWeight: 700,
             padding: "3px 9px",
             borderRadius: 99,
-            background: healthOk ? "rgba(150,215,76,0.15)" : "rgba(255,255,255,0.08)",
-            border: `1px solid ${healthOk ? "#96D74C50" : "rgba(255,255,255,0.12)"}`,
-            color: healthOk ? "#96D74C" : "rgba(255,255,255,0.40)",
+            background: healthOk ? "rgba(47,180,119,0.15)" : "rgba(255,255,255,0.08)",
+            border: `1px solid ${healthOk ? "#2FB47750" : "rgba(255,255,255,0.12)"}`,
+            color: healthOk ? "#2FB477" : "rgba(255,255,255,0.40)",
           }}>
             {healthOk === null ? "Checking..." : healthOk ? "● Backend online" : "○ Backend offline"}
           </span>
@@ -442,8 +442,8 @@ export default function UKDataExplorer() {
       {cities && cities.length === 0 && (
         <div style={{
           padding: "12px 16px", marginBottom: 20, borderRadius: 10,
-          border: "1px solid rgba(245,158,11,0.35)", background: "rgba(245,158,11,0.08)",
-          fontSize: 12, color: "#fbbf24",
+          border: "1px solid rgba(232,136,12,0.35)", background: "rgba(232,136,12,0.08)",
+          fontSize: 12, color: "#E8880C",
         }}>
           No UK cities built yet. Run <code>python tools/uk/ingest_ehs.py</code> then{" "}
           <code>python tools/uk/uk_data_pipeline.py --city london</code>.

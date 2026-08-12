@@ -59,7 +59,7 @@ export default function BuildingMapPanel() {
               [122,80,8,20],[138,74,10,26],[154,79,8,21],[170,82,10,18],
             ] as number[][]).map(([x,y,w,h],i) => (
               <rect key={i} x={x} y={y} width={w} height={h} rx={1}
-                fill={["#721CB8","#96D74C","#995BD5","#509724","#3a6e1a"][i % 5]}
+                fill={["#721CB8","#2FB477","#995BD5","#509724","#3a6e1a"][i % 5]}
                 opacity={0.6 + (i % 3) * 0.13}
               />
             ))}

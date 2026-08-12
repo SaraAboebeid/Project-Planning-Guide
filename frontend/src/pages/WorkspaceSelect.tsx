@@ -274,7 +274,7 @@ export default function WorkspaceSelect() {
               <span className="text-[15px] font-bold">{city}, {country.name}</span>
               {!cityIsLive && (
                 <span className="ml-auto text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(245,158,11,0.14)", color: "#F59E0B", border: "1px solid rgba(245,158,11,0.4)" }}>Demo</span>
+                  style={{ background: "rgba(232,136,12,0.14)", color: "#E8880C", border: "1px solid rgba(232,136,12,0.4)" }}>Demo</span>
               )}
             </div>
 
@@ -283,12 +283,12 @@ export default function WorkspaceSelect() {
                 <StatBar icon={Database} label="Data readiness" pct={readiness?.dataReadiness ?? null} />
                 <StatBar icon={ShieldCheck} label="Model confidence" pct={readiness?.modelConfidence ?? null} />
                 <StatRow icon={Leaf} label="Environmental data" value="Available" valueColor="#4ECDC4" />
-                <StatRow icon={Database} label="Cost database" value={country.id === "se" ? "Partial" : "—"} valueColor="#F59E0B" />
+                <StatRow icon={Database} label="Cost database" value={country.id === "se" ? "Partial" : "—"} valueColor="#E8880C" />
                 <StatRow icon={Target} label="Recommended workflow" value={focus} valueColor={ACCENT} />
               </div>
             ) : (
               <div className="rounded-xl px-4 py-5 text-[12.5px] leading-relaxed text-white/50"
-                style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                style={{ background: "rgba(232,136,12,0.06)", border: "1px solid rgba(232,136,12,0.2)" }}>
                 <strong className="text-white/70">Demo city.</strong> {city}'s building dataset hasn't been ingested yet, so
                 readiness figures aren't shown. Explore the tool with the Gothenburg dataset, which is fully live.
               </div>
@@ -340,7 +340,7 @@ export default function WorkspaceSelect() {
                   </>
                 ) : (
                   <span className="inline-block text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
-                    style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B", border: "1px solid rgba(245,158,11,0.35)" }}>
+                    style={{ background: "rgba(232,136,12,0.12)", color: "#E8880C", border: "1px solid rgba(232,136,12,0.35)" }}>
                     Demo · not ingested
                   </span>
                 )}

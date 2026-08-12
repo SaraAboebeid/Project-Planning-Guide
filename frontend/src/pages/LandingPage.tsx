@@ -42,7 +42,7 @@ function StatCard({ label, value, unit, barColor }: {
       border: "1px solid rgba(255,255,255,0.08)",
       borderRadius: 8, padding: "5px 10px",
     }}>
-      <div style={{ width: 5, height: 5, borderRadius: "50%", background: barColor ?? "#96D74C", flexShrink: 0 }} />
+      <div style={{ width: 5, height: 5, borderRadius: "50%", background: barColor ?? "#2FB477", flexShrink: 0 }} />
       <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{value}</span>
       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{label}{unit ? ` ${unit}` : ""}</span>
     </div>
@@ -170,13 +170,13 @@ export default function LandingPage() {
   const statCards = selectedCountry === "gb"
     ? [
         { label: "buildings",      value: ukStats ? ukStats.buildings.toLocaleString("en-US") : "—", color: "#4A90E2" },
-        { label: "EPC matched",    value: ukStats ? ukStats.withEpc.toLocaleString("en-US") : "—",   color: "#96D74C" },
+        { label: "EPC matched",    value: ukStats ? ukStats.withEpc.toLocaleString("en-US") : "—",   color: "#2FB477" },
         { label: "EHS estimated",  value: ukStats ? ukStats.estimated.toLocaleString("en-US") : "—", color: "#4ECDC4" },
         { label: "districts",      value: ukStats ? String(ukStats.districts) : "—",                 color: "#721CB8" },
       ]
     : [
         { label: "3D buildings",     value: seVal("buildings", "92,973"),     color: "#4A90E2" },
-        { label: "EPC matched",      value: seVal("epc_match", "85,670"),     color: "#96D74C" },
+        { label: "EPC matched",      value: seVal("epc_match", "85,670"),     color: "#2FB477" },
         { label: "TABULA matched",   value: seVal("tabula_match", "26,257"),  color: "#4ECDC4" },
         { label: "Boplats listings", value: boplatsListings,                  color: "#721CB8" },
       ];
@@ -316,7 +316,7 @@ export default function LandingPage() {
                   {(selectedCity || country.name)} 3D Viewer
                 </span>
                 <span className="flex items-center gap-1.5 text-[10px] text-white/60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#96D74C] animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#2FB477] animate-pulse" />
                   Live data
                 </span>
               </div>

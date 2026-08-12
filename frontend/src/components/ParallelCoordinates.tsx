@@ -236,7 +236,7 @@ export default function ParallelCoordinates({
           <div style={{ display: "flex", gap: 10, marginBottom: 5, fontWeight: 700 }}>
             <span style={{ color: "#4A90E2" }}>{Math.round(pareto[hover]!.energy_kwh_m2_yr)} kWh/m²</span>
             <span style={{ color: "#4ECDC4" }}>{(pareto[hover]!.total_carbon / 1000).toFixed(1)}k kg</span>
-            <span style={{ color: "#96D74C" }}>{fmt("cost", pareto[hover]!.total_cost)}</span>
+            <span style={{ color: "#2FB477" }}>{fmt("cost", pareto[hover]!.total_cost)}</span>
           </div>
           {Object.entries(pareto[hover]!.selection_labels).filter(([, v]) => v !== "Keep as-built").map(([k, v]) => (
             <div key={k} style={{ color: "rgba(255,255,255,0.55)" }}><span style={{ color: "rgba(255,255,255,0.35)" }}>{k}:</span> {v}</div>

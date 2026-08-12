@@ -13,7 +13,7 @@ interface StatusResp {
 const white = (o: number) => `rgba(255,255,255,${o})`;
 
 function Dot({ ok }: { ok: boolean }) {
-  return <span style={{ width: 9, height: 9, borderRadius: "50%", background: ok ? "#96D74C" : "#EF4444", boxShadow: `0 0 8px ${ok ? "#96D74C" : "#EF4444"}66`, flexShrink: 0 }} />;
+  return <span style={{ width: 9, height: 9, borderRadius: "50%", background: ok ? "#2FB477" : "#E2483B", boxShadow: `0 0 8px ${ok ? "#2FB477" : "#E2483B"}66`, flexShrink: 0 }} />;
 }
 
 function Row({ label, sub, ok, okText, offText }: { label: string; sub?: string; ok: boolean; okText: string; offText: string }) {
@@ -24,7 +24,7 @@ function Row({ label, sub, ok, okText, offText }: { label: string; sub?: string;
         <div style={{ fontSize: 13, color: "#fff", fontWeight: 600 }}>{label}</div>
         {sub && <div style={{ fontSize: 10.5, color: white(0.35), fontFamily: "ui-monospace, monospace" }}>{sub}</div>}
       </div>
-      <span style={{ fontSize: 11, fontWeight: 700, color: ok ? "#96D74C" : "#EF4444" }}>{ok ? okText : offText}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: ok ? "#2FB477" : "#E2483B" }}>{ok ? okText : offText}</span>
     </div>
   );
 }
@@ -73,8 +73,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
   const btn = (danger?: boolean): React.CSSProperties => ({
     display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 9, fontSize: 12, fontWeight: 700,
-    cursor: "pointer", border: `1px solid ${danger ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.15)"}`,
-    background: danger ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.05)", color: danger ? "#fca5a5" : white(0.8),
+    cursor: "pointer", border: `1px solid ${danger ? "rgba(226,72,59,0.4)" : "rgba(255,255,255,0.15)"}`,
+    background: danger ? "rgba(226,72,59,0.12)" : "rgba(255,255,255,0.05)", color: danger ? "#fca5a5" : white(0.8),
   });
 
   const sectionTitle = (icon: React.ReactNode, title: string) => (
@@ -121,7 +121,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
           {/* Data & session */}
           <div>
-            {sectionTitle(<Database size={15} color="#F59E0B" />, "Data & session")}
+            {sectionTitle(<Database size={15} color="#E8880C" />, "Data & session")}
             <p style={{ fontSize: 11, color: white(0.4), margin: "0 0 10px", lineHeight: 1.5 }}>
               All project data lives in this browser session. Clear parts of it, or reset everything.
             </p>
@@ -130,7 +130,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               <button onClick={clearSims} style={btn()}><Trash2 size={13} /> Clear simulation results</button>
               <button onClick={resetAll} style={btn(true)}><RotateCcw size={13} /> Reset entire project</button>
             </div>
-            {done && <div style={{ marginTop: 10, fontSize: 12, color: "#96D74C", display: "flex", alignItems: "center", gap: 6 }}><Check size={14} /> {done}</div>}
+            {done && <div style={{ marginTop: 10, fontSize: 12, color: "#2FB477", display: "flex", alignItems: "center", gap: 6 }}><Check size={14} /> {done}</div>}
           </div>
         </div>
       </div>

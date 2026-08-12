@@ -50,7 +50,7 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
                 <span style={{ fontSize: 13, fontWeight: 600, color: white(0.85) }}>{a.label}</span>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#4ECDC4", whiteSpace: "nowrap" }}>
                   {isLive ? livePrice : `${a.value ?? "—"} ${a.unit}`}
-                  {a.live && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: "#96D74C" }}>● LIVE</span>}
+                  {a.live && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: "#2FB477" }}>● LIVE</span>}
                   {a.provisional && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: "#F5A623" }}>PROVISIONAL</span>}
                 </span>
               </div>

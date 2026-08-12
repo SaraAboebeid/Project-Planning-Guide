@@ -128,7 +128,7 @@ type PanelId = "sensitivity" | "tabula" | "epc";
 
 const PANELS: { id: PanelId; label: string; icon: typeof Activity; color: string; desc: string }[] = [
   { id: "sensitivity", label: "Sensitivity Analysis", icon: Activity, color: "from-[#2b4a7e] to-[#2e9e96]", desc: "OAT parameter importance & response curves" },
-  { id: "tabula", label: "TABULA Results", icon: Database, color: "from-[#f59e0b] to-[#ef4444]", desc: "Building archetype U-values & energy demand" },
+  { id: "tabula", label: "TABULA Results", icon: Database, color: "from-[#E8880C] to-[#E2483B]", desc: "Building archetype U-values & energy demand" },
   { id: "epc", label: "EPC Results", icon: Zap, color: "from-[#7da828] to-[#2e9e96]", desc: "Energy performance certificates & trends" },
 ];
 

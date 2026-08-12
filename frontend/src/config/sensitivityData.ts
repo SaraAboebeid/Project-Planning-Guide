@@ -151,9 +151,9 @@ export const EPC_DISTRIBUTION: EpcClassDist[] = [
   { class: "A", count: 3, color: "#16a34a" },
   { class: "B", count: 8, color: "#65a30d" },
   { class: "C", count: 22, color: "#C4E81D" },
-  { class: "D", count: 35, color: "#eab308" },
+  { class: "D", count: 35, color: "#E8880C" },
   { class: "E", count: 18, color: "#f97316" },
-  { class: "F", count: 10, color: "#ef4444" },
+  { class: "F", count: 10, color: "#E2483B" },
   { class: "G", count: 4, color: "#dc2626" },
 ];
 

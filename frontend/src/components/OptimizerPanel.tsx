@@ -13,7 +13,7 @@ import ParallelCoordinates from "./ParallelCoordinates";
 type SortKey = "energy_kwh_m2_yr" | "total_cost" | "total_carbon";
 
 const TAG_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
-  "cheapest":       { bg: "rgba(150,215,76,0.16)",  fg: "#96D74C", label: "Cheapest" },
+  "cheapest":       { bg: "rgba(47,180,119,0.16)",  fg: "#2FB477", label: "Cheapest" },
   "lowest-carbon":  { bg: "rgba(78,205,196,0.16)",  fg: "#4ECDC4", label: "Lowest carbon" },
   "lowest-energy":  { bg: "rgba(74,144,226,0.16)",  fg: "#4A90E2", label: "Lowest energy" },
 };
@@ -129,7 +129,7 @@ export default function OptimizerPanel({
         </button>
       </div>
       {disabledReason && !open && (
-        <div style={{ fontSize: 11, color: "#F59E0B", padding: "0 18px 12px" }}>{disabledReason}</div>
+        <div style={{ fontSize: 11, color: "#E8880C", padding: "0 18px 12px" }}>{disabledReason}</div>
       )}
 
       {open && (
@@ -143,7 +143,7 @@ export default function OptimizerPanel({
           </p>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-            {disabledReason && <span style={{ fontSize: 11.5, color: "#F59E0B" }}>{disabledReason}</span>}
+            {disabledReason && <span style={{ fontSize: 11.5, color: "#E8880C" }}>{disabledReason}</span>}
             {result && (
               <span style={{ fontSize: 11.5, color: white(0.45) }}>
                 {result.combinations_total.toLocaleString()} combinations evaluated · {result.pareto_count} Pareto-optimal
@@ -153,7 +153,7 @@ export default function OptimizerPanel({
           </div>
 
           {error && (
-            <div style={{ fontSize: 12, color: "#EF4444", marginBottom: 10 }}>Optimization failed: {error}</div>
+            <div style={{ fontSize: 12, color: "#E2483B", marginBottom: 10 }}>Optimization failed: {error}</div>
           )}
 
           {/* Empty / computing states so the panel isn't blank before any pick */}
@@ -289,7 +289,7 @@ export default function OptimizerPanel({
                           <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
                             <div style={{ color: "#fff", fontWeight: 700 }}>{pt.energy_kwh_m2_yr} kWh/m²/yr</div>
                             {deltaPct != null && deltaPct > 0 && (
-                              <div style={{ fontSize: 10.5, color: "#96D74C" }}>−{deltaPct}% vs baseline</div>
+                              <div style={{ fontSize: 10.5, color: "#2FB477" }}>−{deltaPct}% vs baseline</div>
                             )}
                           </td>
                           <td style={{ padding: "8px", whiteSpace: "nowrap", color: white(0.8) }}>{fmtMoney(pt.total_cost)}</td>

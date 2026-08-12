@@ -6,10 +6,10 @@ import { type BuildingGoalAssessment, type GoalTier } from "../config/climateGoa
  * short, or worse than baseline. Companion to the portfolio ClimateGoalPanel. */
 
 const TIER_COLOR: Record<GoalTier, string> = {
-  exceeds: "#96D74C",
-  meets: "#96D74C",
-  below: "#F59E0B",
-  worse: "#EF4444",
+  exceeds: "#2FB477",
+  meets: "#2FB477",
+  below: "#E8880C",
+  worse: "#E2483B",
 };
 
 function cellText(reductionPct: number | null, tier: GoalTier | null, targetPct: number) {
@@ -47,7 +47,7 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
                     {c.color && <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color }} />}
                     {c.label}
                   </span>
-                  <div style={{ fontSize: 9, fontWeight: 600, color: c.met === c.total ? "#96D74C" : "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                  <div style={{ fontSize: 9, fontWeight: 600, color: c.met === c.total ? "#2FB477" : "rgba(255,255,255,0.35)", marginTop: 2 }}>
                     {c.met}/{c.total} meet
                   </div>
                 </th>
@@ -68,10 +68,10 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
                   const color = cell.tier ? TIER_COLOR[cell.tier] : gray;
                   const met = cell.tier === "meets" || cell.tier === "exceeds";
                   return (
-                    <td key={i} style={{ ...tdStyle, textAlign: "right", background: met ? "rgba(150,215,76,0.08)" : undefined }}>
+                    <td key={i} style={{ ...tdStyle, textAlign: "right", background: met ? "rgba(47,180,119,0.08)" : undefined }}>
                       <div style={{ fontWeight: 700, color }}>
                         {cell.energy == null ? "—" : cell.energy.toFixed(0)}
-                        {met && <CheckCircle2 size={11} color="#96D74C" style={{ marginLeft: 4, verticalAlign: "-1px" }} />}
+                        {met && <CheckCircle2 size={11} color="#2FB477" style={{ marginLeft: 4, verticalAlign: "-1px" }} />}
                       </div>
                       <div style={{ fontSize: 9.5, color, opacity: 0.85, marginTop: 1 }}>
                         {cellText(cell.reductionPct, cell.tier, goal.reductionPct)}
@@ -87,9 +87,9 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
 
       {/* Legend */}
       <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
-        <Legend color="#96D74C" label={`Meets target (≥ −${goal.reductionPct}%)`} />
-        <Legend color="#F59E0B" label="Below target (reduces, not enough)" />
-        <Legend color="#EF4444" label="No reduction vs baseline" />
+        <Legend color="#2FB477" label={`Meets target (≥ −${goal.reductionPct}%)`} />
+        <Legend color="#E8880C" label="Below target (reduces, not enough)" />
+        <Legend color="#E2483B" label="No reduction vs baseline" />
         <span style={{ marginLeft: "auto", opacity: 0.7 }}>values in kWh/m²·yr · pp = percentage points short</span>
       </div>
     </div>

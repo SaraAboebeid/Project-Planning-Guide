@@ -229,7 +229,7 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
     ${project.systemsInScope.length ? `<p class="sub-label">Systems in Scope</p><div class="tag-row">${project.systemsInScope.map(s => badge(s, "#721CB8")).join("")}</div>` : ""}
     ${project.selectedKpis.length ? `<p class="sub-label">Key Performance Indicators</p><div class="tag-row">${project.selectedKpis.map(k => badge(k, "#995BD5")).join("")}</div>` : ""}
     ${project.explorationApproaches.length ? `<p class="sub-label">Exploration Approaches</p><div class="tag-row">${project.explorationApproaches.map(a => badge(a, "#3a6e1a", "#fff")).join("")}</div>` : ""}
-    ${project.renovationEnvelopeComponents.length ? `<p class="sub-label">Envelope Components</p><div class="tag-row">${project.renovationEnvelopeComponents.map(c => badge(c, "#96D74C", "#2d5f0e")).join("")}</div>` : ""}
+    ${project.renovationEnvelopeComponents.length ? `<p class="sub-label">Envelope Components</p><div class="tag-row">${project.renovationEnvelopeComponents.map(c => badge(c, "#2FB477", "#2d5f0e")).join("")}</div>` : ""}
     ${project.buildingUses.length ? `<p class="sub-label">Building Uses</p><div class="tag-row">${project.buildingUses.map(u => badge(u, "#e0d7f7", "#4a1d96")).join("")}</div>` : ""}
   `;
 
@@ -477,7 +477,7 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;text-align:center;">
         <div style="font-size:22px;font-weight:800;color:#166534;">${es.energySavingsPct}%</div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#4ade80;margin-top:2px;">Energy Saving</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#2FB477;margin-top:2px;">Energy Saving</div>
         <div style="font-size:11px;color:#6b7280;margin-top:4px;">${es.energyBefore_kwhM2} → ${es.energyAfter_kwhM2} kWh/m²/yr</div>
       </div>
       <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:12px;text-align:center;">
@@ -487,7 +487,7 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
       </div>
       <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;text-align:center;">
         <div style="font-size:18px;font-weight:800;color:#9a3412;">${esc(es.investmentRange)}</div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#fb923c;margin-top:2px;">Investment Range</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#E8880C;margin-top:2px;">Investment Range</div>
         <div style="font-size:11px;color:#6b7280;margin-top:4px;">CAPEX estimate</div>
       </div>
     </div>

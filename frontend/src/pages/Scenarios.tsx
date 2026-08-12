@@ -44,7 +44,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 4, label: "Scenarios", color: "#F59E0B", isHere: true,
+        n: 4, label: "Scenarios", color: "#E8880C", isHere: true,
         subNodes: [
           { label: "A — Minimal PV (rooftop only)", type: "scenario" },
           { label: "B — PV + Battery storage", type: "scenario" },
@@ -52,7 +52,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 5, label: "Timeline & Cost", color: "#96D74C",
+        n: 5, label: "Timeline & Cost", color: "#2FB477",
         subNodes: [
           { label: "12-month project schedule", type: "output" },
           { label: "CAPEX estimate: 2.1M SEK", type: "output" },
@@ -92,7 +92,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 4, label: "Calculator", color: "#F59E0B", isHere: true,
+        n: 4, label: "Calculator", color: "#E8880C", isHere: true,
         subNodes: [
           { label: "Build packages (catalogue + layers)", type: "input" },
           { label: "Cost (Wikells) + carbon (Boverket)", type: "db" },
@@ -102,7 +102,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 5, label: "Report", color: "#96D74C",
+        n: 5, label: "Report", color: "#2FB477",
         subNodes: [
           { label: "Recommended packages + climate target", type: "output" },
           { label: "Energy, cost & carbon savings", type: "output" },
@@ -113,7 +113,7 @@ const FLOW_DATA: Record<string, {
     ],
   },
   "Renewable Energy Planning": {
-    color: "#96D74C",
+    color: "#2FB477",
     steps: [
       {
         n: 1, label: "Define Project", color: "#721CB8",
@@ -142,7 +142,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 4, label: "Scenarios", color: "#F59E0B", isHere: true,
+        n: 4, label: "Scenarios", color: "#E8880C", isHere: true,
         subNodes: [
           { label: "A — Rooftop PV (standard)", type: "scenario" },
           { label: "B — PV + battery storage", type: "scenario" },
@@ -150,7 +150,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 5, label: "Timeline & Cost", color: "#96D74C",
+        n: 5, label: "Timeline & Cost", color: "#2FB477",
         subNodes: [
           { label: "9-month installation plan", type: "output" },
           { label: "RE Feasibility Report (PDF)", type: "output" },
@@ -163,10 +163,10 @@ const FLOW_DATA: Record<string, {
 const SUB_COLORS: Record<SubNodeType, string> = {
   input:    "#721CB8",
   db:       "#4A90E2",
-  estimate: "#F59E0B",
+  estimate: "#E8880C",
   engine:   "#4ECDC4",
-  scenario: "#F59E0B",
-  output:   "#96D74C",
+  scenario: "#E8880C",
+  output:   "#2FB477",
 };
 
 const SUB_LABELS: Record<SubNodeType, string> = {
@@ -187,7 +187,7 @@ const GRID9 = "1fr 28px 1fr 28px 1fr 28px 1fr 28px 1fr";
 const TAB_COLORS: Record<string, string> = {
   "Energy Community Planning": "#4ECDC4",
   "Renovation Planning":       "#721CB8",
-  "Renewable Energy Planning": "#96D74C",
+  "Renewable Energy Planning": "#2FB477",
 };
 
 /* Pathways kept for later but not yet selectable — shown greyed, consistent with
@@ -472,9 +472,9 @@ const PATHWAYS = [
     key: "Renewable Energy Planning",
     label: "Renewable Energy",
     sub: "Planning",
-    color: "#96D74C",
-    bgActive: "rgba(150,215,76,0.10)",
-    borderActive: "#96D74C",
+    color: "#2FB477",
+    bgActive: "rgba(47,180,119,0.10)",
+    borderActive: "#2FB477",
     Icon: Sun,
     outputs: [
       { n: "01", text: "Roof area → kWp capacity" },
@@ -488,14 +488,14 @@ const PATHWAYS = [
 
 const ENGINE_TAGS = [
   { label: "EnergyPlus / EPSM",     color: "#4ECDC4" },
-  { label: "MCDA + AHP",            color: "#F59E0B" },
+  { label: "MCDA + AHP",            color: "#E8880C" },
   { label: "Facade ML (MBDD2025)",  color: "#E6194B" },
   { label: "Pareto optimizer",      color: "#B98BE8" },
   { label: "Regret / Hurwicz",      color: "#4A90E2" },
   { label: "Sensitivity OAT",       color: "#4A90E2" },
   { label: "TABULA Archetypes",     color: "#4ECDC4" },
   { label: "Wikells Cost DB",       color: "#721CB8" },
-  { label: "Boverket Klimatdb",     color: "#96D74C" },
+  { label: "Boverket Klimatdb",     color: "#2FB477" },
   { label: "Nord Pool spot price",  color: "#4A90E2" },
 ];
 
@@ -550,8 +550,8 @@ const OAT_BY_TYPE: Record<string, { metric: string; unit: string; params: OatPar
 };
 
 const STATUS_COLOR: Record<OatStatus, string> = {
-  available: "#96D74C",
-  partial:   "#F59E0B",
+  available: "#2FB477",
+  partial:   "#E8880C",
   proxy:     "#4A90E2",
   assumed:   "#a78bfa",
   missing:   "rgba(255,80,80,0.90)",
@@ -566,14 +566,14 @@ const STATUS_LABEL: Record<OatStatus, string> = {
 const TIER_LABEL = (rank: number) =>
   rank <= 2 ? "CRITICAL" : rank <= 4 ? "HIGH" : rank <= 6 ? "MODERATE" : "LOWER";
 const TIER_COLOR = (rank: number) =>
-  rank <= 2 ? "rgba(255,80,80,0.85)" : rank <= 4 ? "#F59E0B" : rank <= 6 ? "#4A90E2" : "#96D74C";
+  rank <= 2 ? "rgba(255,80,80,0.85)" : rank <= 4 ? "#E8880C" : rank <= 6 ? "#4A90E2" : "#2FB477";
 
 /* ─── EC pathway detail ─────────────────────────────────────────────── */
 function ECPathwayDetail() {
   const scenarios = [
     { id: "A", name: "Micro cluster",  buildings: "2–4 bldgs",  pv: "20–40 kWp",  self: "55–70%", color: "#4ECDC4" },
     { id: "B", name: "Block sharing",  buildings: "5–12 bldgs", pv: "50–120 kWp", self: "70–85%", color: "#4A90E2" },
-    { id: "C", name: "District-scale", buildings: "13+ bldgs",  pv: "150+ kWp",   self: "85–95%", color: "#96D74C" },
+    { id: "C", name: "District-scale", buildings: "13+ bldgs",  pv: "150+ kWp",   self: "85–95%", color: "#2FB477" },
   ];
   const inputs = [
     "Annual electricity consumption per building (kWh/yr)",
@@ -644,9 +644,9 @@ function ECPathwayDetail() {
 /* ─── RE pathway detail ─────────────────────────────────────────────── */
 function REPathwayDetail() {
   const scenarios = [
-    { id: "A", name: "Partial roof",  pct: "50%",  kWp: "~45 kWp",  yield: "~42 MWh/yr",  color: "#96D74C" },
+    { id: "A", name: "Partial roof",  pct: "50%",  kWp: "~45 kWp",  yield: "~42 MWh/yr",  color: "#2FB477" },
     { id: "B", name: "Full roof",     pct: "90%",  kWp: "~80 kWp",  yield: "~75 MWh/yr",  color: "#4A90E2" },
-    { id: "C", name: "Roof + façade", pct: "100%", kWp: "~110 kWp", yield: "~100 MWh/yr", color: "#F59E0B" },
+    { id: "C", name: "Roof + façade", pct: "100%", kWp: "~110 kWp", yield: "~100 MWh/yr", color: "#E8880C" },
   ];
   const inputs = [
     "Roof area and orientation (azimuth, tilt)",
@@ -704,7 +704,7 @@ function REPathwayDetail() {
           {inputs.map((inp, i) => (
             <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11,
                                   color: "rgba(255,255,255,0.55)" }}>
-              <span style={{ color: "#96D74C", fontWeight: 800, fontSize: 10, marginTop: 1, flexShrink: 0 }}>
+              <span style={{ color: "#2FB477", fontWeight: 800, fontSize: 10, marginTop: 1, flexShrink: 0 }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
               {inp}
@@ -726,7 +726,7 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
   const top3 = params.slice(0, 3);
   const rest = params.slice(3);
   const typeColor = activeType === "Renovation Planning" ? "#721CB8"
-    : activeType === "Energy Community Planning" ? "#4ECDC4" : "#96D74C";
+    : activeType === "Energy Community Planning" ? "#4ECDC4" : "#2FB477";
 
   return (
     <div style={{

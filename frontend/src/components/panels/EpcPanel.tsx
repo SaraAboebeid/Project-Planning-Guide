@@ -126,7 +126,7 @@ export default function EpcPanel() {
                   stroke="#721CB8"
                   strokeWidth={2.5}
                   dot={{ fill: "#721CB8", r: 5 }}
-                  activeDot={{ r: 7, fill: "#96D74C" }}
+                  activeDot={{ r: 7, fill: "#2FB477" }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -171,7 +171,7 @@ export default function EpcPanel() {
                 />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
                 <Bar name="Avg Performance (kWh/m²)" dataKey="avgPerf" fill="#721CB8" radius={[4, 4, 0, 0]} />
-                <Bar name="Building Count" dataKey="count" fill="#96D74C" radius={[4, 4, 0, 0]} />
+                <Bar name="Building Count" dataKey="count" fill="#2FB477" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

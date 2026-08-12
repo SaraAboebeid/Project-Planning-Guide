@@ -733,6 +733,74 @@ const IMPORT_FIELD_MAP: Record<string, keyof BuildingRecord> = (() => {
   return m;
 })();
 
+/* Same idea for a SINGLE building — the single-building lookup uses different
+   field names than the bbox record (energy vs energy_kwh_m2, tabula_u_wall vs
+   u_wall, …), so an import file / paste maps its columns to these keys. */
+const SINGLE_IMPORT_MAP: Record<string, keyof BuildingLookup> = (() => {
+  const m: Record<string, keyof BuildingLookup> = {};
+  const add = (label: string, field: keyof BuildingLookup) => { m[_normKey(label)] = field; };
+  add("Address", "address");
+  add("Use", "use_cat"); add("building_use", "use_cat"); add("use_cat", "use_cat");
+  add("Year", "year"); add("Year built", "year"); add("year_built", "year");
+  add("Floors", "floors");
+  add("Height (m)", "height"); add("height_m", "height"); add("height", "height");
+  add("Footprint (m²)", "footprint_m2"); add("footprint_m2", "footprint_m2");
+  add("Energy (kWh/m²)", "energy"); add("energy_kwh_m2", "energy"); add("Energy", "energy"); add("energy", "energy");
+  add("Energy class", "eclass"); add("EPC", "eclass"); add("epc_class", "eclass"); add("eclass", "eclass");
+  add("U-wall (W/m²K)", "tabula_u_wall"); add("U-Wall", "tabula_u_wall"); add("u_wall", "tabula_u_wall"); add("tabula_u_wall", "tabula_u_wall");
+  add("U-win (W/m²K)", "tabula_u_win"); add("U-Window", "tabula_u_win"); add("u_window", "tabula_u_win"); add("tabula_u_win", "tabula_u_win");
+  add("Latitude", "lat"); add("lat", "lat"); add("Longitude", "lon"); add("lon", "lon");
+  return m;
+})();
+const SINGLE_NUMERIC = new Set<string>(["year", "floors", "height", "footprint_m2", "energy", "tabula_u_wall", "tabula_u_win", "lat", "lon"]);
+
+/* Collapsible "how to format your import" guide — shown next to the CSV/JSON
+   import controls so the user knows exactly what headers to use. The importer
+   is forgiving (many header aliases, any subset of columns), so this shows the
+   common shape rather than a rigid schema. */
+function ImportFormatGuide() {
+  const [open, setOpen] = useState(false);
+  const cell = "font-mono text-[10px] text-emerald-300/90 bg-black/40 rounded p-2 overflow-x-auto whitespace-pre";
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="text-[10.5px] font-semibold text-violet-300 hover:text-violet-200 transition"
+      >
+        {open ? "▾" : "▸"} How should my CSV or JSON look?
+      </button>
+      {open && (
+        <div className="mt-1.5 rounded-md border border-white/10 bg-[#0d1117] p-2.5 text-[10.5px] text-white/60 space-y-2.5 leading-relaxed">
+          <div>
+            <b className="text-white/75">One row per building.</b> Include only the columns you actually have — any you leave
+            out just stay as they are. Rows are matched to a building by its <b className="text-white/75">Address</b>; for a
+            single building, the first row is used if no address matches. Values overwrite what&apos;s shown; a blank cell is ignored.
+          </div>
+          <div>
+            <div className="text-white/45 font-semibold mb-1">Column headers it understands (use any subset):</div>
+            <div className="font-mono text-[10px] text-white/70">
+              Address · Use · Year · Floors · Height (m) · Footprint (m²) · Energy class · Energy (kWh/m²) · U-wall · U-window
+            </div>
+            <div className="text-white/35 mt-1">Header matching is flexible — <span className="font-mono">energy</span>, <span className="font-mono">energy_kwh_m2</span> and <span className="font-mono">Energy (kWh/m²)</span> all work.</div>
+          </div>
+          <div>
+            <div className="text-white/45 font-semibold mb-1">CSV example</div>
+            <div className={cell}>{`Address,Year,Energy (kWh/m²),U-wall,Floors
+Storgatan 1,1965,142,0.45,4`}</div>
+          </div>
+          <div>
+            <div className="text-white/45 font-semibold mb-1">JSON example (one object, or an array of them)</div>
+            <div className={cell}>{`{ "year": 1965, "energy": 142, "tabula_u_wall": 0.45, "floors": 4 }`}</div>
+          </div>
+          <div className="text-white/40">
+            <b className="text-white/60">Excel?</b> Use <b className="text-white/60">File → Save As → CSV (.csv)</b>, then import that file — spreadsheets (.xlsx) can&apos;t be read directly in the browser.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Minimal RFC-4180-ish CSV parser (handles quoted fields, embedded commas, "" escapes).
 function parseCSV(text: string): Record<string, string>[] {
   const rows: string[][] = [];
@@ -1296,6 +1364,7 @@ function BboxDataBanner({
             <button onClick={() => setPasteText("")} className="px-3 py-1.5 rounded-md text-[11px] text-white/45 hover:bg-white/8 transition">Clear</button>
             <span className="text-[10px] text-white/30 ml-1">Respects the “Fill missing only” toggle above.</span>
           </div>
+          <ImportFormatGuide />
         </div>
       )}
 
@@ -1594,6 +1663,8 @@ function BuildingDataBanner({
   const setProject      = useWizardStore(s => s.setProject);
   const storeBuildings  = useWizardStore(s => s.project.lookedUpBuildings);
   const [editing, setEditing] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [importMsg, setImportMsg] = useState<string | null>(null);
   // Current heating system for this building (inferred from the Boverket EPC).
   const [heating, setHeating] = useState<{ system: string } | null>(null);
 
@@ -1641,6 +1712,52 @@ function BuildingDataBanner({
     setProject({ lookedUpBuilding: nextSingle, lookedUpBuildings: list });
   };
 
+  // Import the user's own data (CSV / JSON, file or pasted) onto THIS building.
+  // Excel: save the sheet as .csv first. Columns map by the field labels above.
+  const applySingleImport = (text: string, sourceName: string) => {
+    try {
+      const trimmed = text.trim();
+      if (!trimmed) { setImportMsg("Nothing to apply — paste CSV/JSON or choose a file."); return; }
+      let records: Record<string, unknown>[];
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        const j = JSON.parse(text);
+        records = Array.isArray(j) ? (j as Record<string, unknown>[]) : (j && typeof j === "object" ? [j as Record<string, unknown>] : []);
+      } else {
+        records = parseCSV(text);
+      }
+      if (!records.length) { setImportMsg("No rows found."); return; }
+      // One building: prefer a row whose Address matches, else take the first row.
+      const bKey = _normKey(String(building.address ?? ""));
+      const pick = records.find(r => {
+        const ra = _normKey(String((r as Record<string, unknown>).address ?? (r as Record<string, unknown>).Address ?? ""));
+        return ra && ra === bKey;
+      }) ?? records[0];
+      const patch: Record<string, unknown> = {};
+      let changed = 0;
+      for (const [col, v] of Object.entries(pick)) {
+        const field = SINGLE_IMPORT_MAP[_normKey(col)];
+        if (!field || field === "address") continue;
+        if (v === null || v === undefined || v === "") continue;
+        let val: unknown = v;
+        if (SINGLE_NUMERIC.has(field)) { const n = Number(v); if (Number.isFinite(n)) val = n; }
+        patch[field] = val; changed++;
+      }
+      if (!changed) { setImportMsg("No usable columns — headers should match the field labels above (Year, Energy (kWh/m²), U-wall, Floors, …)."); return; }
+      const nextSingle = { ...building, ...patch } as BuildingLookup;
+      const list = (storeBuildings ?? []).slice();
+      if (list.length) list[0] = { ...list[0], ...patch };
+      setProject({ lookedUpBuilding: nextSingle, lookedUpBuildings: list });
+      setImportMsg(`✓ ${sourceName}: applied ${changed} value${changed === 1 ? "" : "s"} to this building.`);
+    } catch (e) {
+      setImportMsg("Import failed: " + (e as Error).message);
+    }
+  };
+  const handleSingleFile = async (file: File) => {
+    setImportMsg("Reading…");
+    try { applySingleImport(await file.text(), `"${file.name}"`); }
+    catch (e) { setImportMsg("Import failed: " + (e as Error).message); }
+  };
+
   return (
     <div className="rounded-xl border border-purple-700/40 bg-[#0d1117] overflow-hidden">
       {/* Header */}
@@ -1667,8 +1784,44 @@ function BuildingDataBanner({
       </div>
 
       {editing && (
-        <div className="mx-3 mt-3 -mb-1 rounded-lg bg-violet-900/20 border border-violet-700/30 px-3 py-2 text-[10.5px] text-violet-200/80">
-          Editing overrides for <b className="text-violet-100">this session only</b> — they feed the simulation and prioritisation in Steps 3-4 and are never written back to the source datasets. Leave a field blank to clear it.
+        <div className="mx-3 mt-3 -mb-1 space-y-2.5">
+          <div className="rounded-lg bg-violet-900/20 border border-violet-700/30 px-3 py-2 text-[10.5px] text-violet-200/80">
+            Editing overrides for <b className="text-violet-100">this session only</b> — they feed the simulation and prioritisation in Steps 3-4 and are never written back to the source datasets. Edit the fields below, or import your own file. Leave a field blank to clear it.
+          </div>
+          {/* Import the user's own data onto this one building */}
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <label
+                title="Upload a CSV or JSON file to fill in this building's data. Excel: save the sheet as .csv first."
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-violet-200 bg-violet-600/20 ring-1 ring-violet-500/60 hover:bg-violet-600/35 hover:text-white whitespace-nowrap transition cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" /> Import CSV / JSON file
+                <input
+                  type="file" accept=".csv,.json,text/csv,application/json"
+                  style={{ display: "none" }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleSingleFile(f); e.currentTarget.value = ""; }}
+                />
+              </label>
+              <span className="text-[10px] text-white/35">Excel? Save it as <b className="text-white/55">.csv</b> first.</span>
+            </div>
+            <div className="text-[10px] text-white/35 mt-2">Or paste CSV / JSON — column headers should match the field labels below (Year, Energy (kWh/m²), U-wall, Floors, …):</div>
+            <textarea
+              value={pasteText}
+              onChange={e => setPasteText(e.target.value)}
+              placeholder={'address,Year,Energy (kWh/m²),U-wall\nStorgatan 1,1965,142,0.45\n\n— or JSON —\n{ "year": 1965, "energy": 142, "tabula_u_wall": 0.45 }'}
+              rows={4}
+              className="w-full mt-1.5 bg-[#0d1117] border border-white/12 rounded-md px-2.5 py-2 text-[11px] text-white/85 font-mono placeholder:text-white/25 focus:outline-none focus:border-violet-500/60"
+            />
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                onClick={() => applySingleImport(pasteText, "pasted data")}
+                disabled={!pasteText.trim()}
+                className="px-3 py-1 rounded-md text-[11px] font-semibold bg-violet-600/25 text-violet-200 ring-1 ring-violet-500/60 hover:bg-violet-600/40 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >Apply pasted data</button>
+              {importMsg && <span className="text-[10.5px]" style={{ color: importMsg.startsWith("✓") ? "#2FB477" : importMsg.startsWith("⚠") || importMsg.startsWith("Import failed") ? "#E2483B" : "rgba(255,255,255,0.5)" }}>{importMsg}</span>}
+            </div>
+            <ImportFormatGuide />
+          </div>
         </div>
       )}
 
@@ -1829,6 +1982,14 @@ export default function DataCoverage() {
   const buildings  = project.lookedUpBuildings ?? [];
   const bboxStats  = project.bboxStats ?? null;
   const isMulti    = buildings.length > 1;
+
+  // Façade defect detection is only shown when the walls are part of the
+  // renovation scope picked in Step 1 (defects live on the wall surface). With
+  // no components chosen yet, the default scope includes walls — mirrors Step 4.
+  const scopeComponents = project.renovationEnvelopeComponents.length > 0
+    ? project.renovationEnvelopeComponents
+    : ["Walls", "Roof", "Windows"];
+  const wallsInScope = scopeComponents.includes("Walls");
 
 
   /* ── Auto-retry: if building lookups are missing (backend was down when step 1
@@ -2033,11 +2194,13 @@ export default function DataCoverage() {
       <div>
         <h2 className="text-2xl font-bold text-white">Building &amp; Site Data</h2>
         <p className="text-sm text-white/45 mt-1">
-          What data is available for each building, and what is missing — from the cadastral register (Lantmäteriet),
-          EUBUCCO and the Boverket EPC. An empty cell means that value simply doesn&apos;t exist for that building.
-          Select the buildings you want to carry into the analysis. Missing or wrong values? Use{" "}
-          <b className="text-violet-300">＋ Add / Edit</b> on the buildings panel below to fix cells inline or paste
-          your own CSV/JSON — your edits stay in this session and feed Steps 3–4 (the source datasets are never changed).
+          See what&apos;s known about each building and what&apos;s missing, then choose which buildings to carry into the
+          analysis. An empty cell is simply a value that doesn&apos;t exist for that building — fill or correct any of them
+          with <b className="text-violet-300">＋ Add / Edit</b> (or paste your own CSV/JSON); your edits stay in this session
+          and feed the later steps, and the underlying data is never changed.
+          {wallsInScope
+            ? " Upload façade photos to automatically detect defects, then the buildings are ranked by retrofit priority — energy performance, façade condition and upgrade potential."
+            : " The buildings are ranked by retrofit priority from their energy performance and upgrade potential."}
         </p>
       </div>
 
@@ -2113,8 +2276,10 @@ export default function DataCoverage() {
         </div>
       )}
 
-      {/* Facade condition — AI defect detection on user-uploaded facade photos */}
-      {facadeBuildings.length > 0 && <FacadeDefectPanel buildings={facadeBuildings} />}
+      {/* Facade condition — AI defect detection on user-uploaded facade photos.
+          Only when the walls are in the renovation scope (Step 1); otherwise
+          prioritisation runs on building performance alone. */}
+      {wallsInScope && facadeBuildings.length > 0 && <FacadeDefectPanel buildings={facadeBuildings} />}
 
       {/* Retrofit prioritization — ranking of the buildings in scope */}
       {priorityItems.length > 0 && <RetrofitPriorityPanel items={priorityItems} />}

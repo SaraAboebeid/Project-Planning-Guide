@@ -22,7 +22,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (!error) return this.props.children;
     return (
       <div style={{ minHeight: "100vh", background: "#0d1117", color: "#fff", fontFamily: "Inter, system-ui, sans-serif", padding: 24 }}>
-        <div style={{ maxWidth: 720, margin: "48px auto", background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 14, padding: 26 }}>
+        <div style={{ maxWidth: 720, margin: "48px auto", background: "rgba(226,72,59,0.07)", border: "1px solid rgba(226,72,59,0.3)", borderRadius: 14, padding: 26 }}>
           <h2 style={{ color: "#fca5a5", margin: "0 0 6px", fontSize: 18 }}>Something went wrong on this screen</h2>
           <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, margin: "0 0 14px", lineHeight: 1.6 }}>
             A component hit an error. Copy the details below so it can be fixed — or reset the session if it keeps happening.

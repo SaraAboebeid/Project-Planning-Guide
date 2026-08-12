@@ -423,9 +423,9 @@ export default function DefineProject() {
                   <rect x="21" y="20" width="10" height="24" rx="1" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
                   <rect x="36" y="24" width="10" height="20" rx="1" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
                   <path d="M2 44h48" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round"/>
-                  <circle cx="26" cy="10" r="5" stroke="#96D74C" strokeWidth="1.5" fill="none"/>
-                  <path d="M26 5v-3M26 18v-3M17 10h-3M38 10h-3" stroke="#96D74C" strokeWidth="1.5" strokeLinecap="round"/>
-                  <path d="M19.5 7.5l-2-2M34.5 12.5l-2-2M19.5 12.5l-2 2M34.5 7.5l-2 2" stroke="#96D74C" strokeWidth="1.5" strokeLinecap="round"/>
+                  <circle cx="26" cy="10" r="5" stroke="#2FB477" strokeWidth="1.5" fill="none"/>
+                  <path d="M26 5v-3M26 18v-3M17 10h-3M38 10h-3" stroke="#2FB477" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M19.5 7.5l-2-2M34.5 12.5l-2-2M19.5 12.5l-2 2M34.5 7.5l-2 2" stroke="#2FB477" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
               ),
               "Renovation Planning": (
@@ -439,8 +439,8 @@ export default function DefineProject() {
               ),
               "Renewable Energy Planning": (
                 <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-                  <path d="M26 8v6M26 38v6M8 26H2M50 26h-6" stroke="#96D74C" strokeWidth="1.5" strokeLinecap="round"/>
-                  <circle cx="26" cy="26" r="10" stroke="#96D74C" strokeWidth="1.5" fill="none"/>
+                  <path d="M26 8v6M26 38v6M8 26H2M50 26h-6" stroke="#2FB477" strokeWidth="1.5" strokeLinecap="round"/>
+                  <circle cx="26" cy="26" r="10" stroke="#2FB477" strokeWidth="1.5" fill="none"/>
                   <path d="M32 14c2-4 6-6 8-4s0 6-4 8" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
                   <path d="M38 32c4 2 6 6 4 8s-6 0-8-4" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
                   <path d="M14 32c-4 2-6 6-4 8s6 0 8-4" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
@@ -1002,7 +1002,7 @@ export default function DefineProject() {
         const nameMissing = validationErrors.includes("a project name") && !project.projectName.trim();
         return (
           <Card className="animate-fadeIn">
-            <Label>Project Name <span style={{ color: "#f87171" }}>*</span></Label>
+            <Label>Project Name <span style={{ color: "#E2483B" }}>*</span></Label>
             <input
               type="text"
               value={project.projectName}
@@ -1041,7 +1041,7 @@ export default function DefineProject() {
               found status appears) and gates Continue. Hides the "found" messages. */}
           {!locationValid && locationMsg && (
             <div className="mt-3 flex items-start gap-2 text-xs rounded-lg px-3 py-2"
-              style={{ color: "#fca5a5", background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.35)" }}>
+              style={{ color: "#fca5a5", background: "rgba(226,72,59,0.10)", border: "1px solid rgba(226,72,59,0.35)" }}>
               <span>⚠</span>
               <span>
                 <span className="font-semibold">{locationMsg}</span> This tool currently covers <b>Gothenburg</b> only —

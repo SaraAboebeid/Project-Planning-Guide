@@ -24,7 +24,7 @@ const PHASE_SPLIT: [string, number][] = [
   ["Validation & QA",      0.15],
   ["Reporting",            0.10],
 ];
-const TL_COLORS = ["#721CB8", "#995BD5", "#96D74C", "#509724", "#3a6e1a"];
+const TL_COLORS = ["#721CB8", "#995BD5", "#2FB477", "#509724", "#3a6e1a"];
 
 function fmt(d: Date) { return d.toISOString().slice(0, 10); }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
@@ -35,8 +35,8 @@ function GuideBox({ title, children }: { title: string; children: React.ReactNod
   const [open, setOpen] = useState(false);
   return (
     <div style={{
-      borderRadius: 10, border: "1px solid rgba(150,215,76,0.2)",
-      background: "rgba(150,215,76,0.04)", marginBottom: 4,
+      borderRadius: 10, border: "1px solid rgba(47,180,119,0.2)",
+      background: "rgba(47,180,119,0.04)", marginBottom: 4,
     }}>
       <button
         onClick={() => setOpen(o => !o)}
@@ -46,11 +46,11 @@ function GuideBox({ title, children }: { title: string; children: React.ReactNod
           textAlign: "left",
         }}
       >
-        <BookOpen size={13} color="#96D74C" />
-        <span style={{ fontSize: 12, fontWeight: 600, color: "#96D74C", flex: 1 }}>{title}</span>
+        <BookOpen size={13} color="#2FB477" />
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#2FB477", flex: 1 }}>{title}</span>
         {open
-          ? <ChevronUp size={13} color="#96D74C" />
-          : <ChevronDown size={13} color="#96D74C" />}
+          ? <ChevronUp size={13} color="#2FB477" />
+          : <ChevronDown size={13} color="#2FB477" />}
       </button>
       {open && (
         <div style={{ padding: "0 14px 12px", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.8 }}>
@@ -102,15 +102,15 @@ function FormulaRow({
         {label}
       </span>
       <span style={{
-        fontSize: 11, color: "rgba(150,215,76,0.7)",
-        background: "rgba(150,215,76,0.06)", borderRadius: 6,
+        fontSize: 11, color: "rgba(47,180,119,0.7)",
+        background: "rgba(47,180,119,0.06)", borderRadius: 6,
         padding: "2px 8px", fontFamily: "monospace",
       }}>
         {formula}
       </span>
       <span style={{
         fontSize: highlight ? 15 : 13, fontWeight: highlight ? 800 : 600, tabularNums: "true",
-        color: highlight ? "#96D74C" : "rgba(255,255,255,0.75)",
+        color: highlight ? "#2FB477" : "rgba(255,255,255,0.75)",
         minWidth: 120, textAlign: "right",
       }}>
         {fmtNum(result)} {currency}
@@ -195,7 +195,7 @@ export default function Budget() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {[
           { v: `${fmtNum(serviceCost)} ${currency}`, l: "Consultant Service Cost", c: "#721CB8", bg: "rgba(114,28,184,0.10)", border: "rgba(114,28,184,0.25)" },
-          { v: `${fmtNum(opexTotal)} ${currency}`,   l: "Annual OPEX",             c: "#96D74C", bg: "rgba(150,215,76,0.10)", border: "rgba(150,215,76,0.25)" },
+          { v: `${fmtNum(opexTotal)} ${currency}`,   l: "Annual OPEX",             c: "#2FB477", bg: "rgba(47,180,119,0.10)", border: "rgba(47,180,119,0.25)" },
         ].map(s => (
           <div key={s.l} style={{ borderRadius: 14, background: s.bg, border: `1px solid ${s.border}`, padding: "14px 16px", textAlign: "center" }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: s.c }}>{s.v}</div>
@@ -285,7 +285,7 @@ export default function Budget() {
 
         <div style={{ marginTop: 14, borderRadius: 10, background: "rgba(80,151,36,0.08)", border: "1px solid rgba(80,151,36,0.2)", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Annual OPEX Total</span>
-          <span style={{ fontSize: 16, fontWeight: 800, color: opexTotal < 0 ? "#96D74C" : "rgba(255,255,255,0.85)" }}>{fmtNum(opexTotal)} {currency}/yr</span>
+          <span style={{ fontSize: 16, fontWeight: 800, color: opexTotal < 0 ? "#2FB477" : "rgba(255,255,255,0.85)" }}>{fmtNum(opexTotal)} {currency}/yr</span>
         </div>
       </Card>
 
@@ -303,7 +303,7 @@ export default function Budget() {
             <li>Each phase duration = phase hours ÷ 30 h/week (rounded up to whole weeks)</li>
           </ul>
           {project.projectType && (
-            <p style={{ margin: "8px 0 0", color: "rgba(150,215,76,0.8)" }}>
+            <p style={{ margin: "8px 0 0", color: "rgba(47,180,119,0.8)" }}>
               Auto-estimate for your project: {baseHours} h × {scaleMult} = <strong>{estHours} h</strong>
             </p>
           )}
@@ -321,7 +321,7 @@ export default function Budget() {
           </div>
           <button
             onClick={() => setPhaseHours(Object.fromEntries(PHASE_SPLIT.map(([p, f]) => [p, Math.round(estHours * f)])))}
-            style={{ alignSelf: "flex-end", fontSize: 12, color: "#96D74C", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
+            style={{ alignSelf: "flex-end", fontSize: 12, color: "#2FB477", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
           >
             ↺ Reset to estimates
           </button>
@@ -402,7 +402,7 @@ export default function Budget() {
         <div style={{ display: "flex", gap: 24, fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 12, padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 10 }}>
           <span>Total: <strong style={{ color: "rgba(255,255,255,0.8)" }}>{userTotalHours} hours</strong></span>
           <span>Duration: <strong style={{ color: "rgba(255,255,255,0.8)" }}>{userWeeks} weeks</strong></span>
-          <span>Completion: <strong style={{ color: "#96D74C" }}>{timelineRows.at(-1)?.end ?? "—"}</strong></span>
+          <span>Completion: <strong style={{ color: "#2FB477" }}>{timelineRows.at(-1)?.end ?? "—"}</strong></span>
         </div>
       </Card>
 
@@ -421,7 +421,7 @@ export default function Budget() {
           </div>
           <div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>Annual OPEX</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#96D74C" }}>{fmtNum(opexTotal)} {currency}/yr</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#2FB477" }}>{fmtNum(opexTotal)} {currency}/yr</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2 }}>Consultant + OPEX Total</div>

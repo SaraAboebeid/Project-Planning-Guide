@@ -29,7 +29,7 @@ const PHASE_SPLIT: [string, number][] = [
   ["Validation & QA",      0.15],
   ["Reporting",            0.10],
 ];
-const TL_COLORS = ["#721CB8", "#995BD5", "#96D74C", "#509724", "#3a6e1a"];
+const TL_COLORS = ["#721CB8", "#995BD5", "#2FB477", "#509724", "#3a6e1a"];
 
 function fmt(d: Date) { return d.toISOString().slice(0, 10); }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
@@ -38,7 +38,7 @@ function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDat
 const CONSULTANT_RATES: Record<string, number> = {
   SEK: 1400, EUR: 140, USD: 150, GBP: 130, NOK: 1500, DKK: 1050,
 };
-const PIE_COLORS = ["#721CB8", "#995BD5", "#96D74C", "#509724", "#3a6e1a"];
+const PIE_COLORS = ["#721CB8", "#995BD5", "#2FB477", "#509724", "#3a6e1a"];
 
 function fmtNum(n: number) { return n.toLocaleString(); }
 
@@ -216,7 +216,7 @@ export default function ResultsBudget() {
         </div>
         <a
           href="/reports"
-          className="flex items-center gap-1.5 text-xs font-semibold text-[#96D74C] hover:underline mt-1 whitespace-nowrap"
+          className="flex items-center gap-1.5 text-xs font-semibold text-[#2FB477] hover:underline mt-1 whitespace-nowrap"
         >
           View sample reports →
         </a>
@@ -227,7 +227,7 @@ export default function ResultsBudget() {
         {[
           { value: String(totalDelivs),          label: "Deliverables",  color: "text-[#721CB8]", bg: "bg-[#721CB8]/8" },
           { value: `${userTotalHours} hrs`,       label: "Est. Effort",   color: "text-[#995BD5]", bg: "bg-[#995BD5]/10" },
-          { value: `${userWeeks} wk`,             label: "Duration",      color: "text-[#509724]", bg: "bg-[#96D74C]/20" },
+          { value: `${userWeeks} wk`,             label: "Duration",      color: "text-[#509724]", bg: "bg-[#2FB477]/20" },
           { value: `${fmtNum(serviceCost)} ${currency}`, label: "Service Cost", color: "text-[#3a6e1a]", bg: "bg-[#509724]/10" },
         ].map(s => (
           <div key={s.label} className={`rounded-2xl border border-slate-200 px-4 py-3 text-center ${s.bg}`}>

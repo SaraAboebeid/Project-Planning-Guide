@@ -6,15 +6,15 @@ import { type GoalAssessment } from "../config/climateGoals";
  * Step 4 (after packages are simulated) and echoed in the Step 5 report, off the
  * same assessAgainstGoal() result so the two never disagree. */
 
-const MET = "#96D74C";     // green — meets the target
-const NEAR = "#F59E0B";    // amber — below the target
-const WORSE = "#EF4444";   // red — worse than baseline
+const MET = "#2FB477";     // green — meets the target
+const NEAR = "#E8880C";    // amber — below the target
+const WORSE = "#E2483B";   // red — worse than baseline
 
 // Layer build-up chip colors by material category — insulation stands out (teal)
 // since it's the layer that answers "which insulation?".
 const LAYER_COLOR: Record<string, string> = {
   insulation: "#4ECDC4",
-  structure: "#F59E0B",
+  structure: "#E8880C",
   board: "#9CA3AF",
   cladding: "#4A90E2",
   cavity: "#A78BFA",
@@ -140,7 +140,7 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
                         <span style={{ minWidth: 78, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "capitalize" }}>{m.component}</span>
                         <span style={{ flex: 1, color: "rgba(255,255,255,0.82)" }}>{m.material}</span>
                         {m.u != null && (
-                          <span style={{ fontWeight: 700, color: m.u > 0.4 ? "#EF4444" : m.u > 0.3 ? "#F59E0B" : "#96D74C", flexShrink: 0 }}>
+                          <span style={{ fontWeight: 700, color: m.u > 0.4 ? "#E2483B" : m.u > 0.3 ? "#E8880C" : "#2FB477", flexShrink: 0 }}>
                             U {m.u.toFixed(2)}
                           </span>
                         )}

@@ -56,7 +56,7 @@ export default function ComponentScopePanel({ components, onChange, goalAssessme
       </div>
 
       {reached && (
-        <div style={{ marginTop: 11, fontSize: 11.5, color: "#96D74C" }}>
+        <div style={{ marginTop: 11, fontSize: 11.5, color: "#2FB477" }}>
           ✓ The climate target is reached with the current scope.
         </div>
       )}

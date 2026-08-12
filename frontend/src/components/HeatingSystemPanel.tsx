@@ -15,7 +15,7 @@ function sek(v: number): string {
 }
 
 const PICKS: Record<string, { fg: string; label: string }> = {
-  lowestLcc: { fg: "#96D74C", label: "Lowest 30-yr cost" },
+  lowestLcc: { fg: "#2FB477", label: "Lowest 30-yr cost" },
   lowestCarbon: { fg: "#4ECDC4", label: "Lowest carbon" },
   lowestEnergy: { fg: "#4A90E2", label: "Lowest energy" },
   lowestOpCost: { fg: "#B98BE8", label: "Cheapest to run" },
@@ -59,7 +59,7 @@ export default function HeatingSystemPanel({
   const td: React.CSSProperties = { padding: "7px 8px", textAlign: "right", whiteSpace: "nowrap", color: white(0.82) };
 
   const deltaTag = (pct: number) => (
-    <span style={{ fontSize: 9.5, marginLeft: 4, color: pct < 0 ? "#96D74C" : pct > 0 ? "#EF4444" : white(0.3) }}>
+    <span style={{ fontSize: 9.5, marginLeft: 4, color: pct < 0 ? "#2FB477" : pct > 0 ? "#E2483B" : white(0.3) }}>
       {pct > 0 ? "+" : ""}{pct}%
     </span>
   );
@@ -68,11 +68,11 @@ export default function HeatingSystemPanel({
     <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden" }}>
       <button onClick={() => setOpen((o) => !o)}
         style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", background: "transparent", border: 0, cursor: "pointer", textAlign: "left" }}>
-        <span style={{ padding: 6, borderRadius: 9, background: "rgba(245,158,11,0.16)", color: "#F59E0B", display: "flex" }}><Flame size={16} /></span>
+        <span style={{ padding: 6, borderRadius: 9, background: "rgba(232,136,12,0.16)", color: "#E8880C", display: "flex" }}><Flame size={16} /></span>
         <span style={{ flex: 1 }}>
           <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#fff" }}>Heating system (HVAC)</span>
           <span style={{ display: "block", fontSize: 11, color: white(0.4) }}>
-            Compare &amp; choose the heating source — {selected ? <b style={{ color: "#F59E0B" }}>selected: {selected.shortName}</b> : "energy, cost & carbon on the same heat demand"}.
+            Compare &amp; choose the heating source — {selected ? <b style={{ color: "#E8880C" }}>selected: {selected.shortName}</b> : "energy, cost & carbon on the same heat demand"}.
           </span>
         </span>
         {open ? <ChevronUp size={16} color={white(0.4)} /> : <ChevronDown size={16} color={white(0.4)} />}
@@ -97,7 +97,7 @@ export default function HeatingSystemPanel({
                 {selected.deliveredKwhM2Yr} kWh/m²·yr · {sek(selected.operatingCostYrSek)} SEK/yr · {sek(selected.carbonYrKg)} kg CO₂e/yr · {sek(selected.lccSek)} SEK life-cycle
               </span>
               {!selected.isBaseline && selected.vsBaseline && (
-                <span style={{ fontSize: 10.5, color: selected.vsBaseline.opCostPct < 0 ? "#96D74C" : "#EF4444" }}>
+                <span style={{ fontSize: 10.5, color: selected.vsBaseline.opCostPct < 0 ? "#2FB477" : "#E2483B" }}>
                   ({selected.vsBaseline.opCostPct > 0 ? "+" : ""}{selected.vsBaseline.opCostPct}% cost, {selected.vsBaseline.carbonPct > 0 ? "+" : ""}{selected.vsBaseline.carbonPct}% carbon vs district heating)
                 </span>
               )}
@@ -126,7 +126,7 @@ export default function HeatingSystemPanel({
                     <tr key={s.id} onClick={() => selectSystem(s.id)} title="Click to select this heating system"
                       style={{ borderTop: `1px solid ${white(0.07)}`, cursor: "pointer",
                         boxShadow: isSel ? "inset 3px 0 0 #4ECDC4" : undefined,
-                        background: isSel ? "rgba(78,205,196,0.10)" : s.isBaseline ? "rgba(245,158,11,0.05)" : tags.length ? "rgba(255,255,255,0.02)" : undefined }}>
+                        background: isSel ? "rgba(78,205,196,0.10)" : s.isBaseline ? "rgba(232,136,12,0.05)" : tags.length ? "rgba(255,255,255,0.02)" : undefined }}>
                       <td style={{ padding: "7px 8px", textAlign: "center" }}>
                         <span style={{ display: "inline-flex", width: 15, height: 15, borderRadius: "50%", alignItems: "center", justifyContent: "center",
                           border: `1.5px solid ${isSel ? "#4ECDC4" : white(0.25)}`, background: isSel ? "#4ECDC4" : "transparent" }}>
@@ -137,7 +137,7 @@ export default function HeatingSystemPanel({
                         <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
                           <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
                           <span style={{ fontStyle: s.isBaseline ? "italic" : undefined, color: s.isBaseline ? white(0.7) : "#fff" }}>{s.shortName}</span>
-                          {s.isBaseline && <span style={{ fontSize: 8.5, color: "#F59E0B" }}>baseline</span>}
+                          {s.isBaseline && <span style={{ fontSize: 8.5, color: "#E8880C" }}>baseline</span>}
                           {tags.map((t) => {
                             const p = PICKS[t];
                             if (!p) return null;
@@ -149,10 +149,10 @@ export default function HeatingSystemPanel({
                       </td>
                       <td style={td}>{s.spf.toFixed(s.spf >= 1.5 ? 1 : 2)}</td>
                       <td style={td}>{s.deliveredKwhM2Yr}{s.vsBaseline && !s.isBaseline ? deltaTag(s.vsBaseline.deliveredPct) : null}</td>
-                      <td style={{ ...td, color: s.id === picks.lowestOpCost ? "#96D74C" : white(0.82) }}>{sek(s.operatingCostYrSek)}{s.vsBaseline && !s.isBaseline ? deltaTag(s.vsBaseline.opCostPct) : null}</td>
+                      <td style={{ ...td, color: s.id === picks.lowestOpCost ? "#2FB477" : white(0.82) }}>{sek(s.operatingCostYrSek)}{s.vsBaseline && !s.isBaseline ? deltaTag(s.vsBaseline.opCostPct) : null}</td>
                       <td style={{ ...td, color: s.id === picks.lowestCarbon ? "#4ECDC4" : white(0.82) }}>{sek(s.carbonYrKg)}{s.vsBaseline && !s.isBaseline ? deltaTag(s.vsBaseline.carbonPct) : null}</td>
                       <td style={td}>{sek(s.capexSek)}</td>
-                      <td style={{ ...td, fontWeight: s.id === picks.lowestLcc ? 800 : 400, color: s.id === picks.lowestLcc ? "#96D74C" : "#fff" }}>{sek(s.lccSek)}</td>
+                      <td style={{ ...td, fontWeight: s.id === picks.lowestLcc ? 800 : 400, color: s.id === picks.lowestLcc ? "#2FB477" : "#fff" }}>{sek(s.lccSek)}</td>
                     </tr>
                   );
                 })}

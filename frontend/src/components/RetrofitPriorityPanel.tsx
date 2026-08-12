@@ -77,7 +77,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
 
   if (!items.length) return null;
 
-  const scoreColor = (p: number) => p >= 70 ? "#ef4444" : p >= 50 ? "#f59e0b" : p >= 30 ? "#eab308" : "#22c55e";
+  const scoreColor = (p: number) => p >= 70 ? "#E2483B" : p >= 50 ? "#E8880C" : p >= 30 ? "#E8880C" : "#2FB477";
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
@@ -221,7 +221,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
                   return (
                     <tr key={r.key}
                       className={`border-t border-white/6 ${flagged ? "bg-amber-500/[0.06]" : ""} hover:bg-white/[0.03] transition`}
-                      style={flagged ? { boxShadow: "inset 3px 0 0 #f59e0b" } : undefined}>
+                      style={flagged ? { boxShadow: "inset 3px 0 0 #E8880C" } : undefined}>
                       <td className="px-2 py-2 text-white/40 tabular-nums">{i + 1}</td>
                       <td className="px-2 py-2 text-white/80 font-medium max-w-[180px] truncate" title={r.label}>{r.label}</td>
                       <td className="px-2 py-2">

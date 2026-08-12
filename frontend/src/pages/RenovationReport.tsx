@@ -29,9 +29,9 @@ function recordToLookup(r: BuildingRecord): BuildingLookup {
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
 const COMP_COLORS: Record<string, string> = {
-  "Walls": "#721CB8", "Windows": "#F59E0B", "Doors": "#4ECDC4",
-  "Floor": "#4A90E2", "Roof": "#4ECDC4", "Balcony": "#96D74C",
-  "Structure (Columns & Beams)": "#EF4444", "Vertical Extension (New Floor)": "#F97316",
+  "Walls": "#721CB8", "Windows": "#E8880C", "Doors": "#4ECDC4",
+  "Floor": "#4A90E2", "Roof": "#4ECDC4", "Balcony": "#2FB477",
+  "Structure (Columns & Beams)": "#E2483B", "Vertical Extension (New Floor)": "#F97316",
 };
 
 function sek(n: number) { return `${Math.round(n).toLocaleString("sv-SE")} SEK/m²`; }
@@ -206,7 +206,7 @@ export default function RenovationReport() {
         name: `Pkg ${r.packageIndex}`,
         energyUse: r.energyUse,
         saving: r.saving,
-        fill: i === 0 ? "#96D74C" : i === 1 ? "#4ECDC4" : "rgba(114,28,184,0.7)",
+        fill: i === 0 ? "#2FB477" : i === 1 ? "#4ECDC4" : "rgba(114,28,184,0.7)",
       })),
     ];
   }, [simResults, baselineEU]);
@@ -465,15 +465,15 @@ export default function RenovationReport() {
         <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.07)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>Energy use</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#F59E0B" }}>{kwh(result.energyUse)}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#E8880C" }}>{kwh(result.energyUse)}</div>
           </div>
           <div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>Saving</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#96D74C" }}>−{kwh(result.saving)}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#2FB477" }}>−{kwh(result.saving)}</div>
           </div>
           <div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>CO₂e saved</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#60a5fa" }}>−{kg(result.carbonSaving)}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#4A90E2" }}>−{kg(result.carbonSaving)}</div>
           </div>
           <div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>Material cost</div>
@@ -530,9 +530,9 @@ export default function RenovationReport() {
 
       {/* ── No data warning ── */}
       {!hasResults && (
-        <div style={{ borderRadius: 12, padding: "16px 20px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
-          <AlertTriangle size={16} color="#F59E0B" style={{ flexShrink: 0, marginTop: 1 }} />
-          <p style={{ fontSize: 12, color: "#F59E0B", margin: 0 }}>
+        <div style={{ borderRadius: 12, padding: "16px 20px", background: "rgba(232,136,12,0.08)", border: "1px solid rgba(232,136,12,0.3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <AlertTriangle size={16} color="#E8880C" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ fontSize: 12, color: "#E8880C", margin: 0 }}>
             No simulation results yet. Go back to Step 4 and run "Send to Simulation" to generate package results.
           </p>
         </div>
@@ -561,7 +561,7 @@ export default function RenovationReport() {
       {/* ── City climate target ── */}
       {goalAssessment && (
         <Card>
-          <SectionTitle icon={<Target size={15} color="#96D74C" />} title="City climate target" />
+          <SectionTitle icon={<Target size={15} color="#2FB477" />} title="City climate target" />
           <ClimateGoalPanel a={goalAssessment} />
           {buildingGoal && (
             <div style={{ marginTop: 18 }}>
@@ -593,7 +593,7 @@ export default function RenovationReport() {
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>Energy class</div>
-                    <div style={{ fontSize: 13, fontWeight: 900, color: "#F59E0B" }}>{b.eclass ?? "—"}</div>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: "#E8880C" }}>{b.eclass ?? "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>EPC energy</div>
@@ -601,11 +601,11 @@ export default function RenovationReport() {
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>EPSM baseline</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: bl ? "#F59E0B" : "rgba(255,255,255,0.25)" }}>{bl ? kwh(bl.energyUse) : "—"}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: bl ? "#E8880C" : "rgba(255,255,255,0.25)" }}>{bl ? kwh(bl.energyUse) : "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>Baseline status</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: bl ? "#96D74C" : "rgba(255,255,255,0.25)" }}>{bl ? "✓ Done" : "Pending"}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: bl ? "#2FB477" : "rgba(255,255,255,0.25)" }}>{bl ? "✓ Done" : "Pending"}</div>
                   </div>
                 </div>
               );
@@ -617,7 +617,7 @@ export default function RenovationReport() {
       {/* ── 3. Materials selected ── */}
       {Object.keys(materials).length > 0 && (
         <Card>
-          <SectionTitle icon={<Package size={15} color="#F59E0B" />} title="Materials Selected for Testing" />
+          <SectionTitle icon={<Package size={15} color="#E8880C" />} title="Materials Selected for Testing" />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {Object.entries(materials).filter(([, codes]) => codes.length > 0).map(([comp, codes]) => (
               <div key={comp} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -639,7 +639,7 @@ export default function RenovationReport() {
       {/* ── 4. Energy chart ── */}
       {hasResults && (
         <Card>
-          <SectionTitle icon={<Zap size={15} color="#F59E0B" />} title="Energy Use Comparison" />
+          <SectionTitle icon={<Zap size={15} color="#E8880C" />} title="Energy Use Comparison" />
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "0 0 16px" }}>
             Top {Math.min(simResults.length, 8)} packages vs as-built baseline ({kwh(baselineEU)})
           </p>
@@ -651,7 +651,7 @@ export default function RenovationReport() {
                 contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, fontSize: 11 }}
                 formatter={(v: number) => [`${v} kWh/m²·yr`]}
               />
-              <ReferenceLine y={baselineEU} stroke="rgba(239,68,68,0.5)" strokeDasharray="4 3" label={{ value: "Baseline", fill: "rgba(239,68,68,0.6)", fontSize: 10 }} />
+              <ReferenceLine y={baselineEU} stroke="rgba(226,72,59,0.5)" strokeDasharray="4 3" label={{ value: "Baseline", fill: "rgba(226,72,59,0.6)", fontSize: 10 }} />
               <Bar dataKey="energyUse" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
               </Bar>
@@ -663,11 +663,11 @@ export default function RenovationReport() {
       {/* ── 5. Recommendations ── */}
       {hasResults && (
         <div>
-          <SectionTitle icon={<Award size={15} color="#96D74C" />} title="Recommendations" />
+          <SectionTitle icon={<Award size={15} color="#2FB477" />} title="Recommendations" />
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            {bestEnergy  && <PackageCard result={bestEnergy}   label="Best energy saving"  accent="#96D74C" icon={<Zap size={13} color="#96D74C" />} />}
-            {bestCarbon  && bestCarbon.packageIndex !== bestEnergy?.packageIndex  && <PackageCard result={bestCarbon}  label="Lowest carbon"      accent="#60a5fa" icon={<Leaf size={13} color="#60a5fa" />} />}
-            {bestCost    && bestCost.packageIndex !== bestEnergy?.packageIndex    && <PackageCard result={bestCost}    label="Lowest cost"        accent="#F59E0B" icon={<DollarSign size={13} color="#F59E0B" />} />}
+            {bestEnergy  && <PackageCard result={bestEnergy}   label="Best energy saving"  accent="#2FB477" icon={<Zap size={13} color="#2FB477" />} />}
+            {bestCarbon  && bestCarbon.packageIndex !== bestEnergy?.packageIndex  && <PackageCard result={bestCarbon}  label="Lowest carbon"      accent="#4A90E2" icon={<Leaf size={13} color="#4A90E2" />} />}
+            {bestCost    && bestCost.packageIndex !== bestEnergy?.packageIndex    && <PackageCard result={bestCost}    label="Lowest cost"        accent="#E8880C" icon={<DollarSign size={13} color="#E8880C" />} />}
             {bestBalanced && bestBalanced.packageIndex !== bestEnergy?.packageIndex && <PackageCard result={bestBalanced} label="Best balanced"    accent="#c084fc" icon={<Award size={13} color="#c084fc" />} />}
           </div>
         </div>
@@ -695,10 +695,10 @@ export default function RenovationReport() {
               <div key={i} style={{
                 display: "grid", gridTemplateColumns: "28px 1fr 130px 120px 120px 120px", gap: 10,
                 padding: "9px 12px", borderRadius: 10, alignItems: "center",
-                background: i === 0 ? "rgba(150,215,76,0.05)" : "rgba(255,255,255,0.02)",
-                border: `1px solid ${i === 0 ? "rgba(150,215,76,0.2)" : "rgba(255,255,255,0.05)"}`,
+                background: i === 0 ? "rgba(47,180,119,0.05)" : "rgba(255,255,255,0.02)",
+                border: `1px solid ${i === 0 ? "rgba(47,180,119,0.2)" : "rgba(255,255,255,0.05)"}`,
               }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? "#96D74C" : "rgba(255,255,255,0.2)" }}>{i === 0 ? "★" : `#${i + 1}`}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? "#2FB477" : "rgba(255,255,255,0.2)" }}>{i === 0 ? "★" : `#${i + 1}`}</span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {Object.entries(r.components).map(([comp, item]) => (
                     <div key={comp} style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 5 }}>
@@ -713,8 +713,8 @@ export default function RenovationReport() {
                   ))}
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.65)", textAlign: "right" }}>{kwh(r.energyUse)}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#96D74C", textAlign: "right" }}>−{kwh(r.saving)}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#60a5fa", textAlign: "right" }}>−{kg(r.carbonSaving)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#2FB477", textAlign: "right" }}>−{kwh(r.saving)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#4A90E2", textAlign: "right" }}>−{kg(r.carbonSaving)}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>{sek(r.cost)}</span>
               </div>
             ))}
@@ -727,14 +727,14 @@ export default function RenovationReport() {
 
       {/* ── 7. Recommendation summary text ── */}
       {hasResults && bestBalanced && (
-        <Card accent="#96D74C">
-          <SectionTitle icon={<CheckCircle2 size={15} color="#96D74C" />} title="Summary & Recommendation" />
+        <Card accent="#2FB477">
+          <SectionTitle icon={<CheckCircle2 size={15} color="#2FB477" />} title="Summary & Recommendation" />
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.7, margin: "0 0 12px" }}>
             Based on the EPSM simulation of <strong style={{ color: "#fff" }}>{simResults.length} renovation packages</strong> across{" "}
             <strong style={{ color: "#fff" }}>{components.join(", ")}</strong>, the analysis identifies the following recommended strategy:
           </p>
-          <div style={{ borderRadius: 10, padding: "14px 16px", background: "rgba(150,215,76,0.07)", border: "1px solid rgba(150,215,76,0.2)", marginBottom: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "#96D74C", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ borderRadius: 10, padding: "14px 16px", background: "rgba(47,180,119,0.07)", border: "1px solid rgba(47,180,119,0.2)", marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#2FB477", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>
               ★ Recommended Package #{bestBalanced.packageIndex} — Best Balance of Cost, Energy & Carbon
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
@@ -745,23 +745,23 @@ export default function RenovationReport() {
               ))}
             </div>
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.6 }}>
-              This package achieves a <strong style={{ color: "#96D74C" }}>{kwh(bestBalanced.saving)} reduction</strong> in annual energy use
-              (from {kwh(baselineEU)} to <strong style={{ color: "#F59E0B" }}>{kwh(bestBalanced.energyUse)}</strong>),
-              saving an estimated <strong style={{ color: "#60a5fa" }}>{kg(bestBalanced.carbonSaving)}</strong> of embodied carbon per year,
+              This package achieves a <strong style={{ color: "#2FB477" }}>{kwh(bestBalanced.saving)} reduction</strong> in annual energy use
+              (from {kwh(baselineEU)} to <strong style={{ color: "#E8880C" }}>{kwh(bestBalanced.energyUse)}</strong>),
+              saving an estimated <strong style={{ color: "#4A90E2" }}>{kg(bestBalanced.carbonSaving)}</strong> of embodied carbon per year,
               at a material cost of <strong style={{ color: "rgba(255,255,255,0.8)" }}>{sek(bestBalanced.cost)}</strong>.
             </p>
           </div>
           {bestCost && bestCost.packageIndex !== bestBalanced.packageIndex && (
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6, margin: "0 0 6px" }}>
-              If cost is the primary constraint, <strong style={{ color: "#F59E0B" }}>Package #{bestCost.packageIndex}</strong> offers the
-              lowest material cost at <strong style={{ color: "#F59E0B" }}>{sek(bestCost.cost)}</strong> while still saving{" "}
-              <strong style={{ color: "#96D74C" }}>{kwh(bestCost.saving)}</strong>.
+              If cost is the primary constraint, <strong style={{ color: "#E8880C" }}>Package #{bestCost.packageIndex}</strong> offers the
+              lowest material cost at <strong style={{ color: "#E8880C" }}>{sek(bestCost.cost)}</strong> while still saving{" "}
+              <strong style={{ color: "#2FB477" }}>{kwh(bestCost.saving)}</strong>.
             </p>
           )}
           {bestCarbon && bestCarbon.packageIndex !== bestBalanced.packageIndex && (
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6, margin: 0 }}>
-              For maximum carbon impact, <strong style={{ color: "#60a5fa" }}>Package #{bestCarbon.packageIndex}</strong> saves{" "}
-              <strong style={{ color: "#60a5fa" }}>{kg(bestCarbon.carbonSaving)}</strong> of CO₂e per year.
+              For maximum carbon impact, <strong style={{ color: "#4A90E2" }}>Package #{bestCarbon.packageIndex}</strong> saves{" "}
+              <strong style={{ color: "#4A90E2" }}>{kg(bestCarbon.carbonSaving)}</strong> of CO₂e per year.
             </p>
           )}
         </Card>
@@ -781,7 +781,7 @@ export default function RenovationReport() {
         const PICKS: Record<string, { fg: string; label: string; tip: string }> = {
           minimaxRegret: { fg: "#4ECDC4", label: "Safety-first", tip: "Chooses the option with the smallest worst-case disappointment" },
           hurwicz:       { fg: "#B98BE8", label: `Balanced choice (alpha=${ra.alpha.toFixed(2)})`, tip: "Blends worst and best case using your decision-style slider" },
-          mostRobust:    { fg: "#96D74C", label: "Most stable", tip: "Smallest difference between low and high price outcomes" },
+          mostRobust:    { fg: "#2FB477", label: "Most stable", tip: "Smallest difference between low and high price outcomes" },
         };
         const th: React.CSSProperties = { padding: "6px 8px", fontWeight: 600, color: "rgba(255,255,255,0.45)", textAlign: "right", whiteSpace: "nowrap" };
         const td: React.CSSProperties = { padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap", color: "rgba(255,255,255,0.8)" };
@@ -827,7 +827,7 @@ export default function RenovationReport() {
                       <td style={{ padding: "6px 8px", color: o.isBaseline ? "rgba(255,255,255,0.5)" : "#fff", fontStyle: o.isBaseline ? "italic" : undefined, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>{o.label}</td>
                       {o.benefits.map((b, si) => {
                         const best = !o.isBaseline && b === ra.bestPerScenario[si];
-                        return <td key={si} style={{ ...td, color: best ? "#96D74C" : o.isBaseline ? "rgba(255,255,255,0.4)" : b < 0 ? "#fca5a5" : "rgba(255,255,255,0.8)", fontWeight: best ? 800 : 400 }}>{fmtM(b)}</td>;
+                        return <td key={si} style={{ ...td, color: best ? "#2FB477" : o.isBaseline ? "rgba(255,255,255,0.4)" : b < 0 ? "#fca5a5" : "rgba(255,255,255,0.8)", fontWeight: best ? 800 : 400 }}>{fmtM(b)}</td>;
                       })}
                       <td style={td}>{o.isBaseline ? "—" : fmtM(o.range)}</td>
                       <td style={{ ...td, color: o.id === ra.picks.minimaxRegret ? "#4ECDC4" : "rgba(255,255,255,0.6)", fontWeight: o.id === ra.picks.minimaxRegret ? 800 : 400 }}>{o.isBaseline ? "—" : fmtM(o.maxRegret)}</td>
@@ -854,14 +854,14 @@ export default function RenovationReport() {
         const th2: React.CSSProperties = { padding: "6px 8px", fontWeight: 600, color: "rgba(255,255,255,0.45)", textAlign: "right", whiteSpace: "nowrap" };
         const td2: React.CSSProperties = { padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap", color: "rgba(255,255,255,0.8)" };
         return (
-          <Card accent="#F59E0B">
-            <SectionTitle icon={<Flame size={15} color="#F59E0B" />} title="Heating System (HVAC)" />
+          <Card accent="#E8880C">
+            <SectionTitle icon={<Flame size={15} color="#E8880C" />} title="Heating System (HVAC)" />
             <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.65)", lineHeight: 1.7, margin: "0 0 12px" }}>
               On the building's <strong style={{ color: "#fff" }}>{Math.round(ha.heatingDemandKwhM2Yr)} kWh/m²·yr</strong> heat demand, the chosen system is{" "}
-              <strong style={{ color: "#F59E0B" }}>{sel.name}</strong>{sel.isBaseline ? " (the as-built baseline)" : ""} — delivering{" "}
+              <strong style={{ color: "#E8880C" }}>{sel.name}</strong>{sel.isBaseline ? " (the as-built baseline)" : ""} — delivering{" "}
               <strong style={{ color: "#fff" }}>{sel.deliveredKwhM2Yr} kWh/m²·yr</strong> at{" "}
               <strong style={{ color: "#fff" }}>{fsek(sel.operatingCostYrSek)} SEK/yr</strong> and{" "}
-              <strong style={{ color: "#60a5fa" }}>{fsek(sel.carbonYrKg)} kg CO₂e/yr</strong>
+              <strong style={{ color: "#4A90E2" }}>{fsek(sel.carbonYrKg)} kg CO₂e/yr</strong>
               {sel.vsBaseline && !sel.isBaseline && <> ({sel.vsBaseline.opCostPct > 0 ? "+" : ""}{sel.vsBaseline.opCostPct}% cost, {sel.vsBaseline.carbonPct > 0 ? "+" : ""}{sel.vsBaseline.carbonPct}% carbon vs district heating)</>}.
             </p>
             <div style={{ overflowX: "auto" }}>
@@ -881,11 +881,11 @@ export default function RenovationReport() {
                   {ha.results.map((s) => {
                     const isSel = s.id === ha.selectedId;
                     return (
-                      <tr key={s.id} style={{ borderTop: "1px solid rgba(255,255,255,0.07)", background: isSel ? "rgba(78,205,196,0.10)" : s.isBaseline ? "rgba(245,158,11,0.05)" : undefined, boxShadow: isSel ? "inset 3px 0 0 #4ECDC4" : undefined }}>
+                      <tr key={s.id} style={{ borderTop: "1px solid rgba(255,255,255,0.07)", background: isSel ? "rgba(78,205,196,0.10)" : s.isBaseline ? "rgba(232,136,12,0.05)" : undefined, boxShadow: isSel ? "inset 3px 0 0 #4ECDC4" : undefined }}>
                         <td style={{ padding: "6px 8px", color: "#fff" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color }} />
-                            {s.shortName}{isSel && <span style={{ fontSize: 8.5, color: "#4ECDC4", fontWeight: 800 }}>✓ chosen</span>}{s.isBaseline && <span style={{ fontSize: 8.5, color: "#F59E0B" }}>baseline</span>}
+                            {s.shortName}{isSel && <span style={{ fontSize: 8.5, color: "#4ECDC4", fontWeight: 800 }}>✓ chosen</span>}{s.isBaseline && <span style={{ fontSize: 8.5, color: "#E8880C" }}>baseline</span>}
                           </span>
                         </td>
                         <td style={td2}>{s.spf.toFixed(s.spf >= 1.5 ? 1 : 2)}</td>
@@ -893,7 +893,7 @@ export default function RenovationReport() {
                         <td style={td2}>{fsek(s.operatingCostYrSek)}</td>
                         <td style={td2}>{fsek(s.carbonYrKg)}</td>
                         <td style={td2}>{fsek(s.capexSek)}</td>
-                        <td style={{ ...td2, color: s.id === ha.picks.lowestLcc ? "#96D74C" : "#fff", fontWeight: s.id === ha.picks.lowestLcc ? 800 : 400 }}>{fsek(s.lccSek)}</td>
+                        <td style={{ ...td2, color: s.id === ha.picks.lowestLcc ? "#2FB477" : "#fff", fontWeight: s.id === ha.picks.lowestLcc ? 800 : 400 }}>{fsek(s.lccSek)}</td>
                       </tr>
                     );
                   })}

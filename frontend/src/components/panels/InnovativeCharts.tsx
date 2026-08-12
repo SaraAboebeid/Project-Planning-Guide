@@ -145,7 +145,7 @@ export function SankeyFlowView() {
           <Sankey
             data={data}
             node={{ fill: "#721CB8", stroke: "#fff", strokeWidth: 2 }}
-            link={{ stroke: "#96D74C", opacity: 0.5 }}
+            link={{ stroke: "#2FB477", opacity: 0.5 }}
             nodePadding={50}
             margin={{ top: 20, right: 120, bottom: 20, left: 120 }}
           >
@@ -359,6 +359,6 @@ export function BubbleScatterView() {
 function getColorByImportance(pct: number): string {
   if (pct >= 30) return "#dc2626"; // red-600 - Critical
   if (pct >= 20) return "#ea580c"; // orange-600 - High
-  if (pct >= 10) return "#f59e0b"; // yellow-500 - Medium
+  if (pct >= 10) return "#E8880C"; // yellow-500 - Medium
   return "#84cc16"; // lime-500 - Low
 }

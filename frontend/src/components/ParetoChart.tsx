@@ -159,8 +159,8 @@ export default function ParetoChart({
   const OptimalDot = (props: { cx?: number; cy?: number; payload?: OptDatum }) => {
     if (props.cx == null || props.cy == null) return null;
     const v = props.payload?.validated;
-    return <circle cx={props.cx} cy={props.cy} r={7} fill={v ? "rgba(150,215,76,0.9)" : "rgba(78,205,196,0.18)"}
-      stroke={v ? "#96D74C" : "#4ECDC4"} strokeWidth={2.2} style={{ cursor: "pointer" }} />;
+    return <circle cx={props.cx} cy={props.cy} r={7} fill={v ? "rgba(47,180,119,0.9)" : "rgba(78,205,196,0.18)"}
+      stroke={v ? "#2FB477" : "#4ECDC4"} strokeWidth={2.2} style={{ cursor: "pointer" }} />;
   };
   const BaselineDot = (props: { cx?: number; cy?: number }) =>
     props.cx != null && props.cy != null
@@ -298,9 +298,9 @@ export default function ParetoChart({
                   disabled={isVal}
                   style={{ padding: "8px 15px", borderRadius: 9, fontSize: 12, fontWeight: 800,
                     cursor: isVal ? "default" : "pointer",
-                    border: `1px solid ${isVal ? "rgba(150,215,76,0.5)" : "rgba(78,205,196,0.55)"}`,
-                    background: isVal ? "rgba(150,215,76,0.14)" : "rgba(78,205,196,0.18)",
-                    color: isVal ? "#96D74C" : "#4ECDC4" }}>
+                    border: `1px solid ${isVal ? "rgba(47,180,119,0.5)" : "rgba(78,205,196,0.55)"}`,
+                    background: isVal ? "rgba(47,180,119,0.14)" : "rgba(78,205,196,0.18)",
+                    color: isVal ? "#2FB477" : "#4ECDC4" }}>
                   {isVal ? "✓ Running in EPSM" : "Run this pick in EPSM →"}
                 </button>
                 <button onClick={() => setPinned(null)}
@@ -315,7 +315,7 @@ export default function ParetoChart({
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 10.5, color: white(0.5), marginTop: 2, paddingLeft: 8 }}>
         <span><span style={{ color: "#B98BE8" }}>—●</span> {xO.short}/{yO.short} frontier</span>
         <span><span style={{ color: "#4ECDC4" }}>◯</span> optimal package (click to select)</span>
-        <span><span style={{ color: "#96D74C" }}>●</span> validated in EPSM</span>
+        <span><span style={{ color: "#2FB477" }}>●</span> validated in EPSM</span>
         <span><span style={{ color: "#fff" }}>◆</span> baseline</span>
       </div>
     </div>

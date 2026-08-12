@@ -15,7 +15,7 @@ const TOOLS = [
     id: "pvgis",
     title: "PVGIS",
     subtitle: "Solar Irradiance & PV Potential",
-    color: "#F59E0B",
+    color: "#E8880C",
     status: "integrated",
     icon: Sun,
     description:
@@ -133,7 +133,7 @@ const TOOLS = [
     id: "mcda",
     title: "Retrofit Prioritization (MCDA)",
     subtitle: "Multi-Criteria Ranking — which buildings first",
-    color: "#F59E0B",
+    color: "#E8880C",
     status: "integrated",
     icon: ListOrdered,
     description:
@@ -219,7 +219,7 @@ const TOOLS = [
     id: "lca",
     title: "Life Cycle Assessment",
     subtitle: "Whole-Life Carbon & Environmental Impact",
-    color: "#22C55E",
+    color: "#2FB477",
     status: "integrated",
     icon: Leaf,
     description:
@@ -527,7 +527,7 @@ export default function AnalysisTools() {
         <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
           {[
             { label: `${TOOLS.length} tools`, sub: "total", color: "#4ECDC4" },
-            { label: `${TOOLS.filter(t => t.status === "integrated").length}`, sub: "integrated", color: "#96D74C" },
+            { label: `${TOOLS.filter(t => t.status === "integrated").length}`, sub: "integrated", color: "#2FB477" },
             { label: `${TOOLS.filter(t => t.status === "external").length}`, sub: "external", color: "#721CB8" },
           ].map(p => (
             <div key={p.label} style={{

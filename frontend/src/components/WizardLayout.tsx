@@ -19,7 +19,7 @@ function fireConfetti() {
   const dpr = window.devicePixelRatio || 1;
   const W = (canvas.width = window.innerWidth * dpr);
   const H = (canvas.height = window.innerHeight * dpr);
-  const COLORS = ["#96D74C", "#4ECDC4", "#721CB8", "#F59E0B", "#EF4444", "#60a5fa", "#B98BE8"];
+  const COLORS = ["#2FB477", "#4ECDC4", "#721CB8", "#E8880C", "#E2483B", "#4A90E2", "#B98BE8"];
   const parts = Array.from({ length: 170 }, () => ({
     x: W / 2 + (Math.random() - 0.5) * W * 0.35,
     y: H * 0.32 + (Math.random() - 0.5) * 60 * dpr,
@@ -151,7 +151,7 @@ function ProgressRow({ label, pct, color }: { label: string; pct: number; color:
 function DataNeededRow({ label, status }: {
   label: string; status: "available" | "partial" | "missing";
 }) {
-  const color = status === "available" ? "#96D74C" : status === "partial" ? "#F59E0B" : "#EF4444";
+  const color = status === "available" ? "#2FB477" : status === "partial" ? "#E8880C" : "#E2483B";
   const text  = status === "available" ? "Available" : status === "partial" ? "Partial" : "Missing";
   const iconD = status === "available"
     ? IC.check
@@ -201,6 +201,15 @@ export default function WizardLayout() {
   const dataReadiness   = hasBuilding ? 78 : 42;
   const modelConfidence = hasBuilding ? 72 : 38;
   const nextStepLabel   = safeIndex < steps.length - 1 ? steps[safeIndex + 1]!.label : "Complete";
+  // One plain-language line about what the NEXT step does, keyed by the current
+  // step number — shown in the footer so the user knows what Continue leads to.
+  const NEXT_STEP_HINT: Record<number, string> = {
+    1: "we'll gather the available data for your building(s) so you can review, edit or import it.",
+    2: "we'll run an energy simulation to establish each building's current (as-built) performance.",
+    3: "we'll design renovation packages and compare their energy, cost and carbon.",
+    4: "we'll compile everything into a shareable report.",
+  };
+  const nextHint = NEXT_STEP_HINT[activeStep.number];
 
   const goBack = () => {
     if (safeIndex > 0) navigate(steps[safeIndex - 1]!.path);
@@ -367,7 +376,16 @@ export default function WizardLayout() {
           }}>
             <Icon d={IC.arrowL} size={16} /> Back
           </button>
-          <div style={{ flex: 1 }} />
+          {/* What Continue leads to — a plain-language preview of the next step. */}
+          {!isLastStep ? (
+            <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", padding: "0 16px" }}>
+              <div style={{ maxWidth: 620, fontSize: 11.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.45, textAlign: "center" }}>
+                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginRight: 7 }}>Next</span>
+                <b style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>{nextStepLabel}</b>
+                {nextHint ? <span style={{ color: "rgba(255,255,255,0.42)" }}> — {nextHint}</span> : null}
+              </div>
+            </div>
+          ) : <div style={{ flex: 1 }} />}
           {/* No Continue on the final step (Report) — nothing comes after it. */}
           {!isLastStep && (
             <button

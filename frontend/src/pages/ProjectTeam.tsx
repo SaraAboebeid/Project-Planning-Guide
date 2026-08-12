@@ -39,7 +39,7 @@ const TEAM: Member[] = [
   {
     name: "Elena Malakhatka",
     role: "Business Development",
-    roleColor: "#F59E0B",
+    roleColor: "#E8880C",
     bio: "Leads business development, connecting the platform with building owners, municipalities and industry partners. Translates the tool's capabilities into real-world adoption and long-term impact.",
     link: { href: "mailto:elenamal@chalmers.se", label: "elenamal@chalmers.se", kind: "email" },
   },

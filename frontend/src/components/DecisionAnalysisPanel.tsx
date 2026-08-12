@@ -16,7 +16,7 @@ const scenarioHint = (label: string, index: number) => {
 const PICK_STYLE: Record<string, { fg: string; bg: string; label: string; tip: string }> = {
   minimaxRegret: { fg: "#4ECDC4", bg: "rgba(78,205,196,0.16)", label: "Safety-first",   tip: "Chooses the option with the smallest worst-case disappointment." },
   hurwicz:       { fg: "#B98BE8", bg: "rgba(185,139,232,0.16)", label: "Balanced choice", tip: "Blends worst and best case using your slider setting (alpha)." },
-  mostRobust:    { fg: "#96D74C", bg: "rgba(150,215,76,0.16)", label: "Most stable",      tip: "Smallest difference between low and high price outcomes." },
+  mostRobust:    { fg: "#2FB477", bg: "rgba(47,180,119,0.16)", label: "Most stable",      tip: "Smallest difference between low and high price outcomes." },
 };
 
 export default function DecisionAnalysisPanel({
@@ -115,7 +115,7 @@ export default function DecisionAnalysisPanel({
                   </td>
                   {o.benefits.map((b, si) => {
                     const isBest = !o.isBaseline && b === bestPerScenario[si];
-                    return <td key={si} style={{ ...td, color: isBest ? "#96D74C" : o.isBaseline ? white(0.4) : b < 0 ? "#fca5a5" : white(0.8), fontWeight: isBest ? 800 : 400 }}>{fmtM(b)}</td>;
+                    return <td key={si} style={{ ...td, color: isBest ? "#2FB477" : o.isBaseline ? white(0.4) : b < 0 ? "#fca5a5" : white(0.8), fontWeight: isBest ? 800 : 400 }}>{fmtM(b)}</td>;
                   })}
                   <td style={{ ...td, color: white(0.6) }}>{o.isBaseline ? "—" : fmtM(o.range)}</td>
                   <td style={{ ...td, color: o.id === picks.minimaxRegret ? "#4ECDC4" : white(0.6), fontWeight: o.id === picks.minimaxRegret ? 800 : 400 }}>{o.isBaseline ? "—" : fmtM(o.maxRegret)}</td>

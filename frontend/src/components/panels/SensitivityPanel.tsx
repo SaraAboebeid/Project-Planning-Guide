@@ -9,7 +9,7 @@ import {
 } from "../../config/sensitivityData";
 import { TreemapView, SankeyFlowView, RadialImpactView, BubbleScatterView } from "./InnovativeCharts";
 
-const COLORS = ["#721CB8", "#96D74C", "#509724", "#995BD5", "#f59e0b", "#ef4444", "#421869", "#ec4899", "#06b6d4", "#64748b", "#3a6e1a", "#96D74C", "#d946ef"];
+const COLORS = ["#721CB8", "#2FB477", "#509724", "#995BD5", "#E8880C", "#E2483B", "#421869", "#ec4899", "#06b6d4", "#64748b", "#3a6e1a", "#2FB477", "#d946ef"];
 
 function fmt(n: number) {
   return n >= 1000 ? `${(n / 1000).toFixed(0)}k` : n.toFixed(0);
@@ -238,9 +238,9 @@ export default function SensitivityPanel() {
                   <Line
                     type="monotone"
                     dataKey="heating"
-                    stroke="#96D74C"
+                    stroke="#2FB477"
                     strokeWidth={2.5}
-                    dot={{ fill: "#96D74C", r: 4 }}
+                    dot={{ fill: "#2FB477", r: 4 }}
                     activeDot={{ r: 6, fill: "#721CB8" }}
                   />
                 </LineChart>

@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 /* ─── Constants ───────────────────────────────────────────────────── */
-const PACKAGE_COLORS = ["#721CB8", "#995BD5", "#96D74C", "#509724"];
+const PACKAGE_COLORS = ["#721CB8", "#995BD5", "#2FB477", "#509724"];
 const PACKAGE_NAMES  = ["Package A", "Package B", "Package C", "Package D"];
 
 /* ─── Fixed building elements for vertical extension ─────────────── */

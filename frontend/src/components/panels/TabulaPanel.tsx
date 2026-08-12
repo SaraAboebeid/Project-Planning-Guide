@@ -61,8 +61,8 @@ export default function TabulaPanel() {
                 <PolarGrid stroke="#e2e8f0" />
                 <PolarAngleAxis dataKey="component" fontSize={11} />
                 <PolarRadiusAxis fontSize={10} tick={false} />
-                <Radar name="Original" dataKey="Original" stroke="#ef4444" fill="#ef4444" fillOpacity={0.15} strokeWidth={2} />
-                <Radar name="Typical Retrofit" dataKey="Typical Retrofit" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.12} strokeWidth={2} />
+                <Radar name="Original" dataKey="Original" stroke="#E2483B" fill="#E2483B" fillOpacity={0.15} strokeWidth={2} />
+                <Radar name="Typical Retrofit" dataKey="Typical Retrofit" stroke="#E8880C" fill="#E8880C" fillOpacity={0.12} strokeWidth={2} />
                 <Radar name="Advanced Retrofit" dataKey="Advanced Retrofit" stroke="#2e9e96" fill="#2e9e96" fillOpacity={0.15} strokeWidth={2} />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
@@ -117,8 +117,8 @@ export default function TabulaPanel() {
                 />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="Original" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Typical Retrofit" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Original" fill="#E2483B" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Typical Retrofit" fill="#E8880C" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Advanced Retrofit" fill="#2e9e96" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

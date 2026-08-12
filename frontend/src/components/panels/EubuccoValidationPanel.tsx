@@ -35,8 +35,8 @@ const ERROR_DIST = [
 // By building type
 const BY_TYPE = [
   { type: "Detached (Friliggande)", n: 83_876, exactPct: 10.8, mae: 1.02, color: "#721CB8" },
-  { type: "End-terrace (Gavel)",    n:  5_278, exactPct:  2.7, mae: 1.24, color: "#96D74C" },
-  { type: "Mid-terrace (Mellan.)",  n:  1_044, exactPct:  2.2, mae: 1.98, color: "#f59e0b" },
+  { type: "End-terrace (Gavel)",    n:  5_278, exactPct:  2.7, mae: 1.24, color: "#2FB477" },
+  { type: "Mid-terrace (Mellan.)",  n:  1_044, exactPct:  2.2, mae: 1.98, color: "#E8880C" },
 ];
 
 function MetricCard({
@@ -129,7 +129,7 @@ export default function EubuccoValidationPanel() {
                 {ERROR_DIST.map(d => (
                   <Cell
                     key={d.diff}
-                    fill={d.diff === "0" ? "#22c55e" : Number(d.diff) < 0 || d.diff.startsWith("≤") ? "#f97316" : "#6366f1"}
+                    fill={d.diff === "0" ? "#2FB477" : Number(d.diff) < 0 || d.diff.startsWith("≤") ? "#f97316" : "#6366f1"}
                   />
                 ))}
                 <LabelList
@@ -180,7 +180,7 @@ export default function EubuccoValidationPanel() {
                   <span className="text-slate-400">MAE:</span>
                   <span
                     className="px-1.5 py-0.5 rounded font-bold text-white"
-                    style={{ backgroundColor: row.mae > 1.5 ? "#ef4444" : row.mae > 1.1 ? "#f59e0b" : "#22c55e" }}
+                    style={{ backgroundColor: row.mae > 1.5 ? "#E2483B" : row.mae > 1.1 ? "#E8880C" : "#2FB477" }}
                   >
                     {row.mae} floors
                   </span>

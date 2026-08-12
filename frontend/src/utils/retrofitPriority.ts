@@ -39,7 +39,7 @@ export const CRITERION_LABELS: Record<CriterionKey, string> = {
   R: "Retrofit potential",
 };
 export const CRITERION_COLORS: Record<CriterionKey, string> = {
-  E: "#f59e0b", F: "#ef4444", C: "#3b82f6", R: "#22c55e",
+  E: "#E8880C", F: "#E2483B", C: "#4A90E2", R: "#2FB477",
 };
 
 export interface SubScore { value: number; confidence: number; note: string; available: boolean; }

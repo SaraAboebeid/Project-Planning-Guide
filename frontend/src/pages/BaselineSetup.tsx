@@ -107,7 +107,7 @@ export default function BaselineSetup() {
 
   const results = project.renovationBaselineResults;
 
-  const eClassColor: Record<string, string> = { A: "#22c55e", B: "#86efac", C: "#96D74C", D: "#F59E0B", E: "#f97316", F: "#EF4444", G: "#dc2626" };
+  const eClassColor: Record<string, string> = { A: "#2FB477", B: "#2FB477", C: "#2FB477", D: "#E8880C", E: "#f97316", F: "#E2483B", G: "#dc2626" };
 
   function downloadResults() {
     const payload = {
@@ -222,15 +222,15 @@ export default function BaselineSetup() {
           Baseline Simulation
         </h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          Run a real EnergyPlus (EPSM) baseline for the building{buildings.length !== 1 ? "s" : ""} selected in Step 2 —
-          the as-built energy performance you'll compare renovation packages against in Step 4.
+          Run an energy simulation to establish the as-built performance of the building{buildings.length !== 1 ? "s" : ""} selected in Step 2 —
+          the baseline you'll compare renovation packages against in Step 4.
         </p>
       </div>
 
       {/* ── Buildings to simulate (compact list, no data-gap repetition) ── */}
       {buildings.length === 0 ? (
-        <div style={{ borderRadius: 12, padding: "20px 24px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)" }}>
-          <p style={{ fontSize: 13, color: "#F59E0B", margin: 0 }}>
+        <div style={{ borderRadius: 12, padding: "20px 24px", background: "rgba(232,136,12,0.08)", border: "1px solid rgba(232,136,12,0.3)" }}>
+          <p style={{ fontSize: 13, color: "#E8880C", margin: 0 }}>
             No buildings loaded yet — go back to Step 2 to select buildings.
           </p>
         </div>
@@ -281,20 +281,20 @@ export default function BaselineSetup() {
       {/* ── Baseline simulation ── */}
       <div style={{
         borderRadius: 14, padding: "20px 22px",
-        background: canRunBaseline ? "rgba(150,215,76,0.05)" : "rgba(255,255,255,0.02)",
-        border: `1px solid ${canRunBaseline ? "rgba(150,215,76,0.25)" : "rgba(255,255,255,0.07)"}`,
+        background: canRunBaseline ? "rgba(47,180,119,0.05)" : "rgba(255,255,255,0.02)",
+        border: `1px solid ${canRunBaseline ? "rgba(47,180,119,0.25)" : "rgba(255,255,255,0.07)"}`,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           {simRunning
-            ? <Loader2 size={15} color="#96D74C" style={{ animation: "spin 1s linear infinite" }} />
-            : <Zap size={15} color={canRunBaseline ? "#96D74C" : "rgba(255,255,255,0.2)"} />}
+            ? <Loader2 size={15} color="#2FB477" style={{ animation: "spin 1s linear infinite" }} />
+            : <Zap size={15} color={canRunBaseline ? "#2FB477" : "rgba(255,255,255,0.2)"} />}
           <h3 style={{ fontSize: 14, fontWeight: 700, color: canRunBaseline ? "#fff" : "rgba(255,255,255,0.35)", margin: 0 }}>
             Baseline Energy Simulation
           </h3>
           {project.baselineStatus === "done" && !simRunning && (
             <span style={{
-              marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#96D74C",
-              background: "rgba(150,215,76,0.15)", padding: "2px 10px", borderRadius: 20,
+              marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#2FB477",
+              background: "rgba(47,180,119,0.15)", padding: "2px 10px", borderRadius: 20,
             }}>
               ✓ Baseline complete
             </span>
@@ -315,16 +315,16 @@ export default function BaselineSetup() {
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Running EnergyPlus for each building…</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#96D74C" }}>{simProgress}%</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#2FB477" }}>{simProgress}%</span>
             </div>
             <div style={{ height: 6, borderRadius: 4, background: "rgba(255,255,255,0.08)" }}>
-              <div style={{ height: "100%", borderRadius: 4, background: "linear-gradient(90deg,#5a9e1e,#96D74C)", width: `${simProgress}%`, transition: "width 0.25s" }} />
+              <div style={{ height: "100%", borderRadius: 4, background: "linear-gradient(90deg,#5a9e1e,#2FB477)", width: `${simProgress}%`, transition: "width 0.25s" }} />
             </div>
           </div>
         )}
 
         {simError && !simRunning && (
-          <div style={{ borderRadius: 8, padding: "10px 14px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", marginBottom: 14 }}>
+          <div style={{ borderRadius: 8, padding: "10px 14px", background: "rgba(226,72,59,0.1)", border: "1px solid rgba(226,72,59,0.25)", marginBottom: 14 }}>
             <span style={{ fontSize: 12, color: "#fca5a5" }}>⚠ Baseline simulation failed: {simError}</span>
           </div>
         )}
@@ -358,13 +358,13 @@ export default function BaselineSetup() {
                   <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.address}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     {r.eClassFromEpc && (
-                      <span style={{ fontSize: 9, fontWeight: 700, color: "#60a5fa", background: "rgba(96,165,250,0.12)", padding: "1px 6px", borderRadius: 5, border: "1px solid rgba(96,165,250,0.25)" }}>from EPC</span>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: "#4A90E2", background: "rgba(96,165,250,0.12)", padding: "1px 6px", borderRadius: 5, border: "1px solid rgba(96,165,250,0.25)" }}>from EPC</span>
                     )}
                     <span style={{
                       fontSize: 13, fontWeight: 900, padding: "2px 12px", borderRadius: 8,
-                      background: `${eClassColor[r.eClass ?? "D"] ?? "#F59E0B"}22`,
-                      color: eClassColor[r.eClass ?? "D"] ?? "#F59E0B",
-                      border: `1px solid ${eClassColor[r.eClass ?? "D"] ?? "#F59E0B"}55`,
+                      background: `${eClassColor[r.eClass ?? "D"] ?? "#E8880C"}22`,
+                      color: eClassColor[r.eClass ?? "D"] ?? "#E8880C",
+                      border: `1px solid ${eClassColor[r.eClass ?? "D"] ?? "#E8880C"}55`,
                     }}>Energy class {r.eClass ?? "—"}</span>
                   </div>
                 </div>
@@ -372,9 +372,9 @@ export default function BaselineSetup() {
                     shoebox model doesn't simulate DHW or infiltration separately */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                   {[
-                    { icon: <BarChart2 size={13} color="#F59E0B" />, label: "Total energy use", value: `${r.energyUse} kWh/m²·yr`, color: "#F59E0B" },
-                    { icon: <Thermometer size={13} color="#ef4444" />, label: "Heating demand",   value: `${r.heating} kWh/m²·yr`,  color: "#fca5a5" },
-                    { icon: <Droplets size={13} color="#60a5fa" />,    label: "Cooling demand",   value: `${r.cooling} kWh/m²·yr`,  color: "#93c5fd" },
+                    { icon: <BarChart2 size={13} color="#E8880C" />, label: "Total energy use", value: `${r.energyUse} kWh/m²·yr`, color: "#E8880C" },
+                    { icon: <Thermometer size={13} color="#E2483B" />, label: "Heating demand",   value: `${r.heating} kWh/m²·yr`,  color: "#fca5a5" },
+                    { icon: <Droplets size={13} color="#4A90E2" />,    label: "Cooling demand",   value: `${r.cooling} kWh/m²·yr`,  color: "#93c5fd" },
                   ].map(m => (
                     <div key={m.label} style={{ borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>{m.icon}<span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{m.label}</span></div>
@@ -398,10 +398,10 @@ export default function BaselineSetup() {
           style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "11px 24px", borderRadius: 10, border: 0,
-            background: canRunBaseline && !simRunning ? "linear-gradient(135deg,#5a9e1e,#96D74C)" : "rgba(255,255,255,0.06)",
+            background: canRunBaseline && !simRunning ? "linear-gradient(135deg,#5a9e1e,#2FB477)" : "rgba(255,255,255,0.06)",
             color: canRunBaseline && !simRunning ? "#0a0d14" : "rgba(255,255,255,0.2)",
             fontSize: 13, fontWeight: 800, cursor: canRunBaseline && !simRunning ? "pointer" : "not-allowed",
-            boxShadow: canRunBaseline && !simRunning ? "0 4px 14px rgba(150,215,76,0.3)" : "none",
+            boxShadow: canRunBaseline && !simRunning ? "0 4px 14px rgba(47,180,119,0.3)" : "none",
           }}
         >
           {simRunning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={14} />}

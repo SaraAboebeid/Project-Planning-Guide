@@ -82,7 +82,7 @@ const SOURCES: DataSource[] = [
     name: "Data Coverage Statistics",
     description: "Field-by-field coverage across all 92,973 Gothenburg buildings — showing what percentage of buildings have each attribute populated.",
     iconD: IC.tabula,
-    accent: "#96D74C",
+    accent: "#2FB477",
     count: "13,832",
     countLabel: "fully complete",
     status: "static",
@@ -104,7 +104,7 @@ const SOURCES: DataSource[] = [
     name: "EPC Register",
     description: "Swedish Energy Performance Certificates — baseline energy class, specific demand, construction era.",
     iconD: IC.epc,
-    accent: "#96D74C",
+    accent: "#2FB477",
     count: "84,349",
     countLabel: "matched",
     status: "static",
@@ -192,7 +192,7 @@ const SOURCES: DataSource[] = [
     name: "Trafikverket Cameras",
     description: "Road condition and traffic flow cameras around Gothenburg from the Swedish Transport Administration API.",
     iconD: IC.camera,
-    accent: "#F59E0B",
+    accent: "#E8880C",
     count: "Live",
     countLabel: "camera feed",
     status: "live",
@@ -238,7 +238,7 @@ const SOURCES: DataSource[] = [
     name: "Wikells Sektionsfakta",
     description: "Swedish renovation material cost database — installed section costs in SEK/m² with fire class, U-values and sound ratings. Used directly in the Renovation Packages calculator.",
     iconD: IC.hammer,
-    accent: "#F59E0B",
+    accent: "#E8880C",
     count: String(wikellsStats().totalItems),
     countLabel: "line items",
     status: "live",
@@ -252,7 +252,7 @@ const SOURCES: DataSource[] = [
 // ── Wikells category browser ─────────────────────────────────────────────────
 function WikellsPreview() {
   const [openCh, setOpenCh] = useState<string | null>(null);
-  const accent = "#F59E0B";
+  const accent = "#E8880C";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {WIKELLS_CHAPTERS.map((ch) => {
@@ -346,7 +346,7 @@ function WikellsPreview() {
                           { k: "Description", v: s.description,   c: "rgba(255,255,255,0.80)" },
                           { k: "Cost",        v: `${s.costSEK.toLocaleString("sv-SE")} SEK/m²`, c: accent },
                           ...(s.uValue     != null ? [{ k: "U-value",   v: `${s.uValue} W/(m²·K)`, c: "#4A90E2" }] : []),
-                          ...(s.fireClass         ? [{ k: "Fire class", v: s.fireClass,             c: "#96D74C" }] : []),
+                          ...(s.fireClass         ? [{ k: "Fire class", v: s.fireClass,             c: "#2FB477" }] : []),
                           ...(s.soundRw    != null ? [{ k: "Sound Rw",  v: `${s.soundRw} dB`,       c: "#4ECDC4" }] : []),
                           ...(s.weightKgM2 != null ? [{ k: "Weight",    v: `${s.weightKgM2} kg/m²`, c: "rgba(255,255,255,0.50)" }] : []),
                         ] as { k: string; v: string; c: string }[]).map(({ k, v, c }) => (
@@ -372,9 +372,9 @@ function WikellsPreview() {
 // ── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: DataSource["status"] }) {
   const cfg = {
-    live:   { label: "Live",   color: "#96D74C", bg: "rgba(150,215,76,0.12)"  },
+    live:   { label: "Live",   color: "#2FB477", bg: "rgba(47,180,119,0.12)"  },
     cached: { label: "Cached", color: "#4A90E2", bg: "rgba(74,144,226,0.12)" },
-    static: { label: "Static", color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
+    static: { label: "Static", color: "#E8880C", bg: "rgba(232,136,12,0.12)" },
   }[status];
   return (
     <span style={{
@@ -604,7 +604,7 @@ function SourceCard({
                 display: "flex", alignItems: "center", gap: 5, padding: "5px 10px",
                 borderRadius: 7, fontSize: 11, fontWeight: 500, cursor: "pointer",
                 background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-                color: copied ? "#96D74C" : "rgba(255,255,255,0.70)",
+                color: copied ? "#2FB477" : "rgba(255,255,255,0.70)",
               }}>
                 <Icon d={IC.copy} size={12} /> {copied ? "Copied!" : "Copy JSON"}
               </button>
@@ -718,9 +718,9 @@ export default function DataExplorer() {
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: 0 }}>Data Explorer</h1>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 99,
-            background: healthOk ? "rgba(150,215,76,0.15)" : "rgba(255,255,255,0.08)",
-            border: `1px solid ${healthOk ? "#96D74C50" : "rgba(255,255,255,0.12)"}`,
-            color: healthOk ? "#96D74C" : "rgba(255,255,255,0.40)",
+            background: healthOk ? "rgba(47,180,119,0.15)" : "rgba(255,255,255,0.08)",
+            border: `1px solid ${healthOk ? "#2FB47750" : "rgba(255,255,255,0.12)"}`,
+            color: healthOk ? "#2FB477" : "rgba(255,255,255,0.40)",
           }}>
             {healthOk === null ? "Checking…" : healthOk ? "● Backend online" : "○ Backend offline"}
           </span>

@@ -45,8 +45,8 @@ const CITY_ID = "gothenburg"; // Sweden only - UK omits city_id, server auto-res
 const UK_TIER_SELECTIONS_KEY = "UK::RefurbTier";
 
 const COMPONENT_COLORS: Record<string, string> = {
-  "Walls": "#721CB8", "Windows": "#F59E0B", "Doors": "#4ECDC4", "Floor": "#4A90E2",
-  "Roof": "#4ECDC4", "Balcony": "#96D74C", "Vertical Extension (New Floor)": "#F97316",
+  "Walls": "#721CB8", "Windows": "#E8880C", "Doors": "#4ECDC4", "Floor": "#4A90E2",
+  "Roof": "#4ECDC4", "Balcony": "#2FB477", "Vertical Extension (New Floor)": "#F97316",
 };
 
 function fmtSEK(n: number): string {
@@ -71,7 +71,7 @@ function vsBaseline(value: number | null, base: number | null, isBaseline: boole
   }
   const better = pct < 0;
   return (
-    <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, marginTop: 2, color: better ? "#96D74C" : "#EF4444" }}>
+    <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, marginTop: 2, color: better ? "#2FB477" : "#E2483B" }}>
       {better ? "▼" : "▲"} {Math.abs(pct)}% vs baseline
     </span>
   );
@@ -107,7 +107,7 @@ function StageHeader({
   state?: "active" | "waiting" | "done";
 }) {
   const dim = state === "waiting";
-  const accent = state === "done" ? "#96D74C" : dim ? "rgba(255,255,255,0.25)" : "#4ECDC4";
+  const accent = state === "done" ? "#2FB477" : dim ? "rgba(255,255,255,0.25)" : "#4ECDC4";
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "6px 0 2px", opacity: dim ? 0.55 : 1 }}>
       <span style={{
@@ -131,10 +131,10 @@ function kindForKey(key: string): ComponentKind | null {
 }
 function uLabel(u?: number) {
   if (!u) return null;
-  if (u <= 0.13) return { label: "Excellent", color: "#96D74C" };
+  if (u <= 0.13) return { label: "Excellent", color: "#2FB477" };
   if (u <= 0.20) return { label: "Good", color: "#4ECDC4" };
-  if (u <= 0.30) return { label: "Standard", color: "#F59E0B" };
-  return { label: "Basic", color: "#EF4444" };
+  if (u <= 0.30) return { label: "Standard", color: "#E8880C" };
+  return { label: "Basic", color: "#E2483B" };
 }
 
 function ukOverridesFromTier(tier: TabulaArchetypeGB[RefurbTierKey] | undefined | null): Record<string, number> {
@@ -307,10 +307,10 @@ function LineItemPicker({
     const worsens = baselineU != null && it.uValue != null && it.uValue > baselineU;
     const improves = baselineU != null && it.uValue != null && it.uValue <= baselineU;
     const chips: { label: string; color: string }[] = [];
-    if (p.frame) chips.push({ label: p.frame, color: "#F59E0B" });
+    if (p.frame) chips.push({ label: p.frame, color: "#E8880C" });
     if (p.insulationMm != null) {
       chips.push(p.insulationMm === 0
-        ? { label: "no insulation", color: "#EF4444" }
+        ? { label: "no insulation", color: "#E2483B" }
         : { label: `${p.insulationMm} mm ${p.insulationType ?? "insulation"}`, color: "#4ECDC4" });
     }
     if (p.cladding) chips.push({ label: p.cladding, color: "#4A90E2" });
@@ -335,8 +335,8 @@ function LineItemPicker({
           gridTemplateColumns: "18px 34px minmax(0,1fr) 96px 58px 74px",
           gap: 8, alignItems: "center", textAlign: "left",
           padding: "6px 9px", borderRadius: 8, cursor: "pointer",
-          border: `1px solid ${checked ? "rgba(78,205,196,0.45)" : worsens ? "rgba(239,68,68,0.32)" : isRec ? "rgba(150,215,76,0.4)" : hovered ? `${color}55` : "transparent"}`,
-          background: checked ? "rgba(78,205,196,0.12)" : hovered ? `${color}18` : worsens ? "rgba(239,68,68,0.06)" : isRec ? "rgba(150,215,76,0.07)" : "rgba(255,255,255,0.02)",
+          border: `1px solid ${checked ? "rgba(78,205,196,0.45)" : worsens ? "rgba(226,72,59,0.32)" : isRec ? "rgba(47,180,119,0.4)" : hovered ? `${color}55` : "transparent"}`,
+          background: checked ? "rgba(78,205,196,0.12)" : hovered ? `${color}18` : worsens ? "rgba(226,72,59,0.06)" : isRec ? "rgba(47,180,119,0.07)" : "rgba(255,255,255,0.02)",
         }}
       >
         <span style={{
@@ -353,15 +353,15 @@ function LineItemPicker({
           <span style={{ display: "flex", gap: 3, overflow: "hidden", whiteSpace: "nowrap", alignItems: "center" }}>
             {tags.map((t) => {
               const bal = t === "Balanced";
-              const c = bal ? "#E9B949" : "#96D74C";
+              const c = bal ? "#E9B949" : "#2FB477";
               return (
                 <span key={t} style={{ fontSize: 8.5, fontWeight: 800, color: c, background: `${c}24`,
                   border: `1px solid ${c}66`, borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>★ {t}</span>
               );
             })}
             {worsens && (
-              <span style={{ fontSize: 8.5, fontWeight: 800, color: "#EF4444", background: "rgba(239,68,68,0.14)",
-                border: "1px solid rgba(239,68,68,0.4)", borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>▲ raises energy</span>
+              <span style={{ fontSize: 8.5, fontWeight: 800, color: "#E2483B", background: "rgba(226,72,59,0.14)",
+                border: "1px solid rgba(226,72,59,0.4)", borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>▲ raises energy</span>
             )}
             {improves && !tags.length && (
               <span style={{ fontSize: 8.5, fontWeight: 700, color: "#4ECDC4", flexShrink: 0 }}>improves</span>
@@ -380,12 +380,12 @@ function LineItemPicker({
         </span>
         <span style={{ textAlign: "right" }}>
           {ul && (
-            <span style={{ fontSize: 9, fontWeight: 700, color: worsens ? "#EF4444" : ul.color, background: `${worsens ? "#EF4444" : ul.color}22`, borderRadius: 7, padding: "1px 5px" }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: worsens ? "#E2483B" : ul.color, background: `${worsens ? "#E2483B" : ul.color}22`, borderRadius: 7, padding: "1px 5px" }}>
               U {it.uValue}
             </span>
           )}
         </span>
-        <span style={{ fontSize: 9, fontWeight: 700, color: "#60a5fa", textAlign: "right" }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: "#4A90E2", textAlign: "right" }}>
           ~{carbon.value} kg
         </span>
       </button>
@@ -404,7 +404,7 @@ function LineItemPicker({
         <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", margin: "0 2px 4px", lineHeight: 1.5 }}>
           This building's current {item.label.toLowerCase()} ≈ <strong style={{ color: "#fff" }}>U {baselineU.toFixed(2)}</strong>.
           {" "}<span style={{ color: "#4ECDC4" }}>Lower U = better.</span>{" "}
-          <span style={{ color: "#EF4444" }}>Red rows are worse than what's already there.</span>
+          <span style={{ color: "#E2483B" }}>Red rows are worse than what's already there.</span>
         </div>
       )}
       {recommended.length > 0 && (
@@ -432,8 +432,8 @@ function UkTierPicker({
 }) {
   if (!archetype) {
     return (
-      <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
-        <p style={{ fontSize: 12, color: "#F59E0B", margin: 0 }}>
+      <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(232,136,12,0.1)", border: "1px solid rgba(232,136,12,0.25)" }}>
+        <p style={{ fontSize: 12, color: "#E8880C", margin: 0 }}>
           No TABULA GB archetype matched this building's type/era - envelope U-value overrides aren't available, but a
           baseline EnergyPlus simulation can still run on the as-built defaults.
         </p>
@@ -441,7 +441,7 @@ function UkTierPicker({
     );
   }
   const eraLabel = uSource === "known_year" ? "known construction year" : uSource === "ehs_sampled_period" ? "estimated era" : "era unknown";
-  const eraColor = uSource === "known_year" ? "#96D74C" : "#F59E0B";
+  const eraColor = uSource === "known_year" ? "#2FB477" : "#E8880C";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ borderRadius: 10, padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
@@ -498,11 +498,11 @@ function UkTierPicker({
                   </span>
                 )
               ))}
-              <span style={{ fontSize: 11, color: "#60a5fa" }}>
+              <span style={{ fontSize: 11, color: "#4A90E2" }}>
                 TABULA estimate: <b>{tier.kwh_m2_yr} kWh/m²/yr</b>
               </span>
               {estCost != null && estCarbon != null && (
-                <span style={{ fontSize: 11, color: "#F59E0B" }}>
+                <span style={{ fontSize: 11, color: "#E8880C" }}>
                   ~{fmtGBP(estCost)} · ~{estCarbon.toLocaleString("en-GB")} kg CO₂e <i>(building 1, placeholder)</i>
                 </span>
               )}
@@ -877,7 +877,7 @@ export default function RenovationSimulator() {
   const activeCombos = packageCombosList.filter((c) => !excludedCombos.has(comboKey(c)));
 
   /* ── add a new package ─────────────────────────────────────────────────── */
-  const PACKAGE_COLORS = ["#721CB8", "#4ECDC4", "#F59E0B", "#96D74C", "#F97316", "#5FA5FF"];
+  const PACKAGE_COLORS = ["#721CB8", "#4ECDC4", "#E8880C", "#2FB477", "#F97316", "#5FA5FF"];
 
   // Short material label for auto-naming, e.g. "300 blown glass wool".
   function matShort(it?: WikellsItem): string {
@@ -1278,15 +1278,15 @@ export default function RenovationSimulator() {
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>Renovation Calculator</h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
           {isUK
-            ? "Pick a TABULA refurbishment tier and compare real EnergyPlus performance against the as-built baseline."
-            : <>Design build-ups per component, combine them into packages, and simulate each in EnergyPlus against the as-built baseline
+            ? "Pick a refurbishment tier and compare its simulated energy performance against the as-built baseline."
+            : <>Design build-ups per component, combine them into packages, and run an energy simulation for each against the as-built baseline
                {geometries.length > 1 ? ` — across all ${geometries.length} buildings from Step 2, ordered by their retrofit priority (highest first).` : "."}</>}
         </p>
       </div>
 
       {geometries.length === 0 && (
-        <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
-          <p style={{ fontSize: 12, color: "#F59E0B", margin: 0 }}>No buildings resolved yet — go back to Step 1/2 and select a location.</p>
+        <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(232,136,12,0.1)", border: "1px solid rgba(232,136,12,0.25)" }}>
+          <p style={{ fontSize: 12, color: "#E8880C", margin: 0 }}>No buildings resolved yet — go back to Step 1/2 and select a location.</p>
         </div>
       )}
 
@@ -1321,9 +1321,9 @@ export default function RenovationSimulator() {
                   onClick={() => setTargetIdx("all")}
                   style={{
                     fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
-                    border: `1px solid ${targetIdx === "all" ? "#96D74C" : "rgba(255,255,255,0.12)"}`,
-                    background: targetIdx === "all" ? "rgba(150,215,76,0.15)" : "transparent",
-                    color: targetIdx === "all" ? "#96D74C" : "rgba(255,255,255,0.6)",
+                    border: `1px solid ${targetIdx === "all" ? "#2FB477" : "rgba(255,255,255,0.12)"}`,
+                    background: targetIdx === "all" ? "rgba(47,180,119,0.15)" : "transparent",
+                    color: targetIdx === "all" ? "#2FB477" : "rgba(255,255,255,0.6)",
                   }}
                 >
                   All buildings ({geometries.length})
@@ -1348,15 +1348,15 @@ export default function RenovationSimulator() {
                     fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 8,
                     cursor: selectable ? "pointer" : "default",
                     display: "inline-flex", alignItems: "center", gap: 6, maxWidth: 260,
-                    border: `1px solid ${selected ? "#96D74C" : "rgba(255,255,255,0.08)"}`,
-                    background: selected ? "rgba(150,215,76,0.14)" : "rgba(255,255,255,0.02)",
+                    border: `1px solid ${selected ? "#2FB477" : "rgba(255,255,255,0.08)"}`,
+                    background: selected ? "rgba(47,180,119,0.14)" : "rgba(255,255,255,0.02)",
                   }}
                 >
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: selected ? "#fff" : "rgba(255,255,255,0.72)" }}>
                     {g.address ?? `Building ${i + 1}`}
                   </span>
                   <span style={{ fontSize: 10.5, fontWeight: 800, flexShrink: 0,
-                    color: total != null ? "#96D74C" : "rgba(255,255,255,0.35)" }}>
+                    color: total != null ? "#2FB477" : "rgba(255,255,255,0.35)" }}>
                     {total != null ? total : row?.status === "failed" ? "—" : "…"}
                   </span>
                 </button>
@@ -1393,7 +1393,7 @@ export default function RenovationSimulator() {
               prices; deducted from every material cost (Wikells is Sweden-only). */}
           {!isUK && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "0 0 14px",
-              padding: "11px 14px", borderRadius: 10, background: "rgba(150,215,76,0.07)", border: "1px solid rgba(150,215,76,0.22)" }}>
+              padding: "11px 14px", borderRadius: 10, background: "rgba(47,180,119,0.07)", border: "1px solid rgba(47,180,119,0.22)" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#f0f4ff" }}>Supplier discount</span>
                 <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)" }}>
@@ -1408,10 +1408,10 @@ export default function RenovationSimulator() {
                   style={{ width: 72, padding: "6px 8px", borderRadius: 8, textAlign: "right",
                     background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: 13, fontWeight: 700 }}
                 />
-                <span style={{ fontSize: 14, fontWeight: 800, color: "#96D74C" }}>%</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: "#2FB477" }}>%</span>
               </div>
               {(project.supplierDiscountPct || 0) > 0 && (
-                <span style={{ fontSize: 10.5, color: "#96D74C", fontWeight: 700, width: "100%" }}>
+                <span style={{ fontSize: 10.5, color: "#2FB477", fontWeight: 700, width: "100%" }}>
                   ✓ Material prices are net of −{project.supplierDiscountPct}%. Re-pick materials / rebuild packages to apply it to existing ones.
                 </span>
               )}
@@ -1510,7 +1510,7 @@ export default function RenovationSimulator() {
                             <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1 }}>{c.name}</span>
                               <button onClick={() => removeConfig(c.id)} title="Delete configuration"
-                                style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(239,68,68,0.75)", padding: 0 }}>
+                                style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(226,72,59,0.75)", padding: 0 }}>
                                 <XCircle size={13} />
                               </button>
                             </div>
@@ -1528,7 +1528,7 @@ export default function RenovationSimulator() {
                               </div>
                             )}
                             {c.carbonUnmatched && c.carbonUnmatched.length > 0 && (
-                              <div style={{ fontSize: 9.5, color: "#F59E0B", marginTop: 3 }}>
+                              <div style={{ fontSize: 9.5, color: "#E8880C", marginTop: 3 }}>
                                 no Boverket data: {c.carbonUnmatched.join(", ")}
                               </div>
                             )}
@@ -1663,7 +1663,7 @@ export default function RenovationSimulator() {
                   <button onClick={simulateConfiguredPackages} disabled={activeCombos.length === 0}
                     style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", borderRadius: 9,
                       fontSize: 12.5, fontWeight: 800,
-                      border: "1px solid rgba(150,215,76,0.45)", background: "rgba(150,215,76,0.14)", color: "#96D74C",
+                      border: "1px solid rgba(47,180,119,0.45)", background: "rgba(47,180,119,0.14)", color: "#2FB477",
                       cursor: activeCombos.length ? "pointer" : "not-allowed", opacity: activeCombos.length ? 1 : 0.45 }}>
                     <Plus size={14} /> Run energy simulation (EPSM) · {activeCombos.length} package{activeCombos.length === 1 ? "" : "s"}
                     {geometries.length > 1 && targetIdx === "all" ? ` × ${geometries.length} buildings` : ""}
@@ -1686,7 +1686,7 @@ export default function RenovationSimulator() {
                 style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }} />
               <button onClick={() => addPackage()} disabled={!canAddPackage}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                  border: "1px solid rgba(150,215,76,0.4)", background: "rgba(150,215,76,0.12)", color: "#96D74C",
+                  border: "1px solid rgba(47,180,119,0.4)", background: "rgba(47,180,119,0.12)", color: "#2FB477",
                   cursor: canAddPackage ? "pointer" : "not-allowed", opacity: canAddPackage ? 1 : 0.5 }}>
                 <Plus size={13} /> Add package
               </button>
@@ -1738,10 +1738,10 @@ export default function RenovationSimulator() {
             if (running === 0) return null;
             return (
               <div style={{ display: "flex", alignItems: "center", gap: 11, margin: "0 0 12px", padding: "11px 14px", borderRadius: 10,
-                background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.32)" }}>
-                <span style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(245,158,11,0.3)",
-                  borderTopColor: "#F59E0B", display: "inline-block", animation: "spin 0.9s linear infinite", flexShrink: 0 }} />
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#F59E0B" }}>
+                background: "rgba(232,136,12,0.10)", border: "1px solid rgba(232,136,12,0.32)" }}>
+                <span style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(232,136,12,0.3)",
+                  borderTopColor: "#E8880C", display: "inline-block", animation: "spin 0.9s linear infinite", flexShrink: 0 }} />
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#E8880C" }}>
                   Running EnergyPlus simulations… {done}/{total} buildings done.
                   <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.6)", marginLeft: 6 }}>
                     This can take a minute — results fill in below automatically, no need to click.
@@ -1822,7 +1822,7 @@ export default function RenovationSimulator() {
                             {us.map((x, i) => (
                               <span key={x.label}>
                                 {i > 0 ? " · " : ""}{x.label} U{" "}
-                                <span style={{ fontWeight: 700, color: x.u > 0.4 ? "#EF4444" : x.u > 0.3 ? "#F59E0B" : "#96D74C" }}>
+                                <span style={{ fontWeight: 700, color: x.u > 0.4 ? "#E2483B" : x.u > 0.3 ? "#E8880C" : "#2FB477" }}>
                                   {x.u.toFixed(2)}
                                 </span>
                               </span>
@@ -1834,7 +1834,7 @@ export default function RenovationSimulator() {
                           energy exceeds the as-built baseline, say why in plain terms. */}
                       {!pkg.isBaseline && agg.avgTotalKwhM2Yr != null && baselineAgg?.avgTotalKwhM2Yr != null
                         && agg.avgTotalKwhM2Yr > baselineAgg.avgTotalKwhM2Yr && (
-                        <span style={{ display: "block", fontSize: 9.5, marginTop: 3, color: "#EF4444", fontWeight: 600, lineHeight: 1.4 }}>
+                        <span style={{ display: "block", fontSize: 9.5, marginTop: 3, color: "#E2483B", fontWeight: 600, lineHeight: 1.4 }}>
                           ⚠ Less insulated than the current building — this raises energy use.
                           Choose an assembly with insulation (e.g. M95 / M145 walls, or an insulated roof).
                         </span>
@@ -1843,24 +1843,24 @@ export default function RenovationSimulator() {
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && agg.totalCostSEK != null ? "Synthetic placeholder - not a real UK cost source" : undefined}>
                       {agg.totalCostSEK == null ? "—" : isUK ? `${fmtGBP(agg.totalCostSEK)}*` : fmtSEK(agg.totalCostSEK)}
                     </span>
-                    <span style={{ fontSize: 12, color: "#60a5fa" }} title={isUK && agg.totalCarbonKgCO2e != null ? "Synthetic placeholder - not a real UK carbon source" : undefined}>
+                    <span style={{ fontSize: 12, color: "#4A90E2" }} title={isUK && agg.totalCarbonKgCO2e != null ? "Synthetic placeholder - not a real UK carbon source" : undefined}>
                       {agg.totalCarbonKgCO2e == null ? "—" : isUK ? `${agg.totalCarbonKgCO2e.toLocaleString("en-GB")} kg*` : `${agg.totalCarbonKgCO2e.toLocaleString("sv-SE")} kg`}
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>
                       {agg.avgHeatingKwhM2Yr ?? "—"}
                       {vsBaseline(agg.avgHeatingKwhM2Yr, baselineAgg?.avgHeatingKwhM2Yr ?? null, pkg.isBaseline)}
                     </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: pkg.isBaseline ? "rgba(255,255,255,0.6)" : "#96D74C" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: pkg.isBaseline ? "rgba(255,255,255,0.6)" : "#2FB477" }}>
                       {agg.avgTotalKwhM2Yr ?? "—"}
                       {vsBaseline(agg.avgTotalKwhM2Yr, baselineAgg?.avgTotalKwhM2Yr ?? null, pkg.isBaseline)}
                     </span>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      {agg.pending > 0 && <Loader2 size={13} color="#F59E0B" style={{ animation: "spin 1s linear infinite" }} />}
-                      {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#96D74C" />}
+                      {agg.pending > 0 && <Loader2 size={13} color="#E8880C" style={{ animation: "spin 1s linear infinite" }} />}
+                      {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#2FB477" />}
                       {agg.failed > 0 && (
                         <>
-                          <XCircle size={13} color="#EF4444" />
-                          <button onClick={() => retryPackage(pkg)} title="Retry failed buildings" style={{ background: "transparent", border: 0, cursor: "pointer", color: "#EF4444" }}>
+                          <XCircle size={13} color="#E2483B" />
+                          <button onClick={() => retryPackage(pkg)} title="Retry failed buildings" style={{ background: "transparent", border: 0, cursor: "pointer", color: "#E2483B" }}>
                             <RefreshCw size={12} />
                           </button>
                         </>
@@ -1877,7 +1877,7 @@ export default function RenovationSimulator() {
                           <span>{b.carbonKgCO2e == null ? "—" : `${b.carbonKgCO2e.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
                           <span>{b.heatingKwhM2Yr ?? "—"}</span>
                           <span>{b.totalKwhM2Yr ?? "—"}</span>
-                          <span style={{ color: b.status === "failed" ? "#fca5a5" : b.status === "completed" ? "#96D74C" : "#F59E0B" }} title={b.error ?? undefined}>
+                          <span style={{ color: b.status === "failed" ? "#fca5a5" : b.status === "completed" ? "#2FB477" : "#E8880C" }} title={b.error ?? undefined}>
                             {b.status}
                           </span>
                         </div>
@@ -1911,7 +1911,7 @@ export default function RenovationSimulator() {
                     if (v == null || base == null || base === 0) return null;
                     const pct = Math.round(((v - base) / base) * 100);
                     return (
-                      <span style={{ fontSize: 9, fontWeight: 700, marginLeft: 4, color: pct < 0 ? "#96D74C" : pct > 0 ? "#EF4444" : "rgba(255,255,255,0.35)" }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, marginLeft: 4, color: pct < 0 ? "#2FB477" : pct > 0 ? "#E2483B" : "rgba(255,255,255,0.35)" }}>
                         {pct === 0 ? "±0%" : `${pct < 0 ? "▼" : "▲"}${Math.abs(pct)}%`}
                       </span>
                     );
@@ -1945,7 +1945,7 @@ export default function RenovationSimulator() {
                         </div>
                       ))}
                       <p style={{ fontSize: 9.5, color: "rgba(255,255,255,0.3)", padding: "8px 4px 0", lineHeight: 1.5 }}>
-                        Total energy, kWh/m²·yr. <span style={{ color: "#96D74C" }}>▼ green</span> = less energy than as-built · <span style={{ color: "#EF4444" }}>▲ red</span> = more.
+                        Total energy, kWh/m²·yr. <span style={{ color: "#2FB477" }}>▼ green</span> = less energy than as-built · <span style={{ color: "#E2483B" }}>▲ red</span> = more.
                       </p>
                     </div>
                   );

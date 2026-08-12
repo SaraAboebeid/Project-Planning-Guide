@@ -77,8 +77,8 @@ export default function App() {
       <Route path="/viewer"    element={<DataLayout title="3D Viewer" accentColor="#5FA5FF" accentBadge="Digital Twin"><MapViewer /></DataLayout>} />
       <Route path="/viewer/uk" element={<DataLayout title="3D Viewer" accentColor="#5FA5FF" accentBadge="United Kingdom Digital Twin"><UKMapViewer /></DataLayout>} />
       <Route path="/map"       element={<Navigate to="/viewer" replace />} />
-      <Route path="/budget"    element={<DataLayout title="Planning & Cost" accentColor="#F59E0B" accentBadge="Cost Estimate"><Budget /></DataLayout>} />
-      <Route path="/reports" element={<DataLayout title="Reports" accentColor="#96D74C" accentBadge="Examples"><SampleReports /></DataLayout>} />
+      <Route path="/budget"    element={<DataLayout title="Planning & Cost" accentColor="#E8880C" accentBadge="Cost Estimate"><Budget /></DataLayout>} />
+      <Route path="/reports" element={<DataLayout title="Reports" accentColor="#2FB477" accentBadge="Examples"><SampleReports /></DataLayout>} />
       <Route path="/team"    element={<DataLayout title="Project Team" accentColor="#B98BE8" accentBadge="About"><ProjectTeam /></DataLayout>} />
       <Route element={<WizardLayout />}>
         <Route path="/step/1" element={<DefineProject />} />

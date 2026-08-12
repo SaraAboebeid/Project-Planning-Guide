@@ -11,7 +11,7 @@ import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle } from "lucide-reac
    retrofits. */
 
 const CAT_COLOR: Record<LayerCategory, string> = {
-  structure:  "#F59E0B",
+  structure:  "#E8880C",
   insulation: "#4ECDC4",
   board:      "#9B7FD4",
   cladding:   "#4A90E2",
@@ -83,7 +83,7 @@ export default function AssemblyBuilder({
         </div>
         {result.framingApplied && (
           <span style={{ marginLeft: "auto", fontSize: 9.5, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
-            background: "rgba(245,158,11,0.14)", border: "1px solid rgba(245,158,11,0.35)", color: "#F59E0B" }}>
+            background: "rgba(232,136,12,0.14)", border: "1px solid rgba(232,136,12,0.35)", color: "#E8880C" }}>
             framing correction applied
           </span>
         )}
@@ -139,7 +139,7 @@ export default function AssemblyBuilder({
                 <button onClick={() => move(i, 1)} disabled={i === layers.length - 1} title="Move in"
                   style={{ background: "transparent", border: 0, cursor: i === layers.length - 1 ? "default" : "pointer", color: white(i === layers.length - 1 ? 0.15 : 0.45), padding: 2 }}><ChevronDown size={12} /></button>
                 <button onClick={() => remove(i)} title="Remove layer"
-                  style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(239,68,68,0.7)", padding: 2 }}><Trash2 size={12} /></button>
+                  style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(226,72,59,0.7)", padding: 2 }}><Trash2 size={12} /></button>
               </span>
             </div>
           );
@@ -177,7 +177,7 @@ export default function AssemblyBuilder({
       </div>
 
       {result.warnings.map((w) => (
-        <div key={w} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11, color: "#F59E0B" }}>
+        <div key={w} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11, color: "#E8880C" }}>
           <AlertTriangle size={13} style={{ marginTop: 1, flexShrink: 0 }} />{w}
         </div>
       ))}
