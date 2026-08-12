@@ -85,6 +85,7 @@ export default function DefineProject() {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   // Location validity (e.g. address outside the Gothenburg municipality) → gates Continue.
   const [locationValid, setLocationValid] = useState(true);
+  const [locationMsg, setLocationMsg] = useState<string | null>(null);
   const [buildingLoading, setBuildingLoading] = useState(false);
   const lookupDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   // For auto-scrolling to each newly revealed question.
@@ -271,6 +272,7 @@ export default function DefineProject() {
 
   function handleContinue() {
     const missing: string[] = [];
+    if (!project.projectName.trim()) missing.push("a project name");
     if (!pt) missing.push("project type");
     if (!project.systemsInScope.length) missing.push("at least one system in scope");
     if (!project.explorationApproaches.length) missing.push("at least one exploration approach");
@@ -992,16 +994,27 @@ export default function DefineProject() {
       </Card>}
 
       {/* ── PROJECT NAME ── */}
-      {showProjectName && <Card className="animate-fadeIn">
-        <Label>Project Name</Label>
-        <input
-          type="text"
-          value={project.projectName}
-          onChange={(e) => setProject({ projectName: e.target.value })}
-          placeholder="e.g. Lindholmen Retrofit Study"
-          className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
-        />
-      </Card>}
+      {showProjectName && (() => {
+        const nameMissing = validationErrors.includes("a project name") && !project.projectName.trim();
+        return (
+          <Card className="animate-fadeIn">
+            <Label>Project Name <span style={{ color: "#f87171" }}>*</span></Label>
+            <input
+              type="text"
+              value={project.projectName}
+              onChange={(e) => setProject({ projectName: e.target.value })}
+              placeholder="e.g. Lindholmen Retrofit Study"
+              className={`w-full rounded-lg border px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1 ${
+                nameMissing ? "border-red-400" : "border-gray-300"}`}
+            />
+            <p className="mt-1 text-[11px]" style={{ color: nameMissing ? "#fca5a5" : "rgba(255,255,255,0.4)" }}>
+              {nameMissing
+                ? "A project name is required — it's used to label your project and any data you edit in Step 2."
+                : "Required — labels your project and links any data you edit in Step 2."}
+            </p>
+          </Card>
+        );
+      })()}
 
       {/* ── LOCATION ── */}
       {/* District-by-name (SE neighborhood) selects buildings directly, so the
@@ -1017,11 +1030,24 @@ export default function DefineProject() {
             onPointsChange={(pts) => setProject({ buildingPoints: pts })}
             onBboxChange={handleBboxChange}
             onPolygonChange={handlePolygonChange}
-            onLocationValidityChange={(valid) => setLocationValid(valid)}
+            onLocationValidityChange={(valid, message) => { setLocationValid(valid); setLocationMsg(message); }}
           />
 
+          {/* Out-of-area warning — shown here (below the map, where the buildings-
+              found status appears) and gates Continue. Hides the "found" messages. */}
+          {!locationValid && locationMsg && (
+            <div className="mt-3 flex items-start gap-2 text-xs rounded-lg px-3 py-2"
+              style={{ color: "#fca5a5", background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.35)" }}>
+              <span>⚠</span>
+              <span>
+                <span className="font-semibold">{locationMsg}</span> This tool currently covers <b>Gothenburg</b> only —
+                pick a location inside the highlighted area to continue.
+              </span>
+            </div>
+          )}
+
           {/* Building lookup status */}
-          {buildingLoading && (
+          {locationValid && buildingLoading && (
             <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
               <svg className="animate-spin w-3.5 h-3.5 text-purple-500" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
@@ -1030,19 +1056,19 @@ export default function DefineProject() {
               Looking up building data…
             </div>
           )}
-          {!buildingLoading && project.lookedUpBuildings && project.lookedUpBuildings.length > 1 && (
+          {locationValid && !buildingLoading && project.lookedUpBuildings && project.lookedUpBuildings.length > 1 && (
             <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
               <span>✓</span>
               <span><span className="font-semibold">{project.lookedUpBuildings.length} buildings found</span>. Full data shown in Step 2.</span>
             </div>
           )}
-          {!buildingLoading && project.lookedUpBuilding && (!project.lookedUpBuildings || project.lookedUpBuildings.length <= 1) && (
+          {locationValid && !buildingLoading && project.lookedUpBuilding && (!project.lookedUpBuildings || project.lookedUpBuildings.length <= 1) && (
             <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
               <span>✓</span>
               <span>Building found — <span className="font-semibold">{project.lookedUpBuilding.address ?? "EUBUCCO match"}</span>. Full data shown in Step 2.</span>
             </div>
           )}
-          {!buildingLoading && project.bboxStats && (
+          {locationValid && !buildingLoading && project.bboxStats && (
             <div className="mt-2 flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
               <span>✓</span>
               <span><span className="font-semibold">{project.bboxStats.count.toLocaleString()} buildings</span> found in area. Full data shown in Step 2.</span>

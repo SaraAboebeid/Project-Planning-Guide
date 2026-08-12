@@ -466,7 +466,6 @@ export default function LocationMap({
   // Boundary highlight + address validation only apply to Gothenburg (SE).
   const isGothenburg = countryCode === "se" && (city ?? "").toLowerCase().includes("gothenburg");
   const [boundary, setBoundary] = useState<BoundaryFeature | null>(null);
-  const [outsideMsg, setOutsideMsg] = useState<string | null>(null);
 
   const [locationMode, setLocationMode] = useState<"addresses" | "area" | "bbox" | "polygon">(
     "addresses"
@@ -513,24 +512,39 @@ export default function LocationMap({
     return () => { alive = false; };
   }, [isGothenburg]);
 
-  // Whenever the geocoded points or the boundary change, re-check that every
-  // address is inside the municipality; report validity up so Continue can gate.
+  // Re-check that the selection is inside the municipality — covering ALL modes:
+  // typed addresses, a drawn/searched bbox, and a drawn polygon. Report validity
+  // up so Continue can gate. (Addresses are tested per-point; a bbox by its centre;
+  // a polygon by its centroid.)
   useEffect(() => {
-    if (!isGothenburg || !boundary) { setOutsideMsg(null); onLocationValidityChange?.(true, null); return; }
-    const pts = geoPoints.filter((p): p is GeoPoint => !!p && typeof p.lat === "number");
-    const outside = pts.filter((p) => !pointInBoundary(p.lat, p.lon, boundary.geometry));
+    if (!isGothenburg || !boundary) { onLocationValidityChange?.(true, null); return; }
+    const geom = boundary.geometry;
+    const addrPts = geoPoints.filter((p): p is GeoPoint => !!p && typeof p.lat === "number");
+    const tests: { lat: number; lon: number; kind: "address" | "area" }[] =
+      addrPts.map((p) => ({ lat: p.lat, lon: p.lon, kind: "address" as const }));
+    if (bbox) tests.push({ lat: (bbox.north + bbox.south) / 2, lon: (bbox.east + bbox.west) / 2, kind: "area" });
+    if (polyDone && polyVerts.length >= 3) {
+      tests.push({
+        lat: polyVerts.reduce((s, v) => s + v[0], 0) / polyVerts.length,
+        lon: polyVerts.reduce((s, v) => s + v[1], 0) / polyVerts.length,
+        kind: "area",
+      });
+    }
+    if (tests.length === 0) { onLocationValidityChange?.(true, null); return; }
+    const outside = tests.filter((t) => !pointInBoundary(t.lat, t.lon, geom));
     if (outside.length > 0) {
-      const msg = pts.length > 1
-        ? `${outside.length} of ${pts.length} addresses are outside the Gothenburg municipality area.`
-        : "This address is outside the Gothenburg municipality area.";
-      setOutsideMsg(msg);
+      const anyArea = outside.some((o) => o.kind === "area");
+      const msg = anyArea
+        ? "The selected area is outside the Gothenburg municipality."
+        : addrPts.length > 1
+          ? `${outside.length} of ${addrPts.length} addresses are outside the Gothenburg municipality.`
+          : "This address is outside the Gothenburg municipality.";
       onLocationValidityChange?.(false, msg);
     } else {
-      setOutsideMsg(null);
       onLocationValidityChange?.(true, null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geoPoints, boundary, isGothenburg]);
+  }, [geoPoints, bbox, polyVerts, polyDone, boundary, isGothenburg]);
 
   /* Street / area search → select every building inside the feature's bounds.
      Nominatim returns a boundingbox for each hit: for "Jättestensgatan" that is
@@ -802,17 +816,6 @@ export default function LocationMap({
           <div><span className="font-medium">South:</span> {bbox.south.toFixed(5)}°</div>
           <div><span className="font-medium">East:</span> {bbox.east.toFixed(5)}°</div>
           <div><span className="font-medium">West:</span> {bbox.west.toFixed(5)}°</div>
-        </div>
-      )}
-
-      {/* Out-of-area warning — the picked address is outside the municipality */}
-      {outsideMsg && (
-        <div className="flex items-start gap-2 rounded-lg px-3 py-2 mb-2"
-          style={{ background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.35)" }}>
-          <X className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#f87171" }} />
-          <span className="text-[12px]" style={{ color: "#fca5a5" }}>
-            <b>{outsideMsg}</b> This tool currently covers <b>Gothenburg</b> only — pick an address inside the highlighted area to continue.
-          </span>
         </div>
       )}
 

@@ -55,16 +55,18 @@ body {
   color-scheme: dark;
 }
 
-/* Cards */
+/* Cards — a constant purple outline. These are containers, NOT clickable, so the
+   outline must NOT change on hover (only real buttons highlight on hover), or it
+   reads as clickable. */
 .wizard-shell .ppg-card {
   background: rgba(13, 17, 23, 0.80);
-  border-color: rgba(255, 255, 255, 0.10);
+  border-color: rgba(114, 28, 184, 0.45);
   color: rgba(255,255,255,0.88);
   box-shadow: none;
 }
 .wizard-shell .ppg-card:hover {
   border-color: rgba(114, 28, 184, 0.45);
-  box-shadow: 0 4px 14px rgba(114, 28, 184, 0.15);
+  box-shadow: none;
 }
 
 /* Backgrounds */
