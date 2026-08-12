@@ -67,6 +67,11 @@ const DISABLED_PROJECT_TYPES = new Set<string>([
    MAIN COMPONENT
    ════════════════════════════════════════════════════════════════════ */
 
+// Temporarily hide the Project Type selector and lock the tool to Renovation
+// Planning, so Step 1 starts at Project name → Renovation components. The
+// selector markup below is kept (behind this flag) so it can be re-enabled.
+const HIDE_PROJECT_TYPE = true;
+
 export default function DefineProject() {
   const { project, setProject, setStep } = useWizardStore();
   const navigate = useNavigate();
@@ -76,6 +81,10 @@ export default function DefineProject() {
   // old project doesn't stay stuck on a track that can no longer be created —
   // the user then re-picks from the enabled options. Runs once.
   useEffect(() => {
+    if (HIDE_PROJECT_TYPE) {
+      if (project.projectType !== "Renovation Planning") setProject({ projectType: "Renovation Planning" });
+      return;
+    }
     if (project.projectType && DISABLED_PROJECT_TYPES.has(project.projectType)) {
       setProject({ projectType: null });
     }
@@ -357,7 +366,9 @@ export default function DefineProject() {
   /* ── progress tracker ──────────────────────────────────────── */
   // Each entry: [label, isDone]
   const progressSteps: [string, boolean][] = [
-    ["Project type",       !!pt],
+    ...(HIDE_PROJECT_TYPE
+      ? [["Project name", !!project.projectName.trim()] as [string, boolean]]
+      : [["Project type", !!pt] as [string, boolean]]),
     ...(needsBuildingDevType
       ? [["Building type", !!project.buildingDevelopmentType] as [string, boolean]]
       : []),
@@ -368,7 +379,7 @@ export default function DefineProject() {
     ["Exploration",        project.explorationApproaches.length > 0],
     ["KPIs",              project.selectedKpis.length > 0],
     ["Scale",             !!project.scale],
-    ["Project name",      !!project.projectName.trim()],
+    ...(HIDE_PROJECT_TYPE ? [] : [["Project name", !!project.projectName.trim()] as [string, boolean]]),
     ["Location",          !!project.address.trim()],
   ];
   const totalSteps = progressSteps.length;
@@ -411,6 +422,21 @@ export default function DefineProject() {
           </span>
         </div>
 
+        {HIDE_PROJECT_TYPE ? (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "1.4px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>Project type</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+              <svg width="34" height="34" viewBox="0 0 52 52" fill="none" style={{ flexShrink: 0 }}>
+                <rect x="10" y="18" width="32" height="26" rx="1" stroke="#721CB8" strokeWidth="1.5" fill="none"/>
+                <path d="M6 20L26 6l20 14" stroke="#721CB8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="20" y="30" width="12" height="14" rx="1" stroke="#721CB8" strokeWidth="1.5" fill="none"/>
+                <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
+                <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
+              </svg>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Renovation Planning</div>
+            </div>
+          </div>
+        ) : (<>
         <Label required>Project Type</Label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
           {PROJECT_TYPES.map((t) => {
@@ -524,7 +550,31 @@ export default function DefineProject() {
             );
           })}
         </div>
+        </>)}
       </Card>
+
+      {/* ── PROJECT NAME (first, when the project type is fixed) ── */}
+      {HIDE_PROJECT_TYPE && (() => {
+        const nameMissing = validationErrors.includes("a project name") && !project.projectName.trim();
+        return (
+          <Card className="animate-fadeIn">
+            <Label>Project Name <span style={{ color: "#E2483B" }}>*</span></Label>
+            <input
+              type="text"
+              value={project.projectName}
+              onChange={(e) => setProject({ projectName: e.target.value })}
+              placeholder="e.g. Lindholmen Retrofit Study"
+              className={`w-full rounded-lg border px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1 ${
+                nameMissing ? "border-red-400" : "border-gray-300"}`}
+            />
+            <p className="mt-1 text-[11px]" style={{ color: nameMissing ? "#fca5a5" : "rgba(255,255,255,0.4)" }}>
+              {nameMissing
+                ? "A project name is required — it's used to label your project and any data you edit in Step 2."
+                : "Required — labels your project and links any data you edit in Step 2."}
+            </p>
+          </Card>
+        );
+      })()}
 
       {/* ── BUILDING DEVELOPMENT TYPE (EC + RE only) ── */}
       {showBuildingDevType && (
@@ -997,8 +1047,8 @@ export default function DefineProject() {
         )}
       </Card>}
 
-      {/* ── PROJECT NAME ── */}
-      {showProjectName && (() => {
+      {/* ── PROJECT NAME (legacy position — only in the full project-type flow) ── */}
+      {!HIDE_PROJECT_TYPE && showProjectName && (() => {
         const nameMissing = validationErrors.includes("a project name") && !project.projectName.trim();
         return (
           <Card className="animate-fadeIn">
