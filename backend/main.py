@@ -902,6 +902,26 @@ def list_districts(country: str = Query("se")):
     return _DISTRICTS_CACHE
 
 
+def _strip_boundary_slivers(geom, min_area: float = 1e-7):
+    """The primärområden union + buffer(0) leaves tiny degenerate interior holes
+    (and can leave sliver polygons) — near-zero-area artifacts that Leaflet draws
+    as stray purple dots/lines inside the municipality. Drop any interior hole or
+    sub-polygon below `min_area` (~600 m²; real enclaves are far larger)."""
+    from shapely.geometry import Polygon, MultiPolygon
+    def clean(poly):
+        holes = [r for r in poly.interiors if Polygon(r).area >= min_area]
+        return Polygon(poly.exterior, holes)
+    if geom.geom_type == "Polygon":
+        return clean(geom)
+    if geom.geom_type == "MultiPolygon":
+        polys = [clean(p) for p in geom.geoms if p.area >= min_area]
+        if len(polys) == 1:
+            return polys[0]
+        if polys:
+            return MultiPolygon(polys)
+    return geom
+
+
 @app.get("/api/se/gothenburg-boundary")
 def gothenburg_boundary():
     """Dissolved outer boundary of Göteborg municipality (union of the primärområden
@@ -920,6 +940,7 @@ def gothenburg_boundary():
             raise HTTPException(500, "No boundary geometries")
         merged = unary_union(geoms).buffer(0)          # dissolve + heal slivers
         merged = merged.simplify(0.0003, preserve_topology=True)   # ~30 m, small payload
+        merged = _strip_boundary_slivers(merged)       # drop degenerate holes/slivers from the union
         _GBG_BOUNDARY_CACHE = {
             "type": "Feature",
             "properties": {"name": "Göteborgs kommun"},
