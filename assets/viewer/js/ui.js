@@ -434,6 +434,11 @@ async function showInfoPanel(b, idx) {
   row('U-wall',   b.tabula_u_wall ? b.tabula_u_wall + ' W/m²K' : null);
   row('U-win',    b.tabula_u_win  ? b.tabula_u_win  + ' W/m²K' : null);
   document.getElementById('info-content').innerHTML = rows.join('');
+  // Market section (Booli sales + Boplats rentals matched by address) — market.js
+  if (window.marketInfoHtml) {
+    const mh = window.marketInfoHtml(b);
+    if (mh) document.getElementById('info-content').insertAdjacentHTML('beforeend', mh);
+  }
   document.getElementById('info-panel').style.display = 'block';
 
   // Highlight outline

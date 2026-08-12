@@ -128,7 +128,7 @@
     'viewer/js/sunhours.js',     // direct sun-hours analysis (click a point → coloured disc)
     'viewer/js/incident.js',     // incident solar radiation (EPW sky matrix → kWh/m² disc)
     'viewer/js/comfort.js',      // outdoor thermal comfort (UTCI + solar MRT disc)
-    ...(profile.country === 'se' ? ['viewer/js/scb_layers.js'] : []),
+    ...(profile.country === 'se' ? ['viewer/js/scb_layers.js', 'viewer/js/market.js'] : []),
     'viewer/js/city_switcher.js',
   ];
 

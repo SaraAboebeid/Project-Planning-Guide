@@ -518,6 +518,8 @@ let colorMode = 'use';
 let buildingPrimitives = [];
 
 function getBuildingColor(b) {
+  if (colorMode === 'market')
+    return (window.getMarketBuildingColor && window.getMarketBuildingColor(b)) || Cesium.Color.fromBytes(70,74,92,70);
   if (colorMode === 'eclass')
     return (b.eclass && ECLASS_COLORS[b.eclass]) ? ECLASS_COLORS[b.eclass] : Cesium.Color.fromBytes(60,60,70,140);
   if (colorMode === 'year')
