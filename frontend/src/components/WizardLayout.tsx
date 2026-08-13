@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
-import { wizardNav, useWizardCanNext } from "./wizardNav";
+import { wizardNav, useWizardCanNext, useWizardNextError } from "./wizardNav";
 import SettingsModal from "./SettingsModal";
 import { LIBRARY_TABS, tabPathFor, countryCodeFromName } from "../config/countryNav";
 import CountryCitySelector from "./CountryCitySelector";
@@ -172,6 +172,7 @@ function DataNeededRow({ label, status }: {
 export default function WizardLayout() {
   const navigate = useNavigate();
   const canNext = useWizardCanNext();
+  const nextError = useWizardNextError();
   const location = useLocation();
   const { steps, project } = useWizardStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -376,14 +377,21 @@ export default function WizardLayout() {
           }}>
             <Icon d={IC.arrowL} size={16} /> Back
           </button>
-          {/* What Continue leads to — a plain-language preview of the next step. */}
+          {/* A validation message ("Add X to continue") takes over the centre when
+              the step blocks Continue; otherwise a preview of the next step. */}
           {!isLastStep ? (
             <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", padding: "0 16px" }}>
-              <div style={{ maxWidth: 620, fontSize: 11.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.45, textAlign: "center" }}>
-                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginRight: 7 }}>Next</span>
-                <b style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>{nextStepLabel}</b>
-                {nextHint ? <span style={{ color: "rgba(255,255,255,0.42)" }}> — {nextHint}</span> : null}
-              </div>
+              {nextError ? (
+                <div style={{ maxWidth: 660, fontSize: 12, fontWeight: 600, color: "#fca5a5", lineHeight: 1.4, textAlign: "center", display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ color: "#E2483B", fontSize: 15, lineHeight: 1 }}>⚠</span> {nextError}
+                </div>
+              ) : (
+                <div style={{ maxWidth: 620, fontSize: 11.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.45, textAlign: "center" }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginRight: 7 }}>Next</span>
+                  <b style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>{nextStepLabel}</b>
+                  {nextHint ? <span style={{ color: "rgba(255,255,255,0.42)" }}> — {nextHint}</span> : null}
+                </div>
+              )}
             </div>
           ) : <div style={{ flex: 1 }} />}
           {/* No Continue on the final step (Report) — nothing comes after it. */}

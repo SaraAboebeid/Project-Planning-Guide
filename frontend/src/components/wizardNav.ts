@@ -22,8 +22,11 @@ export const wizardNav: {
   /** When false, the footer's Continue is disabled (a step page can gate it,
    *  e.g. Step 1 blocks continuing while the address is outside the area). */
   canNext: boolean;
+  /** A short "fill in X to continue" message the footer shows next to Continue
+   *  when the current step's validation fails. Null = nothing missing. */
+  nextError: string | null;
   _listeners: Set<() => void>;
-} = { onNext: null, onBack: null, canNext: true, _listeners: new Set() };
+} = { onNext: null, onBack: null, canNext: true, nextError: null, _listeners: new Set() };
 
 export function useWizardStepNav(handlers: { onNext?: NavHandler; onBack?: NavHandler }) {
   const { onNext, onBack } = handlers;
@@ -55,4 +58,23 @@ export function useWizardCanNext(): boolean {
     return () => { wizardNav._listeners.delete(l); };
   }, []);
   return wizardNav.canNext;
+}
+
+/** Set (or clear) the "fill in X to continue" message shown next to Continue. */
+export function setWizardNextError(msg: string | null) {
+  if (wizardNav.nextError !== msg) {
+    wizardNav.nextError = msg;
+    wizardNav._listeners.forEach((l) => l());
+  }
+}
+
+/** Subscribe the footer to nextError changes. */
+export function useWizardNextError(): string | null {
+  const [, force] = useReducer((x) => x + 1, 0);
+  useEffect(() => {
+    const l = () => force();
+    wizardNav._listeners.add(l);
+    return () => { wizardNav._listeners.delete(l); };
+  }, []);
+  return wizardNav.nextError;
 }

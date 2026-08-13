@@ -56,7 +56,7 @@ interface Datum { x: number; y: number; c: number; fill: string; }
 interface OptDatum extends Datum { point: OptimizePoint; validated: boolean; }
 
 export default function ParetoChart({
-  cloud, pareto, baseline, axes, currency, evaluated, onValidate, validatedKeys, pointKey,
+  cloud, pareto, baseline, axes, currency, evaluated, onValidate, validatedKeys, pointKey, height = 340,
 }: {
   cloud: OptimizeCloudPoint[];
   pareto: OptimizePoint[];
@@ -67,6 +67,7 @@ export default function ParetoChart({
   onValidate: (p: OptimizePoint) => void;
   validatedKeys: Set<string>;
   pointKey: (p: OptimizePoint) => string;
+  height?: number;
 }) {
   const xO = OBJECTIVES[axes.x], yO = OBJECTIVES[axes.y], cO = OBJECTIVES[axes.color];
   const white = (o: number) => `rgba(255,255,255,${o})`;
@@ -221,7 +222,7 @@ export default function ParetoChart({
       />
 
       <div style={{ display: "flex", gap: 10 }}>
-        <div style={{ flex: 1, height: 340 }}>
+        <div style={{ flex: 1, height }}>
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 8, right: 12, bottom: 30, left: 12 }}>
               <CartesianGrid stroke={white(0.06)} />

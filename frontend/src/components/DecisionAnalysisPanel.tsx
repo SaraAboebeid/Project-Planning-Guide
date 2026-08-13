@@ -1,3 +1,5 @@
+import { Scale } from "lucide-react";
+import PanelShell from "./PanelShell";
 import type { RegretResult } from "../utils/regretAnalysis";
 
 /* Interactive regret / robustness decision analysis for Step 4. Presentational —
@@ -35,11 +37,13 @@ export default function DecisionAnalysisPanel({
   const td: React.CSSProperties = { padding: "7px 8px", textAlign: "right", whiteSpace: "nowrap", color: white(0.8) };
 
   return (
-    <div style={{ borderRadius: 14, padding: "16px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-        <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Compare retrofit choices across future energy prices</span>
-      </div>
-      <p style={{ fontSize: 11.5, color: white(0.4), margin: "0 0 14px", lineHeight: 1.6, maxWidth: 720 }}>
+    <PanelShell
+      icon={<Scale size={17} />}
+      iconColor="#4ECDC4"
+      title="Compare retrofit choices across future energy prices"
+      subtitle="The same options tested across low / medium / high energy-price futures"
+    >
+      <p style={{ fontSize: 11.5, color: white(0.4), margin: "8px 0 14px", lineHeight: 1.6, maxWidth: 720 }}>
         We cannot know future energy prices, so each option is tested in three possible futures: <b style={{ color: white(0.6) }}>Low</b> (cheap energy),
         <b style={{ color: white(0.6) }}> Medium</b> (middle prices), and <b style={{ color: white(0.6) }}>High</b> (expensive energy).
         Results show <b style={{ color: white(0.6) }}>{result.studyPeriodYr}-year net benefit</b> = energy savings value minus investment.
@@ -162,6 +166,6 @@ export default function DecisionAnalysisPanel({
           do-nothing <b style={{ color: white(0.45) }}>0 reference</b>, so retrofits are ranked among themselves. Saved to the Step 5 report.
         </div>
       </div>
-    </div>
+    </PanelShell>
   );
 }

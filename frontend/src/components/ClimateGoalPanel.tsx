@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Target, CheckCircle2, ChevronRight, ChevronDown } from "lucide-react";
 import { type GoalAssessment } from "../config/climateGoals";
+import PanelShell from "./PanelShell";
 
 /* Shows a city climate target and which renovation packages reach it. Used in
  * Step 4 (after packages are simulated) and echoed in the Step 5 report, off the
@@ -53,39 +54,17 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
   const accent = achievers.length ? MET : NEAR;
 
   return (
-    <div
-      style={{
-        borderRadius: 14,
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderLeft: `3px solid ${accent}`,
-        padding: "18px 20px",
-      }}
-    >
-      {/* Goal statement */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-        <Target size={16} color={accent} />
-        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#fff", margin: 0 }}>
-          {goal.city} climate target
-        </h3>
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 800,
-            letterSpacing: 0.6,
-            padding: "3px 10px",
-            borderRadius: 100,
-            background: `${accent}1e`,
-            color: accent,
-            border: `1px solid ${accent}44`,
-          }}
-        >
+    <PanelShell
+      icon={<Target size={17} />}
+      iconColor={accent}
+      title={`${goal.city} climate target`}
+      subtitle={`Reduce the as-built baseline energy demand by ${goal.reductionPct}% by ${goal.targetYear}.`}
+      badge={
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, padding: "3px 10px", borderRadius: 100, background: `${accent}1e`, color: accent, border: `1px solid ${accent}44`, flexShrink: 0 }}>
           −{goal.reductionPct}% BY {goal.targetYear}
         </span>
-      </div>
-      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", margin: "0 0 4px", lineHeight: 1.6 }}>
-        Reduce the as-built baseline energy demand by {goal.reductionPct}% by {goal.targetYear}.
-      </p>
+      }
+    >
 
       {/* Verdict */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 14px" }}>
@@ -177,6 +156,6 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
         </span>
         <span style={{ fontSize: 9.5, color: "rgba(255,255,255,0.3)" }}>{goal.source}</span>
       </div>
-    </div>
+    </PanelShell>
   );
 }

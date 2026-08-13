@@ -23,7 +23,7 @@ import {
 } from "../../config/projectConfig";
 
 import LocationMap from "../../components/LocationMap";
-import { useWizardStepNav, setWizardCanNext } from "../../components/wizardNav";
+import { useWizardStepNav, setWizardCanNext, setWizardNextError } from "../../components/wizardNav";
 
 /* ── tiny reusable bits ─────────────────────────────────────────── */
 
@@ -279,26 +279,49 @@ export default function DefineProject() {
     setProject({ buildingUses: next });
   }
 
-  function handleContinue() {
+  // What still needs filling in before Step 1 can advance (human-readable).
+  function getMissing(): string[] {
     const missing: string[] = [];
     if (!project.projectName.trim()) missing.push("a project name");
-    if (!pt) missing.push("project type");
+    if (!pt) missing.push("a project type");
     if (!project.systemsInScope.length) missing.push("at least one system in scope");
     if (!project.explorationApproaches.length) missing.push("at least one exploration approach");
     if (!project.selectedKpis.length) missing.push("at least one KPI");
-    if (!project.scale) missing.push("project scale");
+    if (!project.scale) missing.push("a project scale");
     if (pt === "Energy Community Planning" && !project.ecEnergyFocus.length) {
-      missing.push("energy focus");
+      missing.push("an energy focus");
     }
+    return missing;
+  }
+
+  const [triedContinue, setTriedContinue] = useState(false);
+
+  function handleContinue() {
+    setTriedContinue(true);
+    const missing = getMissing();
     if (missing.length) {
       setValidationErrors(missing);
+      setWizardNextError(`Add ${missing.join(", ")} to continue.`);
       return;
     }
-    if (!locationValid) return; // address outside the covered area — blocked
+    if (!locationValid) { setWizardNextError("Pick a location inside the covered area to continue."); return; }
     setValidationErrors([]);
+    setWizardNextError(null);
     setStep(2);
     navigate("/step/2");
   }
+
+  // Once the user has tried Continue, keep the footer message in sync as they
+  // fill things in — it clears itself the moment nothing is missing.
+  useEffect(() => {
+    if (!triedContinue) return;
+    const missing = getMissing();
+    if (missing.length) setWizardNextError(`Add ${missing.join(", ")} to continue.`);
+    else if (!locationValid) setWizardNextError("Pick a location inside the covered area to continue.");
+    else setWizardNextError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triedContinue, project.projectName, project.systemsInScope, project.explorationApproaches,
+      project.selectedKpis, project.scale, project.ecEnergyFocus, locationValid, pt]);
 
   // The wizard footer's Continue runs this page's validation + advance.
   useWizardStepNav({ onNext: handleContinue });
@@ -307,7 +330,7 @@ export default function DefineProject() {
   // re-enable it when leaving Step 1.
   useEffect(() => {
     setWizardCanNext(locationValid);
-    return () => setWizardCanNext(true);
+    return () => { setWizardCanNext(true); setWizardNextError(null); };
   }, [locationValid]);
 
   /* ── follow-up helpers ───────────────────────────────────────── */

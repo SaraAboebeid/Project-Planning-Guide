@@ -71,6 +71,14 @@ export default function OptimizerPanel({
   // "Show all" reveals every evaluated package (not just the Pareto-optimal front)
   // when the run is small enough that the backend returned them all.
   const [showAll, setShowAll] = useState(false);
+  const [showParallel, setShowParallel] = useState(false);  // parallel-coordinates is opt-in (advanced)
+  const [maximized, setMaximized] = useState(false);         // Pareto fullscreen overlay
+  useEffect(() => {
+    if (!maximized) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMaximized(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [maximized]);
   const canShowAll = !!result && (result.all_points?.length ?? 0) > result.pareto.length;
   const shown = (showAll && result?.all_points?.length ? [...result.all_points] : (result?.pareto ?? []))
     .sort((a, b) => a[sort] - b[sort]);
@@ -167,47 +175,86 @@ export default function OptimizerPanel({
 
           {result && pareto.length > 0 && (
             <>
-              {/* Two complementary views side by side: the 2-D Pareto frontier
-                  (cost×GWP, colour = energy) and a parallel-coordinates plot that
-                  shows every dimension — material choices + all three KPIs — at once. */}
+              {/* The 2-D Pareto frontier (cost×GWP, colour = energy) is the primary,
+                  full-width view; the parallel-coordinates plot is an opt-in advanced
+                  toggle, and the Pareto can be maximised to a fullscreen overlay. */}
               <div style={{ marginBottom: 6, fontSize: 11, color: white(0.45) }}>
                 Axes from your Step-1 KPIs: <b style={{ color: "#fff" }}>{OBJECTIVES[axes.x].label}</b> ×{" "}
                 <b style={{ color: "#fff" }}>{OBJECTIVES[axes.y].label}</b>, coloured by <b style={{ color: "#fff" }}>{OBJECTIVES[axes.color].label}</b>.
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "flex-start" }}>
-                <div style={{ flex: "1 1 360px", minWidth: 300 }}>
-                  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: white(0.4), textTransform: "uppercase", marginBottom: 6 }}>
+              {/* Pareto frontier — full width. Parallel coordinates is an opt-in
+                  advanced view (toggle); the Pareto can be maximised to fullscreen. */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: white(0.4), textTransform: "uppercase" }}>
                     Pareto frontier
                   </div>
-                  <ParetoChart
-                    cloud={result.cloud}
-                    pareto={result.pareto}
-                    baseline={result.baseline}
-                    axes={axes}
-                    currency={currency}
-                    evaluated={result.unique_points}
-                    onValidate={onValidate}
-                    validatedKeys={validatedKeys}
-                    pointKey={pointKey}
-                  />
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 7 }}>
+                    <button onClick={() => setShowParallel(v => !v)}
+                      style={{ fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
+                        border: `1px solid ${showParallel ? "rgba(114,28,184,0.7)" : "rgba(255,255,255,0.14)"}`,
+                        background: showParallel ? "rgba(114,28,184,0.3)" : "transparent", color: showParallel ? "#fff" : white(0.6) }}>
+                      {showParallel ? "Hide parallel view" : "＋ Parallel view"}
+                    </button>
+                    <button onClick={() => setMaximized(true)} title="Maximise the chart"
+                      style={{ fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
+                        border: "1px solid rgba(255,255,255,0.14)", background: "transparent", color: white(0.6) }}>
+                      ⤢ Maximise
+                    </button>
+                  </div>
                 </div>
-                <div style={{ flex: "1.25 1 440px", minWidth: 320 }}>
-                  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: white(0.4), textTransform: "uppercase", marginBottom: 6 }}>
+                <ParetoChart
+                  cloud={result.cloud} pareto={result.pareto} baseline={result.baseline}
+                  axes={axes} currency={currency} evaluated={result.unique_points}
+                  onValidate={onValidate} validatedKeys={validatedKeys} pointKey={pointKey}
+                  height={420}
+                />
+              </div>
+
+              {/* Parallel coordinates — opt-in advanced view */}
+              {showParallel && (
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: white(0.4), textTransform: "uppercase", marginBottom: 4 }}>
                     Parallel coordinates · materials → KPIs
                   </div>
-                  {/* Spacer matching the Pareto column's Replay button + scrubber row,
-                      so both plot areas start at the same vertical level. */}
-                  <div aria-hidden style={{ height: 50 }} />
+                  <div style={{ fontSize: 10.5, color: white(0.4), marginBottom: 8, lineHeight: 1.5, maxWidth: 720 }}>
+                    Each package is one line crossing every axis — the material choices and all three KPIs at once. Drag along an axis to filter. An advanced view for spotting patterns the 2-D Pareto can&apos;t show.
+                  </div>
                   <ParallelCoordinates
-                    pareto={pcPoints}
-                    currency={currency}
-                    colorBy={axes.color}
-                    onValidate={onValidate}
-                    validatedKeys={validatedKeys}
-                    pointKey={pointKey}
+                    pareto={pcPoints} currency={currency} colorBy={axes.color}
+                    onValidate={onValidate} validatedKeys={validatedKeys} pointKey={pointKey}
                   />
                 </div>
-              </div>
+              )}
+
+              {/* Fullscreen Pareto overlay */}
+              {maximized && (
+                <div onClick={() => setMaximized(false)}
+                  style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(5,7,12,0.9)", display: "flex", flexDirection: "column", padding: 20 }}>
+                  <div onClick={e => e.stopPropagation()}
+                    style={{ background: "#0d1117", border: "1px solid rgba(114,28,184,0.4)", borderRadius: 14, padding: "16px 20px", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Pareto frontier</span>
+                      <span style={{ fontSize: 11, color: white(0.45) }}>
+                        {OBJECTIVES[axes.x].label} × {OBJECTIVES[axes.y].label}, coloured by {OBJECTIVES[axes.color].label}
+                      </span>
+                      <button onClick={() => setMaximized(false)}
+                        style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 8, cursor: "pointer",
+                          border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", color: "#fff" }}>
+                        ✕ Minimise
+                      </button>
+                    </div>
+                    <div style={{ flex: 1, minHeight: 0 }}>
+                      <ParetoChart
+                        cloud={result.cloud} pareto={result.pareto} baseline={result.baseline}
+                        axes={axes} currency={currency} evaluated={result.unique_points}
+                        onValidate={onValidate} validatedKeys={validatedKeys} pointKey={pointKey}
+                        height={Math.max(360, (typeof window !== "undefined" ? window.innerHeight : 800) - 200)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, marginTop: 16, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 11, color: white(0.4) }}>Sort by:</span>

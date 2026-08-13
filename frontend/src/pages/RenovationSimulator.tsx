@@ -1959,17 +1959,9 @@ export default function RenovationSimulator() {
           {/* City climate target — which package reaches Gothenburg's −30% by 2030 */}
           {(isUK || hasEnvelope) && goalAssessment && <ClimateGoalPanel a={goalAssessment} />}
 
-          {/* Heating-system (HVAC source) comparison on the baseline heat demand.
-              Shown only when heating is in scope (Step 1 or added in Step 4). */}
-          {!isUK && hasHeating && baselineAgg?.avgHeatingKwhM2Yr != null && totalFloorAreaM2 > 0 && (
-            <HeatingSystemPanel
-              heatingDemandKwhM2Yr={baselineAgg.avgHeatingKwhM2Yr}
-              floorAreaM2={totalFloorAreaM2}
-              discountRate={assumptionValue("SE", "discount_rate") ?? 0.03}
-            />
-          )}
-
-          {/* Regret / robustness decision analysis under uncertain energy prices */}
+          {/* Regret / robustness decision analysis under uncertain energy prices.
+              Kept next to the envelope/package discussion (materials → packages →
+              trade-offs) so the flow isn't interrupted. */}
           {regretResult && regretResult.options.length >= 2 && (
             <DecisionAnalysisPanel
               result={regretResult}
@@ -1978,6 +1970,18 @@ export default function RenovationSimulator() {
               prices={regretPrices}
               setPrices={setRegretPrices}
               currentPrice={livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8}
+            />
+          )}
+
+          {/* Heating-system (HVAC source) comparison on the baseline heat demand.
+              Comes LAST — it's a supply-side topic (heating source), separate from
+              the envelope/material/package discussion above. Shown only when
+              heating is in scope (Step 1 or added in Step 4). */}
+          {!isUK && hasHeating && baselineAgg?.avgHeatingKwhM2Yr != null && totalFloorAreaM2 > 0 && (
+            <HeatingSystemPanel
+              heatingDemandKwhM2Yr={baselineAgg.avgHeatingKwhM2Yr}
+              floorAreaM2={totalFloorAreaM2}
+              discountRate={assumptionValue("SE", "discount_rate") ?? 0.03}
             />
           )}
 

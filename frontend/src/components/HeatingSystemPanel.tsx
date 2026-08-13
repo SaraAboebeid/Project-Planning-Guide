@@ -29,7 +29,7 @@ export default function HeatingSystemPanel({
   studyPeriodYr?: number;
   discountRate?: number;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);   // open by default, like the other Step-4 panels
   const [showSources, setShowSources] = useState(false);
   const selectedId = useWizardStore((s) => s.project.heatingSystemId);
   const setProject = useWizardStore((s) => s.setProject);
