@@ -137,12 +137,13 @@
         _pointsDS.entities.add({
           position: Cesium.Cartesian3.fromDegrees(lon, lat, 6),
           point: {
-            pixelSize: sold ? 8 : 11,
-            color: sold ? col.withAlpha(0.25) : col,
-            outlineColor: sold ? col : Cesium.Color.WHITE.withAlpha(0.9),
-            outlineWidth: 1.6,
+            pixelSize: sold ? 12 : 15,
+            color: sold ? col.withAlpha(0.30) : col,
+            outlineColor: sold ? col : Cesium.Color.WHITE.withAlpha(0.95),
+            outlineWidth: sold ? 2.5 : 3,
+            // Always draw on top — even over the photorealistic 3-D tiles basemap.
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            scaleByDistance: new Cesium.NearFarScalar(300, 1.3, 4000, 0.55),
+            scaleByDistance: new Cesium.NearFarScalar(300, 1.5, 8000, 0.75),
           },
           properties: { _market: 'sale', addr: r.address || k, key: k },
         });
@@ -274,11 +275,19 @@
     if (document.getElementById('market-panel')) return;
     const panel = document.createElement('div');
     panel.id = 'market-panel';
-    panel.className = 'panel';
-    panel.style.cssText = 'display:none;margin-top:10px;background:rgba(13,17,40,0.72);border:1px solid rgba(114,28,184,0.34);border-radius:12px;padding:11px 13px';
-    const anchor = document.getElementById('legend-container') || document.querySelector('#left-panel');
-    if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(panel, anchor);
-    else document.querySelector('#left-panel')?.appendChild(panel);
+    // NOTE: no 'panel' class — that class is absolutely positioned (the floating
+    // info box) and made this overlap the sidebar. Plain block, in normal flow.
+    panel.style.cssText = 'display:none;margin:8px 2px 4px;background:rgba(114,28,184,0.10);border:1px solid rgba(114,28,184,0.34);border-radius:10px;padding:11px 13px';
+    // Embed it directly under the "Market data" toggle, inside Additional Layers.
+    const bc = document.getElementById('buildings-content');
+    const grp = bc && bc.querySelector('.overlay-group');
+    if (grp && grp.parentNode) {
+      grp.parentNode.insertBefore(panel, grp.nextSibling);
+    } else {
+      const anchor = document.getElementById('legend-container') || document.querySelector('#left-panel');
+      if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(panel, anchor);
+      else document.querySelector('#left-panel')?.appendChild(panel);
+    }
   }
 
   // ── state transitions ──

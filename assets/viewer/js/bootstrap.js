@@ -130,6 +130,7 @@
     'viewer/js/comfort.js',      // outdoor thermal comfort (UTCI + solar MRT disc)
     ...(profile.country === 'se' ? ['viewer/js/scb_layers.js', 'viewer/js/market.js'] : []),
     'viewer/js/city_switcher.js',
+    'viewer/js/display_controls.js',   // Visualization Mode + Color By dropdowns → setBasemap/setColorMode
   ];
 
   for (const src of scripts) {

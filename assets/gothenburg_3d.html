@@ -6,15 +6,40 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="gothenburg_3d.css?v=20260812-market">
+  <link rel="stylesheet" href="gothenburg_3d.css?v=20260813-layout">
   <link rel="stylesheet" href="sidebar-theme.css?v=20260812-cvd">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
        is stamped on <body> by bootstrap.js. */
     body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
+    /* Display-section dropdowns (Visualization Mode / Color By). Dark-styled so the
+       native option popup isn't white-on-white. */
+    .ctrl-select { background:#11161d; color:#fff; border:1px solid rgba(255,255,255,0.16);
+      border-radius:8px; padding:5px 9px; font-size:12px; font-weight:600; cursor:pointer;
+      min-width:132px; outline:none; transition:border-color .15s; }
+    .ctrl-select:hover, .ctrl-select:focus { border-color:rgba(114,28,184,0.65); }
+    .ctrl-select option { background:#11161d; color:#fff; }
+    /* Base-map thumbnail picker (Light / Dark / Satellite / Terrain / 3D). */
+    .basemap-thumbs { display:flex; gap:7px; }
+    .bm-thumb { flex:1; min-width:0; background:transparent; border:0; padding:0; cursor:pointer;
+      display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .bm-thumb-img { position:relative; width:100%; aspect-ratio:1/1; border-radius:9px;
+      background-size:cover; background-position:center; border:2px solid rgba(255,255,255,0.14);
+      transition:border-color .15s, box-shadow .15s; }
+    .bm-thumb:hover .bm-thumb-img { border-color:rgba(255,255,255,0.38); }
+    .bm-thumb.active .bm-thumb-img { border-color:#7C3AED; box-shadow:0 0 0 1px #7C3AED; }
+    .bm-check { position:absolute; top:3px; right:3px; width:15px; height:15px; border-radius:50%;
+      background:#7C3AED; color:#fff; font-size:9px; line-height:15px; text-align:center; display:none; }
+    .bm-thumb.active .bm-check { display:block; }
+    .bm-label { font-size:11px; font-weight:600; color:rgba(255,255,255,0.5); }
+    .bm-thumb.active .bm-label { color:#fff; }
+    /* The selected-building card belongs INSIDE the Building Analysis section, in
+       normal flow — .panel makes it position:absolute, which floated it over the
+       sidebar and overlapped the sections below. Pin it back into the flow. */
+    #info-panel { position:static !important; z-index:auto !important; margin-top:8px; }
   </style>
-  <script src="gothenburg_3d.meta.js?v=20260812-market" defer></script>
-  <script src="viewer/js/bootstrap.js?v=20260812-market" defer></script>
+  <script src="gothenburg_3d.meta.js?v=20260813-layout" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260813-layout" defer></script>
 </head>
 <body>
 
@@ -68,49 +93,55 @@
   <button id="btn-disruptions" style="display:none">disruptions</button>
   <button id="btn-parking"     style="display:none">parking</button>
 
-  <!-- ══ SELECTED BUILDING ══════════════════════════════════════════════
-       Contextual: the building's data AND the tools that act on it live
-       together, so selecting → inspecting → running a tool needs no scrolling. -->
-  <div class="lp-divider"></div>
-  <div class="collapse-head">
-    <button class="collapse-toggle" id="building-toggle" type="button" aria-expanded="false" aria-controls="building-content">
-      <span class="collapse-chevron">&#9662;</span>
-      <span class="collapse-label">Building Analysis</span>
-      <span class="sec-badge" id="building-badge" hidden></span>
-    </button>
-    <button class="info-btn" data-layer="selected-building"></button>
-  </div>
-  <div id="building-content" class="collapse-content collapsed">
-    <div id="lp-no-selection">Click a building on the map to see its data and enable the analysis tools.</div>
-    <div class="panel" id="info-panel">
-      <button class="close-btn" id="info-close" aria-label="Clear selection">&#x2715;</button>
-      <h2>Building</h2>
-      <div id="info-content"></div>
-    </div>
-    <div class="analysis-tools-group">
-      <button class="tool-btn" id="btn-inspect" disabled>Facade Inspection</button>
-      <div class="analysis-note" id="inspect-saved-badge" style="display:none"></div>
-      <button class="tool-btn" id="btn-pvgis" disabled>Rooftop PV Estimate</button>
-      <div class="analysis-note" id="pvgis-saved-badge" style="display:none"></div>
-      <div id="pvgis-result" class="analysis-result"></div>
-      <button class="tool-btn" id="btn-sim" disabled>Run Energy Simulation</button>
-      <div class="analysis-note" id="sim-saved-badge" style="display:none"></div>
-      <div id="sim-result" class="analysis-result"></div>
-    </div>
-  </div>
 
   <!-- ══ BASE MAP ═══════════════════════════════════════════════════════ -->
   <div class="lp-divider"></div>
   <div class="collapse-head">
     <button class="collapse-toggle" id="basemap-toggle" type="button" aria-expanded="false" aria-controls="basemap-content">
       <span class="collapse-chevron">&#9662;</span>
-      <span class="collapse-label">Base Map</span>
+      <span class="collapse-label">Display</span>
       <span class="sec-badge" id="basemap-badge" hidden></span>
     </button>
     <button class="info-btn" data-layer="base-map"></button>
   </div>
   <div id="basemap-content" class="collapse-content collapsed">
-    <div class="basemap-group" role="radiogroup" aria-label="Base map" style="padding:0 0 4px">
+    <!-- Dropdown controls. The old radio buttons + colour tabs stay hidden below /
+         in the Buildings section so their IDs & handlers remain valid; these
+         selects just drive the same setBasemap / setColorMode globals. -->
+    <div style="padding:2px 12px 8px;display:flex;flex-direction:column;gap:9px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.4)">Base Map</div>
+      <div class="basemap-thumbs" role="radiogroup" aria-label="Base map">
+        <button class="bm-thumb" data-mode="light" role="radio" aria-checked="false" title="Light">
+          <span class="bm-thumb-img" style="background-color:#e6e6e6;background-image:url('https://a.basemaps.cartocdn.com/light_all/12/2184/1240.png')"><span class="bm-check">&#10003;</span></span>
+          <span class="bm-label">Light</span>
+        </button>
+        <button class="bm-thumb" data-mode="dark" role="radio" aria-checked="false" title="Dark">
+          <span class="bm-thumb-img" style="background-color:#161616;background-image:url('https://a.basemaps.cartocdn.com/dark_all/12/2184/1240.png')"><span class="bm-check">&#10003;</span></span>
+          <span class="bm-label">Dark</span>
+        </button>
+        <button class="bm-thumb" data-mode="satellite" role="radio" aria-checked="false" title="Satellite">
+          <span class="bm-thumb-img" style="background-color:#39422f;background-image:url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/12/1240/2184')"><span class="bm-check">&#10003;</span></span>
+          <span class="bm-label">Satellite</span>
+        </button>
+        <button class="bm-thumb" data-mode="terrain" role="radio" aria-checked="false" title="Terrain relief">
+          <span class="bm-thumb-img" style="background-color:#5a5347;background-image:url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Hillshade/MapServer/tile/12/1240/2184')"><span class="bm-check">&#10003;</span></span>
+          <span class="bm-label">Terrain</span>
+        </button>
+        <button class="bm-thumb active" data-mode="photo" role="radio" aria-checked="true" title="Photorealistic 3D">
+          <span class="bm-thumb-img" style="background-color:#39422f;background-image:url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2480/4368')"><span class="bm-check">&#10003;</span></span>
+          <span class="bm-label">3D</span>
+        </button>
+      </div>
+      <div id="color-by-row" style="display:none;align-items:center;justify-content:space-between;gap:10px">
+        <span style="font-size:12px;color:rgba(255,255,255,0.62)">Color By</span>
+        <select id="color-by-select" class="ctrl-select" aria-label="Colour buildings by">
+          <option value="use">Asset type</option>
+          <option value="eclass">Energy class</option>
+          <option value="year">Year era</option>
+        </select>
+      </div>
+    </div>
+    <div class="basemap-group" role="radiogroup" aria-label="Base map" style="display:none;padding:0 0 4px">
       <div class="base-row">
         <button class="base-btn" id="btn-base-light" role="radio" aria-checked="false">
           <span class="base-indicator"></span>
@@ -154,6 +185,38 @@
     </div>
   </div>
 
+  <!-- ══ SELECTED BUILDING ══════════════════════════════════════════════
+       Moved AFTER Display. Contextual: the building's data AND the tools that
+       act on it live together, so selecting → inspecting → running needs no
+       scrolling. The card now flows in-section (see #info-panel CSS override). -->
+  <div class="lp-divider"></div>
+  <div class="collapse-head">
+    <button class="collapse-toggle" id="building-toggle" type="button" aria-expanded="false" aria-controls="building-content">
+      <span class="collapse-chevron">&#9662;</span>
+      <span class="collapse-label">Building Analysis</span>
+      <span class="sec-badge" id="building-badge" hidden></span>
+    </button>
+    <button class="info-btn" data-layer="selected-building"></button>
+  </div>
+  <div id="building-content" class="collapse-content collapsed">
+    <div id="lp-no-selection">Click a building on the map to see its data and enable the analysis tools.</div>
+    <div class="panel" id="info-panel">
+      <button class="close-btn" id="info-close" aria-label="Clear selection">&#x2715;</button>
+      <h2>Building</h2>
+      <div id="info-content"></div>
+    </div>
+    <div class="analysis-tools-group">
+      <button class="tool-btn" id="btn-inspect" disabled>Facade Inspection</button>
+      <div class="analysis-note" id="inspect-saved-badge" style="display:none"></div>
+      <button class="tool-btn" id="btn-pvgis" disabled>Rooftop PV Estimate</button>
+      <div class="analysis-note" id="pvgis-saved-badge" style="display:none"></div>
+      <div id="pvgis-result" class="analysis-result"></div>
+      <button class="tool-btn" id="btn-sim" disabled>Run Energy Simulation</button>
+      <div class="analysis-note" id="sim-saved-badge" style="display:none"></div>
+      <div id="sim-result" class="analysis-result"></div>
+    </div>
+  </div>
+
   <!-- ══ DATA LAYERS ════════════════════════════════════════════════════ -->
   <div id="lp-layers">
 
@@ -178,7 +241,10 @@
           <button class="info-btn" data-title="Buildings" data-desc="92,973 building footprints with 3D volumes for Gothenburg. Coloured by use type, energy class, or construction year. EPC data linked from the Boverket register." data-source="EUBUCCO v0.2 · Boverket EPC register"></button>
         </div>
         <div id="photo-pick-hint" style="display:none;font-size:10px;color:var(--muted);padding:2px 12px 6px;line-height:1.5">Photorealistic view: data boxes are hidden — hover or click the 3D model itself to select a building.</div>
-        <div class="overlay-row">
+        <!-- OSM Buildings hidden: it only renders on the Photorealistic basemap,
+             where it overlaps Google's photorealistic mesh and reads as redundant.
+             Kept in the DOM (display:none) so it can be re-enabled later. -->
+        <div class="overlay-row" style="display:none">
           <button class="overlay-btn" id="btn-osm-buildings" aria-pressed="false">
             <span class="overlay-check"></span>
             <span class="base-name">OSM Buildings</span>
@@ -188,8 +254,10 @@
         </div>
       </div>
       <div id="colour-by-group">
-      <div class="lp-subhead">Colour buildings by</div>
-      <div id="lp-tabs" role="tablist" aria-label="Colour buildings by">
+      <!-- Old colour-by tabs: hidden (moved to the 'Color By' dropdown in Display),
+           kept in the DOM so setColorMode's active-class toggling still works. -->
+      <div class="lp-subhead" style="display:none">Colour buildings by</div>
+      <div id="lp-tabs" role="tablist" aria-label="Colour buildings by" style="display:none">
         <button class="lp-tab active" id="btn-use" role="tab" aria-selected="true">Use type</button>
         <button class="lp-tab" id="btn-eclass" role="tab" aria-selected="false">Energy</button>
         <button class="lp-tab" id="btn-year" role="tab" aria-selected="false">Year era</button>

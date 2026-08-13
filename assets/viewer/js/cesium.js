@@ -86,7 +86,10 @@ viewer.imageryLayers.addImageryProvider(
 // ─────────────────────────────────────────────────────────────────
 let _currentBasemap = 'light';
 window.setBasemap = function(type) {
+  const _prevBasemap = _currentBasemap;
   _currentBasemap = type;
+  // Buildings are uniform grey on satellite, coloured elsewhere — recolour if that flips.
+  const _greyChanged = (_prevBasemap === 'satellite') !== (type === 'satellite');
   if (type === 'photo') {
     _flatGroundMode = false;   // real Google-mesh elevation applies again
     window.setPhotoMode(true);
@@ -120,6 +123,9 @@ window.setBasemap = function(type) {
       if (window.vegetationReground) window.vegetationReground();
       if (window.roofsRebuild) window.roofsRebuild();
     }
+    // A flat→flat switch into/out of satellite doesn't hit the block above, so
+    // recolour the buildings (uniform grey ⇄ coloured) explicitly.
+    else if (_greyChanged && buildingPrimitives.length) rebuildBuildings();
     viewer.imageryLayers.removeAll();
     const tileUrls = {
       light:     'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
@@ -518,6 +524,11 @@ let colorMode = 'use';
 let buildingPrimitives = [];
 
 function getBuildingColor(b) {
+  // On the satellite (Esri) imagery, show a clean uniform-grey city instead of
+  // the coloured overlay — the scattered use/market colours over aerial imagery
+  // read as random. Colour modes still apply on the light/dark basemaps.
+  if (_currentBasemap === 'satellite')
+    return Cesium.Color.fromBytes(124, 127, 138, 240);
   if (colorMode === 'market')
     return (window.getMarketBuildingColor && window.getMarketBuildingColor(b)) || Cesium.Color.fromBytes(70,74,92,70);
   if (colorMode === 'eclass')
