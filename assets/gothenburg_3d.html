@@ -6,7 +6,7 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="gothenburg_3d.css?v=20260813-layout">
+  <link rel="stylesheet" href="gothenburg_3d.css?v=20260813-icons3">
   <link rel="stylesheet" href="sidebar-theme.css?v=20260812-cvd">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
@@ -37,9 +37,19 @@
        normal flow — .panel makes it position:absolute, which floated it over the
        sidebar and overlapped the sections below. Pin it back into the flow. */
     #info-panel { position:static !important; z-index:auto !important; margin-top:8px; }
+    /* Section headers: a numbered badge + a section icon, like the mockup. */
+    .sec-num { flex-shrink:0; width:17px; height:17px; border-radius:5px;
+      background:rgba(124,58,237,0.22); border:1px solid rgba(124,58,237,0.55);
+      color:#c4b5fd; font-size:9.5px; font-weight:800; display:inline-flex;
+      align-items:center; justify-content:center; }
+    .sec-icon { flex-shrink:0; display:inline-flex; align-items:center; color:#a78bfa; }
+    .sec-icon svg { width:13px; height:13px; }
+    .collapse-toggle .collapse-label { font-size:9.5px !important; font-weight:600 !important; letter-spacing:0.03em; white-space:nowrap; }
+    .collapse-toggle { gap:6px !important; }
+    .collapse-toggle .collapse-chevron { margin-left:4px; }
   </style>
-  <script src="gothenburg_3d.meta.js?v=20260813-layout" defer></script>
-  <script src="viewer/js/bootstrap.js?v=20260813-layout" defer></script>
+  <script src="gothenburg_3d.meta.js?v=20260813-icons3" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260813-icons3" defer></script>
 </head>
 <body>
 
@@ -200,7 +210,7 @@
   </div>
   <div id="building-content" class="collapse-content collapsed">
     <div id="lp-no-selection">Click a building on the map to see its data and enable the analysis tools.</div>
-    <div class="panel" id="info-panel">
+    <div id="info-panel">
       <button class="close-btn" id="info-close" aria-label="Clear selection">&#x2715;</button>
       <h2>Building</h2>
       <div id="info-content"></div>
