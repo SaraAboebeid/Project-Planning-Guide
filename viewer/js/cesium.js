@@ -86,8 +86,16 @@ viewer.imageryLayers.addImageryProvider(
 // ─────────────────────────────────────────────────────────────────
 let _currentBasemap = 'light';
 window.setBasemap = function(type) {
-  _currentBasemap = type;
-  if (type === 'photo') {
+  const validType = ['light', 'dark', 'satellite', 'terrain', 'photo'].includes(type) ? type : 'light';
+  _currentBasemap = validType;
+
+  document.querySelectorAll('.base-btn').forEach((btn) => {
+    const active = btn.id === 'btn-base-' + validType;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
+  });
+
+  if (validType === 'photo') {
     _flatGroundMode = false;   // real Google-mesh elevation applies again
     window.setPhotoMode(true);
     viewer.imageryLayers.removeAll();
@@ -131,11 +139,11 @@ window.setBasemap = function(type) {
       dark:      '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
       satellite: 'Esri, DigitalGlobe, GeoEye',
     };
-    if (type === 'terrain') {
+    if (validType === 'terrain') {
       _addTerrainImagery();
-    } else if (tileUrls[type]) {
+    } else if (tileUrls[validType]) {
       viewer.imageryLayers.addImageryProvider(
-        new Cesium.UrlTemplateImageryProvider({ url: tileUrls[type], credit: credits[type] })
+        new Cesium.UrlTemplateImageryProvider({ url: tileUrls[validType], credit: credits[validType] })
       );
     }
   }

@@ -112,7 +112,7 @@
   <div id="basemap-content" class="collapse-content collapsed">
     <div class="basemap-group" role="radiogroup" aria-label="Base map" style="padding:0 0 4px">
       <div class="base-row">
-        <button class="base-btn" id="btn-base-light" role="radio" aria-checked="false">
+        <button class="base-btn active" id="btn-base-light" role="radio" aria-checked="true">
           <span class="base-indicator"></span>
           <span class="base-name">Light</span>
           <span class="layer-pill">CartoDB</span>
@@ -136,7 +136,7 @@
         <button class="info-btn" data-layer="satellite-imagery"></button>
       </div>
       <div class="base-row">
-        <button class="base-btn active" id="btn-base-photo" role="radio" aria-checked="true">
+        <button class="base-btn" id="btn-base-photo" role="radio" aria-checked="false">
           <span class="base-indicator"></span>
           <span class="base-name">Photorealistic 3D</span>
           <span class="layer-pill">Google</span>
@@ -324,28 +324,7 @@
             </button>
             <button class="info-btn" data-layer="green-space-accessibility"></button>
           </div>
-          <div class="overlay-row">
-            <button class="overlay-btn" id="btn-urban-spacesyntax" aria-pressed="false">
-              <span class="overlay-check"></span>
-              <span class="base-name">Space Syntax</span>
-              <span class="layer-pill">SMoG &middot; OSM</span>
-            </button>
-            <button class="info-btn" data-title="Space syntax" data-desc="Street-network centrality (space syntax) on the OSM street network: betweenness (through-movement / choice), integration (closeness / how central), and reach. HOW TO USE: pan/zoom to a neighbourhood, tick this layer, pick a measure below, then press ↻ Recompute for current view. Streets colour blue→red = low→high. Method after SMoG — Spatial Morphology Group, Chalmers." data-source="OpenStreetMap · networkx (space-syntax, method A)"></button>
-          </div>
         </div>
-        <div id="ss-controls" style="display:none;padding:2px 12px 6px">
-          <div style="font-size:10px;color:var(--muted);line-height:1.45;margin-bottom:6px">
-            <b>1.</b> Pan/zoom to a neighbourhood &nbsp;<b>2.</b> Pick a measure &nbsp;<b>3.</b> Press <b>↻ Recompute</b>.<br>Streets colour <span style="color:#4a66dc">blue</span>→<span style="color:#e05a23">red</span> = low→high.
-          </div>
-          <div id="ss-tabs" role="tablist" style="display:flex;gap:4px;margin-bottom:5px">
-            <button class="lp-tab active" id="ss-tab-betweenness" role="tab">Betweenness</button>
-            <button class="lp-tab" id="ss-tab-integration" role="tab">Integration</button>
-            <button class="lp-tab" id="ss-tab-reach" role="tab">Reach</button>
-          </div>
-          <button class="btn" id="ss-refresh" style="width:100%;font-size:10px;padding:5px">&#8635; Recompute for current view</button>
-        </div>
-        <div id="ss-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
-        <div id="ss-legend" style="display:none;padding:4px 12px 8px"></div>
         <div id="urban-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
         <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:11px;color:var(--text)"></div>
       </div>

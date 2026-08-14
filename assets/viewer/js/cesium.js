@@ -86,11 +86,16 @@ viewer.imageryLayers.addImageryProvider(
 // ─────────────────────────────────────────────────────────────────
 let _currentBasemap = 'light';
 window.setBasemap = function(type) {
-  const _prevBasemap = _currentBasemap;
-  _currentBasemap = type;
-  // Buildings are uniform grey on satellite, coloured elsewhere — recolour if that flips.
-  const _greyChanged = (_prevBasemap === 'satellite') !== (type === 'satellite');
-  if (type === 'photo') {
+  const validType = ['light', 'dark', 'satellite', 'terrain', 'photo'].includes(type) ? type : 'light';
+  _currentBasemap = validType;
+
+  document.querySelectorAll('.base-btn').forEach((btn) => {
+    const active = btn.id === 'btn-base-' + validType;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
+  });
+
+  if (validType === 'photo') {
     _flatGroundMode = false;   // real Google-mesh elevation applies again
     window.setPhotoMode(true);
     viewer.imageryLayers.removeAll();
@@ -123,9 +128,6 @@ window.setBasemap = function(type) {
       if (window.vegetationReground) window.vegetationReground();
       if (window.roofsRebuild) window.roofsRebuild();
     }
-    // A flat→flat switch into/out of satellite doesn't hit the block above, so
-    // recolour the buildings (uniform grey ⇄ coloured) explicitly.
-    else if (_greyChanged && buildingPrimitives.length) rebuildBuildings();
     viewer.imageryLayers.removeAll();
     const tileUrls = {
       light:     'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
@@ -137,11 +139,11 @@ window.setBasemap = function(type) {
       dark:      '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
       satellite: 'Esri, DigitalGlobe, GeoEye',
     };
-    if (type === 'terrain') {
+    if (validType === 'terrain') {
       _addTerrainImagery();
-    } else if (tileUrls[type]) {
+    } else if (tileUrls[validType]) {
       viewer.imageryLayers.addImageryProvider(
-        new Cesium.UrlTemplateImageryProvider({ url: tileUrls[type], credit: credits[type] })
+        new Cesium.UrlTemplateImageryProvider({ url: tileUrls[validType], credit: credits[validType] })
       );
     }
   }
@@ -524,13 +526,6 @@ let colorMode = 'use';
 let buildingPrimitives = [];
 
 function getBuildingColor(b) {
-  // On the satellite (Esri) imagery, show a clean uniform-grey city instead of
-  // the coloured overlay — the scattered use/market colours over aerial imagery
-  // read as random. Colour modes still apply on the light/dark basemaps.
-  if (_currentBasemap === 'satellite')
-    return Cesium.Color.fromBytes(124, 127, 138, 240);
-  if (colorMode === 'market')
-    return (window.getMarketBuildingColor && window.getMarketBuildingColor(b)) || Cesium.Color.fromBytes(70,74,92,70);
   if (colorMode === 'eclass')
     return (b.eclass && ECLASS_COLORS[b.eclass]) ? ECLASS_COLORS[b.eclass] : Cesium.Color.fromBytes(60,60,70,140);
   if (colorMode === 'year')

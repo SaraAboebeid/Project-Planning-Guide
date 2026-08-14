@@ -64,7 +64,7 @@ function buildBudget(hours: number, rateSEK = 1_400) {
 
 const RENO_SYSTEMS   = ["Thermal Envelope", "HVAC / Ventilation", "Heating System"];
 const RENO_KPI       = ["Energy Use Intensity", "Carbon Intensity", "Heating Demand", "Cost per m²"];
-const RENO_EXPLORE   = ["Scenario Comparison", "Sensitivity Analysis"];
+const RENO_EXPLORE   = ["Comparison of Renovation Packages", "Sensitivity Analysis"];
 const RENO_ENVELOPE  = ["External Wall", "Windows & Glazing", "Roof / Attic"];
 
 const RENO_HOURS     = 65;
@@ -301,7 +301,7 @@ export const SAMPLE_RENOVATION_COMPUTED: ReportComputedValues = {
 
 const EC_SYSTEMS  = ["Rooftop PV", "Community PV", "Demand Response", "Shared Battery Storage"];
 const EC_KPI      = ["Self-sufficiency ratio", "Peak demand reduction", "CO₂ avoided", "Collective investment cost"];
-const EC_EXPLORE  = ["Scenario Comparison", "Sensitivity Analysis", "Optimisation"];
+const EC_EXPLORE  = ["Comparison of Renovation Packages", "Sensitivity Analysis", "Optimisation"];
 
 const EC_HOURS    = 108; // 60 × 1.8 (Neighborhood scale)
 const EC_START    = "2026-09-15";
@@ -410,7 +410,7 @@ export const SAMPLE_EC_COMPUTED: ReportComputedValues = {
 
 const RE_SYSTEMS  = ["Rooftop PV", "Facade PV"];
 const RE_KPI      = ["Annual energy yield", "LCOE", "Self-consumption ratio", "CO₂ reduction potential", "Payback period"];
-const RE_EXPLORE  = ["Parametric Study", "Scenario Comparison"];
+const RE_EXPLORE  = ["Parametric Study", "Comparison of Renovation Packages"];
 
 const RE_HOURS    = 125; // 50 × 2.5 (City scale)
 const RE_START    = "2026-10-01";

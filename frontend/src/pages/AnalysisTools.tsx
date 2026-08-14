@@ -1,4 +1,4 @@
-import { ExternalLink, Sun, Eye, Zap, Wrench, Leaf, Target, ChevronRight, Network, ScanSearch, ListOrdered, Scale } from "lucide-react";
+import { ExternalLink, Sun, Eye, Zap, Wrench, Leaf, Target, ChevronRight, ScanSearch, ListOrdered, Scale } from "lucide-react";
 
 /* Optional "method & equations" block for tools that document a formal model. */
 interface Methodology {
@@ -204,34 +204,6 @@ const TOOLS = [
     link: null,
     linkLabel: null,
     usedIn: ["Renovation Planning", "Energy Community Planning", "Renewable Energy Planning"],
-  },
-  {
-    id: "space-syntax",
-    title: "Space Syntax",
-    subtitle: "Street-Network Centrality (SMoG)",
-    color: "#38BDF8",
-    status: "integrated",
-    icon: Network,
-    description:
-      "Space-syntax analysis of the street network — quantifying how each street contributes to movement and accessibility across the city. Computed live on the OpenStreetMap street graph and rendered as colour-graded streets directly in the 3D viewer's Urban Analysis. Method after the Spatial Morphology Group (SMoG), Chalmers.",
-    features: [
-      "Betweenness (choice) — through-movement potential",
-      "Integration (closeness) — how central / accessible a street is",
-      "Reach — extent of network reachable within a radius",
-      "Computed live on the OSM street graph (networkx engine)",
-      "Colour-graded street network rendered in the 3D viewer",
-    ],
-    link: null,
-    linkLabel: null,
-    attribution: {
-      heading: "METHOD AFTER",
-      headline: "Spatial Morphology Group (SMoG)",
-      sub: "Chalmers University of Technology",
-      roles: [
-        { role: "Reference toolkit", name: "PST / Pstalgo (space-syntax analysis)" },
-      ],
-    },
-    usedIn: ["Energy Community Planning", "Renovation Planning"],
   },
 ];
 

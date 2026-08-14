@@ -52,7 +52,7 @@
       const solid = mode === 'light' || mode === 'dark';
       if (cbyRow) cbyRow.style.display = solid ? 'flex' : 'none';
     };
-    let current = 'photo';   // default active thumbnail (matches the viewer's startup)
+    let current = 'light';   // default active thumbnail for the viewer startup
     thumbs.forEach((btn) => {
       btn.addEventListener('click', () => {
         const mode = btn.getAttribute('data-mode');
@@ -68,7 +68,7 @@
       });
     });
     if (cby) cby.addEventListener('change', () => window.setColorMode(cby.value));
-    syncColorBy(current);   // Photorealistic default → Color By hidden
+    syncColorBy(current);   // Light default → Color By stays available
   }
   init();
 })();

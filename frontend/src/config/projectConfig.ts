@@ -167,7 +167,7 @@ export interface ExplorationConstraint {
 
 export const EXPLORATION_OPTIONS: string[] = [
   "Baseline Assessment",
-  "Scenario Comparison",
+  "Comparison of Renovation Packages",
   "Multi-objective Optimization",
 ];
 
@@ -180,12 +180,12 @@ export const EXPLORATION_CONSTRAINTS: Record<string, ExplorationConstraint> = {
       "Evaluate current performance against selected KPIs to establish a reference point.",
     hint: "Select one or more KPIs",
   },
-  "Scenario Comparison": {
+  "Comparison of Renovation Packages": {
     min_kpis: 1,
     max_kpis: null,
     icon: "🔀",
     description:
-      "Compare multiple design or operational scenarios side-by-side across KPIs.",
+      "Compare multiple renovation packages side-by-side across energy, cost and carbon KPIs.",
     hint: "Select one or more KPIs",
   },
   "What-if Simulation": {

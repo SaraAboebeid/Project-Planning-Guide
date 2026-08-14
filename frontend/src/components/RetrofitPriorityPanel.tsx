@@ -113,7 +113,8 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
           <span className="block text-sm font-semibold text-white">Renovation prioritization</span>
           <span className="block text-[11px] text-white/40">
             Ranks {items.length} building{items.length === 1 ? "" : "s"} by a weighted score of energy, façade condition,
-            characteristics &amp; renovation potential — which to renovate first.
+            characteristi
+            cs &amp; renovation potential — which to renovate first.
           </span>
         </span>
         {open ? <ChevronUp className="w-4 h-4 text-white/40" /> : <ChevronDown className="w-4 h-4 text-white/40" />}

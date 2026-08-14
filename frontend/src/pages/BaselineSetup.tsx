@@ -87,9 +87,12 @@ export default function BaselineSetup() {
   const [simProgress, setSimProgress] = useState(0);
   const [simError, setSimError] = useState<string | null>(null);
 
-  // Which buildings to run the baseline for. null = all (the default); a Set
-  // once the user starts (de)selecting. Lets you run all, or just a subset.
+  // Which buildings to run the baseline for. null means: fall back to the
+  // Step 2 shortlist or all buildings by default. Keep a dedicated mode so the
+  // UI can distinguish “Use Step 2 shortlist” from “Select all” even when both
+  // resolve to the same set.
   const [selected, setSelected] = useState<Set<number> | null>(null);
+  const [selectionMode, setSelectionMode] = useState<"step2" | "all" | "custom">("step2");
   const allIdx = useMemo(() => new Set(buildings.map((_, i) => i)), [buildings]);
   const prioritizedIdx = useMemo(() => {
     const idx = project.prioritizedBuildingIndices ?? [];
@@ -97,17 +100,25 @@ export default function BaselineSetup() {
     return valid.length ? new Set(valid) : null;
   }, [project.prioritizedBuildingIndices, buildings.length]);
   const effectiveSelected = selected ?? prioritizedIdx ?? allIdx;
-  const carriesFromStep2 = selected == null && prioritizedIdx != null;
+  const carriesFromStep2 = selectionMode === "step2" && prioritizedIdx != null;
 
   useEffect(() => {
     setSelected(null);
+    setSelectionMode("step2");
   }, [project.prioritizedBuildingIndices, buildings.length]);
 
   const runList = useMemo(
     () => buildings.filter((_, i) => effectiveSelected.has(i)),
     [buildings, effectiveSelected],
   );
+
+  function applySelection(nextSet: Set<number>, mode: "step2" | "all" | "custom") {
+    setSelected(nextSet);
+    setSelectionMode(mode);
+  }
+
   function toggleBuilding(i: number) {
+    setSelectionMode("custom");
     setSelected((prev) => {
       const base = prev ?? new Set(effectiveSelected);
       const next = new Set(base);
@@ -253,17 +264,27 @@ export default function BaselineSetup() {
               {effectiveSelected.size} of {buildings.length} building{buildings.length !== 1 ? "s" : ""} selected
             </span>
             <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-              <button onClick={() => setSelected(null)}
-                style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
-                  background: "rgba(78,205,196,0.12)", border: "1px solid rgba(78,205,196,0.35)", color: "#4ECDC4" }}>
+              <button onClick={() => applySelection(prioritizedIdx ? new Set(prioritizedIdx) : new Set(allIdx), "step2")}
+                style={{
+                  fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
+                  background: selectionMode === "step2" ? "rgba(78,205,196,0.18)" : "rgba(78,205,196,0.12)",
+                  border: `1px solid ${selectionMode === "step2" ? "rgba(78,205,196,0.7)" : "rgba(78,205,196,0.35)"}`,
+                  color: selectionMode === "step2" ? "#7AF0E1" : "#4ECDC4",
+                  boxShadow: selectionMode === "step2" ? "0 0 0 1px rgba(122,240,225,0.18)" : "none",
+                }}>
                 Use Step 2 shortlist
               </button>
-              <button onClick={() => setSelected(new Set(allIdx))}
-                style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
-                  background: "rgba(78,205,196,0.12)", border: "1px solid rgba(78,205,196,0.35)", color: "#4ECDC4" }}>
+              <button onClick={() => applySelection(new Set(allIdx), "all")}
+                style={{
+                  fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
+                  background: selectionMode === "all" ? "rgba(78,205,196,0.18)" : "rgba(78,205,196,0.12)",
+                  border: `1px solid ${selectionMode === "all" ? "rgba(78,205,196,0.7)" : "rgba(78,205,196,0.35)"}`,
+                  color: selectionMode === "all" ? "#7AF0E1" : "#4ECDC4",
+                  boxShadow: selectionMode === "all" ? "0 0 0 1px rgba(122,240,225,0.18)" : "none",
+                }}>
                 Select all
               </button>
-              <button onClick={() => setSelected(new Set())}
+              <button onClick={() => applySelection(new Set(), "custom")}
                 style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
                   background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)" }}>
                 Clear

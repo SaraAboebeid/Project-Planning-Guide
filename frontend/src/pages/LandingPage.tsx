@@ -69,7 +69,7 @@ const WORKFLOW_STEPS = [
     n: 2,
     shortLabel: "Step 2",
     name: "Building & Site Data",
-    desc: "Load open building data (EUBUCCO + Boverket EPC) and select the buildings to renovate.",
+    desc: "Load building data and select the buildings to renovate. Prioritise by energy class, construction era, or custom criteria.",
     status: "not-started" as StepStatus,
     path: "/step/2",
     icon: IC.map,

@@ -5,23 +5,33 @@
 //  Overlays  (checkboxes — mix freely): Buildings · Live Transit · Störning · Parking
 // ─────────────────────────────────────────────────────────────────────────────
 
+function syncBaseSelection(type) {
+  const target = type ? document.getElementById('btn-base-' + type) : null;
+  document.querySelectorAll('.base-btn').forEach((btn) => {
+    const active = btn === target;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
+  });
+}
+
 function layersInit() {
   // ── Base Map selector ────────────────────────────────────────────────────
   ['light', 'dark', 'satellite', 'terrain', 'photo'].forEach(type => {
     const btn = document.getElementById('btn-base-' + type);
     if (!btn) return;   // e.g. the UK viewer has no "terrain" basemap button
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.base-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      syncBaseSelection(type);
       window.setBasemap(type);
     });
   });
 
-  // Sync when Google tiles fail / get disabled internally
+  // Keep the sidebar badge/list state aligned with the actual basemap.
   document.addEventListener('basemapReset', () => {
-    document.querySelectorAll('.base-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn-base-photo').classList.add('active');
+    syncBaseSelection('light');
   });
+
+  syncBaseSelection('light');
+  if (window.setBasemap) window.setBasemap('light');
 
   // ── Buildings overlay ────────────────────────────────────────────────────
   document.getElementById('btn-overlay-buildings').addEventListener('click', () => {

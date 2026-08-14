@@ -62,5 +62,17 @@ services:
       - ./frontend/public/dtcc_vegetation.json:/usr/share/nginx/html/dtcc_vegetation.json:ro
       # Mounted (not baked) so the daily Boplats refresh shows up live — no rebuild.
       - ./frontend/public/boplats_data.json:/usr/share/nginx/html/boplats_data.json:ro
+      # ── Viewer assets are LIVE-MOUNTED so viewer changes reach Docker immediately
+      # ── after `python build.py --se --skip-pipeline` — no image rebuild needed.
+      # ── Mount specific files/dirs only so the baked SPA (index.html) stays intact.
+      - ./assets/viewer:/usr/share/nginx/html/viewer:ro
+      - ./assets/gothenburg_3d.html:/usr/share/nginx/html/gothenburg_3d.html:ro
+      - ./assets/gothenburg_3d.css:/usr/share/nginx/html/gothenburg_3d.css:ro
+      - ./assets/gothenburg_3d.meta.js:/usr/share/nginx/html/gothenburg_3d.meta.js:ro
+      - ./assets/uk_3d.html:/usr/share/nginx/html/uk_3d.html:ro
+      - ./assets/uk_3d.css:/usr/share/nginx/html/uk_3d.css:ro
+      - ./assets/uk_3d.meta.js:/usr/share/nginx/html/uk_3d.meta.js:ro
+      - ./assets/sidebar-theme.css:/usr/share/nginx/html/sidebar-theme.css:ro
+      - ./assets/country_profile.js:/usr/share/nginx/html/country_profile.js:ro
     depends_on:
       - backend

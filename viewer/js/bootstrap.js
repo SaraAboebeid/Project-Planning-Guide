@@ -120,7 +120,6 @@
       ? ['viewer/js/trafik_canvas.js', 'viewer/js/vasttrafik.js', 'viewer/js/trafikverket.js']
       : []),
     'viewer/js/urban_analysis.js', // Green Index / Green Accessibility work anywhere (OSM); Heat Island stays SE-only in the UI
-    'viewer/js/space_syntax.js',   // OSM space-syntax centrality — any city
     'viewer/js/layers.js',
     'viewer/js/vegetation.js',   // DTCC LiDAR-derived trees & shrubs (data is Gothenburg-only; no-ops elsewhere)
     'viewer/js/roofs.js',        // DTCC LiDAR-derived pitched roof caps (Gothenburg-only; no-ops elsewhere)

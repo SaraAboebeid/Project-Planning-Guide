@@ -18,44 +18,52 @@
 .env.local
 *.local
 
-# Large data — mounted via docker-compose volumes instead of baked in
-data/eubucco
-data/sensitivity/archive
-data/sensitivity/*.duckdb
-data/sensitivity/*.duckdb.zip
-data/dtcc/pointcloud
-**/*.laz
-**/*.gpkg
-**/*.parquet
-assets/buildings.json
-assets/dtcc_vegetation.json
-assets/*.backup-*.json
+# ── Large data / images — mounted via volumes, never baked ───────────────────
+data
+booli_images
+boplats_images
+assets/boplats_images
 frontend/public/buildings.json
 frontend/public/dtcc_vegetation.json
 frontend/public/*.backup-*.json
-boplats_images
-assets/boplats_images
+frontend/public/uk
+frontend/public/booli_images
+frontend/public/boplats_images
+
+# ── Heavy static assets served from CDN or mounted volumes ──────────────────
+assets/buildings.json
+assets/dtcc_vegetation.json
+assets/*.backup-*.json
+assets/*.backup_facade
 assets/Cesium.js
 assets/cesium-widgets.css
 assets/deck.gl.min.js
 assets/globe.gl.min.js
+
+# ── Viewer source — the BUILD ARTIFACT (assets/*_3d.html) is what Docker     
+# ── needs; the viewer/ source tree is only for local development.            
+viewer
+
+# ── Logs / scratch / scratch scripts ────────────────────────────────────────
+logs
+tools/scratch
+*.log
+*.bak
+*.tmp
+*.csv
+*.xlsx
+_*.py
+_*.js
+tv_test.js
 
 # Streamlit app (not part of the FastAPI image)
 pages
 planning_guide.py
 launch.py
 
-# Repo docs / scratch
+# Repo docs
 *.md
 !backend/README.md
-_*.py
-_*.js
-tv_test.js
-*.log
-*.bak
-*.tmp
-*.csv
-*.xlsx
 
 # OS
 .DS_Store

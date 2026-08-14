@@ -310,9 +310,14 @@ export default function DefineProject() {
   }
 
   function toggleExploration(approach: string) {
-    const next = project.explorationApproaches.includes(approach)
+    let next = project.explorationApproaches.includes(approach)
       ? project.explorationApproaches.filter((a) => a !== approach)
       : [...project.explorationApproaches, approach];
+    // Selecting Optimization automatically includes the two prerequisite steps.
+    if (approach === "Multi-objective Optimization" && !project.explorationApproaches.includes(approach)) {
+      const required = ["Baseline Assessment", "Comparison of Renovation Packages"];
+      required.forEach((r) => { if (!next.includes(r)) next = [...next, r]; });
+    }
     setProject({ explorationApproaches: next });
   }
 

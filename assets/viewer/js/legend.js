@@ -104,10 +104,6 @@ function updateLegend(mode) {
   const container = document.getElementById('legend-container');
   let rows = [];
 
-  if (mode === 'market') {           // market.js renders its own legend in #market-panel
-    container.innerHTML = '';
-    return;
-  }
   if (mode === 'use') {
     rows = Object.entries(USE_LABELS_JS).map(([key, lbl]) => {
       const cnt = _useCounts[key] || 0;
