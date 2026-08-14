@@ -97,6 +97,7 @@ export default function DefineProject() {
   const [locationMsg, setLocationMsg] = useState<string | null>(null);
   const [buildingLoading, setBuildingLoading] = useState(false);
   const lookupDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const areaLookupSeq = useRef(0);
   // For auto-scrolling to each newly revealed question.
   const rootRef = useRef<HTMLDivElement>(null);
   const didMountRef = useRef(false);
@@ -106,6 +107,8 @@ export default function DefineProject() {
   const [districts, setDistricts] = useState<{ name: string; count: number }[]>([]);
   const [districtQuery, setDistrictQuery] = useState(project.district ?? project.neighborhoodName ?? "");
   const [districtOpen, setDistrictOpen] = useState(false);
+  const [districtExactCounts, setDistrictExactCounts] = useState<Record<string, number>>({});
+  const districtCountSeq = useRef(0);
   const isSweden = project.country !== "United Kingdom";
 
   useEffect(() => {
@@ -119,6 +122,9 @@ export default function DefineProject() {
     : districts.slice(0, 12);
 
   const selectedDistrict = districts.find(x => x.name === project.district) ?? null;
+  const selectedDistrictCount = selectedDistrict
+    ? (districtExactCounts[selectedDistrict.name] ?? selectedDistrict.count)
+    : null;
 
   function pickDistrict(name: string) {
     setDistrictQuery(name);
@@ -129,25 +135,53 @@ export default function DefineProject() {
       bboxStats: null,
       currentBbox: null,
     });
+
+    // Keep Step 1's neighborhood count in sync with Step 2's actual row source.
+    if (districtExactCounts[name] !== undefined) return;
+    const reqId = ++districtCountSeq.current;
+    void api.buildingsByDistrict(name)
+      .then((rows) => {
+        if (reqId !== districtCountSeq.current) return;
+        setDistrictExactCounts((prev) => ({ ...prev, [name]: rows.length }));
+        setProject({ bboxRows: rows });
+      })
+      .catch(() => {
+        // Fallback to cached district aggregate if this lookup fails.
+      });
   }
 
   /* ── Bbox lookup — fires when user finishes drawing a bbox ──── */
   async function handleBboxChange(bbox: { north: number; south: number; east: number; west: number } | null) {
     if (!bbox) {
-      setProject({ bboxStats: null, lookedUpBuilding: null });
+      areaLookupSeq.current += 1;
+      setProject({ bboxStats: null, lookedUpBuilding: null, lookedUpBuildings: [], bboxRows: [] });
+      setBuildingLoading(false);
       return;
     }
+    const reqId = ++areaLookupSeq.current;
     setBuildingLoading(true);
     try {
-      const stats = await api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west);
+      const [stats, rows] = await Promise.all([
+        api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west),
+        api.buildingsBboxList(bbox.north, bbox.south, bbox.east, bbox.west),
+      ]);
+      if (reqId !== areaLookupSeq.current) return;
       // A rectangle supersedes any previously drawn free-form polygon.
-      setProject({ bboxStats: stats, lookedUpBuilding: null, currentBbox: bbox, selectionPolygon: null });
+      setProject({
+        bboxStats: { ...stats, count: rows.length, with_epc: rows.filter((r) => !!r.has_epc).length },
+        bboxRows: rows,
+        lookedUpBuilding: null,
+        lookedUpBuildings: [],
+        currentBbox: bbox,
+        selectionPolygon: null,
+      });
       // Sync bbox to 3D viewer via localStorage
       try { localStorage.setItem('ppg_bbox', JSON.stringify(bbox)); } catch { /* ignore */ }
     } catch {
+      if (reqId !== areaLookupSeq.current) return;
       setProject({ bboxStats: null });
     } finally {
-      setBuildingLoading(false);
+      if (reqId === areaLookupSeq.current) setBuildingLoading(false);
     }
   }
 
@@ -157,18 +191,33 @@ export default function DefineProject() {
     bbox: { north: number; south: number; east: number; west: number } | null,
   ) {
     if (!polygon || !bbox) {
-      setProject({ bboxStats: null, selectionPolygon: null });
+      areaLookupSeq.current += 1;
+      setProject({ bboxStats: null, selectionPolygon: null, bboxRows: [] });
+      setBuildingLoading(false);
       return;
     }
+    const reqId = ++areaLookupSeq.current;
     setBuildingLoading(true);
     try {
-      const stats = await api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west, polygon);
-      setProject({ bboxStats: stats, lookedUpBuilding: null, currentBbox: bbox, selectionPolygon: polygon });
+      const [stats, rows] = await Promise.all([
+        api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west, polygon),
+        api.buildingsBboxList(bbox.north, bbox.south, bbox.east, bbox.west, polygon),
+      ]);
+      if (reqId !== areaLookupSeq.current) return;
+      setProject({
+        bboxStats: { ...stats, count: rows.length, with_epc: rows.filter((r) => !!r.has_epc).length },
+        bboxRows: rows,
+        lookedUpBuilding: null,
+        lookedUpBuildings: [],
+        currentBbox: bbox,
+        selectionPolygon: polygon,
+      });
       try { localStorage.setItem('ppg_bbox', JSON.stringify(bbox)); } catch { /* ignore */ }
     } catch {
+      if (reqId !== areaLookupSeq.current) return;
       setProject({ bboxStats: null, selectionPolygon: null });
     } finally {
-      setBuildingLoading(false);
+      if (reqId === areaLookupSeq.current) setBuildingLoading(false);
     }
   }
 
@@ -223,6 +272,8 @@ export default function DefineProject() {
   );
 
   const scaleOptions = pt ? SCALE_OPTIONS_BY_TYPE[pt] : ["Building", "Neighborhood", "City"];
+  const disabledScales = new Set(["City"]);
+  const comingSoonScales = new Set(["City", "Portfolio"]);
 
   /* ── handlers ────────────────────────────────────────────────── */
 
@@ -284,7 +335,11 @@ export default function DefineProject() {
     const missing: string[] = [];
     if (!project.projectName.trim()) missing.push("a project name");
     if (!pt) missing.push("a project type");
-    if (!project.systemsInScope.length) missing.push("at least one system in scope");
+    if (pt === "Renovation Planning") {
+      if (!project.renovationEnvelopeComponents.length) missing.push("at least one renovation component");
+    } else if (!project.systemsInScope.length) {
+      missing.push("at least one system in scope");
+    }
     if (!project.explorationApproaches.length) missing.push("at least one exploration approach");
     if (!project.selectedKpis.length) missing.push("at least one KPI");
     if (!project.scale) missing.push("a project scale");
@@ -316,12 +371,13 @@ export default function DefineProject() {
   useEffect(() => {
     if (!triedContinue) return;
     const missing = getMissing();
+    setValidationErrors(missing);
     if (missing.length) setWizardNextError(`Add ${missing.join(", ")} to continue.`);
     else if (!locationValid) setWizardNextError("Pick a location inside the covered area to continue.");
     else setWizardNextError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triedContinue, project.projectName, project.systemsInScope, project.explorationApproaches,
-      project.selectedKpis, project.scale, project.ecEnergyFocus, locationValid, pt]);
+      project.selectedKpis, project.scale, project.ecEnergyFocus, project.renovationEnvelopeComponents, locationValid, pt]);
 
   // The wizard footer's Continue runs this page's validation + advance.
   useWizardStepNav({ onNext: handleContinue });
@@ -581,7 +637,7 @@ export default function DefineProject() {
         const nameMissing = validationErrors.includes("a project name") && !project.projectName.trim();
         return (
           <Card className="animate-fadeIn">
-            <Label>Project Name <span style={{ color: "#E2483B" }}>*</span></Label>
+            <Label required>Project Name</Label>
             <input
               type="text"
               value={project.projectName}
@@ -625,9 +681,7 @@ export default function DefineProject() {
       {pt === "Renovation Planning" && (
         <Card className="animate-fadeIn">
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.90)", marginBottom: 4 }}>
-              Renovation components
-            </div>
+            <Label required>Renovation components</Label>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.40)" }}>
               Select the building elements included in your assessment.
             </div>
@@ -979,14 +1033,27 @@ export default function DefineProject() {
           {scaleOptions.map((opt) => (
             <button
               key={opt}
-              onClick={() => setProject({ scale: opt, buildingUses: [] })}
+              onClick={() => {
+                if (disabledScales.has(opt)) return;
+                setProject({ scale: opt, buildingUses: [] });
+              }}
+              disabled={disabledScales.has(opt)}
               className={`px-4 py-2 rounded-lg text-sm font-medium border ${
                 project.scale === opt
                   ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
-                  : "bg-white border-gray-300 hover:border-gray-400"
+                  : disabledScales.has(opt)
+                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                    : "bg-white border-gray-300 hover:border-gray-400"
               }`}
             >
-              {opt === "Building" ? "Building(s)" : opt}
+              <span className="inline-flex items-center gap-2">
+                <span>{opt === "Building" ? "Building(s)" : opt}</span>
+                {comingSoonScales.has(opt) && (
+                  <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                    Soon
+                  </span>
+                )}
+              </span>
             </button>
           ))}
         </div>
@@ -1026,7 +1093,7 @@ export default function DefineProject() {
                 )}
                 {selectedDistrict ? (
                   <p className="text-xs text-emerald-700 mt-1">
-                    ✓ <span className="font-semibold">{selectedDistrict.name}</span> — all {selectedDistrict.count.toLocaleString()} buildings will be loaded in Step 2.
+                    ✓ <span className="font-semibold">{selectedDistrict.name}</span> — all {(selectedDistrictCount ?? selectedDistrict.count).toLocaleString()} buildings will be loaded in Step 2.
                   </p>
                 ) : (
                   <p className="text-xs text-gray-500 mt-1">Pick a Gothenburg neighborhood to auto-select every building within it.</p>
@@ -1058,13 +1125,13 @@ export default function DefineProject() {
               className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
               style={{ backgroundColor: "#11161d", color: "#fff" }}
             >
-              <option value="" style={{ backgroundColor: "#11161d", color: "#fff" }}>Select a property owner…</option>
+              <option value="" style={{ backgroundColor: "#11161d", color: "#fff" }}>Property-owner portfolios coming soon…</option>
               {PORTFOLIO_OWNERS.map((owner) => (
-                <option key={owner} value={owner} style={{ backgroundColor: "#11161d", color: "#fff" }}>{owner}</option>
+                <option key={owner} value={owner} disabled style={{ backgroundColor: "#11161d", color: "#7c8597" }}>{owner}</option>
               ))}
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Placeholder list — buildings will be mapped to their owner later; this scopes the portfolio to one owner.
+              Coming soon — the portfolio owner list is visible for preview, but owner selection is not enabled yet.
             </p>
           </div>
         )}
@@ -1075,7 +1142,7 @@ export default function DefineProject() {
         const nameMissing = validationErrors.includes("a project name") && !project.projectName.trim();
         return (
           <Card className="animate-fadeIn">
-            <Label>Project Name <span style={{ color: "#E2483B" }}>*</span></Label>
+            <Label required>Project Name</Label>
             <input
               type="text"
               value={project.projectName}
@@ -1096,7 +1163,21 @@ export default function DefineProject() {
       {/* ── LOCATION ── */}
       {/* District-by-name (SE neighborhood) selects buildings directly, so the
           bbox-draw map is redundant and hidden in that case. */}
-      {showLocation && !(project.scale === "Neighborhood" && isSweden && project.district) && (
+      {showLocation && project.scale === "Neighborhood" && (
+        <Card className="animate-fadeIn">
+          <Label>Project Location</Label>
+          <p className="text-sm text-white/65">
+            Neighborhood scale uses the neighborhood selection above, so address entry is not needed here.
+          </p>
+          <p className="text-xs text-white/45 mt-2">
+            {isSweden
+              ? "Pick a Gothenburg neighborhood above to load its buildings in Step 2."
+              : "Enter the neighborhood name above to define the project area."}
+          </p>
+        </Card>
+      )}
+
+      {showLocation && project.scale !== "Neighborhood" && !(project.scale === "Neighborhood" && isSweden && project.district) && (
         <Card className="animate-fadeIn">
           <Label>Project Location</Label>
           <LocationMap

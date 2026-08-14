@@ -77,6 +77,23 @@ function prepImage(file: File): Promise<Blob> {
   });
 }
 
+function readImageSize(blob: Blob): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const out = { width: img.naturalWidth, height: img.naturalHeight };
+      URL.revokeObjectURL(url);
+      resolve(out);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read uploaded image dimensions"));
+    };
+    img.src = url;
+  });
+}
+
 /** Draw an image + defect boxes onto a canvas, scaled to fit maxW × maxH. */
 function drawAnnotated(canvas: HTMLCanvasElement, img: HTMLImageElement, result: FacadeDetectResponse | null, maxW: number, maxH: number) {
   const scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
@@ -302,11 +319,42 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
     setImages(key, prev => prev.map(e => e.id === id ? { ...e, status: "running", error: null } : e));
     const t0 = performance.now();
     try {
-      const [ml, ai] = await Promise.all([
+      const [mlRes, aiRes] = await Promise.allSettled([
         api.facadeDetect(blob, threshold),
-        aiAssist ? api.facadeVision(blob, 0.3).catch(() => null) : Promise.resolve(null),
+        aiAssist ? api.facadeVision(blob, 0.3) : Promise.resolve(null),
       ]);
-      const result = mergeDetections(ml, ai);
+
+      let result: FacadeDetectResponse;
+      const mlOk = mlRes.status === "fulfilled";
+      const aiOk = aiRes.status === "fulfilled" && !!aiRes.value;
+
+      if (mlOk) {
+        const ai = aiOk ? aiRes.value : null;
+        result = mergeDetections(mlRes.value, ai);
+      } else if (aiOk && aiRes.value) {
+        // ML failed but AI still produced detections: keep the workflow alive.
+        const ai = aiRes.value;
+        const { width, height } = await readImageSize(blob);
+        const aiPx: FacadeDetection[] = (ai.detections ?? []).map((d) => ({
+          ...d,
+          source: "ai",
+          box: (ai.normalized
+            ? [d.box[0] * width, d.box[1] * height, d.box[2] * width, d.box[3] * height]
+            : d.box) as [number, number, number, number],
+        }));
+        result = {
+          detections: aiPx,
+          width,
+          height,
+          model: ai.model ?? "AI vision",
+          normalized: false,
+        } as FacadeDetectResponse;
+      } else {
+        const mlErr = mlRes.status === "rejected" ? (mlRes.reason instanceof Error ? mlRes.reason.message : String(mlRes.reason)) : "ML unavailable";
+        const aiErr = aiRes.status === "rejected" ? (aiRes.reason instanceof Error ? aiRes.reason.message : String(aiRes.reason)) : "AI unavailable";
+        throw new Error(`Detection failed: ${mlErr}. ${aiAssist ? aiErr : "AI assist disabled."}`);
+      }
+
       const ms = performance.now() - t0;
       setImages(key, prev => {
         const next = prev.map(e => e.id === id ? { ...e, status: "done" as const, result, ms } : e);

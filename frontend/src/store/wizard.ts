@@ -192,6 +192,10 @@ interface ProjectState {
      Only a lightweight summary is persisted (images stay in-component memory to keep
      sessionStorage small). */
   facadeDefects: Record<string, FacadeDefectSummary>;
+    /* Step 2 — prioritized shortlist carried to Step 3 baseline preselection.
+      Indices are relative to the Step-2 active building list order. */
+    prioritizedBuildingIndices: number[];
+    prioritizedBuildingCount: number;
   /* Step 4 — regret-based decision analysis (minimax regret / range / Hurwicz over
      retrofit options under future energy-price scenarios); rendered in the Step 5 report. */
   regretAnalysis: RegretResult | null;
@@ -269,6 +273,8 @@ const DEFAULT_PROJECT: ProjectState = {
   renovationBaselineResults: [],
   renovationSimResults: [],
   facadeDefects: {},
+  prioritizedBuildingIndices: [],
+  prioritizedBuildingCount: 0,
   regretAnalysis: null,
   heatingSystemId: "dh_keep",
   heatingAnalysis: null,

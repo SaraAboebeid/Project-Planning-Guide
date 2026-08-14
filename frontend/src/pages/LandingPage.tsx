@@ -321,7 +321,7 @@ export default function LandingPage() {
               </h1>
               <p className="text-[13px] text-white/50 leading-relaxed mb-7 max-w-[380px]">
                 A decision-support tool for building renovation planning — explore
-                real building and energy data and compare retrofit packages by
+                real building and energy data and compare renovation packages by
                 energy, cost, and carbon.
               </p>
 

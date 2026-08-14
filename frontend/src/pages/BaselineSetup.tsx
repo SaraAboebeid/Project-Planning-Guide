@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationBaselineResult } from "../store/wizard";
 import { api } from "../api/client";
@@ -91,14 +91,25 @@ export default function BaselineSetup() {
   // once the user starts (de)selecting. Lets you run all, or just a subset.
   const [selected, setSelected] = useState<Set<number> | null>(null);
   const allIdx = useMemo(() => new Set(buildings.map((_, i) => i)), [buildings]);
-  const effectiveSelected = selected ?? allIdx;
+  const prioritizedIdx = useMemo(() => {
+    const idx = project.prioritizedBuildingIndices ?? [];
+    const valid = idx.filter((i) => Number.isInteger(i) && i >= 0 && i < buildings.length);
+    return valid.length ? new Set(valid) : null;
+  }, [project.prioritizedBuildingIndices, buildings.length]);
+  const effectiveSelected = selected ?? prioritizedIdx ?? allIdx;
+  const carriesFromStep2 = selected == null && prioritizedIdx != null;
+
+  useEffect(() => {
+    setSelected(null);
+  }, [project.prioritizedBuildingIndices, buildings.length]);
+
   const runList = useMemo(
     () => buildings.filter((_, i) => effectiveSelected.has(i)),
     [buildings, effectiveSelected],
   );
   function toggleBuilding(i: number) {
     setSelected((prev) => {
-      const base = prev ?? new Set(allIdx);
+      const base = prev ?? new Set(effectiveSelected);
       const next = new Set(base);
       next.has(i) ? next.delete(i) : next.add(i);
       return next;
@@ -245,6 +256,11 @@ export default function BaselineSetup() {
               <button onClick={() => setSelected(null)}
                 style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
                   background: "rgba(78,205,196,0.12)", border: "1px solid rgba(78,205,196,0.35)", color: "#4ECDC4" }}>
+                Use Step 2 shortlist
+              </button>
+              <button onClick={() => setSelected(new Set(allIdx))}
+                style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
+                  background: "rgba(78,205,196,0.12)", border: "1px solid rgba(78,205,196,0.35)", color: "#4ECDC4" }}>
                 Select all
               </button>
               <button onClick={() => setSelected(new Set())}
@@ -254,6 +270,11 @@ export default function BaselineSetup() {
               </button>
             </span>
           </div>
+          {prioritizedIdx && (
+            <p style={{ fontSize: 11, color: carriesFromStep2 ? "#fcd34d" : "rgba(255,255,255,0.45)", margin: "0 0 10px" }}>
+              Step 2 flagged top priorities: {project.prioritizedBuildingCount || prioritizedIdx.size} building{(project.prioritizedBuildingCount || prioritizedIdx.size) === 1 ? "" : "s"}. These are the default buildings that will run baseline energy simulation in Step 3.
+            </p>
+          )}
           <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", margin: "0 0 10px" }}>
             Click a building to include or exclude it from the baseline run.
           </p>

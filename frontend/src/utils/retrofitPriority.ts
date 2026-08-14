@@ -36,7 +36,7 @@ export const CRITERION_LABELS: Record<CriterionKey, string> = {
   E: "Energy performance",
   F: "Façade / envelope condition",
   C: "Building characteristics",
-  R: "Retrofit potential",
+  R: "Renovation potential",
 };
 export const CRITERION_COLORS: Record<CriterionKey, string> = {
   E: "#E8880C", F: "#E2483B", C: "#4A90E2", R: "#2FB477",

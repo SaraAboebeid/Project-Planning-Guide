@@ -88,3 +88,9 @@ data/eubucco/
 # Runtime EPSM results DB (regenerated) + OS Open UPRN download (re-downloadable) — too large for git
 data/simulation_database.sqlite3
 data/os/openuprn_gb.zip
+
+# Generated apartment image downloads
+assets/boplats_images/
+boplats_images/
+frontend/public/boplats_images/
+

@@ -79,8 +79,6 @@ const LOCATION_MODES: {
 }[] = [
   { key: "addresses", label: "Address", icon: MapPin,
     desc: "Pin one or more specific buildings by address." },
-  { key: "area", label: "Street / Area", icon: Search,
-    desc: "Search a whole street or neighborhood — selects every building inside it." },
   { key: "bbox", label: "Draw box", icon: Square,
     desc: "Drag a rectangle on the map to grab everything inside it." },
   { key: "polygon", label: "Draw shape", icon: PenTool,
@@ -116,6 +114,49 @@ interface BboxCoords {
   east: number;
   west: number;
 }
+
+const MIN_BBOX_SPAN = 0.0004;
+
+function normalizeBbox(box: BboxCoords): BboxCoords {
+  let north = Math.max(box.north, box.south);
+  let south = Math.min(box.north, box.south);
+  let east = Math.max(box.east, box.west);
+  let west = Math.min(box.east, box.west);
+
+  if (north - south < MIN_BBOX_SPAN) {
+    const mid = (north + south) / 2;
+    north = mid + MIN_BBOX_SPAN / 2;
+    south = mid - MIN_BBOX_SPAN / 2;
+  }
+  if (east - west < MIN_BBOX_SPAN) {
+    const mid = (east + west) / 2;
+    east = mid + MIN_BBOX_SPAN / 2;
+    west = mid - MIN_BBOX_SPAN / 2;
+  }
+
+  return { north, south, east, west };
+}
+
+const _bboxCornerIcon = L.divIcon({
+  className: "",
+  html: '<div style="width:12px;height:12px;border-radius:9999px;background:#721CB8;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.35)"></div>',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+});
+
+const _bboxEdgeIcon = L.divIcon({
+  className: "",
+  html: '<div style="width:10px;height:10px;border-radius:9999px;background:#995BD5;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.30)"></div>',
+  iconSize: [10, 10],
+  iconAnchor: [5, 5],
+});
+
+const _bboxCenterIcon = L.divIcon({
+  className: "",
+  html: '<div style="width:14px;height:14px;border-radius:9999px;background:#14b8a6;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.35)"></div>',
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
 
 // ── Nominatim autocomplete hook ──────────────────────────────────────────────
 
@@ -266,6 +307,82 @@ function BboxDragHandler({
     },
   });
   return null;
+}
+
+function BboxEditHandles({
+  bbox,
+  onPreview,
+  onCommit,
+}: {
+  bbox: BboxCoords;
+  onPreview: (bbox: BboxCoords) => void;
+  onCommit: (bbox: BboxCoords) => void;
+}) {
+  const centerLat = (bbox.north + bbox.south) / 2;
+  const centerLng = (bbox.east + bbox.west) / 2;
+
+  const handles: Array<{
+    key: string;
+    lat: number;
+    lng: number;
+    icon: L.DivIcon;
+    move: (lat: number, lng: number) => BboxCoords;
+  }> = [
+    { key: "nw", lat: bbox.north, lng: bbox.west, icon: _bboxCornerIcon, move: (lat, lng) => ({ ...bbox, north: lat, west: lng }) },
+    { key: "n", lat: bbox.north, lng: centerLng, icon: _bboxEdgeIcon, move: (lat) => ({ ...bbox, north: lat }) },
+    { key: "ne", lat: bbox.north, lng: bbox.east, icon: _bboxCornerIcon, move: (lat, lng) => ({ ...bbox, north: lat, east: lng }) },
+    { key: "e", lat: centerLat, lng: bbox.east, icon: _bboxEdgeIcon, move: (_lat, lng) => ({ ...bbox, east: lng }) },
+    { key: "se", lat: bbox.south, lng: bbox.east, icon: _bboxCornerIcon, move: (lat, lng) => ({ ...bbox, south: lat, east: lng }) },
+    { key: "s", lat: bbox.south, lng: centerLng, icon: _bboxEdgeIcon, move: (lat) => ({ ...bbox, south: lat }) },
+    { key: "sw", lat: bbox.south, lng: bbox.west, icon: _bboxCornerIcon, move: (lat, lng) => ({ ...bbox, south: lat, west: lng }) },
+    { key: "w", lat: centerLat, lng: bbox.west, icon: _bboxEdgeIcon, move: (_lat, lng) => ({ ...bbox, west: lng }) },
+  ];
+
+  const previewHandlers = (move: (lat: number, lng: number) => BboxCoords) => ({
+    drag: (e: L.LeafletEvent) => {
+      const marker = e.target as L.Marker;
+      onPreview(normalizeBbox(move(marker.getLatLng().lat, marker.getLatLng().lng)));
+    },
+    dragend: (e: L.LeafletEvent) => {
+      const marker = e.target as L.Marker;
+      onCommit(normalizeBbox(move(marker.getLatLng().lat, marker.getLatLng().lng)));
+    },
+  });
+
+  return (
+    <>
+      {handles.map((h) => (
+        <Marker
+          key={h.key}
+          position={[h.lat, h.lng]}
+          icon={h.icon}
+          draggable
+          eventHandlers={previewHandlers(h.move)}
+        />
+      ))}
+      <Marker
+        position={[centerLat, centerLng]}
+        icon={_bboxCenterIcon}
+        draggable
+        eventHandlers={{
+          drag: (e: L.LeafletEvent) => {
+            const marker = e.target as L.Marker;
+            const { lat, lng } = marker.getLatLng();
+            const halfH = (bbox.north - bbox.south) / 2;
+            const halfW = (bbox.east - bbox.west) / 2;
+            onPreview({ north: lat + halfH, south: lat - halfH, east: lng + halfW, west: lng - halfW });
+          },
+          dragend: (e: L.LeafletEvent) => {
+            const marker = e.target as L.Marker;
+            const { lat, lng } = marker.getLatLng();
+            const halfH = (bbox.north - bbox.south) / 2;
+            const halfW = (bbox.east - bbox.west) / 2;
+            onCommit({ north: lat + halfH, south: lat - halfH, east: lng + halfW, west: lng - halfW });
+          },
+        }}
+      />
+    </>
+  );
 }
 
 // ── Polygon (any-shape) draw handler: click to add each vertex ──────────────
@@ -478,10 +595,42 @@ export default function LocationMap({
   const [bbox, setBbox] = useState<BboxCoords | null>(null);
   const [bboxPreview, setBboxPreview] = useState<BboxCoords | null>(null);
   const [bboxDone, setBboxDone] = useState(false);
+  const [bboxRedrawMode, setBboxRedrawMode] = useState(false);
 
   // Free-form polygon vertices ([lat, lng] for Leaflet); done = closed & applied
   const [polyVerts, setPolyVerts] = useState<LatLngTuple[]>([]);
   const [polyDone, setPolyDone] = useState(false);
+
+  function switchLocationMode(next: LocationMode) {
+    if (next === locationMode) return;
+    setLocationMode(next);
+
+    // Keep whichever mode the user chose as the only active location source.
+    if (next === "bbox") {
+      setAreaLabel(null);
+      setPolyVerts([]);
+      setPolyDone(false);
+      onPolygonChange?.(null, null);
+      setBbox(null);
+      setBboxPreview(null);
+      setBboxDone(false);
+      setBboxRedrawMode(false);
+      onBboxChange?.(null);
+      onAddressChange("");
+      onPointsChange?.([]);
+    }
+
+    if (next === "polygon") {
+      setAreaLabel(null);
+      setBbox(null);
+      setBboxPreview(null);
+      setBboxDone(false);
+      setBboxRedrawMode(false);
+      onBboxChange?.(null);
+      onAddressChange("");
+      onPointsChange?.([]);
+    }
+  }
 
   // Reset when scale changes
   useEffect(() => {
@@ -491,6 +640,7 @@ export default function LocationMap({
     setBbox(null);
     setBboxPreview(null);
     setBboxDone(false);
+    setBboxRedrawMode(false);
     setPolyVerts([]);
     setPolyDone(false);
     setAreaLabel(null);
@@ -571,6 +721,7 @@ export default function LocationMap({
     setBbox(box);
     setBboxPreview(null);
     setBboxDone(true);
+    setBboxRedrawMode(false);
     setAreaLabel(r.display_name.split(",").slice(0, 2).join(",").trim());
     onBboxChange?.(box);
     onPolygonChange?.(null, null);
@@ -636,13 +787,15 @@ export default function LocationMap({
     if (done) {
       setBboxDone(true);
       if (preview) {
-        setBbox(preview);
+        const next = normalizeBbox(preview);
+        setBbox(next);
+        setBboxRedrawMode(false);
         onAddressChange(
-          `BBOX: N${preview.north.toFixed(4)} S${preview.south.toFixed(4)} E${preview.east.toFixed(4)} W${preview.west.toFixed(4)}`
+          `BBOX: N${next.north.toFixed(4)} S${next.south.toFixed(4)} E${next.east.toFixed(4)} W${next.west.toFixed(4)}`
         );
         // Notify parent with the raw bbox so it can query ALL buildings inside it;
         // clear any single-building points so the two modes don't conflict.
-        onBboxChange?.(preview);
+        onBboxChange?.(next);
         onPointsChange?.([]);
       } else {
         // trivial drag — keep existing box
@@ -650,6 +803,17 @@ export default function LocationMap({
     } else {
       setBboxDone(false);
     }
+  }
+
+  function commitBboxEdit(next: BboxCoords) {
+    const box = normalizeBbox(next);
+    setBbox(box);
+    setBboxPreview(null);
+    setBboxDone(true);
+    setBboxRedrawMode(false);
+    onAddressChange(`BBOX: N${box.north.toFixed(4)} S${box.south.toFixed(4)} E${box.east.toFixed(4)} W${box.west.toFixed(4)}`);
+    onBboxChange?.(box);
+    onPointsChange?.([]);
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -684,7 +848,7 @@ export default function LocationMap({
               return (
                 <button
                   key={m.key}
-                  onClick={() => setLocationMode(m.key)}
+                  onClick={() => switchLocationMode(m.key)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                     active
                       ? "bg-white text-navy shadow-sm border border-gray-200"
@@ -739,7 +903,7 @@ export default function LocationMap({
 
       {/* Address inputs — the default for every scale; at Building(s) they hide
           when the user switches to a draw mode. */}
-      {(!isBuilding || locationMode === "addresses") && (
+      {scale !== "Neighborhood" && scale !== "Portfolio" && (!isBuilding || locationMode === "addresses") && (
         <div className="space-y-2">
           {addressInputs.map((addr, i) => (
             <div key={i} className="flex gap-2 items-start">
@@ -790,21 +954,38 @@ export default function LocationMap({
           <span>🖱️</span>
           <span>
             {bboxDone
-              ? "Area drawn. Click and drag on the map to redraw."
+              ? "Area drawn. Drag handles to resize, drag the center to move, or click Redraw to draw a new box."
               : "Click and drag on the map to draw your area."}
           </span>
           {bboxDone && (
-            <button
-              onClick={() => {
-                setBbox(null);
-                setBboxPreview(null);
-                setBboxDone(false);
-                onAddressChange("");
-              }}
-              className="ml-auto text-xs text-teal hover:underline whitespace-nowrap"
-            >
-              Clear
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  setBbox(null);
+                  setBboxPreview(null);
+                  setBboxDone(false);
+                  setBboxRedrawMode(true);
+                  onBboxChange?.(null);
+                  onAddressChange("");
+                }}
+                className="ml-auto text-xs text-teal hover:underline whitespace-nowrap"
+              >
+                Redraw
+              </button>
+              <button
+                onClick={() => {
+                  setBbox(null);
+                  setBboxPreview(null);
+                  setBboxDone(false);
+                  setBboxRedrawMode(false);
+                  onBboxChange?.(null);
+                  onAddressChange("");
+                }}
+                className="text-xs text-white/70 hover:underline whitespace-nowrap"
+              >
+                Clear
+              </button>
+            </>
           )}
         </div>
       )}
@@ -868,21 +1049,30 @@ export default function LocationMap({
             ))}
 
           {/* Bbox drag-draw handler */}
-          {isBuilding && locationMode === "bbox" && (
+          {isBuilding && locationMode === "bbox" && (!bboxDone || bboxRedrawMode) && (
             <BboxDragHandler onDraw={handleBboxDraw} />
           )}
 
           {/* Bounding box rectangle */}
           {bboxBounds && (
-            <Rectangle
-              bounds={bboxBounds}
-              pathOptions={{
-                color: "#721CB8",
-                weight: 2,
-                fillColor: "#995BD5",
-                fillOpacity: 0.12,
-              }}
-            />
+            <>
+              <Rectangle
+                bounds={bboxBounds}
+                pathOptions={{
+                  color: "#721CB8",
+                  weight: 2,
+                  fillColor: "#995BD5",
+                  fillOpacity: 0.12,
+                }}
+              />
+              {isBuilding && locationMode === "bbox" && bboxDone && bbox && !bboxRedrawMode && (
+                <BboxEditHandles
+                  bbox={bbox}
+                  onPreview={(next) => setBbox(normalizeBbox(next))}
+                  onCommit={commitBboxEdit}
+                />
+              )}
+            </>
           )}
 
           {/* Free-form polygon: click handler + shape + vertex dots */}

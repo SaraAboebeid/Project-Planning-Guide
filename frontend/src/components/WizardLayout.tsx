@@ -90,12 +90,16 @@ function SideNavItem({
   active?: boolean;
   onClick?: () => void;
 }) {
+  const clickable = !!onClick;
   return (
     <button onClick={onClick} title={title ?? label}
-            className={`group flex flex-col items-center gap-1 w-full py-2.5 rounded-lg transition-all cursor-pointer border-0 ${
+            disabled={!clickable}
+            className={`group flex flex-col items-center gap-1 w-full py-2.5 rounded-lg transition-all border-0 ${
               active
                 ? "bg-white/12 text-white"
-                : "text-white/40 hover:text-white/80 hover:bg-white/8"
+                : clickable
+                  ? "text-white/40 hover:text-white/80 hover:bg-white/8 cursor-pointer"
+                  : "text-white/20 cursor-not-allowed opacity-60"
             }`}>
       <Icon d={iconD} size={19} />
       <span className="text-[9px] tracking-wide font-medium leading-none text-center px-0.5">{label}</span>
@@ -174,13 +178,31 @@ export default function WizardLayout() {
   const canNext = useWizardCanNext();
   const nextError = useWizardNextError();
   const location = useLocation();
-  const { steps, project } = useWizardStore();
+  const { steps, project, currentStep, setStep } = useWizardStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const stepIndex = steps.findIndex((s) => s.path === location.pathname);
   const safeIndex = stepIndex < 0 ? 0 : stepIndex;
   const activeStep = steps[safeIndex]!;
   const isLastStep = safeIndex === steps.length - 1;
+  const highestUnlockedStep = Math.max(1, currentStep);
+
+  useEffect(() => {
+    // Keep future steps locked, but allow normal sequential progression
+    // (e.g. Step 2 -> Step 3 via Continue) to unlock the next step.
+    if (activeStep.number > highestUnlockedStep + 1) {
+      navigate(steps[highestUnlockedStep - 1]!.path, { replace: true });
+      return;
+    }
+    if (activeStep.number > currentStep) {
+      setStep(activeStep.number);
+    }
+  }, [activeStep.number, currentStep, highestUnlockedStep, navigate, setStep, steps]);
+
+  function goToStep(stepNumber: number, path: string) {
+    if (stepNumber > highestUnlockedStep) return;
+    navigate(path);
+  }
 
   // Arrival splash on the final step (Report): a full-screen message appears with
   // a confetti burst, then fades out to reveal the report behind it.
@@ -272,7 +294,7 @@ export default function WizardLayout() {
             label={`Step ${step.number}`}
             title={step.label}
             active={location.pathname === step.path}
-            onClick={() => navigate(step.path)}
+            onClick={step.number <= highestUnlockedStep ? () => goToStep(step.number, step.path) : undefined}
           />
         ))}
 

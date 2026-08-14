@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useWizardStore } from "../store/wizard";
 import { api } from "../api/client";
+import { setWizardCanNext, setWizardNextError } from "../components/wizardNav";
 import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import FacadeDefectPanel, { type FacadeBuilding } from "../components/FacadeDefectPanel";
 import RetrofitPriorityPanel from "../components/RetrofitPriorityPanel";
@@ -970,9 +971,11 @@ function BboxDataBanner({
   const [tableSort, setTableSort]     = useState<{ key: keyof BuildingRecord; asc: boolean } | null>(null);
   const [importMsg, setImportMsg]     = useState<string | null>(null);
   const [fillMissingOnly, setFillMissingOnly] = useState(false);
-  const [addOpen, setAddOpen]         = useState(false);   // paste-JSON/CSV panel
+  const [addOpen, setAddOpen]         = useState(false);   // guided add-data panel
+  const [showPaste, setShowPaste]     = useState(false);
   const [pasteText, setPasteText]     = useState("");
   const [editing, setEditing]         = useState(false);   // inline table cell editing
+  const [editDraftRows, setEditDraftRows] = useState<BuildingRecord[] | null>(null);
   // Current heating system per building (from the Boverket EPC), keyed by address.
   const [heating, setHeating]         = useState<Record<string, { system: string } | null>>({});
   const PAGE_SIZE = 50;
@@ -1137,10 +1140,41 @@ function BboxDataBanner({
     catch (e) { setImportMsg("Import failed: " + (e as Error).message); }
   }
 
+  function downloadTemplateCsv() {
+    const header = "Address,Year,Energy (kWh/m²),U-Wall,Floors";
+    const sample = "Herkulesgatan 38,1968,126,0.42,6";
+    const blob = new Blob([`${header}\n${sample}\n`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "building_data_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function startEditMode() {
+    if (!rows) return;
+    setEditDraftRows(rows.map((r) => ({ ...r })));
+    setEditing(true);
+    setAddOpen(false);
+  }
+
+  function cancelEditMode() {
+    setEditing(false);
+    setEditDraftRows(null);
+  }
+
+  function saveEditMode() {
+    if (editDraftRows) setRows(editDraftRows);
+    setEditing(false);
+    setEditDraftRows(null);
+    setImportMsg("✓ Table edits saved for this session.");
+  }
+
   // Inline table editing: write one cell back into its row (numeric fields coerced,
   // empty → null). Same rows state → same downstream propagation as an import.
   function updateCell(globalIdx: number, field: keyof BuildingRecord, raw: string) {
-    setRows(prev => {
+    setEditDraftRows(prev => {
       if (!prev) return prev;
       const next = prev.slice();
       const r: Record<string, unknown> = { ...next[globalIdx] };
@@ -1165,7 +1199,8 @@ function BboxDataBanner({
   // scrambling which buildings are selected.
   const orderedRows: { r: BuildingRecord; idx: number }[] = rows
     ? (() => {
-        const withIdx = rows.map((r, idx) => ({ r, idx }));
+        const srcRows = editing ? (editDraftRows ?? rows) : rows;
+        const withIdx = srcRows.map((r, idx) => ({ r, idx }));
         if (tableSort) withIdx.sort((a, b) => sortByCol(a.r, b.r, tableSort.key, tableSort.asc));
         return withIdx;
       })()
@@ -1210,7 +1245,10 @@ function BboxDataBanner({
 
   // Build ranked compare list
   const cfg         = (COMPARE_COLS.find(c => c.key === sortCol) ?? COMPARE_COLS[0])!;
-  const selectedRows = rows ? [...selected].map(i => ({ i, r: rows[i] })).filter((x): x is { i: number; r: BuildingRecord } => x.r !== undefined) : [];
+  const baseRowsForSelection = editing ? (editDraftRows ?? rows ?? []) : (rows ?? []);
+  const selectedRows = baseRowsForSelection.length
+    ? [...selected].map(i => ({ i, r: baseRowsForSelection[i] })).filter((x): x is { i: number; r: BuildingRecord } => x.r !== undefined)
+    : [];
   const rankedRows   = [...selectedRows].sort((a, b) => sortByCol(a.r, b.r, sortCol, cfg.asc));
 
   return (
@@ -1221,11 +1259,8 @@ function BboxDataBanner({
           <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
           <div>
             <span className="text-sm font-bold text-white/85">{bboxStats.count.toLocaleString()} buildings</span>
-            <span className="text-xs text-white/35 ml-2">Bounding box · EUBUCCO</span>
+            <span className="text-xs text-white/35 ml-2">Bounding box</span>
           </div>
-          <span className="px-2 py-0.5 rounded-md bg-emerald-900/40 text-emerald-400 text-[10px] font-semibold border border-emerald-700/50 shrink-0">
-            {epcPct}% EPC
-          </span>
         </div>
         <div className="flex items-center gap-1 shrink-0 ml-3">
           <button
@@ -1242,26 +1277,38 @@ function BboxDataBanner({
           >
             <Download className="w-3 h-3" /> Export
           </button>
-          <label
-            title="Upload your own CSV or JSON to overwrite or fill missing data — matched to these buildings by Address or Cadastral ID"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 whitespace-nowrap transition cursor-pointer"
-          >
-            <Upload className="w-3 h-3" /> Import
-            <input
-              type="file" accept=".csv,.json,text/csv,application/json"
-              style={{ display: "none" }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.currentTarget.value = ""; }}
-            />
-          </label>
           <button
             onClick={() => setAddOpen(o => !o)}
-            title="Add or edit data: paste CSV/JSON, or edit the table cells directly"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold whitespace-nowrap transition ring-1 ${addOpen
-              ? "bg-violet-600 text-white ring-violet-400 shadow-lg shadow-violet-900/40"
-              : "bg-violet-600/20 text-violet-200 ring-violet-500/60 hover:bg-violet-600/35 hover:text-white"}`}
+            title="Open guided add-data panel: template, upload, paste, and formatting help"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 whitespace-nowrap transition"
           >
-            <Plus className="w-3.5 h-3.5" /> Add / Edit
+            <Plus className="w-3.5 h-3.5" /> Add Data
           </button>
+          {!editing ? (
+            <button
+              onClick={startEditMode}
+              disabled={!rows || loading}
+              title="Edit the current table values and save them for this session"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/60 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
+            >
+              <Pencil className="w-3 h-3" /> Edit Table
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={saveEditMode}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold bg-emerald-700/30 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-700/45 whitespace-nowrap transition"
+              >
+                Save changes
+              </button>
+              <button
+                onClick={cancelEditMode}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 whitespace-nowrap transition"
+              >
+                Cancel
+              </button>
+            </>
+          )}
           <a
             href={viewer3dUrl}
             target="_blank" rel="noopener noreferrer"
@@ -1321,50 +1368,106 @@ function BboxDataBanner({
         </div>
       </div>
 
-      {/* Import your own data — overwrite or fill gaps for these buildings */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2 border-t border-white/8 text-[11px]">
-        <span className="flex items-center gap-1.5 text-white/40"><Upload className="w-3 h-3" /> Add your own data via <b className="text-white/60">Import</b> (CSV/JSON, matched by Address / Cadastral ID)</span>
-        <label className="flex items-center gap-1.5 text-white/45 cursor-pointer select-none" title="When on, only blank fields are filled; existing values are kept unchanged.">
-          <input type="checkbox" checked={fillMissingOnly} onChange={e => setFillMissingOnly(e.target.checked)} className="w-3 h-3 accent-violet-600 cursor-pointer" />
-          Fill missing only
-        </label>
-        {importMsg && (
-          <span className={`ml-auto ${importMsg.startsWith("✓") ? "text-emerald-400" : importMsg.startsWith("⚠") ? "text-amber-400" : importMsg.startsWith("Import failed") ? "text-red-400" : "text-white/40"}`}>
+      {importMsg && (
+        <div className="px-4 py-2 border-t border-white/8 text-[11px]">
+          <span className={`${importMsg.startsWith("✓") ? "text-emerald-400" : importMsg.startsWith("⚠") ? "text-amber-400" : importMsg.startsWith("Import failed") ? "text-red-400" : "text-white/40"}`}>
             {importMsg}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Add / edit panel — inline cell editing + paste CSV/JSON */}
+      {/* Guided add-data modal */}
       {addOpen && (
-        <div className="border-t border-white/8 bg-white/[0.02] px-4 py-3 space-y-2.5">
-          <div className="text-[10px] text-white/40 bg-violet-950/20 border border-violet-800/30 rounded-md px-2.5 py-1.5 leading-relaxed">
-            <b className="text-violet-300">Where do my edits go?</b> Changes are kept in <b className="text-white/60">your browser session</b> and
-            become the numbers Steps 3–4 (simulation &amp; results) use. They are <b className="text-white/60">not written back</b> to the
-            cadastral / EUBUCCO / EPC source data, and don&apos;t affect other users. Closing the tab clears them.
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4">
+          <div className="w-full max-w-3xl rounded-xl border border-white/12 bg-[#0d1117] shadow-2xl shadow-black/60">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+              <div>
+                <div className="text-sm font-semibold text-white/90">Add Data</div>
+                <div className="text-[11px] text-white/45">Import CSV/JSON with a clear guided flow</div>
+              </div>
+              <button
+                onClick={() => setAddOpen(false)}
+                className="px-2 py-1 rounded text-white/45 hover:text-white/80 hover:bg-white/10 transition"
+                title="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-4 py-3 space-y-3">
+              <div className="text-[10px] text-white/40 bg-violet-950/20 border border-violet-800/30 rounded-md px-2.5 py-1.5 leading-relaxed">
+                <b className="text-violet-300">Where do my edits go?</b> Changes are kept in <b className="text-white/60">your browser session</b> and
+                become the numbers Steps 3–4 (simulation &amp; results) use. They are <b className="text-white/60">not written back</b> to the
+                cadastral / EUBUCCO / EPC source data, and don&apos;t affect other users. Closing the tab clears them.
+              </div>
+
+              <div className="text-[11px] text-white/65">
+                1. Download a template or open the format guide.
+                2. Import your CSV/JSON file.
+                3. Use Edit Table outside this dialog if you prefer direct cell editing.
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={downloadTemplateCsv}
+                  className="px-3 py-1.5 rounded-md text-[11px] font-semibold bg-white/8 text-white/75 hover:bg-white/12 transition"
+                >
+                  Download CSV template
+                </button>
+                <label
+                  title="Upload your own CSV or JSON to overwrite or fill missing data — matched by Address or Cadastral ID"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold text-violet-200 bg-violet-600/20 ring-1 ring-violet-500/60 hover:bg-violet-600/35 hover:text-white whitespace-nowrap transition cursor-pointer"
+                >
+                  <Upload className="w-3 h-3" /> Drop / choose file
+                  <input
+                    type="file" accept=".csv,.json,text/csv,application/json"
+                    style={{ display: "none" }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.currentTarget.value = ""; }}
+                  />
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  onClick={() => setShowPaste(v => !v)}
+                  className="text-[11px] font-medium text-violet-300 hover:text-violet-200 transition"
+                >
+                  {showPaste ? "Hide manual paste" : "Paste data manually"}
+                </button>
+                <ImportFormatGuide />
+              </div>
+
+              {showPaste && (
+                <>
+                  <div className="text-[10px] text-white/35">Paste CSV / JSON (same columns as Export; rows matched by Address / Cadastral ID):</div>
+                  <textarea
+                    value={pasteText}
+                    onChange={e => setPasteText(e.target.value)}
+                    placeholder={'Address,Energy (kWh/m²),U-Wall\nHerkulesgatan 38,90,0.30\n\n— or —\n[{"address":"Herkulesgatan 38","energy_kwh_m2":90,"u_wall":0.30}]'}
+                    rows={6}
+                    className="w-full rounded-md bg-[#0d1117] border border-white/12 px-3 py-2 text-[11px] text-white/80 font-mono resize-y focus:outline-none focus:border-violet-500/60"
+                  />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => applyImportText(pasteText, "pasted data")}
+                      disabled={!pasteText.trim()}
+                      className="px-3 py-1.5 rounded-md text-[11px] font-semibold bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition"
+                    >Apply pasted data</button>
+                    <button onClick={() => setPasteText("")} className="px-3 py-1.5 rounded-md text-[11px] text-white/45 hover:bg-white/8 transition">Clear</button>
+                  </div>
+                </>
+              )}
+
+              <div className="flex justify-end pt-1">
+                <button
+                  onClick={() => setAddOpen(false)}
+                  className="px-3 py-1.5 rounded-md text-[11px] font-medium text-white/60 hover:bg-white/8 transition"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
           </div>
-          <label className="flex items-center gap-2 text-[11px] text-white/65 cursor-pointer select-none w-fit">
-            <input type="checkbox" checked={editing} onChange={e => setEditing(e.target.checked)} className="w-3.5 h-3.5 accent-violet-600 cursor-pointer" />
-            <Pencil className="w-3 h-3" /> Edit table cells directly — click any cell below and type (numbers are parsed, blank clears)
-          </label>
-          <div className="text-[10px] text-white/35">Or paste CSV / JSON (same columns as Export; rows matched by Address / Cadastral ID):</div>
-          <textarea
-            value={pasteText}
-            onChange={e => setPasteText(e.target.value)}
-            placeholder={'Address,Energy (kWh/m²),U-Wall\nHerkulesgatan 38,90,0.30\n\n— or —\n[{"address":"Herkulesgatan 38","energy_kwh_m2":90,"u_wall":0.30}]'}
-            rows={5}
-            className="w-full rounded-md bg-[#0d1117] border border-white/12 px-3 py-2 text-[11px] text-white/80 font-mono resize-y focus:outline-none focus:border-violet-500/60"
-          />
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => applyImportText(pasteText, "pasted data")}
-              disabled={!pasteText.trim()}
-              className="px-3 py-1.5 rounded-md text-[11px] font-semibold bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition"
-            >Apply pasted data</button>
-            <button onClick={() => setPasteText("")} className="px-3 py-1.5 rounded-md text-[11px] text-white/45 hover:bg-white/8 transition">Clear</button>
-            <span className="text-[10px] text-white/30 ml-1">Respects the “Fill missing only” toggle above.</span>
-          </div>
-          <ImportFormatGuide />
         </div>
       )}
 
@@ -1983,6 +2086,12 @@ export default function DataCoverage() {
   const bboxStats  = project.bboxStats ?? null;
   const isMulti    = buildings.length > 1;
 
+  // Step 2 should never inherit a disabled Continue button from Step 1.
+  useEffect(() => {
+    setWizardCanNext(true);
+    setWizardNextError(null);
+  }, []);
+
   // Façade defect detection is only shown when the walls are part of the
   // renovation scope picked in Step 1 (defects live on the wall surface). With
   // no components chosen yet, the default scope includes walls — mirrors Step 4.
@@ -2017,12 +2126,20 @@ export default function DataCoverage() {
       return;
     }
 
-    // Re-run bbox stats when bbox exists but stats are empty
+    // Re-run bbox rows/stats when bbox exists but stats are empty.
+    // Use the list endpoint so counts match the table and downstream selection.
     if (bbox && !bboxStats && pts.length === 0) {
       (async () => {
         try {
-          const stats = await api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west);
-          setProject({ bboxStats: stats });
+          const rows = await api.buildingsBboxList(
+            bbox.north,
+            bbox.south,
+            bbox.east,
+            bbox.west,
+            project.selectionPolygon ?? undefined,
+          );
+          setBboxRows(rows);
+          setProject({ bboxRows: rows, bboxStats: deriveStats(rows) });
         } catch { /* backend still not ready — silent */ }
       })();
     }
@@ -2035,7 +2152,7 @@ export default function DataCoverage() {
   );
 
   // Bbox table rows + selection (lifted from BboxDataBanner)
-  const [bboxRows, setBboxRows]               = useState<BuildingRecord[]>([]);
+  const [bboxRows, setBboxRows]               = useState<BuildingRecord[]>(project.bboxRows ?? []);
   const [bboxSelectedIdx, setBboxSelectedIdx] = useState<Set<number>>(new Set());
 
   // Active rows: the buildings the user CHECKED (or all bbox rows if none are
@@ -2047,8 +2164,13 @@ export default function DataCoverage() {
     return bboxRows;
   }, [bboxRows, bboxSelectedIdx]);
 
-  // Persist the SELECTED buildings downstream (Steps 3-4 read project.bboxRows).
-  useEffect(() => { setProject({ bboxRows: activeCovRows }); }, [activeCovRows]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Persist the SELECTED buildings downstream (Steps 3-4 read project.bboxRows),
+  // but don't transiently overwrite Step 1's carried rows with an empty list
+  // while Step 2 is still fetching its table data.
+  useEffect(() => {
+    if (!bboxRows.length) return;
+    setProject({ bboxRows: activeCovRows });
+  }, [bboxRows, activeCovRows, setProject]);
 
   // Buildings in scope for the facade-defect panel: the selected coverage rows
   // (canonical carried-forward set), falling back to single/multi address lookups.
@@ -2194,13 +2316,11 @@ export default function DataCoverage() {
       <div>
         <h2 className="text-2xl font-bold text-white">Building &amp; Site Data</h2>
         <p className="text-sm text-white/45 mt-1">
-          See what&apos;s known about each building and what&apos;s missing, then choose which buildings to carry into the
-          analysis. An empty cell is simply a value that doesn&apos;t exist for that building — fill or correct any of them
-          with <b className="text-violet-300">＋ Add / Edit</b> (or paste your own CSV/JSON); your edits stay in this session
-          and feed the later steps, and the underlying data is never changed.
+          Review the available data, fill any gaps with <b className="text-violet-300">＋ Add / Edit</b> or your own CSV/JSON,
+          and choose which buildings to include. Your edits stay in this session and do not change the source data.
           {wallsInScope
-            ? " Upload façade photos to automatically detect defects, then the buildings are ranked by retrofit priority — energy performance, façade condition and upgrade potential."
-            : " The buildings are ranked by retrofit priority from their energy performance and upgrade potential."}
+            ? " Upload façade photos to detect defects and rank buildings by energy performance, façade condition and upgrade potential."
+            : " Buildings are ranked by energy performance and upgrade potential."}
         </p>
       </div>
 
