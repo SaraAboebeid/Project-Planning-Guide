@@ -15,7 +15,6 @@ import StepScenarios from "./pages/StepScenarios";
 import ResultsBudget from "./pages/ResultsBudget";
 import RenovationReport from "./pages/RenovationReport";
 import DataExplorer from "./pages/DataExplorer";
-import Timeline from "./pages/Timeline";
 import Budget from "./pages/Budget";
 import AnalysisTools from "./pages/AnalysisTools";
 import SampleReports from "./pages/SampleReports";

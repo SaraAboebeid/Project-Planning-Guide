@@ -146,7 +146,13 @@ export default function DataLayout({
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         <TopBar />
 
-        <main style={{ flex: 1, overflowY: "auto", padding: "24px" }}>{children}</main>
+        <main style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.3, textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>{title}</span>
+            <span style={{ padding: "4px 8px", borderRadius: 999, background: accentColor, color: "#0b1220", fontSize: 10, fontWeight: 800, letterSpacing: 0.8 }}>{accentBadge}</span>
+          </div>
+          {children}
+        </main>
       </div>
     </div>
   );

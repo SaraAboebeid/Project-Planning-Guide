@@ -49,6 +49,7 @@ export default function TopBar({
   const country: CountryCode =
     countryProp ?? (location.pathname === "/" ? countryCodeFromName(project.country) : countryFromPath(location.pathname));
   const countryDef = COUNTRIES.find((c) => c.id === country) ?? COUNTRIES[0];
+  const safeCountryDef = countryDef ?? COUNTRIES[0];
   const _city = cityProp ?? project.city ?? defaultCityFor(country);
   const city = cityEnabled(country, _city) ? _city : defaultCityFor(country);
 
@@ -165,11 +166,11 @@ export default function TopBar({
           })}
         </div>
 
-        {countryDef.cities.length > 0 && (
+        {safeCountryDef.cities.length > 0 && (
           <>
             <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 12, margin: "0 2px" }}>›</span>
             <div style={pill}>
-              {countryDef.cities.map((name) => {
+              {safeCountryDef.cities.map((name) => {
                 const enabled = cityEnabled(country, name);
                 return (
                 <button

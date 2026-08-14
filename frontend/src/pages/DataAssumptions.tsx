@@ -3,7 +3,7 @@ import { useWizardStore } from "../store/wizard";
 import {
   CheckCircle2, AlertTriangle, XCircle,
   ChevronDown, ChevronUp, Database,
-  FileText, Layers, Zap, TrendingUp, Activity, Info, ArrowRight, MapPin, Hammer,
+  FileText, Layers, Zap, TrendingUp, Activity, Info, MapPin, Hammer,
 } from "lucide-react";
 import BuildingMapPanel from "../components/panels/BuildingMap";
 import SensitivityPanel from "../components/panels/SensitivityPanel";
@@ -176,20 +176,7 @@ export default function DataAssumptions() {
     () => (isRenovation ? getImportanceRanking().slice(0, 6) : []),
     [isRenovation]
   );
-  const crossRefs = useMemo(() => {
-    if (!isRenovation || !hasStep2) return [];
-    return saRanking
-      .map(r => {
-        const bridge = SA_BRIDGE[r.key];
-        if (!bridge) return null;
-        const isGap = bridge.keys.some(k => {
-          const item = project.dataInputs[k];
-          return item && !item.available;
-        });
-        return isGap ? { label: r.label, dataLabel: bridge.dataLabel, pct: r.pct } : null;
-      })
-      .filter((x): x is { label: string; dataLabel: string; pct: number } => x !== null);
-  }, [isRenovation, hasStep2, saRanking, project.dataInputs]);
+  void saRanking;
 
   /* ── Overall confidence % ── */
   const confPct = total > 0

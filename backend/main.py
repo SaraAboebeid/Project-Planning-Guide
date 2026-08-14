@@ -861,6 +861,7 @@ def buildings_bbox_stats(
     }
 _DISTRICTS_CACHE: dict | None = None
 _GBG_BOUNDARY_CACHE: dict | None = None
+_DISTRICT_BOUNDARY_CACHE: dict[str, dict] = {}
 
 
 @app.get("/api/districts")
@@ -947,6 +948,55 @@ def gothenburg_boundary():
             "geometry": mapping(merged),
         }
     return _GBG_BOUNDARY_CACHE
+
+
+@app.get("/api/se/district-boundary")
+def district_boundary(name: str = Query(..., min_length=1)):
+    """Boundary polygon for one Gothenburg primärområde by name.
+
+    Used by Step 1 to highlight the selected district on the map.
+    """
+    global _DISTRICT_BOUNDARY_CACHE
+    key = name.strip().casefold()
+    if not key:
+        raise HTTPException(422, "District name is required")
+    if key in _DISTRICT_BOUNDARY_CACHE:
+        return _DISTRICT_BOUNDARY_CACHE[key]
+
+    path = PROJECT_ROOT / "data" / "districts" / "gbg_primaromraden.geojson"
+    if not path.exists():
+        raise HTTPException(404, "District boundary data not found")
+
+    fc = json.loads(path.read_text(encoding="utf-8"))
+    feats = fc.get("features", [])
+    if not feats:
+        raise HTTPException(500, "No district boundary geometries")
+
+    # Preferred field in this dataset is PRIMÄRNAMN, but keep a fallback for
+    # future schema variations.
+    def _name_of(props: dict) -> str:
+        if not isinstance(props, dict):
+            return ""
+        if isinstance(props.get("PRIMÄRNAMN"), str):
+            return props["PRIMÄRNAMN"].strip()
+        for k, v in props.items():
+            if isinstance(v, str) and "NAMN" in k.upper():
+                return v.strip()
+        return ""
+
+    for f in feats:
+        props = f.get("properties") or {}
+        d_name = _name_of(props)
+        if d_name and d_name.casefold() == key and f.get("geometry"):
+            out = {
+                "type": "Feature",
+                "properties": {"name": d_name},
+                "geometry": f["geometry"],
+            }
+            _DISTRICT_BOUNDARY_CACHE[key] = out
+            return out
+
+    raise HTTPException(404, f"District boundary not found for '{name}'")
 
 
 @app.get("/api/buildings/bbox/list")

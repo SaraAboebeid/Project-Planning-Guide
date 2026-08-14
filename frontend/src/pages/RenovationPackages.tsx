@@ -129,10 +129,12 @@ function inferWwrFromArchetype(useCat: string | null, year: number | null): numb
   return clamp(Math.round(wwr), 10, 65);
 }
 
-function calcBuildingAreas(footprint: number, newFloors: number, floorH: number): {
-  grossWallArea: number; windowArea: number; opaqueWallArea: number; roofArea: number; floorArea: number;
-}
-function calcBuildingAreas(footprint: number, newFloors: number, floorH: number, wwrPct: number): {
+function calcBuildingAreas(
+  footprint: number,
+  newFloors: number,
+  floorH: number,
+  wwrPct = 28,
+): {
   grossWallArea: number; windowArea: number; opaqueWallArea: number; roofArea: number; floorArea: number;
 } {
   const perimeter = 4 * Math.sqrt(footprint);   // square approximation

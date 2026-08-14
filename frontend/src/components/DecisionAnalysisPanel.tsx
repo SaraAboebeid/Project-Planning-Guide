@@ -31,7 +31,7 @@ export default function DecisionAnalysisPanel({
 }) {
   const { scenarios, options, bestPerScenario, picks } = result;
   const picksFor = (id: string) =>
-    (Object.entries(picks) as [keyof typeof picks, string][]).filter(([, v]) => v === id).map(([k]) => k);
+    (Object.entries(picks) as [string, string][]).filter(([, v]) => v === id).map(([k]) => k);
 
   const th: React.CSSProperties = { padding: "6px 8px", fontWeight: 600, color: white(0.45), textAlign: "right", whiteSpace: "nowrap" };
   const td: React.CSSProperties = { padding: "7px 8px", textAlign: "right", whiteSpace: "nowrap", color: white(0.8) };
@@ -110,11 +110,14 @@ export default function DecisionAnalysisPanel({
                   <td style={{ padding: "7px 8px", color: o.isBaseline ? white(0.5) : "#fff", fontStyle: o.isBaseline ? "italic" : undefined }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <span style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>{o.label}</span>
-                      {tags.map((t) => (
-                        <span key={t} title={PICK_STYLE[t].tip} style={{ fontSize: 8.5, fontWeight: 800, padding: "1px 6px", borderRadius: 99, color: PICK_STYLE[t].fg, background: PICK_STYLE[t].bg }}>
-                          ★ {PICK_STYLE[t].label}
-                        </span>
-                      ))}
+                      {tags.map((t) => {
+                        const style = PICK_STYLE[t] ?? { fg: "#fff", bg: "rgba(255,255,255,0.08)", label: t, tip: "" };
+                        return (
+                          <span key={t} title={style.tip} style={{ fontSize: 8.5, fontWeight: 800, padding: "1px 6px", borderRadius: 99, color: style.fg, background: style.bg }}>
+                            ★ {style.label}
+                          </span>
+                        );
+                      })}
                     </div>
                   </td>
                   {o.benefits.map((b, si) => {
@@ -151,11 +154,12 @@ export default function DecisionAnalysisPanel({
         })()}
         {(["minimaxRegret", "hurwicz", "mostRobust"] as const).map((k) => {
           const opt = options.find((o) => o.id === picks[k]);
+          const style = PICK_STYLE[k] ?? { fg: "#fff", bg: "rgba(255,255,255,0.08)", label: k, tip: "" };
           if (!opt) return null;
           return (
             <div key={k} style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-              <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 7px", borderRadius: 99, color: PICK_STYLE[k].fg, background: PICK_STYLE[k].bg, whiteSpace: "nowrap" }}>★ {PICK_STYLE[k].label}</span>
-              <span><b style={{ color: "#fff" }}>{opt.label}</b> - {PICK_STYLE[k].tip}</span>
+              <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 7px", borderRadius: 99, color: style.fg, background: style.bg, whiteSpace: "nowrap" }}>★ {style.label}</span>
+              <span><b style={{ color: "#fff" }}>{opt.label}</b> - {style.tip}</span>
             </div>
           );
         })}

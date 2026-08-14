@@ -1122,7 +1122,7 @@ function BboxDataBanner({
             if (fillMissingOnly && !isMissing) continue;
             if (merged[f] !== v) { merged[f] = v; changed++; }
           }
-          return merged as BuildingRecord;
+          return merged as unknown as BuildingRecord;
         });
       });
       const dataFields = [...fields].filter(f => f !== "address" && f !== "cadastral_id");
@@ -1181,7 +1181,7 @@ function BboxDataBanner({
       if (raw.trim() === "") r[field] = null;
       else if (NUMERIC_FIELDS.has(field)) { const n = Number(raw); r[field] = Number.isNaN(n) ? raw : n; }
       else r[field] = raw;
-      next[globalIdx] = r as BuildingRecord;
+      next[globalIdx] = r as unknown as BuildingRecord;
       return next;
     });
   }

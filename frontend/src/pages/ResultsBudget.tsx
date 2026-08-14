@@ -6,7 +6,7 @@ import type { WikellsItem } from "../config/wikellsData";
 import { generateReport } from "../utils/reportGenerator";
 import type { ReportComputedValues } from "../utils/reportGenerator";
 import {
-  Calendar, DollarSign,
+  Calendar, DollarSign, Package,
   ChevronDown, ChevronUp, Leaf, Info, Download,
 } from "lucide-react";
 import {
@@ -161,6 +161,11 @@ export default function ResultsBudget() {
       lkpCost,
       overheadCost,
       serviceCost,
+      capex: { construction: 0, design: 0, permits: 0, equipment: 0 },
+      contingencyPct: 0,
+      capexBase: 0,
+      capexTotal: 0,
+      opex: { energy: 0, maintenance: 0, staffing: 0, other: 0 },
       timelineRows,
       delivSections,
       packageTotals: packageTotals.map(t => ({

@@ -553,6 +553,8 @@ interface LocationMapProps {
   /** City name as stored in project.city (e.g. "Gothenburg"/"London") - narrows the default
    * map center further than country alone; falls back to the country's overview center. */
   city?: string | null;
+  /** Selected Gothenburg district (primärområde) to highlight on the map. */
+  selectedDistrict?: string | null;
   onAddressChange: (addressString: string) => void;
   onPointsChange?: (points: { lat: number; lon: number; label: string }[]) => void;
   onBboxChange?: (bbox: { north: number; south: number; east: number; west: number } | null) => void;
@@ -571,6 +573,7 @@ export default function LocationMap({
   scale,
   country,
   city,
+  selectedDistrict,
   onAddressChange,
   onPointsChange,
   onBboxChange,
@@ -583,6 +586,7 @@ export default function LocationMap({
   // Boundary highlight + address validation only apply to Gothenburg (SE).
   const isGothenburg = countryCode === "se" && (city ?? "").toLowerCase().includes("gothenburg");
   const [boundary, setBoundary] = useState<BoundaryFeature | null>(null);
+  const [districtBoundary, setDistrictBoundary] = useState<BoundaryFeature | null>(null);
 
   const [locationMode, setLocationMode] = useState<"addresses" | "area" | "bbox" | "polygon">(
     "addresses"
@@ -661,6 +665,18 @@ export default function LocationMap({
       .catch(() => { /* boundary optional — no restriction if it fails */ });
     return () => { alive = false; };
   }, [isGothenburg]);
+
+  // Fetch the selected district polygon (primärområde) for visual confirmation.
+  useEffect(() => {
+    const name = (selectedDistrict ?? "").trim();
+    if (!isGothenburg || !name) { setDistrictBoundary(null); return; }
+    let alive = true;
+    fetch(`/api/se/district-boundary?name=${encodeURIComponent(name)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d?.geometry) setDistrictBoundary(d as BoundaryFeature); })
+      .catch(() => { if (alive) setDistrictBoundary(null); });
+    return () => { alive = false; };
+  }, [isGothenburg, selectedDistrict]);
 
   // Re-check that the selection is inside the municipality — covering ALL modes:
   // typed addresses, a drawn/searched bbox, and a drawn polygon. Report validity
@@ -1034,6 +1050,26 @@ export default function LocationMap({
             </>
           )}
           {boundary && validPoints.length === 0 && !bbox && <FitToBoundary boundary={boundary} />}
+
+          {/* Selected district boundary — highlighted on top of municipality so
+              users can confirm exactly which primärområde is selected. */}
+          {districtBoundary && (
+            <>
+              <GeoJSON
+                key="district-halo"
+                data={districtBoundary as never}
+                interactive={false}
+                style={() => ({ color: "#ffffff", weight: 6, opacity: 0.8, fill: false })}
+              />
+              <GeoJSON
+                key="district-boundary"
+                data={districtBoundary as never}
+                interactive={false}
+                style={() => ({ color: "#4ECDC4", weight: 3.5, opacity: 1, fillColor: "#4ECDC4", fillOpacity: 0.20 })}
+              />
+            </>
+          )}
+          {districtBoundary && validPoints.length === 0 && !bbox && <FitToBoundary boundary={districtBoundary} />}
 
           {/* Auto-fit bounds when points or bbox changes */}
           <MapFitBounds points={validPoints} bbox={bbox} />

@@ -109,9 +109,10 @@ function FormulaRow({
         {formula}
       </span>
       <span style={{
-        fontSize: highlight ? 15 : 13, fontWeight: highlight ? 800 : 600, tabularNums: "true",
+        fontSize: highlight ? 15 : 13, fontWeight: highlight ? 800 : 600,
         color: highlight ? "#2FB477" : "rgba(255,255,255,0.75)",
         minWidth: 120, textAlign: "right",
+        fontVariantNumeric: "tabular-nums",
       }}>
         {fmtNum(result)} {currency}
       </span>
@@ -358,8 +359,8 @@ export default function Budget() {
                 contentStyle={{ background: "#1e1e2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }}
                 formatter={(v: number) => [`${v} hours`, "Hours"]}
               />
-              {barData.map((d, i) => (
-                <Bar key={d.phase} dataKey="hours" fill={TL_COLORS[i]} radius={[4, 4, 0, 0]} isAnimationActive={false}>
+              {barData.map((entry, i) => (
+                <Bar key={entry.phase} dataKey="hours" fill={TL_COLORS[i]} radius={[4, 4, 0, 0]} isAnimationActive={false}>
                 </Bar>
               ))}
               <Bar dataKey="hours" fill="#721CB8" radius={[4, 4, 0, 0]}>
@@ -402,7 +403,7 @@ export default function Budget() {
         <div style={{ display: "flex", gap: 24, fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 12, padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 10 }}>
           <span>Total: <strong style={{ color: "rgba(255,255,255,0.8)" }}>{userTotalHours} hours</strong></span>
           <span>Duration: <strong style={{ color: "rgba(255,255,255,0.8)" }}>{userWeeks} weeks</strong></span>
-          <span>Completion: <strong style={{ color: "#2FB477" }}>{timelineRows.at(-1)?.end ?? "—"}</strong></span>
+          <span>Completion: <strong style={{ color: "#2FB477" }}>{timelineRows.length ? timelineRows[timelineRows.length - 1].end : "—"}</strong></span>
         </div>
       </Card>
 

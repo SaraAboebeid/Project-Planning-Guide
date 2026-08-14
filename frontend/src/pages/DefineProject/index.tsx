@@ -16,7 +16,6 @@ import {
   EXPLORATION_CONSTRAINTS,
   SCALE_OPTIONS_BY_TYPE,
   PORTFOLIO_OWNERS,
-  BUILDING_USES,
   RE_ELECTRICITY_THRESHOLDS,
   BUILDING_DEVELOPMENT_OPTIONS,
   type ProjectType,
@@ -105,7 +104,7 @@ export default function DefineProject() {
 
   /* ── Named neighborhoods (Gothenburg primärområden) for the picker ─── */
   const [districts, setDistricts] = useState<{ name: string; count: number }[]>([]);
-  const [districtQuery, setDistrictQuery] = useState(project.district ?? project.neighborhoodName ?? "");
+  const [districtQuery, setDistrictQuery] = useState("");
   const [districtOpen, setDistrictOpen] = useState(false);
   const [districtExactCounts, setDistrictExactCounts] = useState<Record<string, number>>({});
   const districtCountSeq = useRef(0);
@@ -118,16 +117,17 @@ export default function DefineProject() {
   }, [project.scale, isSweden, districts.length]);
 
   const districtMatches = districtQuery.trim()
-    ? districts.filter(d => d.name.toLowerCase().includes(districtQuery.trim().toLowerCase())).slice(0, 12)
-    : districts.slice(0, 12);
+    ? districts.filter(d => d.name.toLowerCase().includes(districtQuery.trim().toLowerCase()))
+    : districts;
 
   const selectedDistrict = districts.find(x => x.name === project.district) ?? null;
   const selectedDistrictCount = selectedDistrict
     ? (districtExactCounts[selectedDistrict.name] ?? selectedDistrict.count)
     : null;
+  const districtTriggerLabel = selectedDistrict ? selectedDistrict.name : "Select a district";
 
   function pickDistrict(name: string) {
-    setDistrictQuery(name);
+    setDistrictQuery("");
     setDistrictOpen(false);
     setProject({
       neighborhoodName: name,
@@ -272,6 +272,7 @@ export default function DefineProject() {
   );
 
   const scaleOptions = pt ? SCALE_OPTIONS_BY_TYPE[pt] : ["Building", "Neighborhood", "City"];
+  const orderedScaleOptions = ["Building", "Neighborhood", "City", "Portfolio"].filter((opt) => scaleOptions.includes(opt));
   const disabledScales = new Set(["City"]);
   const comingSoonScales = new Set(["City", "Portfolio"]);
 
@@ -1028,11 +1029,11 @@ export default function DefineProject() {
         <Label required>Scale</Label>
         {pt === "Energy Community Planning" && (
           <p className="text-xs text-gray-500 mb-2">
-            Energy Community Planning is available at Neighborhood or Portfolio scale
+            Energy Community Planning is available at Districts, City, or Portfolio scale
           </p>
         )}
         <div className="flex gap-3 mt-1">
-          {scaleOptions.map((opt) => (
+          {orderedScaleOptions.map((opt) => (
             <button
               key={opt}
               onClick={() => {
@@ -1049,7 +1050,13 @@ export default function DefineProject() {
               }`}
             >
               <span className="inline-flex items-center gap-2">
-                <span>{opt === "Building" ? "Building(s)" : opt}</span>
+                <span>
+                  {opt === "Building"
+                    ? "Building(s)"
+                    : opt === "Neighborhood"
+                      ? "Districts"
+                      : opt}
+                </span>
                 {comingSoonScales.has(opt) && (
                   <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
                     Soon
@@ -1060,45 +1067,80 @@ export default function DefineProject() {
           ))}
         </div>
 
-        {/* Neighborhood name — searchable picker of real Gothenburg
-            primärområden (SE); typing "lindholm" resolves "Lindholmen" and
-            auto-selects all its buildings in Step 2. UK keeps free text. */}
+        {/* District selector — use a real dropdown for Gothenburg districts
+            so the user can pick from a list instead of typing and deleting text. */}
         {project.scale === "Neighborhood" && (
           <div className="mt-4">
-            <Label>Neighborhood name</Label>
+            <Label>District</Label>
             {isSweden && districts.length > 0 ? (
-              <div className="relative">
-                <input
-                  type="text"
-                  value={districtQuery}
-                  onChange={(e) => { setDistrictQuery(e.target.value); setDistrictOpen(true); if (project.district) setProject({ district: null }); }}
-                  onFocus={() => setDistrictOpen(true)}
-                  onBlur={() => setTimeout(() => setDistrictOpen(false), 150)}
-                  placeholder="e.g. Lindholmen, Majorna, Gamlestaden"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
-                />
-                {districtOpen && districtMatches.length > 0 && (
-                  <ul className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-lg border border-white/10 bg-[#11161d] shadow-xl shadow-black/40">
-                    {districtMatches.map((d) => (
-                      <li key={d.name}>
-                        <button
-                          type="button"
-                          onMouseDown={(e) => { e.preventDefault(); pickDistrict(d.name); }}
-                          className="flex w-full items-center justify-between px-4 py-2 text-sm hover:bg-white/10 text-left"
-                        >
-                          <span className="text-white/85">{d.name}</span>
-                          <span className="text-xs text-white/40">{d.count.toLocaleString()} buildings</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+              <div className="relative mt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDistrictOpen((open) => !open);
+                    setDistrictQuery("");
+                  }}
+                  onFocus={() => {
+                    setDistrictOpen(true);
+                    setDistrictQuery("");
+                  }}
+                  className="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-[#0f1721] px-4 py-3 text-left text-sm text-white shadow-sm transition hover:border-[#4ECDC4] focus:outline-none focus:ring-2 focus:ring-teal focus:ring-offset-0"
+                >
+                  <span className={selectedDistrict ? "text-white" : "text-white/60"}>
+                    {districtTriggerLabel}
+                  </span>
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    className={`h-4 w-4 text-white/60 transition-transform ${districtOpen ? "rotate-180" : ""}`}
+                    aria-hidden="true"
+                  >
+                    <path d="M5 7.5 10 12.5 15 7.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+
+                {districtOpen && (
+                  <div className="absolute z-50 mt-1 w-full rounded-xl border border-white/10 bg-[#11161d] p-2 shadow-2xl shadow-black/40">
+                    <input
+                      type="text"
+                      value={districtQuery}
+                      onChange={(e) => {
+                        setDistrictQuery(e.target.value);
+                        setDistrictOpen(true);
+                        if (project.district) setProject({ district: null });
+                      }}
+                      onFocus={() => setDistrictOpen(true)}
+                      placeholder="Search district"
+                      className="w-full rounded-lg border border-white/10 bg-[#0b1118] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-[#4ECDC4] focus:outline-none"
+                    />
+                    {districtMatches.length > 0 ? (
+                      <ul className="mt-2 max-h-64 overflow-auto">
+                        {districtMatches.map((d) => (
+                          <li key={d.name}>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => { e.preventDefault(); pickDistrict(d.name); }}
+                              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10"
+                            >
+                              <span>{d.name}</span>
+                              <span className="text-xs text-white/40">{d.count.toLocaleString()} buildings</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 px-2 py-2 text-xs text-white/50">No matching districts found.</p>
+                    )}
+                  </div>
                 )}
                 {selectedDistrict ? (
-                  <p className="text-xs text-emerald-700 mt-1">
+                  <p className="text-xs text-emerald-700 mt-2">
                     ✓ <span className="font-semibold">{selectedDistrict.name}</span> — all {(selectedDistrictCount ?? selectedDistrict.count).toLocaleString()} buildings will be loaded in Step 2.
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-500 mt-1">Pick a Gothenburg neighborhood to auto-select every building within it.</p>
+                  <p className="text-xs text-gray-500 mt-2">Pick a Gothenburg district to auto-select every building within it.</p>
                 )}
               </div>
             ) : (
@@ -1107,10 +1149,10 @@ export default function DefineProject() {
                   type="text"
                   value={project.neighborhoodName}
                   onChange={(e) => setProject({ neighborhoodName: e.target.value })}
-                  placeholder="e.g. Canary Wharf"
+                  placeholder="e.g. Askim, Backa, Eriksberg"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
                 />
-                <p className="text-xs text-gray-500 mt-1">Name the neighborhood/district this project covers.</p>
+                <p className="text-xs text-gray-500 mt-1">Name the district or neighborhood this project covers.</p>
               </>
             )}
           </div>
@@ -1163,19 +1205,32 @@ export default function DefineProject() {
       })()}
 
       {/* ── LOCATION ── */}
-      {/* District-by-name (SE neighborhood) selects buildings directly, so the
-          bbox-draw map is redundant and hidden in that case. */}
+      {/* District-by-name (SE primärområde) selects buildings directly. Keep
+          the map visible so users can verify municipality + district boundary. */}
       {showLocation && project.scale === "Neighborhood" && (
         <Card className="animate-fadeIn">
           <Label>Project Location</Label>
           <p className="text-sm text-white/65">
-            Neighborhood scale uses the neighborhood selection above, so address entry is not needed here.
+            District scale uses the district selection above. The map below shows Gothenburg and the selected district boundary.
           </p>
           <p className="text-xs text-white/45 mt-2">
             {isSweden
-              ? "Pick a Gothenburg neighborhood above to load its buildings in Step 2."
-              : "Enter the neighborhood name above to define the project area."}
+              ? "Pick a Gothenburg district above to load its buildings in Step 2."
+              : "Enter the district name above to define the project area."}
           </p>
+          <div className="mt-3">
+            <LocationMap
+              scale={project.scale}
+              country={project.country}
+              city={project.city}
+              selectedDistrict={project.district}
+              onAddressChange={(addr) => setProject({ address: addr })}
+              onPointsChange={(pts) => setProject({ buildingPoints: pts })}
+              onBboxChange={handleBboxChange}
+              onPolygonChange={handlePolygonChange}
+              onLocationValidityChange={(valid, message) => { setLocationValid(valid); setLocationMsg(message); }}
+            />
+          </div>
         </Card>
       )}
 
@@ -1186,6 +1241,7 @@ export default function DefineProject() {
             scale={project.scale}
             country={project.country}
             city={project.city}
+            selectedDistrict={project.district}
             onAddressChange={(addr) => setProject({ address: addr })}
             onPointsChange={(pts) => setProject({ buildingPoints: pts })}
             onBboxChange={handleBboxChange}
