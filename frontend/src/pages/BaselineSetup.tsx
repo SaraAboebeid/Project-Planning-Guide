@@ -267,20 +267,20 @@ export default function BaselineSetup() {
               <button onClick={() => applySelection(prioritizedIdx ? new Set(prioritizedIdx) : new Set(allIdx), "step2")}
                 style={{
                   fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
-                  background: selectionMode === "step2" ? "rgba(78,205,196,0.18)" : "rgba(78,205,196,0.12)",
-                  border: `1px solid ${selectionMode === "step2" ? "rgba(78,205,196,0.7)" : "rgba(78,205,196,0.35)"}`,
-                  color: selectionMode === "step2" ? "#7AF0E1" : "#4ECDC4",
-                  boxShadow: selectionMode === "step2" ? "0 0 0 1px rgba(122,240,225,0.18)" : "none",
+                  background: selectionMode === "step2" ? "#4ECDC4" : "rgba(78,205,196,0.12)",
+                  border: `1px solid ${selectionMode === "step2" ? "#4ECDC4" : "rgba(78,205,196,0.35)"}`,
+                  color: selectionMode === "step2" ? "#0b1220" : "#4ECDC4",
+                  boxShadow: selectionMode === "step2" ? "0 0 0 1px rgba(78,205,196,0.18)" : "none",
                 }}>
                 Use Step 2 shortlist
               </button>
               <button onClick={() => applySelection(new Set(allIdx), "all")}
                 style={{
                   fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
-                  background: selectionMode === "all" ? "rgba(78,205,196,0.18)" : "rgba(78,205,196,0.12)",
-                  border: `1px solid ${selectionMode === "all" ? "rgba(78,205,196,0.7)" : "rgba(78,205,196,0.35)"}`,
-                  color: selectionMode === "all" ? "#7AF0E1" : "#4ECDC4",
-                  boxShadow: selectionMode === "all" ? "0 0 0 1px rgba(122,240,225,0.18)" : "none",
+                  background: selectionMode === "all" ? "#4ECDC4" : "rgba(78,205,196,0.12)",
+                  border: `1px solid ${selectionMode === "all" ? "#4ECDC4" : "rgba(78,205,196,0.35)"}`,
+                  color: selectionMode === "all" ? "#0b1220" : "#4ECDC4",
+                  boxShadow: selectionMode === "all" ? "0 0 0 1px rgba(78,205,196,0.18)" : "none",
                 }}>
                 Select all
               </button>
@@ -307,8 +307,8 @@ export default function BaselineSetup() {
                   style={{
                     fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 600, cursor: "pointer",
                     display: "inline-flex", alignItems: "center", gap: 5,
-                    background: on ? "rgba(78,205,196,0.14)" : "rgba(255,255,255,0.03)",
-                    color: on ? "#4ECDC4" : "rgba(255,255,255,0.4)",
+                    background: on ? "#4ECDC4" : "rgba(255,255,255,0.03)",
+                    color: on ? "#0b1220" : "rgba(255,255,255,0.4)",
                     border: `1px solid ${on ? "#4ECDC4" : "rgba(255,255,255,0.08)"}`,
                     maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>

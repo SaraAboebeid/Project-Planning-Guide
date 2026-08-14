@@ -176,7 +176,7 @@ export default function SensitivityPanel() {
                 onClick={() => setSelectedParam(r.key)}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition ${
                   selectedParam === r.key
-                    ? "bg-teal text-white"
+                    ? "bg-teal text-[#0b1220]"
                     : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                 }`}
               >

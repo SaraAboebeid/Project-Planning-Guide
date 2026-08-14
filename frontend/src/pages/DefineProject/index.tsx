@@ -420,7 +420,9 @@ export default function DefineProject() {
   const showExploration    = !!pt && systemsChosen
                               && (pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0);
   const showKpis           = showExploration && project.explorationApproaches.length > 0;
-  const showScale          = showKpis && project.selectedKpis.length > 0;
+  // Let users jump straight to Scale after choosing an exploration approach.
+  // KPIs remain visible and required, but no longer gate the Scale question.
+  const showScale          = showKpis;
   // Country/city are chosen once on the landing page (see LandingPage.tsx's
   // startAt()), not asked again here - Step 1 used to have its own separate
   // Country question, redundant now that Sweden/UK/etc have dedicated pages.
@@ -564,7 +566,7 @@ export default function DefineProject() {
                 disabled={disabled}
                 title={disabled ? "Coming soon — not available yet" : undefined}
                 style={{
-                  background: selected ? "rgba(78,205,196,0.10)" : "rgba(13,17,40,0.85)",
+                  background: selected ? "#4ECDC4" : "rgba(13,17,40,0.85)",
                   border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.10)"}`,
                   borderRadius: 16,
                   padding: "24px 20px",
@@ -577,7 +579,7 @@ export default function DefineProject() {
                   flexDirection: "column",
                   alignItems: "center",
                   gap: 12,
-                  boxShadow: selected ? "0 0 0 1px #4ECDC4, 0 4px 20px rgba(78,205,196,0.25)" : "none",
+                  boxShadow: selected ? "0 0 0 1px #4ECDC4, 0 4px 20px rgba(78,205,196,0.18)" : "none",
                 }}
                 onMouseEnter={e => {
                   if (!selected && !disabled) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(78,205,196,0.35)";
@@ -604,7 +606,7 @@ export default function DefineProject() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
                     {selected && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="#0b1220">
                         <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
                       </svg>
                     )}
@@ -618,7 +620,7 @@ export default function DefineProject() {
                 <div>
                   <div style={{
                     fontSize: 14, fontWeight: 700,
-                    color: selected ? "#fff" : "rgba(255,255,255,0.85)",
+                    color: selected ? "#0b1220" : "rgba(255,255,255,0.85)",
                     marginBottom: 8, lineHeight: 1.3,
                   }}>
                     {t}
@@ -732,7 +734,7 @@ export default function DefineProject() {
                     key={comp}
                     onClick={() => toggleEnvelopeComponent(comp)}
                     style={{
-                      background: selected ? "rgba(78,205,196,0.10)" : "rgba(13,17,40,0.80)",
+                      background: selected ? "#4ECDC4" : "rgba(13,17,40,0.80)",
                       border: `1.5px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.10)"}`,
                       borderRadius: 10,
                       padding: "12px 12px",
@@ -743,7 +745,7 @@ export default function DefineProject() {
                       gap: 10,
                       textAlign: "left",
                       transition: "all 0.15s",
-                      color: selected ? "#4ECDC4" : "rgba(255,255,255,0.55)",
+                      color: selected ? "#0b1220" : "rgba(255,255,255,0.55)",
                     }}
                     onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(78,205,196,0.35)"; }}
                     onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.10)"; }}
@@ -752,11 +754,11 @@ export default function DefineProject() {
                     <span style={{ flexShrink: 0 }}>{meta.icon}</span>
                     {/* Text */}
                     <span>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: selected ? "#fff" : "rgba(255,255,255,0.80)", lineHeight: 1.2 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: selected ? "#0b1220" : "rgba(255,255,255,0.80)", lineHeight: 1.2 }}>
                         {displayName}
                       </div>
                       {meta.subtitle && (
-                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                        <div style={{ fontSize: 10, color: selected ? "rgba(11,18,32,0.75)" : "rgba(255,255,255,0.35)", marginTop: 2 }}>
                           {meta.subtitle}
                         </div>
                       )}
@@ -769,11 +771,6 @@ export default function DefineProject() {
                       background: selected ? "#4ECDC4" : "transparent",
                       display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                     }}>
-                      {selected && (
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="#0a0d14">
-                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                        </svg>
-                      )}
                     </div>
                   </button>
                 );
@@ -984,16 +981,16 @@ export default function DefineProject() {
                   onClick={() => toggleExploration(approach)}
                   className={`w-full text-left rounded-xl border-2 px-4 py-3 transition ${
                     selected
-                      ? "border-[#4ECDC4] bg-[#4ECDC4]/5"
+                      ? "border-[#4ECDC4] bg-[#4ECDC4]"
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-dark">
+                    <span className={`font-semibold text-sm ${selected ? "text-[#0b1220]" : "text-dark"}`}>
                       {approach}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className={`text-xs mt-1 ${selected ? "text-[#0b1220]/80" : "text-gray-500"}`}>
                     {cfg.description}
                   </p>
                 </button>
@@ -1017,7 +1014,7 @@ export default function DefineProject() {
                     ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
                 }`}
-                style={{ color: project.selectedKpis.includes(kpi) ? "#fff" : "rgba(255,255,255,0.80)" }}
+                style={{ color: project.selectedKpis.includes(kpi) ? "#0b1220" : "rgba(255,255,255,0.80)" }}
               >
                 {kpi}
               </button>

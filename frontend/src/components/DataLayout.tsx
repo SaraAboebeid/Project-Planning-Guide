@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import TopBar from "./TopBar";
+import ThemeToggle from "./ThemeToggle";
 
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
   return (
@@ -101,7 +102,7 @@ export default function DataLayout({
                 padding: "8px 0",
                 borderRadius: 8,
                 cursor: "pointer",
-                background: isActive ? "rgba(114,28,184,0.28)" : "transparent",
+                background: isActive ? "#721CB8" : "transparent",
                 color: isActive ? "#fff" : "rgba(255,255,255,0.35)",
                 display: "flex",
                 flexDirection: "column",
@@ -118,8 +119,11 @@ export default function DataLayout({
 
         <div style={{ flex: 1 }} />
 
+        <ThemeToggle />
+
         <button
           title="Settings"
+          className="sidebar-theme-icon"
           style={{
             border: 0,
             width: "100%",
@@ -127,7 +131,7 @@ export default function DataLayout({
             borderRadius: 8,
             cursor: "pointer",
             background: "transparent",
-            color: "rgba(255,255,255,0.28)",
+            color: "var(--sidebar-icon-color)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",

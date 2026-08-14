@@ -11,7 +11,7 @@ const PATHWAYS = [
     label: "Renovation",
     sub: "Planning",
     color: "#721CB8",
-    bgActive: "rgba(114,28,184,0.15)",
+    bgActive: "#721CB8",
     borderActive: "#721CB8",
     Icon: Hammer,
     outputs: [
@@ -27,7 +27,7 @@ const PATHWAYS = [
     label: "Energy Community",
     sub: "Planning",
     color: "#4ECDC4",
-    bgActive: "rgba(78,205,196,0.12)",
+    bgActive: "#4ECDC4",
     borderActive: "#4ECDC4",
     Icon: Zap,
     outputs: [
@@ -426,6 +426,7 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
         {PATHWAYS.map((pw) => {
           const isActive = activeType === pw.key;
+          const selectedText = pw.color === "#4ECDC4" ? "#0b1220" : "#fff";
           const Ic = pw.Icon;
           return (
             <div key={pw.key} style={{
@@ -439,7 +440,7 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
                 <div style={{
                   position: "absolute", top: 10, right: 10,
                   padding: "2px 7px", borderRadius: 5, fontSize: 9, fontWeight: 700,
-                  background: pw.color, color: "#fff", letterSpacing: 1, textTransform: "uppercase",
+                  background: pw.color, color: selectedText, letterSpacing: 1, textTransform: "uppercase",
                 }}>Active</div>
               )}
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -450,11 +451,11 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   boxShadow: isActive ? `0 4px 14px ${pw.color}44` : "none",
                 }}>
-                  <Ic size={18} color={isActive ? "#fff" : "rgba(255,255,255,0.28)"} />
+                  <Ic size={18} color={isActive ? selectedText : "rgba(255,255,255,0.28)"} />
                 </div>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.2,
-                                color: isActive ? "#fff" : "rgba(255,255,255,0.40)" }}>{pw.label}</div>
+                                color: isActive ? selectedText : "rgba(255,255,255,0.40)" }}>{pw.label}</div>
                   <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", marginTop: 1 }}>{pw.sub}</div>
                 </div>
               </div>
@@ -463,11 +464,11 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
                   <div key={o.n} style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
                     <span style={{
                       fontSize: 8, fontWeight: 800, flexShrink: 0, marginTop: 1.5, letterSpacing: 0.5,
-                      color: isActive ? pw.color : "rgba(255,255,255,0.18)",
+                      color: isActive ? selectedText : "rgba(255,255,255,0.18)",
                     }}>{o.n}</span>
                     <span style={{
                       fontSize: 11, lineHeight: 1.4,
-                      color: isActive ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.28)",
+                      color: isActive ? selectedText : "rgba(255,255,255,0.28)",
                     }}>{o.text}</span>
                   </div>
                 ))}

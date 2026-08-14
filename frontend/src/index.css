@@ -62,6 +62,69 @@
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  --sidebar-icon-color: #ffffff;
+  --sidebar-icon-hover-color: #ffffff;
+}
+
+/* ── Global theme toggle ───────────────────────────────────────────────── */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  width: 100%;
+  padding: 8px 0;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--sidebar-icon-color);
+  background: transparent;
+  transition: all 0.15s;
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--sidebar-icon-hover-color);
+}
+
+.theme-toggle-sidebar {
+  margin-bottom: 2px;
+}
+
+.sidebar-theme-icon {
+  color: var(--sidebar-icon-color) !important;
+}
+
+.sidebar-theme-icon:hover {
+  color: var(--sidebar-icon-hover-color) !important;
+}
+
+/* ── Bright mode (global) ─────────────────────────────────────────────── */
+body.bright-mode {
+  background: #f6f8fc;
+  --sidebar-icon-color: #4b5563;
+  --sidebar-icon-hover-color: #374151;
+}
+
+/* Full-app inversion gives a consistent bright variant across pages that use
+   many inline dark styles, while media elements are un-inverted below. */
+body.bright-mode #root {
+  filter: invert(1) hue-rotate(180deg);
+  background: #f6f8fc;
+}
+
+/* Preserve natural media and external views (logos, map iframes, charts). */
+body.bright-mode img,
+body.bright-mode video,
+body.bright-mode iframe,
+body.bright-mode canvas,
+body.bright-mode [data-no-theme-invert="true"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Keep the floating toggle readable in bright mode. */
+body.bright-mode .sidebar-theme-icon {
+  filter: invert(1) hue-rotate(180deg);
 }
 
 /* ── Shared card style ── */
@@ -175,7 +238,7 @@ body {
 .wizard-shell .ppg-btn-secondary {
   background: rgba(255,255,255,0.07) !important;
   color: rgba(255,255,255,0.80) !important;
-  border-color: rgba(255,255,255,0.15) !important;
+  border-color: #721CB8 !important;
 }
 
 /* Chevron / icon components */
@@ -214,14 +277,14 @@ body {
   font-weight: 500;
   color: #475569;
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #721CB8;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: background 0.15s, border-color 0.15s;
   cursor: pointer;
 }
 .ppg-btn-secondary:hover {
   background: #f8fafc;
-  border-color: #cbd5e1;
+  border-color: #5a1490;
 }
 
 /* ── Stat card (top summary) ── */

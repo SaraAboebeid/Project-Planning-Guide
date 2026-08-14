@@ -192,8 +192,8 @@ export default function OptimizerPanel({
                   <div style={{ marginLeft: "auto", display: "flex", gap: 7 }}>
                     <button onClick={() => setShowParallel(v => !v)}
                       style={{ fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
-                        border: `1px solid ${showParallel ? "rgba(114,28,184,0.7)" : "rgba(255,255,255,0.14)"}`,
-                        background: showParallel ? "rgba(114,28,184,0.3)" : "transparent", color: showParallel ? "#fff" : white(0.6) }}>
+                        border: `1px solid ${showParallel ? "#721CB8" : "rgba(255,255,255,0.14)"}`,
+                        background: showParallel ? "#721CB8" : "transparent", color: showParallel ? "#fff" : white(0.6) }}>
                       {showParallel ? "Hide parallel view" : "＋ Parallel view"}
                     </button>
                     <button onClick={() => setMaximized(true)} title="Maximise the chart"
@@ -261,8 +261,8 @@ export default function OptimizerPanel({
                 {([["energy_kwh_m2_yr", "Energy"], ["total_cost", "Cost"], ["total_carbon", "Carbon"]] as const).map(([k, lbl]) => (
                   <button key={k} onClick={() => setSort(k)} style={{
                     fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
-                    border: `1px solid ${sort === k ? "rgba(185,139,232,0.6)" : "rgba(255,255,255,0.12)"}`,
-                    background: sort === k ? "rgba(185,139,232,0.18)" : "transparent",
+                    border: `1px solid ${sort === k ? "#721CB8" : "rgba(255,255,255,0.12)"}`,
+                    background: sort === k ? "#721CB8" : "transparent",
                     color: sort === k ? "#fff" : white(0.55),
                   }}>{lbl}</button>
                 ))}
@@ -272,9 +272,9 @@ export default function OptimizerPanel({
                     {([[false, `Pareto-optimal (${result.pareto.length})`], [true, `All packages (${result.all_points!.length})`]] as const).map(([v, lbl]) => (
                       <button key={String(v)} onClick={() => setShowAll(v)} style={{
                         fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
-                        border: `1px solid ${showAll === v ? "rgba(78,205,196,0.6)" : "rgba(255,255,255,0.12)"}`,
-                        background: showAll === v ? "rgba(78,205,196,0.16)" : "transparent",
-                        color: showAll === v ? "#4ECDC4" : white(0.55),
+                        border: `1px solid ${showAll === v ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
+                        background: showAll === v ? "#4ECDC4" : "transparent",
+                        color: showAll === v ? "#0b1220" : white(0.55),
                       }}>{lbl}</button>
                     ))}
                   </span>

@@ -58,7 +58,7 @@ export default function CountryCitySelector() {
               cursor: enabled ? "pointer" : "not-allowed",
               fontSize: 11,
               fontWeight: country === c.id ? 700 : 500,
-              background: country === c.id ? "rgba(114,28,184,0.35)" : "transparent",
+              background: country === c.id ? "#721CB8" : "transparent",
               color: !enabled ? "rgba(255,255,255,0.32)"
                     : country === c.id ? "#fff" : "rgba(255,255,255,0.72)",
               opacity: enabled ? 1 : 0.6,
@@ -92,9 +92,9 @@ export default function CountryCitySelector() {
                   cursor: enabled ? "pointer" : "not-allowed",
                   fontSize: 11,
                   fontWeight: city === name ? 700 : 500,
-                  background: city === name ? "rgba(78,205,196,0.2)" : "transparent",
+                  background: city === name ? "#4ECDC4" : "transparent",
                   color: !enabled ? "rgba(255,255,255,0.32)"
-                        : city === name ? "#4ECDC4" : "rgba(255,255,255,0.72)",
+                    : city === name ? "#0b1220" : "rgba(255,255,255,0.72)",
                   opacity: enabled ? 1 : 0.6,
                   transition: "all .15s",
                   whiteSpace: "nowrap",

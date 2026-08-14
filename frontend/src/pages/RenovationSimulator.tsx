@@ -1555,9 +1555,9 @@ export default function RenovationSimulator() {
                             title={disabled ? "Windows and doors are picked as whole units, not layer-composed" : undefined}
                             style={{ fontSize: 11, fontWeight: 700, padding: "4px 11px", borderRadius: 8,
                               cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.35 : 1,
-                              border: `1px solid ${active ? "rgba(78,205,196,0.6)" : "rgba(255,255,255,0.12)"}`,
-                              background: active ? "rgba(78,205,196,0.16)" : "transparent",
-                              color: active ? "#4ECDC4" : "rgba(255,255,255,0.55)" }}>
+                              border: `1px solid ${active ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
+                              background: active ? "#4ECDC4" : "transparent",
+                              color: active ? "#0b1220" : "rgba(255,255,255,0.55)" }}>
                             {m === "catalogue" ? "Catalogue assembly" : "Build from layers"}
                           </button>
                         );
@@ -1759,9 +1759,9 @@ export default function RenovationSimulator() {
                 {([["package", "By package"], ["building", "By building"]] as const).map(([v, label]) => (
                   <button key={v} onClick={() => setResultView(v)}
                     style={{ padding: "5px 12px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                      border: `1px solid ${resultView === v ? "rgba(78,205,196,0.5)" : "rgba(255,255,255,0.12)"}`,
-                      background: resultView === v ? "rgba(78,205,196,0.14)" : "transparent",
-                      color: resultView === v ? "#4ECDC4" : "rgba(255,255,255,0.5)" }}>
+                      border: `1px solid ${resultView === v ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
+                      background: resultView === v ? "#4ECDC4" : "transparent",
+                      color: resultView === v ? "#0b1220" : "rgba(255,255,255,0.5)" }}>
                     {label}
                   </button>
                 ))}

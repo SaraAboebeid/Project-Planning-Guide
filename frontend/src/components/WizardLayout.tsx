@@ -5,6 +5,7 @@ import { wizardNav, useWizardCanNext, useWizardNextError } from "./wizardNav";
 import SettingsModal from "./SettingsModal";
 import { LIBRARY_TABS, tabPathFor, countryCodeFromName } from "../config/countryNav";
 import CountryCitySelector from "./CountryCitySelector";
+import ThemeToggle from "./ThemeToggle";
 
 // ── Confetti ─────────────────────────────────────────────────────────────────
 // Tiny self-contained canvas burst (no dependency) fired once when the user
@@ -82,6 +83,7 @@ function SideNavItem({
   title,
   active = false,
   onClick,
+  className,
 }: {
   iconD: string;
   label: string;
@@ -89,6 +91,7 @@ function SideNavItem({
   title?: string;
   active?: boolean;
   onClick?: () => void;
+  className?: string;
 }) {
   const clickable = !!onClick;
   return (
@@ -100,7 +103,7 @@ function SideNavItem({
                 : clickable
                   ? "text-white/40 hover:text-white/80 hover:bg-white/8 cursor-pointer"
                   : "text-white/20 cursor-not-allowed opacity-60"
-            }`}>
+            } ${className ?? ""}`}>
       <Icon d={iconD} size={19} />
       <span className="text-[9px] tracking-wide font-medium leading-none text-center px-0.5">{label}</span>
     </button>
@@ -299,7 +302,8 @@ export default function WizardLayout() {
         ))}
 
         <div className="flex-1" />
-        <SideNavItem iconD={IC.settings} label="Settings" onClick={() => setSettingsOpen(true)} />
+        <ThemeToggle />
+        <SideNavItem iconD={IC.settings} label="Settings" className="sidebar-theme-icon" onClick={() => setSettingsOpen(true)} />
       </aside>
 
       {/* ── MAIN COLUMN ─────────────────────────────────────────────────── */}
@@ -357,7 +361,7 @@ export default function WizardLayout() {
                       fontWeight: 700,
                       whiteSpace: "nowrap",
                       color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
-                      background: isActive ? "rgba(114,28,184,0.35)" : "transparent",
+                      background: isActive ? "#721CB8" : "transparent",
                       transition: "all 0.15s",
                     }}
                   >

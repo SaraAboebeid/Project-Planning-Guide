@@ -46,8 +46,8 @@ export default function ComponentScopePanel({ components, onChange, goalAssessme
                 display: "inline-flex", alignItems: "center", gap: 6,
                 border: `1px solid ${on ? "#4ECDC4" : "rgba(255,255,255,0.15)"}`,
                 borderStyle: on ? "solid" : "dashed",
-                background: on ? "rgba(78,205,196,0.15)" : "rgba(255,255,255,0.03)",
-                color: on ? "#4ECDC4" : "rgba(255,255,255,0.55)",
+                background: on ? "#4ECDC4" : "rgba(255,255,255,0.03)",
+                color: on ? "#0b1220" : "rgba(255,255,255,0.55)",
               }}>
               <span style={{ fontSize: 11 }}>{on ? "✓" : "＋"}</span>{c}
             </button>

@@ -441,7 +441,7 @@ const PATHWAYS = [
     label: "Renovation",
     sub: "Planning",
     color: "#721CB8",
-    bgActive: "rgba(114,28,184,0.15)",
+    bgActive: "#721CB8",
     borderActive: "#721CB8",
     Icon: Hammer,
     outputs: [
@@ -457,7 +457,7 @@ const PATHWAYS = [
     label: "Energy Community",
     sub: "Planning",
     color: "#4ECDC4",
-    bgActive: "rgba(78,205,196,0.12)",
+    bgActive: "#4ECDC4",
     borderActive: "#4ECDC4",
     Icon: Zap,
     outputs: [

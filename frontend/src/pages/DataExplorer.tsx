@@ -737,8 +737,8 @@ export default function DataExplorer() {
           <button key={f} onClick={() => setStatusFilter(f)} style={{
             padding: "5px 14px", borderRadius: 99, fontSize: 11, fontWeight: 600, cursor: "pointer",
             textTransform: "capitalize",
-            background: statusFilter === f ? "rgba(114,28,184,0.35)" : "rgba(255,255,255,0.06)",
-            border: `1px solid ${statusFilter === f ? "rgba(114,28,184,0.6)" : "rgba(255,255,255,0.10)"}`,
+            background: statusFilter === f ? "#721CB8" : "rgba(255,255,255,0.06)",
+            border: `1px solid ${statusFilter === f ? "#721CB8" : "rgba(255,255,255,0.10)"}`,
             color: statusFilter === f ? "#fff" : "rgba(255,255,255,0.55)",
           }}>{f === "all" ? `All (${SOURCES.length})` : f}</button>
         ))}
