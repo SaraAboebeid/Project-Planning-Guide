@@ -40,6 +40,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
   const [ahpPos, setAhpPos] = useState<Record<string, number>>({}); // "E>F" → position
   const [topN, setTopN] = useState<number>(Math.max(1, Math.ceil(items.length * 0.2)));
   const [showRemaining, setShowRemaining] = useState(false);
+  const [weightsOpen, setWeightsOpen] = useState(false);
 
   // How many buildings have a façade AI inspection feeding the F criterion (live).
   const inspectedCount = useMemo(() => {
@@ -113,8 +114,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
           <span className="block text-sm font-semibold text-white">Renovation prioritization</span>
           <span className="block text-[11px] text-white/40">
             Ranks {items.length} building{items.length === 1 ? "" : "s"} by a weighted score of energy, façade condition,
-            characteristi
-            cs &amp; renovation potential — which to renovate first.
+            building characteristics, and renovation potential — which to renovate first.
           </span>
         </span>
         {open ? <ChevronUp className="w-4 h-4 text-white/40" /> : <ChevronDown className="w-4 h-4 text-white/40" />}
@@ -130,154 +130,8 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
               {inspectedCount > 0
                 ? <b className="text-violet-300"> {inspectedCount} of {items.length} building{items.length === 1 ? "" : "s"} inspected</b>
                 : <span className="text-amber-400"> none inspected yet</span>}.
-              {inspectedCount < items.length && " For the rest, F shows “—” and its weight is spread across Energy/Characteristics/Potential until you add their photos above."}
+              {inspectedCount < items.length && " For the rest, façade shows “—” and its weight is spread across energy performance, characteristics, and renovation potential until you add their photos above."}
             </span>
-          </div>
-
-          {/* Weights */}
-          <div className="space-y-2.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-semibold text-white/60">Weighting method</span>
-              <div className="inline-flex rounded-md border border-white/10 bg-white/5 p-0.5">
-                <button
-                  onClick={() => setWeightingMethod("ahp")}
-                  className={`px-2.5 py-1 rounded text-[10px] transition ${weightingMethod === "ahp" ? "bg-amber-600/85 text-white" : "text-white/55 hover:text-white hover:bg-white/10"}`}
-                >
-                  AHP
-                </button>
-                <button
-                  onClick={() => setWeightingMethod("direct")}
-                  className={`px-2.5 py-1 rounded text-[10px] transition ${weightingMethod === "direct" ? "bg-violet-600/85 text-white" : "text-white/55 hover:text-white hover:bg-white/10"}`}
-                >
-                  Direct sliders
-                </button>
-              </div>
-              <span className="text-[10px] text-white/35">
-                Analytical Hierarchy Process derives weights from pairwise judgements and checks consistency (CR). Direct sliders are faster manual percentages.
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-white/60"><SlidersHorizontal className="w-3.5 h-3.5" /> Criterion weights</span>
-              {weightingMethod === "direct" && (
-                <div className="flex gap-1 flex-wrap ml-auto">
-                  {Object.entries(WEIGHT_PRESETS).map(([name, w]) => (
-                    <button key={name} onClick={() => setWeights(w)}
-                      className="px-2 py-0.5 rounded text-[10px] text-white/50 hover:text-white bg-white/5 hover:bg-white/12 transition">
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {weightingMethod === "direct" ? (
-              <div className="grid gap-x-5 gap-y-2 sm:grid-cols-2">
-                {CRITS.map(k => (
-                  <div key={k} className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: CRITERION_COLORS[k] }} />
-                    <span className="text-[11px] text-white/55 w-[150px] shrink-0">{CRITERION_LABELS[k]}</span>
-                    <input type="range" min={0} max={1} step={0.01} value={weights[k]}
-                      onChange={e => setW(k, parseFloat(e.target.value))}
-                      className="flex-1 accent-violet-500 h-1" />
-                    <span className="text-[11px] font-semibold text-white/70 w-9 text-right tabular-nums">{pct(norm[k] * 100)}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-white/8 bg-black/20">
-                <button onClick={() => setAhpOpen(o => !o)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-white/60 hover:text-white/80 transition">
-                  <Scale className="w-3.5 h-3.5" /> Derive weights via AHP (pairwise expert judgement)
-                  {ahpOpen ? <ChevronUp className="w-3.5 h-3.5 ml-auto" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto" />}
-                </button>
-                {ahpOpen && (
-                  <div className="px-2 pb-2 space-y-1.5">
-                    <p className="text-[10px] text-white/35 leading-relaxed flex gap-1.5">
-                      <Info className="w-3 h-3 mt-0.5 shrink-0" />
-                      Slide toward the more important criterion in each pair.
-                    </p>
-                    {AHP_PAIRS.map(([a, b]) => {
-                      const key = `${a}>${b}`;
-                      const pos = ahpPos[key] ?? 0;
-                      const val = saatyFromPos(pos);
-                      const favored = pos === 0 ? "equal" : pos > 0 ? CRITERION_LABELS[a] : CRITERION_LABELS[b];
-                      const intensity = pos === 0 ? "" : `${Math.round(pos > 0 ? val : 1 / val)}×`;
-                      return (
-                        <div key={key} className="rounded-lg border border-white/10 bg-white/[0.02] px-2.5 py-2 space-y-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="text-[10px] leading-tight truncate" style={{ color: CRITERION_COLORS[a] }}>{CRITERION_LABELS[a]}</div>
-                              <div className="text-[9px] text-white/55">◀ more</div>
-                            </div>
-                            <div className="min-w-0 flex-1 text-right">
-                              <div className="text-[10px] leading-tight truncate" style={{ color: CRITERION_COLORS[b] }}>{CRITERION_LABELS[b]}</div>
-                              <div className="text-[9px] text-white/55">more ▶</div>
-                            </div>
-                          </div>
-
-                          <input
-                            type="range"
-                            min={-8}
-                            max={8}
-                            step={1}
-                            value={pos}
-                            onChange={e => setAhpPos(p => ({ ...p, [key]: parseInt(e.target.value) }))}
-                            className="w-full accent-amber-500 h-1"
-                          />
-
-                          <div className="grid grid-cols-9 text-[9px] text-white/55 select-none leading-none">
-                            {SAATY_TICKS.map((t, idx) => (
-                              <span key={`${key}-${idx}`} className={`text-center ${idx === 4 ? "text-white/80 font-semibold" : ""}`}>{t}</span>
-                            ))}
-                          </div>
-
-                          <div className="text-[9px] text-white/50 text-center leading-none">
-                            {pos === 0 ? "Equal" : `${intensity} toward ${favored}`}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <div className="flex items-center gap-3 flex-wrap pt-1">
-                      <span className="text-[10px] text-white/40">
-                        Derived: {CRITS.map(k => `${k} ${pct(ahp.weights[k] * 100)}`).join(" · ")}
-                      </span>
-                      <span className={`text-[10px] font-medium ${ahp.consistent ? "text-emerald-400" : "text-amber-400"}`}>
-                        CR {ahp.CR.toFixed(2)} {ahp.consistent ? "✓ consistent" : "⚠ inconsistent (>0.10)"}
-                      </span>
-                      <button onClick={() => { setWeights(ahp.weights); setWeightingMethod("direct"); }}
-                        className="ml-auto px-2.5 py-1 rounded-md text-[10px] font-semibold bg-amber-600/80 hover:bg-amber-600 text-white transition">
-                        Copy AHP to Direct sliders
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="text-[10px] text-white/30">
-              P = {pct(norm.E * 100)} energy + {pct(norm.F * 100)} façade + {pct(norm.C * 100)} characteristics + {pct(norm.R * 100)} potential
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center gap-3 flex-wrap text-[11px]">
-            <label className="flex items-center gap-1.5 text-white/45">
-              Flag top
-              <input type="number" min={1} max={items.length} value={topN}
-                onChange={e => {
-                  const next = Math.max(1, Math.min(items.length, parseInt(e.target.value) || 1));
-                  setTopN(next);
-                  setShowRemaining(false);
-                }}
-                className="w-14 bg-[#0d1117] border border-white/12 rounded px-2 py-0.5 text-white/80 text-center" />
-              priorities
-            </label>
-            <span className="text-[10px] text-amber-300/90 font-medium">
-              Step 3 baseline will run these {topN} building{topN === 1 ? "" : "s"} by default
-            </span>
-            <button onClick={exportCsv}
-              className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-md text-white/50 hover:text-white hover:bg-white/8 transition">
-              <Download className="w-3.5 h-3.5" /> Export renovation ranking (CSV)
-            </button>
           </div>
 
           {/* Ranked table */}
@@ -288,8 +142,12 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
                   <th className="px-2 py-2 font-semibold w-8">#</th>
                   <th className="px-2 py-2 font-semibold">Building</th>
                   <th className="px-2 py-2 font-semibold w-28">Priority</th>
-                  {CRITS.map(k => <th key={k} className="px-2 py-2 font-semibold" style={{ color: CRITERION_COLORS[k] }}>{k}</th>)}
-                  <th className="px-2 py-2 font-semibold w-14">Conf.</th>
+                  {CRITS.map(k => (
+                    <th key={k} className="px-2 py-2 font-semibold" style={{ color: CRITERION_COLORS[k] }}>
+                      {CRITERION_LABELS[k]}
+                    </th>
+                  ))}
+                  <th className="px-2 py-2 font-semibold w-20">Data coverage</th>
                   <th className="px-2 py-2 font-semibold">Why prioritized</th>
                 </tr>
               </thead>
@@ -321,6 +179,165 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Weights */}
+          <div className="space-y-2.5">
+            <button
+              onClick={() => setWeightsOpen(v => !v)}
+              className="flex w-full items-center justify-between rounded-lg border border-white/8 bg-black/20 px-3 py-2 text-left text-[11px] font-semibold text-white/60 hover:text-white/80 transition"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <SlidersHorizontal className="w-3.5 h-3.5" /> Change criterion weights
+              </span>
+              {weightsOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+            {weightsOpen && (
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-semibold text-white/60">Weighting method</span>
+                  <div className="inline-flex rounded-md border border-white/10 bg-white/5 p-0.5">
+                    <button
+                      onClick={() => setWeightingMethod("ahp")}
+                      className={`px-2.5 py-1 rounded text-[10px] transition ${weightingMethod === "ahp" ? "bg-amber-600/85 text-white" : "text-white/55 hover:text-white hover:bg-white/10"}`}
+                    >
+                      Pairwise expert judgment
+                    </button>
+                    <button
+                      onClick={() => setWeightingMethod("direct")}
+                      className={`px-2.5 py-1 rounded text-[10px] transition ${weightingMethod === "direct" ? "bg-violet-600/85 text-white" : "text-white/55 hover:text-white hover:bg-white/10"}`}
+                    >
+                      Direct sliders
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-white/35">
+                    Analytical Hierarchy Process derives weights from pairwise judgements and checks consistency (CR). Direct sliders are faster manual percentages.
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-white/60"><Scale className="w-3.5 h-3.5" /> Criterion weights</span>
+                  {weightingMethod === "direct" && (
+                    <div className="flex gap-1 flex-wrap ml-auto">
+                      {Object.entries(WEIGHT_PRESETS).map(([name, w]) => (
+                        <button key={name} onClick={() => setWeights(w)}
+                          className="px-2 py-0.5 rounded text-[10px] text-white/50 hover:text-white bg-white/5 hover:bg-white/12 transition">
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {weightingMethod === "direct" ? (
+                  <div className="grid gap-x-5 gap-y-2 sm:grid-cols-2">
+                    {CRITS.map(k => (
+                      <div key={k} className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: CRITERION_COLORS[k] }} />
+                        <span className="text-[11px] text-white/55 w-[150px] shrink-0">{CRITERION_LABELS[k]}</span>
+                        <input type="range" min={0} max={1} step={0.01} value={weights[k]}
+                          onChange={e => setW(k, parseFloat(e.target.value))}
+                          className="flex-1 accent-violet-500 h-1" />
+                        <span className="text-[11px] font-semibold text-white/70 w-9 text-right tabular-nums">{pct(norm[k] * 100)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-white/8 bg-black/20">
+                    <button onClick={() => setAhpOpen(o => !o)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-white/60 hover:text-white/80 transition">
+                      <Scale className="w-3.5 h-3.5" /> Derive weights via pairwise expert judgment
+                      {ahpOpen ? <ChevronUp className="w-3.5 h-3.5 ml-auto" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto" />}
+                    </button>
+                    {ahpOpen && (
+                      <div className="px-2 pb-2 space-y-1.5">
+                        <p className="text-[10px] text-white/35 leading-relaxed flex gap-1.5">
+                          <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                          Slide toward the more important criterion in each pair.
+                        </p>
+                        {AHP_PAIRS.map(([a, b]) => {
+                          const key = `${a}>${b}`;
+                          const pos = ahpPos[key] ?? 0;
+                          const val = saatyFromPos(pos);
+                          const favored = pos === 0 ? "equal" : pos > 0 ? CRITERION_LABELS[a] : CRITERION_LABELS[b];
+                          const intensity = pos === 0 ? "" : `${Math.round(pos > 0 ? val : 1 / val)}×`;
+                          return (
+                            <div key={key} className="rounded-lg border border-white/10 bg-white/[0.02] px-2.5 py-2 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[10px] leading-tight truncate" style={{ color: CRITERION_COLORS[a] }}>{CRITERION_LABELS[a]}</div>
+                                  <div className="text-[9px] text-white/55">◀ more</div>
+                                </div>
+                                <div className="min-w-0 flex-1 text-right">
+                                  <div className="text-[10px] leading-tight truncate" style={{ color: CRITERION_COLORS[b] }}>{CRITERION_LABELS[b]}</div>
+                                  <div className="text-[9px] text-white/55">more ▶</div>
+                                </div>
+                              </div>
+
+                              <input
+                                type="range"
+                                min={-8}
+                                max={8}
+                                step={1}
+                                value={pos}
+                                onChange={e => setAhpPos(p => ({ ...p, [key]: parseInt(e.target.value) }))}
+                                className="w-full accent-amber-500 h-1"
+                              />
+
+                              <div className="grid grid-cols-9 text-[9px] text-white/55 select-none leading-none">
+                                {SAATY_TICKS.map((t, idx) => (
+                                  <span key={`${key}-${idx}`} className={`text-center ${idx === 4 ? "text-white/80 font-semibold" : ""}`}>{t}</span>
+                                ))}
+                              </div>
+
+                              <div className="text-[9px] text-white/50 text-center leading-none">
+                                {pos === 0 ? "Equal" : `${intensity} toward ${favored}`}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-center gap-3 flex-wrap pt-1">
+                          <span className="text-[10px] text-white/40">
+                            Derived: {CRITS.map(k => `${k} ${pct(ahp.weights[k] * 100)}`).join(" · ")}
+                          </span>
+                          <span className={`text-[10px] font-medium ${ahp.consistent ? "text-emerald-400" : "text-amber-400"}`}>
+                            CR {ahp.CR.toFixed(2)} {ahp.consistent ? "✓ consistent" : "⚠ inconsistent (>0.10)"}
+                          </span>
+                          <button onClick={() => { setWeights(ahp.weights); setWeightingMethod("direct"); }}
+                            className="ml-auto px-2.5 py-1 rounded-md text-[10px] font-semibold bg-amber-600/80 hover:bg-amber-600 text-white transition">
+                            Copy pairwise weights to Direct sliders
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="text-[10px] text-white/30">
+                  P = {pct(norm.E * 100)} energy + {pct(norm.F * 100)} façade + {pct(norm.C * 100)} characteristics + {pct(norm.R * 100)} potential
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-3 flex-wrap text-[11px]">
+            <label className="flex items-center gap-1.5 text-white/45">
+              Flag top
+              <input type="number" min={1} max={items.length} value={topN}
+                onChange={e => {
+                  const next = Math.max(1, Math.min(items.length, parseInt(e.target.value) || 1));
+                  setTopN(next);
+                  setShowRemaining(false);
+                }}
+                className="w-14 bg-[#0d1117] border border-white/12 rounded px-2 py-0.5 text-white/80 text-center" />
+              priorities
+            </label>
+            <span className="text-[10px] text-amber-300/90 font-medium">
+              Step 3 baseline will run these {topN} building{topN === 1 ? "" : "s"} by default
+            </span>
+            <button onClick={exportCsv}
+              className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-md text-white/50 hover:text-white hover:bg-white/8 transition">
+              <Download className="w-3.5 h-3.5" /> Export renovation ranking (CSV)
+            </button>
           </div>
 
           {remainingRanked.length > 0 && (
@@ -360,10 +377,8 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
           )}
 
           <p className="text-[10px] text-white/30 leading-relaxed">
-            Scores are 0–100 (higher = higher priority). <b className="text-white/45">E</b> energy performance ·
-            <b className="text-white/45"> F</b> façade condition (from the AI inspection above; shown as “—” and excluded until a building is inspected) ·
-            <b className="text-white/45"> C</b> characteristics (vintage + size) · <b className="text-white/45">R</b> renovation potential.
-            <b className="text-white/45"> Conf.</b> reflects how much real data backs each building — low confidence means fill gaps
+            Scores are 0–100 (higher = higher priority). Energy performance, façade condition (from the AI inspection above; shown as “—” and excluded until a building is inspected), building characteristics, and renovation potential are the four scoring groups.
+            <b className="text-white/45"> Data coverage</b> reflects how much real data backs each building — low coverage means fill gaps
             in the table or add façade photos. The flagged top {topN} are the buildings to carry into Steps 3–4 first.
           </p>
         </div>

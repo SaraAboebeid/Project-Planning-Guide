@@ -701,9 +701,12 @@ const BBOX_CSV_COLS: { key: keyof BuildingRecord; label: string }[] = [
   { key: "tabula_period",               label: "TABULA Period" },
   { key: "u_wall",                      label: "U-Wall" },
   { key: "u_window",                    label: "U-Window" },
-  { key: "boplats_listings",            label: "Boplats #" },
-  { key: "boplats_avg_rent_per_m2_sek", label: "Rent/m² (SEK)" },
 ];
+
+const FUTURE_META_COLS = [
+  { key: "renovated", label: "Renovated", badge: "soon", title: "Renovation status is not yet available from the EPC dataset." },
+  { key: "renovation_measure", label: "Renovation measure", badge: "soon", title: "Renovation measure is a future feature and is not currently populated." },
+] as const;
 
 /* ─────────────────────────────────────────────
    User data import (CSV / JSON) — merge the user's own data onto the loaded
@@ -864,7 +867,6 @@ const COMPARE_COLS: {
   { key: "u_window",                    label: "U-Window",     unit: "W/m²K",      asc: true,  betterLabel: "lower = better" },
   { key: "floors",                      label: "Floors",                            asc: false, betterLabel: "more floors"    },
   { key: "footprint_m2",                label: "Footprint",    unit: "m²",          asc: false, betterLabel: "larger = more"  },
-  { key: "boplats_avg_rent_per_m2_sek", label: "Rent/m²",     unit: "SEK",         asc: true,  betterLabel: "lower = cheaper"},
 ];
 
 /** Convert Swedish cadastral IDs like "JÄRNBROTT 134:3" → "Järnbrott 134:3" */
@@ -1210,6 +1212,8 @@ function BboxDataBanner({
   const pageIdxs       = pagedRows.map(p => p.idx);
   const pageAllChecked = pageIdxs.length > 0 && pageIdxs.every(i => selected.has(i));
   const pagePartial    = !pageAllChecked && pageIdxs.some(i => selected.has(i));
+  const allRowIdxs     = rows?.map((_, idx) => idx) ?? [];
+  const allRowsChecked = allRowIdxs.length > 0 && allRowIdxs.every(i => selected.has(i));
 
   // Click a header to sort by it; click the same header again to flip asc/desc.
   const toggleSort = (key: keyof BuildingRecord) =>
@@ -1241,6 +1245,16 @@ function BboxDataBanner({
       else                { pageIdxs.forEach(i => next.add(i)); }
       return next;
     });
+  }
+
+  function selectAllRows() {
+    if (!rows) return;
+    setSelected(new Set(allRowIdxs));
+  }
+
+  function clearSelection() {
+    setSelected(new Set());
+    setCompareOpen(false);
   }
 
   // Build ranked compare list
@@ -1326,12 +1340,6 @@ function BboxDataBanner({
           <div className="px-4 py-2.5">
             <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Primary use</div>
             <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.common_use}</div>
-          </div>
-        )}
-        {bboxStats.avg_year && (
-          <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Avg year built</div>
-            <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.avg_year}</div>
           </div>
         )}
         {bboxStats.avg_floors && (
@@ -1467,6 +1475,24 @@ function BboxDataBanner({
                 </button>
               </div>
             </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={selectAllRows}
+                disabled={!rows || allRowsChecked}
+                className="px-3 py-1.5 rounded-md border border-white/10 text-[11px] font-medium text-white/70 hover:bg-white/8 disabled:opacity-35 disabled:hover:bg-transparent transition"
+                title="Select every building in the table"
+              >
+                Select all
+              </button>
+              <button
+                onClick={clearSelection}
+                disabled={selected.size === 0}
+                className="px-3 py-1.5 rounded-md border border-white/10 text-[11px] font-medium text-white/70 hover:bg-white/8 disabled:opacity-35 disabled:hover:bg-transparent transition"
+                title="Clear the current selection"
+              >
+                Clear
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1519,6 +1545,20 @@ function BboxDataBanner({
                       </th>
                     );
                   })}
+                  {FUTURE_META_COLS.map(col => (
+                    <th
+                      key={col.key}
+                      className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60"
+                      title={col.title}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {col.label}
+                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] uppercase tracking-[0.14em] text-amber-300">
+                          {col.badge}
+                        </span>
+                      </span>
+                    </th>
+                  ))}
                   <th className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60" title="Current heating system, inferred from the Boverket EPC (energideklaration)">
                     Current heating
                   </th>
@@ -1569,6 +1609,16 @@ function BboxDataBanner({
                           </td>
                         );
                       })}
+                      {FUTURE_META_COLS.map(col => (
+                        <td
+                          key={col.key}
+                          className={`px-2 py-1 whitespace-nowrap ${isSelected ? "" : "bg-white/[0.02] text-white/25"}`}
+                          title={col.title}
+                          onClick={editing ? (e => e.stopPropagation()) : undefined}
+                        >
+                          —
+                        </td>
+                      ))}
                       {(() => {
                         const h = r.address ? heating[r.address] : null;
                         const sys = h?.system ?? null;
@@ -1606,7 +1656,7 @@ function BboxDataBanner({
             <div className="flex items-center justify-end gap-3 px-4 py-2 border-t border-white/10 text-[10px]">
               <span className="text-white/40">{selected.size} selected</span>
               <button
-                onClick={() => { setSelected(new Set()); setCompareOpen(false); }}
+                onClick={clearSelection}
                 className="text-gray-400 hover:text-red-500 transition"
                 title="Clear selection"
               >

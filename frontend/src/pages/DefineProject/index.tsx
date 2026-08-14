@@ -107,6 +107,7 @@ export default function DefineProject() {
   const [districtQuery, setDistrictQuery] = useState("");
   const [districtOpen, setDistrictOpen] = useState(false);
   const [districtExactCounts, setDistrictExactCounts] = useState<Record<string, number>>({});
+  const [addressUploadMessage, setAddressUploadMessage] = useState<string | null>(null);
   const districtCountSeq = useRef(0);
   const isSweden = project.country !== "United Kingdom";
 
@@ -129,11 +130,13 @@ export default function DefineProject() {
   function pickDistrict(name: string) {
     setDistrictQuery("");
     setDistrictOpen(false);
+    setAddressUploadMessage(null);
     setProject({
       neighborhoodName: name,
       district: name,
       bboxStats: null,
       currentBbox: null,
+      buildingPoints: [],
     });
 
     // Keep Step 1's neighborhood count in sync with Step 2's actual row source.
@@ -148,6 +151,76 @@ export default function DefineProject() {
       .catch(() => {
         // Fallback to cached district aggregate if this lookup fails.
       });
+  }
+
+  async function handleAddressCsvUpload(file: File | null) {
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const rawLines = text
+        .replace(/\r/g, "")
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      if (rawLines.length === 0) {
+        setAddressUploadMessage("This file is empty — add one address per line or a single Address column.");
+        return;
+      }
+
+      const header = rawLines[0].toLowerCase();
+      let addresses: string[] = rawLines.slice(1);
+      if (header.includes("address") || header.includes("street") || header.includes("name")) {
+        addresses = rawLines
+          .slice(1)
+          .map((line) => {
+            const cells = line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, ""));
+            return cells[0] || line;
+          })
+          .filter(Boolean);
+      } else {
+        addresses = rawLines.flatMap((line) => {
+          const cells = line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, ""));
+          return cells.filter(Boolean);
+        });
+      }
+
+      const uniqueAddresses = [...new Set(addresses.map((address) => address.trim()).filter((address) => address.length > 2))].slice(0, 200);
+      if (uniqueAddresses.length === 0) {
+        setAddressUploadMessage("No valid addresses were found. Use a column called Address or one address per line.");
+        return;
+      }
+
+      setAddressUploadMessage("Geocoding uploaded addresses…");
+      const settled = await Promise.allSettled(
+        uniqueAddresses.map(async (address) => {
+          const geo = await api.geocode(address);
+          return { lat: geo.lat, lon: geo.lon, label: address };
+        })
+      );
+
+      const points = settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+      if (points.length === 0) {
+        setAddressUploadMessage("No uploaded addresses could be matched. Check the spelling or use full street addresses.");
+        return;
+      }
+
+      setProject({
+        district: null,
+        neighborhoodName: "",
+        bboxStats: null,
+        bboxRows: [],
+        currentBbox: null,
+        selectionPolygon: null,
+        buildingPoints: points,
+      });
+      setDistrictQuery("");
+      setDistrictOpen(false);
+      setAddressUploadMessage(`Loaded ${points.length} address${points.length === 1 ? "" : "es"} from the CSV. They will appear in Step 2.`);
+    } catch {
+      setAddressUploadMessage("The file could not be processed. Please use a plain CSV or text file with one address per row.");
+    }
   }
 
   /* ── Bbox lookup — fires when user finishes drawing a bbox ──── */
@@ -1142,6 +1215,31 @@ export default function DefineProject() {
                 ) : (
                   <p className="text-xs text-gray-500 mt-2">Pick a Gothenburg district to auto-select every building within it.</p>
                 )}
+
+                <div className="mt-3 rounded-xl border border-white/10 bg-[#0b1118] p-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Or upload a list of addresses</div>
+                  <input
+                    type="file"
+                    accept=".csv,.txt,text/csv,text/plain"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      void handleAddressCsvUpload(file);
+                      e.target.value = "";
+                    }}
+                    className="mt-2 block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border-0 file:bg-[#4ECDC4] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#0b1220] file:cursor-pointer"
+                  />
+                  <p className="mt-2 text-[11px] text-white/50">
+                    Use one column named <span className="font-mono text-emerald-300">Address</span> or put one address per line. Excel: save as CSV first.
+                  </p>
+                  <div className="mt-2 rounded-lg border border-white/10 bg-black/20 p-2 font-mono text-[10px] text-emerald-300 whitespace-pre-wrap">
+                    Address
+                    Storgatan 1, Gothenburg
+                    Kungsgatan 10, Göteborg
+                  </div>
+                  {addressUploadMessage && (
+                    <p className="mt-2 text-[11px] text-violet-300">{addressUploadMessage}</p>
+                  )}
+                </div>
               </div>
             ) : (
               <>
@@ -1246,6 +1344,8 @@ export default function DefineProject() {
             onPointsChange={(pts) => setProject({ buildingPoints: pts })}
             onBboxChange={handleBboxChange}
             onPolygonChange={handlePolygonChange}
+            onBuildingListCsvUpload={handleAddressCsvUpload}
+            buildingListCsvMessage={addressUploadMessage}
             onLocationValidityChange={(valid, message) => { setLocationValid(valid); setLocationMsg(message); }}
           />
 

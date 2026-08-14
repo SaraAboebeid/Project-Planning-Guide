@@ -564,6 +564,8 @@ interface LocationMapProps {
     polygon: string | null,
     bbox: { north: number; south: number; east: number; west: number } | null,
   ) => void;
+  onBuildingListCsvUpload?: (file: File | null) => void;
+  buildingListCsvMessage?: string | null;
   /** Fires when the selected location's validity changes (e.g. an address falls
    *  outside the Gothenburg municipality). `valid=false` should block Continue. */
   onLocationValidityChange?: (valid: boolean, message: string | null) => void;
@@ -578,6 +580,8 @@ export default function LocationMap({
   onPointsChange,
   onBboxChange,
   onPolygonChange,
+  onBuildingListCsvUpload,
+  buildingListCsvMessage,
   onLocationValidityChange,
 }: LocationMapProps) {
   const isBuilding = scale === "Building";
@@ -856,30 +860,63 @@ export default function LocationMap({
           street/area, or draw a box / any shape. A segmented control (not four
           loose buttons) + a one-line description of the active mode. */}
       {isBuilding && (
-        <div>
-          <div className="inline-flex flex-wrap gap-1 p-1 rounded-xl bg-gray-100 border border-gray-200">
-            {LOCATION_MODES.map((m) => {
-              const active = locationMode === m.key;
-              const Icon = m.icon;
-              return (
-                <button
-                  key={m.key}
-                  onClick={() => switchLocationMode(m.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                    active
-                      ? "bg-white text-navy shadow-sm border border-gray-200"
-                      : "text-gray-500 hover:text-gray-800 border border-transparent"
-                  }`}
-                >
-                  <Icon size={15} className={active ? "text-purple-600" : ""} />
-                  {m.label}
-                </button>
-              );
-            })}
+        <div className="space-y-2">
+          <div>
+            <div className="inline-flex flex-wrap gap-1 p-1 rounded-xl bg-gray-100 border border-gray-200">
+              {LOCATION_MODES.map((m) => {
+                const active = locationMode === m.key;
+                const Icon = m.icon;
+                return (
+                  <button
+                    key={m.key}
+                    onClick={() => switchLocationMode(m.key)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                      active
+                        ? "bg-white text-navy shadow-sm border border-gray-200"
+                        : "text-gray-500 hover:text-gray-800 border border-transparent"
+                    }`}
+                  >
+                    <Icon size={15} className={active ? "text-purple-600" : ""} />
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-500 mt-1.5">
+              {LOCATION_MODES.find((m) => m.key === locationMode)?.desc}
+            </p>
           </div>
-          <p className="text-xs text-gray-500 mt-1.5">
-            {LOCATION_MODES.find((m) => m.key === locationMode)?.desc}
-          </p>
+
+          <div className="rounded-xl border border-white/10 bg-[#0b1118] p-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Building list CSV</div>
+              <label className="flex items-center gap-2 rounded-lg border border-[#4ECDC4]/50 bg-[#4ECDC4]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[#A8F3EA] hover:bg-[#4ECDC4]/20 cursor-pointer">
+                <span>Upload CSV</span>
+                <input
+                  type="file"
+                  accept=".csv,.txt,text/csv,text/plain"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    onBuildingListCsvUpload?.(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            <p className="mt-2 text-[11px] text-white/50">
+              One row per building. Use a column named <span className="font-mono text-emerald-300">Address</span> or put one address per line. Excel: save as CSV first.
+            </p>
+            <div className="mt-2 text-[10.5px] text-white/60 rounded-md border border-white/10 bg-[#0d1117] p-2.5 leading-relaxed">
+              <div><b className="text-white/75">CSV format:</b> <span className="font-mono text-emerald-300">Address,Name</span></div>
+              <div className="mt-1 font-mono text-[10px] text-emerald-300/90 whitespace-pre">Address,Name
+Storgatan 1,Gothenburg
+Kungsgatan 10,Göteborg</div>
+            </div>
+            {buildingListCsvMessage && (
+              <p className="mt-2 text-[11px] text-violet-300">{buildingListCsvMessage}</p>
+            )}
+          </div>
         </div>
       )}
 
