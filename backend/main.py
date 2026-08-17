@@ -114,6 +114,25 @@ def health():
     return {"status": "ok"}
 
 
+def _resolve_facade_ml_url(default: str | None = None) -> str:
+    """Resolve facade ML URL from env with backward-compatible aliases.
+
+    Canonical name is FACADE_ML_URL; FACADE_MODEL_URL is accepted for
+    compatibility with older deploy files.
+    """
+    ml_url = os.environ.get("FACADE_ML_URL", "").strip()
+    model_url = os.environ.get("FACADE_MODEL_URL", "").strip()
+
+    if ml_url and model_url and ml_url != model_url:
+        print(
+            "[config] Warning: FACADE_ML_URL and FACADE_MODEL_URL differ; "
+            f"using FACADE_ML_URL={ml_url}"
+        )
+
+    chosen = ml_url or model_url or (default or "")
+    return chosen.rstrip("/")
+
+
 @app.get("/api/status")
 async def status():
     """Live status of the optional integrations, for the Settings → Connections
@@ -123,8 +142,7 @@ async def status():
     openai_on = bool(os.environ.get("OPENAI_API_KEY", "").strip())
     anthropic_on = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
     epsm_url = os.environ.get("EPSM_BASE_URL", "http://localhost:8010").strip()
-    facade_url = (os.environ.get("FACADE_MODEL_URL", "").strip()
-                  or os.environ.get("FACADE_ML_URL", "http://host.docker.internal:8020").strip())
+    facade_url = _resolve_facade_ml_url(default="http://host.docker.internal:8020")
 
     async def reachable(url: str) -> bool:
         try:
@@ -2256,9 +2274,10 @@ async def trafikverket_data(refresh: bool = False):
 
 # ── Facade defect detection (MBDD2025 Faster R-CNN) — CONNECTED ─────────────
 # Proxies to the on-host torch service (tools/ml/facade_detect_service.py) via
-# FACADE_MODEL_URL. In prod that is set to http://host.docker.internal:8020 in
-# docker-compose.prod.yml (same host-gateway pattern as EPSM). If FACADE_MODEL_URL
-# is unset OR the service is down, it falls back to a clearly-labelled placeholder
+# FACADE_ML_URL (preferred) / FACADE_MODEL_URL (legacy alias). In prod that is
+# set to http://host.docker.internal:8020 in docker-compose.prod.yml (same
+# host-gateway pattern as EPSM). If neither env var is set OR the service is
+# down, it falls back to a clearly-labelled placeholder
 # ("model_connected": false) so the UI degrades gracefully.
 #
 # Service I/O contract (tools/ml/facade_detect_service.py):
@@ -2270,12 +2289,6 @@ FACADE_DEFECT_CLASS_COLORS = {
     "crack": "#e6194B", "leakage": "#4363d8", "abscission": "#f58231",
     "corrosion": "#3cb44b", "bulge": "#911eb4",
 }
-# Base URL of the on-host model service (see tools/ml/facade_detect_service.py).
-# Set via docker-compose.prod.yml → http://host.docker.internal:8020. Empty = the
-# service isn't wired (returns the placeholder).
-FACADE_MODEL_URL = os.environ.get("FACADE_MODEL_URL", "").strip()
-
-
 class FacadeDefectRequest(BaseModel):
     image_base64: str
     direction: str = "N"
@@ -2293,20 +2306,23 @@ async def facade_defects(req: FacadeDefectRequest):
 
     When FACADE_MODEL_URL is set, proxies the image to that model service and
     normalizes its boxes/labels/scores into the response shape below."""
+    facade_url = _resolve_facade_ml_url()
+
     base = {
         "defect_classes": FACADE_DEFECT_CLASSES,
         "class_colors": FACADE_DEFECT_CLASS_COLORS,
         "direction": req.direction,
     }
 
-    if not FACADE_MODEL_URL:
+    if not facade_url:
         return {
             **base,
             "model_connected": False,
             "source": "placeholder",
             "defects": [],
             "message": (
-                "Facade-defect ML model not connected yet. Set FACADE_MODEL_URL to a "
+                "Facade-defect ML model not connected yet. Set FACADE_ML_URL "
+                "(or legacy FACADE_MODEL_URL) to a "
                 "running model service (POST /predict) to enable real detection."
             ),
         }
@@ -2323,7 +2339,7 @@ async def facade_defects(req: FacadeDefectRequest):
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             r = await client.post(
-                f"{FACADE_MODEL_URL}/detect",
+                f"{facade_url}/detect",
                 params={"threshold": req.threshold},
                 content=img_bytes,
                 headers={"Content-Type": "application/octet-stream"},
@@ -2331,7 +2347,7 @@ async def facade_defects(req: FacadeDefectRequest):
         r.raise_for_status()
         raw = r.json()
     except httpx.RequestError as exc:
-        raise HTTPException(502, f"Could not reach facade model at {FACADE_MODEL_URL}: {exc}")
+        raise HTTPException(502, f"Could not reach facade model at {facade_url}: {exc}")
     except Exception as exc:
         raise HTTPException(502, f"Facade model returned an unusable response: {exc}")
 
@@ -4287,22 +4303,20 @@ def api_incident_surfaces(req: IncidentSurfacesRequest):
 
 
 # ── Facade defect detection (proxy to the on-host ML inference service) ────────
-FACADE_ML_URL = os.environ.get("FACADE_ML_URL", "http://host.docker.internal:8020")
-
-
 @app.post("/api/facade-detect")
 async def facade_detect(request: Request, threshold: float = 0.5):
     """Forward a captured facade image to the on-host ML service and return the
     detected defects (crack/leakage/abscission/corrosion/bulge) as boxes."""
     import httpx
+    facade_url = _resolve_facade_ml_url(default="http://host.docker.internal:8020")
     body = await request.body()
     try:
         async with httpx.AsyncClient(timeout=60) as client:
-            r = await client.post(f"{FACADE_ML_URL}/detect", params={"threshold": threshold},
+            r = await client.post(f"{facade_url}/detect", params={"threshold": threshold},
                                   content=body, headers={"content-type": "application/octet-stream"})
         return JSONResponse(r.json(), status_code=r.status_code)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(503, f"Facade ML service unreachable at {FACADE_ML_URL}. Start it with "
+        raise HTTPException(503, f"Facade ML service unreachable at {facade_url}. Start it with "
                                  f"`python tools/ml/facade_detect_service.py`. ({type(e).__name__})")
 
 

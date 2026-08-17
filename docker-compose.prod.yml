@@ -35,6 +35,7 @@ services:
         required: false
     environment:
       EPSM_BASE_URL: "http://host.docker.internal:8010"
+      FACADE_ML_URL: "http://host.docker.internal:8020"
       FACADE_MODEL_URL: "http://host.docker.internal:8020"
     extra_hosts:
       - "host.docker.internal:host-gateway"

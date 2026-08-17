@@ -35,6 +35,9 @@ services:
       # EPSM (energy sim) runs as its own compose on the host; endpoints that use
       # it degrade gracefully if it isn't running.
       EPSM_BASE_URL: "http://host.docker.internal:8010"
+      # Canonical facade var plus legacy alias for compatibility.
+      FACADE_ML_URL: "http://host.docker.internal:8020"
+      FACADE_MODEL_URL: "http://host.docker.internal:8020"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
