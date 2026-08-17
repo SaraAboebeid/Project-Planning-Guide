@@ -4,7 +4,13 @@
 # to it via host.docker.internal:8020, so this must be running for the "Defects"
 # button in the Facade Inspector to work. Keep this window open (or run it as a
 # scheduled/background task).
-$proj = 'C:\Users\saraabo\Desktop\Project Planning Guide\Project-Planning-Guide'
+$proj = if ($env:PROJECT_ROOT) {
+    $env:PROJECT_ROOT
+} elseif ($PSScriptRoot) {
+    $PSScriptRoot
+} else {
+    (Get-Location).Path
+}
 Set-Location $proj
 # Uses whichever `python` has torch installed (the one you trained the model with).
 python tools\ml\facade_detect_service.py

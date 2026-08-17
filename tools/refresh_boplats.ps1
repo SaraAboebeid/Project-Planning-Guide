@@ -4,7 +4,13 @@
 # The app picks the new JSON up live (it's bind-mounted into the web container),
 # so no rebuild is needed — just a browser refresh.
 $ErrorActionPreference = 'Continue'
-$proj = 'C:\Users\saraabo\Desktop\Project Planning Guide\Project-Planning-Guide'
+$proj = if ($env:PROJECT_ROOT) {
+    $env:PROJECT_ROOT
+} elseif ($PSScriptRoot) {
+    $PSScriptRoot
+} else {
+    (Get-Location).Path
+}
 $py   = 'C:\Users\saraabo\AppData\Local\Programs\Python\Python312\python.exe'
 $log  = Join-Path $proj 'tools\boplats_refresh.log'
 
