@@ -3,7 +3,7 @@ import geopandas as gpd
 import pandas as pd
 from pathlib import Path
 
-EPC_DB = Path(r"c:\Users\saraabo\Desktop\Project Planning Guide\data\sensitivity\epc_sweden.duckdb")
+EPC_DB = Path(r"/app/data/sensitivity/epc_sweden.duckdb")
 
 con = duckdb.connect(str(EPC_DB), read_only=True)
 row = con.execute("SELECT geom FROM footprints WHERE source='GOT' AND geom IS NOT NULL LIMIT 1").fetchone()

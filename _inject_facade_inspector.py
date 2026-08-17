@@ -6,8 +6,8 @@ just before the last </script> tag.
 """
 import re
 
-HTML  = r"c:\Users\saraabo\Desktop\Project Planning Guide\Project-Planning-Guide\assets\gothenburg_3d.html"
-JS    = r"c:\Users\saraabo\Desktop\Project Planning Guide\Project-Planning-Guide\_facade_quality_wwr_style.js"
+HTML  = r"/app/assets/gothenburg_3d.html"
+JS    = r"/app/_facade_quality_wwr_style.js"
 BEGIN = "// >>> FACADE_INSPECTOR_BEGIN >>>"
 END   = "// <<< FACADE_INSPECTOR_END <<<"
 

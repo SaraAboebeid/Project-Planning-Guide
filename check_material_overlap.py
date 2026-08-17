@@ -30,7 +30,7 @@ print(f'\nTotal Boverket materials: {len(boverket_materials)}')
 print('\nExtracting Wikells materials from TypeScript...')
 import re
 
-wikells_file = r'c:\Users\saraabo\Desktop\Project Planning Guide\frontend\src\config\wikellsData.ts'
+wikells_file = r'/app/frontend/src/config/wikellsData.ts'
 with open(wikells_file, 'r', encoding='utf-8') as f:
     content = f.read()
 
