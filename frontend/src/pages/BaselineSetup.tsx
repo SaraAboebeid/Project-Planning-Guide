@@ -3,7 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationBaselineResult } from "../store/wizard";
 import { api } from "../api/client";
 import type { BuildingLookup, BuildingRecord } from "../types";
-import { Building2, Zap, Loader2, BarChart2, Thermometer, Droplets, Download } from "lucide-react";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
+} from "recharts";
+import { Building2, Zap, Loader2, BarChart2, Thermometer, Droplets, Download, Lightbulb, Cpu } from "lucide-react";
+
+const END_USE_COLORS = {
+  heating: "#E2483B",
+  cooling: "#4A90E2",
+  lighting: "#E8880C",
+  equipment: "#2FB477",
+  total: "#d1d5db",
+} as const;
 
 /** Normalise a bbox BuildingRecord into the same shape as BuildingLookup */
 function recordToLookup(r: BuildingRecord, idx: number): BuildingLookup {
@@ -86,6 +97,8 @@ export default function BaselineSetup() {
   const [simRunning, setSimRunning] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
   const [simError, setSimError] = useState<string | null>(null);
+  const [resultView, setResultView] = useState<"all" | "building">("all");
+  const [activeResultAddress, setActiveResultAddress] = useState<string | null>(null);
 
   // Which buildings to run the baseline for. null means: fall back to the
   // Step 2 shortlist or all buildings by default. Keep a dedicated mode so the
@@ -129,6 +142,45 @@ export default function BaselineSetup() {
 
   const results = project.renovationBaselineResults;
 
+  useEffect(() => {
+    if (!results.length) {
+      setActiveResultAddress(null);
+      return;
+    }
+    if (!activeResultAddress || !results.some((r) => r.address === activeResultAddress)) {
+      setActiveResultAddress(results[0]?.address ?? null);
+    }
+  }, [activeResultAddress, results]);
+
+  const allBuildingsChartData = useMemo(
+    () => results.map((r) => ({
+      name: r.address,
+      shortName: r.address.length > 28 ? `${r.address.slice(0, 28)}…` : r.address,
+      heating: r.heating,
+      cooling: r.cooling,
+      lighting: r.lighting,
+      equipment: r.equipment,
+      total: r.energyUse,
+    })),
+    [results],
+  );
+
+  const activeBuildingResult = useMemo(
+    () => results.find((r) => r.address === activeResultAddress) ?? results[0] ?? null,
+    [activeResultAddress, results],
+  );
+
+  const activeBuildingChartData = useMemo(() => {
+    if (!activeBuildingResult) return [];
+    return [
+      { key: "Heating", value: activeBuildingResult.heating, color: END_USE_COLORS.heating },
+      { key: "Cooling", value: activeBuildingResult.cooling, color: END_USE_COLORS.cooling },
+      { key: "Lighting", value: activeBuildingResult.lighting, color: END_USE_COLORS.lighting },
+      { key: "Equipment", value: activeBuildingResult.equipment, color: END_USE_COLORS.equipment },
+      { key: "Total", value: activeBuildingResult.energyUse, color: END_USE_COLORS.total },
+    ];
+  }, [activeBuildingResult]);
+
   const eClassColor: Record<string, string> = { A: "#2FB477", B: "#2FB477", C: "#2FB477", D: "#E8880C", E: "#f97316", F: "#E2483B", G: "#dc2626" };
 
   function downloadResults() {
@@ -142,6 +194,9 @@ export default function BaselineSetup() {
         totalEnergyUse_kWh_m2_yr: r.energyUse,
         heatingDemand_kWh_m2_yr: r.heating,
         coolingDemand_kWh_m2_yr: r.cooling,
+        lightingDemand_kWh_m2_yr: r.lighting,
+        equipmentDemand_kWh_m2_yr: r.equipment,
+        hotWaterDemand_kWh_m2_yr: null,
       })),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -188,6 +243,8 @@ export default function BaselineSetup() {
               energyUse: r?.total_kwh_m2_yr ?? 0,
               heating: r?.heating_kwh_m2_yr ?? 0,
               cooling: r?.cooling_kwh_m2_yr ?? 0,
+              lighting: r?.lighting_kwh_m2_yr ?? 0,
+              equipment: r?.equipment_kwh_m2_yr ?? 0,
               // The shoebox IDF model doesn't simulate domestic hot water or
               // infiltration separately from the 4 end-uses EPSM reports
               // (Heating/Cooling/Lighting/Equipment) - real 0s, not filler.
@@ -389,6 +446,106 @@ export default function BaselineSetup() {
                 <Download size={12} /> Download JSON
               </button>
             </div>
+            <div style={{
+              borderRadius: 12, padding: "14px 16px",
+              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Annual end-use comparison</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 4 }}>
+                    Compare all buildings together, or inspect one building's annual EPSM end-use split. Monthly and hourly views need a backend time-series export that the current EPSM batch API does not return yet.
+                  </div>
+                </div>
+                <div style={{ display: "inline-flex", borderRadius: 10, padding: 3, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
+                  <button
+                    onClick={() => setResultView("all")}
+                    style={{
+                      border: 0, cursor: "pointer", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 700,
+                      background: resultView === "all" ? "rgba(78,205,196,0.18)" : "transparent",
+                      color: resultView === "all" ? "#4ECDC4" : "rgba(255,255,255,0.55)",
+                    }}
+                  >
+                    All buildings
+                  </button>
+                  <button
+                    onClick={() => setResultView("building")}
+                    style={{
+                      border: 0, cursor: "pointer", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 700,
+                      background: resultView === "building" ? "rgba(78,205,196,0.18)" : "transparent",
+                      color: resultView === "building" ? "#4ECDC4" : "rgba(255,255,255,0.55)",
+                    }}
+                  >
+                    One building
+                  </button>
+                </div>
+              </div>
+
+              {resultView === "building" && activeBuildingResult && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700 }}>Building</span>
+                  <select
+                    value={activeBuildingResult.address}
+                    onChange={(e) => setActiveResultAddress(e.target.value)}
+                    style={{
+                      minWidth: 240, padding: "6px 10px", borderRadius: 8, fontSize: 11,
+                      color: "#fff", background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)",
+                    }}
+                  >
+                    {results.map((r) => <option key={r.address} value={r.address}>{r.address}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div style={{ width: "100%", height: resultView === "all" ? Math.max(240, results.length * 56) : 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  {resultView === "all" ? (
+                    <BarChart data={allBuildingsChartData} layout="vertical" margin={{ top: 8, right: 20, left: 10, bottom: 0 }}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.06)" horizontal={false} />
+                      <XAxis type="number" stroke="rgba(255,255,255,0.35)" tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10 }} unit=" kWh/m²·yr" />
+                      <YAxis type="category" dataKey="shortName" width={180} stroke="rgba(255,255,255,0.25)" tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 10 }} />
+                      <Tooltip
+                        cursor={{ fill: "rgba(255,255,255,0.03)" }}
+                        contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff" }}
+                        formatter={(value: number, name: string) => [`${Number(value).toFixed(1)} kWh/m²·yr`, name]}
+                        labelFormatter={(_, payload) => (payload?.[0]?.payload?.name as string) ?? ""}
+                      />
+                      <Bar dataKey="heating" stackId="enduse" fill={END_USE_COLORS.heating} radius={[0, 0, 0, 0]} name="Heating" />
+                      <Bar dataKey="cooling" stackId="enduse" fill={END_USE_COLORS.cooling} radius={[0, 0, 0, 0]} name="Cooling" />
+                      <Bar dataKey="lighting" stackId="enduse" fill={END_USE_COLORS.lighting} radius={[0, 0, 0, 0]} name="Lighting" />
+                      <Bar dataKey="equipment" stackId="enduse" fill={END_USE_COLORS.equipment} radius={[0, 4, 4, 0]} name="Equipment" />
+                    </BarChart>
+                  ) : (
+                    <BarChart data={activeBuildingChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                      <XAxis dataKey="key" stroke="rgba(255,255,255,0.35)" tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 10 }} />
+                      <YAxis stroke="rgba(255,255,255,0.35)" tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10 }} unit=" kWh/m²·yr" />
+                      <Tooltip
+                        contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff" }}
+                        formatter={(value: number) => `${Number(value).toFixed(1)} kWh/m²·yr`}
+                      />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {activeBuildingChartData.map((d) => <Cell key={d.key} fill={d.color} />)}
+                      </Bar>
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+                {[
+                  { label: "Heating", color: END_USE_COLORS.heating },
+                  { label: "Cooling", color: END_USE_COLORS.cooling },
+                  { label: "Lighting", color: END_USE_COLORS.lighting },
+                  { label: "Equipment", color: END_USE_COLORS.equipment },
+                ].map((item) => (
+                  <div key={item.label} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
+                    <span style={{ width: 9, height: 9, borderRadius: 999, background: item.color, display: "inline-block" }} />
+                    {item.label}
+                  </div>
+                ))}
+              </div>
+            </div>
             {results.map(r => (
               <div key={r.address} style={{
                 borderRadius: 12, padding: "14px 16px",
@@ -412,11 +569,14 @@ export default function BaselineSetup() {
                 </div>
                 {/* Metric grid - Total/Heating/Cooling are real EPSM output; the
                     shoebox model doesn't simulate DHW or infiltration separately */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
                   {[
                     { icon: <BarChart2 size={13} color="#E8880C" />, label: "Total energy use", value: `${r.energyUse} kWh/m²·yr`, color: "#E8880C" },
                     { icon: <Thermometer size={13} color="#E2483B" />, label: "Heating demand",   value: `${r.heating} kWh/m²·yr`,  color: "#fca5a5" },
                     { icon: <Droplets size={13} color="#4A90E2" />,    label: "Cooling demand",   value: `${r.cooling} kWh/m²·yr`,  color: "#93c5fd" },
+                    { icon: <Lightbulb size={13} color="#E8880C" />,   label: "Lighting",         value: `${r.lighting} kWh/m²·yr`, color: "#fcd34d" },
+                    { icon: <Cpu size={13} color="#2FB477" />,          label: "Equipment",        value: `${r.equipment} kWh/m²·yr`, color: "#86efac" },
+                    { icon: <Droplets size={13} color="#94a3b8" />,     label: "Hot water",        value: "Not modelled",          color: "#94a3b8" },
                   ].map(m => (
                     <div key={m.label} style={{ borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>{m.icon}<span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{m.label}</span></div>

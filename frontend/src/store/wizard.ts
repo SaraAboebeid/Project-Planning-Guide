@@ -29,6 +29,8 @@ export interface RenovationBaselineResult {
   energyUse: number;
   heating: number;
   cooling: number;
+  lighting: number;
+  equipment: number;
   dhw: number;
   airLeakage: number;
   eClass: string | null;
