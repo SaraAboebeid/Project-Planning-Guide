@@ -25,7 +25,7 @@ for cat in categories:
         }
 
 # Extract Wikells materials
-wikells_file = r'c:\Users\saraabo\Desktop\Project Planning Guide\frontend\src\config\wikellsData.ts'
+wikells_file = r'/app/frontend/src/config/wikellsData.ts'
 with open(wikells_file, 'r', encoding='utf-8') as f:
     content = f.read()
 

@@ -35,7 +35,7 @@ services:
         required: false
     environment:
       EPSM_BASE_URL: "http://host.docker.internal:8010"
-      FACADE_ML_URL: "http://host.docker.internal:8020"
+      FACADE_ML_URL: "http://localhost:8020"
       FACADE_MODEL_URL: "http://host.docker.internal:8020"
       EUBUCCO_DATA_DIR: "/app/data/eubucco"
     extra_hosts:

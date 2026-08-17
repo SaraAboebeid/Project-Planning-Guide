@@ -6,8 +6,8 @@
 # NOTE: the Apify actor is PAID — this is scheduled WEEKLY on purpose. Emails
 # saraabo@chalmers.se on failure (reuses boplats_notify.py; needs SMTP in .env).
 $ErrorActionPreference = 'Continue'
-$proj = 'C:\Users\saraabo\Desktop\Project Planning Guide\Project-Planning-Guide'
-$py   = 'C:\Users\saraabo\AppData\Local\Programs\Python\Python312\python.exe'
+$proj = '/app'
+$py   = '/usr/local/bin/python3'
 $log  = Join-Path $proj 'tools\booli_refresh.log'
 
 Set-Location $proj
