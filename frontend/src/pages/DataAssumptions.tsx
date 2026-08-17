@@ -122,15 +122,13 @@ function SectionCard({
 export default function DataAssumptions() {
   const { project } = useWizardStore();
 
-  const [openSec, setOpenSec] = useState<Set<string>>(
-    () => new Set(["confidence", "sensitivity", "eubucco", "data"])
-  );
-  const [openDb, setOpenDb] = useState<Set<string>>(new Set());
+  const [openSec, setOpenSec] = useState<string | null>("confidence");
+  const [openDb, setOpenDb] = useState<string | null>(null);
 
   const toggleSec = (id: string) =>
-    setOpenSec(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setOpenSec((p) => (p === id ? null : id));
   const toggleDb = (id: string) =>
-    setOpenDb(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setOpenDb((p) => (p === id ? null : id));
 
   /* ── Step 2 summary from store ── */
   const entries = Object.entries(project.dataInputs);
@@ -342,7 +340,7 @@ export default function DataAssumptions() {
         icon={<CheckCircle2 className="w-5 h-5 text-emerald-600" />}
         title="Confidence & Data Gaps"
         subtitle="Live summary derived from your Step 2 selections"
-        open={openSec.has("confidence")}
+        open={openSec === "confidence"}
         onToggle={() => toggleSec("confidence")}
       >
         {!hasStep2 ? (
@@ -426,7 +424,7 @@ export default function DataAssumptions() {
             ? "Parameter importance rankings for your heating demand model"
             : "Key uncertainty drivers for your project type"
         }
-        open={openSec.has("sensitivity")}
+        open={openSec === "sensitivity"}
         onToggle={() => toggleSec("sensitivity")}
       >
         {isRenovation ? (
@@ -495,7 +493,7 @@ export default function DataAssumptions() {
         icon={<MapPin className="w-5 h-5 text-violet-600" />}
         title="EUBUCCO Building Data — Validation vs EPC"
         subtitle="Cross-check: floors accuracy for 90 198 buildings in Gothenburg (SE23)"
-        open={openSec.has("eubucco")}
+        open={openSec === "eubucco"}
         onToggle={() => toggleSec("eubucco")}
       >
         <EubuccoValidationPanel />
@@ -508,7 +506,7 @@ export default function DataAssumptions() {
         icon={<Database className="w-5 h-5 text-navy" />}
         title="Reference Data Explorer"
         subtitle="Context-filtered datasets — only those relevant to your project and systems"
-        open={openSec.has("data")}
+        open={openSec === "data"}
         onToggle={() => toggleSec("data")}
       >
         {dbCards.length === 0 ? (
@@ -543,11 +541,11 @@ export default function DataAssumptions() {
                       <p className="text-xs text-slate-500 mt-0.5">{card.subtitle}</p>
                     </div>
                   </div>
-                  {openDb.has(card.id)
+                  {openDb === card.id
                     ? <ChevronUp   className="w-4 h-4 text-slate-400 flex-shrink-0" />
                     : <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />}
                 </button>
-                {openDb.has(card.id) && (
+                {openDb === card.id && (
                   <div className="border-t border-slate-100 px-4 py-4 space-y-4">
                     <div className="flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">
                       <Info className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />

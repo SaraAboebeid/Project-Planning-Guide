@@ -482,26 +482,29 @@ export default function DefineProject() {
     setProject({ systemsInScope: ["Building Envelope (Windows, Roof, Walls, Floors)"] });
   }
   const needsBuildingDevType = pt === "Energy Community Planning" || pt === "Renewable Energy Planning";
-  const showBuildingDevType  = needsBuildingDevType;
-  const showSystems          = !!pt && pt !== "Renovation Planning" && !!project.buildingDevelopmentType;
-  const showEcFocus        = pt === "Energy Community Planning" && project.systemsInScope.length > 0;
-  // "Systems answered" for the reveal chain. For Renovation the coarse envelope
-  // system is auto-selected (above) for downstream use, so gate on the user's own
-  // component picks instead — otherwise the next question would appear instantly.
+  const projectNameReady = !!project.projectName.trim();
+  const showBuildingDevType  = needsBuildingDevType && projectNameReady;
+  const showSystems          = !!pt && projectNameReady && pt !== "Renovation Planning" && !!project.buildingDevelopmentType;
+  const showEcFocus        = pt === "Energy Community Planning" && projectNameReady && project.systemsInScope.length > 0;
+  const renovationComponentsChosen = pt === "Renovation Planning" && project.renovationEnvelopeComponents.length > 0;
+  // Keep renovation Step 1 in a strict sequence: choose the project name, then
+  // the renovation components, and only then reveal the evaluation method.
   const systemsChosen      = pt === "Renovation Planning"
-                              ? project.renovationEnvelopeComponents.length > 0
+                              ? renovationComponentsChosen
                               : project.systemsInScope.length > 0;
-  const showExploration    = !!pt && systemsChosen
-                              && (pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0);
-  const showKpis           = showExploration && project.explorationApproaches.length > 0;
+  const showExploration    = projectNameReady && !!pt && systemsChosen
+                              && (pt === "Renovation Planning"
+                                ? renovationComponentsChosen
+                                : (pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0));
+  const showKpis           = projectNameReady && showExploration && project.explorationApproaches.length > 0;
   // Let users jump straight to Scale after choosing an exploration approach.
   // KPIs remain visible and required, but no longer gate the Scale question.
-  const showScale          = showKpis;
+  const showScale          = projectNameReady && showKpis && project.selectedKpis.length > 0;
   // Country/city are chosen once on the landing page (see LandingPage.tsx's
   // startAt()), not asked again here - Step 1 used to have its own separate
   // Country question, redundant now that Sweden/UK/etc have dedicated pages.
-  const showProjectName    = showScale && !!project.scale;
-  const showLocation       = showProjectName;
+  const showProjectName    = HIDE_PROJECT_TYPE ? true : !!pt;
+  const showLocation       = showProjectName && showScale && !!project.scale;
 
   /* ── auto-scroll to each newly revealed question ──────────────── */
   // Count how many follow-up questions are currently revealed; when that grows,
@@ -759,7 +762,7 @@ export default function DefineProject() {
       )}
 
       {/* ── RENOVATION ENVELOPE COMPONENTS ── */}
-      {pt === "Renovation Planning" && (
+      {pt === "Renovation Planning" && projectNameReady && !renovationComponentsChosen && (
         <Card className="animate-fadeIn">
           <div style={{ marginBottom: 14 }}>
             <Label required>Renovation components</Label>
@@ -1043,6 +1046,18 @@ export default function DefineProject() {
       {/* ── EXPLORATION APPROACHES ── */}
       {showExploration && (
         <Card className="animate-fadeIn">
+          {pt === "Renovation Planning" && renovationComponentsChosen && (
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="text-[10px] font-bold uppercase tracking-[1.4px] text-white/45">Next step</div>
+              <button
+                type="button"
+                onClick={() => setProject({ renovationEnvelopeComponents: [] })}
+                className="text-[11px] font-medium text-[#4ECDC4] hover:text-[#65f0e0]"
+              >
+                Edit components
+              </button>
+            </div>
+          )}
           <Label required>How would you like to explore this?</Label>
           <div className="space-y-2 mt-2">
             {EXPLORATION_OPTIONS.map((approach) => {

@@ -15,16 +15,9 @@ export default function DeliverablesSection({ projectType, systemsInScope }: Pro
 
   const totalItems = sections.reduce((s, [, items]) => s + items.length, 0) + CROSS_CUTTING.length;
 
-  const [openSects, setOpenSects] = useState<Set<string>>(
-    () => new Set(sections.map(([t]) => t)),
-  );
+  const [openSects, setOpenSects] = useState<string | null>(() => sections[0]?.[0] ?? "__cross__");
   const toggle = (k: string) =>
-    setOpenSects(prev => {
-      const n = new Set(prev);
-      n.has(k) ? n.delete(k) : n.add(k);
-      return n;
-    });
-  const [crossOpen, setCrossOpen] = useState(true);
+    setOpenSects(prev => (prev === k ? null : k));
 
   if (sections.length === 0) {
     return (
@@ -50,7 +43,7 @@ export default function DeliverablesSection({ projectType, systemsInScope }: Pro
       {/* Section accordions */}
       <div className="space-y-2">
         {sections.map(([title, items]) => {
-          const open = openSects.has(title);
+          const open = openSects === title;
           return (
             <div key={title} className="rounded-xl border border-slate-200 overflow-hidden">
               <button
@@ -85,18 +78,18 @@ export default function DeliverablesSection({ projectType, systemsInScope }: Pro
         {/* Report */}
         <div className="rounded-xl border border-slate-200 overflow-hidden">
           <button
-            onClick={() => setCrossOpen(o => !o)}
+            onClick={() => setOpenSects((p) => (p === "__cross__" ? null : "__cross__"))}
             className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition text-left"
           >
             <span className="font-semibold text-xs text-slate-700">
               Report{" "}
               <span className="text-slate-400 font-normal">({CROSS_CUTTING.length})</span>
             </span>
-            {crossOpen
+            {openSects === "__cross__"
               ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
               : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
           </button>
-          {crossOpen && (
+          {openSects === "__cross__" && (
             <div className="px-4 pb-3 space-y-1.5">
               {CROSS_CUTTING.map(([name, desc]) => (
                 <div

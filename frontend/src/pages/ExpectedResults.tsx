@@ -205,12 +205,9 @@ export default function ExpectedResults() {
   );
   const totalDeliverables =
     sections.reduce((s, [, items]) => s + items.length, 0) + CROSS_CUTTING.length;
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    () => new Set(sections.map(([t]) => t))
-  );
-  const [crossExpanded, setCrossExpanded] = useState(false);
+  const [openSection, setOpenSection] = useState<string | null>(() => sections[0]?.[0] ?? "__cross__");
   const toggle = (key: string) =>
-    setExpandedSections((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+    setOpenSection((prev) => (prev === key ? null : key));
 
   /* ── Timeline ── */
   const baseHours = EFFORT_BASE["Retrofit & Transformation"] ?? 55;
@@ -302,7 +299,7 @@ export default function ExpectedResults() {
           ) : (
             <div className="space-y-3">
               {sections.map(([title, items]) => {
-                const open = expandedSections.has(title);
+                const open = openSection === title;
                 return (
                   <div key={title} className="ppg-card overflow-hidden">
                     <button
@@ -332,16 +329,16 @@ export default function ExpectedResults() {
               {/* Cross-cutting */}
               <div className="ppg-card overflow-hidden">
                 <button
-                  onClick={() => setCrossExpanded((p) => !p)}
+                  onClick={() => setOpenSection((p) => (p === "__cross__" ? null : "__cross__"))}
                   className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50"
                 >
                   <span className="font-semibold text-sm text-dark">
                     Cross-Cutting Deliverables{" "}
                     <span className="text-xs text-gray-400">({CROSS_CUTTING.length} items)</span>
                   </span>
-                  {crossExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                  {openSection === "__cross__" ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                 </button>
-                {crossExpanded && (
+                {openSection === "__cross__" && (
                   <div className="px-5 pb-4 space-y-1">
                     {CROSS_CUTTING.map(([name, desc]) => (
                       <div key={name} className="px-3 py-2 rounded-lg bg-[#f8fafc] border-l-[3px] border-gray-400">

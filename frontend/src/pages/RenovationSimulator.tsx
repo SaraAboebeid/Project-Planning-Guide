@@ -99,17 +99,25 @@ interface ComponentConfig {
    cards of equal weight and you can't tell what to do first. `state` dims a
    stage that isn't reachable yet and says what unlocks it. */
 function StageHeader({
-  n, title, hint, state = "active",
+  n, title, hint, state = "active", onClick,
 }: {
   n: number;
   title: string;
   hint?: string;
   state?: "active" | "waiting" | "done";
+  onClick?: () => void;
 }) {
   const dim = state === "waiting";
   const accent = state === "done" ? "#2FB477" : dim ? "rgba(255,255,255,0.25)" : "#4ECDC4";
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "6px 0 2px", opacity: dim ? 0.55 : 1 }}>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "baseline", gap: 10, margin: "6px 0 2px", opacity: dim ? 0.55 : 1,
+        background: "transparent", border: 0, padding: 0, cursor: onClick ? "pointer" : "default", textAlign: "left",
+      }}
+    >
       <span style={{
         flexShrink: 0, width: 20, height: 20, borderRadius: "50%", display: "inline-flex",
         alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
@@ -118,7 +126,7 @@ function StageHeader({
       }}>{n}</span>
       <span style={{ fontSize: 13.5, fontWeight: 800, color: dim ? "rgba(255,255,255,0.55)" : "#fff" }}>{title}</span>
       {hint && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{hint}</span>}
-    </div>
+    </button>
   );
 }
 
@@ -594,6 +602,7 @@ export default function RenovationSimulator() {
   const [livePriceSek, setLivePriceSek] = useState<number | null>(null);
   const [packageName, setPackageName] = useState("");
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
+  const [openStage, setOpenStage] = useState<number>(1);
   // Results can be read two ways: by package (portfolio aggregate per design) or
   // by building (every address as a row, baseline next to each package so you can
   // compare a single building across all designs). The matrix is what a user means
@@ -872,6 +881,18 @@ export default function RenovationSimulator() {
     }
     return configuredComponents.length ? combos : [];
   }, [configuredComponents]);
+
+  const stageProgress = [
+    { n: 1, ready: geometries.length > 0 },
+    { n: 2, ready: geometries.length > 0 && hasEnvelope },
+    { n: 3, ready: geometries.length > 0 && hasEnvelope && packageCombosList.length > 0 },
+    { n: 4, ready: packages.filter((p) => !p.isBaseline).length > 0 },
+  ] as const;
+  const firstIncompleteStage = stageProgress.find((stage) => !stage.ready)?.n ?? 4;
+  useEffect(() => {
+    if (openStage < firstIncompleteStage) setOpenStage(firstIncompleteStage);
+    if (openStage > 4) setOpenStage(4);
+  }, [firstIncompleteStage, openStage]);
 
   const comboKey = (combo: ComponentConfig[]) => combo.map((c) => c.id).join("+");
   const activeCombos = packageCombosList.filter((c) => !excludedCombos.has(comboKey(c)));
@@ -1305,11 +1326,12 @@ export default function RenovationSimulator() {
           hint={baselineAgg?.avgTotalKwhM2Yr != null
             ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr`
             : "running the as-built simulation…"}
-          state={baselineAgg?.avgTotalKwhM2Yr != null ? "done" : "active"} />
+          state={baselineAgg?.avgTotalKwhM2Yr != null ? "done" : "active"}
+          onClick={() => setOpenStage(1)} />
       )}
 
       {/* ── Buildings & baseline performance + package target selector ── */}
-      {geometries.length > 0 && (
+      {geometries.length > 0 && openStage === 1 && (
         <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Buildings & baseline performance</span>
@@ -1387,10 +1409,12 @@ export default function RenovationSimulator() {
             hint={configs.length
               ? configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" · ")
               : "save one or more build-ups per component"}
-            state={configs.length ? "done" : "active"} />
+            state={configs.length ? "done" : "active"}
+            onClick={() => setOpenStage(2)} />
 
           {/* Supplier discount — the % the property owner gets off catalogue material
               prices; deducted from every material cost (Wikells is Sweden-only). */}
+          {openStage === 2 && (<>
           {!isUK && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "0 0 14px",
               padding: "11px 14px", borderRadius: 10, background: "rgba(47,180,119,0.07)", border: "1px solid rgba(47,180,119,0.22)" }}>
@@ -1608,7 +1632,8 @@ export default function RenovationSimulator() {
             )}
           </div>
         </>
-      )}
+          )}
+        </>) }
 
       {geometries.length > 0 && (
         <>
@@ -1618,9 +1643,10 @@ export default function RenovationSimulator() {
               hint={packageCombosList.length
                 ? `${activeCombos.length} selected of ${packageCombosList.length}`
                 : "needs at least one configuration"}
-              state={packageCombosList.length ? "active" : "waiting"} />
+              state={packageCombosList.length ? "active" : "waiting"}
+              onClick={() => setOpenStage(3)} />
           )}
-          {!isUK && hasEnvelope && (
+          {!isUK && hasEnvelope && openStage === 3 && (
             <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Packages</span>
@@ -1724,8 +1750,11 @@ export default function RenovationSimulator() {
             hint={packages.filter((p) => !p.isBaseline).length
               ? `${packages.filter((p) => !p.isBaseline).length} package${packages.filter((p) => !p.isBaseline).length === 1 ? "" : "s"} vs baseline`
               : "simulate a package to compare"}
-            state={packages.filter((p) => !p.isBaseline).length ? "active" : "waiting"} />
+            state={packages.filter((p) => !p.isBaseline).length ? "active" : "waiting"}
+            onClick={() => setOpenStage(4)} />
 
+          {openStage === 4 && (
+          <>
           {/* Prominent "EnergyPlus is running" banner so it's obvious a simulation
               is in flight and results will appear on their own (no click needed). */}
           {(() => {
@@ -1983,6 +2012,9 @@ export default function RenovationSimulator() {
               floorAreaM2={totalFloorAreaM2}
               discountRate={assumptionValue("SE", "discount_rate") ?? 0.03}
             />
+          )}
+
+          </>
           )}
 
         </>
