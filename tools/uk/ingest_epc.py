@@ -10,10 +10,10 @@ source - it is not scraped here, and should not be.
 Access needs a bearer token: sign in to the service with GOV.UK One Login and copy
 the token from your account page. Then either export it:
 
-    export UK_EPC_API_TOKEN=...          # bash
-    $env:UK_EPC_API_TOKEN = "..."        # PowerShell
+    export UK_EPC_API_TOKEN              # bash (set it in your shell profile)
+    $env:UK_EPC_API_TOKEN                # PowerShell (set it in your session)
 
-or drop it in a .env file at the repo root as UK_EPC_API_TOKEN=...
+or put it in the repo-root .env file under the UK_EPC_API_TOKEN name.
 
 Without a token the certificate lookups return nothing and the buildings pipeline
 falls back to English Housing Survey band priors (see ingest_ehs.py).

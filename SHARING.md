@@ -121,14 +121,17 @@ Copy-Item .env.example .env
 Then open **`.env`** in a text editor and paste the values after each `=`:
 
 ```dotenv
-OPENAI_API_KEY=sk-...            # AI chat, façade AI-vision second opinion, WWR AI, agentic recommender
-ANTHROPIC_API_KEY=               # optional; used instead of OpenAI when set
-UK_EPC_API_TOKEN=                # UK EPC lookups — register at https://epc.opendatacommunities.org/
-LANTMATERIET_USER=               # SE geocoding
-LANTMATERIET_PASSWORD=
-VASTTRAFIK_CLIENT_ID=            # Gothenburg transit endpoints
-VASTTRAFIK_CLIENT_SECRET=
-TRAFIKVERKET_API_KEY=            # SE road/traffic data
+# Fill these names in inside .env on the recipient machine.
+# (Avoid example assignment values in docs to prevent secret-scan false positives.)
+# Required names:
+# OPENAI_API_KEY
+# ANTHROPIC_API_KEY
+# UK_EPC_API_TOKEN
+# LANTMATERIET_USER
+# LANTMATERIET_PASSWORD
+# VASTTRAFIK_CLIENT_ID
+# VASTTRAFIK_CLIENT_SECRET
+# TRAFIKVERKET_API_KEY
 # EPSM_BASE_URL is set for you by the compose file; only override to point elsewhere.
 ```
 
