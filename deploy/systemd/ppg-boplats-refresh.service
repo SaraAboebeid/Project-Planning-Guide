@@ -1,0 +1,16 @@
+[Unit]
+Description=Project Planning Guide - Boplats daily refresh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/app
+Environment=PPG_PROJECT_ROOT=/app
+Environment=PPG_PYTHON=/usr/local/bin/python3
+# Optional: load additional env vars (SMTP, API keys) if present.
+EnvironmentFile=-/app/.env
+ExecStart=/app/tools/refresh_boplats.sh
+
+[Install]
+WantedBy=multi-user.target

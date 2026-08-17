@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Project Planning Guide Boplats refresh daily
+
+[Timer]
+# Every day at 12:00
+OnCalendar=*-*-* 12:00:00
+Persistent=true
+Unit=ppg-boplats-refresh.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Project Planning Guide Booli refresh weekly
+
+[Timer]
+# Every Sunday at 03:30
+OnCalendar=Sun *-*-* 03:30:00
+Persistent=true
+Unit=ppg-booli-refresh.service
+
+[Install]
+WantedBy=timers.target
