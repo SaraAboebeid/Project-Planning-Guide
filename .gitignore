@@ -47,8 +47,16 @@ ENV/
 
 # Secrets / API keys
 .env
+.env.*
 .env.local
+.envrc
 *.env
+*.pem
+*.key
+*.p12
+*.crt
+*.cer
+*.pfx
 !.env.example
 
 # Project specific
