@@ -37,8 +37,9 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-PARQUET_PATH = "data/eubucco/SE23.parquet"
-GPKG_PATH    = r"C:\Users\saraabo\Desktop\Project Planning Guide\data\eubucco\SE23.gpkg"
+_LEGACY_EUBUCCO_DIR = Path(os.environ.get("EUBUCCO_DATA_DIR", str(Path(__file__).resolve().parent / "data" / "eubucco"))).expanduser()
+PARQUET_PATH = str(_LEGACY_EUBUCCO_DIR / "SE23.parquet")
+GPKG_PATH = str(_LEGACY_EUBUCCO_DIR / "SE23.gpkg")
 OUTPUT_HTML  = "assets/gothenburg_3d.html"
 
 # Central Gothenburg bounding box (EPSG:4326)

@@ -20,11 +20,15 @@ from pathlib import Path
 import duckdb
 from shapely import wkb as shapely_wkb
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-PARQUET_PATH = "data/eubucco/SE23.parquet"
-GPKG_PATH    = r"C:\Users\saraabo\Desktop\Project Planning Guide\data\eubucco\SE23.gpkg"
+_DEFAULT_EUBUCCO_DIR = PROJECT_ROOT / "data" / "eubucco"
+EUBUCCO_DATA_DIR = Path(os.environ.get("EUBUCCO_DATA_DIR", str(_DEFAULT_EUBUCCO_DIR))).expanduser()
+PARQUET_PATH = str(EUBUCCO_DATA_DIR / "SE23.parquet")
+GPKG_PATH = str(EUBUCCO_DATA_DIR / "SE23.gpkg")
 
 # Working bounding box (EPSG:4326) — defaults to Gothenburg; _apply_city() below
 # repoints all of these to another city from tools/se/se_cities.py.
@@ -52,12 +56,14 @@ def _apply_city(city_key: str):
     from se_cities import get_city
     c = get_city(city_key)
     root = _P(__file__).resolve().parent
-    PARQUET_PATH = str(root / c["eubucco"].replace(".gpkg", ".parquet"))
-    GPKG_PATH = str(root / c["eubucco"])
+    eubucco_dir = _P(os.environ.get("EUBUCCO_DATA_DIR", str(root / "data" / "eubucco"))).expanduser()
+    eubucco_file = _P(c["eubucco"]).name
+    PARQUET_PATH = str(eubucco_dir / eubucco_file.replace(".gpkg", ".parquet"))
+    GPKG_PATH = str(eubucco_dir / eubucco_file)
     LON_MIN, LAT_MIN, LON_MAX, LAT_MAX = c["bbox4326"]
     _KOMMUN = c["kommun"]
     _REGION_KOMMUNS = c["region_kommuns"]
-    print(f"[city] {c['name']}  bbox={c['bbox4326']}  eubucco={c['eubucco']}", flush=True)
+    print(f"[city] {c['name']}  bbox={c['bbox4326']}  eubucco_parquet={PARQUET_PATH}  eubucco_gpkg={GPKG_PATH}", flush=True)
     return c
 
 USE_COLORS = {
@@ -99,7 +105,7 @@ ECLASS_LABELS = {
 TABULA_PERIODS = ["...1960", "1961-1975", "1976-1985", "1986-1995", "1996-2005"]
 PERIOD_KEYS    = ['...1960', '1961-1975', '1976-1985', '1986-1995', '1996-2005', 'post-2005']
 
-_TABULA_DIR = Path("data/sensitivity/FW_ Map selection in notebook")
+_TABULA_DIR = PROJECT_ROOT / "data" / "sensitivity" / "FW_ Map selection in notebook"
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +315,17 @@ def process_data(city_key: str = "gothenburg") -> dict:
 
     # ── Load ──────────────────────────────────────────────────────────────
     print("Loading building data ...")
-    src = PARQUET_PATH if os.path.exists(PARQUET_PATH) else GPKG_PATH
+    parquet_exists = os.path.exists(PARQUET_PATH)
+    gpkg_exists = os.path.exists(GPKG_PATH)
+    if not parquet_exists and not gpkg_exists:
+        raise FileNotFoundError(
+            "Missing EUBUCCO source data for city "
+            f"'{city_key}'. Expected one of:\n"
+            f"- {PARQUET_PATH}\n"
+            f"- {GPKG_PATH}\n"
+            "Set EUBUCCO_DATA_DIR or place the files in the default data/eubucco directory."
+        )
+    src = PARQUET_PATH if parquet_exists else GPKG_PATH
     gdf = gpd.read_parquet(src) if src.endswith(".parquet") else gpd.read_file(src)
     print(f"  Loaded {len(gdf):,} buildings  CRS={gdf.crs}")
 
