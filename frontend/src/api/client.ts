@@ -159,6 +159,33 @@ export const api = {
       floors: number; footprint_m2: number; total_floor_area_m2: number;
     }>(`/simulation-results/${id}`),
 
+  /** Resolve the batch id of the most recent baseline run covering a building.
+   * Lets the load-profile charts work on baselines simulated before the id was
+   * being persisted - the trace was always in the database, only the pointer to
+   * it was missing. Returns the id alone, never the payload. */
+  baselineBatchLookup: (lat: number, lon: number, radiusM = 25) =>
+    get<{ found: boolean; batch_id: string | null; submitted_at?: string; status?: string }>(
+      "/baseline-batch-lookup", { lat: String(lat), lon: String(lon), radius_m: String(radiusM) },
+    ),
+
+  /** Monthly (12) or hourly (8760) baseline load profile per end use, in kWh.
+   * Aggregated backend-side from the trace EPSM already stored with the run, so
+   * nothing re-simulates and the wizard store never holds the raw time series.
+   * Pass idfIdx for hourly - it is 8760 points per series per building. */
+  simulationTimeseries: (batchId: string, resolution: "monthly" | "hourly", idfIdx?: number) =>
+    get<{
+      batch_id: string; resolution: "monthly" | "hourly"; unit: string;
+      labels: (string | number)[];
+      buildings: Array<{
+        idf_idx: number; address: string | null; total_floor_area_m2: number | null;
+        series: Partial<Record<"heating" | "cooling" | "lighting" | "equipment" | "dhw", number[]>>;
+        available: string[];
+      }>;
+    }>(`/simulation-timeseries/${batchId}`, {
+      resolution,
+      ...(idfIdx != null ? { idf_idx: String(idfIdx) } : {}),
+    }),
+
   /** Every saved/running simulation near a location - one per package_id
    * (baseline + N renovation packages) - for rehydrating the comparison
    * table on mount without re-submitting. */

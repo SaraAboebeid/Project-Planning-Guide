@@ -188,6 +188,11 @@ interface ProjectState {
   baselineStatus: "idle" | "done";
   /* Step 3 Renovation — saved baseline results per building */
   renovationBaselineResults: RenovationBaselineResult[];
+  /* Step 3 Renovation — EPSM batch id of the baseline run. Persisted (only an
+     id, not the payload) so the load-profile charts can fetch the 8760-hour
+     trace back from the backend after a reload instead of holding megabytes of
+     time series in sessionStorage. */
+  baselineBatchId: string | null;
   /* Step 4 Renovation — saved package simulation results */
   renovationSimResults: RenovationPackageResult[];
   /* Step 2 — ML facade defect detection summary per building (address / cadastral id).
@@ -273,6 +278,7 @@ const DEFAULT_PROJECT: ProjectState = {
   supplementaryData: {},
   baselineStatus: "idle",
   renovationBaselineResults: [],
+  baselineBatchId: null,
   renovationSimResults: [],
   facadeDefects: {},
   prioritizedBuildingIndices: [],

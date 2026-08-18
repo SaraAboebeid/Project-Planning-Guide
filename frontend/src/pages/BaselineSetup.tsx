@@ -7,9 +7,11 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
 } from "recharts";
 import { Building2, Zap, Loader2, BarChart2, Thermometer, Droplets, Download, Lightbulb, Cpu } from "lucide-react";
+import BaselineLoadProfile from "../components/BaselineLoadProfile";
 
 const END_USE_COLORS = {
   heating: "#E2483B",
+  dhw: "#93c5fd",
   cooling: "#4A90E2",
   lighting: "#E8880C",
   equipment: "#2FB477",
@@ -154,11 +156,20 @@ export default function BaselineSetup() {
     }
   }, [activeResultAddress, results]);
 
+  /** Hot water for a saved result. Results written before the DHW field existed
+   *  stored 0, but the total is the sum of all five end uses by construction, so
+   *  the residual recovers it exactly - and stays 0 for genuinely DHW-free runs.
+   *  A function declaration, not a const: the charts below call it during render. */
+  function dhwOf(r: RenovationBaselineResult) {
+    return r.dhw || Math.max(0, Math.round((r.energyUse - r.heating - r.cooling - r.lighting - r.equipment) * 10) / 10);
+  }
+
   const allBuildingsChartData = useMemo(
     () => results.map((r) => ({
       name: r.address,
       shortName: r.address.length > 28 ? `${r.address.slice(0, 28)}…` : r.address,
       heating: r.heating,
+      dhw: dhwOf(r),
       cooling: r.cooling,
       lighting: r.lighting,
       equipment: r.equipment,
@@ -176,6 +187,7 @@ export default function BaselineSetup() {
     if (!activeBuildingResult) return [];
     return [
       { key: "Heating", value: activeBuildingResult.heating, color: END_USE_COLORS.heating },
+      { key: "Hot water", value: dhwOf(activeBuildingResult), color: END_USE_COLORS.dhw },
       { key: "Cooling", value: activeBuildingResult.cooling, color: END_USE_COLORS.cooling },
       { key: "Lighting", value: activeBuildingResult.lighting, color: END_USE_COLORS.lighting },
       { key: "Equipment", value: activeBuildingResult.equipment, color: END_USE_COLORS.equipment },
@@ -184,6 +196,35 @@ export default function BaselineSetup() {
   }, [activeBuildingResult]);
 
   const eClassColor: Record<string, string> = { A: "#2FB477", B: "#2FB477", C: "#2FB477", D: "#E8880C", E: "#f97316", F: "#E2483B", G: "#dc2626" };
+
+  /** Trigger a browser download for an in-memory file. */
+  function saveFile(contents: string, filename: string, mime: string) {
+    const blob = new Blob([contents], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /** Same figures as the JSON export, one row per building. Quoted addresses
+   *  because Swedish street names carry commas often enough to corrupt a CSV. */
+  function downloadResultsCsv() {
+    const header = [
+      "address", "energy_class", "energy_class_source",
+      "total_energy_use_kWh_m2_yr", "heating_demand_kWh_m2_yr", "cooling_demand_kWh_m2_yr",
+      "hot_water_demand_kWh_m2_yr", "lighting_demand_kWh_m2_yr", "equipment_demand_kWh_m2_yr",
+    ];
+    const lines = [header.join(",")];
+    for (const r of results) {
+      lines.push([
+        `"${(r.address ?? "").replace(/"/g, '""')}"`,
+        r.eClass ?? "", r.eClassFromEpc ? "EPC" : "not available",
+        r.energyUse, r.heating, r.cooling, dhwOf(r), r.lighting, r.equipment,
+      ].join(","));
+    }
+    saveFile(lines.join("\n"), "epsm_baseline_results.csv", "text/csv;charset=utf-8");
+  }
 
   function downloadResults() {
     const payload = {
@@ -198,15 +239,10 @@ export default function BaselineSetup() {
         coolingDemand_kWh_m2_yr: r.cooling,
         lightingDemand_kWh_m2_yr: r.lighting,
         equipmentDemand_kWh_m2_yr: r.equipment,
-        hotWaterDemand_kWh_m2_yr: null,
+        hotWaterDemand_kWh_m2_yr: dhwOf(r),
       })),
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "epsm_baseline_results.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    saveFile(JSON.stringify(payload, null, 2), "epsm_baseline_results.json", "application/json");
   }
 
   /** Real batch EPSM run - one shoebox IDF per building, submitted together
@@ -261,7 +297,7 @@ export default function BaselineSetup() {
               eClassFromEpc: !!src?.eclass,
             };
           });
-          setProject({ baselineStatus: "done", renovationBaselineResults: mapped });
+          setProject({ baselineStatus: "done", renovationBaselineResults: mapped, baselineBatchId: batch_id });
           setSimRunning(false);
           setSimProgress(100);
           // Auto-scroll to results
@@ -298,6 +334,23 @@ export default function BaselineSetup() {
   // details fall back to TABULA archetype defaults in the shoebox IDF, so the
   // run always completes. No need to gate on "all fields present" anymore.
   const canRunBaseline = runList.length > 0;
+
+  /* Baselines simulated before baselineBatchId existed have no pointer to their
+     own EPSM run, so the load-profile panel had nothing to fetch and simply did
+     not render - which reads as "the feature is missing" rather than "this run
+     predates it". The trace is in the database either way, so resolve the id
+     from the first building's coordinates and heal the stored project. */
+  const [lookupTried, setLookupTried] = useState(false);
+  useEffect(() => {
+    if (project.baselineStatus !== "done" || project.baselineBatchId || lookupTried) return;
+    const first = runList[0];
+    if (!first) return;
+    setLookupTried(true);
+    api.baselineBatchLookup(first.lat, first.lon)
+      .then((r) => { if (r.found && r.batch_id) setProject({ baselineBatchId: r.batch_id }); })
+      .catch(() => { /* no profile available for this run - panel stays hidden */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.baselineStatus, project.baselineBatchId, runList, lookupTried]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1000 }}>
@@ -465,7 +518,7 @@ export default function BaselineSetup() {
             <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 2 }}>
               EPSM Baseline Results
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
               <button
                 onClick={downloadResults}
                 style={{
@@ -476,6 +529,16 @@ export default function BaselineSetup() {
               >
                 <Download size={12} /> Download JSON
               </button>
+              <button
+                onClick={downloadResultsCsv}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                  border: "1px solid rgba(78,205,196,0.35)", background: "rgba(78,205,196,0.08)", color: "#4ECDC4",
+                }}
+              >
+                <Download size={12} /> Download CSV
+              </button>
             </div>
             <div style={{
               borderRadius: 12, padding: "14px 16px",
@@ -485,7 +548,7 @@ export default function BaselineSetup() {
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Annual end-use comparison</div>
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 4 }}>
-                    Compare all buildings together, or inspect one building's annual EPSM end-use split. Monthly and hourly views need a backend time-series export that the current EPSM batch API does not return yet.
+                    Compare all buildings together, or inspect one building's annual EPSM end-use split. For monthly and hourly profiles, see the load-profile panel below.
                   </div>
                 </div>
                 <div style={{ display: "inline-flex", borderRadius: 10, padding: 3, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
@@ -528,10 +591,13 @@ export default function BaselineSetup() {
                 </div>
               )}
 
-              <div style={{ width: "100%", height: resultView === "all" ? Math.max(240, results.length * 56) : 280 }}>
+              {/* Row pitch drives the panel height, so it shrinks with the bars
+                  rather than leaving a tall band of empty space. At 28px per
+                  building a 20-building portfolio is ~600px instead of ~1120. */}
+              <div style={{ width: "100%", height: resultView === "all" ? Math.max(130, results.length * 28 + 46) : 280 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   {resultView === "all" ? (
-                    <BarChart data={allBuildingsChartData} layout="vertical" margin={{ top: 8, right: 20, left: 10, bottom: 0 }}>
+                    <BarChart data={allBuildingsChartData} layout="vertical" barSize={20} margin={{ top: 8, right: 20, left: 10, bottom: 0 }}>
                       <CartesianGrid stroke="rgba(255,255,255,0.06)" horizontal={false} />
                       <XAxis type="number" stroke="rgba(255,255,255,0.35)" tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10 }} unit=" kWh/m²·yr" />
                       <YAxis type="category" dataKey="shortName" width={180} stroke="rgba(255,255,255,0.25)" tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 10 }} />
@@ -542,6 +608,7 @@ export default function BaselineSetup() {
                         labelFormatter={(_, payload) => (payload?.[0]?.payload?.name as string) ?? ""}
                       />
                       <Bar dataKey="heating" stackId="enduse" fill={END_USE_COLORS.heating} radius={[0, 0, 0, 0]} name="Heating" />
+                      <Bar dataKey="dhw" stackId="enduse" fill={END_USE_COLORS.dhw} radius={[0, 0, 0, 0]} name="Hot water" />
                       <Bar dataKey="cooling" stackId="enduse" fill={END_USE_COLORS.cooling} radius={[0, 0, 0, 0]} name="Cooling" />
                       <Bar dataKey="lighting" stackId="enduse" fill={END_USE_COLORS.lighting} radius={[0, 0, 0, 0]} name="Lighting" />
                       <Bar dataKey="equipment" stackId="enduse" fill={END_USE_COLORS.equipment} radius={[0, 4, 4, 0]} name="Equipment" />
@@ -605,7 +672,11 @@ export default function BaselineSetup() {
                     even when the run itself included it. The total is the sum of
                     all five end uses by construction, so the residual recovers it
                     exactly - and stays 0 for genuinely DHW-free older runs. */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
+                {/* Fixed six columns, not auto-fit: with a min track width the
+                    sixth tile (hot water) wrapped onto its own line and looked
+                    like a separate, lesser thing. minmax(0,1fr) lets them
+                    compress instead of wrapping. */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 8 }}>
                   {[
                     { icon: <BarChart2 size={13} color="#E8880C" />, label: "Total energy use", value: `${r.energyUse} kWh/m²·yr`, color: "#E8880C" },
                     { icon: <Thermometer size={13} color="#E2483B" />, label: "Heating demand",   value: `${r.heating} kWh/m²·yr`,  color: "#fca5a5" },
@@ -616,14 +687,21 @@ export default function BaselineSetup() {
                       value: `${r.dhw || Math.max(0, Math.round((r.energyUse - r.heating - r.cooling - r.lighting - r.equipment) * 10) / 10)} kWh/m²·yr`,
                       color: "#93c5fd" },
                   ].map(m => (
-                    <div key={m.label} style={{ borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>{m.icon}<span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{m.label}</span></div>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: m.color }}>{m.value}</div>
+                    <div key={m.label} style={{ borderRadius: 8, padding: "10px 10px", minWidth: 0, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5, minWidth: 0 }}>{m.icon}<span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</span></div>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: m.color, whiteSpace: "nowrap",
+                                    overflow: "hidden", textOverflow: "ellipsis" }} title={m.value}>{m.value}</div>
                     </div>
                   ))}
                 </div>
               </div>
             ))}
+            {project.baselineBatchId && (
+              <BaselineLoadProfile
+                batchId={project.baselineBatchId}
+                addresses={results.map((r, i) => r.address || `Building ${i + 1}`)}
+              />
+            )}
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
               * Real EnergyPlus (EPSM) output. Hot water is simulated from a Sveby standard draw profile for the
               building's use category (25 kWh/m²·yr for dwellings — the Göteborg EPC median is 23.6), so it is a

@@ -145,6 +145,12 @@ OUTPUT_VARIABLE_NAMES = [
     "VRF Heat Pump Heating Electricity Energy",
     "Water Heater Electricity Energy",
     "Water Heater NaturalGas Energy",
+    # Our DHW heater burns DistrictHeatingWater, so neither of the two above
+    # ever fires. These two give the hourly trace behind the "Water Systems"
+    # end use; runs made before they were added simply have no DHW series and
+    # the load-profile chart reports it as unavailable rather than as zero.
+    "Water Heater DistrictHeatingWater Energy",
+    "Water Heater Heating Energy",
     "Water Use Equipment Heating Energy",
     "Zone Electric Equipment Electricity Energy",
     "Zone Gas Equipment NaturalGas Energy",

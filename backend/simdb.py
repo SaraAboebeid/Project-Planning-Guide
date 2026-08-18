@@ -224,6 +224,32 @@ def find_all_near(lat: float, lon: float, radius_m: float) -> list[dict]:
         con.close()
 
 
+def latest_batch_near(lat: float, lon: float, radius_m: float, package_id: str) -> Optional[dict]:
+    """The most recent batch id covering this point for one package.
+
+    Selects only the few columns it needs - unlike find_all_near, which returns
+    whole records including the 8760-hour trace inside `results` and would be
+    megabytes per building.
+    """
+    con = _connect()
+    try:
+        lo_lat, hi_lat, lo_lon, hi_lon = _bbox(lat, lon, radius_m)
+        rows = con.execute(
+            """SELECT lat, lon, epsm_simulation_id, submitted_at, status
+               FROM simulations
+               WHERE package_id = ? AND epsm_simulation_id IS NOT NULL
+                 AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?
+               ORDER BY submitted_at DESC""",
+            (package_id, lo_lat, hi_lat, lo_lon, hi_lon),
+        ).fetchall()
+        for r in rows:
+            if _haversine_m(r["lat"], r["lon"], lat, lon) <= radius_m:
+                return {"batch_id": r["epsm_simulation_id"], "submitted_at": r["submitted_at"], "status": r["status"]}
+        return None
+    finally:
+        con.close()
+
+
 def all_records() -> list[dict]:
     con = _connect()
     try:

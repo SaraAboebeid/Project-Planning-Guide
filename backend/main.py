@@ -3035,6 +3035,140 @@ async def simulation_batch_status(batch_id: str):
     }
 
 
+# ── Baseline load profiles (monthly / hourly) ───────────────────────────────
+#
+# EPSM already returns a full 8760-hour trace per building inside each result's
+# `raw.hourly_timeseries`, in JOULES, keyed by EnergyPlus's own mangled
+# "<ZONE>_<Variable>_J" names. That payload is far too big to push into the
+# wizard store (4-5 series x 8760 floats x N buildings), so it stays in the
+# simulation database and is aggregated here, on demand, per request.
+
+# Match on the suffix: the prefix is the zone/equipment name, which differs per
+# building. Two DHW spellings because the fuel-specific variable name depends on
+# the heater's fuel type, and "Heating Energy" is the fuel-agnostic fallback.
+_TS_END_USE_SUFFIXES: list[tuple[str, str]] = [
+    ("Zone_Ideal_Loads_Supply_Air_Total_Heating_Energy_J", "heating"),
+    ("Zone_Ideal_Loads_Supply_Air_Total_Cooling_Energy_J", "cooling"),
+    ("Zone_Lights_Electricity_Energy_J", "lighting"),
+    ("Zone_Electric_Equipment_Electricity_Energy_J", "equipment"),
+    ("Water_Heater_DistrictHeatingWater_Energy_J", "dhw"),
+    ("Water_Heater_Heating_Energy_J", "dhw"),
+]
+
+# Hours per calendar month in a non-leap year; sums to 8760, which is exactly
+# the trace length EnergyPlus returns for our RunPeriod.
+_MONTH_HOURS = [744, 672, 744, 720, 744, 720, 744, 744, 720, 744, 720, 744]
+_MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+_J_TO_KWH = 1.0 / 3_600_000.0
+
+
+def _end_use_of_series(name: str) -> Optional[str]:
+    for suffix, end_use in _TS_END_USE_SUFFIXES:
+        if name.endswith(suffix):
+            return end_use
+    return None
+
+
+def _timeseries_for_row(row: dict, resolution: str) -> Optional[dict]:
+    """Aggregate one building's hourly trace into kWh per end use.
+
+    Returns None when the run carries no trace at all (older records, or a
+    building that failed) so the caller can report it as unavailable rather
+    than as a building whose demand is genuinely zero.
+    """
+    results = row.get("results") or {}
+    ts = (results.get("raw") or {}).get("hourly_timeseries") or {}
+    series = ts.get("series") or {}
+    if not series:
+        return None
+
+    # Several EnergyPlus variables can map to the same end use (e.g. a zone
+    # split across objects), so accumulate rather than overwrite.
+    totals: dict[str, list[float]] = {}
+    for name, values in series.items():
+        end_use = _end_use_of_series(name)
+        if end_use is None or not isinstance(values, list):
+            continue
+        bucket = totals.setdefault(end_use, [0.0] * len(values))
+        for i, v in enumerate(values):
+            if i < len(bucket):
+                bucket[i] += float(v or 0.0)
+
+    if not totals:
+        return None
+
+    out: dict[str, list[float]] = {}
+    for end_use, hourly_j in totals.items():
+        if resolution == "hourly":
+            out[end_use] = [round(v * _J_TO_KWH, 4) for v in hourly_j]
+        else:
+            monthly, cursor = [], 0
+            for hours in _MONTH_HOURS:
+                chunk = hourly_j[cursor:cursor + hours]
+                monthly.append(round(sum(chunk) * _J_TO_KWH, 2))
+                cursor += hours
+            out[end_use] = monthly
+    return out
+
+
+@app.get("/api/baseline-batch-lookup")
+async def baseline_batch_lookup(
+    lat: float = Query(...), lon: float = Query(...), radius_m: float = Query(25),
+    package_id: str = Query("baseline"),
+):
+    """Resolve the most recent batch id for a building, so the load-profile
+    charts work on baselines that were run before the id started being saved in
+    the wizard - the trace is already in the database; only the pointer to it
+    was missing. Returns just the id, never the payload."""
+    hit = simdb.latest_batch_near(lat, lon, radius_m, package_id)
+    if hit is None:
+        return {"found": False, "batch_id": None}
+    return {"found": True, **hit}
+
+
+@app.get("/api/simulation-timeseries/{batch_id}")
+async def simulation_timeseries(
+    batch_id: str,
+    resolution: str = Query("monthly", pattern="^(monthly|hourly)$"),
+    idf_idx: Optional[int] = Query(None, description="Limit to one building; required in practice for hourly, which is 8760 points per series."),
+):
+    """Monthly or hourly baseline load profile per end use, in kWh.
+
+    Reads the trace EPSM already stored with each result - no re-simulation.
+    """
+    rows = simdb.get_by_epsm_id(batch_id)
+    if not rows:
+        raise HTTPException(404, "Unknown batch_id")
+    if idf_idx is not None:
+        rows = [r for r in rows if r["idf_idx"] == idf_idx]
+        if not rows:
+            raise HTTPException(404, f"No building with idf_idx={idf_idx} in this batch")
+
+    buildings = []
+    for row in rows:
+        results = row.get("results") or {}
+        series = _timeseries_for_row(row, resolution)
+        buildings.append({
+            "idf_idx": row["idf_idx"],
+            "address": row["address"],
+            "total_floor_area_m2": results.get("total_floor_area_m2"),
+            "series": series or {},
+            # Explicit so the UI can say "this run predates hourly output" rather
+            # than drawing an empty chart that reads as zero demand.
+            "available": sorted(series.keys()) if series else [],
+        })
+
+    return {
+        "batch_id": batch_id,
+        "resolution": resolution,
+        "unit": "kWh",
+        "labels": _MONTH_LABELS if resolution == "monthly" else list(range(8760)),
+        "buildings": buildings,
+    }
+
+
 @app.get("/api/simulation-lookup")
 async def lookup_simulation(
     lat: float = Query(...), lon: float = Query(...), radius_m: float = Query(25),
