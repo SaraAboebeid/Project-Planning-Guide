@@ -40,7 +40,7 @@ export default function DecisionAnalysisPanel({
     <PanelShell
       icon={<Scale size={17} />}
       iconColor="#4ECDC4"
-      title="Compare retrofit choices across future energy prices"
+      title="Compare renovation choices across future energy prices"
       subtitle="The same options tested across low / medium / high energy-price futures"
     >
       <p style={{ fontSize: 11.5, color: white(0.4), margin: "8px 0 14px", lineHeight: 1.6, maxWidth: 720 }}>

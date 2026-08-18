@@ -99,12 +99,13 @@ interface ComponentConfig {
    cards of equal weight and you can't tell what to do first. `state` dims a
    stage that isn't reachable yet and says what unlocks it. */
 function StageHeader({
-  n, title, hint, state = "active", onClick,
+  n, title, hint, state = "active", isOpen = false, onClick,
 }: {
   n: number;
   title: string;
   hint?: string;
   state?: "active" | "waiting" | "done";
+  isOpen?: boolean;
   onClick?: () => void;
 }) {
   const dim = state === "waiting";
@@ -114,18 +115,35 @@ function StageHeader({
       type="button"
       onClick={onClick}
       style={{
-        display: "flex", alignItems: "baseline", gap: 10, margin: "6px 0 2px", opacity: dim ? 0.55 : 1,
-        background: "transparent", border: 0, padding: 0, cursor: onClick ? "pointer" : "default", textAlign: "left",
+        width: "100%",
+        display: "flex", alignItems: "center", gap: 12,
+        padding: "13px 18px",
+        opacity: dim ? 0.55 : 1,
+        background: isOpen ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
+        border: `1px solid ${isOpen ? accent + "55" : "rgba(255,255,255,0.08)"}`,
+        borderRadius: 12,
+        cursor: onClick ? "pointer" : "default",
+        textAlign: "left",
+        transition: "border-color 0.18s, background 0.18s",
       }}
     >
+      {/* Number bubble */}
       <span style={{
-        flexShrink: 0, width: 20, height: 20, borderRadius: "50%", display: "inline-flex",
+        flexShrink: 0, width: 24, height: 24, borderRadius: "50%", display: "inline-flex",
         alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
         color: dim ? "rgba(255,255,255,0.4)" : "#0b1220", background: accent,
-        transform: "translateY(3px)",
-      }}>{n}</span>
-      <span style={{ fontSize: 13.5, fontWeight: 800, color: dim ? "rgba(255,255,255,0.55)" : "#fff" }}>{title}</span>
-      {hint && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{hint}</span>}
+      }}>{state === "done" && !isOpen ? "✓" : String(n)}</span>
+      {/* Labels */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13.5, fontWeight: 800, color: dim ? "rgba(255,255,255,0.55)" : "#fff" }}>{title}</span>
+        {hint && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.38)" }}>{hint}</span>}
+      </div>
+      {/* Chevron */}
+      <ChevronDown size={15} style={{
+        flexShrink: 0, color: "rgba(255,255,255,0.35)",
+        transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+        transition: "transform 0.18s",
+      }} />
     </button>
   );
 }
@@ -602,7 +620,7 @@ export default function RenovationSimulator() {
   const [livePriceSek, setLivePriceSek] = useState<number | null>(null);
   const [packageName, setPackageName] = useState("");
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
-  const [openStage, setOpenStage] = useState<number>(1);
+  const [openStage, setOpenStage] = useState<number | null>(1);
   // Results can be read two ways: by package (portfolio aggregate per design) or
   // by building (every address as a row, baseline next to each package so you can
   // compare a single building across all designs). The matrix is what a user means
@@ -885,14 +903,32 @@ export default function RenovationSimulator() {
   const stageProgress = [
     { n: 1, ready: geometries.length > 0 },
     { n: 2, ready: geometries.length > 0 && hasEnvelope },
-    { n: 3, ready: geometries.length > 0 && hasEnvelope && packageCombosList.length > 0 },
+    { n: 3, ready: packages.filter((p) => !p.isBaseline).length > 0 },
     { n: 4, ready: packages.filter((p) => !p.isBaseline).length > 0 },
   ] as const;
   const firstIncompleteStage = stageProgress.find((stage) => !stage.ready)?.n ?? 4;
+
+  // Stage section refs for auto-scrolling when a stage opens
+  const stageRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const prevOpenStage = useRef(openStage);
+
+  // Auto-advance when a stage becomes complete (firstIncompleteStage moves forward),
+  // but never constrain manual backward navigation — removing openStage from deps
+  // is intentional: we only want this to fire when the *completed* set changes.
   useEffect(() => {
-    if (openStage < firstIncompleteStage) setOpenStage(firstIncompleteStage);
-    if (openStage > 4) setOpenStage(4);
-  }, [firstIncompleteStage, openStage]);
+    if ((openStage ?? 0) < firstIncompleteStage) setOpenStage(firstIncompleteStage);
+  }, [firstIncompleteStage]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-scroll to the newly opened stage
+  useEffect(() => {
+    if (openStage !== prevOpenStage.current) {
+      prevOpenStage.current = openStage;
+      if (openStage !== null) {
+        const el = stageRefs.current[openStage];
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }, [openStage]);
 
   const comboKey = (combo: ComponentConfig[]) => combo.map((c) => c.id).join("+");
   const activeCombos = packageCombosList.filter((c) => !excludedCombos.has(comboKey(c)));
@@ -1311,27 +1347,29 @@ export default function RenovationSimulator() {
         </div>
       )}
 
-      {/* Renovation scope — add/remove components to test; nudges when the
-          climate target isn't reached by the current (envelope-subset) scope. */}
-      {!isUK && geometries.length > 0 && (
-        <ComponentScopePanel
-          components={components}
-          onChange={(next) => setProject({ renovationEnvelopeComponents: next })}
-          goalAssessment={goalAssessment}
-        />
-      )}
-
       {geometries.length > 0 && (
-        <StageHeader n={1} title="Buildings & baseline"
-          hint={baselineAgg?.avgTotalKwhM2Yr != null
-            ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr`
-            : "running the as-built simulation…"}
-          state={baselineAgg?.avgTotalKwhM2Yr != null ? "done" : "active"}
-          onClick={() => setOpenStage(1)} />
+        <>
+          <div ref={(el) => { stageRefs.current[1] = el; }} style={{ scrollMarginTop: 80 }} />
+          <StageHeader n={1} title="Renovation scope"
+            hint={baselineAgg?.avgTotalKwhM2Yr != null
+              ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr`
+              : undefined}
+            state={baselineAgg?.avgTotalKwhM2Yr != null ? "done" : "active"}
+            isOpen={openStage === 1}
+            onClick={() => setOpenStage((s) => (s === 1 ? null : 1))} />
+        </>
       )}
 
-      {/* ── Buildings & baseline performance + package target selector ── */}
+      {/* ── Buildings & components: scope toggles + building picker ── */}
       {geometries.length > 0 && openStage === 1 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {!isUK && (
+          <ComponentScopePanel
+            components={components}
+            onChange={(next) => setProject({ renovationEnvelopeComponents: next })}
+            goalAssessment={goalAssessment}
+          />
+        )}
         <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Buildings & baseline performance</span>
@@ -1391,26 +1429,32 @@ export default function RenovationSimulator() {
             </p>
           )}
         </div>
-      )}
-
-      {geometries.length > 0 && isUK && (
-        <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(114,28,184,0.2)" }}>
-          <UkTierPicker
-            archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier}
-            footprintM2={geometries[0]?.footprintM2 ?? null} buildingCount={geometries.length}
-            uSource={geometries[0]?.tabulaUSource ?? null}
-          />
+        {isUK && (
+          <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(114,28,184,0.2)" }}>
+            <UkTierPicker
+              archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier}
+              footprintM2={geometries[0]?.footprintM2 ?? null} buildingCount={geometries.length}
+              uSource={geometries[0]?.tabulaUSource ?? null}
+            />
+          </div>
+        )}
         </div>
       )}
 
       {geometries.length > 0 && !isUK && hasEnvelope && (
         <>
-          <StageHeader n={2} title="Design configurations"
-            hint={configs.length
-              ? configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" · ")
-              : "save one or more build-ups per component"}
+          <div ref={(el) => { stageRefs.current[2] = el; }} style={{ scrollMarginTop: 80 }} />
+          <StageHeader n={2} title="Renovation Packages"
+            hint={(() => {
+              const parts: string[] = [];
+              if (baselineAgg?.avgTotalKwhM2Yr != null) parts.push(`baseline ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr`);
+              if (configs.length) parts.push(configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" · "));
+              if (packageCombosList.length) parts.push(`${activeCombos.length}/${packageCombosList.length} packages`);
+              return parts.length ? parts.join("  ·  ") : "save one or more build-ups per component";
+            })()}
             state={configs.length ? "done" : "active"}
-            onClick={() => setOpenStage(2)} />
+            isOpen={openStage === 2}
+            onClick={() => setOpenStage((s) => (s === 2 ? null : 2))} />
 
           {/* Supplier discount — the % the property owner gets off catalogue material
               prices; deducted from every material cost (Wikells is Sweden-only). */}
@@ -1637,16 +1681,8 @@ export default function RenovationSimulator() {
 
       {geometries.length > 0 && (
         <>
-          {/* ══ PACKAGES — the product of your configurations ══════════════ */}
-          {!isUK && hasEnvelope && (
-            <StageHeader n={3} title="Packages"
-              hint={packageCombosList.length
-                ? `${activeCombos.length} selected of ${packageCombosList.length}`
-                : "needs at least one configuration"}
-              state={packageCombosList.length ? "active" : "waiting"}
-              onClick={() => setOpenStage(3)} />
-          )}
-          {!isUK && hasEnvelope && openStage === 3 && (
+          {/* ══ PACKAGES — folded into stage 2 (Design & Packages) ══════ */}
+          {!isUK && hasEnvelope && openStage === 2 && (
             <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Packages</span>
@@ -1705,7 +1741,7 @@ export default function RenovationSimulator() {
           )}
 
           {/* UK keeps the tier-based flow */}
-          {isUK && (
+          {isUK && openStage === 2 && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <input value={packageName} onChange={(e) => setPackageName(e.target.value)}
                 placeholder="Package name (optional)"
@@ -1721,7 +1757,7 @@ export default function RenovationSimulator() {
 
           {/* The trade-off curve now updates live from the same picks, so it's a
               companion view (not a separate "run this instead" tool). */}
-          {!isUK && hasEnvelope && (
+          {!isUK && hasEnvelope && openStage === 2 && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 -4px" }}>
               <span style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
               <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>
@@ -1734,7 +1770,7 @@ export default function RenovationSimulator() {
           {/* Multi-objective optimizer (Sweden) — Pareto front over the fast
               degree-day physics; each validated winner runs in EPSM and drops
               into the comparison table below. */}
-          {!isUK && hasEnvelope && (
+          {!isUK && hasEnvelope && openStage === 2 && (
             <OptimizerPanel
               input={optimizerInput.input}
               disabledReason={optimizerInput.disabledReason}
@@ -1746,14 +1782,16 @@ export default function RenovationSimulator() {
           )}
 
           {(isUK || hasEnvelope) && (<>
-          <StageHeader n={4} title="Results"
+          <div ref={(el) => { stageRefs.current[3] = el; }} style={{ scrollMarginTop: 80 }} />
+          <StageHeader n={3} title="Results"
             hint={packages.filter((p) => !p.isBaseline).length
               ? `${packages.filter((p) => !p.isBaseline).length} package${packages.filter((p) => !p.isBaseline).length === 1 ? "" : "s"} vs baseline`
               : "simulate a package to compare"}
             state={packages.filter((p) => !p.isBaseline).length ? "active" : "waiting"}
-            onClick={() => setOpenStage(4)} />
+            isOpen={openStage === 3}
+            onClick={() => setOpenStage((s) => (s === 3 ? null : 3))} />
 
-          {openStage === 4 && (
+          {openStage === 3 && (
           <>
           {/* Prominent "EnergyPlus is running" banner so it's obvious a simulation
               is in flight and results will appear on their own (no click needed). */}
@@ -1985,28 +2023,8 @@ export default function RenovationSimulator() {
 
           </>)}
 
-          {/* City climate target — which package reaches Gothenburg's −30% by 2030 */}
-          {(isUK || hasEnvelope) && goalAssessment && <ClimateGoalPanel a={goalAssessment} />}
-
-          {/* Regret / robustness decision analysis under uncertain energy prices.
-              Kept next to the envelope/package discussion (materials → packages →
-              trade-offs) so the flow isn't interrupted. */}
-          {regretResult && regretResult.options.length >= 2 && (
-            <DecisionAnalysisPanel
-              result={regretResult}
-              alpha={regretAlpha}
-              setAlpha={setRegretAlpha}
-              prices={regretPrices}
-              setPrices={setRegretPrices}
-              currentPrice={livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8}
-            />
-          )}
-
-          {/* Heating-system (HVAC source) comparison on the baseline heat demand.
-              Comes LAST — it's a supply-side topic (heating source), separate from
-              the envelope/material/package discussion above. Shown only when
-              heating is in scope (Step 1 or added in Step 4). */}
-          {!isUK && hasHeating && baselineAgg?.avgHeatingKwhM2Yr != null && totalFloorAreaM2 > 0 && (
+          {/* Heating system — only when HVAC is a selected renovation component */}
+          {openStage === 3 && !isUK && hasHeating && baselineAgg?.avgHeatingKwhM2Yr != null && totalFloorAreaM2 > 0 && (
             <HeatingSystemPanel
               heatingDemandKwhM2Yr={baselineAgg.avgHeatingKwhM2Yr}
               floorAreaM2={totalFloorAreaM2}
@@ -2016,6 +2034,31 @@ export default function RenovationSimulator() {
 
           </>
           )}
+
+          {/* ── Stage 4: Targets & Scenarios ── */}
+          {packages.filter((p) => !p.isBaseline).length > 0 && (<>
+            <div ref={(el) => { stageRefs.current[4] = el; }} style={{ scrollMarginTop: 80 }} />
+            <StageHeader n={4} title="Targets & Scenarios"
+              hint="climate target · future energy price scenarios"
+              state="active"
+              isOpen={openStage === 4}
+              onClick={() => setOpenStage((s) => (s === 4 ? null : 4))} />
+
+            {openStage === 4 && (<>
+              {goalAssessment && <ClimateGoalPanel a={goalAssessment} />}
+
+              {regretResult && regretResult.options.length >= 2 && (
+                <DecisionAnalysisPanel
+                  result={regretResult}
+                  alpha={regretAlpha}
+                  setAlpha={setRegretAlpha}
+                  prices={regretPrices}
+                  setPrices={setRegretPrices}
+                  currentPrice={livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8}
+                />
+              )}
+            </>)}
+          </>)}
 
         </>
       )}

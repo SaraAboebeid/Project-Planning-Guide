@@ -476,47 +476,64 @@ export default function DefineProject() {
   const pvTriggers = new Set(["Rooftop PV", "Community PV", "Facade PV"]);
   const hasPvSelected = [...pvTriggers].some((t) => systemsSet.has(t));
 
-  /* ── progressive reveal conditions ────────────────────────────── */
+  /* ── strict single-open stage conditions ──────────────────────── */
   // For Renovation Planning, Building Envelope is always in scope — auto-select it
   if (pt === "Renovation Planning" && !systemsSet.has("Building Envelope (Windows, Roof, Walls, Floors)")) {
     setProject({ systemsInScope: ["Building Envelope (Windows, Roof, Walls, Floors)"] });
   }
+
   const needsBuildingDevType = pt === "Energy Community Planning" || pt === "Renewable Energy Planning";
+  const projectTypeReady = !!pt;
   const projectNameReady = !!project.projectName.trim();
-  const showBuildingDevType  = needsBuildingDevType && projectNameReady;
-  const showSystems          = !!pt && projectNameReady && pt !== "Renovation Planning" && !!project.buildingDevelopmentType;
-  const showEcFocus        = pt === "Energy Community Planning" && projectNameReady && project.systemsInScope.length > 0;
+  const buildingTypeReady = !needsBuildingDevType || !!project.buildingDevelopmentType;
   const renovationComponentsChosen = pt === "Renovation Planning" && project.renovationEnvelopeComponents.length > 0;
-  // Keep renovation Step 1 in a strict sequence: choose the project name, then
-  // the renovation components, and only then reveal the evaluation method.
-  const systemsChosen      = pt === "Renovation Planning"
-                              ? renovationComponentsChosen
-                              : project.systemsInScope.length > 0;
-  const showExploration    = projectNameReady && !!pt && systemsChosen
-                              && (pt === "Renovation Planning"
-                                ? renovationComponentsChosen
-                                : (pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0));
-  const showKpis           = projectNameReady && showExploration && project.explorationApproaches.length > 0;
-  // Let users jump straight to Scale after choosing an exploration approach.
-  // KPIs remain visible and required, but no longer gate the Scale question.
-  const showScale          = projectNameReady && showKpis && project.selectedKpis.length > 0;
-  // Country/city are chosen once on the landing page (see LandingPage.tsx's
-  // startAt()), not asked again here - Step 1 used to have its own separate
-  // Country question, redundant now that Sweden/UK/etc have dedicated pages.
-  const showProjectName    = HIDE_PROJECT_TYPE ? true : !!pt;
-  const showLocation       = showProjectName && showScale && !!project.scale;
+  const systemsChosen = pt === "Renovation Planning"
+    ? renovationComponentsChosen
+    : project.systemsInScope.length > 0;
+  const ecFocusReady = pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0;
+  const explorationReady = project.explorationApproaches.length > 0;
+  const kpisReady = project.selectedKpis.length > 0;
+  const scaleReady = !!project.scale;
+  const locationReady = !!project.address.trim();
+
+  type Step1Stage = "projectType" | "projectName" | "buildingType" | "components" | "systems" | "ecFocus" | "exploration" | "kpis" | "scale" | "location" | "complete";
+
+  let activeStage: Step1Stage = "complete";
+  if (!HIDE_PROJECT_TYPE && !projectTypeReady) activeStage = "projectType";
+  else if (!projectNameReady) activeStage = "projectName";
+  else if (needsBuildingDevType && !buildingTypeReady) activeStage = "buildingType";
+  else if (!systemsChosen) activeStage = pt === "Renovation Planning" ? "components" : "systems";
+  else if (pt === "Energy Community Planning" && !ecFocusReady) activeStage = "ecFocus";
+  else if (!explorationReady) activeStage = "exploration";
+  else if (!kpisReady) activeStage = "kpis";
+  else if (!scaleReady) activeStage = "scale";
+  else if (!locationReady) activeStage = "location";
+
+  const showProjectName = activeStage === "projectName";
+  const showBuildingDevType = activeStage === "buildingType";
+  const showRenovationComponents = activeStage === "components";
+  const showSystems = activeStage === "systems";
+  const showEcFocus = activeStage === "ecFocus";
+  const showExploration = activeStage === "exploration";
+  const showKpis = activeStage === "kpis";
+  const showScale = activeStage === "scale";
+  const showLocation = activeStage === "location";
 
   /* ── auto-scroll to each newly revealed question ──────────────── */
-  // Count how many follow-up questions are currently revealed; when that grows,
-  // smoothly bring the newest one (the last .animate-fadeIn card) into view.
-  const revealCount =
-    (showBuildingDevType ? 1 : 0) +
-    (pt === "Renovation Planning" || showSystems ? 1 : 0) +
-    (showEcFocus ? 1 : 0) +
-    (showExploration ? 1 : 0) +
-    (showKpis ? 1 : 0) +
-    (showScale ? 1 : 0) +
-    (showProjectName ? 1 : 0);
+  const stageOrder: Step1Stage[] = [
+    ...(HIDE_PROJECT_TYPE ? [] : ["projectType"] as Step1Stage[]),
+    "projectName",
+    ...(needsBuildingDevType ? ["buildingType"] as Step1Stage[] : []),
+    ...(pt === "Renovation Planning" ? ["components"] as Step1Stage[] : ["systems"] as Step1Stage[]),
+    ...(pt === "Energy Community Planning" ? ["ecFocus"] as Step1Stage[] : []),
+    "exploration",
+    "kpis",
+    "scale",
+    "location",
+    "complete",
+  ];
+  const revealCount = Math.max(0, stageOrder.indexOf(activeStage));
+
   useEffect(() => {
     if (didMountRef.current && revealCount > prevRevealRef.current && rootRef.current) {
       const cards = rootRef.current.querySelectorAll<HTMLElement>(".animate-fadeIn");
@@ -717,7 +734,7 @@ export default function DefineProject() {
       </Card>
 
       {/* ── PROJECT NAME (first, when the project type is fixed) ── */}
-      {HIDE_PROJECT_TYPE && (() => {
+      {HIDE_PROJECT_TYPE && showProjectName && (() => {
         const nameMissing = validationErrors.includes("a project name") && !project.projectName.trim();
         return (
           <Card className="animate-fadeIn">
@@ -730,11 +747,11 @@ export default function DefineProject() {
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1 ${
                 nameMissing ? "border-red-400" : "border-gray-300"}`}
             />
-            <p className="mt-1 text-[11px]" style={{ color: nameMissing ? "#fca5a5" : "rgba(255,255,255,0.4)" }}>
-              {nameMissing
-                ? "A project name is required — it's used to label your project and any data you edit in Step 2."
-                : "Required — labels your project and links any data you edit in Step 2."}
-            </p>
+            {nameMissing && (
+              <p className="mt-1 text-[11px]" style={{ color: "#fca5a5" }}>
+                A project name is required — it's used to label your project and any data you edit in Step 2.
+              </p>
+            )}
           </Card>
         );
       })()}
@@ -762,7 +779,7 @@ export default function DefineProject() {
       )}
 
       {/* ── RENOVATION ENVELOPE COMPONENTS ── */}
-      {pt === "Renovation Planning" && projectNameReady && !renovationComponentsChosen && (
+      {showRenovationComponents && (
         <Card className="animate-fadeIn">
           <div style={{ marginBottom: 14 }}>
             <Label required>Renovation components</Label>
@@ -1308,11 +1325,11 @@ export default function DefineProject() {
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1 ${
                 nameMissing ? "border-red-400" : "border-gray-300"}`}
             />
-            <p className="mt-1 text-[11px]" style={{ color: nameMissing ? "#fca5a5" : "rgba(255,255,255,0.4)" }}>
-              {nameMissing
-                ? "A project name is required — it's used to label your project and any data you edit in Step 2."
-                : "Required — labels your project and links any data you edit in Step 2."}
-            </p>
+            {nameMissing && (
+              <p className="mt-1 text-[11px]" style={{ color: "#fca5a5" }}>
+                A project name is required — it's used to label your project and any data you edit in Step 2.
+              </p>
+            )}
           </Card>
         );
       })()}

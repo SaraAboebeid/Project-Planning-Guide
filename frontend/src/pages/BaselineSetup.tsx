@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationBaselineResult } from "../store/wizard";
 import { api } from "../api/client";
@@ -99,6 +99,8 @@ export default function BaselineSetup() {
   const [simError, setSimError] = useState<string | null>(null);
   const [resultView, setResultView] = useState<"all" | "building">("all");
   const [activeResultAddress, setActiveResultAddress] = useState<string | null>(null);
+  // Ref to the results section so we can auto-scroll when simulation completes
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   // Which buildings to run the baseline for. null means: fall back to the
   // Step 2 shortlist or all buildings by default. Keep a dedicated mode so the
@@ -257,6 +259,10 @@ export default function BaselineSetup() {
           setProject({ baselineStatus: "done", renovationBaselineResults: mapped });
           setSimRunning(false);
           setSimProgress(100);
+          // Auto-scroll to results
+          setTimeout(() => {
+            resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 150);
           return;
         }
         await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -430,7 +436,7 @@ export default function BaselineSetup() {
 
         {/* Real EPSM results */}
         {project.baselineStatus === "done" && !simRunning && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+          <div ref={resultsRef} style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18, scrollMarginTop: 80 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 2 }}>
               EPSM Baseline Results
             </div>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useWizardStore } from "../store/wizard";
 import { api } from "../api/client";
 import { setWizardCanNext, setWizardNextError } from "../components/wizardNav";
@@ -7,7 +7,7 @@ import FacadeDefectPanel, { type FacadeBuilding } from "../components/FacadeDefe
 import RetrofitPriorityPanel from "../components/RetrofitPriorityPanel";
 import { makeBuildingKeys, type PriorityInput } from "../utils/retrofitPriority";
 import {
-  ChevronUp,
+  ChevronUp, ChevronDown,
   Download, Upload, Plus, Pencil, MapPin, Building2, Loader2, Layers, Globe2, Database,
 } from "lucide-react";
 
@@ -2449,11 +2449,152 @@ export default function DataCoverage() {
       {/* Facade condition — AI defect detection on user-uploaded facade photos.
           Only when the walls are in the renovation scope (Step 1); otherwise
           prioritisation runs on building performance alone. */}
-      {wallsInScope && facadeBuildings.length > 0 && <FacadeDefectPanel buildings={facadeBuildings} />}
 
-      {/* Retrofit prioritization — ranking of the buildings in scope */}
-      {priorityItems.length > 0 && <RetrofitPriorityPanel items={priorityItems} />}
+      {/* Step 2 sequential accordion: Facade Detection → Renovation Prioritisation.
+          Only one section is open at a time; each section auto-scrolls into view
+          when it opens. The Facade section is shown only when Walls are in scope. */}
+      {(() => {
+        type Sec2 = "facade" | "priority";
+        // Use module-level refs via a small wrapper so we keep a single shared
+        // state without a separate sub-component.
+        return <Step2Sections
+          showFacade={wallsInScope && facadeBuildings.length > 0}
+          facadeBuildings={facadeBuildings}
+          priorityItems={priorityItems}
+        />;
+      })()}
 
+    </div>
+  );
+}
+
+/* ── Step2Sections ──────────────────────────────────────────────── */
+function Step2Sections({
+  showFacade, facadeBuildings, priorityItems,
+}: {
+  showFacade: boolean;
+  facadeBuildings: FacadeBuilding[];
+  priorityItems: PriorityInput[];
+}) {
+  // Strict single-open accordion: facade first (if walls in scope), then
+  // prioritisation.
+  const firstSection: "facade" | "priority" = showFacade ? "facade" : "priority";
+  const [openSec, setOpenSec] = useState<"facade" | "priority">(firstSection);
+  const prevOpen = useRef<string>(firstSection);
+  const facadeRef = useRef<HTMLDivElement>(null);
+  const priorityRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to whatever section just opened.
+  useEffect(() => {
+    if (openSec === prevOpen.current) return;
+    prevOpen.current = openSec;
+    const el = openSec === "facade" ? facadeRef.current : priorityRef.current;
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [openSec]);
+
+  // Section header used for both sections.
+  function SectionHeader({
+    id, label, subtitle, done,
+  }: { id: "facade" | "priority"; label: string; subtitle: string; done?: boolean }) {
+    const isOpen = openSec === id;
+    return (
+      <button
+        type="button"
+        onClick={() => setOpenSec(id)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 12,
+          padding: "14px 18px", background: "transparent", border: 0, cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        {/* Number bubble */}
+        <div style={{
+          width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: isOpen ? "#4ECDC4" : done ? "rgba(47,180,119,0.25)" : "rgba(255,255,255,0.07)",
+          border: `1.5px solid ${isOpen ? "#4ECDC4" : done ? "rgba(47,180,119,0.5)" : "rgba(255,255,255,0.12)"}`,
+          fontSize: 11, fontWeight: 800, color: isOpen ? "#0b1220" : done ? "#2FB477" : "rgba(255,255,255,0.4)",
+        }}>
+          {done && !isOpen ? "✓" : id === "facade" ? "1" : showFacade ? "2" : "1"}
+        </div>
+        {/* Labels */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: isOpen ? "#fff" : "rgba(255,255,255,0.55)" }}>
+            {label}
+          </div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>{subtitle}</div>
+        </div>
+        {/* Chevron */}
+        {isOpen
+          ? <ChevronUp size={14} color="rgba(255,255,255,0.4)" />
+          : <ChevronDown size={14} color="rgba(255,255,255,0.2)" />}
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* ─ Facade Detection ─ */}
+      {showFacade && (
+        <div
+          ref={facadeRef}
+          style={{
+            borderRadius: 14,
+            border: `1px solid ${openSec === "facade" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            background: "rgba(255,255,255,0.02)",
+            overflow: "hidden",
+            transition: "border-color 0.18s",
+          }}
+        >
+          <SectionHeader
+            id="facade"
+            label="Facade Condition Detection"
+            subtitle="Upload photos to detect surface defects with AI"
+          />
+          {openSec === "facade" && (
+            <div style={{ padding: "0 18px 18px" }}>
+              <FacadeDefectPanel buildings={facadeBuildings} />
+              {/* After reviewing defects, advance to prioritisation */}
+              <button
+                type="button"
+                onClick={() => setOpenSec("priority")}
+                style={{
+                  marginTop: 14, padding: "9px 20px", borderRadius: 9, border: 0,
+                  background: "linear-gradient(135deg,#4ECDC4,#2FB477)",
+                  color: "#0b1220", fontSize: 12, fontWeight: 800, cursor: "pointer",
+                }}
+              >
+                Next → Renovation Prioritisation
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─ Renovation Prioritisation ─ */}
+      {priorityItems.length > 0 && (
+        <div
+          ref={priorityRef}
+          style={{
+            borderRadius: 14,
+            border: `1px solid ${openSec === "priority" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            background: "rgba(255,255,255,0.02)",
+            overflow: "hidden",
+            transition: "border-color 0.18s",
+          }}
+        >
+          <SectionHeader
+            id="priority"
+            label="Renovation Prioritisation"
+            subtitle="Buildings ranked by energy performance and upgrade potential"
+          />
+          {openSec === "priority" && (
+            <div style={{ padding: "0 18px 18px" }}>
+              <RetrofitPriorityPanel items={priorityItems} />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
