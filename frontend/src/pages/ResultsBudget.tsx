@@ -29,7 +29,7 @@ const PHASE_SPLIT: [string, number][] = [
   ["Validation & QA",      0.15],
   ["Reporting",            0.10],
 ];
-const TL_COLORS = ["#721CB8", "#995BD5", "#2FB477", "#509724", "#3a6e1a"];
+const TL_COLORS = ["#5A1790", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
 
 function fmt(d: Date) { return d.toISOString().slice(0, 10); }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
@@ -38,7 +38,7 @@ function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDat
 const CONSULTANT_RATES: Record<string, number> = {
   SEK: 1400, EUR: 140, USD: 150, GBP: 130, NOK: 1500, DKK: 1050,
 };
-const PIE_COLORS = ["#721CB8", "#995BD5", "#2FB477", "#509724", "#3a6e1a"];
+const PIE_COLORS = ["#5A1790", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
 
 function fmtNum(n: number) { return n.toLocaleString(); }
 
@@ -230,8 +230,8 @@ export default function ResultsBudget() {
       {/* Summary stat strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { value: String(totalDelivs),          label: "Deliverables",  color: "text-[#721CB8]", bg: "bg-[#721CB8]/8" },
-          { value: `${userTotalHours} hrs`,       label: "Est. Effort",   color: "text-[#995BD5]", bg: "bg-[#995BD5]/10" },
+          { value: String(totalDelivs),          label: "Deliverables",  color: "text-[#5A1790]", bg: "bg-[#5A1790]/8" },
+          { value: `${userTotalHours} hrs`,       label: "Est. Effort",   color: "text-[#6E2AAE]", bg: "bg-[#6E2AAE]/10" },
           { value: `${userWeeks} wk`,             label: "Duration",      color: "text-[#509724]", bg: "bg-[#2FB477]/20" },
           { value: `${fmtNum(serviceCost)} ${currency}`, label: "Service Cost", color: "text-[#3a6e1a]", bg: "bg-[#509724]/10" },
         ].map(s => (
@@ -255,7 +255,7 @@ export default function ResultsBudget() {
                 onClick={() => setSelectedPkgId(t.pkg.id)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
                   selectedPkgId === t.pkg.id
-                    ? "border-[#721CB8] bg-[#721CB8]/8 text-[#721CB8]"
+                    ? "border-[#5A1790] bg-[#5A1790]/8 text-[#5A1790]"
                     : "border-slate-200 text-slate-500 hover:border-slate-300"
                 }`}
               >
@@ -280,7 +280,7 @@ export default function ResultsBudget() {
       )}
 
       {/* ── Timeline ── */}
-      <Section title="Project Timeline" icon={<Calendar className="w-5 h-5 text-[#995BD5]" />}>
+      <Section title="Project Timeline" icon={<Calendar className="w-5 h-5 text-[#6E2AAE]" />}>
         <div className="flex flex-wrap gap-4 mb-4">
           <div>
             <label className="text-xs text-slate-500 block mb-1">Start date</label>
@@ -288,12 +288,12 @@ export default function ResultsBudget() {
               type="date"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
-              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#721CB8]/30"
+              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A1790]/30"
             />
           </div>
           <button
             onClick={() => setPhaseHours(Object.fromEntries(PHASE_SPLIT.map(([p, f]) => [p, Math.round(totalHours * f)])))}
-            className="self-end text-xs text-[#995BD5] hover:underline"
+            className="self-end text-xs text-[#6E2AAE] hover:underline"
           >
             Reset to estimates
           </button>
@@ -364,7 +364,7 @@ export default function ResultsBudget() {
         {/* Top summary */}
         <div className="grid grid-cols-1 gap-3 mb-4">
           {[
-            { v: `${fmtNum(serviceCost)} ${currency}`, l: "Service Cost",  c: "text-[#721CB8]", bg: "bg-[#721CB8]/8" },
+            { v: `${fmtNum(serviceCost)} ${currency}`, l: "Service Cost",  c: "text-[#5A1790]", bg: "bg-[#5A1790]/8" },
           ].map(s => (
             <div key={s.l} className={`rounded-xl border border-slate-200 px-3 py-2.5 text-center ${s.bg}`}>
               <div className={`text-lg font-bold ${s.c}`}>{s.v}</div>
@@ -416,7 +416,7 @@ export default function ResultsBudget() {
               </tr>
               <tr className="bg-slate-50">
                 <td className="px-4 py-2.5 font-semibold text-slate-800">Total Service Cost</td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-bold text-[#721CB8]">{fmtNum(serviceCost)} {currency}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-bold text-[#5A1790]">{fmtNum(serviceCost)} {currency}</td>
               </tr>
             </tbody>
           </table>
@@ -428,7 +428,7 @@ export default function ResultsBudget() {
         <div className="flex gap-3">
           <button
             onClick={handleCreateReport}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#721CB8] text-white font-semibold text-sm shadow hover:bg-[#5c16a0] transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5A1790] text-white font-semibold text-sm shadow hover:bg-[#5c16a0] transition-colors"
           >
             <Download className="w-4 h-4" />
             Create Report

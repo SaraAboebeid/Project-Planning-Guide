@@ -10,9 +10,9 @@ const PATHWAYS = [
     key: "Renovation Planning",
     label: "Renovation",
     sub: "Planning",
-    color: "#721CB8",
-    bgActive: "#721CB8",
-    borderActive: "#721CB8",
+    color: "#5A1790",
+    bgActive: "#5A1790",
+    borderActive: "#5A1790",
     Icon: Hammer,
     outputs: [
       { n: "01", text: "Package cost estimate (SEK/m┬▓)" },
@@ -62,7 +62,7 @@ const ENGINE_TAGS = [
   { label: "Model Confidence",   color: "#E8880C" },
   { label: "Data Coverage",      color: "#2FB477" },
   { label: "TABULA Archetypes",  color: "#4ECDC4" },
-  { label: "Wikells Cost DB",    color: "#721CB8" },
+  { label: "Wikells Cost DB",    color: "#5A1790" },
 ];
 
 /* OAT sensitivity data ΓÇö from config/sensitivity_config.py OAT_PARAMETERS */

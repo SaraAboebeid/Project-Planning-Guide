@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../../store/wizard";
 import { api } from "../../api/client";
@@ -582,9 +582,9 @@ export default function DefineProject() {
             <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "1.4px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>Project type</div>
             <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
               <svg width="34" height="34" viewBox="0 0 52 52" fill="none" style={{ flexShrink: 0 }}>
-                <rect x="10" y="18" width="32" height="26" rx="1" stroke="#721CB8" strokeWidth="1.5" fill="none"/>
-                <path d="M6 20L26 6l20 14" stroke="#721CB8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="20" y="30" width="12" height="14" rx="1" stroke="#721CB8" strokeWidth="1.5" fill="none"/>
+                <rect x="10" y="18" width="32" height="26" rx="1" stroke="#5A1790" strokeWidth="1.5" fill="none"/>
+                <path d="M6 20L26 6l20 14" stroke="#5A1790" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="20" y="30" width="12" height="14" rx="1" stroke="#5A1790" strokeWidth="1.5" fill="none"/>
                 <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
                 <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
               </svg>
@@ -611,9 +611,9 @@ export default function DefineProject() {
               ),
               "Renovation Planning": (
                 <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-                  <rect x="10" y="18" width="32" height="26" rx="1" stroke="#721CB8" strokeWidth="1.5" fill="none"/>
-                  <path d="M6 20L26 6l20 14" stroke="#721CB8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <rect x="20" y="30" width="12" height="14" rx="1" stroke="#721CB8" strokeWidth="1.5" fill="none"/>
+                  <rect x="10" y="18" width="32" height="26" rx="1" stroke="#5A1790" strokeWidth="1.5" fill="none"/>
+                  <path d="M6 20L26 6l20 14" stroke="#5A1790" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <rect x="20" y="30" width="12" height="14" rx="1" stroke="#5A1790" strokeWidth="1.5" fill="none"/>
                   <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
                   <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
                 </svg>

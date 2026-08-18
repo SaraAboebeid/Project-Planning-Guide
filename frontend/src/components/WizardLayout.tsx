@@ -20,7 +20,7 @@ function fireConfetti() {
   const dpr = window.devicePixelRatio || 1;
   const W = (canvas.width = window.innerWidth * dpr);
   const H = (canvas.height = window.innerHeight * dpr);
-  const COLORS = ["#2FB477", "#4ECDC4", "#721CB8", "#E8880C", "#E2483B", "#4A90E2", "#B98BE8"];
+  const COLORS = ["#2FB477", "#4ECDC4", "#5A1790", "#E8880C", "#E2483B", "#4A90E2", "#B98BE8"];
   const parts = Array.from({ length: 170 }, () => ({
     x: W / 2 + (Math.random() - 0.5) * W * 0.35,
     y: H * 0.32 + (Math.random() - 0.5) * 60 * dpr,
@@ -167,7 +167,7 @@ function DataNeededRow({ label, status }: {
     <div className="flex items-center justify-between py-1.5"
          style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
       <div className="flex items-center gap-2">
-        <span style={{ color: "#721CB8" }}><Icon d={iconD} size={12} /></span>
+        <span style={{ color: "#5A1790" }}><Icon d={iconD} size={12} /></span>
         <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.65)" }}>{label}</span>
       </div>
       <span className="text-[10px] font-semibold" style={{ color }}>{text}</span>
@@ -287,7 +287,7 @@ export default function WizardLayout() {
              style={{ background: "#0a0d14", borderRight: "1px solid rgba(255,255,255,0.07)" }}>
         {/* Logo */}
         <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 shadow-lg shrink-0 cursor-pointer"
-             style={{ background: "linear-gradient(135deg,#721CB8,#421869)" }}
+             style={{ background: "linear-gradient(135deg,#5A1790,#421869)" }}
              onClick={() => navigate("/")}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         </div>
@@ -363,7 +363,7 @@ export default function WizardLayout() {
                       fontWeight: 700,
                       whiteSpace: "nowrap",
                       color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
-                      background: isActive ? "#721CB8" : "transparent",
+                      background: isActive ? "#5A1790" : "transparent",
                       transition: "all 0.15s",
                     }}
                   >
@@ -432,7 +432,7 @@ export default function WizardLayout() {
               style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "8px 24px",
                 borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#fff",
-                background: canNext ? "linear-gradient(135deg,#721CB8,#421869)" : "rgba(255,255,255,0.10)",
+                background: canNext ? "linear-gradient(135deg,#5A1790,#421869)" : "rgba(255,255,255,0.10)",
                 boxShadow: canNext ? "0 4px 14px rgba(114,28,184,0.45)" : "none", border: 0,
                 cursor: canNext ? "pointer" : "not-allowed",
                 opacity: canNext ? 1 : 0.55, transition: "all 0.15s",

@@ -75,7 +75,7 @@ const TOOLS = [
     id: "epsm",
     title: "EPSM",
     subtitle: "Energy Performance Simulation Manager",
-    color: "#721CB8",
+    color: "#5A1790",
     status: "external",
     icon: Zap,
     description:
@@ -470,7 +470,7 @@ export default function AnalysisTools() {
           {[
             { label: `${TOOLS.length} tools`, sub: "total", color: "#4ECDC4" },
             { label: `${TOOLS.filter(t => t.status === "integrated").length}`, sub: "integrated", color: "#2FB477" },
-            { label: `${TOOLS.filter(t => t.status === "external").length}`, sub: "external", color: "#721CB8" },
+            { label: `${TOOLS.filter(t => t.status === "external").length}`, sub: "external", color: "#5A1790" },
           ].map(p => (
             <div key={p.label} style={{
               display: "flex", alignItems: "center", gap: 8,

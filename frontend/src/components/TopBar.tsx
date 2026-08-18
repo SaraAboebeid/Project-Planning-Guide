@@ -120,7 +120,7 @@ export default function TopBar({
                 fontWeight: 700,
                 whiteSpace: "nowrap",
                 color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
-                background: isActive ? "#721CB8" : "transparent",
+                background: isActive ? "#5A1790" : "transparent",
                 transition: "all 0.15s",
               }}
             >
@@ -152,7 +152,7 @@ export default function TopBar({
                 cursor: enabled ? "pointer" : "not-allowed",
                 fontSize: 11,
                 fontWeight: country === c.id ? 700 : 500,
-                background: country === c.id ? "#721CB8" : "transparent",
+                background: country === c.id ? "#5A1790" : "transparent",
                 color: !enabled ? "rgba(255,255,255,0.32)"
                       : country === c.id ? "#fff" : "rgba(255,255,255,0.72)",
                 opacity: enabled ? 1 : 0.6,
@@ -208,7 +208,7 @@ export default function TopBar({
             width: 28,
             height: 28,
             borderRadius: "50%",
-            background: "linear-gradient(135deg,#721CB8,#421869)",
+            background: "linear-gradient(135deg,#5A1790,#421869)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

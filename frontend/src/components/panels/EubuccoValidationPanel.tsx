@@ -34,7 +34,7 @@ const ERROR_DIST = [
 
 // By building type
 const BY_TYPE = [
-  { type: "Detached (Friliggande)", n: 83_876, exactPct: 10.8, mae: 1.02, color: "#721CB8" },
+  { type: "Detached (Friliggande)", n: 83_876, exactPct: 10.8, mae: 1.02, color: "#5A1790" },
   { type: "End-terrace (Gavel)",    n:  5_278, exactPct:  2.7, mae: 1.24, color: "#2FB477" },
   { type: "Mid-terrace (Mellan.)",  n:  1_044, exactPct:  2.2, mae: 1.98, color: "#E8880C" },
 ];

@@ -174,7 +174,7 @@ export default function WikellsPanel() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="rounded-xl bg-[#f7f5fb] border border-[#e8e0f5] px-3 py-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 text-center">Options Available</p>
-            <p className="text-lg font-bold text-[#721CB8] mt-0.5 text-center">{chapterStats.count}</p>
+            <p className="text-lg font-bold text-[#5A1790] mt-0.5 text-center">{chapterStats.count}</p>
           </div>
           <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mb-1 flex items-center gap-1">
@@ -221,7 +221,7 @@ export default function WikellsPanel() {
             onClick={() => { setActiveChap(c.id); setQuery(""); }}
             className={`px-4 py-2 text-xs font-semibold rounded-t-lg border border-b-0 transition-colors ${
               activeChap === c.id
-                ? "bg-white border-slate-200 text-[#721CB8] -mb-px z-10"
+                ? "bg-white border-slate-200 text-[#5A1790] -mb-px z-10"
                 : "bg-slate-50 border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
@@ -250,7 +250,7 @@ export default function WikellsPanel() {
                 onClick={() => setSortBy(s)}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors ${
                   sortBy === s
-                    ? "bg-[#721CB8]/10 border-[#721CB8]/30 text-[#721CB8]"
+                    ? "bg-[#5A1790]/10 border-[#5A1790]/30 text-[#5A1790]"
                     : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                 }`}
               >

@@ -142,7 +142,7 @@ const SOURCES: DataSource[] = [
     name: "Boplats Listings",
     description: "Live rental housing listings from Boplats Göteborg. Updated daily — addresses, rents, areas, and images.",
     iconD: IC.boplats,
-    accent: "#721CB8",
+    accent: "#5A1790",
     count: "297",
     countLabel: "active listings",
     status: "live",
@@ -737,8 +737,8 @@ export default function DataExplorer() {
           <button key={f} onClick={() => setStatusFilter(f)} style={{
             padding: "5px 14px", borderRadius: 99, fontSize: 11, fontWeight: 600, cursor: "pointer",
             textTransform: "capitalize",
-            background: statusFilter === f ? "#721CB8" : "rgba(255,255,255,0.06)",
-            border: `1px solid ${statusFilter === f ? "#721CB8" : "rgba(255,255,255,0.10)"}`,
+            background: statusFilter === f ? "#5A1790" : "rgba(255,255,255,0.06)",
+            border: `1px solid ${statusFilter === f ? "#5A1790" : "rgba(255,255,255,0.10)"}`,
             color: statusFilter === f ? "#fff" : "rgba(255,255,255,0.55)",
           }}>{f === "all" ? `All (${SOURCES.length})` : f}</button>
         ))}

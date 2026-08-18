@@ -31,11 +31,11 @@ export default function DeliverablesSection({ projectType, systemsInScope }: Pro
     <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <FileText className="w-4 h-4 text-[#721CB8]" />
+        <FileText className="w-4 h-4 text-[#5A1790]" />
         <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
           Expected Deliverables
         </span>
-        <span className="ml-auto text-xs font-semibold text-[#721CB8] bg-[#721CB8]/8 rounded-full px-2.5 py-0.5">
+        <span className="ml-auto text-xs font-semibold text-[#5A1790] bg-[#5A1790]/8 rounded-full px-2.5 py-0.5">
           {totalItems} items
         </span>
       </div>
@@ -63,7 +63,7 @@ export default function DeliverablesSection({ projectType, systemsInScope }: Pro
                   {items.map(([name, desc]) => (
                     <div
                       key={name}
-                      className="pl-3 py-1.5 rounded-lg bg-slate-50 border-l-[3px] border-[#995BD5]"
+                      className="pl-3 py-1.5 rounded-lg bg-slate-50 border-l-[3px] border-[#6E2AAE]"
                     >
                       <div className="text-xs font-semibold text-slate-800">{name}</div>
                       <div className="text-[11px] text-slate-500">{desc}</div>

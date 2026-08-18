@@ -1,4 +1,4 @@
-﻿/**
+/**
  * LocationMap — interactive address picker with Leaflet map.
  *
  * Modes:
@@ -139,14 +139,14 @@ function normalizeBbox(box: BboxCoords): BboxCoords {
 
 const _bboxCornerIcon = L.divIcon({
   className: "",
-  html: '<div style="width:12px;height:12px;border-radius:9999px;background:#721CB8;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.35)"></div>',
+  html: '<div style="width:12px;height:12px;border-radius:9999px;background:#5A1790;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.35)"></div>',
   iconSize: [12, 12],
   iconAnchor: [6, 6],
 });
 
 const _bboxEdgeIcon = L.divIcon({
   className: "",
-  html: '<div style="width:10px;height:10px;border-radius:9999px;background:#995BD5;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.30)"></div>',
+  html: '<div style="width:10px;height:10px;border-radius:9999px;background:#6E2AAE;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.30)"></div>',
   iconSize: [10, 10],
   iconAnchor: [5, 5],
 });
@@ -523,7 +523,7 @@ function AddressInput({
                     borderBottom: i < results.length - 1 ? "1px solid #f1f5f9" : "none",
                   }}
                 >
-                  <MapPin size={14} className="mt-0.5 flex-shrink-0" style={{ color: "#721CB8" }} />
+                  <MapPin size={14} className="mt-0.5 flex-shrink-0" style={{ color: "#5A1790" }} />
                   <span>{r.display_name}</span>
                 </li>
               ))}
@@ -1022,7 +1022,7 @@ Kungsgatan 10,Göteborg</div>
 
       {/* Bbox draw instructions */}
       {isBuilding && locationMode === "bbox" && (
-        <div className="flex items-center gap-2 text-xs text-white/80 bg-[#721CB8]/15 border border-[#721CB8]/35 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-white/80 bg-[#5A1790]/15 border border-[#5A1790]/35 rounded-lg px-3 py-2">
           <span>🖱️</span>
           <span>
             {bboxDone
@@ -1101,7 +1101,7 @@ Kungsgatan 10,Göteborg</div>
                 key="gbg-boundary"
                 data={boundary as never}
                 interactive={false}
-                style={() => ({ color: "#721CB8", weight: 3.5, opacity: 1, fillColor: "#721CB8", fillOpacity: 0.10 })}
+                style={() => ({ color: "#5A1790", weight: 3.5, opacity: 1, fillColor: "#5A1790", fillOpacity: 0.10 })}
               />
             </>
           )}
@@ -1151,9 +1151,9 @@ Kungsgatan 10,Göteborg</div>
               <Rectangle
                 bounds={bboxBounds}
                 pathOptions={{
-                  color: "#721CB8",
+                  color: "#5A1790",
                   weight: 2,
-                  fillColor: "#995BD5",
+                  fillColor: "#6E2AAE",
                   fillOpacity: 0.12,
                 }}
               />

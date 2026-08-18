@@ -157,7 +157,7 @@ export interface ReportProject {
 const fmtNum = (n: number) => n.toLocaleString("en-SE");
 const pct = (n: number, total: number) => total > 0 ? Math.round((n / total) * 100) : 0;
 
-function badge(text: string, bg = "#721CB8", fg = "#fff") {
+function badge(text: string, bg = "#5A1790", fg = "#fff") {
   return `<span style="display:inline-block;background:${bg};color:${fg};border-radius:6px;padding:1px 8px;font-size:11px;font-weight:600;margin:1px;">${esc(text)}</span>`;
 }
 
@@ -170,7 +170,7 @@ function esc(s: unknown): string {
     .replace(/"/g, "&quot;");
 }
 
-function section(title: string, content: string, accentColor = "#721CB8") {
+function section(title: string, content: string, accentColor = "#5A1790") {
   return `
   <div class="section">
     <div class="section-header" style="border-left-color:${accentColor}">
@@ -226,8 +226,8 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
       ${kv("Country", project.country)}
       ${kv("Scale", project.scale)}
     </table>
-    ${project.systemsInScope.length ? `<p class="sub-label">Systems in Scope</p><div class="tag-row">${project.systemsInScope.map(s => badge(s, "#721CB8")).join("")}</div>` : ""}
-    ${project.selectedKpis.length ? `<p class="sub-label">Key Performance Indicators</p><div class="tag-row">${project.selectedKpis.map(k => badge(k, "#995BD5")).join("")}</div>` : ""}
+    ${project.systemsInScope.length ? `<p class="sub-label">Systems in Scope</p><div class="tag-row">${project.systemsInScope.map(s => badge(s, "#5A1790")).join("")}</div>` : ""}
+    ${project.selectedKpis.length ? `<p class="sub-label">Key Performance Indicators</p><div class="tag-row">${project.selectedKpis.map(k => badge(k, "#6E2AAE")).join("")}</div>` : ""}
     ${project.explorationApproaches.length ? `<p class="sub-label">Exploration Approaches</p><div class="tag-row">${project.explorationApproaches.map(a => badge(a, "#3a6e1a", "#fff")).join("")}</div>` : ""}
     ${project.renovationEnvelopeComponents.length ? `<p class="sub-label">Envelope Components</p><div class="tag-row">${project.renovationEnvelopeComponents.map(c => badge(c, "#2FB477", "#2d5f0e")).join("")}</div>` : ""}
     ${project.buildingUses.length ? `<p class="sub-label">Building Uses</p><div class="tag-row">${project.buildingUses.map(u => badge(u, "#e0d7f7", "#4a1d96")).join("")}</div>` : ""}
@@ -643,7 +643,7 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
 
     /* ── Cover ── */
     .cover {
-      background: linear-gradient(135deg, #721CB8 0%, #995BD5 50%, #3a6e1a 100%);
+      background: linear-gradient(135deg, #5A1790 0%, #6E2AAE 50%, #3a6e1a 100%);
       color: #fff;
       border-radius: 16px;
       padding: 48px 40px;
@@ -667,7 +667,7 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
     }
     .download-bar span { font-size: 13px; color: #64748b; flex: 1; }
     .btn-print {
-      background: #721CB8;
+      background: #5A1790;
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -681,7 +681,7 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
     /* ── Sections ── */
     .section { margin-bottom: 28px; }
     .section-header {
-      border-left: 4px solid #721CB8;
+      border-left: 4px solid #5A1790;
       padding: 8px 0 8px 16px;
       margin-bottom: 12px;
     }
@@ -726,7 +726,7 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
     }
     .package-header { display: flex; align-items: center; gap: 8px; font-size: 14px; }
     .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-    .selected-badge { background: #721CB8; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; }
+    .selected-badge { background: #5A1790; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; }
 
     /* ── Divider ── */
     hr { border: none; border-top: 1px solid #e2e8f0; margin: 24px 0; }
@@ -767,15 +767,15 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
       <button class="btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
     </div>
 
-    ${section("1. Project Definition", defContent, "#721CB8")}
-    ${section("2. Location & Building Data", locContent, "#995BD5")}
+    ${section("1. Project Definition", defContent, "#5A1790")}
+    ${section("2. Location & Building Data", locContent, "#6E2AAE")}
     ${section("3. Data Coverage", dataContent, "#509724")}
     ${isRenovation && execSummaryContent ? section("Executive Summary", execSummaryContent, "#d97706") : ""}
     ${isRenovation && frameworkContent ? section("4. Renovation Scope & Framework", frameworkContent, "#0369a1") : ""}
     ${isRenovation ? section(frameworkContent ? "5. Renovation Packages" : "4. Renovation Packages", packagesContent, "#d97706") : ""}
     ${isRenovation && impactContent ? section("6. Impact Assessment", impactContent, "#166534") : ""}
-    ${section(isRenovation ? (impactContent ? "7. Expected Deliverables" : "5. Expected Deliverables") : "4. Expected Deliverables", delivContent, "#721CB8")}
-    ${section(isRenovation ? (impactContent ? "8. Project Timeline" : "6. Project Timeline") : "5. Project Timeline", tlContent, "#995BD5")}
+    ${section(isRenovation ? (impactContent ? "7. Expected Deliverables" : "5. Expected Deliverables") : "4. Expected Deliverables", delivContent, "#5A1790")}
+    ${section(isRenovation ? (impactContent ? "8. Project Timeline" : "6. Project Timeline") : "5. Project Timeline", tlContent, "#6E2AAE")}
     ${section(isRenovation ? (impactContent ? "9. Budget & Cost" : "7. Budget & Cost") : "6. Budget & Cost", budgetContent, "#3a6e1a")}
     ${isRenovation && conclusionsContent ? section(impactContent ? "10. Conclusions & Recommendations" : "8. Conclusions & Recommendations", conclusionsContent, "#0f766e") : ""}
     ${isRenovation ? section("Disclaimer", disclaimerContent, "#94a3b8") : ""}

@@ -23,7 +23,7 @@ export const C = {
   warn:      "#E8880C", // warning · provisional data · running
   info:      "#4A90E2", // neutral info · UK accent
   selected:  "#4ECDC4", // active / selected state (brand teal) — unchanged
-  brand:     "#721CB8", // primary purple — unchanged
+  brand:     "#5A1790", // primary purple — unchanged
   brandLite: "#B98BE8", // light purple accent — unchanged
 } as const;
 

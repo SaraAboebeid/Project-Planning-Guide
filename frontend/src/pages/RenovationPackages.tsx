@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 /* ─── Constants ───────────────────────────────────────────────────── */
-const PACKAGE_COLORS = ["#721CB8", "#995BD5", "#2FB477", "#509724"];
+const PACKAGE_COLORS = ["#5A1790", "#6E2AAE", "#2FB477", "#509724"];
 const PACKAGE_NAMES  = ["Package A", "Package B", "Package C", "Package D"];
 
 /* ─── Fixed building elements for vertical extension ─────────────── */
@@ -218,11 +218,11 @@ function ElementRow({
               value={area || ""}
               placeholder={defaultArea > 0 ? String(defaultArea) : "0"}
               onChange={e => onChange(code, parseFloat(e.target.value) || 0)}
-              className="w-28 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#721CB8]/30"
+              className="w-28 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#5A1790]/30"
             />
           </div>
           {defaultArea > 0 && area !== defaultArea && (
-            <button onClick={() => onChange(code, defaultArea)} className="text-[10px] text-[#721CB8] hover:underline">
+            <button onClick={() => onChange(code, defaultArea)} className="text-[10px] text-[#5A1790] hover:underline">
               Reset to {fmtSEK(defaultArea)} m²
             </button>
           )}
@@ -253,7 +253,7 @@ function ElementRow({
                   autoFocus
                   type="text" placeholder={`Search ${el.label.toLowerCase()} assemblies…`}
                   value={filter} onChange={e => setFilter(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#721CB8]/30"
+                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#5A1790]/30"
                 />
               </div>
               <div className="overflow-y-auto max-h-72">
@@ -627,8 +627,8 @@ export default function RenovationPackages() {
                         <td className="px-4 py-2 tabular-nums text-slate-600">{fmtSEK(r.footprint)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-slate-700 font-semibold">{fmtSEK(r.grossWallArea)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-sky-600 font-semibold">{fmtSEK(r.windowArea)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#721CB8] font-semibold">{fmtSEK(r.opaqueWallArea)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#995BD5] font-semibold">{fmtSEK(r.roofArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#5A1790] font-semibold">{fmtSEK(r.opaqueWallArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#6E2AAE] font-semibold">{fmtSEK(r.roofArea)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-[#509724] font-semibold">{fmtSEK(r.floorArea)} m²</td>
                       </tr>
                     ))}
@@ -638,8 +638,8 @@ export default function RenovationPackages() {
                         <td className="px-4 py-2 tabular-nums text-slate-700">{fmtSEK(totals.footprint)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-slate-700">{fmtSEK(totals.grossWallArea)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-sky-700">{fmtSEK(totals.windowArea)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#721CB8]">{fmtSEK(totals.opaqueWallArea)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#995BD5]">{fmtSEK(totals.roofArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#5A1790]">{fmtSEK(totals.opaqueWallArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#6E2AAE]">{fmtSEK(totals.roofArea)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-[#509724]">{fmtSEK(totals.floorArea)} m²</td>
                       </tr>
                     )}
@@ -736,7 +736,7 @@ export default function RenovationPackages() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex flex-wrap gap-6">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Material Cost</div>
-                    <div className="text-xl font-bold text-[#721CB8] tabular-nums">{fmtSEK(t.totalCostSEK)} SEK</div>
+                    <div className="text-xl font-bold text-[#5A1790] tabular-nums">{fmtSEK(t.totalCostSEK)} SEK</div>
                     <div className="text-[10px] text-slate-400 tabular-nums">
                       ({(t.totalCostSEK / 1000).toFixed(0)} kSEK &nbsp;·&nbsp; {(t.totalCostSEK / 1_000_000).toFixed(2)} MSEK)
                     </div>
@@ -746,7 +746,7 @@ export default function RenovationPackages() {
                       Embodied Carbon
                       {!t.hasAllCarbon && <span className="text-amber-500 font-normal">(partly est.)</span>}
                     </div>
-                    <div className="text-xl font-bold text-[#995BD5] tabular-nums">{t.totalCarbonKg.toFixed(0)} kg CO₂e</div>
+                    <div className="text-xl font-bold text-[#6E2AAE] tabular-nums">{t.totalCarbonKg.toFixed(0)} kg CO₂e</div>
                     <div className="text-[10px] text-slate-400 tabular-nums">
                       ({(t.totalCarbonKg / 1000).toFixed(1)} tonne CO₂e)
                     </div>

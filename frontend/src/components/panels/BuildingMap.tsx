@@ -1,4 +1,4 @@
-﻿import { Map, ExternalLink, Layers, Zap, Calendar, Building2 } from "lucide-react";
+import { Map, ExternalLink, Layers, Zap, Calendar, Building2 } from "lucide-react";
 import { useWizardStore } from "../../store/wizard";
 
 export default function BuildingMapPanel() {
@@ -59,7 +59,7 @@ export default function BuildingMapPanel() {
               [122,80,8,20],[138,74,10,26],[154,79,8,21],[170,82,10,18],
             ] as number[][]).map(([x,y,w,h],i) => (
               <rect key={i} x={x} y={y} width={w} height={h} rx={1}
-                fill={["#721CB8","#2FB477","#995BD5","#509724","#3a6e1a"][i % 5]}
+                fill={["#5A1790","#2FB477","#6E2AAE","#509724","#3a6e1a"][i % 5]}
                 opacity={0.6 + (i % 3) * 0.13}
               />
             ))}
