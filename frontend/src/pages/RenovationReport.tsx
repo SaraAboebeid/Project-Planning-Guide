@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useWizardStore } from "../store/wizard";
+import { useWizardStore, FACADE_ORIENTATIONS, type FacadeOrientation } from "../store/wizard";
 import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal } from "../config/climateGoals";
 import ClimateGoalPanel from "../components/ClimateGoalPanel";
 import ClimateGoalBuildingTable from "../components/ClimateGoalBuildingTable";
@@ -12,6 +12,24 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell,
 } from "recharts";
+
+/* Facade labels for the report. Kept here rather than imported from the Step 2
+   panel so the report has no dependency on that component's UI internals. */
+const FACADE_LABELS: Record<FacadeOrientation, string> = {
+  north: "North", east: "East", south: "South", west: "West",
+};
+const FACADE_DEFECT_LABELS: Record<string, string> = {
+  crack: "Crack", leakage: "Leakage / staining", abscission: "Spalling / abscission",
+  corrosion: "Corrosion", bulge: "Bulge / deformation", other: "Other defect",
+};
+
+/** "3× Crack, 1× Corrosion" - or a dash when nothing was flagged. */
+function breakdownText(byClass: Record<string, number>): string {
+  const parts = Object.entries(byClass ?? {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${v}× ${FACADE_DEFECT_LABELS[k] ?? k}`);
+  return parts.length ? parts.join(", ") : "—";
+}
 
 function recordToLookup(r: BuildingRecord): BuildingLookup {
   const approxPerimeter = r.footprint_m2 ? 4 * Math.sqrt(r.footprint_m2) : null;
@@ -237,6 +255,66 @@ export default function RenovationReport() {
     // Absolute origin so the logos resolve from the Blob-URL document (relative
     // paths there point at the blob, not the app). Logos are white → dark banner.
     const origin = window.location.origin;
+
+    /* ── Facade condition (Step 2) ─────────────────────────────────────────
+       Annotated photos live on the backend (/api/facade-image/<id>) because the
+       wizard store is sessionStorage-backed and cannot hold images. Referencing
+       them by absolute origin URL means the report window - which is rendered
+       from a Blob URL - still resolves them. Photos that never got persisted
+       simply do not appear; the counts still do. */
+    const facadeEntries = Object.entries(project.facadeDefects ?? {})
+      .filter(([, sum]) => sum && sum.imageCount > 0);
+    // The key is a cadastral/address hash, so prefer the label saved with the
+    // summary; the key is only a last resort so a row is never nameless.
+    const buildingLabelFor = (key: string) =>
+      project.facadeDefects?.[key]?.label || key;
+
+    const facadeReport = facadeEntries.length === 0 ? "" : [
+      "<h2>Facade Defect Detection</h2>",
+      '<p class="sub">Facade photos analysed by the MBDD2025 defect detector with an AI vision second opinion. '
+        + "Boxes and labels are drawn on the images exactly as reviewed in Step 2. "
+        + "Detection is a screening aid, not a structural survey.</p>",
+      "<table><thead><tr><th>Building</th><th>Facade</th><th>Photos</th><th>Defects</th><th>Breakdown</th></tr></thead><tbody>",
+      facadeEntries.map(([key, sum]) => {
+        const label = buildingLabelFor(key);
+        const orientations = FACADE_ORIENTATIONS.filter((o) => sum.byOrientation?.[o]?.imageCount);
+        if (!orientations.length) {
+          return "<tr><td>" + esc(label) + '</td><td class="muted">not recorded per facade</td><td>'
+            + sum.imageCount + "</td><td>" + sum.defectCount + "</td><td>"
+            + esc(breakdownText(sum.byClass)) + "</td></tr>";
+        }
+        return orientations.map((o, i) => {
+          const os = sum.byOrientation![o]!;
+          return "<tr>"
+            + (i === 0 ? '<td rowspan="' + orientations.length + '">' + esc(label) + "</td>" : "")
+            + "<td>" + FACADE_LABELS[o] + "</td><td>" + os.imageCount + "</td><td>" + os.defectCount + "</td><td>"
+            + esc(breakdownText(os.byClass)) + "</td></tr>";
+        }).join("");
+      }).join(""),
+      "</tbody></table>",
+      facadeEntries.map(([key, sum]) => {
+        const photos = sum.photos ?? [];
+        if (!photos.length) return "";
+        return '<h3 style="font-size:10.5pt;margin:12px 0 4px;color:#0f172a">' + esc(buildingLabelFor(key)) + "</h3>"
+          + '<div class="fac-grid">'
+          + photos.map((ph) => {
+              const dets = ph.detections ?? [];
+              return '<div class="fac-card">'
+                + '<div class="fac-cap"><b>' + FACADE_LABELS[ph.orientation] + " facade</b> — " + esc(ph.name) + "</div>"
+                + '<img src="' + origin + ph.url + '" alt="' + esc(FACADE_LABELS[ph.orientation] + " facade of " + buildingLabelFor(key)) + '" />'
+                + (dets.length
+                    ? '<ol class="fac-list">' + dets.map((d) =>
+                        "<li>" + esc(FACADE_DEFECT_LABELS[d.label] ?? d.label)
+                        + " — " + Math.round(d.score * 100) + "% confidence"
+                        + (d.source === "ai" ? " (AI vision)" : " (ML model)")
+                        + (d.note ? " — " + esc(d.note) : "")
+                        + "</li>").join("") + "</ol>"
+                    : '<div class="fac-clean">No defects detected on this photo.</div>')
+                + "</div>";
+            }).join("")
+          + "</div>";
+      }).join(""),
+    ].join("");
     const team = "Sara Abouebeid · Holger Wallbaum · Liane Thuvander · Elena Malakhatka";
 
     const bestBlock = (label: string, r: typeof simResults[0] | null | undefined, why: string) => {
@@ -286,6 +364,13 @@ export default function RenovationReport() {
   .foot { margin-top:26px; padding-top:8px; border-top:1px solid #e2e8f0; color:#94a3b8; font-size:8.5pt; }
   .no-print { margin-bottom:14px; }
   @media print { .no-print { display:none; } }
+  .fac-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin:8px 0 4px; }
+  .fac-card { border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; break-inside:avoid; }
+  .fac-card img { display:block; width:100%; height:auto; }
+  .fac-cap { padding:5px 8px; font-size:8.5pt; color:#334155; background:#f8fafc; border-bottom:1px solid #e2e8f0; }
+  .fac-cap b { color:#0f172a; }
+  .fac-list { margin:0; padding:6px 8px 7px 20px; font-size:8pt; color:#475569; }
+  .fac-clean { padding:6px 8px; font-size:8pt; color:#15803d; }
   .cover { background:#0d1117; color:#fff; border-radius:10px; padding:26px 30px; margin-bottom:14px; }
   .cover-logos { display:flex; align-items:center; gap:26px; margin-bottom:20px; }
   .cover-logos img { height:30px; width:auto; }
@@ -320,6 +405,8 @@ export default function RenovationReport() {
       <td>${b.energyUse.toFixed(1)} kWh/m²·yr</td><td>${b.heating.toFixed(1)} kWh/m²·yr</td></tr>`).join("")
     : `<tr><td colspan="4" class="muted">No baseline simulation recorded.</td></tr>`}
   </tbody></table>
+
+  ${facadeReport}
 
   ${goalAssessment ? `
   <h2>${esc(goalAssessment.goal.city)} climate target</h2>

@@ -159,6 +159,22 @@ export const api = {
       floors: number; footprint_m2: number; total_floor_area_m2: number;
     }>(`/simulation-results/${id}`),
 
+  /** Persist an annotated facade photo so it survives the tab and can be shown
+   * in the Step 5 report. Returns the URL to render it from. */
+  facadeImageSave: async (imageId: string, blob: Blob) => {
+    const res = await fetch(`${BASE}/facade-image?image_id=${encodeURIComponent(imageId)}`, {
+      method: "POST", body: blob, headers: { "Content-Type": "application/octet-stream" },
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    return res.json() as Promise<{ id: string; url: string; bytes: number }>;
+  },
+
+  facadeImageDelete: async (imageId: string) => {
+    const res = await fetch(`${BASE}/facade-image/${encodeURIComponent(imageId)}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    return res.json() as Promise<{ deleted: boolean }>;
+  },
+
   /** Resolve the batch id of the most recent baseline run covering a building.
    * Lets the load-profile charts work on baselines simulated before the id was
    * being persisted - the trace was always in the database, only the pointer to

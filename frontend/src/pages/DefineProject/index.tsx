@@ -509,17 +509,7 @@ export default function DefineProject() {
   else if (!scaleReady) activeStage = "scale";
   else if (!locationReady) activeStage = "location";
 
-  const showProjectName = activeStage === "projectName";
-  const showBuildingDevType = activeStage === "buildingType";
-  const showRenovationComponents = activeStage === "components";
-  const showSystems = activeStage === "systems";
-  const showEcFocus = activeStage === "ecFocus";
-  const showExploration = activeStage === "exploration";
-  const showKpis = activeStage === "kpis";
-  const showScale = activeStage === "scale";
-  const showLocation = activeStage === "location";
-
-  /* ── auto-scroll to each newly revealed question ──────────────── */
+  /* Canonical question order; drives both the accordion and the auto-scroll. */
   const stageOrder: Step1Stage[] = [
     ...(HIDE_PROJECT_TYPE ? [] : ["projectType"] as Step1Stage[]),
     "projectName",
@@ -532,10 +522,45 @@ export default function DefineProject() {
     "location",
     "complete",
   ];
+
+  /* ── progressive reveal ───────────────────────────────────────────
+     Answer a question and the next one appears below it - but every question
+     already reached STAYS on the page, fully open, showing what was chosen or
+     typed. Each `show*` used to be `activeStage === "x"`, which unmounted a
+     question the instant it was answered; since a text answer counts as
+     answered on the first keystroke, typing one letter of the project name made
+     the field vanish mid-word. Rendering is now driven by "have we reached this
+     question", so nothing that has been answered disappears. */
+  const stageIndex = (st: Step1Stage) => stageOrder.indexOf(st);
+  // Monotonic: answering an earlier question again must not hide the later ones
+  // the user has already filled in.
+  const [maxReached, setMaxReached] = useState(0);
+  useEffect(() => {
+    setMaxReached((m) => Math.max(m, stageIndex(activeStage)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStage]);
+  const reached = (st: Step1Stage) => {
+    const i = stageIndex(st);
+    return i >= 0 && i <= Math.max(maxReached, stageIndex(activeStage));
+  };
+
+  const showProjectName = reached("projectName");
+  const showBuildingDevType = reached("buildingType");
+  const showRenovationComponents = reached("components");
+  const showSystems = reached("systems");
+  const showEcFocus = reached("ecFocus");
+  const showExploration = reached("exploration");
+  const showKpis = reached("kpis");
+  const showScale = reached("scale");
+  const showLocation = reached("location");
+
+  /* ── auto-scroll to each newly revealed question ──────────────── */
   const revealCount = Math.max(0, stageOrder.indexOf(activeStage));
 
   useEffect(() => {
     if (didMountRef.current && revealCount > prevRevealRef.current && rootRef.current) {
+      // Questions render in stage order and all of them stay on the page, so the
+      // last card is the one that was just revealed.
       const cards = rootRef.current.querySelectorAll<HTMLElement>(".animate-fadeIn");
       cards[cards.length - 1]?.scrollIntoView({ behavior: "smooth", block: "center" });
     }

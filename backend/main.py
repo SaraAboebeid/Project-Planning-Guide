@@ -4462,6 +4462,60 @@ async def facade_detect(request: Request, threshold: float = 0.5):
                                  f"`python tools/ml/facade_detect_service.py`. ({type(e).__name__})")
 
 
+# ── Facade photo storage ────────────────────────────────────────────────────
+#
+# Annotated facade photos have to outlive the browser tab: the Step 5 report
+# renders them, and the wizard store is sessionStorage-backed, which cannot hold
+# images (a multi-building project blows the quota - hence the store keeping only
+# a small per-building summary). So the annotated JPEG is written here and the
+# store keeps nothing but the id.
+
+FACADE_IMAGE_DIR = Path(__file__).resolve().parents[1] / "data" / "facade_images"
+_FACADE_ID_RE = _re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_MAX_FACADE_IMAGE_BYTES = 8 * 1024 * 1024
+
+
+@app.post("/api/facade-image")
+async def save_facade_image(request: Request, image_id: str = Query(..., description="Client-generated id, also the filename")):
+    """Persist one annotated facade photo. Body is the raw JPEG/PNG bytes."""
+    if not _FACADE_ID_RE.match(image_id):
+        # The id becomes a filename, so anything outside [A-Za-z0-9_-] is refused
+        # rather than sanitised - no path traversal, no surprises.
+        raise HTTPException(400, "image_id must match [A-Za-z0-9_-]{1,64}")
+    body = await request.body()
+    if not body:
+        raise HTTPException(400, "Empty image body")
+    if len(body) > _MAX_FACADE_IMAGE_BYTES:
+        raise HTTPException(413, f"Image too large ({len(body)} bytes; limit {_MAX_FACADE_IMAGE_BYTES})")
+
+    FACADE_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    (FACADE_IMAGE_DIR / f"{image_id}.jpg").write_bytes(body)
+    return {"id": image_id, "url": f"/api/facade-image/{image_id}", "bytes": len(body)}
+
+
+@app.get("/api/facade-image/{image_id}")
+async def get_facade_image(image_id: str):
+    """Serve a stored annotated facade photo (used by the panel and Step 5)."""
+    if not _FACADE_ID_RE.match(image_id):
+        raise HTTPException(400, "Bad image id")
+    path = FACADE_IMAGE_DIR / f"{image_id}.jpg"
+    if not path.exists():
+        raise HTTPException(404, "No such facade image")
+    return FileResponse(path, media_type="image/jpeg")
+
+
+@app.delete("/api/facade-image/{image_id}")
+async def delete_facade_image(image_id: str):
+    """Drop a stored photo when the user removes it from a facade slot."""
+    if not _FACADE_ID_RE.match(image_id):
+        raise HTTPException(400, "Bad image id")
+    path = FACADE_IMAGE_DIR / f"{image_id}.jpg"
+    existed = path.exists()
+    if existed:
+        path.unlink()
+    return {"deleted": existed}
+
+
 _VISION_DEFECT_CLASSES = ("crack", "leakage", "abscission", "corrosion", "bulge")
 
 

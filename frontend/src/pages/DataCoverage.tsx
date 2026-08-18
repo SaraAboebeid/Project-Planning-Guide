@@ -2446,7 +2446,7 @@ export default function DataCoverage() {
         </div>
       )}
 
-      {/* Facade condition — AI defect detection on user-uploaded facade photos.
+      {/* Facade defect detection on user-uploaded facade photos.
           Only when the walls are in the renovation scope (Step 1); otherwise
           prioritisation runs on building performance alone. */}
 
@@ -2479,8 +2479,11 @@ function Step2Sections({
   // Strict single-open accordion: facade first (if walls in scope), then
   // prioritisation.
   const firstSection: "facade" | "priority" = showFacade ? "facade" : "priority";
-  const [openSec, setOpenSec] = useState<"facade" | "priority">(firstSection);
-  const prevOpen = useRef<string>(firstSection);
+  // Nullable: the sections used to rely on their inner panels for collapsing,
+  // and those panels no longer have their own headers - so the section header
+  // itself has to be able to close, not just open.
+  const [openSec, setOpenSec] = useState<"facade" | "priority" | null>(firstSection);
+  const prevOpen = useRef<string | null>(firstSection);
   const facadeRef = useRef<HTMLDivElement>(null);
   const priorityRef = useRef<HTMLDivElement>(null);
 
@@ -2488,6 +2491,8 @@ function Step2Sections({
   useEffect(() => {
     if (openSec === prevOpen.current) return;
     prevOpen.current = openSec;
+    // Nothing to scroll to when a section was just collapsed.
+    if (openSec === null) return;
     const el = openSec === "facade" ? facadeRef.current : priorityRef.current;
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [openSec]);
@@ -2500,7 +2505,7 @@ function Step2Sections({
     return (
       <button
         type="button"
-        onClick={() => setOpenSec(id)}
+        onClick={() => setOpenSec(isOpen ? null : id)}
         style={{
           width: "100%", display: "flex", alignItems: "center", gap: 12,
           padding: "14px 18px", background: "transparent", border: 0, cursor: "pointer",
@@ -2548,24 +2553,12 @@ function Step2Sections({
         >
           <SectionHeader
             id="facade"
-            label="Facade Condition Detection"
-            subtitle="Upload photos to detect surface defects with AI"
+            label="Facade Defect Detection"
+            subtitle="Upload photos per facade to detect surface defects"
           />
           {openSec === "facade" && (
             <div style={{ padding: "0 18px 18px" }}>
               <FacadeDefectPanel buildings={facadeBuildings} />
-              {/* After reviewing defects, advance to prioritisation */}
-              <button
-                type="button"
-                onClick={() => setOpenSec("priority")}
-                style={{
-                  marginTop: 14, padding: "9px 20px", borderRadius: 9, border: 0,
-                  background: "linear-gradient(135deg,#4ECDC4,#2FB477)",
-                  color: "#0b1220", fontSize: 12, fontWeight: 800, cursor: "pointer",
-                }}
-              >
-                Next → Renovation Prioritisation
-              </button>
             </div>
           )}
         </div>

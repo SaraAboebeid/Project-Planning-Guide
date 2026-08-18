@@ -213,11 +213,49 @@ interface ProjectState {
   heatingAnalysis: (HvacOutcome & { selectedId: string; heatingDemandKwhM2Yr: number }) | null;
 }
 
+/** The four facades a user uploads against. Fixed set, fixed order (N-E-S-W)
+ *  so every building reads the same way in the panel and in the report. */
+export const FACADE_ORIENTATIONS = ["north", "east", "south", "west"] as const;
+export type FacadeOrientation = typeof FACADE_ORIENTATIONS[number];
+
+/** One analysed photo. The image itself lives on the backend (see
+ *  /api/facade-image) - sessionStorage cannot hold images, so only this
+ *  lightweight record is persisted, and Step 5 loads the picture by url. */
+export interface FacadePhotoRecord {
+  id: string;
+  url: string;                        // /api/facade-image/<id>
+  name: string;                       // original filename
+  orientation: FacadeOrientation;
+  width: number;
+  height: number;
+  detections: Array<{
+    label: string;
+    score: number;
+    box: [number, number, number, number];
+    source?: string;                  // "ml" | "ai"
+    note?: string;
+  }>;
+  checkedAt: string;
+}
+
+export interface FacadeOrientationSummary {
+  imageCount: number;
+  defectCount: number;
+  byClass: Record<string, number>;
+}
+
 export interface FacadeDefectSummary {
+  /** Human-readable building name, saved with the summary so the Step 5 report
+   *  never has to reverse-engineer a label out of the (cadastral) key. */
+  label?: string;
   imageCount: number;
   defectCount: number;
   byClass: Record<string, number>;   // e.g. { crack: 3, corrosion: 1 }
   checkedAt: string;                  // ISO timestamp
+  /** Per-facade breakdown; absent on summaries written before orientations existed. */
+  byOrientation?: Partial<Record<FacadeOrientation, FacadeOrientationSummary>>;
+  /** Analysed photos, for the Step 5 report. Boxes only - no image data. */
+  photos?: FacadePhotoRecord[];
 }
 
 interface WizardState {

@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
-  ScanSearch, Upload, Loader2, X, ChevronDown, ChevronUp, ImageOff,
-  Building2, Check, Sparkles, Maximize2,
+  Upload, Loader2, X, ChevronDown, ChevronUp,
+  Building2, Sparkles, Maximize2, Download,
 } from "lucide-react";
 import { api, type FacadeDetectResponse, type FacadeDetection } from "../api/client";
-import { useWizardStore, type FacadeDefectSummary } from "../store/wizard";
+import {
+  useWizardStore, FACADE_ORIENTATIONS,
+  type FacadeDefectSummary, type FacadeOrientation, type FacadePhotoRecord,
+} from "../store/wizard";
+
+/** Compass labels for the four facade slots. Order matches FACADE_ORIENTATIONS. */
+const ORIENTATION_LABELS: Record<FacadeOrientation, string> = {
+  north: "North", east: "East", south: "South", west: "West",
+};
+const ORIENTATION_SHORT: Record<FacadeOrientation, string> = {
+  north: "N", east: "E", south: "S", west: "W",
+};
 
 /* Facade defect classes + colours — matched to the on-host MBDD2025 model and the
    3D viewer's Facade Inspector legend so results look consistent across the app. */
@@ -25,12 +36,16 @@ export interface FacadeBuilding { key: string; label: string; }
 
 interface ImgEntry {
   id: string; name: string; url: string; blob: Blob;
+  orientation: FacadeOrientation;
   status: "idle" | "running" | "done" | "error";
   result: FacadeDetectResponse | null; error: string | null; ms: number | null;
+  /** Set once the annotated render has been persisted for the Step 5 report. */
+  savedUrl: string | null;
 }
 
 let _uid = 0;
-const nextId = () => `img-${Date.now()}-${_uid++}`;
+/** Also the persisted filename, so keep it inside the backend's [A-Za-z0-9_-] rule. */
+const nextId = () => `img-${Date.now()}-${_uid++}-${Math.random().toString(36).slice(2, 8)}`;
 
 /* ── geometry helpers ──────────────────────────────────────────────────────── */
 function iou(a: number[], b: number[]): number {
@@ -123,6 +138,22 @@ function drawAnnotated(canvas: HTMLCanvasElement, img: HTMLImageElement, result:
   });
 }
 
+/** Render the annotated image (photo + boxes) to a JPEG blob at full detection
+ *  resolution - used both for the Step 5 copy on the backend and for the
+ *  lightbox's Download, so what is downloaded is exactly what is reported. */
+function renderAnnotatedBlob(entry: ImgEntry): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      drawAnnotated(canvas, img, entry.result, img.naturalWidth, img.naturalHeight);
+      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.9);
+    };
+    img.onerror = () => resolve(null);
+    img.src = entry.url;
+  });
+}
+
 /** A canvas that (re)paints the annotated image; `mode` sets the target size. */
 function AnnotatedCanvas({ entry, mode, className, onClick }: {
   entry: ImgEntry; mode: "thumb" | "full"; className?: string; onClick?: () => void;
@@ -147,7 +178,9 @@ function AnnotatedCanvas({ entry, mode, className, onClick }: {
 }
 
 /* ── Lightbox: full-size image + a list of every issue found ────────────────── */
-function Lightbox({ entry, buildingLabel, onClose }: { entry: ImgEntry; buildingLabel: string; onClose: () => void }) {
+function Lightbox({ entry, buildingLabel, onClose, onDownload }: {
+  entry: ImgEntry; buildingLabel: string; onClose: () => void; onDownload: () => void;
+}) {
   useEffect(() => {
     const on = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", on);
@@ -172,8 +205,12 @@ function Lightbox({ entry, buildingLabel, onClose }: { entry: ImgEntry; building
             <Building2 className="w-4 h-4 text-violet-300 mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold text-white truncate">{buildingLabel}</div>
-              <div className="text-[10px] text-white/40 truncate">{entry.name}</div>
+              <div className="text-[10px] text-white/40 truncate">
+                {ORIENTATION_LABELS[entry.orientation]} facade · {entry.name}
+              </div>
             </div>
+            <button onClick={onDownload} title="Download this photo with the detected issues drawn on it"
+              className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white"><Download className="w-4 h-4" /></button>
             <button onClick={onClose} className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white"><X className="w-4 h-4" /></button>
           </div>
           <div className="px-3.5 py-2 border-b border-white/10 flex items-center gap-1.5 flex-wrap text-[11px]">
@@ -276,40 +313,61 @@ const SENSITIVITY = [
 
 export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuilding[] }) {
   const { project, setProject } = useWizardStore();
-  const [open, setOpen] = useState(false);
-  const [activeKey, setActiveKey] = useState<string>(buildings[0]?.key ?? "");
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [imagesByBuilding, setImagesByBuilding] = useState<Record<string, ImgEntry[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [dragOver, setDragOver] = useState(false);
+  /** Which facade slot is under an active drag, keyed "<building>|<orientation>". */
+  const [dragSlot, setDragSlot] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(0.45);
   const [aiAssist, setAiAssist] = useState(true);
   const [lightbox, setLightbox] = useState<{ entry: ImgEntry; label: string } | null>(null);
   const warmed = useRef(false);
 
+  // Warm on mount: the panel only mounts once its wizard section is opened, so
+  // mounting is the same signal the old `open` flag carried.
   useEffect(() => {
-    if (buildings.length && !buildings.some(b => b.key === activeKey)) setActiveKey(buildings[0]!.key);
-  }, [buildings, activeKey]);
-
-  useEffect(() => {
-    if (!open || warmed.current) return;
+    if (warmed.current) return;
     warmed.current = true;
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 32;
     canvas.getContext("2d")!.fillRect(0, 0, 32, 32);
     canvas.toBlob(b => { if (b) api.facadeDetect(b, 0.9).catch(() => {}); }, "image/jpeg");
-  }, [open]);
+  }, []);
 
-  const activeLabel = buildings.find(b => b.key === activeKey)?.label ?? "—";
   const setImages = (key: string, updater: (prev: ImgEntry[]) => ImgEntry[]) =>
     setImagesByBuilding(prev => ({ ...prev, [key]: updater(prev[key] ?? []) }));
 
   const writeSummary = (key: string, entries: ImgEntry[]) => {
     const done = entries.filter(e => e.status === "done");
     const byClass: Record<string, number> = {};
+    const byOrientation: Partial<Record<FacadeOrientation, { imageCount: number; defectCount: number; byClass: Record<string, number> }>> = {};
     let defectCount = 0;
-    for (const e of done) for (const d of e.result?.detections ?? []) { byClass[d.label] = (byClass[d.label] ?? 0) + 1; defectCount++; }
-    const summary: FacadeDefectSummary = { imageCount: done.length, defectCount, byClass, checkedAt: new Date().toISOString() };
+    for (const e of done) {
+      const o = (byOrientation[e.orientation] ??= { imageCount: 0, defectCount: 0, byClass: {} });
+      o.imageCount++;
+      for (const d of e.result?.detections ?? []) {
+        byClass[d.label] = (byClass[d.label] ?? 0) + 1;
+        o.byClass[d.label] = (o.byClass[d.label] ?? 0) + 1;
+        o.defectCount++;
+        defectCount++;
+      }
+    }
+    // Only photos already persisted can appear in Step 5 - a record pointing at
+    // a URL the backend never received would render as a broken image there.
+    const photos: FacadePhotoRecord[] = done
+      .filter(e => e.savedUrl)
+      .map(e => ({
+        id: e.id, url: e.savedUrl!, name: e.name, orientation: e.orientation,
+        width: e.result?.width ?? 0, height: e.result?.height ?? 0,
+        detections: (e.result?.detections ?? []).map(d => ({
+          label: d.label, score: d.score, box: d.box, source: d.source, note: d.note,
+        })),
+        checkedAt: new Date().toISOString(),
+      }));
+    const summary: FacadeDefectSummary = {
+      label: buildings.find(b => b.key === key)?.label,
+      imageCount: done.length, defectCount, byClass,
+      checkedAt: new Date().toISOString(), byOrientation, photos,
+    };
     const next = { ...(project.facadeDefects ?? {}) };
     if (done.length === 0) delete next[key]; else next[key] = summary;
     setProject({ facadeDefects: next });
@@ -356,25 +414,48 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
       }
 
       const ms = performance.now() - t0;
+      let doneEntry: ImgEntry | undefined;
       setImages(key, prev => {
         const next = prev.map(e => e.id === id ? { ...e, status: "done" as const, result, ms } : e);
+        doneEntry = next.find(e => e.id === id);
         writeSummary(key, next);
         return next;
       });
+
+      // Persist the annotated render so Step 5 can show it after a reload. A
+      // failure here must not fail the detection the user is looking at - the
+      // photo simply stays session-only and is left out of the report.
+      if (doneEntry) {
+        try {
+          const annotated = await renderAnnotatedBlob(doneEntry);
+          if (annotated) {
+            const saved = await api.facadeImageSave(id, annotated);
+            setImages(key, prev => {
+              const next = prev.map(e => e.id === id ? { ...e, savedUrl: saved.url } : e);
+              writeSummary(key, next);
+              return next;
+            });
+          }
+        } catch {
+          /* report copy unavailable; the panel itself still works */
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setImages(key, prev => prev.map(e => e.id === id ? { ...e, status: "error", error: msg } : e));
     }
   };
 
-  const addFiles = async (fileList: FileList | File[]) => {
-    const key = activeKey;
+  const addFiles = async (key: string, orientation: FacadeOrientation, fileList: FileList | File[]) => {
     const files = Array.from(fileList).filter(f => f.type.startsWith("image/"));
     if (!files.length) return;
     setExpanded(prev => new Set(prev).add(key));  // auto-expand the building we're adding to
     for (const f of files) {
       const blob = await prepImage(f);
-      const entry: ImgEntry = { id: nextId(), name: f.name, url: URL.createObjectURL(blob), blob, status: "idle", result: null, error: null, ms: null };
+      const entry: ImgEntry = {
+        id: nextId(), name: f.name, url: URL.createObjectURL(blob), blob, orientation,
+        status: "idle", result: null, error: null, ms: null, savedUrl: null,
+      };
       setImages(key, prev => [...prev, entry]);
       void runDetection(key, entry.id, blob);
     }
@@ -384,10 +465,26 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
     setImages(key, prev => {
       const gone = prev.find(e => e.id === id);
       if (gone) URL.revokeObjectURL(gone.url);
+      // Drop the stored copy too, so deleting a photo here also removes it from
+      // the Step 5 report rather than leaving an orphan on disk.
+      if (gone?.savedUrl) void api.facadeImageDelete(id).catch(() => {});
       const next = prev.filter(e => e.id !== id);
       writeSummary(key, next);
       return next;
     });
+  };
+
+  /** Download the annotated photo - what you see boxed is what you get. */
+  const downloadAnnotated = async (entry: ImgEntry, buildingLabel: string) => {
+    const blob = await renderAnnotatedBlob(entry);
+    if (!blob) return;
+    const safe = `${buildingLabel}_${entry.orientation}`.replace(/[^\w-]+/g, "_");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `facade_${safe}_${entry.name.replace(/\.[^.]+$/, "")}.jpg`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const toggleExpand = (key: string) => setExpanded(prev => {
@@ -402,145 +499,140 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
 
   const summaries = project.facadeDefects ?? {};
   const totalChecked = Object.keys(summaries).length;
-  const withImages = buildings.filter(b => (imagesByBuilding[b.key]?.length ?? 0) > 0);
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
-      <button onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-white/[0.03] transition">
-        <span className="p-1.5 rounded-lg bg-violet-600/20 text-violet-300"><ScanSearch className="w-4 h-4" /></span>
-        <span className="flex-1">
-          <span className="block text-sm font-semibold text-white">Facade condition — AI defect detection</span>
-          <span className="block text-[11px] text-white/40">
-            Upload facade photos; your MBDD2025 model + AI vision flag cracks, leakage, spalling, corrosion &amp; bulges.
+    // No wrapper box and no header of its own: this panel is always rendered
+    // inside the "Facade Defect Detection" wizard section, which already gives
+    // it a title, a number and a collapse control. Repeating them here produced
+    // two nested panels saying the same thing.
+    <div className="space-y-3">
+        {/* AI + sensitivity. The building picker and the single shared drop zone
+            are gone: each building now has its own four facade slots, so the
+            upload target is the slot you drop onto - there is nothing to pick. */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] text-white/45">
+            Upload into a building's north / east / south / west facade below — the MBDD2025 detector flags cracks,
+            leakage, spalling, corrosion &amp; bulges.
             {totalChecked > 0 && <b className="text-violet-300"> · {totalChecked} building{totalChecked === 1 ? "" : "s"} checked</b>}
           </span>
-        </span>
-        {open ? <ChevronUp className="w-4 h-4 text-white/40" /> : <ChevronDown className="w-4 h-4 text-white/40" />}
-      </button>
+          <label className="text-[11px] text-white/50 ml-auto flex items-center gap-1.5 cursor-pointer select-none"
+            title="Also run a general vision model as a second opinion and merge anything the ML detector missed.">
+            <input type="checkbox" checked={aiAssist} onChange={e => setAiAssist(e.target.checked)} className="w-3.5 h-3.5 accent-sky-500 cursor-pointer" />
+            <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-sky-300" /> AI vision assist</span>
+          </label>
+          <label className="text-[11px] text-white/45 flex items-center gap-1.5">
+            Sensitivity:
+            <select value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))}
+              style={{ background: "#0d1117", color: "#e5e7eb" }}
+              className="border border-white/15 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:border-violet-500/60">
+              {SENSITIVITY.map(s => <option key={s.value} value={s.value} style={{ background: "#161b22", color: "#e5e7eb" }}>{s.label}</option>)}
+            </select>
+          </label>
+        </div>
 
-      {open && (
-        <div className="px-4 pb-4 space-y-3 border-t border-white/8 pt-3">
-          {/* Upload target + AI + sensitivity */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <label className="text-[11px] text-white/45">Upload to:</label>
-            <div className="relative">
-              <button onClick={() => setPickerOpen(o => !o)}
-                className="flex items-center gap-2 bg-[#0d1117] border border-white/15 rounded-md pl-2.5 pr-2 py-1.5 text-[12px] text-white hover:border-violet-500/60 min-w-[210px] max-w-[320px]">
-                <Building2 className="w-3.5 h-3.5 text-violet-300 shrink-0" />
-                <span className="truncate flex-1 text-left">{activeLabel}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-white/40 shrink-0" />
-              </button>
-              {pickerOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full max-h-64 overflow-auto rounded-md border border-white/15 bg-[#161b22] shadow-2xl py-1">
-                    {buildings.map(b => {
-                      const s = summaries[b.key];
-                      const nImg = imagesByBuilding[b.key]?.length ?? 0;
+        {/* Legend */}
+        <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[10px] text-white/40">
+          {Object.keys(DEFECT_LABELS).map(k => (
+            <span key={k} className="inline-flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-sm" style={{ background: colorFor(k) }} /> {DEFECT_LABELS[k]}
+            </span>
+          ))}
+        </div>
+
+        {/* Every building, every facade. Buildings are always listed - a facade
+            you have not photographed yet is a visible empty slot rather than a
+            building missing from the list, which is what makes the four-facade
+            coverage legible at a glance. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {buildings.map(b => {
+            const imgs = imagesByBuilding[b.key] ?? [];
+            const s = summaries[b.key];
+            const isOpen = expanded.has(b.key);
+            const running = imgs.some(e => e.status === "running");
+            const covered = FACADE_ORIENTATIONS.filter(o => imgs.some(e => e.orientation === o)).length;
+            return (
+              <div key={b.key} className="rounded-lg border border-white/8 overflow-hidden">
+                <button onClick={() => toggleExpand(b.key)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] transition ${isOpen ? "bg-white/[0.04]" : "hover:bg-white/[0.03]"}`}>
+                  {isOpen ? <ChevronUp className="w-3.5 h-3.5 text-white/40 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-white/40 shrink-0" />}
+                  <Building2 className="w-3.5 h-3.5 text-violet-300 shrink-0" />
+                  <span className="font-semibold text-white truncate">{b.label}</span>
+                  <span className="text-[10px] text-white/35 shrink-0" title="Facades with at least one photo">
+                    {covered}/4 facades
+                  </span>
+                  {running ? <Loader2 className="w-3 h-3 animate-spin text-white/40 shrink-0" /> : <SummaryChips s={s} />}
+                </button>
+
+                {isOpen && (
+                  <div className="p-2.5 pt-1.5 grid gap-2"
+                       style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+                    {FACADE_ORIENTATIONS.map(orientation => {
+                      const slotImgs = imgs.filter(e => e.orientation === orientation);
+                      const slotKey = `${b.key}|${orientation}`;
+                      const isDragging = dragSlot === slotKey;
+                      const slotDefects = slotImgs.reduce((n, e) => n + (e.result?.detections.length ?? 0), 0);
                       return (
-                        <button key={b.key} onClick={() => { setActiveKey(b.key); setPickerOpen(false); }}
-                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12px] hover:bg-violet-600/20 transition ${b.key === activeKey ? "bg-violet-600/10" : ""}`}>
-                          {b.key === activeKey ? <Check className="w-3.5 h-3.5 text-violet-300 shrink-0" /> : <span className="w-3.5 shrink-0" />}
-                          <span className="flex-1 truncate text-white">{b.label}</span>
-                          {nImg > 0 && <span className="text-[9px] text-white/40 shrink-0">{nImg}📷</span>}
-                          {s && <span className="text-[9px] px-1.5 py-0.5 rounded-full shrink-0" style={{ background: "#7c3aed33", color: "#c4b5fd" }}>{s.defectCount}</span>}
-                        </button>
+                        <div key={orientation} className="rounded-lg border border-white/10 bg-black/15 overflow-hidden flex flex-col">
+                          <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-white/8">
+                            <span className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold bg-violet-600/25 text-violet-200 shrink-0">
+                              {ORIENTATION_SHORT[orientation]}
+                            </span>
+                            <span className="text-[11px] font-semibold text-white/85 flex-1 truncate">
+                              {ORIENTATION_LABELS[orientation]} facade
+                            </span>
+                            {slotImgs.length > 0 && (
+                              <span className="text-[9px] shrink-0"
+                                    style={{ color: slotDefects > 0 ? "#fca5a5" : "#6ee7b7" }}>
+                                {slotDefects > 0 ? `${slotDefects} defect${slotDefects === 1 ? "" : "s"}` : "clean"}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="p-1.5 grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
+                            {slotImgs.map(e => (
+                              <Thumb key={e.id} entry={e}
+                                onOpen={() => setLightbox({ entry: e, label: b.label })}
+                                onRemove={() => removeImage(b.key, e.id)}
+                                onRerun={() => runDetection(b.key, e.id, e.blob)} />
+                            ))}
+                          </div>
+
+                          <label
+                            onDragOver={ev => { ev.preventDefault(); setDragSlot(slotKey); }}
+                            onDragLeave={() => setDragSlot(null)}
+                            onDrop={ev => {
+                              ev.preventDefault(); setDragSlot(null);
+                              if (ev.dataTransfer.files) void addFiles(b.key, orientation, ev.dataTransfer.files);
+                            }}
+                            className={`mt-auto flex items-center justify-center gap-1.5 py-2 m-1.5 rounded-md border-2 border-dashed cursor-pointer transition ${
+                              isDragging ? "border-violet-500 bg-violet-600/10" : "border-white/12 hover:border-white/25 hover:bg-white/[0.02]"}`}>
+                            <Upload className="w-3.5 h-3.5 text-white/40" />
+                            <span className="text-[10px] text-white/50">
+                              {slotImgs.length ? "Add another photo" : `Upload ${ORIENTATION_LABELS[orientation].toLowerCase()} photo`}
+                            </span>
+                            <input type="file" accept="image/*" multiple style={{ display: "none" }}
+                              onChange={ev => { if (ev.target.files) void addFiles(b.key, orientation, ev.target.files); ev.currentTarget.value = ""; }} />
+                          </label>
+                        </div>
                       );
                     })}
                   </div>
-                </>
-              )}
-            </div>
-            <label className="text-[11px] text-white/50 ml-auto flex items-center gap-1.5 cursor-pointer select-none"
-              title="Also run a general vision model (GPT-4o) as a second opinion and merge anything the ML detector missed.">
-              <input type="checkbox" checked={aiAssist} onChange={e => setAiAssist(e.target.checked)} className="w-3.5 h-3.5 accent-sky-500 cursor-pointer" />
-              <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-sky-300" /> AI vision assist</span>
-            </label>
-            <label className="text-[11px] text-white/45 flex items-center gap-1.5">
-              Sensitivity:
-              <select value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))}
-                style={{ background: "#0d1117", color: "#e5e7eb" }}
-                className="border border-white/15 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:border-violet-500/60">
-                {SENSITIVITY.map(s => <option key={s.value} value={s.value} style={{ background: "#161b22", color: "#e5e7eb" }}>{s.label}</option>)}
-              </select>
-            </label>
-          </div>
-
-          {/* Legend */}
-          <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[10px] text-white/40">
-            {Object.keys(DEFECT_LABELS).map(k => (
-              <span key={k} className="inline-flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: colorFor(k) }} /> {DEFECT_LABELS[k]}
-              </span>
-            ))}
-          </div>
-
-          {/* Drop zone (compact) */}
-          <label
-            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={e => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files) void addFiles(e.dataTransfer.files); }}
-            className={`flex items-center justify-center gap-2 py-3 rounded-lg border-2 border-dashed cursor-pointer transition ${
-              dragOver ? "border-violet-500 bg-violet-600/10" : "border-white/12 hover:border-white/25 hover:bg-white/[0.02]"}`}>
-            <Upload className="w-4 h-4 text-white/40" />
-            <span className="text-[11px] text-white/55">Drop photos for <b className="text-violet-300">{activeLabel}</b> or click — runs automatically (ML ~1–2s{aiAssist ? "; +AI a few s" : ""})</span>
-            <input type="file" accept="image/*" multiple style={{ display: "none" }}
-              onChange={e => { if (e.target.files) void addFiles(e.target.files); e.currentTarget.value = ""; }} />
-          </label>
-
-          {/* Buildings — accordion rows (compact) */}
-          {withImages.length === 0 ? (
-            <div className="flex items-center gap-2 text-[11px] text-white/30 py-1">
-              <ImageOff className="w-3.5 h-3.5" /> No photos uploaded yet.
-            </div>
-          ) : (
-            <div style={{ columnWidth: "300px", columnGap: "10px" }}>
-              {withImages.map(b => {
-                const imgs = imagesByBuilding[b.key] ?? [];
-                const s = summaries[b.key];
-                const isOpen = expanded.has(b.key);
-                const running = imgs.some(e => e.status === "running");
-                return (
-                  <div key={b.key} className="rounded-lg border border-white/8 overflow-hidden mb-2.5" style={{ breakInside: "avoid" }}>
-                    <button onClick={() => toggleExpand(b.key)}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] transition ${isOpen ? "bg-white/[0.04]" : "hover:bg-white/[0.03]"}`}>
-                      {isOpen ? <ChevronUp className="w-3.5 h-3.5 text-white/40 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-white/40 shrink-0" />}
-                      <Building2 className="w-3.5 h-3.5 text-violet-300 shrink-0" />
-                      <span className="font-semibold text-white truncate">{b.label}</span>
-                      <span className="text-[10px] text-white/35 shrink-0">{imgs.length}📷</span>
-                      {running ? <Loader2 className="w-3 h-3 animate-spin text-white/40 shrink-0" /> : <SummaryChips s={s} />}
-                      <span className="ml-auto shrink-0">
-                        <span onClick={e => { e.stopPropagation(); setActiveKey(b.key); }}
-                          className={`text-[10px] px-2 py-0.5 rounded transition cursor-pointer ${b.key === activeKey ? "text-violet-300" : "text-white/35 hover:text-white hover:bg-white/8"}`}>
-                          {b.key === activeKey ? "▲ upload target" : "upload here"}
-                        </span>
-                      </span>
-                    </button>
-                    {isOpen && (
-                      <div className="p-2.5 pt-1.5 grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))" }}>
-                        {imgs.map(e => (
-                          <Thumb key={e.id} entry={e}
-                            onOpen={() => setLightbox({ entry: e, label: b.label })}
-                            onRemove={() => removeImage(b.key, e.id)}
-                            onRerun={() => runDetection(b.key, e.id, e.blob)} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <p className="text-[10px] text-white/30 leading-relaxed">
-            Click a photo to enlarge and see each issue listed. Photos stay in your browser session (only sent to the local ML model &amp;
-            the vision API); a small per-building defect summary feeds the retrofit prioritization below &amp; the report.
-          </p>
+                )}
+              </div>
+            );
+          })}
         </div>
-      )}
 
-      {lightbox && <Lightbox entry={lightbox.entry} buildingLabel={lightbox.label} onClose={() => setLightbox(null)} />}
+        <p className="text-[10px] text-white/30 leading-relaxed">
+          Click a photo to enlarge, see every issue listed and download it with the boxes drawn on. The annotated copy is
+          saved so the Step 5 report can show it; the per-facade defect summary also feeds the retrofit prioritization below.
+        </p>
+
+      {lightbox && (
+        <Lightbox entry={lightbox.entry} buildingLabel={lightbox.label}
+          onClose={() => setLightbox(null)}
+          onDownload={() => void downloadAnnotated(lightbox.entry, lightbox.label)} />
+      )}
     </div>
   );
 }
