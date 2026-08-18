@@ -27,7 +27,7 @@ import { parseAssemblyParts } from "../config/materialProperties";
 import type { OptimizeComponentInput, OptimizeParams, OptimizePoint } from "../api/client";
 import type { WikellsItem } from "../config/wikellsData";
 import type { BoverketResource, WWRRecord } from "../types";
-import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight, Play } from "lucide-react";
 
 /* Sweden/Gothenburg is the only geometry+cost+carbon-complete dataset - UK
  * buildings resolve via /api/uk/building and get real EPSM energy
@@ -721,7 +721,7 @@ export default function RenovationSimulator() {
     return entries.map(({ g, idx }) => {
       const cc = costCarbonFor ? costCarbonFor(g, idx) : { costSEK: null, carbonKgCO2e: null };
       return {
-        address: g.address ?? `Building ${idx + 1}`, lat: g.lat, lon: g.lon, status: "queued",
+        address: g.address ?? `Building ${idx + 1}`, lat: g.lat, lon: g.lon, status: "idle",
         heatingKwhM2Yr: null, coolingKwhM2Yr: null, totalKwhM2Yr: null,
         costSEK: cc.costSEK, carbonKgCO2e: cc.carbonKgCO2e, error: null,
       };
@@ -731,6 +731,30 @@ export default function RenovationSimulator() {
   const submitBaseline = useCallback(() => {
     if (geometries.length === 0) return;
     const entries = geometries.map((g, i) => ({ g, idx: i }));
+
+    // Prefer Step 3 baseline results — they're already simulated; no need to
+    // re-submit a new EPSM batch. Match by position (Step 3 iterates the same
+    // geometry list in the same order).
+    const step3 = useWizardStore.getState().project.renovationBaselineResults;
+    if (step3 && step3.length === geometries.length) {
+      const pkg: RenovationCalcPackage = {
+        id: "baseline", name: "Baseline (as-built)", color: "rgba(255,255,255,0.4)", isBaseline: true,
+        selections: {}, batchId: null,
+        buildings: entries.map(({ g, idx }) => ({
+          address: g.address ?? `Building ${idx + 1}`,
+          lat: g.lat, lon: g.lon,
+          status: "completed" as const,
+          heatingKwhM2Yr: step3[idx]?.heating ?? null,
+          coolingKwhM2Yr: step3[idx]?.cooling ?? null,
+          totalKwhM2Yr: step3[idx]?.energyUse ?? null,
+          costSEK: null, carbonKgCO2e: null, error: null,
+        })),
+      };
+      setProject({ renovationCalcPackages: [...useWizardStore.getState().project.renovationCalcPackages.filter((p) => p.id !== "baseline"), pkg] });
+      return;
+    }
+
+    // Fallback: no Step 3 data yet — submit a fresh EPSM batch.
     const pkg: RenovationCalcPackage = {
       id: "baseline", name: "Baseline (as-built)", color: "rgba(255,255,255,0.4)", isBaseline: true,
       selections: {}, batchId: null, buildings: makeBuildingRows(entries),
@@ -1561,54 +1585,8 @@ export default function RenovationSimulator() {
                     </span>
                   </div>
                 )}
-                {/* ── Saved configurations for this component ── */}
-                {(() => {
-                  const mine = configs.filter((c) => c.componentKey === activeItem.key);
-                  return (
-                    <div style={{ marginBottom: mine.length ? 14 : 4 }}>
-                      {mine.length > 0 && (
-                        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 6 }}>
-                          Saved ({mine.length}) — each becomes a package option
-                        </div>
-                      )}
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {mine.map((c) => (
-                          <div key={c.id} style={{ minWidth: 190, padding: "9px 11px", borderRadius: 10,
-                            background: "rgba(78,205,196,0.07)", border: "1px solid rgba(78,205,196,0.28)" }}>
-                            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1 }}>{c.name}</span>
-                              <button onClick={() => removeConfig(c.id)} title="Delete configuration"
-                                style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(226,72,59,0.75)", padding: 0 }}>
-                                <XCircle size={13} />
-                              </button>
-                            </div>
-                            <div style={{ fontSize: 11, color: "#4ECDC4", fontWeight: 700, marginTop: 3 }}>
-                              U {c.uValue?.toFixed(2) ?? "—"} W/m²K
-                            </div>
-                            <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
-                              {c.costPerM2 != null ? `${Math.round(c.costPerM2).toLocaleString("sv-SE")} SEK/m²` : "cost —"}
-                              {" · "}
-                              {c.carbonPerM2 != null ? `${c.carbonPerM2.toFixed(1)} kg CO₂e/m²` : "carbon —"}
-                            </div>
-                            {c.costFromCode && (
-                              <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.32)", marginTop: 3 }}>
-                                cost from Wikells {c.costFromCode} (nearest, ΔU {c.costDeltaU?.toFixed(2)})
-                              </div>
-                            )}
-                            {c.carbonUnmatched && c.carbonUnmatched.length > 0 && (
-                              <div style={{ fontSize: 9.5, color: "#E8880C", marginTop: 3 }}>
-                                no Boverket data: {c.carbonUnmatched.join(", ")}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
                 {/* ── Design a new configuration ── */}
-                <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12 }}>
+                <div style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
                     {(() => {
                       const canLayers = !!kindForKey(activeItem.key);
@@ -1672,6 +1650,51 @@ export default function RenovationSimulator() {
                     </>
                   )}
                 </div>
+
+                {/* ── Saved configurations for this component ── */}
+                {(() => {
+                  const mine = configs.filter((c) => c.componentKey === activeItem.key);
+                  if (!mine.length) return null;
+                  return (
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 6 }}>
+                        Saved ({mine.length}) — each becomes a package option
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {mine.map((c) => (
+                          <div key={c.id} style={{ minWidth: 190, padding: "9px 11px", borderRadius: 10,
+                            background: "rgba(78,205,196,0.07)", border: "1px solid rgba(78,205,196,0.28)" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1 }}>{c.name}</span>
+                              <button onClick={() => removeConfig(c.id)} title="Delete configuration"
+                                style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(226,72,59,0.75)", padding: 0 }}>
+                                <XCircle size={13} />
+                              </button>
+                            </div>
+                            <div style={{ fontSize: 11, color: "#4ECDC4", fontWeight: 700, marginTop: 3 }}>
+                              U {c.uValue?.toFixed(2) ?? "—"} W/m²K
+                            </div>
+                            <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
+                              {c.costPerM2 != null ? `${Math.round(c.costPerM2).toLocaleString("sv-SE")} SEK/m²` : "cost —"}
+                              {" · "}
+                              {c.carbonPerM2 != null ? `${c.carbonPerM2.toFixed(1)} kg CO₂e/m²` : "carbon —"}
+                            </div>
+                            {c.costFromCode && (
+                              <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.32)", marginTop: 3 }}>
+                                cost from Wikells {c.costFromCode} (nearest, ΔU {c.costDeltaU?.toFixed(2)})
+                              </div>
+                            )}
+                            {c.carbonUnmatched && c.carbonUnmatched.length > 0 && (
+                              <div style={{ fontSize: 9.5, color: "#E8880C", marginTop: 3 }}>
+                                no Boverket data: {c.carbonUnmatched.join(", ")}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -1720,23 +1743,71 @@ export default function RenovationSimulator() {
                 </div>
               )}
 
-              {packageCombosList.length > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                  <button onClick={simulateConfiguredPackages} disabled={activeCombos.length === 0}
-                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", borderRadius: 9,
-                      fontSize: 12.5, fontWeight: 800,
-                      border: "1px solid rgba(47,180,119,0.45)", background: "rgba(47,180,119,0.14)", color: "#2FB477",
-                      cursor: activeCombos.length ? "pointer" : "not-allowed", opacity: activeCombos.length ? 1 : 0.45 }}>
-                    <Plus size={14} /> Run energy simulation (EPSM) · {activeCombos.length} package{activeCombos.length === 1 ? "" : "s"}
-                    {geometries.length > 1 && targetIdx === "all" ? ` × ${geometries.length} buildings` : ""}
-                  </button>
-                  <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", maxWidth: 460, lineHeight: 1.5 }}>
-                    {activeCombos.length <= 10
-                      ? "Small enough to run every combination in EnergyPlus directly — exact results for exactly these designs."
-                      : "That's a lot of EnergyPlus runs. Use the optimizer below to find the best trade-offs first, then simulate only those."}
-                  </span>
-                </div>
-              )}
+              {packageCombosList.length > 0 && (() => {
+                // Only count packages that are ACTIVELY running (have at least one
+                // queued/running building). Completed packages from previous runs
+                // are excluded — otherwise old results inflate the total and make
+                // isRunning true even before a new run is triggered.
+                const activeSimPkgs = packages.filter(
+                  // batchId must be set — packages that exist in the store but have
+                  // never been submitted to EPSM have batchId: null and must not
+                  // trigger the "Simulating" state before the user presses Run.
+                  (pk) => !pk.isBaseline && pk.batchId !== null && pk.buildings.some((b) => b.status === "queued" || b.status === "running")
+                );
+                let simTotal = 0, simDone = 0;
+                for (const p of activeSimPkgs) {
+                  for (const b of p.buildings) {
+                    simTotal++;
+                    if (b.status === "completed" || b.status === "failed") simDone++;
+                  }
+                }
+                const pct = simTotal > 0 ? Math.round((simDone / simTotal) * 100) : 0;
+                const isRunning = activeSimPkgs.length > 0;
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                      <button onClick={simulateConfiguredPackages} disabled={activeCombos.length === 0 || isRunning}
+                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 9,
+                          fontSize: 12.5, fontWeight: 800,
+                          border: `1px solid ${isRunning ? "rgba(232,136,12,0.45)" : "rgba(47,180,119,0.45)"}`,
+                          background: isRunning ? "rgba(232,136,12,0.12)" : "rgba(47,180,119,0.14)",
+                          color: isRunning ? "#E8880C" : "#2FB477",
+                          cursor: (activeCombos.length && !isRunning) ? "pointer" : "not-allowed",
+                          opacity: activeCombos.length ? 1 : 0.45,
+                          minWidth: 260, position: "relative", overflow: "hidden" }}>
+                        {isRunning
+                          ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite", flexShrink: 0 }} />
+                          : <Play size={14} style={{ flexShrink: 0 }} />}
+                        <span style={{ flex: 1 }}>
+                          {isRunning
+                            ? `Simulating\u2026 ${simDone}\u200a/\u200a${simTotal} buildings`
+                            : `Run energy simulation (EPSM) \u00b7 ${activeCombos.length} package${activeCombos.length === 1 ? "" : "s"}${geometries.length > 1 && targetIdx === "all" ? ` \u00d7 ${geometries.length} buildings` : ""}`}
+                        </span>
+                        {isRunning && (
+                          <span style={{ fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{pct}%</span>
+                        )}
+                        {/* Progress fill behind text */}
+                        {isRunning && (
+                          <span style={{
+                            position: "absolute", left: 0, top: 0, bottom: 0,
+                            width: `${pct}%`,
+                            background: "rgba(232,136,12,0.18)",
+                            transition: "width 0.4s ease",
+                            pointerEvents: "none",
+                          }} />
+                        )}
+                      </button>
+                      <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", maxWidth: 460, lineHeight: 1.5 }}>
+                        {isRunning
+                          ? `EnergyPlus is running \u2014 results will appear in Stage 3 automatically.`
+                          : activeCombos.length <= 10
+                            ? "Small enough to run every combination in EnergyPlus directly \u2014 exact results for exactly these designs."
+                            : "That\u2019s a lot of EnergyPlus runs. Use the optimizer below to find the best trade-offs first, then simulate only those."}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -1796,11 +1867,14 @@ export default function RenovationSimulator() {
           {/* Prominent "EnergyPlus is running" banner so it's obvious a simulation
               is in flight and results will appear on their own (no click needed). */}
           {(() => {
+            // Only show the banner for packages with active jobs
             let running = 0, done = 0, total = 0;
-            for (const p of packages) for (const b of p.buildings) {
-              total++;
-              if (b.status === "completed" || b.status === "failed") done++;
-              if (b.status === "queued" || b.status === "running") running++;
+            for (const p of packages.filter((pk) => !pk.isBaseline && pk.buildings.some((b) => b.status === "queued" || b.status === "running"))) {
+              for (const b of p.buildings) {
+                total++;
+                if (b.status === "completed" || b.status === "failed") done++;
+                if (b.status === "queued" || b.status === "running") running++;
+              }
             }
             if (running === 0) return null;
             return (
@@ -1924,13 +1998,14 @@ export default function RenovationSimulator() {
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       {agg.pending > 0 && <Loader2 size={13} color="#E8880C" style={{ animation: "spin 1s linear infinite" }} />}
                       {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#2FB477" />}
-                      {agg.failed > 0 && (
-                        <>
-                          <XCircle size={13} color="#E2483B" />
-                          <button onClick={() => retryPackage(pkg)} title="Retry failed buildings" style={{ background: "transparent", border: 0, cursor: "pointer", color: "#E2483B" }}>
-                            <RefreshCw size={12} />
-                          </button>
-                        </>
+                      {agg.failed > 0 && <XCircle size={13} color="#E2483B" />}
+                      {(agg.failed > 0 || agg.pending > 0) && (
+                        <button onClick={() => retryPackage(pkg)}
+                          title={agg.failed > 0 ? "Retry failed buildings" : "Re-run stuck buildings"}
+                          style={{ background: "transparent", border: 0, cursor: "pointer",
+                            color: agg.failed > 0 ? "#E2483B" : "rgba(255,255,255,0.35)" }}>
+                          <RefreshCw size={12} />
+                        </button>
                       )}
                       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{agg.completed}/{agg.n}</span>
                     </span>
