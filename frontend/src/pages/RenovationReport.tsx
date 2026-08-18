@@ -314,6 +314,24 @@ export default function RenovationReport() {
     || project.prioritizedBuildingIndices.length
     || 0;
 
+  /* Per-building package choices made in Step 4. When present they are the real
+     recommendation — a portfolio-wide "best package" is an average that may suit
+     none of the buildings individually. */
+  const perBuildingPicks = useMemo(() => {
+    const saved = project.selectedPackageByBuilding ?? {};
+    if (!Object.keys(saved).length) return [];
+    const pkgById = new Map(project.renovationCalcPackages.map((p) => [p.id, p]));
+    return (project.renovationBaselineResults ?? [])
+      .map((b) => {
+        if (b.lat == null || b.lon == null) return null;
+        const pkg = pkgById.get(saved[`${b.lat.toFixed(6)},${b.lon.toFixed(6)}`] ?? "");
+        if (!pkg) return null;
+        const row = pkg.buildings.find((x) => Math.abs(x.lat - b.lat!) < 1e-6 && Math.abs(x.lon - b.lon!) < 1e-6);
+        return { address: b.address, pkg: pkg.name, baseline: b.energyUse, after: row?.totalKwhM2Yr ?? null };
+      })
+      .filter((x): x is { address: string; pkg: string; baseline: number; after: number | null } => x != null);
+  }, [project.selectedPackageByBuilding, project.renovationCalcPackages, project.renovationBaselineResults]);
+
   const facadeEntries = useMemo(
     () => Object.entries(project.facadeDefects ?? {}).filter(([, sum]) => sum && sum.imageCount > 0),
     [project.facadeDefects],
@@ -583,6 +601,19 @@ export default function RenovationReport() {
   <h2>Renovation packages tested</h2>
   <p class="sub">Every package below was simulated against the as-built baseline above, on the same buildings.</p>
   ${packageChart}
+
+  ${perBuildingPicks.length ? `
+  <h2>Chosen package per building</h2>
+  <p class="sub">Selected building by building in Step 4 — where a portfolio-wide pick would average over real differences between them.</p>
+  <table><thead><tr><th>Building</th><th>Chosen package</th><th>Baseline</th><th>After</th><th>Reduction</th></tr></thead><tbody>
+  ${perBuildingPicks.map((r) => {
+    const pct = r.after != null && r.baseline ? Math.round(((r.after - r.baseline) / r.baseline) * 100) : null;
+    return `<tr><td>${esc(r.address)}</td><td>${esc(r.pkg)}</td>
+      <td>${r.baseline.toFixed(1)}</td><td>${r.after == null ? "—" : r.after.toFixed(1)}</td>
+      <td>${pct == null ? "—" : `${pct}%`}</td></tr>`;
+  }).join("")}
+  </tbody></table>
+  <p class="sub" style="margin-top:4px">Energy in kWh/m²·yr.</p>` : ""}
 
   <h2>Recommended packages — and what they are made of</h2>
   ${bestBlock("Best energy saving", bestEnergy, "largest reduction in energy use")}
@@ -990,6 +1021,35 @@ export default function RenovationReport() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Per-building picks outrank the portfolio-wide recommendation below,
+          so they come first when they exist. */}
+      {perBuildingPicks.length > 0 && (
+        <Card>
+          <SectionTitle icon={<Building2 size={15} color="#4ECDC4" />} title="Chosen Package per Building" />
+          <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 10px" }}>
+            Selected building by building in Step 4 — a single portfolio-wide pick would average over real differences between them.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {perBuildingPicks.map((r) => {
+              const pct = r.after != null && r.baseline ? Math.round(((r.after - r.baseline) / r.baseline) * 100) : null;
+              return (
+                <div key={r.address} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                  padding: "8px 12px", borderRadius: 9, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", minWidth: 160 }}>{r.address}</span>
+                  <span style={{ fontSize: 11.5, color: "#4ECDC4", flex: 1 }}>{r.pkg}</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                    {r.baseline.toFixed(1)} → {r.after == null ? "—" : r.after.toFixed(1)} kWh/m²·yr
+                  </span>
+                  {pct != null && (
+                    <span style={{ fontSize: 12, fontWeight: 800, color: pct < 0 ? "#2FB477" : "#E2483B" }}>{pct}%</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </Card>
       )}
 

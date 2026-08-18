@@ -1231,6 +1231,7 @@ export default function RenovationSimulator() {
     submitBatch(pkg.id, overrides, pkg.name, entries);
   }
 
+  const saved = project.selectedPackageByBuilding ?? {};
   const baselinePkg = packages.find((p) => p.isBaseline);
   const baselineRunning = !!baselinePkg?.buildings.some(isBuildingRunning);
   const baselineAgg = baselinePkg ? pkgAggregate(baselinePkg) : null;
@@ -2195,6 +2196,17 @@ export default function RenovationSimulator() {
                     );
                   };
                   const th = { fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: 1 };
+                  // Buildings are identified by rounded coordinates, the same basis
+                  // Step 3 uses to match its shortlist — addresses are not unique
+                  // and are sometimes just "Building 3".
+                  const bKeyOf = (b: RenovationCalcBuildingResult) => `${b.lat.toFixed(6)},${b.lon.toFixed(6)}`;
+                  const savedFor = (b: RenovationCalcBuildingResult) => saved[bKeyOf(b)];
+                  const savePick = (b: RenovationCalcBuildingResult, pkgId: string) => {
+                    const key = bKeyOf(b);
+                    const next = { ...saved };
+                    if (next[key] === pkgId) delete next[key]; else next[key] = pkgId;
+                    setProject({ selectedPackageByBuilding: next });
+                  };
                   return (
                     <div style={{ minWidth: 460 }}>
                       <div style={{ display: "grid", gridTemplateColumns: cols, gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 6 }}>
@@ -2214,16 +2226,27 @@ export default function RenovationSimulator() {
                           <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.55)" }}>{b.totalKwhM2Yr ?? "—"}</span>
                           {others.map((p) => {
                             const v = findTotal(p, b);
+                            const isSaved = savedFor(b) === p.id;
                             return (
-                              <span key={p.id} style={{ fontSize: 11.5, color: "rgba(255,255,255,0.85)" }}>
-                                {v ?? "—"}{delta(v, b.totalKwhM2Yr)}
-                              </span>
+                              <button key={p.id}
+                                onClick={() => v != null && savePick(b, p.id)}
+                                disabled={v == null}
+                                title={v == null ? "Run this package first" : isSaved ? `Saved for ${b.address} — click to unsave` : `Save ${p.name} for ${b.address}`}
+                                style={{ display: "flex", alignItems: "center", gap: 4, textAlign: "left",
+                                  fontSize: 11.5, color: "rgba(255,255,255,0.85)", padding: "3px 6px", borderRadius: 7,
+                                  background: isSaved ? "rgba(47,180,119,0.16)" : "transparent",
+                                  border: `1px solid ${isSaved ? "#2FB477" : "transparent"}`,
+                                  cursor: v == null ? "default" : "pointer" }}>
+                                {isSaved && <CheckCircle2 size={11} color="#2FB477" style={{ flexShrink: 0 }} />}
+                                <span>{v ?? "—"}{delta(v, b.totalKwhM2Yr)}</span>
+                              </button>
                             );
                           })}
                         </div>
                       ))}
                       <p style={{ fontSize: 9.5, color: "rgba(255,255,255,0.3)", padding: "8px 4px 0", lineHeight: 1.5 }}>
                         Total energy, kWh/m²·yr. <span style={{ color: "#2FB477" }}>▼ green</span> = less energy than as-built · <span style={{ color: "#E2483B" }}>▲ red</span> = more.
+                        <br />Click a value to <b style={{ color: "rgba(255,255,255,0.5)" }}>save that package for that building</b> — each building can keep a different one, and Step 5 reports them per building. Click again to unsave.
                       </p>
                     </div>
                   );

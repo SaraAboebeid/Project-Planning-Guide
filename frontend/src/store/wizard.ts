@@ -213,6 +213,12 @@ interface ProjectState {
   /* Step 4 — regret-based decision analysis (minimax regret / range / Hurwicz over
      retrofit options under future energy-price scenarios); rendered in the Step 5 report. */
   regretAnalysis: RegretResult | null;
+  /* Step 4 — the package chosen FOR a specific building, keyed by
+     "lat,lon" (6dp). Iterating buildings one at a time is the normal way to
+     work: the best package for a 1960s block is rarely the best for its
+     neighbour. Empty means "no per-building choice made" and the portfolio-wide
+     recommendation stands. */
+  selectedPackageByBuilding: Record<string, string>;
   /* Step 4 — chosen heating system (HVAC source), id from hvacSystems.ts.
      Default "dh_keep" = keep district heating (the as-built baseline). */
   heatingSystemId: string;
@@ -329,6 +335,7 @@ const DEFAULT_PROJECT: ProjectState = {
   prioritizedBuildingIndices: [],
   prioritizedBuildingCount: 0,
   regretAnalysis: null,
+  selectedPackageByBuilding: {},
   heatingSystemId: "dh_keep",
   heatingAnalysis: null,
 };

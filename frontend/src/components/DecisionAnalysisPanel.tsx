@@ -16,10 +16,28 @@ const scenarioHint = (label: string, index: number) => {
   return ["cheap energy future", "middle-price future", "expensive energy future"][index] ?? "price scenario";
 };
 
-const PICK_STYLE: Record<string, { fg: string; bg: string; label: string; tip: string }> = {
-  minimaxRegret: { fg: "#4ECDC4", bg: "rgba(78,205,196,0.16)", label: "Safety-first",   tip: "Chooses the option with the smallest worst-case disappointment." },
-  hurwicz:       { fg: "#B98BE8", bg: "rgba(185,139,232,0.16)", label: "Balanced choice", tip: "Blends worst and best case using your slider setting (alpha)." },
-  mostRobust:    { fg: "#2FB477", bg: "rgba(47,180,119,0.16)", label: "Most stable",      tip: "Smallest difference between low and high price outcomes." },
+const PICK_STYLE: Record<string, { fg: string; bg: string; label: string; tip: string; what: string; when: string; column: string }> = {
+  minimaxRegret: {
+    fg: "#4ECDC4", bg: "rgba(78,205,196,0.16)", label: "Safety-first",
+    tip: "Chooses the option with the smallest worst-case disappointment.",
+    what: "Whichever energy-price future actually arrives, this option is never far behind whichever option turns out to have been best.",
+    when: "Use it when you cannot predict prices and want to avoid looking wrong in hindsight. This is the standard choice under genuine uncertainty.",
+    column: "Lowest “Worst miss vs best”",
+  },
+  hurwicz: {
+    fg: "#B98BE8", bg: "rgba(185,139,232,0.16)", label: "Balanced choice",
+    tip: "Blends worst and best case using your slider setting (alpha).",
+    what: "Scores each option as alpha x its best outcome + (1 - alpha) x its worst, so it sits between optimism and caution.",
+    when: "Use it when you have a view on how prices will move. The alpha slider under Advanced sets that view — 0.5 is neutral.",
+    column: "Best “Balanced score”",
+  },
+  mostRobust: {
+    fg: "#2FB477", bg: "rgba(47,180,119,0.16)", label: "Most stable",
+    tip: "Smallest difference between low and high price outcomes.",
+    what: "Its result barely changes between the cheap and the expensive future — the outcome is predictable even if prices are not.",
+    when: "Use it when a dependable number matters more than the highest possible return, e.g. for a fixed budget or a business case.",
+    column: "Smallest “Outcome spread”",
+  },
 };
 
 export default function DecisionAnalysisPanel({
@@ -30,7 +48,13 @@ export default function DecisionAnalysisPanel({
   prices: number[]; setPrices: (p: number[]) => void;
   currentPrice: number;
 }) {
-  const [alphaOpen, setAlphaOpen] = useState(false);
+  /* "Worst miss vs best" is the column that answers the question people actually
+     have — how bad can this look in hindsight — and it is the one minimax regret
+     is built on. Outcome spread is a second-order sensitivity check, and the
+     balanced score moves whenever alpha moves, so neither belongs in the default
+     view. One switch reveals both, together with the alpha slider they depend on. */
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [openTag, setOpenTag] = useState<string | null>(null);
   const { scenarios, options, bestPerScenario, picks } = result;
   const picksFor = (id: string) =>
     (Object.entries(picks) as [string, string][]).filter(([, v]) => v === id).map(([k]) => k);
@@ -78,12 +102,12 @@ export default function DecisionAnalysisPanel({
             letter in front of everyone, so it is opt-in with a sensible 0.5. */}
         <div style={{ flex: "1 1 240px", minWidth: 220 }}>
           <button
-            onClick={() => setAlphaOpen((o) => !o)}
+            onClick={() => setAdvancedOpen((o) => !o)}
             style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: 0, cursor: "pointer",
               fontSize: 10, fontWeight: 700, color: white(0.35), textTransform: "uppercase", letterSpacing: 1, padding: 0, marginBottom: 6 }}>
-            {alphaOpen ? "▾" : "▸"} Advanced — decision style (alpha) = <span style={{ color: "#B98BE8" }}>{alpha.toFixed(2)}</span>
+            {advancedOpen ? "▾" : "▸"} Advanced — decision style (alpha) = <span style={{ color: "#B98BE8" }}>{alpha.toFixed(2)}</span>
           </button>
-          {alphaOpen && (<>
+          {advancedOpen && (<>
           <input type="range" min={0} max={1} step={0.05} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))}
             style={{ width: "100%", accentColor: "#B98BE8" }} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9.5, color: white(0.3) }}>
@@ -109,9 +133,13 @@ export default function DecisionAnalysisPanel({
                   <span style={{ fontWeight: 400, color: white(0.3) }}>{scenarioHint(s.label, i)}</span>
                 </th>
               ))}
-              <th style={th} title="Best minus worst across scenarios (sensitivity)">Outcome spread</th>
+              {advancedOpen && (
+                <th style={th} title="Best minus worst across scenarios (sensitivity)">Outcome spread</th>
+              )}
               <th style={th} title="Worst-case regret vs the best option in each scenario">Worst miss vs best</th>
-              <th style={th} title="alpha x best + (1 - alpha) x worst">Balanced score</th>
+              {advancedOpen && (
+                <th style={th} title="alpha x best + (1 - alpha) x worst">Balanced score</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -126,9 +154,12 @@ export default function DecisionAnalysisPanel({
                       {tags.map((t) => {
                         const style = PICK_STYLE[t] ?? { fg: "#fff", bg: "rgba(255,255,255,0.08)", label: t, tip: "" };
                         return (
-                          <span key={t} title={style.tip} style={{ fontSize: 8.5, fontWeight: 800, padding: "1px 6px", borderRadius: 99, color: style.fg, background: style.bg }}>
+                          <button key={t} onClick={() => setOpenTag((cur) => (cur === t ? null : t))}
+                            title={style.tip}
+                            style={{ fontSize: 8.5, fontWeight: 800, padding: "1px 6px", borderRadius: 99, color: style.fg,
+                              background: style.bg, border: `1px solid ${openTag === t ? style.fg : "transparent"}`, cursor: "pointer" }}>
                             ★ {style.label}
-                          </span>
+                          </button>
                         );
                       })}
                     </div>
@@ -137,9 +168,13 @@ export default function DecisionAnalysisPanel({
                     const isBest = !o.isBaseline && b === bestPerScenario[si];
                     return <td key={si} style={{ ...td, color: isBest ? "#2FB477" : o.isBaseline ? white(0.4) : b < 0 ? "#fca5a5" : white(0.8), fontWeight: isBest ? 800 : 400 }}>{fmtM(b)}</td>;
                   })}
-                  <td style={{ ...td, color: white(0.6) }}>{o.isBaseline ? "—" : fmtM(o.range)}</td>
+                  {advancedOpen && (
+                    <td style={{ ...td, color: white(0.6) }}>{o.isBaseline ? "—" : fmtM(o.range)}</td>
+                  )}
                   <td style={{ ...td, color: o.id === picks.minimaxRegret ? "#4ECDC4" : white(0.6), fontWeight: o.id === picks.minimaxRegret ? 800 : 400 }}>{o.isBaseline ? "—" : fmtM(o.maxRegret)}</td>
-                  <td style={{ ...td, color: o.id === picks.hurwicz ? "#B98BE8" : white(0.6), fontWeight: o.id === picks.hurwicz ? 800 : 400 }}>{o.isBaseline ? "—" : fmtM(o.hurwicz)}</td>
+                  {advancedOpen && (
+                    <td style={{ ...td, color: o.id === picks.hurwicz ? "#B98BE8" : white(0.6), fontWeight: o.id === picks.hurwicz ? 800 : 400 }}>{o.isBaseline ? "—" : fmtM(o.hurwicz)}</td>
+                  )}
                 </tr>
               );
             })}
@@ -147,11 +182,35 @@ export default function DecisionAnalysisPanel({
         </table>
       </div>
 
-      {/* What the three decision columns mean */}
+      {/* Clicking a tag explains the rule behind it. Inline rather than a tooltip:
+          these are decision methods, and a sentence you can read at your own pace
+          beats hover text that vanishes. */}
+      {openTag && PICK_STYLE[openTag] && (() => {
+        const st = PICK_STYLE[openTag]!;
+        return (
+          <div style={{ marginBottom: 12, padding: "11px 13px", borderRadius: 10, background: st.bg, border: `1px solid ${st.fg}44` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: st.fg, flex: 1 }}>★ {st.label}</span>
+              <span style={{ fontSize: 9.5, color: white(0.4) }}>{st.column}</span>
+              <button onClick={() => setOpenTag(null)} title="Close"
+                style={{ background: "transparent", border: 0, cursor: "pointer", color: white(0.45), padding: 0, lineHeight: 1, fontSize: 13 }}>×</button>
+            </div>
+            <div style={{ fontSize: 11, color: white(0.7), lineHeight: 1.55 }}>{st.what}</div>
+            <div style={{ fontSize: 10.5, color: white(0.45), lineHeight: 1.5, marginTop: 4 }}>{st.when}</div>
+          </div>
+        );
+      })()}
+
+      {/* What the decision columns mean */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", marginTop: 10, fontSize: 10.5, color: white(0.4), lineHeight: 1.5 }}>
-        <span><b style={{ color: white(0.6) }}>Outcome spread</b> — how much the benefit swings between the cheap and expensive futures (smaller = more stable).</span>
+        {advancedOpen && (
+          <span><b style={{ color: white(0.6) }}>Outcome spread</b> — how much the benefit swings between the cheap and expensive futures (smaller = more stable).</span>
+        )}
         <span><b style={{ color: white(0.6) }}>Worst miss vs best</b> — the biggest shortfall behind the best option in any future (smaller = safer).</span>
-        <span><b style={{ color: white(0.6) }}>Balanced score</b> — best &amp; worst case blended by your α slider (higher = better).</span>
+        {advancedOpen && (
+          <span><b style={{ color: white(0.6) }}>Balanced score</b> — best &amp; worst case blended by your α slider (higher = better).</span>
+        )}
+        <span style={{ color: white(0.3) }}>Click a ★ tag for what that pick means.</span>
       </div>
 
       {/* Plain-language summary */}
