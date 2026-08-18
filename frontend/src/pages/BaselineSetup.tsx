@@ -247,10 +247,15 @@ export default function BaselineSetup() {
               cooling: r?.cooling_kwh_m2_yr ?? 0,
               lighting: r?.lighting_kwh_m2_yr ?? 0,
               equipment: r?.equipment_kwh_m2_yr ?? 0,
-              // The shoebox IDF model doesn't simulate domestic hot water or
-              // infiltration separately from the 4 end-uses EPSM reports
-              // (Heating/Cooling/Lighting/Equipment) - real 0s, not filler.
-              dhw: 0,
+              // Real EnergyPlus "Water Systems" output. The shoebox draws hot
+              // water from a stand-alone water heater sized to the Sveby
+              // standard intensity for the building's use category, so this is
+              // a played-back assumption rather than a prediction - but it puts
+              // our total on the same end-use basis as an energideklaration.
+              dhw: r?.dhw_kwh_m2_yr ?? 0,
+              // Infiltration IS modelled (ZoneInfiltration:DesignFlowRate), but
+              // EnergyPlus books it inside Heating rather than as its own end
+              // use, so there is no separate figure to report.
               airLeakage: 0,
               eClass: src?.eclass ?? null,
               eClassFromEpc: !!src?.eclass,
@@ -379,6 +384,26 @@ export default function BaselineSetup() {
                 </button>
               );
             })}
+          </div>
+          {/* The run button belongs with the selection it acts on - it reads
+              "for N buildings", so putting it anywhere else made the user scroll
+              away from the chips to find out what N referred to. */}
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+            <button
+              disabled={!canRunBaseline || simRunning}
+              onClick={runBaseline}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "11px 24px", borderRadius: 10, border: 0,
+                background: canRunBaseline && !simRunning ? "linear-gradient(135deg,#5a9e1e,#2FB477)" : "rgba(255,255,255,0.06)",
+                color: canRunBaseline && !simRunning ? "#0a0d14" : "rgba(255,255,255,0.2)",
+                fontSize: 13, fontWeight: 800, cursor: canRunBaseline && !simRunning ? "pointer" : "not-allowed",
+                boxShadow: canRunBaseline && !simRunning ? "0 4px 14px rgba(47,180,119,0.3)" : "none",
+              }}
+            >
+              {simRunning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={14} />}
+              {simRunning ? "Running…" : `${project.baselineStatus === "done" ? "Re-run" : "Run"} baseline energy simulation (EPSM) for ${runList.length} building${runList.length !== 1 ? "s" : ""}`}
+            </button>
           </div>
         </div>
       )}
@@ -573,8 +598,13 @@ export default function BaselineSetup() {
                     }}>Energy class {r.eClass ?? "—"}</span>
                   </div>
                 </div>
-                {/* Metric grid - Total/Heating/Cooling are real EPSM output; the
-                    shoebox model doesn't simulate DHW or infiltration separately */}
+                {/* Metric grid - all six are real EPSM end-use output. Hot water
+                    is EnergyPlus's "Water Systems" end use, driven by a Sveby
+                    standard draw profile (see tools/idf/defaults.py). */}
+                {/* Results saved before the hot-water field existed stored dhw: 0
+                    even when the run itself included it. The total is the sum of
+                    all five end uses by construction, so the residual recovers it
+                    exactly - and stays 0 for genuinely DHW-free older runs. */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
                   {[
                     { icon: <BarChart2 size={13} color="#E8880C" />, label: "Total energy use", value: `${r.energyUse} kWh/m²·yr`, color: "#E8880C" },
@@ -582,7 +612,9 @@ export default function BaselineSetup() {
                     { icon: <Droplets size={13} color="#4A90E2" />,    label: "Cooling demand",   value: `${r.cooling} kWh/m²·yr`,  color: "#93c5fd" },
                     { icon: <Lightbulb size={13} color="#E8880C" />,   label: "Lighting",         value: `${r.lighting} kWh/m²·yr`, color: "#fcd34d" },
                     { icon: <Cpu size={13} color="#2FB477" />,          label: "Equipment",        value: `${r.equipment} kWh/m²·yr`, color: "#86efac" },
-                    { icon: <Droplets size={13} color="#94a3b8" />,     label: "Hot water",        value: "Not modelled",          color: "#94a3b8" },
+                    { icon: <Droplets size={13} color="#4A90E2" />,     label: "Hot water",
+                      value: `${r.dhw || Math.max(0, Math.round((r.energyUse - r.heating - r.cooling - r.lighting - r.equipment) * 10) / 10)} kWh/m²·yr`,
+                      color: "#93c5fd" },
                   ].map(m => (
                     <div key={m.label} style={{ borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>{m.icon}<span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{m.label}</span></div>
@@ -593,28 +625,15 @@ export default function BaselineSetup() {
               </div>
             ))}
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
-              * Real EnergyPlus (EPSM) output. Domestic hot water and infiltration aren't modelled by the current
-              shoebox geometry, so they're omitted rather than shown as a guess. Proceed to Step 4 to test renovation
-              packages against this baseline.
+              * Real EnergyPlus (EPSM) output. Hot water is simulated from a Sveby standard draw profile for the
+              building's use category (25 kWh/m²·yr for dwellings — the Göteborg EPC median is 23.6), so it is a
+              standard assumption played back through EnergyPlus, not a prediction: it will not vary between two
+              dwellings of the same size. Infiltration is modelled too, but EnergyPlus reports it inside heating
+              rather than as its own end use. Proceed to Step 4 to test renovation packages against this baseline.
             </p>
           </div>
         )}
 
-        <button
-          disabled={!canRunBaseline || simRunning}
-          onClick={runBaseline}
-          style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "11px 24px", borderRadius: 10, border: 0,
-            background: canRunBaseline && !simRunning ? "linear-gradient(135deg,#5a9e1e,#2FB477)" : "rgba(255,255,255,0.06)",
-            color: canRunBaseline && !simRunning ? "#0a0d14" : "rgba(255,255,255,0.2)",
-            fontSize: 13, fontWeight: 800, cursor: canRunBaseline && !simRunning ? "pointer" : "not-allowed",
-            boxShadow: canRunBaseline && !simRunning ? "0 4px 14px rgba(47,180,119,0.3)" : "none",
-          }}
-        >
-          {simRunning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={14} />}
-          {simRunning ? "Running…" : `${project.baselineStatus === "done" ? "Re-run" : "Run"} baseline energy simulation (EPSM) for ${runList.length} building${runList.length !== 1 ? "s" : ""}`}
-        </button>
       </div>
 
 

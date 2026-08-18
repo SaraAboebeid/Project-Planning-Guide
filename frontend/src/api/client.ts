@@ -152,9 +152,10 @@ export const api = {
 
   simulationResults: (id: string) =>
     get<{
-      heating_kwh: number; cooling_kwh: number; lighting_kwh: number; equipment_kwh: number; total_kwh: number;
+      heating_kwh: number; cooling_kwh: number; lighting_kwh: number; equipment_kwh: number;
+      dhw_kwh: number; total_kwh: number;
       heating_kwh_m2_yr: number | null; cooling_kwh_m2_yr: number | null; lighting_kwh_m2_yr: number | null;
-      equipment_kwh_m2_yr: number | null; total_kwh_m2_yr: number | null;
+      equipment_kwh_m2_yr: number | null; dhw_kwh_m2_yr: number | null; total_kwh_m2_yr: number | null;
       floors: number; footprint_m2: number; total_floor_area_m2: number;
     }>(`/simulation-results/${id}`),
 
@@ -190,7 +191,8 @@ export const api = {
         package_id: string; package_label: string | null; status: string;
         results: {
           heating_kwh_m2_yr: number | null; cooling_kwh_m2_yr: number | null;
-          lighting_kwh_m2_yr: number | null; equipment_kwh_m2_yr: number | null; total_kwh_m2_yr: number | null;
+          lighting_kwh_m2_yr: number | null; equipment_kwh_m2_yr: number | null;
+          dhw_kwh_m2_yr: number | null; total_kwh_m2_yr: number | null;
           floors: number; footprint_m2: number; total_floor_area_m2: number;
         } | null;
         error: string | null;

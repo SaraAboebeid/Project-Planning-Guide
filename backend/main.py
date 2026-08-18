@@ -2643,7 +2643,13 @@ def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], bu
     cooling_kwh = _kwh("Cooling")
     lighting_kwh = _kwh("Interior Lighting") + _kwh("Exterior Lighting")
     equipment_kwh = _kwh("Interior Equipment") + _kwh("Exterior Equipment")
-    total_kwh = heating_kwh + cooling_kwh + lighting_kwh + equipment_kwh
+    # Domestic hot water. EnergyPlus reports the shoebox's stand-alone water
+    # heater under "Water Systems" (see tools/idf/generate_idf.py). Older runs
+    # predate the water heater and legitimately carry 0 here - they were
+    # simulated without any hot-water draw at all, so 0 is their true value,
+    # not a missing one.
+    dhw_kwh = _kwh("Water Systems")
+    total_kwh = heating_kwh + cooling_kwh + lighting_kwh + equipment_kwh + dhw_kwh
 
     def _per_m2(kwh: float) -> Optional[float]:
         return round(kwh / total_floor_area, 1) if total_floor_area else None
@@ -2656,11 +2662,13 @@ def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], bu
         "cooling_kwh": round(cooling_kwh, 1),
         "lighting_kwh": round(lighting_kwh, 1),
         "equipment_kwh": round(equipment_kwh, 1),
+        "dhw_kwh": round(dhw_kwh, 1),
         "total_kwh": round(total_kwh, 1),
         "heating_kwh_m2_yr": _per_m2(heating_kwh),
         "cooling_kwh_m2_yr": _per_m2(cooling_kwh),
         "lighting_kwh_m2_yr": _per_m2(lighting_kwh),
         "equipment_kwh_m2_yr": _per_m2(equipment_kwh),
+        "dhw_kwh_m2_yr": _per_m2(dhw_kwh),
         "total_kwh_m2_yr": _per_m2(total_kwh),
     }
 

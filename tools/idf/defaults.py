@@ -61,6 +61,62 @@ INTERNAL_GAINS_BY_USE: dict[str, dict] = {
 }
 DEFAULT_INTERNAL_GAINS = _LOW_USE
 
+# ── Domestic hot water ───────────────────────────────────────────────────
+# The shoebox models DHW as a stand-alone WaterHeater:Mixed drawing
+# DistrictHeatingWater, so EnergyPlus reports it under the "Water Systems"
+# end use alongside Heating/Lighting/Equipment.
+#
+# BE HONEST ABOUT WHAT THIS IS: EnergyPlus does not *predict* hot-water use,
+# it plays back the draw profile we hand it. The annual figure out is the
+# annual figure in - a standard assumption, not a simulation result. Its
+# value is that the building's total energy then covers the same end uses as
+# a Swedish energideklaration (which includes tappvarmvatten), so the two are
+# finally comparable; before this, our totals were structurally low.
+#
+# Intensities are Sveby "Brukarindata" standard values (kWh per m2 Atemp per
+# year). The 25 for dwellings is corroborated by the national EPC register:
+# Goteborg's 72,133 declared hot-water figures have a median of 23.6
+# (p25 14.9, p75 25.0). Includes circulation (VVC) losses, which is why the
+# water heater below is modelled with no separate standby loss.
+DHW_KWH_M2_YR_BY_USE: dict[str, float] = {
+    "bostad_enfamilj": 25.0,
+    "bostad_flerfamilj": 25.0,
+    "verksamhet": 2.0,      # Sveby kontor - washrooms only
+    "samhalle": 10.0,       # schools/care: showers + commercial kitchens
+    "industri": 2.0,
+    "ovrigt": 2.0,
+    "komplement": 0.0,      # garages/sheds: no hot water at all
+}
+DEFAULT_DHW_KWH_M2_YR = 2.0
+# NOTE: the UK datasets reuse this same use_cat taxonomy, so UK buildings get
+# the Swedish Sveby intensities too. For dwellings the magnitude is close
+# enough for screening, but it is a Swedish standard applied to UK stock -
+# swap in SAP/BREDEM figures if UK results ever need defending on their own.
+
+DHW_SUPPLY_TEMP_C = 55.0      # BBR minimum at the tap to control legionella
+DHW_DEADBAND_K = 2.0
+# The tank cycles across the deadband rather than sitting exactly on setpoint,
+# so water leaves at the MEAN tank temperature (setpoint - deadband/2), not at
+# setpoint. Sizing the draw on the setpoint therefore under-delivers by
+# deadband/(2*dT) - measured at 2.3% against a real EnergyPlus run before this
+# was accounted for. The generator sizes on the mean instead, which removes it.
+DHW_COLD_TEMP_C = 10.0        # incoming mains, Swedish annual mean
+# Fixed rather than left blank on purpose: blank makes EnergyPlus use the
+# site's own varying mains temperature, which would drift the annual total
+# away from the intensity we are calibrating to.
+
+# Daily draw profile (fraction of peak): morning and evening peaks, the
+# classic residential tapping pattern. The generator derives the peak flow
+# rate from this profile's own annual mean, so editing the shape here keeps
+# the annual total on target automatically.
+DHW_DAY_PATTERN: list[tuple[str, float]] = [
+    ("06:00", 0.20), ("08:00", 1.00), ("11:00", 0.40),
+    ("17:00", 0.30), ("21:00", 0.90), ("24:00", 0.30),
+]
+
+WATER_DENSITY_KG_M3 = 1000.0
+WATER_SPECIFIC_HEAT_J_KGK = 4186.0
+
 HEATING_SETPOINT_C = 21.0
 COOLING_SETPOINT_C = 25.0
 ACTIVITY_LEVEL_W_PER_PERSON = 120.0

@@ -136,7 +136,7 @@ export const EQUATIONS: EquationDoc[] = [
   {
     name: "Annual heating energy",
     latexish: "Q_b = Q_fixed,b + H_tr,b · F_dh     [kWh/yr]",
-    explain: "Total annual demand = the part a retrofit can't change (Q_fixed: hot water, ventilation, appliances, internal gains — derived per building from its EPC) plus envelope transmission losses.",
+    explain: "Total annual demand = the part a retrofit can't change (Q_fixed: hot water, ventilation, appliances, internal gains — derived per building from its own EnergyPlus baseline run) plus envelope transmission losses.",
   },
   {
     name: "Discount factor (present value)",

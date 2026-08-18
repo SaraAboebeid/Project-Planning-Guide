@@ -53,6 +53,9 @@ services:
     # host browser, unlike sharing the backend's network namespace).
     environment:
       VITE_API_PROXY_TARGET: "http://backend:8000"
+      # Bind-mounted source on Windows gets no inotify events into the container,
+      # so Vite must poll or HMR never fires - see frontend/vite.config.ts.
+      VITE_USE_POLLING: "1"
     command: sh -lc "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5180"
     volumes:
       - ./:/app

@@ -72,8 +72,9 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
           ))}
         </div>
         <p style={{ fontSize: 11, color: white(0.35), marginTop: 10 }}>
-          Q_fixed is derived per building from its EPC (total specific energy minus envelope transmission), not a
-          looked-up constant. Values marked PROVISIONAL still need confirming against the cited source.
+          Q_fixed is derived per building from its own EnergyPlus baseline run (total specific energy minus envelope
+          transmission), not a looked-up constant. Values marked PROVISIONAL still need confirming against the cited
+          source.
         </p>
 
         {/* Methods */}

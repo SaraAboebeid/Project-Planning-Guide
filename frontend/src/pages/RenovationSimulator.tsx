@@ -255,14 +255,34 @@ function assumptionValue(country: "SE" | "UK", key: string): number | null {
   return ASSUMPTIONS[country].find((a) => a.key === key)?.value ?? null;
 }
 
+/** Is this row still in flight - i.e. is a batch actively working on it? */
+function isBuildingRunning(b: RenovationCalcBuildingResult) {
+  return b.status === "queued" || b.status === "running";
+}
+
+/** A row is done when the backend said so, or when it already carries simulated
+ * numbers and nothing is actively re-running it. The status string alone is not
+ * enough: the baseline rehydrated from Step 3 results is never pushed to
+ * "completed" by a poll, so a leftover "idle" would keep the Results row
+ * spinning forever even though the numbers were right there. */
+function isBuildingSettled(b: RenovationCalcBuildingResult) {
+  return b.status === "completed"
+    || (b.status !== "failed" && !isBuildingRunning(b) && b.totalKwhM2Yr != null);
+}
+
 /** Aggregate a package's per-building rows into portfolio-level figures for
  * the comparison table - energy is averaged (it's a per-m² rate, comparable
  * across differently-sized buildings), cost/carbon are summed (portfolio
  * totals, not rates). */
 function pkgAggregate(pkg: RenovationCalcPackage) {
   const n = pkg.buildings.length;
-  const completed = pkg.buildings.filter((b) => b.status === "completed").length;
+  const completed = pkg.buildings.filter(isBuildingSettled).length;
   const failed = pkg.buildings.filter((b) => b.status === "failed").length;
+  // Unfinished rows split two ways, and the Status column must not conflate
+  // them: a package with a live batch really is simulating (spinner), while one
+  // that was never submitted is simply not run yet (no spinner - there is
+  // nothing to wait for).
+  const running = pkg.buildings.filter((b) => isBuildingRunning(b) || (pkg.batchId != null && !isBuildingSettled(b) && b.status !== "failed")).length;
   const avg = (xs: (number | null)[]) => {
     const vals = xs.filter((x): x is number => x != null);
     return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
@@ -270,7 +290,7 @@ function pkgAggregate(pkg: RenovationCalcPackage) {
   const sumOrNull = (xs: (number | null)[]) =>
     xs.some((x) => x != null) ? Math.round(xs.reduce((a: number, x) => a + (x ?? 0), 0)) : null;
   return {
-    n, completed, failed, pending: n - completed - failed,
+    n, completed, failed, running, pending: n - completed - failed,
     avgHeatingKwhM2Yr: avg(pkg.buildings.map((b) => b.heatingKwhM2Yr)),
     avgCoolingKwhM2Yr: avg(pkg.buildings.map((b) => b.coolingKwhM2Yr)),
     avgTotalKwhM2Yr: avg(pkg.buildings.map((b) => b.totalKwhM2Yr)),
@@ -652,9 +672,11 @@ export default function RenovationSimulator() {
 
   const pollBatch = useCallback((packageId: string, batchId: string) => {
     stopPoll(packageId);
+    let consecutiveErrors = 0;
     const tick = async () => {
       try {
         const status = await api.simulationBatchStatus(batchId);
+        consecutiveErrors = 0;
         setProject({
           renovationCalcPackages: useWizardStore.getState().project.renovationCalcPackages.map((p) => {
             if (p.id !== packageId) return p;
@@ -675,11 +697,31 @@ export default function RenovationSimulator() {
             };
           }),
         });
-        if (status.buildings.every((b) => b.status === "completed" || b.status === "failed")) {
+        // Stop on "nothing is still in flight" rather than on an explicit
+        // completed/failed list - an unrecognised status from the backend would
+        // otherwise poll (and spin) forever.
+        if (status.buildings.every((b) => b.status !== "queued" && b.status !== "running")) {
           stopPoll(packageId);
         }
       } catch {
-        // Transient network hiccup - keep polling.
+        // A hiccup or two is normal and worth riding out, but a batch the
+        // backend no longer knows about (404 after the sim database was reset)
+        // never recovers - polling it forever just spins the Status column with
+        // no way for the user to tell anything is wrong. Surface it instead.
+        if (++consecutiveErrors >= 5) {
+          stopPoll(packageId);
+          setProject({
+            renovationCalcPackages: useWizardStore.getState().project.renovationCalcPackages.map((p) =>
+              p.id !== packageId ? p : {
+                ...p,
+                buildings: p.buildings.map((b) => isBuildingSettled(b) ? b : {
+                  ...b, status: "failed" as const,
+                  error: b.error ?? "Lost contact with this simulation batch - re-run it.",
+                }),
+              }
+            ),
+          });
+        }
       }
     };
     tick();
@@ -696,9 +738,16 @@ export default function RenovationSimulator() {
         package_id: packageId, package_label: packageLabel ?? null,
         ...overrides,
       });
+      // Flip the rows to "queued" in the SAME update that stores the batch id.
+      // Leaving them "idle" opened a hole: if the tab closed before the first
+      // poll landed, the resume-on-mount check (which looked for queued/running)
+      // skipped the package and nothing ever polled it again - the batch would
+      // finish in EPSM while the Results row span forever.
       setProject({
         renovationCalcPackages: useWizardStore.getState().project.renovationCalcPackages.map((p) =>
-          p.id === packageId ? { ...p, batchId: batch_id } : p
+          p.id === packageId
+            ? { ...p, batchId: batch_id, buildings: p.buildings.map((b) => ({ ...b, status: "queued" as const })) }
+            : p
         ),
       });
       pollBatch(packageId, batch_id);
@@ -789,13 +838,24 @@ export default function RenovationSimulator() {
     }
 
     const existing = useWizardStore.getState().project.renovationCalcPackages;
-    if (!existing.some((p) => p.isBaseline)) {
+    const baseline = existing.find((p) => p.isBaseline);
+    // A baseline carried over from an earlier visit can be stranded: no batchId
+    // to poll and rows still missing results. Nothing would ever move it, so the
+    // status column spun indefinitely. Re-seed it - from Step 3's results if they
+    // exist by now, otherwise a fresh EPSM batch.
+    const stranded = baseline != null && baseline.batchId === null
+      && baseline.buildings.some((b) => b.totalKwhM2Yr == null && b.status !== "failed");
+    if (!baseline || stranded) {
       submitBaseline();
-    } else {
-      for (const pkg of existing) {
-        if (pkg.batchId && pkg.buildings.some((b) => b.status === "queued" || b.status === "running")) {
-          pollBatch(pkg.id, pkg.batchId);
-        }
+    }
+    // Resume polling for every package with a live batch that has not settled.
+    // Keyed on "not settled" rather than "queued || running" so a package left
+    // in any other in-between state still gets picked back up - the backend only
+    // reconciles finished EPSM results while this endpoint is being polled, so a
+    // package nobody polls stays queued in the database indefinitely.
+    for (const pkg of existing) {
+      if (pkg.batchId && pkg.buildings.some((b) => !isBuildingSettled(b) && b.status !== "failed")) {
+        pollBatch(pkg.id, pkg.batchId);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1917,7 +1977,7 @@ export default function RenovationSimulator() {
                 { k: "cost", l: "Cost" },
                 { k: "carbon", l: "Carbon" },
                 { k: "heat", l: "Heating", sub: "kWh/m²·yr" },
-                { k: "total", l: "Total energy", sub: "heating + hot water + lighting + equipment, kWh/m²·yr" },
+                { k: "total", l: "Total energy", sub: "heating + hot water + cooling + lighting + equipment, kWh/m²·yr" },
                 { k: "status", l: "Status" },
               ].map((h) => (
                 <span key={h.k} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>
@@ -1996,7 +2056,12 @@ export default function RenovationSimulator() {
                       {vsBaseline(agg.avgTotalKwhM2Yr, baselineAgg?.avgTotalKwhM2Yr ?? null, pkg.isBaseline)}
                     </span>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      {agg.pending > 0 && <Loader2 size={13} color="#E8880C" style={{ animation: "spin 1s linear infinite" }} />}
+                      {agg.running > 0 && <Loader2 size={13} color="#E8880C" style={{ animation: "spin 1s linear infinite" }} />}
+                      {/* Pending but nothing in flight = never submitted. A spinner
+                          here claims work is happening when none is. */}
+                      {agg.running === 0 && agg.pending > 0 && (
+                        <span title="Not simulated yet" style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>not run</span>
+                      )}
                       {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#2FB477" />}
                       {agg.failed > 0 && <XCircle size={13} color="#E2483B" />}
                       {(agg.failed > 0 || agg.pending > 0) && (
@@ -2019,9 +2084,14 @@ export default function RenovationSimulator() {
                           <span>{b.carbonKgCO2e == null ? "—" : `${b.carbonKgCO2e.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
                           <span>{b.heatingKwhM2Yr ?? "—"}</span>
                           <span>{b.totalKwhM2Yr ?? "—"}</span>
-                          <span style={{ color: b.status === "failed" ? "#fca5a5" : b.status === "completed" ? "#2FB477" : "#E8880C" }} title={b.error ?? undefined}>
-                            {b.status}
-                          </span>
+                          {(() => {
+                            const done = isBuildingSettled(b);
+                            return (
+                              <span style={{ color: b.status === "failed" ? "#fca5a5" : done ? "#2FB477" : "#E8880C" }} title={b.error ?? undefined}>
+                                {done ? "completed" : b.status}
+                              </span>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>

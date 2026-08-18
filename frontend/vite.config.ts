@@ -108,6 +108,15 @@ export default defineConfig({
   server: {
     port: 5173,
     fs: { strict: false },
+    // Docker Desktop on Windows does NOT forward inotify events across a bind
+    // mount, so Vite's watcher never fires and HMR silently stops working - the
+    // dev container keeps serving the modules it saw at startup, which reads as
+    // "I rebuilt and Docker still shows the old UI". Polling is the fix, but it
+    // costs CPU, so only the Docker dev stack turns it on (VITE_USE_POLLING=1 in
+    // docker-compose.yml); native `npm run dev` keeps native file events.
+    watch: process.env.VITE_USE_POLLING
+      ? { usePolling: true, interval: 400 }
+      : undefined,
     proxy: {
       "/api": {
         // Defaults to the local backend for native dev; Docker dev sets

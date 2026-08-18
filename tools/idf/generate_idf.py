@@ -138,6 +138,39 @@ def _schedule_compact(name: str, type_limits: str, day_pattern: list[tuple[str, 
     return obj("Schedule:Compact", fields)
 
 
+def _day_pattern_mean(pattern: list[tuple[str, float]]) -> float:
+    """Hour-weighted mean of a Schedule:Compact day pattern, used to convert a
+    target ANNUAL energy into the peak flow rate the schedule modulates."""
+    mean = 0.0
+    prev_h = 0.0
+    for until, value in pattern:
+        hh, mm = until.split(":")
+        h = int(hh) + int(mm) / 60.0
+        mean += (h - prev_h) * value
+        prev_h = h
+    return mean / prev_h if prev_h else 0.0
+
+
+def _dhw_peak_flow_m3_s(annual_kwh: float, pattern: list[tuple[str, float]]) -> float:
+    """Peak draw (m3/s) that makes the scheduled profile deliver `annual_kwh`.
+
+    Inverts Q = rho * c * V * dT over the year: the schedule's own mean
+    fraction sets how much of the peak is actually drawn, so the annual total
+    stays on target no matter how the profile's shape is edited.
+    """
+    # Mean tank temperature, not setpoint - see D.DHW_DEADBAND_K.
+    delta_t = (D.DHW_SUPPLY_TEMP_C - D.DHW_DEADBAND_K / 2.0) - D.DHW_COLD_TEMP_C
+    kwh_per_m3 = D.WATER_DENSITY_KG_M3 * D.WATER_SPECIFIC_HEAT_J_KGK * delta_t / 3_600_000.0
+    if kwh_per_m3 <= 0:
+        return 0.0
+    annual_m3 = annual_kwh / kwh_per_m3
+    mean_fraction = _day_pattern_mean(pattern)
+    seconds_per_year = 8760 * 3600
+    if mean_fraction <= 0:
+        return 0.0
+    return annual_m3 / (seconds_per_year * mean_fraction)
+
+
 def _constant_schedule(name: str, type_limits: str, value: float) -> str:
     return obj("Schedule:Compact", [
         (name, "Name"),
@@ -365,6 +398,62 @@ def build_shoebox_idf(
         (0, "Velocity Term Coefficient"), (0, "Velocity Squared Term Coefficient"),
     ]))
 
+    # ── domestic hot water ──────────────────────────────────────────
+    # A stand-alone WaterHeater:Mixed (use-side node names left blank) is the
+    # documented way to model DHW without building a plant loop, and its fuel
+    # lands on the "Water Systems" end use - the one EPSM reports but that was
+    # always 0.0 here, because nothing in the shoebox drew hot water.
+    # Efficiency 1.0 and zero standby loss are deliberate: the Sveby intensity
+    # is already a DELIVERED figure including circulation losses, so adding
+    # tank losses or a boiler efficiency on top would double-count.
+    dhw_kwh_m2 = D.DHW_KWH_M2_YR_BY_USE.get(use_cat or "", D.DEFAULT_DHW_KWH_M2_YR)
+    dhw_annual_kwh = dhw_kwh_m2 * total_floor_area
+    if dhw_annual_kwh > 0:
+        dhw_peak_flow = _dhw_peak_flow_m3_s(dhw_annual_kwh, D.DHW_DAY_PATTERN)
+        # Capacity to meet the peak draw instantaneously, doubled so a cold
+        # tank at the start of a peak still recovers rather than clipping the
+        # draw (a capacity-limited heater would silently under-deliver).
+        delta_t = D.DHW_SUPPLY_TEMP_C - D.DHW_COLD_TEMP_C
+        dhw_peak_w = dhw_peak_flow * D.WATER_DENSITY_KG_M3 * D.WATER_SPECIFIC_HEAT_J_KGK * delta_t
+        objects.append(_schedule_compact("DHW Draw Schedule", "Fractional", D.DHW_DAY_PATTERN))
+        objects.append(_constant_schedule("DHW Setpoint Schedule", "Temperature", D.DHW_SUPPLY_TEMP_C))
+        objects.append(_constant_schedule("DHW Cold Water Schedule", "Temperature", D.DHW_COLD_TEMP_C))
+        objects.append(_constant_schedule("DHW Ambient Schedule", "Temperature", 20.0))
+        objects.append(obj("WaterHeater:Mixed", [
+            (f"{zone_name} DHW", "Name"), (0.3, "Tank Volume {m3}"),
+            ("DHW Setpoint Schedule", "Setpoint Temperature Schedule Name"),
+            (D.DHW_DEADBAND_K, "Deadband Temperature Difference {deltaC}"),
+            (82.2, "Maximum Temperature Limit {C}"), ("Cycle", "Heater Control Type"),
+            (round(max(dhw_peak_w * 2.0, 1000.0), 1), "Heater Maximum Capacity {W}"),
+            (0, "Heater Minimum Capacity {W}"), (None, "Heater Ignition Minimum Flow Rate {m3/s}"),
+            (None, "Heater Ignition Delay {s}"),
+            ("DistrictHeatingWater", "Heater Fuel Type"), (1.0, "Heater Thermal Efficiency"),
+            (None, "Part Load Factor Curve Name"),
+            (0, "Off Cycle Parasitic Fuel Consumption Rate {W}"), (None, "Off Cycle Parasitic Fuel Type"),
+            (0, "Off Cycle Parasitic Heat Fraction to Tank"),
+            (0, "On Cycle Parasitic Fuel Consumption Rate {W}"), (None, "On Cycle Parasitic Fuel Type"),
+            (0, "On Cycle Parasitic Heat Fraction to Tank"),
+            ("Schedule", "Ambient Temperature Indicator"),
+            ("DHW Ambient Schedule", "Ambient Temperature Schedule Name"),
+            (None, "Ambient Temperature Zone Name"), (None, "Ambient Temperature Outdoor Air Node Name"),
+            (0, "Off Cycle Loss Coefficient to Ambient Temperature {W/K}"),
+            (None, "Off Cycle Loss Fraction to Zone"),
+            (0, "On Cycle Loss Coefficient to Ambient Temperature {W/K}"),
+            (None, "On Cycle Loss Fraction to Zone"),
+            (round(dhw_peak_flow, 10), "Peak Use Flow Rate {m3/s}"),
+            ("DHW Draw Schedule", "Use Flow Rate Fraction Schedule Name"),
+            ("DHW Cold Water Schedule", "Cold Water Supply Temperature Schedule Name"),
+            (None, "Use Side Inlet Node Name"), (None, "Use Side Outlet Node Name"),
+            (1.0, "Use Side Effectiveness"),
+            (None, "Source Side Inlet Node Name"), (None, "Source Side Outlet Node Name"),
+            (1.0, "Source Side Effectiveness"),
+            (None, "Use Side Design Flow Rate {m3/s}"), (None, "Source Side Design Flow Rate {m3/s}"),
+            (None, "Indirect Water Heating Recovery Time {hr}"),
+            (None, "Source Side Flow Control Mode"),
+            (None, "Indirect Alternate Setpoint Temperature Schedule Name"),
+            ("Domestic Hot Water", "End-Use Subcategory"),
+        ]))
+
     # ── ideal-loads HVAC ────────────────────────────────────────────
     supply_node = f"{zone_name} Supply Node"
     exhaust_node = f"{zone_name} Exhaust Node"
@@ -431,5 +520,6 @@ def build_shoebox_idf(
         "floors": floors, "footprint_m2": round(footprint_m2, 1), "total_floor_area_m2": round(total_floor_area, 1),
         "height_m": height, "use_cat": use_cat, "wwr": round(wwr, 3), "window_count": window_count,
         "u_wall": round(u_wall, 3), "u_roof": round(u_roof, 3), "u_win": round(u_win, 3),
+        "dhw_kwh_m2_yr": dhw_kwh_m2,
     }
     return template.render(meta=meta, objects=objects)
