@@ -26,6 +26,13 @@ const STEPS: StepDef[] = [
 /* ── Renovation simulation result types ── */
 export interface RenovationBaselineResult {
   address: string;
+  /* Which building this row IS. Step 4 and the Step 5 report narrow themselves
+     to the buildings Step 3 actually simulated, and matching on coordinates is
+     exact where matching on an address string is not (a building with no address
+     falls back to "Building 3"). Optional: results saved before this existed
+     have no coordinates and fall back to address matching. */
+  lat?: number;
+  lon?: number;
   energyUse: number;
   heating: number;
   cooling: number;

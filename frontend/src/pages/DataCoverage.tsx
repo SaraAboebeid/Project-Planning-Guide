@@ -1297,6 +1297,24 @@ function BboxDataBanner({
           >
             <Download className="w-3 h-3" /> Export
           </button>
+          {/* Selection drives what carries into Steps 3-4, so the two bulk
+              actions belong next to Export rather than only inside the table. */}
+          <button
+            onClick={selectAllRows}
+            disabled={!rows || !rows.length}
+            title="Select every loaded building"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
+          >
+            Select all
+          </button>
+          <button
+            onClick={clearSelection}
+            disabled={selected.size === 0}
+            title="Clear the current selection"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
+          >
+            Clear
+          </button>
           <button
             onClick={() => setAddOpen(o => !o)}
             title="Open guided add-data panel: template, upload, paste, and formatting help"
@@ -2372,11 +2390,10 @@ export default function DataCoverage() {
       <div>
         <h2 className="text-2xl font-bold text-white">Building &amp; Site Data</h2>
         <p className="text-sm text-white/45 mt-1">
-          Review the available data, fill any gaps with <b className="text-violet-300">＋ Add / Edit</b> or your own CSV/JSON,
-          and choose which buildings to include. Your edits stay in this session and do not change the source data.
-          {wallsInScope
-            ? " Upload façade photos to detect defects and rank buildings by energy performance, façade condition and upgrade potential."
-            : " Buildings are ranked by energy performance and upgrade potential."}
+          {/* A brief, not a walkthrough — each numbered section below carries its
+              own subtitle explaining what it does. */}
+          Review each building's data, fill any gaps, and choose which buildings carry forward.
+          Your edits stay in this session and never change the source data.
         </p>
       </div>
 
@@ -2415,18 +2432,6 @@ export default function DataCoverage() {
         />
       )}
 
-      {/* EUBUCCO bbox aggregate banner (bbox draw mode OR neighborhood-by-name) */}
-      {(bboxStats || project.district) && (
-        <BboxDataBanner
-          bboxStats={bboxStats}
-          bbox={project.currentBbox ?? null}
-          district={project.district ?? null}
-          polygon={project.selectionPolygon ?? null}
-          onRowsChange={setBboxRows}
-          onSelectionChange={setBboxSelectedIdx}
-        />
-      )}
-
       {/* 🔗 Viewer selection — building highlighted in the 3D viewer */}
       {viewerSelection && (
         <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#0d1117] px-4 py-2.5">
@@ -2460,13 +2465,20 @@ export default function DataCoverage() {
           Only one section is open at a time; each section auto-scrolls into view
           when it opens. The Facade section is shown only when Walls are in scope. */}
       {(() => {
-        type Sec2 = "facade" | "priority";
-        // Use module-level refs via a small wrapper so we keep a single shared
-        // state without a separate sub-component.
         return <Step2Sections
           showFacade={wallsInScope && facadeBuildings.length > 0}
           facadeBuildings={facadeBuildings}
           priorityItems={priorityItems}
+          overview={(bboxStats || project.district) ? (
+            <BboxDataBanner
+              bboxStats={bboxStats}
+              bbox={project.currentBbox ?? null}
+              district={project.district ?? null}
+              polygon={project.selectionPolygon ?? null}
+              onRowsChange={setBboxRows}
+              onSelectionChange={setBboxSelectedIdx}
+            />
+          ) : null}
         />;
       })()}
 
@@ -2475,23 +2487,50 @@ export default function DataCoverage() {
 }
 
 /* ── Step2Sections ──────────────────────────────────────────────── */
+type Sec2Id = "overview" | "facade" | "priority";
+
 function Step2Sections({
-  showFacade, facadeBuildings, priorityItems,
+  showFacade, facadeBuildings, priorityItems, overview,
 }: {
   showFacade: boolean;
   facadeBuildings: FacadeBuilding[];
   priorityItems: PriorityInput[];
+  /** The buildings table, rendered as section 2.1. Null when no selection has
+   *  produced one yet, in which case the section is not shown at all. */
+  overview?: React.ReactNode;
 }) {
-  // Strict single-open accordion: facade first (if walls in scope), then
-  // prioritisation.
-  const firstSection: "facade" | "priority" = showFacade ? "facade" : "priority";
+  // Single-open accordion. Numbering is derived from which sections are
+  // actually visible, so hiding one (facade needs walls in scope) renumbers the
+  // rest rather than leaving a gap.
+  const visibleSections: Sec2Id[] = [
+    ...(overview ? ["overview" as Sec2Id] : []),
+    ...(showFacade ? ["facade" as Sec2Id] : []),
+    "priority",
+  ];
+  // Open the buildings table by default - it is the substance of this step and
+  // used to be permanently visible. Facade detection starts CLOSED: it is an
+  // optional upload workflow, and opening it first pushed the data everyone
+  // needs below the fold.
+  const firstSection: Sec2Id | null = overview ? "overview" : null;
   // Nullable: the sections used to rely on their inner panels for collapsing,
   // and those panels no longer have their own headers - so the section header
   // itself has to be able to close, not just open.
-  const [openSec, setOpenSec] = useState<"facade" | "priority" | null>(firstSection);
+  const [openSec, setOpenSec] = useState<Sec2Id | null>(firstSection);
   const prevOpen = useRef<string | null>(firstSection);
+  const overviewRef = useRef<HTMLDivElement>(null);
   const facadeRef = useRef<HTMLDivElement>(null);
   const priorityRef = useRef<HTMLDivElement>(null);
+
+  // The table often arrives after first render (a district picked later, rows
+  // still loading). Open it when it turns up, otherwise it would appear already
+  // collapsed with nothing indicating the data had loaded.
+  const sawOverview = useRef(!!overview);
+  useEffect(() => {
+    if (overview && !sawOverview.current) {
+      sawOverview.current = true;
+      setOpenSec((cur) => cur ?? "overview");
+    }
+  }, [overview]);
 
   // Auto-scroll to whatever section just opened.
   useEffect(() => {
@@ -2499,14 +2538,16 @@ function Step2Sections({
     prevOpen.current = openSec;
     // Nothing to scroll to when a section was just collapsed.
     if (openSec === null) return;
-    const el = openSec === "facade" ? facadeRef.current : priorityRef.current;
+    const el = openSec === "overview" ? overviewRef.current
+             : openSec === "facade" ? facadeRef.current
+             : priorityRef.current;
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [openSec]);
 
   // Section header used for both sections.
   function SectionHeader({
     id, label, subtitle, done,
-  }: { id: "facade" | "priority"; label: string; subtitle: string; done?: boolean }) {
+  }: { id: Sec2Id; label: string; subtitle: string; done?: boolean }) {
     const isOpen = openSec === id;
     return (
       <button
@@ -2527,11 +2568,9 @@ function Step2Sections({
           fontSize: 11, fontWeight: 800, letterSpacing: 0.2,
           color: isOpen ? "#0b1220" : done ? "#2FB477" : "rgba(255,255,255,0.4)",
         }}>
-          {/* Facade is optional (walls in scope), so prioritisation is .2 only
-              when it is actually shown — same rule as before, now step-prefixed. */}
-          {done && !isOpen
-            ? "✓"
-            : `${STEP_NUMBER}.${id === "facade" ? 1 : showFacade ? 2 : 1}`}
+          {/* Position within the sections actually on screen, so a hidden
+              facade section (walls not in scope) renumbers the rest. */}
+          {done && !isOpen ? "✓" : `${STEP_NUMBER}.${visibleSections.indexOf(id) + 1}`}
         </div>
         {/* Labels */}
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -2550,6 +2589,29 @@ function Step2Sections({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* ─ Building Data Overview ─ */}
+      {overview && (
+        <div
+          ref={overviewRef}
+          style={{
+            borderRadius: 14,
+            border: `1px solid ${openSec === "overview" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            background: "rgba(255,255,255,0.02)",
+            overflow: "hidden",
+            transition: "border-color 0.18s",
+          }}
+        >
+          <SectionHeader
+            id="overview"
+            label="Building Data Overview"
+            subtitle="Every selected building, its data coverage and what you can edit or add"
+          />
+          {openSec === "overview" && (
+            <div style={{ padding: "0 18px 18px" }}>{overview}</div>
+          )}
+        </div>
+      )}
+
       {/* ─ Facade Detection ─ */}
       {showFacade && (
         <div

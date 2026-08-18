@@ -73,8 +73,8 @@ export default function App() {
       <Route path="/data/uk"   element={<DataLayout title="Data Explorer" accentColor="#4A90E2" accentBadge="United Kingdom Data"><UKDataExplorer /></DataLayout>} />
       <Route path="/pathways"  element={<DataLayout title="Pathways"       accentColor="#721CB8" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
       <Route path="/analysis"  element={<DataLayout title="Analysis" accentColor="#4ECDC4" accentBadge="Tools"><AnalysisTools /></DataLayout>} />
-      <Route path="/viewer"    element={<DataLayout title="3D Viewer" accentColor="#5FA5FF" accentBadge="Digital Twin"><MapViewer /></DataLayout>} />
-      <Route path="/viewer/uk" element={<DataLayout title="3D Viewer" accentColor="#5FA5FF" accentBadge="United Kingdom Digital Twin"><UKMapViewer /></DataLayout>} />
+      <Route path="/viewer"    element={<DataLayout title="" accentColor="#5FA5FF" accentBadge=""><MapViewer /></DataLayout>} />
+      <Route path="/viewer/uk" element={<DataLayout title="" accentColor="#5FA5FF" accentBadge=""><UKMapViewer /></DataLayout>} />
       <Route path="/map"       element={<Navigate to="/viewer" replace />} />
       <Route path="/budget"    element={<DataLayout title="Planning & Cost" accentColor="#E8880C" accentBadge="Cost Estimate"><Budget /></DataLayout>} />
       <Route path="/reports" element={<DataLayout title="Reports" accentColor="#2FB477" accentBadge="Examples"><SampleReports /></DataLayout>} />

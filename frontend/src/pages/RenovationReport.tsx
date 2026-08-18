@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, FACADE_ORIENTATIONS, type FacadeOrientation } from "../store/wizard";
+import { filterToBaselineShortlist } from "../utils/baselineShortlist";
 import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal } from "../config/climateGoals";
 import ClimateGoalPanel from "../components/ClimateGoalPanel";
 import ClimateGoalBuildingTable from "../components/ClimateGoalBuildingTable";
 import type { BuildingLookup, BuildingRecord } from "../types";
 import {
-  Building2, Leaf, DollarSign, Zap, CheckCircle2, Download,
+  Building2, Leaf, DollarSign, Zap, CheckCircle2, Download, ScanSearch,
   Award, TrendingDown, Package, FileText, AlertTriangle, Target, Flame,
 } from "lucide-react";
 import {
@@ -22,6 +23,91 @@ const FACADE_DEFECT_LABELS: Record<string, string> = {
   crack: "Crack", leakage: "Leakage / staining", abscission: "Spalling / abscission",
   corrosion: "Corrosion", bulge: "Bulge / deformation", other: "Other defect",
 };
+
+/* ── Inline SVG charts for the exported report ─────────────────────────────
+   The report is a standalone HTML document opened from a Blob URL: no chart
+   library is loaded and an <img> would need a server round-trip, so the charts
+   are emitted as plain SVG. Light palette on purpose - the report prints. */
+
+const escHtml = (v: unknown) =>
+  String(v ?? "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]!));
+
+/** End-use colours, matching the Step 3/4 screens so the report is recognisable. */
+const END_USE_STYLE: { key: string; label: string; color: string }[] = [
+  { key: "heating",   label: "Heating",   color: "#E2483B" },
+  { key: "dhw",       label: "Hot water", color: "#60a5fa" },
+  { key: "cooling",   label: "Cooling",   color: "#4A90E2" },
+  { key: "lighting",  label: "Lighting",  color: "#E8880C" },
+  { key: "equipment", label: "Equipment", color: "#2FB477" },
+];
+
+function chartLegend(keys: string[]): string {
+  const items = END_USE_STYLE.filter((e) => keys.includes(e.key));
+  if (!items.length) return "";
+  return '<div style="display:flex;gap:12px;flex-wrap:wrap;margin:4px 0 8px;font-size:8pt;color:#475569">'
+    + items.map((e) =>
+        `<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${e.color};margin-right:4px"></span>${e.label}</span>`
+      ).join("")
+    + "</div>";
+}
+
+/** Horizontal stacked bars — one row per building, split by end use. */
+type ChartTheme = { label: string; value: string };
+/** Light for the printed report, dim-on-dark for the Step 5 screen. */
+const PRINT_THEME: ChartTheme = { label: "#475569", value: "#0f172a" };
+const SCREEN_THEME: ChartTheme = { label: "rgba(255,255,255,0.45)", value: "rgba(255,255,255,0.85)" };
+
+function svgStackedBars(
+  rows: { label: string; parts: { key: string; value: number }[] }[],
+  unit: string,
+  theme: ChartTheme = PRINT_THEME,
+): string {
+  if (!rows.length) return "";
+  const W = 680, rowH = 20, gap = 8, labelW = 165, padR = 66;
+  const barW = W - labelW - padR;
+  const totals = rows.map((r) => r.parts.reduce((a, p) => a + p.value, 0));
+  const max = Math.max(1, ...totals);
+  const H = rows.length * (rowH + gap) + 4;
+  const body = rows.map((r, i) => {
+    const y = i * (rowH + gap);
+    let x = labelW;
+    const segs = r.parts.map((p) => {
+      const w = (p.value / max) * barW;
+      if (w <= 0) return "";
+      const color = END_USE_STYLE.find((e) => e.key === p.key)?.color ?? "#94a3b8";
+      const rect = `<rect x="${x.toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="${rowH}" fill="${color}"/>`;
+      x += w;
+      return rect;
+    }).join("");
+    const label = r.label.length > 26 ? r.label.slice(0, 25) + "…" : r.label;
+    return `<text x="${labelW - 8}" y="${y + rowH / 2 + 3.5}" text-anchor="end" font-size="9" fill="${theme.label}">${escHtml(label)}</text>`
+      + segs
+      + `<text x="${(x + 6).toFixed(1)}" y="${y + rowH / 2 + 3.5}" font-size="9" font-weight="600" fill="${theme.value}">${totals[i]!.toFixed(1)}</text>`;
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="Energy use by end use, ${escHtml(unit)}">${body}</svg>`;
+}
+
+/** Plain horizontal bars — package totals against the baseline. */
+function svgCompareBars(
+  rows: { label: string; value: number; highlight?: boolean }[],
+  unit: string,
+  theme: ChartTheme = PRINT_THEME,
+): string {
+  if (!rows.length) return "";
+  const W = 680, rowH = 20, gap = 8, labelW = 200, padR = 90;
+  const barW = W - labelW - padR;
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  const H = rows.length * (rowH + gap) + 4;
+  const body = rows.map((r, i) => {
+    const y = i * (rowH + gap);
+    const w = Math.max(1, (r.value / max) * barW);
+    const label = r.label.length > 32 ? r.label.slice(0, 31) + "…" : r.label;
+    return `<text x="${labelW - 8}" y="${y + rowH / 2 + 3.5}" text-anchor="end" font-size="9" fill="${theme.label}">${escHtml(label)}</text>`
+      + `<rect x="${labelW}" y="${y}" width="${w.toFixed(1)}" height="${rowH}" fill="${r.highlight ? "#94a3b8" : "#2FB477"}" rx="2"/>`
+      + `<text x="${(labelW + w + 6).toFixed(1)}" y="${y + rowH / 2 + 3.5}" font-size="9" font-weight="600" fill="${theme.value}">${r.value.toFixed(1)} ${escHtml(unit)}</text>`;
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="Total energy per package, ${escHtml(unit)}">${body}</svg>`;
+}
 
 /** "3× Crack, 1× Corrosion" - or a dash when nothing was flagged. */
 function breakdownText(byClass: Record<string, number>): string {
@@ -94,11 +180,17 @@ export default function RenovationReport() {
   const materials    = project.simulationMaterials ?? {};
   const components   = project.renovationEnvelopeComponents ?? [];
   const buildings    = useMemo(() => {
-    if (project.lookedUpBuildings.length > 0) return project.lookedUpBuildings;
-    if (project.lookedUpBuilding) return [project.lookedUpBuilding];
-    if (project.bboxRows.length > 0) return project.bboxRows.map(recordToLookup);
-    return [];
-  }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows]);
+    const all = project.lookedUpBuildings.length > 0
+      ? project.lookedUpBuildings
+      : project.lookedUpBuilding
+        ? [project.lookedUpBuilding]
+        : project.bboxRows.length > 0
+          ? project.bboxRows.map(recordToLookup)
+          : [];
+    // The report describes the project Steps 3-4 analysed, which is the Step 3
+    // shortlist - not everything that was selected back in Step 2.
+    return filterToBaselineShortlist(all, project.renovationBaselineResults);
+  }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows, project.renovationBaselineResults]);
 
   const baseline = baselines[0] ?? null;
   const baselineEU = baseline?.energyUse ?? 0;
@@ -212,6 +304,49 @@ export default function RenovationReport() {
     }, simResults[0]);
   }, [simResults]);
 
+  /* Funnel counts — how the project narrowed from Step 2 to Step 4. `buildings`
+     is already the Step 3 shortlist, so the pre-filter total comes from the raw
+     Step 2 selection. */
+  const selectedCount = project.bboxRows.length
+    || project.lookedUpBuildings.length
+    || (project.lookedUpBuilding ? 1 : 0);
+  const prioritisedCount = project.prioritizedBuildingCount
+    || project.prioritizedBuildingIndices.length
+    || 0;
+
+  const facadeEntries = useMemo(
+    () => Object.entries(project.facadeDefects ?? {}).filter(([, sum]) => sum && sum.imageCount > 0),
+    [project.facadeDefects],
+  );
+
+  /* Charts are built once and rendered twice: dim-on-dark on the Step 5 page,
+     light in the printed report. Same data and same SVG, so the two cannot drift. */
+  const baselineChartHtml = (theme: ChartTheme) => {
+    if (!baselines.length) return "";
+    const rows = baselines.map((b) => ({
+      label: b.address || "Building",
+      parts: [
+        { key: "heating", value: b.heating ?? 0 },
+        { key: "dhw", value: b.dhw || Math.max(0, (b.energyUse ?? 0) - (b.heating ?? 0) - (b.cooling ?? 0) - (b.lighting ?? 0) - (b.equipment ?? 0)) },
+        { key: "cooling", value: b.cooling ?? 0 },
+        { key: "lighting", value: b.lighting ?? 0 },
+        { key: "equipment", value: b.equipment ?? 0 },
+      ],
+    }));
+    const present = END_USE_STYLE.map((e) => e.key)
+      .filter((k) => rows.some((r) => (r.parts.find((p) => p.key === k)?.value ?? 0) > 0));
+    return chartLegend(present) + svgStackedBars(rows, "kWh/m²·yr", theme);
+  };
+
+  const packageChartHtml = (theme: ChartTheme) => {
+    if (!simResults.length) return "";
+    const rows = [
+      ...(climateBaselineEU ? [{ label: "Baseline (as-built)", value: climateBaselineEU, highlight: true }] : []),
+      ...simResults.map((r) => ({ label: `Package ${r.packageIndex}`, value: r.energyUse })),
+    ];
+    return svgCompareBars(rows, "kWh/m²·yr", theme);
+  };
+
   const hasResults = simResults.length > 0;
   const hasBaseline = baselines.length > 0;
 
@@ -262,6 +397,40 @@ export default function RenovationReport() {
        them by absolute origin URL means the report window - which is rendered
        from a Blob URL - still resolves them. Photos that never got persisted
        simply do not appear; the counts still do. */
+    /* ── The funnel, in the tool's own order ───────────────────────────────
+       Step 2 selected N buildings and flagged M as priorities; Step 3 simulated
+       the shortlist; Step 4 tested P packages against it. Stating that up front
+       is what makes the rest of the report readable as one argument rather than
+       a pile of tables. */
+    const selectedCount = project.bboxRows.length
+      || project.lookedUpBuildings.length
+      || (project.lookedUpBuilding ? 1 : 0);
+    const prioritisedCount = project.prioritizedBuildingCount
+      || project.prioritizedBuildingIndices.length
+      || 0;
+    const simulatedCount = baselines.length;
+    const packagesTested = simResults.length;
+
+    const funnelBlock = `
+  <h2>What was analysed</h2>
+  <table><thead><tr><th>Stage</th><th>Buildings / packages</th><th>What happened</th></tr></thead><tbody>
+    <tr><td>Step 2 — selection</td><td><b>${selectedCount}</b> building${selectedCount === 1 ? "" : "s"}</td>
+        <td>Selected on the map and reviewed against the available data.</td></tr>
+    ${prioritisedCount ? `<tr><td>Step 2 — prioritisation</td><td><b>${prioritisedCount}</b> flagged</td>
+        <td>Ranked by energy performance, façade condition, characteristics and upgrade potential.</td></tr>` : ""}
+    <tr><td>Step 3 — baseline</td><td><b>${simulatedCount}</b> simulated</td>
+        <td>As-built performance from EnergyPlus, the baseline everything is measured against.</td></tr>
+    <tr><td>Step 4 — packages</td><td><b>${packagesTested}</b> package${packagesTested === 1 ? "" : "s"}</td>
+        <td>Each renovation package simulated against that baseline for energy, cost and carbon.</td></tr>
+  </tbody></table>`;
+
+    const baselineChart = baselines.length
+      ? `<p class="sub">Energy use by end use, kWh/m²·yr.</p>${baselineChartHtml(PRINT_THEME)}`
+      : "";
+    const packageChart = simResults.length
+      ? `<p class="sub">Total energy after renovation, kWh/m²·yr — baseline in grey.</p>${packageChartHtml(PRINT_THEME)}`
+      : "";
+
     const facadeEntries = Object.entries(project.facadeDefects ?? {})
       .filter(([, sum]) => sum && sum.imageCount > 0);
     // The key is a cadastral/address hash, so prefer the label saved with the
@@ -398,6 +567,8 @@ export default function RenovationReport() {
   </div>
   <div class="prepared"><span class="lbl">Prepared by</span><b>Chalmers Next Labs</b> — ${esc(team)}</div>
 
+  ${funnelBlock}
+
   <h2>Baseline (as-built)</h2>
   <table><thead><tr><th>Building</th><th>Energy class</th><th>Energy use</th><th>Heating</th></tr></thead><tbody>
   ${baselines.length ? baselines.map((b) => `<tr>
@@ -405,8 +576,29 @@ export default function RenovationReport() {
       <td>${b.energyUse.toFixed(1)} kWh/m²·yr</td><td>${b.heating.toFixed(1)} kWh/m²·yr</td></tr>`).join("")
     : `<tr><td colspan="4" class="muted">No baseline simulation recorded.</td></tr>`}
   </tbody></table>
+  ${baselineChart}
 
   ${facadeReport}
+
+  <h2>Renovation packages tested</h2>
+  <p class="sub">Every package below was simulated against the as-built baseline above, on the same buildings.</p>
+  ${packageChart}
+
+  <h2>Recommended packages — and what they are made of</h2>
+  ${bestBlock("Best energy saving", bestEnergy, "largest reduction in energy use")}
+  ${bestBlock("Lowest cost", bestCost, "cheapest to build")}
+  ${bestBlock("Lowest carbon", bestCarbon, "largest CO₂e saving")}
+  ${bestBlock("Best balanced", bestBalanced, "weighted 40% energy / 30% carbon / 30% cost")}
+
+  <h2>All simulated packages</h2>
+  <table><thead><tr><th>#</th><th>Materials</th><th>Energy</th><th>Saving</th><th>Cost</th><th>CO₂e saved</th></tr></thead><tbody>
+  ${simResults.length ? simResults.map((r) => `<tr>
+      <td>${r.packageIndex}</td>
+      <td>${esc(materialsOf(r).map((m) => `${m.component}: ${m.buildup || m.desc}`).join("; ") || "—")}</td>
+      <td>${r.energyUse.toFixed(1)}</td><td>${r.saving.toFixed(1)}</td>
+      <td>${sek(r.cost)}</td><td>${Math.round(r.carbonSaving).toLocaleString("sv-SE")}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="muted">No packages simulated.</td></tr>`}
+  </tbody></table>
 
   ${goalAssessment ? `
   <h2>${esc(goalAssessment.goal.city)} climate target</h2>
@@ -444,27 +636,13 @@ export default function RenovationReport() {
   </tbody></table>
   <p class="sub" style="margin-top:4px">Values in kWh/m²·yr · pp = percentage points short of the −${buildingGoal.goal.reductionPct}% target.</p>` : ""}` : ""}
 
-  <h2>Recommended packages — and what they are made of</h2>
-  ${bestBlock("Best energy saving", bestEnergy, "largest reduction in energy use")}
-  ${bestBlock("Lowest cost", bestCost, "cheapest to build")}
-  ${bestBlock("Lowest carbon", bestCarbon, "largest CO₂e saving")}
-  ${bestBlock("Best balanced", bestBalanced, "weighted 40% energy / 30% carbon / 30% cost")}
-
-  <h2>All simulated packages</h2>
-  <table><thead><tr><th>#</th><th>Materials</th><th>Energy</th><th>Saving</th><th>Cost</th><th>CO₂e saved</th></tr></thead><tbody>
-  ${simResults.length ? simResults.map((r) => `<tr>
-      <td>${r.packageIndex}</td>
-      <td>${esc(materialsOf(r).map((m) => `${m.component}: ${m.buildup || m.desc}`).join("; ") || "—")}</td>
-      <td>${r.energyUse.toFixed(1)}</td><td>${r.saving.toFixed(1)}</td>
-      <td>${sek(r.cost)}</td><td>${Math.round(r.carbonSaving).toLocaleString("sv-SE")}</td></tr>`).join("")
-    : `<tr><td colspan="6" class="muted">No packages simulated.</td></tr>`}
-  </tbody></table>
-
   <div class="foot">
     Energy from EnergyPlus (EPSM) single-zone shoebox simulation · U-values per EN ISO 6946 ·
     cost from Wikells Sektionsfakta · embodied carbon from Boverket Klimatdatabas ·
-    baseline energy class from Boverket EPC. Cooling is not reported: the single-zone model
-    does not reach the cooling setpoint.
+    baseline energy class from Boverket EPC. Hot water is a Sveby standard draw profile played
+    back through EnergyPlus, not a prediction. Cooling reads 0 because EPSM&#39;s end-use table
+    carries only electricity and district heating; the hourly trace does show ideal-loads
+    cooling, which a single-zone model with no openable windows overstates.
   </div>
   <script>window.addEventListener('load',function(){setTimeout(function(){try{window.print();}catch(e){}},400);});</script>
 </body></html>`;
@@ -585,6 +763,9 @@ export default function RenovationReport() {
             {project.projectName || "Renovation Report"}
           </h1>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
+            Everything from Steps 1-4, ready to share or save as PDF.
+          </p>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", margin: "4px 0 0" }}>
             {locationText} · {buildings.length} building{buildings.length !== 1 ? "s" : ""} · {components.length} component{components.length !== 1 ? "s" : ""}
           </p>
         </div>
@@ -628,6 +809,26 @@ export default function RenovationReport() {
       {/* ── 1. Project Summary ── */}
       <Card>
         <SectionTitle icon={<FileText size={15} color="#721CB8" />} title="Project Summary" />
+        {/* The funnel, in the tool's own order — how many buildings were selected,
+            how many were prioritised, how many simulated, how many packages tested.
+            Without it the rest of the report is a pile of tables with no thread. */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          {[
+            { n: selectedCount, label: `building${selectedCount === 1 ? "" : "s"} selected`, step: "Step 2" },
+            ...(prioritisedCount ? [{ n: prioritisedCount, label: "flagged as priorities", step: "Step 2" }] : []),
+            { n: baselines.length, label: "baseline simulated", step: "Step 3" },
+            { n: simResults.length, label: `package${simResults.length === 1 ? "" : "s"} tested`, step: "Step 4" },
+          ].map((f, i) => (
+            <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {i > 0 && <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 14 }}>→</span>}
+              <div style={{ borderRadius: 10, padding: "8px 14px", background: "rgba(78,205,196,0.07)", border: "1px solid rgba(78,205,196,0.22)" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#4ECDC4", lineHeight: 1.1 }}>{f.n}</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{f.label}</div>
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>{f.step}</div>
+              </div>
+            </div>
+          ))}
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
           {[
             { label: "Project type",   value: project.projectType ?? "—" },
@@ -644,22 +845,6 @@ export default function RenovationReport() {
           ))}
         </div>
       </Card>
-
-      {/* ── City climate target ── */}
-      {goalAssessment && (
-        <Card>
-          <SectionTitle icon={<Target size={15} color="#2FB477" />} title="City climate target" />
-          <ClimateGoalPanel a={goalAssessment} />
-          {buildingGoal && (
-            <div style={{ marginTop: 18 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>
-                Per-building goal
-              </div>
-              <ClimateGoalBuildingTable a={buildingGoal} />
-            </div>
-          )}
-        </Card>
-      )}
 
       {/* ── 2. Buildings ── */}
       {buildings.length > 0 && (
@@ -701,6 +886,64 @@ export default function RenovationReport() {
         </Card>
       )}
 
+      {/* ── Baseline energy performance ──
+          The same SVG the printed report draws, in the screen theme — the charts
+          used to exist only in the PDF, so the page and the export disagreed
+          about what the report contained. */}
+      {baselines.length > 0 && (
+        <Card>
+          <SectionTitle icon={<Zap size={15} color="#E8880C" />} title="Baseline Energy Performance" />
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "0 0 12px" }}>
+            As-built energy use by end use, kWh/m²·yr — the baseline every package is measured against.
+          </p>
+          <div dangerouslySetInnerHTML={{ __html: baselineChartHtml(SCREEN_THEME) }} />
+        </Card>
+      )}
+
+      {/* ── Facade condition ──
+          The exported report has carried the annotated photos for a while; the
+          on-screen report did not show them at all, so what Step 2 found was
+          invisible here. */}
+      {facadeEntries.length > 0 && (
+        <Card>
+          <SectionTitle icon={<ScanSearch size={15} color="#B98BE8" />} title="Facade Condition" />
+          <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 12px" }}>
+            Photos analysed by the MBDD2025 defect detector with an AI vision second opinion — a screening aid, not a structural survey.
+          </p>
+          {facadeEntries.map(([key, sum]) => (
+            <div key={key} style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>{sum.label || key}</span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                  {sum.imageCount} photo{sum.imageCount === 1 ? "" : "s"} · {sum.defectCount} defect{sum.defectCount === 1 ? "" : "s"}
+                </span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{breakdownText(sum.byClass)}</span>
+              </div>
+              {(sum.photos ?? []).length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+                  {(sum.photos ?? []).map((ph) => (
+                    <div key={ph.id} style={{ borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)" }}>
+                      <img src={ph.url} alt={`${FACADE_LABELS[ph.orientation]} facade of ${sum.label || key}`}
+                           style={{ display: "block", width: "100%", height: "auto" }} />
+                      <div style={{ padding: "6px 9px" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+                          {FACADE_LABELS[ph.orientation]} facade
+                        </div>
+                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+                          {ph.detections.length
+                            ? ph.detections.map((d) => `${FACADE_DEFECT_LABELS[d.label] ?? d.label} ${Math.round(d.score * 100)}%`).join(" · ")
+                            : "No defects detected"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </Card>
+      )}
+
       {/* ── 3. Materials selected ── */}
       {Object.keys(materials).length > 0 && (
         <Card>
@@ -730,6 +973,9 @@ export default function RenovationReport() {
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "0 0 16px" }}>
             Top {Math.min(simResults.length, 8)} packages vs as-built baseline ({kwh(baselineEU)})
           </p>
+          {/* Every package, matching the printed report exactly; the interactive
+              chart below shows the top few with tooltips. */}
+          <div dangerouslySetInnerHTML={{ __html: packageChartHtml(SCREEN_THEME) }} style={{ marginBottom: 14 }} />
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData} barSize={28}>
               <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -850,6 +1096,22 @@ export default function RenovationReport() {
               For maximum carbon impact, <strong style={{ color: "#4A90E2" }}>Package #{bestCarbon.packageIndex}</strong> saves{" "}
               <strong style={{ color: "#4A90E2" }}>{kg(bestCarbon.carbonSaving)}</strong> of CO₂e per year.
             </p>
+          )}
+        </Card>
+      )}
+
+      {/* ── City climate target ── */}
+      {goalAssessment && (
+        <Card>
+          <SectionTitle icon={<Target size={15} color="#2FB477" />} title="City climate target" />
+          <ClimateGoalPanel a={goalAssessment} />
+          {buildingGoal && (
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>
+                Per-building goal
+              </div>
+              <ClimateGoalBuildingTable a={buildingGoal} />
+            </div>
           )}
         </Card>
       )}

@@ -52,23 +52,46 @@
       const solid = mode === 'light' || mode === 'dark';
       if (cbyRow) cbyRow.style.display = solid ? 'flex' : 'none';
     };
-    let current = 'light';   // default active thumbnail for the viewer startup
+    /* One source of truth: the hidden .base-btn radios. The badge next to the
+       "Display" header is rendered from `.base-btn.active` (see ui.js), so a
+       thumbnail that tracked its own separate `current` variable could - and did
+       - disagree with it: the panel showed 3D ticked while the badge read
+       "Light". Thumbnails now mirror the radios instead of shadowing them. */
+    const activeMode = () => {
+      const on = document.querySelector('.base-btn.active');
+      return on ? on.id.replace('btn-base-', '') : 'light';
+    };
+    const syncThumbs = () => {
+      const mode = activeMode();
+      thumbs.forEach((t) => {
+        const on = t.getAttribute('data-mode') === mode;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-checked', String(on));
+      });
+      syncColorBy(mode);
+    };
+
     thumbs.forEach((btn) => {
       btn.addEventListener('click', () => {
         const mode = btn.getAttribute('data-mode');
-        if (mode === current) return;
-        current = mode;
-        thumbs.forEach((t) => {
-          const on = t === btn;
-          t.classList.toggle('active', on);
-          t.setAttribute('aria-checked', String(on));
-        });
-        window.setBasemap(mode);
-        syncColorBy(mode);
+        const radio = document.getElementById('btn-base-' + mode);
+        if (radio) {
+          if (radio.classList.contains('active')) return;   // already on it
+          // Go through the radio's own handler (layers.js) so the selection,
+          // the basemap and the badge all move together.
+          radio.click();
+        } else if (mode !== activeMode()) {
+          window.setBasemap(mode);                          // viewer without the radios
+        }
+        syncThumbs();
       });
     });
+
     if (cby) cby.addEventListener('change', () => window.setColorMode(cby.value));
-    syncColorBy(current);   // Light default → Color By stays available
+    // The viewer resets to light on some interactions; follow it rather than
+    // letting the thumbnails keep showing a mode that is no longer active.
+    document.addEventListener('basemapReset', syncThumbs);
+    syncThumbs();
   }
   init();
 })();

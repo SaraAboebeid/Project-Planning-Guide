@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS simulations (
     submitted_at TEXT NOT NULL,
     completed_at TEXT,
     results TEXT,
+    results_raw TEXT,
     error TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_sim_epsm_id ON simulations(epsm_simulation_id);
@@ -65,6 +66,12 @@ def _connect() -> sqlite3.Connection:
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
     con.executescript(_SCHEMA)
+    # Databases created before results_raw existed need it added in place; CREATE
+    # TABLE IF NOT EXISTS above will not alter an existing table.
+    cols = {r["name"] for r in con.execute("PRAGMA table_info(simulations)")}
+    if "results_raw" not in cols:
+        con.execute("ALTER TABLE simulations ADD COLUMN results_raw TEXT")
+        con.commit()
     return con
 
 
@@ -144,7 +151,16 @@ def update_by_epsm_id(epsm_simulation_id: str, idf_idx: Optional[int] = None, **
     so idf_idx must be given to target just one building's row in that case."""
     if not fields:
         return
-    if "results" in fields and fields["results"] is not None:
+    if "results" in fields and isinstance(fields.get("results"), dict):
+        # `raw` (EPSM's full item, incl. the 8760-hour trace) goes to its own
+        # column so the frequently-polled read path never loads it. Callers keep
+        # passing one dict; the split is this layer's concern.
+        res = dict(fields["results"])
+        raw = res.pop("raw", None)
+        fields = {**fields, "results": json.dumps(res)}
+        if raw is not None:
+            fields["results_raw"] = json.dumps(raw)
+    elif "results" in fields and fields["results"] is not None:
         fields = {**fields, "results": json.dumps(fields["results"])}
     set_clause = ", ".join(f"{k} = ?" for k in fields)
     params = list(fields.values()) + [epsm_simulation_id]
@@ -160,13 +176,23 @@ def update_by_epsm_id(epsm_simulation_id: str, idf_idx: Optional[int] = None, **
         con.close()
 
 
+# Every column except results_raw. The status endpoint is polled every 4 s, and
+# `SELECT *` used to drag the whole 8760-hour trace off disk with it - 57 MB per
+# poll for a 39-building batch, which on a bind-mounted database took seconds and
+# starved everything else on the page.
+_LIGHT_COLS = ("id, lat, lon, address, country, city_id, building_info, package_id, "
+               "package_label, batch_id, idf_idx, epsm_simulation_id, epsm_task_id, "
+               "status, submitted_at, completed_at, results, error")
+
+
 def get_by_epsm_id(epsm_simulation_id: str) -> list[dict]:
     """All rows for a simulation_id - a single row for a normal submission,
-    or one row per building for a batch submission."""
+    or one row per building for a batch submission. Excludes the bulk trace;
+    use get_raw_by_epsm_id for that."""
     con = _connect()
     try:
         rows = con.execute(
-            "SELECT * FROM simulations WHERE epsm_simulation_id = ? ORDER BY idf_idx",
+            f"SELECT {_LIGHT_COLS} FROM simulations WHERE epsm_simulation_id = ? ORDER BY idf_idx",
             (epsm_simulation_id,),
         ).fetchall()
         return [_row_to_dict(r) for r in rows]
@@ -246,6 +272,40 @@ def latest_batch_near(lat: float, lon: float, radius_m: float, package_id: str) 
             if _haversine_m(r["lat"], r["lon"], lat, lon) <= radius_m:
                 return {"batch_id": r["epsm_simulation_id"], "submitted_at": r["submitted_at"], "status": r["status"]}
         return None
+    finally:
+        con.close()
+
+
+def get_raw_by_epsm_id(epsm_simulation_id: str, idf_idx: Optional[int] = None) -> dict[int, dict]:
+    """The bulk EPSM item per building (hourly traces), keyed by idf_idx.
+
+    Falls back to the legacy location - `results.raw` - for rows written before
+    the column split, so old batches keep their load profiles.
+    """
+    con = _connect()
+    try:
+        sql = "SELECT idf_idx, results_raw, results FROM simulations WHERE epsm_simulation_id = ?"
+        params: list[Any] = [epsm_simulation_id]
+        if idf_idx is not None:
+            sql += " AND idf_idx = ?"
+            params.append(idf_idx)
+        out: dict[int, dict] = {}
+        for r in con.execute(sql, params):
+            blob = r["results_raw"]
+            if blob:
+                try:
+                    out[r["idf_idx"]] = json.loads(blob)
+                    continue
+                except Exception:
+                    pass
+            if r["results"]:
+                try:
+                    legacy = json.loads(r["results"]).get("raw")
+                    if legacy:
+                        out[r["idf_idx"]] = legacy
+                except Exception:
+                    pass
+        return out
     finally:
         con.close()
 

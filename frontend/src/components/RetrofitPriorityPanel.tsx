@@ -192,6 +192,42 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
         </table>
       </div>
 
+      {remainingRanked.length > 0 && (
+        <div className="rounded-lg border border-white/8 bg-black/20 overflow-hidden">
+          <button
+            onClick={() => setShowRemaining(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 text-left text-[10px] font-medium text-white/60 hover:text-white hover:bg-white/[0.03] transition"
+          >
+            <span>
+              Remaining {remainingRanked.length} building{remainingRanked.length === 1 ? "" : "s"} (minimized)
+            </span>
+            <span className="text-white/40">{showRemaining ? "Hide" : "Show"}</span>
+          </button>
+          {showRemaining && (
+            <div className="border-t border-white/8">
+              <table className="w-full text-[11px] border-collapse">
+                <tbody>
+                  {remainingRanked.map((r, i) => (
+                    <tr key={r.key} className="border-t border-white/6 hover:bg-white/[0.03] transition">
+                      <td className="px-2 py-2 text-white/40 tabular-nums w-8">{topN + i + 1}</td>
+                      <td className="px-2 py-2 text-white/80 font-medium max-w-[180px] truncate" title={r.label}>{r.label}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-2 flex-1 min-w-[40px] rounded-full bg-white/10 overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${r.P}%`, background: scoreColor(r.P) }} />
+                          </div>
+                          <span className="font-bold tabular-nums w-7 text-right" style={{ color: scoreColor(r.P) }}>{Math.round(r.P)}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Weights */}
       <div className="space-y-2.5">
         <button
@@ -328,42 +364,6 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
           </div>
         )}
       </div>
-
-      {remainingRanked.length > 0 && (
-        <div className="rounded-lg border border-white/8 bg-black/20 overflow-hidden">
-          <button
-            onClick={() => setShowRemaining(v => !v)}
-            className="w-full flex items-center justify-between px-3 py-2 text-left text-[10px] font-medium text-white/60 hover:text-white hover:bg-white/[0.03] transition"
-          >
-            <span>
-              Remaining {remainingRanked.length} building{remainingRanked.length === 1 ? "" : "s"} (minimized)
-            </span>
-            <span className="text-white/40">{showRemaining ? "Hide" : "Show"}</span>
-          </button>
-          {showRemaining && (
-            <div className="border-t border-white/8">
-              <table className="w-full text-[11px] border-collapse">
-                <tbody>
-                  {remainingRanked.map((r, i) => (
-                    <tr key={r.key} className="border-t border-white/6 hover:bg-white/[0.03] transition">
-                      <td className="px-2 py-2 text-white/40 tabular-nums w-8">{topN + i + 1}</td>
-                      <td className="px-2 py-2 text-white/80 font-medium max-w-[180px] truncate" title={r.label}>{r.label}</td>
-                      <td className="px-2 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-2 flex-1 min-w-[40px] rounded-full bg-white/10 overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${r.P}%`, background: scoreColor(r.P) }} />
-                          </div>
-                          <span className="font-bold tabular-nums w-7 text-right" style={{ color: scoreColor(r.P) }}>{Math.round(r.P)}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
 
       <p className="text-[10px] text-white/30 leading-relaxed">
         Scores are 0–100 (higher = higher priority). Energy performance, façade condition (from the AI inspection above; shown as “—” and excluded until a building is inspected), building characteristics, and renovation potential are the four scoring groups.

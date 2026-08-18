@@ -2627,6 +2627,28 @@ def _energy_use_dict_from_list(items: Optional[list]) -> dict:
     return {item["end_use"]: item for item in (items or []) if item.get("end_use")}
 
 
+# Keys inside a stored result that exist only for server-side analysis and must
+# never be shipped to the browser. `raw` holds EPSM's complete item, including an
+# 8760-hour trace per end use - for a 39-building batch that made a single
+# /simulation-batch-status response 53 MB, re-fetched every 4 s by the poller and
+# once per package. The frontend uses only the scalar *_kwh_m2_yr fields; the
+# hourly data is served, aggregated, by /api/simulation-timeseries instead.
+_BULK_RESULT_KEYS = ("raw",)
+
+
+def _slim_results(results: Optional[dict]) -> Optional[dict]:
+    if not isinstance(results, dict):
+        return results
+    return {k: v for k, v in results.items() if k not in _BULK_RESULT_KEYS}
+
+
+def _slim_record(record: dict) -> dict:
+    """Same trimming for whole simulation records (lookup endpoints)."""
+    if not isinstance(record, dict) or "results" not in record:
+        return record
+    return {**record, "results": _slim_results(record.get("results"))}
+
+
 def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], building_info: dict) -> dict:
     """Recompute per-m2 figures using our own total floor area (floors x
     footprint_m2), not EPSM's own per-m2 fields - see _fetch_and_normalize_results'
@@ -2970,15 +2992,35 @@ async def simulation_batch_status(batch_id: str):
             raise HTTPException(502, f"Could not reach EPSM at {EPSM_BASE_URL}: {exc}")
         if not r.is_success:
             raise HTTPException(r.status_code, f"EPSM status lookup failed: {r.text[:300]}")
-        overall_status = (r.json() or {}).get("status")
+        _epsm_status = r.json() or {}
+        overall_status = _epsm_status.get("status")
+        # EPSM reports real per-run progress. Our own rows only flip to
+        # "completed" when the whole batch is reconciled at the end, so a
+        # progress bar driven off row counts sat at 0% and then jumped to 100%.
+        overall_progress = _epsm_status.get("progress")
 
     still_pending = any(row["status"] not in ("completed", "failed") for row in rows)
 
     if overall_status == "completed" and still_pending:
-        async with httpx.AsyncClient(timeout=30) as client:
-            pr = await client.get(f"{EPSM_BASE_URL}/api/simulation/{batch_id}/parallel-results/")
-        if pr.is_success:
-            payload = pr.json()
+        # This payload carries every building's full hourly trace - 57 MB for a
+        # 39-building batch - so a 30 s budget truncated it mid-transfer
+        # ("peer closed connection without sending complete message body"),
+        # which surfaced as a 500 on THIS endpoint and left the batch stuck at
+        # "queued" forever even though EnergyPlus had finished. Give it room,
+        # and treat a failed fetch as "not reconciled yet" (the next poll
+        # retries) rather than as an error the whole request dies on.
+        pr = None
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=15.0)) as client:
+                pr = await client.get(f"{EPSM_BASE_URL}/api/simulation/{batch_id}/parallel-results/")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[batch-status] parallel-results fetch failed for {batch_id}: {type(exc).__name__}: {exc}")
+        if pr is not None and pr.is_success:
+            try:
+                payload = pr.json()
+            except Exception as exc:  # noqa: BLE001
+                print(f"[batch-status] parallel-results JSON parse failed for {batch_id}: {exc}")
+                payload = []
             results_list = payload if isinstance(payload, list) else (payload.get("results") or [])
             by_idx = {int(item["idf_idx"]): item for item in results_list if item.get("idf_idx") is not None}
             now = datetime.datetime.utcnow().isoformat() + "Z"
@@ -3024,11 +3066,12 @@ async def simulation_batch_status(batch_id: str):
         "total": len(rows),
         "counts": counts,
         "overall_status": overall_status,
+        "overall_progress": overall_progress,
         "buildings": [
             {
                 "idf_idx": row["idf_idx"], "lat": row["lat"], "lon": row["lon"], "address": row["address"],
                 "package_id": row["package_id"], "package_label": row["package_label"],
-                "status": row["status"], "results": row["results"], "error": row["error"],
+                "status": row["status"], "results": _slim_results(row["results"]), "error": row["error"],
             }
             for row in rows
         ],
@@ -3071,15 +3114,14 @@ def _end_use_of_series(name: str) -> Optional[str]:
     return None
 
 
-def _timeseries_for_row(row: dict, resolution: str) -> Optional[dict]:
+def _timeseries_from_raw(raw: Optional[dict], resolution: str) -> Optional[dict]:
     """Aggregate one building's hourly trace into kWh per end use.
 
     Returns None when the run carries no trace at all (older records, or a
     building that failed) so the caller can report it as unavailable rather
     than as a building whose demand is genuinely zero.
     """
-    results = row.get("results") or {}
-    ts = (results.get("raw") or {}).get("hourly_timeseries") or {}
+    ts = (raw or {}).get("hourly_timeseries") or {}
     series = ts.get("series") or {}
     if not series:
         return None
@@ -3146,10 +3188,13 @@ async def simulation_timeseries(
         if not rows:
             raise HTTPException(404, f"No building with idf_idx={idf_idx} in this batch")
 
+    # The traces live in their own column now (see simdb.get_raw_by_epsm_id),
+    # loaded only here rather than on every status poll.
+    raw_by_idx = simdb.get_raw_by_epsm_id(batch_id, idf_idx)
     buildings = []
     for row in rows:
         results = row.get("results") or {}
-        series = _timeseries_for_row(row, resolution)
+        series = _timeseries_from_raw(raw_by_idx.get(row["idf_idx"]), resolution)
         buildings.append({
             "idf_idx": row["idf_idx"],
             "address": row["address"],
@@ -3180,7 +3225,7 @@ async def lookup_simulation(
     hit = simdb.find_nearest(lat, lon, radius_m, package_id)
     if hit is None:
         return {"found": False, "record": None}
-    return {"found": True, "record": hit["record"], "dist_m": hit["dist_m"]}
+    return {"found": True, "record": _slim_record(hit["record"]), "dist_m": hit["dist_m"]}
 
 
 @app.get("/api/simulation-lookup-all")
@@ -3188,13 +3233,13 @@ async def lookup_simulation_all(lat: float = Query(...), lon: float = Query(...)
     """Every saved/running simulation record within radius_m of this location -
     one row per package_id (baseline + N renovation packages) - nearest first.
     Lets the renovation calculator rehydrate every package's status in one call."""
-    return {"records": simdb.find_all_near(lat, lon, radius_m)}
+    return {"records": [_slim_record(r) for r in simdb.find_all_near(lat, lon, radius_m)]}
 
 
 @app.get("/api/simulation-database")
 async def get_simulation_database():
     """Return all saved simulation records."""
-    return {"records": simdb.all_records()}
+    return {"records": [_slim_record(r) for r in simdb.all_records()]}
 
 
 # ── Multi-objective renovation optimizer ────────────────────────────────────

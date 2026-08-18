@@ -229,6 +229,8 @@ export const api = {
   simulationBatchStatus: (batchId: string) =>
     get<{
       batch_id: string; total: number; counts: Record<string, number>; overall_status: string;
+      /** EPSM's own 0-100 progress; our row statuses only move at the end. */
+      overall_progress?: number | null;
       buildings: Array<{
         idf_idx: number; lat: number; lon: number; address: string | null;
         package_id: string; package_label: string | null; status: string;

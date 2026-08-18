@@ -71,7 +71,14 @@ export function estimateCarbon(
   return { value: 30, confidence: "fallback" };
 }
 
-export type KpiKey = "Environmental" | "Economic" | "Performance / Technical";
+export type KpiKey = "Environmental" | "Economic" | "Energy Demand";
+
+/** The "Energy Demand" KPI was called "Performance / Technical" until 2026-08.
+ *  Projects saved before the rename still carry the old string, so read through
+ *  this rather than comparing the new name directly. */
+const LEGACY_ENERGY_DEMAND = "Performance / Technical";
+const wantsEnergyDemand = (selected: string[]) =>
+  selected.includes("Energy Demand") || selected.includes(LEGACY_ENERGY_DEMAND);
 /** Recommendation tags = the three KPIs, plus a synthesised "Balanced" pick that
  *  trades the selected KPIs off against each other (only when ≥2 are selected). */
 export type RecTag = KpiKey | "Balanced";
@@ -114,11 +121,11 @@ export function recommendationsForLineItem(
     const lowest = scored.reduce((a, b) => (a.v <= b.v ? a : b));
     tag(lowest.code, "Environmental");
   }
-  if (selectedKpis.includes("Performance / Technical")) {
+  if (wantsEnergyDemand(selectedKpis)) {
     const withU = pool.filter((i) => i.uValue != null);
     if (withU.length) {
       const best = withU.reduce((a, b) => (a.uValue! <= b.uValue! ? a : b));
-      tag(best.code, "Performance / Technical");
+      tag(best.code, "Energy Demand");
     }
   }
 
@@ -127,10 +134,13 @@ export function recommendationsForLineItem(
   // assembly that best BALANCES the selected KPIs: min-max normalise each
   // selected metric across the pool (cost, carbon, U — all "lower is better"),
   // give them equal weight, and pick the lowest combined score.
-  const activeKpis = (["Economic", "Environmental", "Performance / Technical"] as KpiKey[])
-    .filter((k) => selectedKpis.includes(k));
+  const activeKpis = ([
+    ...(selectedKpis.includes("Economic") ? ["Economic"] as KpiKey[] : []),
+    ...(selectedKpis.includes("Environmental") ? ["Environmental"] as KpiKey[] : []),
+    ...(wantsEnergyDemand(selectedKpis) ? ["Energy Demand"] as KpiKey[] : []),
+  ]);
   if (activeKpis.length >= 2) {
-    const wantPerf = activeKpis.includes("Performance / Technical");
+    const wantPerf = activeKpis.includes("Energy Demand");
     // Performance needs a U-value; require one only when that KPI is active.
     const cand = pool.filter((i) => !wantPerf || i.uValue != null);
     if (cand.length) {

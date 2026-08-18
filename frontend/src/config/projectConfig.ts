@@ -112,7 +112,7 @@ export const ENVELOPE_COMPONENTS = [
 export const UNIVERSAL_KPIS = [
   "Environmental",
   "Economic",
-  "Performance / Technical",
+  "Energy Demand",
 ];
 
 export const KPIS_BY_PROJECT_TYPE: Record<ProjectType, string[]> = {

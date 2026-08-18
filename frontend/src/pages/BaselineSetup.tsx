@@ -118,6 +118,10 @@ export default function BaselineSetup() {
   }, [project.prioritizedBuildingIndices, buildings.length]);
   const effectiveSelected = selected ?? prioritizedIdx ?? allIdx;
   const carriesFromStep2 = selectionMode === "step2" && prioritizedIdx != null;
+  /* "Use Step 2 shortlist" is only worth offering when it differs from "Select
+     all" — with no shortlist, or one covering every building, the two buttons
+     did exactly the same thing. */
+  const shortlistDiffersFromAll = prioritizedIdx != null && prioritizedIdx.size < buildings.length;
 
   useEffect(() => {
     setSelected(null);
@@ -270,7 +274,14 @@ export default function BaselineSetup() {
       while (true) {
         const status = await api.simulationBatchStatus(batch_id);
         const done = (status.counts.completed ?? 0) + (status.counts.failed ?? 0);
-        setSimProgress(Math.round((done / status.total) * 100));
+        // Our own rows all flip at the very end of the batch, so counting them
+        // pinned the bar at 0% for the whole run. EPSM's own progress moves
+        // during it; take whichever is further along, and never go backwards.
+        const rowPct = status.total ? Math.round((done / status.total) * 100) : 0;
+        const epsmPct = typeof status.overall_progress === "number"
+          ? Math.max(0, Math.min(100, Math.round(status.overall_progress)))
+          : 0;
+        setSimProgress((prev) => Math.max(prev, rowPct, epsmPct));
 
         if (status.overall_status === "completed" || status.overall_status === "failed" || done === status.total) {
           const mapped: RenovationBaselineResult[] = status.buildings.map((row, i) => {
@@ -278,6 +289,8 @@ export default function BaselineSetup() {
             const r = row.results;
             return {
               address: row.address ?? (src ? bKey(src, i) : `Building ${i + 1}`),
+              lat: row.lat ?? src?.lat,
+              lon: row.lon ?? src?.lon,
               energyUse: r?.total_kwh_m2_yr ?? 0,
               heating: r?.heating_kwh_m2_yr ?? 0,
               cooling: r?.cooling_kwh_m2_yr ?? 0,
@@ -335,6 +348,35 @@ export default function BaselineSetup() {
   // run always completes. No need to gate on "all fields present" anymore.
   const canRunBaseline = runList.length > 0;
 
+  /* Results persist across visits, so returning to Step 3 used to show a full
+     set of baseline results for a selection the user had never run — including
+     after they changed which buildings are selected. Compare what is stored
+     against what is selected now, on coordinates (exact) with an address
+     fallback for results saved before coordinates were recorded. */
+  const baselineMatchesSelection = useMemo(() => {
+    const stored = project.renovationBaselineResults ?? [];
+    if (stored.length === 0 || runList.length === 0) return false;
+    if (stored.length !== runList.length) return false;
+    // Pick ONE comparison basis for both sides. Deciding per item would make a
+    // legacy result (address only) unable to ever match a selection that has
+    // coordinates, silently discarding a baseline that is actually current.
+    const haveCoords =
+      stored.every((r) => r.lat != null && r.lon != null) &&
+      runList.every((b) => b.lat != null && b.lon != null);
+    const key = (x: { lat?: number | null; lon?: number | null; address?: string | null }) =>
+      haveCoords ? `${x.lat!.toFixed(6)},${x.lon!.toFixed(6)}` : (x.address ?? "").trim().toLowerCase();
+    const storedKeys = new Set(stored.map(key));
+    return runList.every((b) => storedKeys.has(key(b)));
+  }, [project.renovationBaselineResults, runList]);
+
+  // "Done" only counts when it describes the CURRENT selection.
+  const baselineIsCurrent = project.baselineStatus === "done" && baselineMatchesSelection;
+  // Re-run is only meaningful once a stored baseline exists for a different set
+  // of buildings; otherwise this is simply a run.
+  const isRerun = project.baselineStatus === "done"
+    && (project.renovationBaselineResults?.length ?? 0) > 0
+    && !baselineMatchesSelection;
+
   /* Baselines simulated before baselineBatchId existed have no pointer to their
      own EPSM run, so the load-profile panel had nothing to fetch and simply did
      not render - which reads as "the feature is missing" rather than "this run
@@ -365,8 +407,8 @@ export default function BaselineSetup() {
           Baseline Simulation
         </h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          Run an energy simulation to establish the as-built performance of the building{buildings.length !== 1 ? "s" : ""} selected in Step 2 —
-          the baseline you'll compare renovation packages against in Step 4.
+          Simulate the as-built performance of the selected building{buildings.length !== 1 ? "s" : ""} —
+          the baseline every renovation package is measured against.
         </p>
       </div>
 
@@ -385,7 +427,8 @@ export default function BaselineSetup() {
               {effectiveSelected.size} of {buildings.length} building{buildings.length !== 1 ? "s" : ""} selected
             </span>
             <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-              <button onClick={() => applySelection(prioritizedIdx ? new Set(prioritizedIdx) : new Set(allIdx), "step2")}
+              {shortlistDiffersFromAll && (
+              <button onClick={() => applySelection(new Set(prioritizedIdx!), "step2")}
                 style={{
                   fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
                   background: selectionMode === "step2" ? "#4ECDC4" : "rgba(78,205,196,0.12)",
@@ -395,6 +438,7 @@ export default function BaselineSetup() {
                 }}>
                 Use Step 2 shortlist
               </button>
+              )}
               <button onClick={() => applySelection(new Set(allIdx), "all")}
                 style={{
                   fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
@@ -455,7 +499,7 @@ export default function BaselineSetup() {
               }}
             >
               {simRunning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={14} />}
-              {simRunning ? "Running…" : `${project.baselineStatus === "done" ? "Re-run" : "Run"} baseline energy simulation (EPSM) for ${runList.length} building${runList.length !== 1 ? "s" : ""}`}
+              {simRunning ? "Running…" : `${isRerun ? "Re-run" : "Run"} baseline energy simulation (EPSM) for ${runList.length} building${runList.length !== 1 ? "s" : ""}`}
             </button>
           </div>
         </div>
@@ -474,7 +518,7 @@ export default function BaselineSetup() {
           <h3 style={{ fontSize: 14, fontWeight: 700, color: canRunBaseline ? "#fff" : "rgba(255,255,255,0.35)", margin: 0 }}>
             Baseline Energy Simulation
           </h3>
-          {project.baselineStatus === "done" && !simRunning && (
+          {baselineIsCurrent && !simRunning && (
             <span style={{
               marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#2FB477",
               background: "rgba(47,180,119,0.15)", padding: "2px 10px", borderRadius: 20,
@@ -512,8 +556,8 @@ export default function BaselineSetup() {
           </div>
         )}
 
-        {/* Real EPSM results */}
-        {project.baselineStatus === "done" && !simRunning && (
+        {/* Real EPSM results — only for the selection they actually describe. */}
+        {baselineIsCurrent && !simRunning && (
           <div ref={resultsRef} style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18, scrollMarginTop: 80 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 2 }}>
               EPSM Baseline Results

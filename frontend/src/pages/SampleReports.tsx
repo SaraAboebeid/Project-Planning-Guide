@@ -9,6 +9,12 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   "Renewable Energy Planning": <Zap       className="w-5 h-5" />,
 };
 
+/* Only Renovation Planning is an enabled track in the tool right now (see
+   projectConfig's DISABLED types and Step 1's HIDE_PROJECT_TYPE), so the
+   Energy Community and Renewable Energy samples are hidden rather than deleted
+   — their data is intact and re-listing them is a one-line change. */
+const VISIBLE_SAMPLE_IDS = ["renovation"];
+
 /* ─── open report in new tab ─────────────────────────────────────────── */
 function openReport(idx: number) {
   const s   = SAMPLE_REPORTS[idx];
@@ -37,7 +43,7 @@ export default function SampleReports() {
           Example Project Reports
         </h1>
         <p style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", maxWidth: 560, margin: 0, lineHeight: 1.6 }}>
-          Fully generated sample reports for each project type. Click{" "}
+          A fully generated sample report for the Renovation Planning track. Click{" "}
           <strong style={{ color: "rgba(255,255,255,0.75)" }}>Preview Report</strong>{" "}
           to open a print-ready HTML report in a new tab — ready to save as PDF.
         </p>
@@ -45,9 +51,12 @@ export default function SampleReports() {
 
       {/* ── Cards ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        {SAMPLE_REPORTS.map((s, idx) => (
-          <SampleCard key={s.id} sample={s} index={idx} />
-        ))}
+        {SAMPLE_REPORTS
+          .map((s, idx) => ({ s, idx }))
+          .filter(({ s }) => VISIBLE_SAMPLE_IDS.includes(s.id))
+          .map(({ s, idx }) => (
+            <SampleCard key={s.id} sample={s} index={idx} />
+          ))}
       </div>
 
       {/* ── Footer note ── */}

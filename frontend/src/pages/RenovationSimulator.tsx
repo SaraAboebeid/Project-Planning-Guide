@@ -10,6 +10,8 @@ import { computeRegret, annuityFactor, type RegretOptionInput } from "../utils/r
 import { api } from "../api/client";
 import { lineItemsFor, type AreaLineItem } from "../config/componentAreaLineItems";
 import { resolveBuildingGeometry, computeAreaForLineItem, quantityUnitLabel, type ResolvedBuildingGeometry } from "../utils/componentAreas";
+import { filterToBaselineShortlist } from "../utils/baselineShortlist";
+import type { BuildingLookup, BuildingRecord } from "../types";
 import { itemsForLineItem, estimateCarbon, recommendationsForLineItem, type RecTag } from "../utils/materialRecommendation";
 import { computePriorities, makeBuildingKeys, DEFAULT_WEIGHTS } from "../utils/retrofitPriority";
 import {
@@ -27,7 +29,7 @@ import { parseAssemblyParts } from "../config/materialProperties";
 import type { OptimizeComponentInput, OptimizeParams, OptimizePoint } from "../api/client";
 import type { WikellsItem } from "../config/wikellsData";
 import type { BoverketResource, WWRRecord } from "../types";
-import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight, Play } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight, Play, Layers } from "lucide-react";
 
 /* Sweden/Gothenburg is the only geometry+cost+carbon-complete dataset - UK
  * buildings resolve via /api/uk/building and get real EPSM energy
@@ -140,7 +142,11 @@ function StageHeader({
         display: "inline-flex", alignItems: "center", justifyContent: "center",
         fontSize: 11, fontWeight: 800, letterSpacing: 0.2,
         color: dim ? "rgba(255,255,255,0.4)" : "#0b1220", background: accent,
-      }}>{state === "done" && !isOpen ? "✓" : `${STEP_NUMBER}.${n}`}</span>
+        // Always the section number, never a tick: the number is how the section
+        // is referred to, and swapping it out once reviewed meant 4.1 and 4.2
+        // stopped being findable exactly when you wanted to go back to them.
+        // Completion is still carried by the badge colour and the hint text.
+      }}>{`${STEP_NUMBER}.${n}`}</span>
       {/* Labels */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: 13.5, fontWeight: 800, color: dim ? "rgba(255,255,255,0.55)" : "#fff" }}>{title}</span>
@@ -611,9 +617,22 @@ export default function RenovationSimulator() {
     return ranked.map(r => r.row);
   }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows, project.facadeDefects]);
 
+  /* Step 3 decides which buildings the project is about; Step 4 must not widen
+     that. Running every package over the whole Step 2 selection meant 39
+     EnergyPlus runs per package where the user had shortlisted 3. */
+  // Explicit type argument: `buildings` is BuildingLookup[] | BuildingRecord[]
+  // (a union of arrays), which generic inference cannot unify on its own.
+  const shortlisted = useMemo(
+    () => filterToBaselineShortlist<BuildingLookup | BuildingRecord>(
+      buildings as (BuildingLookup | BuildingRecord)[],
+      project.renovationBaselineResults,
+    ),
+    [buildings, project.renovationBaselineResults],
+  );
+
   const geometries = useMemo(
-    () => buildings.map((b) => resolveBuildingGeometry(b)).filter((g): g is ResolvedBuildingGeometry => g !== null),
-    [buildings]
+    () => shortlisted.map((b) => resolveBuildingGeometry(b)).filter((g): g is ResolvedBuildingGeometry => g !== null),
+    [shortlisted]
   );
 
   const [wwrByIndex, setWwrByIndex] = useState<Record<number, WWRRecord | null>>({});
@@ -1427,9 +1446,9 @@ export default function RenovationSimulator() {
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>Renovation Calculator</h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
           {isUK
-            ? "Pick a refurbishment tier and compare its simulated energy performance against the as-built baseline."
-            : <>Design build-ups per component, combine them into packages, and run an energy simulation for each against the as-built baseline
-               {geometries.length > 1 ? ` — across all ${geometries.length} buildings from Step 2, ordered by their retrofit priority (highest first).` : "."}</>}
+            ? "Pick a refurbishment tier and compare its simulated performance against the baseline."
+            : <>Design build-ups, combine them into packages, and simulate each against the baseline to compare energy, cost and carbon
+               {geometries.length > 1 ? ` — across the ${geometries.length} buildings from Step 3.` : "."}</>}
         </p>
       </div>
 
@@ -1963,6 +1982,20 @@ export default function RenovationSimulator() {
           {/* Two read-outs of the same batch: per-package aggregates, or a
               per-building matrix (baseline vs every package, one row per address). */}
           <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "16px 18px" }}>
+            {/* Titled like the HVAC panel below it: this table is the envelope /
+                component-material side of the comparison, and without a heading
+                it was not obvious which half of the retrofit it covered. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <span style={{ padding: 6, borderRadius: 9, background: "rgba(78,205,196,0.16)", color: "#4ECDC4", display: "flex" }}>
+                <Layers size={16} />
+              </span>
+              <span style={{ flex: 1 }}>
+                <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#fff" }}>Component materials</span>
+                <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                  Envelope build-ups simulated against the as-built baseline — energy, cost &amp; carbon per package.
+                </span>
+              </span>
+            </div>
             {(baselinePkg?.buildings.length ?? 0) > 1 && (
               <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
                 {([["package", "By package"], ["building", "By building"]] as const).map(([v, label]) => (
@@ -2188,30 +2221,51 @@ export default function RenovationSimulator() {
           </>
           )}
 
-          {/* ── Stage 4: Targets & Scenarios ── */}
-          {packages.filter((p) => !p.isBaseline).length > 0 && (<>
-            <div ref={(el) => { stageRefs.current[4] = el; }} style={{ scrollMarginTop: 80 }} />
-            <StageHeader n={4} title="Targets & Scenarios"
-              hint="climate target · future energy price scenarios"
-              state="active"
-              isOpen={openStage === 4}
-              onClick={() => setOpenStage((s) => (s === 4 ? null : 4))} />
+          {/* ── Stage 4: Targets & Scenarios ──
+              Always rendered, like Results above it. Hiding the section until a
+              package existed made the numbering stop at 4.3 with nothing saying
+              why, which read as a broken step rather than one waiting on input. */}
+          {(() => {
+            const designed = packages.filter((p) => !p.isBaseline);
+            const hasResults = designed.some((p) => pkgAggregate(p).avgTotalKwhM2Yr != null);
+            return (<>
+              <div ref={(el) => { stageRefs.current[4] = el; }} style={{ scrollMarginTop: 80 }} />
+              <StageHeader n={4} title="Targets & Scenarios"
+                hint={designed.length === 0
+                  ? "design a package in 4.2 first"
+                  : !hasResults
+                    ? "waiting for package results"
+                    : "climate target · future energy price scenarios"}
+                state={hasResults ? "active" : "waiting"}
+                isOpen={openStage === 4}
+                onClick={() => setOpenStage((s) => (s === 4 ? null : 4))} />
 
-            {openStage === 4 && (<>
-              {goalAssessment && <ClimateGoalPanel a={goalAssessment} />}
+              {openStage === 4 && (<>
+                {goalAssessment && <ClimateGoalPanel a={goalAssessment} />}
 
-              {regretResult && regretResult.options.length >= 2 && (
-                <DecisionAnalysisPanel
-                  result={regretResult}
-                  alpha={regretAlpha}
-                  setAlpha={setRegretAlpha}
-                  prices={regretPrices}
-                  setPrices={setRegretPrices}
-                  currentPrice={livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8}
-                />
-              )}
-            </>)}
-          </>)}
+                {regretResult && regretResult.options.length >= 2 && (
+                  <DecisionAnalysisPanel
+                    result={regretResult}
+                    alpha={regretAlpha}
+                    setAlpha={setRegretAlpha}
+                    prices={regretPrices}
+                    setPrices={setRegretPrices}
+                    currentPrice={livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8}
+                  />
+                )}
+
+                {/* Both panels above need simulated packages to say anything. Say
+                    so, rather than opening to an empty section. */}
+                {!goalAssessment && !(regretResult && regretResult.options.length >= 2) && (
+                  <div style={{ padding: "14px 18px", fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+                    {designed.length === 0
+                      ? "Design at least one renovation package in 4.2, run it, and its climate-target assessment and energy-price scenarios appear here."
+                      : "Waiting for package results — the climate target and price scenarios are computed from simulated packages."}
+                  </div>
+                )}
+              </>)}
+            </>);
+          })()}
 
         </>
       )}

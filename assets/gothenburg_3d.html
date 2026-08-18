@@ -121,7 +121,7 @@
     <div style="padding:2px 12px 8px;display:flex;flex-direction:column;gap:9px">
       <div style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.4)">Base Map</div>
       <div class="basemap-thumbs" role="radiogroup" aria-label="Base map">
-        <button class="bm-thumb" data-mode="light" role="radio" aria-checked="false" title="Light">
+        <button class="bm-thumb active" data-mode="light" role="radio" aria-checked="true" title="Light">
           <span class="bm-thumb-img" style="background-color:#e6e6e6;background-image:url('https://a.basemaps.cartocdn.com/light_all/12/2184/1240.png')"><span class="bm-check">&#10003;</span></span>
           <span class="bm-label">Light</span>
         </button>
@@ -137,7 +137,7 @@
           <span class="bm-thumb-img" style="background-color:#5a5347;background-image:url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Hillshade/MapServer/tile/12/1240/2184')"><span class="bm-check">&#10003;</span></span>
           <span class="bm-label">Terrain</span>
         </button>
-        <button class="bm-thumb active" data-mode="photo" role="radio" aria-checked="true" title="Photorealistic 3D">
+        <button class="bm-thumb" data-mode="photo" role="radio" aria-checked="false" title="Photorealistic 3D">
           <span class="bm-thumb-img" style="background-color:#39422f;background-image:url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2480/4368')"><span class="bm-check">&#10003;</span></span>
           <span class="bm-label">3D</span>
         </button>
@@ -153,7 +153,7 @@
     </div>
     <div class="basemap-group" role="radiogroup" aria-label="Base map" style="display:none;padding:0 0 4px">
       <div class="base-row">
-        <button class="base-btn" id="btn-base-light" role="radio" aria-checked="false">
+        <button class="base-btn active" id="btn-base-light" role="radio" aria-checked="true">
           <span class="base-indicator"></span>
           <span class="base-name">Light</span>
           <span class="layer-pill">CartoDB</span>
@@ -185,7 +185,7 @@
         <button class="info-btn" data-layer="terrain-lidar"></button>
       </div>
       <div class="base-row">
-        <button class="base-btn active" id="btn-base-photo" role="radio" aria-checked="true">
+        <button class="base-btn" id="btn-base-photo" role="radio" aria-checked="false">
           <span class="base-indicator"></span>
           <span class="base-name">Photorealistic 3D</span>
           <span class="layer-pill">Google</span>

@@ -229,11 +229,13 @@ export default function WizardLayout() {
   const nextStepLabel   = safeIndex < steps.length - 1 ? steps[safeIndex + 1]!.label : "Complete";
   // One plain-language line about what the NEXT step does, keyed by the current
   // step number — shown in the footer so the user knows what Continue leads to.
+  // Kept in step with each page's own brief, so the promise made here matches
+  // what the next screen actually says it does.
   const NEXT_STEP_HINT: Record<number, string> = {
-    1: "we'll gather the available data for your building(s) so you can review, edit or import it.",
-    2: "we'll run an energy simulation to establish each building's current (as-built) performance.",
-    3: "we'll design renovation packages and compare their energy, cost and carbon.",
-    4: "we'll compile everything into a shareable report.",
+    1: "review each building's data, fill any gaps, and choose which buildings carry forward.",
+    2: "simulate the as-built performance of the selected buildings — the baseline to compare against.",
+    3: "design renovation packages and simulate each against the baseline for energy, cost and carbon.",
+    4: "compile everything into a shareable report.",
   };
   const nextHint = NEXT_STEP_HINT[activeStep.number];
 

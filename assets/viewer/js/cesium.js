@@ -954,9 +954,13 @@ viewer.camera.flyTo({
   // Each stage is isolated: the buildings are the point of this viewer, so
   // nothing optional above them is allowed to prevent them from rendering.
   try {
+    // Start on the flat Light basemap, which is what the Display panel shows as
+    // selected. Loading the photorealistic tiles here would immediately call
+    // setPhotoMode(true) and strip the imagery, so the viewer opened in 3D while
+    // every control still read "Light". The tiles are loaded on demand instead -
+    // setBasemap('photo') calls loadGoogleTiles() itself when the user picks 3D.
     if (ION_TOKEN) {
       document.getElementById('token-panel').style.display = 'none';
-      await loadGoogleTiles(ION_TOKEN, { skipAutoRebuild: true });
     }
     if (window.VIEWER_COUNTRY && window.VIEWER_COUNTRY !== 'se') {
       await toggleOsmBuildings(true, { skipAutoRebuild: true });
