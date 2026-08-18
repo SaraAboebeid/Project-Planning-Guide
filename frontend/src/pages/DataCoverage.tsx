@@ -603,6 +603,12 @@ function buildDefs(projectType: string | null, systems: string[], ecEnergyFocus:
 type BKey = keyof BuildingLookup;
 
 // Which EUBUCCO field (non-null / boolean-true) proves a DataCoverage item is available
+/* This page IS wizard step 2. Section badges are numbered against it ("2.1",
+   "2.2") rather than "1", "2", which collided visually with the step number in
+   the breadcrumb. A module constant rather than the store's currentStep: the
+   page is fixed to its step, so it should not depend on navigation state. */
+const STEP_NUMBER = 2;
+
 const FIELD_MAP: Record<string, BKey> = {
   // Renovation Planning
   r_fp:    "footprint_m2",
@@ -2512,15 +2518,20 @@ function Step2Sections({
           textAlign: "left",
         }}
       >
-        {/* Number bubble */}
+        {/* Section number — a pill, not a circle, so "2.1" fits without clipping */}
         <div style={{
-          width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+          minWidth: 26, height: 26, padding: "0 7px", borderRadius: 999, flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
           background: isOpen ? "#4ECDC4" : done ? "rgba(47,180,119,0.25)" : "rgba(255,255,255,0.07)",
           border: `1.5px solid ${isOpen ? "#4ECDC4" : done ? "rgba(47,180,119,0.5)" : "rgba(255,255,255,0.12)"}`,
-          fontSize: 11, fontWeight: 800, color: isOpen ? "#0b1220" : done ? "#2FB477" : "rgba(255,255,255,0.4)",
+          fontSize: 11, fontWeight: 800, letterSpacing: 0.2,
+          color: isOpen ? "#0b1220" : done ? "#2FB477" : "rgba(255,255,255,0.4)",
         }}>
-          {done && !isOpen ? "✓" : id === "facade" ? "1" : showFacade ? "2" : "1"}
+          {/* Facade is optional (walls in scope), so prioritisation is .2 only
+              when it is actually shown — same rule as before, now step-prefixed. */}
+          {done && !isOpen
+            ? "✓"
+            : `${STEP_NUMBER}.${id === "facade" ? 1 : showFacade ? 2 : 1}`}
         </div>
         {/* Labels */}
         <div style={{ flex: 1, minWidth: 0 }}>

@@ -98,6 +98,13 @@ interface ComponentConfig {
    Numbering it makes that legible; without it the page reads as five unrelated
    cards of equal weight and you can't tell what to do first. `state` dims a
    stage that isn't reachable yet and says what unlocks it. */
+/* This page IS wizard step 4. Section badges are numbered against it ("4.1",
+   "4.2", …) rather than "1", "2", … which collided visually with the step
+   number itself - a circled "3" next to "Results" while the breadcrumb read
+   "Step 4". A module constant rather than the store's currentStep: the page is
+   fixed to its step, so it should not depend on transient navigation state. */
+const STEP_NUMBER = 4;
+
 function StageHeader({
   n, title, hint, state = "active", isOpen = false, onClick,
 }: {
@@ -127,12 +134,13 @@ function StageHeader({
         transition: "border-color 0.18s, background 0.18s",
       }}
     >
-      {/* Number bubble */}
+      {/* Section number — a pill, not a circle, so "4.1" fits without clipping */}
       <span style={{
-        flexShrink: 0, width: 24, height: 24, borderRadius: "50%", display: "inline-flex",
-        alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
+        flexShrink: 0, minWidth: 24, height: 24, padding: "0 7px", borderRadius: 999,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        fontSize: 11, fontWeight: 800, letterSpacing: 0.2,
         color: dim ? "rgba(255,255,255,0.4)" : "#0b1220", background: accent,
-      }}>{state === "done" && !isOpen ? "✓" : String(n)}</span>
+      }}>{state === "done" && !isOpen ? "✓" : `${STEP_NUMBER}.${n}`}</span>
       {/* Labels */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: 13.5, fontWeight: 800, color: dim ? "rgba(255,255,255,0.55)" : "#fff" }}>{title}</span>
@@ -1859,7 +1867,7 @@ export default function RenovationSimulator() {
                       </button>
                       <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", maxWidth: 460, lineHeight: 1.5 }}>
                         {isRunning
-                          ? `EnergyPlus is running \u2014 results will appear in Stage 3 automatically.`
+                          ? `EnergyPlus is running \u2014 results will appear in section 4.3 automatically.`
                           : activeCombos.length <= 10
                             ? "Small enough to run every combination in EnergyPlus directly \u2014 exact results for exactly these designs."
                             : "That\u2019s a lot of EnergyPlus runs. Use the optimizer below to find the best trade-offs first, then simulate only those."}

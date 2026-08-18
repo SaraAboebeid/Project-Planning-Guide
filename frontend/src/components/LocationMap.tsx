@@ -595,6 +595,9 @@ export default function LocationMap({
   const [locationMode, setLocationMode] = useState<"addresses" | "area" | "bbox" | "polygon">(
     "addresses"
   );
+  // CSV formatting rules start hidden: uploading is one option among several, and
+  // the rules only matter to someone actually preparing a file.
+  const [csvHelpOpen, setCsvHelpOpen] = useState(false);
   // Street/area search: the label of the feature whose bounds are selected.
   const [areaLabel, setAreaLabel] = useState<string | null>(null);
   const [addressInputs, setAddressInputs] = useState<string[]>([""]);
@@ -890,6 +893,14 @@ export default function LocationMap({
           <div className="rounded-xl border border-white/10 bg-[#0b1118] p-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Building list CSV</div>
+              <div className="flex items-center gap-2 ml-auto">
+              <button
+                type="button"
+                onClick={() => setCsvHelpOpen((v) => !v)}
+                className="text-[11px] text-white/45 hover:text-white/80 underline underline-offset-2"
+              >
+                {csvHelpOpen ? "Hide format" : "File format"}
+              </button>
               <label className="flex items-center gap-2 rounded-lg border border-[#4ECDC4]/50 bg-[#4ECDC4]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[#A8F3EA] hover:bg-[#4ECDC4]/20 cursor-pointer">
                 <span>Upload CSV</span>
                 <input
@@ -903,16 +914,24 @@ export default function LocationMap({
                   }}
                 />
               </label>
+              </div>
             </div>
-            <p className="mt-2 text-[11px] text-white/50">
-              One row per building. Use a column named <span className="font-mono text-emerald-300">Address</span> or put one address per line. Excel: save as CSV first.
-            </p>
-            <div className="mt-2 text-[10.5px] text-white/60 rounded-md border border-white/10 bg-[#0d1117] p-2.5 leading-relaxed">
-              <div><b className="text-white/75">CSV format:</b> <span className="font-mono text-emerald-300">Address,Name</span></div>
-              <div className="mt-1 font-mono text-[10px] text-emerald-300/90 whitespace-pre">Address,Name
+            {/* Uploading is one option among several, so its formatting rules do
+                not need to occupy the panel permanently - they are one click away
+                for whoever is actually preparing a file. */}
+            {csvHelpOpen && (
+              <>
+                <p className="mt-2 text-[11px] text-white/50">
+                  One row per building. Use a column named <span className="font-mono text-emerald-300">Address</span> or put one address per line. Excel: save as CSV first.
+                </p>
+                <div className="mt-2 text-[10.5px] text-white/60 rounded-md border border-white/10 bg-[#0d1117] p-2.5 leading-relaxed">
+                  <div><b className="text-white/75">CSV format:</b> <span className="font-mono text-emerald-300">Address,Name</span></div>
+                  <div className="mt-1 font-mono text-[10px] text-emerald-300/90 whitespace-pre">Address,Name
 Storgatan 1,Gothenburg
 Kungsgatan 10,Göteborg</div>
-            </div>
+                </div>
+              </>
+            )}
             {buildingListCsvMessage && (
               <p className="mt-2 text-[11px] text-violet-300">{buildingListCsvMessage}</p>
             )}

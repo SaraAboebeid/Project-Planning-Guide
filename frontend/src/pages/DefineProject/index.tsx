@@ -568,31 +568,6 @@ export default function DefineProject() {
     didMountRef.current = true;
   }, [revealCount]);
 
-  /* ── progress tracker ──────────────────────────────────────── */
-  // Each entry: [label, isDone]
-  const progressSteps: [string, boolean][] = [
-    ...(HIDE_PROJECT_TYPE
-      ? [["Project name", !!project.projectName.trim()] as [string, boolean]]
-      : [["Project type", !!pt] as [string, boolean]]),
-    ...(needsBuildingDevType
-      ? [["Building type", !!project.buildingDevelopmentType] as [string, boolean]]
-      : []),
-    [pt === "Renovation Planning" ? "Components" : "Systems in scope", systemsChosen],
-    ...(pt === "Energy Community Planning"
-      ? [["Energy focus", project.ecEnergyFocus.length > 0] as [string, boolean]]
-      : []),
-    ["Exploration",        project.explorationApproaches.length > 0],
-    ["KPIs",              project.selectedKpis.length > 0],
-    ["Scale",             !!project.scale],
-    ...(HIDE_PROJECT_TYPE ? [] : [["Project name", !!project.projectName.trim()] as [string, boolean]]),
-    ["Location",          !!project.address.trim()],
-  ];
-  const totalSteps = progressSteps.length;
-  const doneSteps  = progressSteps.filter(([, done]) => done).length;
-  const pct        = Math.round((doneSteps / totalSteps) * 100);
-  // Next pending label
-  const nextStep   = progressSteps.find(([, done]) => !done);
-
   /* ════════════════════════════════════════════════════════════════
      RENDER
      ════════════════════════════════════════════════════════════════ */
@@ -600,33 +575,8 @@ export default function DefineProject() {
   return (
     <div ref={rootRef} className="space-y-2">
 
-      {/* ── PROJECT TYPE (with slim inline progress hint) ── */}
+      {/* ── PROJECT TYPE ── */}
       <Card>
-        {/* slim progress hint */}
-        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
-          <div className="flex-1 h-1 rounded-full bg-gray-100 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${pct}%`,
-                background: pct === 100
-                  ? "#509724"
-                  : "linear-gradient(90deg,#995BD5,#721CB8)",
-              }}
-            />
-          </div>
-          <span className="text-xs text-muted whitespace-nowrap">
-            <span className="font-semibold text-dark">{doneSteps}</span>
-            {"\u00a0/\u00a0"}{totalSteps}
-            {nextStep && pct < 100 && (
-              <> &middot; next: <span className="font-medium text-dark">{nextStep[0]}</span></>
-            )}
-            {pct === 100 && (
-              <span className="text-green font-semibold"> &middot; complete ✓</span>
-            )}
-          </span>
-        </div>
-
         {HIDE_PROJECT_TYPE ? (
           <div>
             <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "1.4px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>Project type</div>

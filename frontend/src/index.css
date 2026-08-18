@@ -75,8 +75,6 @@ body {
   border-radius: 8px;
   width: 100%;
   padding: 8px 0;
-  font-size: 8px;
-  font-weight: 700;
   color: var(--sidebar-icon-color);
   background: transparent;
   transition: all 0.15s;
@@ -89,6 +87,10 @@ body {
 
 .theme-toggle-sidebar {
   margin-bottom: 2px;
+  /* Icon over caption, matching the Settings item it sits directly above so the
+     two sidebar controls read as the same kind of thing. */
+  flex-direction: column;
+  gap: 3px;
 }
 
 .sidebar-theme-icon {

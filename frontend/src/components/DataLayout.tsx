@@ -139,7 +139,7 @@ export default function DataLayout({
           }}
         >
           <Icon d={IC.settings} size={18} />
-          <span style={{ fontSize: 8 }}>Settings</span>
+          <span className="text-[9px] tracking-wide font-medium leading-none">Settings</span>
         </button>
       </aside>
 

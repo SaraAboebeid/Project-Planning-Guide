@@ -26,6 +26,9 @@ export default function ThemeToggle() {
       aria-label={mode === "dark" ? "Switch to bright mode" : "Switch to dark mode"}
     >
       {mode === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+      {/* Same treatment as the sidebar's other captions (SideNavItem / Settings)
+          so the two controls sitting together read at the same size and weight. */}
+      <span className="text-[9px] tracking-wide font-medium leading-none">Theme</span>
     </button>
   );
 }
