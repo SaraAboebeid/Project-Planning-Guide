@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationCalcPackage, type RenovationCalcBuildingResult, type RenovationCalcSelection } from "../store/wizard";
 import { climateGoalFor, assessAgainstGoal } from "../config/climateGoals";
 import ClimateGoalPanel from "../components/ClimateGoalPanel";
-import ComponentScopePanel from "../components/ComponentScopePanel";
 import DecisionAnalysisPanel from "../components/DecisionAnalysisPanel";
 import HeatingSystemPanel from "../components/HeatingSystemPanel";
 import { computeRegret, annuityFactor, type RegretOptionInput } from "../utils/regretAnalysis";
@@ -29,7 +28,7 @@ import { parseAssemblyParts } from "../config/materialProperties";
 import type { OptimizeComponentInput, OptimizeParams, OptimizePoint } from "../api/client";
 import type { WikellsItem } from "../config/wikellsData";
 import type { BoverketResource, WWRRecord } from "../types";
-import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight, Play, Layers } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight, Play, Layers, Settings } from "lucide-react";
 
 /* Sweden/Gothenburg is the only geometry+cost+carbon-complete dataset - UK
  * buildings resolve via /api/uk/building and get real EPSM energy
@@ -668,6 +667,10 @@ export default function RenovationSimulator() {
   const [packageName, setPackageName] = useState("");
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
   const [openStage, setOpenStage] = useState<number | null>(1);
+  const [discountOpen, setDiscountOpen] = useState(false);
+  // The optimiser is a power feature; it should not stand between the user and
+  // the run button.
+  const [optimizerOpen, setOptimizerOpen] = useState(false);
   // Results can be read two ways: by package (portfolio aggregate per design) or
   // by building (every address as a row, baseline next to each package so you can
   // compare a single building across all designs). The matrix is what a user means
@@ -686,6 +689,9 @@ export default function RenovationSimulator() {
   // Which building(s) a new package applies to: "all" or a specific index.
   // Entries carry the ORIGINAL building index so per-building lookups (wwr,
   // cost/carbon) stay correct even when a package targets a single building.
+  // Which buildings a package is built for: every building in the Step 3
+  // shortlist, or one of them. Chosen in 4.1 next to the assemblies, because it
+  // changes what the quantities and costs below refer to.
   const [targetIdx, setTargetIdx] = useState<number | "all">("all");
   type GeoEntry = { g: ResolvedBuildingGeometry; idx: number };
   const allEntries: GeoEntry[] = useMemo(() => geometries.map((g, i) => ({ g, idx: i })), [geometries]);
@@ -804,8 +810,10 @@ export default function RenovationSimulator() {
     });
   }
 
-  const submitBaseline = useCallback(() => {
-    if (geometries.length === 0) return;
+  /** Copy Step 3's finished baseline across when it covers these buildings.
+   *  Returns false when there is nothing to copy. Never submits anything. */
+  const seedBaselineFromStep3 = useCallback(() => {
+    if (geometries.length === 0) return false;
     const entries = geometries.map((g, i) => ({ g, idx: i }));
 
     // Prefer Step 3 baseline results — they're already simulated; no need to
@@ -827,10 +835,18 @@ export default function RenovationSimulator() {
         })),
       };
       setProject({ renovationCalcPackages: [...useWizardStore.getState().project.renovationCalcPackages.filter((p) => p.id !== "baseline"), pkg] });
-      return;
+      return true;
     }
+    return false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geometries]);
 
-    // Fallback: no Step 3 data yet — submit a fresh EPSM batch.
+  /** Explicit user action only - this is what starts an EnergyPlus batch. */
+  const submitBaseline = useCallback(() => {
+    if (geometries.length === 0) return;
+    const entries = geometries.map((g, i) => ({ g, idx: i }));
+
+    // Submits a fresh EPSM batch — only ever reached from the Run button.
     const pkg: RenovationCalcPackage = {
       id: "baseline", name: "Baseline (as-built)", color: "rgba(255,255,255,0.4)", isBaseline: true,
       selections: {}, batchId: null, buildings: makeBuildingRows(entries),
@@ -873,7 +889,10 @@ export default function RenovationSimulator() {
     const stranded = baseline != null && baseline.batchId === null
       && baseline.buildings.some((b) => b.totalKwhM2Yr == null && b.status !== "failed");
     if (!baseline || stranded) {
-      submitBaseline();
+      // Reusing Step 3's finished numbers is free; STARTING a batch is not, and
+      // must never happen just because the page was opened. The fallback that
+      // submits one now sits behind the explicit "Run baseline" button below.
+      seedBaselineFromStep3();
     }
     // Resume polling for every package with a live batch that has not settled.
     // Keyed on "not settled" rather than "queued || running" so a package left
@@ -1213,6 +1232,7 @@ export default function RenovationSimulator() {
   }
 
   const baselinePkg = packages.find((p) => p.isBaseline);
+  const baselineRunning = !!baselinePkg?.buildings.some(isBuildingRunning);
   const baselineAgg = baselinePkg ? pkgAggregate(baselinePkg) : null;
 
   // City climate target (Gothenburg: −30% by 2030). Scored against the baseline
@@ -1461,138 +1481,115 @@ export default function RenovationSimulator() {
       {geometries.length > 0 && (
         <>
           <div ref={(el) => { stageRefs.current[1] = el; }} style={{ scrollMarginTop: 80 }} />
-          <StageHeader n={1} title="Renovation scope"
+          <StageHeader n={1} title="Design assemblies"
             hint={baselineAgg?.avgTotalKwhM2Yr != null
-              ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr`
-              : undefined}
+              ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr · components in scope, build-ups saved per component`
+              : "pick components, design build-ups, save them as configurations"}
             state={baselineAgg?.avgTotalKwhM2Yr != null ? "done" : "active"}
             isOpen={openStage === 1}
             onClick={() => setOpenStage((s) => (s === 1 ? null : 1))} />
         </>
       )}
 
-      {/* ── Buildings & components: scope toggles + building picker ── */}
-      {geometries.length > 0 && openStage === 1 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {!isUK && (
-          <ComponentScopePanel
-            components={components}
-            onChange={(next) => setProject({ renovationEnvelopeComponents: next })}
-            goalAssessment={goalAssessment}
-          />
-        )}
-        <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Buildings & baseline performance</span>
-            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>baseline kWh/m²·yr</span>
-            {geometries.length > 1 && (
-              <>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>· new package applies to:</span>
-                <button
-                  onClick={() => setTargetIdx("all")}
-                  style={{
-                    fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
-                    border: `1px solid ${targetIdx === "all" ? "#2FB477" : "rgba(255,255,255,0.12)"}`,
-                    background: targetIdx === "all" ? "rgba(47,180,119,0.15)" : "transparent",
-                    color: targetIdx === "all" ? "#2FB477" : "rgba(255,255,255,0.6)",
-                  }}
-                >
-                  All buildings ({geometries.length})
-                </button>
-              </>
-            )}
-          </div>
-          {/* Same compact pill language as Step 3's building picker — name + its
-              baseline energy inline; green when it's the package target. */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {geometries.map((g, i) => {
-              const row = baselinePkg?.buildings[i];
-              const total = row?.totalKwhM2Yr;
-              const selectable = geometries.length > 1;
-              const selected = targetIdx === i;
-              return (
-                <button
-                  key={`${g.lat}-${g.lon}-${i}`}
-                  onClick={() => selectable && setTargetIdx(i)}
-                  title={selectable ? `Build a package just for ${g.address ?? `Building ${i + 1}`}` : undefined}
-                  style={{
-                    fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 8,
-                    cursor: selectable ? "pointer" : "default",
-                    display: "inline-flex", alignItems: "center", gap: 6, maxWidth: 260,
-                    border: `1px solid ${selected ? "#2FB477" : "rgba(255,255,255,0.08)"}`,
-                    background: selected ? "rgba(47,180,119,0.14)" : "rgba(255,255,255,0.02)",
-                  }}
-                >
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: selected ? "#fff" : "rgba(255,255,255,0.72)" }}>
-                    {g.address ?? `Building ${i + 1}`}
-                  </span>
-                  <span style={{ fontSize: 10.5, fontWeight: 800, flexShrink: 0,
-                    color: total != null ? "#2FB477" : "rgba(255,255,255,0.35)" }}>
-                    {total != null ? total : row?.status === "failed" ? "—" : "…"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {geometries.length > 1 && (
-            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: "8px 0 0" }}>
-              Pick a building to build a package just for it, or “All buildings” to apply the same package to every one. Each package runs its own EnergyPlus batch.
-            </p>
-          )}
-        </div>
-        {isUK && (
-          <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(114,28,184,0.2)" }}>
-            <UkTierPicker
-              archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier}
-              footprintM2={geometries[0]?.footprintM2 ?? null} buildingCount={geometries.length}
-              uSource={geometries[0]?.tabulaUSource ?? null}
-            />
-          </div>
-        )}
+      {/* Nothing to compare against until a baseline exists. It is copied from
+          Step 3 when that covers these buildings; otherwise running it is an
+          explicit choice, because it starts an EnergyPlus batch. */}
+      {geometries.length > 0 && openStage === 1 && baselineAgg?.avgTotalKwhM2Yr == null && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "13px 16px", borderRadius: 12,
+          background: "rgba(232,136,12,0.08)", border: "1px solid rgba(232,136,12,0.28)" }}>
+          <span style={{ fontSize: 12.5, color: "rgba(255,255,255,0.7)", flex: 1, minWidth: 240 }}>
+            No as-built baseline for these buildings yet — run it in Step 3, or run it here.
+          </span>
+          <button
+            onClick={submitBaseline}
+            disabled={baselineRunning}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 9, border: 0,
+              background: baselineRunning ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg,#5a9e1e,#2FB477)",
+              color: baselineRunning ? "rgba(255,255,255,0.35)" : "#0a0d14",
+              fontSize: 12.5, fontWeight: 800, cursor: baselineRunning ? "not-allowed" : "pointer" }}>
+            {baselineRunning
+              ? <><Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> Running baseline…</>
+              : <><Play size={13} /> Run baseline energy simulation (EPSM)</>}
+          </button>
         </div>
       )}
 
       {geometries.length > 0 && !isUK && hasEnvelope && (
         <>
-          <div ref={(el) => { stageRefs.current[2] = el; }} style={{ scrollMarginTop: 80 }} />
-          <StageHeader n={2} title="Renovation Packages"
-            hint={(() => {
-              const parts: string[] = [];
-              if (baselineAgg?.avgTotalKwhM2Yr != null) parts.push(`baseline ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr`);
-              if (configs.length) parts.push(configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" · "));
-              if (packageCombosList.length) parts.push(`${activeCombos.length}/${packageCombosList.length} packages`);
-              return parts.length ? parts.join("  ·  ") : "save one or more build-ups per component";
-            })()}
-            state={configs.length ? "done" : "active"}
-            isOpen={openStage === 2}
-            onClick={() => setOpenStage((s) => (s === 2 ? null : 2))} />
 
           {/* Supplier discount — the % the property owner gets off catalogue material
               prices; deducted from every material cost (Wikells is Sweden-only). */}
-          {openStage === 2 && (<>
+          {openStage === 1 && (<>
+          {/* Applies-to selector: small and inline, because it is a qualifier on
+              the design work rather than a step of its own — the panel it
+              replaced took a third of the stage. */}
+          {geometries.length > 1 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>These assemblies are for</span>
+              <select
+                value={targetIdx === "all" ? "all" : String(targetIdx)}
+                onChange={(e) => setTargetIdx(e.target.value === "all" ? "all" : Number(e.target.value))}
+                style={{ padding: "5px 9px", borderRadius: 8, fontSize: 11.5, fontWeight: 700,
+                  background: "#0d1117", color: "#fff", border: "1px solid rgba(255,255,255,0.15)", maxWidth: 280 }}>
+                <option value="all">All buildings ({geometries.length})</option>
+                {geometries.map((g, i) => (
+                  <option key={`${g.lat},${g.lon}`} value={i}>{g.address ?? `Building ${i + 1}`}</option>
+                ))}
+              </select>
+              <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.3)" }}>
+                {targetIdx === "all"
+                  ? "one package, applied to every building"
+                  : "a package built just for this building"}
+              </span>
+            </div>
+          )}
+
+          {/* Supplier discount sits behind a gear rather than as a banner at the top
+              of the stage: it only applies to owners with negotiated Swedish supplier
+              rates, and it was the first thing in the way of the material-picking
+              flow. It now sits with the prices it modifies. */}
           {!isUK && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "0 0 14px",
-              padding: "11px 14px", borderRadius: 10, background: "rgba(47,180,119,0.07)", border: "1px solid rgba(47,180,119,0.22)" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#f0f4ff" }}>Supplier discount</span>
-                <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)" }}>
-                  If the owner has a supplier discount, enter it — it's deducted from every catalogue material price (cost only; carbon unaffected).
-                </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-                <input
-                  type="number" min={0} max={90} step={1}
-                  value={project.supplierDiscountPct || 0}
-                  onChange={(e) => setProject({ supplierDiscountPct: Math.min(90, Math.max(0, Number(e.target.value) || 0)) })}
-                  style={{ width: 72, padding: "6px 8px", borderRadius: 8, textAlign: "right",
-                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: 13, fontWeight: 700 }}
-                />
-                <span style={{ fontSize: 14, fontWeight: 800, color: "#2FB477" }}>%</span>
-              </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 8, position: "relative" }}>
               {(project.supplierDiscountPct || 0) > 0 && (
-                <span style={{ fontSize: 10.5, color: "#2FB477", fontWeight: 700, width: "100%" }}>
-                  ✓ Material prices are net of −{project.supplierDiscountPct}%. Re-pick materials / rebuild packages to apply it to existing ones.
+                <span style={{ fontSize: 10.5, color: "#2FB477", fontWeight: 700 }}>
+                  prices net of −{project.supplierDiscountPct}%
                 </span>
+              )}
+              <button
+                onClick={() => setDiscountOpen((o) => !o)}
+                title="Supplier discount — deducted from catalogue material prices"
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "transparent", border: 0, cursor: "pointer",
+                  color: (project.supplierDiscountPct || 0) > 0 ? "#2FB477" : "rgba(255,255,255,0.35)", fontSize: 11, padding: 2 }}>
+                <Settings size={13} /> Supplier discount
+              </button>
+              {discountOpen && (
+                <>
+                  <div onClick={() => setDiscountOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
+                  <div style={{ position: "absolute", top: 24, right: 0, zIndex: 40, width: 290, padding: "12px 14px", borderRadius: 10,
+                    background: "#0d1117", border: "1px solid rgba(255,255,255,0.15)", boxShadow: "0 12px 30px rgba(0,0,0,0.5)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1 }}>Supplier discount</div>
+                      <button onClick={() => setDiscountOpen(false)} title="Close"
+                        style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(255,255,255,0.45)", padding: 0, lineHeight: 1 }}>
+                        <XCircle size={14} />
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginBottom: 9, lineHeight: 1.5 }}>
+                      Deducted from every catalogue material price (cost only — carbon is unaffected).
+                      Re-pick materials or rebuild packages to apply it to existing ones.
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <input
+                        type="number" min={0} max={90} step={1}
+                        value={project.supplierDiscountPct || 0}
+                        onChange={(e) => setProject({ supplierDiscountPct: Math.min(90, Math.max(0, Number(e.target.value) || 0)) })}
+                        style={{ width: 78, padding: "6px 8px", borderRadius: 8, textAlign: "right",
+                          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: 13, fontWeight: 700 }}
+                      />
+                      <span style={{ fontSize: 14, fontWeight: 800, color: "#2FB477" }}>%</span>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -1787,6 +1784,19 @@ export default function RenovationSimulator() {
           </div>
         </>
           )}
+
+          <div ref={(el) => { stageRefs.current[2] = el; }} style={{ scrollMarginTop: 80 }} />
+          <StageHeader n={2} title="Build packages & run"
+            hint={(() => {
+              const parts: string[] = [];
+              if (baselineAgg?.avgTotalKwhM2Yr != null) parts.push(`baseline ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr`);
+              if (configs.length) parts.push(configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" · "));
+              if (packageCombosList.length) parts.push(`${activeCombos.length}/${packageCombosList.length} packages`);
+              return parts.length ? parts.join("  ·  ") : "save one or more build-ups per component";
+            })()}
+            state={configs.length ? "done" : "active"}
+            isOpen={openStage === 2}
+            onClick={() => setOpenStage((s) => (s === 2 ? null : 2))} />
         </>) }
 
       {geometries.length > 0 && (
@@ -1867,7 +1877,7 @@ export default function RenovationSimulator() {
                           : <Play size={14} style={{ flexShrink: 0 }} />}
                         <span style={{ flex: 1 }}>
                           {isRunning
-                            ? `Simulating\u2026 ${simDone}\u200a/\u200a${simTotal} buildings`
+                            ? `Simulating\u2026 ${simDone}\u200a/\u200a${simTotal} runs \u00b7 ${activeSimPkgs.length} package${activeSimPkgs.length === 1 ? "" : "s"} \u00d7 ${geometries.length} building${geometries.length === 1 ? "" : "s"}`
                             : `Run energy simulation (EPSM) \u00b7 ${activeCombos.length} package${activeCombos.length === 1 ? "" : "s"}${geometries.length > 1 && targetIdx === "all" ? ` \u00d7 ${geometries.length} buildings` : ""}`}
                         </span>
                         {isRunning && (
@@ -1929,14 +1939,28 @@ export default function RenovationSimulator() {
               degree-day physics; each validated winner runs in EPSM and drops
               into the comparison table below. */}
           {!isUK && hasEnvelope && openStage === 2 && (
-            <OptimizerPanel
+            <div>
+              <button
+                onClick={() => setOptimizerOpen((o) => !o)}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: 0, cursor: "pointer",
+                  color: "rgba(255,255,255,0.45)", fontSize: 11.5, fontWeight: 700, padding: "6px 0" }}>
+                <ChevronDown size={13} style={{ transform: optimizerOpen ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} />
+                Advanced — multi-objective optimiser
+                <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.3)" }}>
+                  · Pareto front over cost, carbon &amp; energy
+                </span>
+              </button>
+              {optimizerOpen && (
+                <OptimizerPanel
               input={optimizerInput.input}
               disabledReason={optimizerInput.disabledReason}
               onValidate={validateOptimizerPick}
               currency="SEK"
-              validatedKeys={validatedKeys}
-              selectedKpis={project.selectedKpis}
-            />
+                  validatedKeys={validatedKeys}
+                  selectedKpis={project.selectedKpis}
+                />
+              )}
+            </div>
           )}
 
           {(isUK || hasEnvelope) && (<>
@@ -1970,7 +1994,8 @@ export default function RenovationSimulator() {
                 <span style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(232,136,12,0.3)",
                   borderTopColor: "#E8880C", display: "inline-block", animation: "spin 0.9s linear infinite", flexShrink: 0 }} />
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: "#E8880C" }}>
-                  Running EnergyPlus simulations… {done}/{total} buildings done.
+                  Running EnergyPlus simulations… {done}/{total} runs done
+                  {geometries.length ? ` (${Math.max(1, Math.round(total / geometries.length))} package${Math.round(total / geometries.length) === 1 ? "" : "s"} × ${geometries.length} building${geometries.length === 1 ? "" : "s"})` : ""}.
                   <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.6)", marginLeft: 6 }}>
                     This can take a minute — results fill in below automatically, no need to click.
                   </span>

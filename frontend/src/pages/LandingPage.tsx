@@ -53,14 +53,15 @@ type StepStatus = "not-started" | "in-progress" | "review";
 
 // ── Data ───────────────────────────────────────────────────────────────────
 // The real Renovation Planning wizard steps — each card matches the page it
-// links to (Define Project → Building & Site Data → Baseline → Calculator →
-// Report), so the home page describes what actually happens in the flow.
+// links to (Define Project → Building Data & Prioritisation → Select & Baseline
+// → Renovation Calculator → Report), so the home page describes what actually
+// happens in the flow. Keep these names in step with the wizard's own STEPS.
 const WORKFLOW_STEPS = [
   {
     n: 1,
     shortLabel: "Step 1",
     name: "Define Project",
-    desc: "Set the project type, systems in scope, KPIs and location.",
+    desc: "Set the components in scope, the KPIs to optimise for, the scale and the location.",
     status: "not-started" as StepStatus,
     path: "/step/1",
     icon: IC.deliverable,
@@ -68,8 +69,8 @@ const WORKFLOW_STEPS = [
   {
     n: 2,
     shortLabel: "Step 2",
-    name: "Building & Site Data",
-    desc: "Load building data and select the buildings to renovate. Prioritise by energy class, construction era, or custom criteria.",
+    name: "Building Data & Prioritisation",
+    desc: "Review each building’s data and fill gaps, inspect façade photos for defects, and rank the buildings to flag which to renovate first.",
     status: "not-started" as StepStatus,
     path: "/step/2",
     icon: IC.map,
@@ -77,8 +78,8 @@ const WORKFLOW_STEPS = [
   {
     n: 3,
     shortLabel: "Step 3",
-    name: "Baseline Simulation",
-    desc: "Run an EnergyPlus baseline for the selected buildings — the as-built energy demand.",
+    name: "Select & Baseline",
+    desc: "Confirm which of the flagged buildings to carry forward, then run the EnergyPlus baseline — their as-built demand, monthly or hourly.",
     status: "not-started" as StepStatus,
     path: "/step/3",
     icon: IC.database,
@@ -86,8 +87,8 @@ const WORKFLOW_STEPS = [
   {
     n: 4,
     shortLabel: "Step 4",
-    name: "Calculator",
-    desc: "Design envelope build-ups, combine them into packages, and simulate or optimise each against the baseline.",
+    name: "Renovation Calculator",
+    desc: "Design component build-ups, combine them into packages, and simulate or optimise each against the baseline for energy, cost and carbon.",
     status: "not-started" as StepStatus,
     path: "/step/4",
     icon: IC.layers,
@@ -96,7 +97,7 @@ const WORKFLOW_STEPS = [
     n: 5,
     shortLabel: "Step 5",
     name: "Report",
-    desc: "Recommended packages, cost, carbon, the city climate target, and a downloadable report.",
+    desc: "What was analysed, the baseline, façade findings, every package tested and the recommended ones — shareable or saved as PDF.",
     status: "not-started" as StepStatus,
     path: "/step/5",
     icon: IC.report,

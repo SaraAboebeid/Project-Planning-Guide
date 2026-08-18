@@ -17,9 +17,9 @@ export interface StepDef {
 // full renovation name used in the top bar and the rail's hover tooltip.
 const STEPS: StepDef[] = [
   { number: 1, label: "Define Project",       path: "/step/1" },
-  { number: 2, label: "Building & Site Data", path: "/step/2" },
-  { number: 3, label: "Baseline Simulation",  path: "/step/3" },
-  { number: 4, label: "Calculator",           path: "/step/4" },
+  { number: 2, label: "Building Data & Prioritisation", path: "/step/2" },
+  { number: 3, label: "Select & Baseline",    path: "/step/3" },
+  { number: 4, label: "Renovation Calculator", path: "/step/4" },
   { number: 5, label: "Report",               path: "/step/5" },
 ];
 

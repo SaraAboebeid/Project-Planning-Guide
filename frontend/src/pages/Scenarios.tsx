@@ -27,7 +27,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 2, label: "Building & Site Data", color: "#4A90E2",
+        n: 2, label: "Building Data & Prioritisation", color: "#4A90E2",
         subNodes: [
           { label: "EUBUCCO 3D geometry", type: "db" },
           { label: "Smart meter data (proxy)", type: "estimate" },
@@ -74,7 +74,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 2, label: "Building & Site Data", color: "#4A90E2",
+        n: 2, label: "Building Data & Prioritisation", color: "#4A90E2",
         subNodes: [
           { label: "EUBUCCO footprint + floors, EPC class", type: "db" },
           { label: "TABULA archetype match", type: "db" },
@@ -84,7 +84,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 3, label: "Baseline Simulation", color: "#4ECDC4",
+        n: 3, label: "Select & Baseline", color: "#4ECDC4",
         subNodes: [
           { label: "EnergyPlus baseline via EPSM", type: "engine" },
           { label: "As-built heating / cooling / total", type: "output" },
@@ -125,7 +125,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 2, label: "Building & Site Data", color: "#4A90E2",
+        n: 2, label: "Building Data & Prioritisation", color: "#4A90E2",
         subNodes: [
           { label: "EUBUCCO roof geometry", type: "db" },
           { label: "PVGIS annual irradiation", type: "db" },

@@ -97,9 +97,9 @@ export default function TopBar({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-        <img src="/CTH_new_logo_white.png" alt="Chalmers" style={{ height: 28, opacity: 0.8 }} />
+        <img src="/CTH_new_logo_white.png" alt="Chalmers" className="brand-logo" style={{ height: 28, opacity: 0.8 }} />
         <span style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)" }} />
-        <img src="/CNL_new_logo_white.png" alt="Chalmers Next Labs" style={{ height: 28, opacity: 0.8 }} />
+        <img src="/CNL_new_logo_white.png" alt="Chalmers Next Labs" className="brand-logo" style={{ height: 28, opacity: 0.8 }} />
       </div>
 
       {/* Library tabs */}

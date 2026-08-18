@@ -4,10 +4,14 @@ import { Moon, Sun } from "lucide-react";
 type ThemeMode = "dark" | "bright";
 const STORAGE_KEY = "ppg-theme-mode";
 
+/** Bright is the product default; dark is opt-in and remembered per browser.
+ *  Anyone who has already chosen keeps their choice - only an unset preference
+ *  falls through to bright. Mirrors the inline script in index.html, which
+ *  applies the same rule before first paint. */
 function initialMode(): ThemeMode {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "bright";
   const saved = window.localStorage.getItem(STORAGE_KEY);
-  return saved === "bright" ? "bright" : "dark";
+  return saved === "dark" ? "dark" : "bright";
 }
 
 export default function ThemeToggle() {

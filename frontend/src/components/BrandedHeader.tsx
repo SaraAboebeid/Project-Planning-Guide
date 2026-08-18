@@ -7,13 +7,13 @@ export default function BrandedHeader() {
           <img
             src="/CTH_new_logo_white.png"
             alt="Chalmers University of Technology"
-            className="h-16 opacity-90"
+            className="brand-logo h-16 opacity-90"
           />
           <span className="w-px h-6 bg-white/25" />
           <img
             src="/CNL_new_logo_white.png"
             alt="Chalmers Next Labs"
-            className="h-16 opacity-90"
+            className="brand-logo h-16 opacity-90"
           />
         </div>
 

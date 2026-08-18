@@ -13,6 +13,17 @@
     />
   </head>
   <body class="bg-slate-50 font-sans antialiased">
+    <!-- Set the theme class before React mounts. ThemeToggle applies it in an
+         effect, which runs after first paint: with bright as the default that
+         showed a dark flash on every load. Same rule as initialMode(). -->
+    <script>
+      (function () {
+        try {
+          var saved = window.localStorage.getItem("ppg-theme-mode");
+          if (saved !== "dark") document.body.classList.add("bright-mode");
+        } catch (e) { document.body.classList.add("bright-mode"); }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

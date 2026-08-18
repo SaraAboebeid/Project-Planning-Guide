@@ -404,7 +404,7 @@ export default function BaselineSetup() {
           Renovation Planning · Step 3
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>
-          Baseline Simulation
+          Select & Baseline
         </h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
           Simulate the as-built performance of the selected building{buildings.length !== 1 ? "s" : ""} —

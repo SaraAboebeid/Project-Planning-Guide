@@ -1358,48 +1358,6 @@ function BboxDataBanner({
         </div>
       </div>
 
-      {/* Metrics bar */}
-      <div className="flex flex-wrap divide-x divide-white/8 border-t border-white/8">
-        {bboxStats.common_use && (
-          <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Primary use</div>
-            <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.common_use}</div>
-          </div>
-        )}
-        {bboxStats.avg_floors && (
-          <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Avg floors</div>
-            <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.avg_floors}</div>
-          </div>
-        )}
-        {bboxStats.avg_footprint && (
-          <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Avg footprint</div>
-            <div className="text-xs font-bold text-white/75 mt-0.5">{Math.round(bboxStats.avg_footprint)} m²</div>
-          </div>
-        )}
-        {bboxStats.avg_height && (
-          <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Avg height</div>
-            <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.avg_height} m</div>
-          </div>
-        )}
-        {bboxStats.avg_energy && (
-          <div className="px-4 py-2.5">
-            <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Avg energy use</div>
-            <div className="text-xs font-bold text-white/75 mt-0.5">{bboxStats.avg_energy} kWh/m²</div>
-          </div>
-        )}
-        <div className="px-4 py-2.5">
-          <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Height data</div>
-          <div className="text-xs font-bold text-white/75 mt-0.5">{Math.round(bboxStats.with_height/bboxStats.count*100)}% <span className="font-normal text-white/30">({bboxStats.with_height}/{bboxStats.count})</span></div>
-        </div>
-        <div className="px-4 py-2.5">
-          <div className="text-[9px] uppercase tracking-wider text-white/35 font-semibold">Floor data</div>
-          <div className="text-xs font-bold text-white/75 mt-0.5">{Math.round(bboxStats.with_floors/bboxStats.count*100)}% <span className="font-normal text-white/30">({bboxStats.with_floors}/{bboxStats.count})</span></div>
-        </div>
-      </div>
-
       {importMsg && (
         <div className="px-4 py-2 border-t border-white/8 text-[11px]">
           <span className={`${importMsg.startsWith("✓") ? "text-emerald-400" : importMsg.startsWith("⚠") ? "text-amber-400" : importMsg.startsWith("Import failed") ? "text-red-400" : "text-white/40"}`}>
@@ -2388,7 +2346,7 @@ export default function DataCoverage() {
 
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-white">Building &amp; Site Data</h2>
+        <h2 className="text-2xl font-bold text-white">Building Data &amp; Prioritisation</h2>
         <p className="text-sm text-white/45 mt-1">
           {/* A brief, not a walkthrough — each numbered section below carries its
               own subtitle explaining what it does. */}

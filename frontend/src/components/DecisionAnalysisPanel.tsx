@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Scale } from "lucide-react";
 import PanelShell from "./PanelShell";
 import type { RegretResult } from "../utils/regretAnalysis";
@@ -29,6 +30,7 @@ export default function DecisionAnalysisPanel({
   prices: number[]; setPrices: (p: number[]) => void;
   currentPrice: number;
 }) {
+  const [alphaOpen, setAlphaOpen] = useState(false);
   const { scenarios, options, bestPerScenario, picks } = result;
   const picksFor = (id: string) =>
     (Object.entries(picks) as [string, string][]).filter(([, v]) => v === id).map(([k]) => k);
@@ -61,17 +63,27 @@ export default function DecisionAnalysisPanel({
               <label key={s.key} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10, color: white(0.4) }}>
                 {s.label}
                 <span style={{ fontSize: 9, color: white(0.3), marginTop: -2 }}>{scenarioHint(s.label, i)}</span>
-                <input type="number" min={0} step={0.1} value={prices[i]}
-                  onChange={(e) => { const p = [...prices]; p[i] = Math.max(0, Number(e.target.value)); setPrices(p); }}
-                  style={{ width: 62, background: "#0d1117", border: `1px solid ${white(0.15)}`, borderRadius: 6, padding: "4px 6px", color: "#fff", fontSize: 12 }} />
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="number" min={0} step={0.1} value={prices[i]}
+                    onChange={(e) => { const p = [...prices]; p[i] = Math.max(0, Number(e.target.value)); setPrices(p); }}
+                    style={{ width: 62, background: "#0d1117", border: `1px solid ${white(0.15)}`, borderRadius: 6, padding: "4px 6px", color: "#fff", fontSize: 12 }} />
+                  <span style={{ fontSize: 9.5, color: white(0.35), whiteSpace: "nowrap" }}>SEK/kWh</span>
+                </span>
               </label>
             ))}
           </div>
         </div>
+        {/* Alpha only weights the "Balanced choice" column; the minimax-regret and
+            worst-case results do not depend on it. Defaulting it open put a Greek
+            letter in front of everyone, so it is opt-in with a sensible 0.5. */}
         <div style={{ flex: "1 1 240px", minWidth: 220 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: white(0.35), textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-            Decision style (alpha) = <span style={{ color: "#B98BE8" }}>{alpha.toFixed(2)}</span>
-          </div>
+          <button
+            onClick={() => setAlphaOpen((o) => !o)}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: 0, cursor: "pointer",
+              fontSize: 10, fontWeight: 700, color: white(0.35), textTransform: "uppercase", letterSpacing: 1, padding: 0, marginBottom: 6 }}>
+            {alphaOpen ? "▾" : "▸"} Advanced — decision style (alpha) = <span style={{ color: "#B98BE8" }}>{alpha.toFixed(2)}</span>
+          </button>
+          {alphaOpen && (<>
           <input type="range" min={0} max={1} step={0.05} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))}
             style={{ width: "100%", accentColor: "#B98BE8" }} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9.5, color: white(0.3) }}>
@@ -80,6 +92,7 @@ export default function DecisionAnalysisPanel({
           <div style={{ fontSize: 9.5, color: white(0.32), marginTop: 4 }}>
             This slider controls the "Balanced choice" score (also called Hurwicz). Use 0.5 if you are unsure.
           </div>
+          </>)}
         </div>
       </div>
 

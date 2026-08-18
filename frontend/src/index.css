@@ -124,6 +124,32 @@ body.bright-mode [data-no-theme-invert="true"] {
   filter: invert(1) hue-rotate(180deg);
 }
 
+/* The Chalmers marks are WHITE artwork. The rule above re-inverts every <img>
+   back to its natural colours, which left them white-on-white in bright mode.
+   Opting them out of that re-inversion lets the root inversion do its job and
+   render them black — the correct mark for a light background. */
+body.bright-mode img.brand-logo {
+  filter: none;
+}
+
+/* Native <select> popups are drawn by the OS, OUTSIDE the page's filter layer,
+   so the root inversion never reaches the open option list: dark-on-dark inline
+   styles stayed invisible in bright mode. Un-invert the control (so the filter
+   nets out) and state light-mode colours explicitly, which the popup then uses
+   verbatim. !important because the colours are set inline at each call site. */
+body.bright-mode select {
+  filter: invert(1) hue-rotate(180deg);
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+body.bright-mode option,
+body.bright-mode optgroup {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
 /* Keep the floating toggle readable in bright mode. */
 body.bright-mode .sidebar-theme-icon {
   filter: invert(1) hue-rotate(180deg);

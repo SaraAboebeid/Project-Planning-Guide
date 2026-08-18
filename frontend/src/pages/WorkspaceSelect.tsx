@@ -139,9 +139,9 @@ export default function WorkspaceSelect() {
 
       {/* ── Header ── */}
       <header className="flex items-center gap-4 px-8 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
-        <img src="/CTH_new_logo_white.png" alt="Chalmers University of Technology" style={{ height: 26, opacity: 0.9 }} />
+        <img src="/CTH_new_logo_white.png" alt="Chalmers University of Technology" className="brand-logo" style={{ height: 26, opacity: 0.9 }} />
         <span style={{ width: 1, height: 26, background: "rgba(255,255,255,0.12)" }} />
-        <img src="/CNL_new_logo_white.png" alt="Chalmers Next Labs" style={{ height: 26, opacity: 0.9 }} />
+        <img src="/CNL_new_logo_white.png" alt="Chalmers Next Labs" className="brand-logo" style={{ height: 26, opacity: 0.9 }} />
         <span style={{ width: 1, height: 26, background: "rgba(255,255,255,0.12)" }} />
         <div className="flex items-center gap-2.5">
           <span className="flex items-center justify-center w-9 h-9 rounded-lg"

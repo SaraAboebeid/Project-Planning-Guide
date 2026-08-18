@@ -84,6 +84,14 @@ def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * asin(sqrt(a))
 
 
+# Every column except results_raw. The status endpoint is polled every 4 s, and
+# `SELECT *` used to drag the whole 8760-hour trace off disk with it - 57 MB per
+# poll for a 39-building batch, which on a bind-mounted database took seconds and
+# starved everything else on the page.
+_LIGHT_COLS = ("id, lat, lon, address, country, city_id, building_info, package_id, "
+               "package_label, batch_id, idf_idx, epsm_simulation_id, epsm_task_id, "
+               "status, submitted_at, completed_at, results, error")
+
 def _row_to_dict(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["building_info"] = json.loads(d["building_info"]) if d.get("building_info") else {}
@@ -176,13 +184,6 @@ def update_by_epsm_id(epsm_simulation_id: str, idf_idx: Optional[int] = None, **
         con.close()
 
 
-# Every column except results_raw. The status endpoint is polled every 4 s, and
-# `SELECT *` used to drag the whole 8760-hour trace off disk with it - 57 MB per
-# poll for a 39-building batch, which on a bind-mounted database took seconds and
-# starved everything else on the page.
-_LIGHT_COLS = ("id, lat, lon, address, country, city_id, building_info, package_id, "
-               "package_label, batch_id, idf_idx, epsm_simulation_id, epsm_task_id, "
-               "status, submitted_at, completed_at, results, error")
 
 
 def get_by_epsm_id(epsm_simulation_id: str) -> list[dict]:
@@ -204,7 +205,7 @@ def get_by_batch_id(batch_id: str) -> list[dict]:
     con = _connect()
     try:
         rows = con.execute(
-            "SELECT * FROM simulations WHERE batch_id = ? ORDER BY idf_idx", (batch_id,)
+            f"SELECT {_LIGHT_COLS} FROM simulations WHERE batch_id = ? ORDER BY idf_idx", (batch_id,)
         ).fetchall()
         return [_row_to_dict(r) for r in rows]
     finally:
@@ -215,7 +216,7 @@ def find_nearest(lat: float, lon: float, radius_m: float, package_id: Optional[s
     con = _connect()
     try:
         lo_lat, hi_lat, lo_lon, hi_lon = _bbox(lat, lon, radius_m)
-        query = "SELECT * FROM simulations WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?"
+        query = f"SELECT {_LIGHT_COLS} FROM simulations WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?"
         params: list[Any] = [lo_lat, hi_lat, lo_lon, hi_lon]
         if package_id is not None:
             query += " AND package_id = ?"
@@ -236,7 +237,7 @@ def find_all_near(lat: float, lon: float, radius_m: float) -> list[dict]:
     try:
         lo_lat, hi_lat, lo_lon, hi_lon = _bbox(lat, lon, radius_m)
         rows = con.execute(
-            "SELECT * FROM simulations WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
+            f"SELECT {_LIGHT_COLS} FROM simulations WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
             (lo_lat, hi_lat, lo_lon, hi_lon),
         ).fetchall()
         hits = []
@@ -313,7 +314,7 @@ def get_raw_by_epsm_id(epsm_simulation_id: str, idf_idx: Optional[int] = None) -
 def all_records() -> list[dict]:
     con = _connect()
     try:
-        rows = con.execute("SELECT * FROM simulations ORDER BY id").fetchall()
+        rows = con.execute(f"SELECT {_LIGHT_COLS} FROM simulations ORDER BY id").fetchall()
         return [_row_to_dict(r) for r in rows]
     finally:
         con.close()

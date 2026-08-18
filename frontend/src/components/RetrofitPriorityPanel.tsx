@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Download, SlidersHorizontal, Scale, Info, ScanSearch } from "lucide-react";
 import { useWizardStore } from "../store/wizard";
 import {
@@ -37,7 +37,24 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
   const [weights, setWeights] = useState<CriterionWeights>(DEFAULT_WEIGHTS);
   const [ahpOpen, setAhpOpen] = useState(true);
   const [ahpPos, setAhpPos] = useState<Record<string, number>>({}); // "E>F" → position
-  const [topN, setTopN] = useState<number>(Math.max(1, Math.ceil(items.length * 0.2)));
+  /* Default to 3 buildings — a workable shortlist to carry into Steps 3-4 —
+     clamped to however many there actually are, so selecting one or two
+     buildings flags all of them rather than asking for more than exist.
+     The user can still dial it up or down. */
+  const DEFAULT_TOP_N = 3;
+  const [topN, setTopN] = useState<number>(Math.max(1, Math.min(DEFAULT_TOP_N, items.length)));
+
+  /* items.length changes when the Step 2 selection changes. Keep the default
+     honest for the new list, but never overwrite a number the user set. */
+  const touchedTopN = useRef(false);
+  useEffect(() => {
+    if (touchedTopN.current) {
+      // Only clamp a user-set value that no longer fits.
+      setTopN((n) => Math.max(1, Math.min(n, items.length)));
+      return;
+    }
+    setTopN(Math.max(1, Math.min(DEFAULT_TOP_N, items.length)));
+  }, [items.length]);
   const [showRemaining, setShowRemaining] = useState(false);
   const [weightsOpen, setWeightsOpen] = useState(false);
 
@@ -130,6 +147,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
           <input type="number" min={1} max={items.length} value={topN}
             onChange={e => {
               const next = Math.max(1, Math.min(items.length, parseInt(e.target.value) || 1));
+              touchedTopN.current = true;
               setTopN(next);
               setShowRemaining(false);
             }}
