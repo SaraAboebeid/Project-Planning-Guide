@@ -660,7 +660,6 @@ export default function RenovationSimulator() {
   /* ── Configuration library ────────────────────────────────────────────────
      Named build-ups the user designs per component. Packages are the cartesian
      product across components that have at least one configuration. */
-  const [configs, setConfigs] = useState<ComponentConfig[]>([]);
   // Build-from-layers leads: composing an assembly from real layers (with a live
   // U-value) is the honest way to design a retrofit; the catalogue is the "or
   // pick a ready-made assembly" fallback. Windows/doors can't be layer-composed,
@@ -678,6 +677,7 @@ export default function RenovationSimulator() {
   const [packageName, setPackageName] = useState("");
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
   const [openStage, setOpenStage] = useState<number | null>(1);
+  const justRanRef = useRef(false);
   const [discountOpen, setDiscountOpen] = useState(false);
   // The optimiser is a power feature; it should not stand between the user and
   // the run button.
@@ -704,6 +704,19 @@ export default function RenovationSimulator() {
   // shortlist, or one of them. Chosen in 4.1 next to the assemblies, because it
   // changes what the quantities and costs below refer to.
   const [targetIdx, setTargetIdx] = useState<number | "all">("all");
+
+  /* Saved build-ups are per building: the assemblies that suit a 1960s block are
+     not the ones that suit its neighbour, and a single shared list meant
+     switching building in 4.1 still showed - and still had ticked - the previous
+     building's configurations. "All buildings" keeps its own set. */
+  const [configsByBuilding, setConfigsByBuilding] = useState<Record<string, ComponentConfig[]>>({});
+  const cfgKey = targetIdx === "all" ? "all" : String(targetIdx);
+  const configs = configsByBuilding[cfgKey] ?? [];
+  const setConfigs = (updater: ComponentConfig[] | ((prev: ComponentConfig[]) => ComponentConfig[])) =>
+    setConfigsByBuilding((prev) => ({
+      ...prev,
+      [cfgKey]: typeof updater === "function" ? updater(prev[cfgKey] ?? []) : updater,
+    }));
   type GeoEntry = { g: ResolvedBuildingGeometry; idx: number };
   const allEntries: GeoEntry[] = useMemo(() => geometries.map((g, i) => ({ g, idx: i })), [geometries]);
   const targetEntries: GeoEntry[] = targetIdx === "all" ? allEntries : (geometries[targetIdx] ? [{ g: geometries[targetIdx]!, idx: targetIdx }] : allEntries);
@@ -1067,6 +1080,10 @@ export default function RenovationSimulator() {
   // but never constrain manual backward navigation — removing openStage from deps
   // is intentional: we only want this to fire when the *completed* set changes.
   useEffect(() => {
+    // Running a simulation completes stages, which moves firstIncompleteStage
+    // forward and used to drag the user past Results to Targets & Scenarios -
+    // exactly the screen they did not ask for. An explicit Run wins once.
+    if (justRanRef.current) { justRanRef.current = false; return; }
     if ((openStage ?? 0) < firstIncompleteStage) setOpenStage(firstIncompleteStage);
   }, [firstIncompleteStage]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1147,6 +1164,11 @@ export default function RenovationSimulator() {
     });
 
     setProject({ renovationCalcPackages: [...packages, ...newPkgs] });
+    // Pressing Run means "show me the outcome" - open Results and scroll to it,
+    // instead of leaving the user on the builder wondering where the run went.
+    justRanRef.current = true;
+    setOpenStage(3);
+    setTimeout(() => stageRefs.current[3]?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
     setPackageName("");
     setDraftSelection({});
     newPkgs.forEach((pkg) => submitBatch(pkg.id, overridesFromSeSelections(pkg.selections, itemByCode), pkg.name, targetEntries));
@@ -1193,6 +1215,11 @@ export default function RenovationSimulator() {
     });
 
     setProject({ renovationCalcPackages: [...packages, ...newPkgs] });
+    // Pressing Run means "show me the outcome" - open Results and scroll to it,
+    // instead of leaving the user on the builder wondering where the run went.
+    justRanRef.current = true;
+    setOpenStage(3);
+    setTimeout(() => stageRefs.current[3]?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
     newPkgs.forEach((pkg) =>
       submitBatch(pkg.id, overridesFromSeSelections(pkg.selections, itemByCode), pkg.name, targetEntries));
   }
@@ -1674,7 +1701,7 @@ export default function RenovationSimulator() {
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{activeItem.label}</h3>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
                     {activeQuantity != null
-                      ? `${activeQuantity.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} ${quantityUnitLabel(activeItem.quantityKind)}${geometries.length > 1 ? " (building 1)" : ""}`
+                      ? `${activeQuantity.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} ${quantityUnitLabel(activeItem.quantityKind)}${geometries.length > 1 ? ` (${pickedGeo?.address ?? `building ${pickedIdx + 1}`})` : ""}`
                       : "quantity: manual entry needed"}
                   </span>
                 </div>
@@ -1828,6 +1855,15 @@ export default function RenovationSimulator() {
             <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Packages</span>
+                {geometries.length > 1 && (
+                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                    color: targetIdx === "all" ? "rgba(255,255,255,0.5)" : "#4ECDC4",
+                    background: targetIdx === "all" ? "rgba(255,255,255,0.06)" : "rgba(78,205,196,0.14)" }}>
+                    {targetIdx === "all"
+                      ? `for all ${geometries.length} buildings`
+                      : `for ${geometries[targetIdx]?.address ?? `Building ${targetIdx + 1}`} only`}
+                  </span>
+                )}
                 {configuredComponents.length > 0 ? (
                   <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)" }}>
                     {configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" × ")}
@@ -2097,6 +2133,13 @@ export default function RenovationSimulator() {
                     >
                       {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </button>
+                    {!pkg.isBaseline && pkg.buildings.length === 1 && geometries.length > 1 && (
+                      <span title={`Built for ${pkg.buildings[0]!.address} only`}
+                        style={{ fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 99, marginRight: 6,
+                          color: "#4ECDC4", background: "rgba(78,205,196,0.14)", whiteSpace: "nowrap" }}>
+                        1 building
+                      </span>
+                    )}
                     <span style={{ fontSize: 12, fontWeight: 600, color: pkg.isBaseline ? "rgba(255,255,255,0.5)" : "#fff" }}>
                       <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: pkg.color, marginRight: 6 }} />
                       {pkg.name}{agg.n > 1 ? ` (${agg.n} buildings)` : ""}
