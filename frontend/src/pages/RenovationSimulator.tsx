@@ -1064,6 +1064,32 @@ export default function RenovationSimulator() {
     return configuredComponents.length ? combos : [];
   }, [configuredComponents]);
 
+  /** Every building that has saved build-ups, with its own package combinations.
+   *  4.1 designs one building at a time; 4.2 has to show the whole picture. */
+  const combosByBuilding = useMemo(() => {
+    const combosFor = (cfgs: ComponentConfig[]) => {
+      const grouped = lineItems
+        .map((item) => cfgs.filter((c) => c.componentKey === item.key))
+        .filter((a) => a.length > 0);
+      if (!grouped.length) return [] as ComponentConfig[][];
+      let combos: ComponentConfig[][] = [[]];
+      for (const g of grouped) combos = combos.flatMap((c) => g.map((cfg) => [...c, cfg]));
+      return combos;
+    };
+    return Object.entries(configsByBuilding)
+      .filter(([, cfgs]) => cfgs.length > 0)
+      .map(([key, cfgs]) => ({
+        key,
+        label: key === "all"
+          ? `All buildings (${geometries.length})`
+          : geometries[Number(key)]?.address ?? `Building ${Number(key) + 1}`,
+        combos: combosFor(cfgs),
+      }))
+      .filter((b) => b.combos.length > 0);
+  }, [configsByBuilding, lineItems, geometries]);
+
+  const totalCombosAllBuildings = combosByBuilding.reduce((n, b) => n + b.combos.length, 0);
+
   const stageProgress = [
     { n: 1, ready: geometries.length > 0 },
     { n: 2, ready: geometries.length > 0 && hasEnvelope },
@@ -1177,6 +1203,58 @@ export default function RenovationSimulator() {
   /** Simulate every selected combination: one EPSM batch per package, across all
    *  targeted buildings. A layer-composed configuration passes its computed U
    *  through `customUValue`, which replaces the catalogue U in the IDF. */
+  function simulateAllBuildings() {
+    if (!combosByBuilding.length) return;
+    const stamp = Date.now();
+    let seq = packages.filter((p) => !p.isBaseline).length;
+    const newPkgs: RenovationCalcPackage[] = [];
+    const entriesFor = (key: string): GeoEntry[] =>
+      key === "all" ? allEntries : (geometries[Number(key)] ? [{ g: geometries[Number(key)]!, idx: Number(key) }] : allEntries);
+
+    for (const b of combosByBuilding) {
+      const entries = entriesFor(b.key);
+      for (const combo of b.combos) {
+        const selections: Record<string, RenovationCalcSelection> = Object.fromEntries(
+          combo.map((c) => [c.componentKey, {
+            wikellsCode: c.wikellsCode ?? "", quantity: 0,
+            ...(c.uValue != null ? { customUValue: c.uValue } : {}),
+            ...(c.name ? { customLabel: c.name } : {}),
+            ...(c.layers ? { layers: c.layers } : {}),
+          } as RenovationCalcSelection]),
+        );
+        const name = `${combo.map((c) => c.name).join(" + ")} · ${b.label}`;
+        newPkgs.push({
+          id: `pkg-${stamp}-${seq}-${Math.round(Math.random() * 1e6)}`,
+          name, color: PACKAGE_COLORS[seq % PACKAGE_COLORS.length]!, isBaseline: false,
+          selections, batchId: null,
+          buildings: makeBuildingRows(entries, (g, i) => {
+            let costSEK = 0, carbonKgCO2e = 0, any = false;
+            for (const c of combo) {
+              const item = lineItems.find((li) => li.key === c.componentKey);
+              if (!item) continue;
+              const qty = computeAreaForLineItem(item, g, wwrByIndex[i] ?? null, manualOverrides);
+              if (qty == null) continue;
+              any = true;
+              if (c.costPerM2 != null) costSEK += c.costPerM2 * qty;
+              if (c.carbonPerM2 != null) carbonKgCO2e += c.carbonPerM2 * qty;
+            }
+            return any ? { costSEK: Math.round(costSEK), carbonKgCO2e: Math.round(carbonKgCO2e) } : { costSEK: null, carbonKgCO2e: null };
+          }),
+        });
+        seq++;
+      }
+    }
+
+    setProject({ renovationCalcPackages: [...packages, ...newPkgs] });
+    justRanRef.current = true;
+    setOpenStage(3);
+    setTimeout(() => stageRefs.current[3]?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    newPkgs.forEach((pkg, k) => {
+      const key = combosByBuilding.flatMap((b) => b.combos.map(() => b.key))[k]!;
+      submitBatch(pkg.id, overridesFromSeSelections(pkg.selections, itemByCode), pkg.name, entriesFor(key));
+    });
+  }
+
   function simulateConfiguredPackages() {
     if (geometries.length === 0 || activeCombos.length === 0) return;
     const existing = packages.filter((p) => !p.isBaseline).length;
@@ -1455,7 +1533,17 @@ export default function RenovationSimulator() {
     const pkg: RenovationCalcPackage = { id, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows, ...(opts?.auto ? { auto: true } : {}) };
     // Auto picks REPLACE the previous auto-package so exploring the curve doesn't
     // pile up dozens of near-identical "Optimal" runs; manual picks always add.
-    const kept = opts?.auto ? packages.filter((p) => !p.auto) : packages;
+    // Scoped to THIS building: dropping every auto package meant optimising one
+    // building silently deleted another building's optimal pick, which breaks the
+    // per-building workflow the rest of Step 4 now follows.
+    const sameTarget = (p: RenovationCalcPackage) => {
+      if (targetIdx === "all") return p.buildings.length === geometries.length;
+      const g = geometries[targetIdx];
+      return !!g && p.buildings.length === 1
+        && Math.abs(p.buildings[0]!.lat - g.lat) < 1e-6
+        && Math.abs(p.buildings[0]!.lon - g.lon) < 1e-6;
+    };
+    const kept = opts?.auto ? packages.filter((p) => !p.auto || !sameTarget(p)) : packages;
     setProject({ renovationCalcPackages: [...kept, pkg] });
     submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
   }
@@ -1855,6 +1943,20 @@ export default function RenovationSimulator() {
             <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Packages</span>
+                {geometries.length > 1 && combosByBuilding.length > 0 && (
+                  <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", width: "100%", marginTop: 4 }}>
+                    Designed so far:{" "}
+                    {combosByBuilding.map((b, i) => (
+                      <span key={b.key}>
+                        {i > 0 && " · "}
+                        <b style={{ color: b.key === cfgKey ? "#4ECDC4" : "rgba(255,255,255,0.6)" }}>{b.label}</b>
+                        {" "}{b.combos.length} package{b.combos.length === 1 ? "" : "s"}
+                      </span>
+                    ))}
+                    {" — "}<b style={{ color: "rgba(255,255,255,0.6)" }}>{totalCombosAllBuildings} total</b>.
+                    {" "}Switch building in 4.1 to design another; Run below simulates the one shown.
+                  </span>
+                )}
                 {geometries.length > 1 && (
                   <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
                     color: targetIdx === "all" ? "rgba(255,255,255,0.5)" : "#4ECDC4",
@@ -1921,6 +2023,16 @@ export default function RenovationSimulator() {
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                      {combosByBuilding.length > 1 && (
+                        <button onClick={simulateAllBuildings} disabled={isRunning}
+                          title="Simulate every building's saved packages in one go"
+                          style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 9,
+                            fontSize: 12.5, fontWeight: 800, border: "1px solid rgba(78,205,196,0.45)",
+                            background: "rgba(78,205,196,0.12)", color: "#4ECDC4",
+                            cursor: isRunning ? "not-allowed" : "pointer", opacity: isRunning ? 0.5 : 1 }}>
+                          <Play size={13} /> Run all buildings · {totalCombosAllBuildings} package{totalCombosAllBuildings === 1 ? "" : "s"}
+                        </button>
+                      )}
                       <button onClick={simulateConfiguredPackages} disabled={activeCombos.length === 0 || isRunning}
                         style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 9,
                           fontSize: 12.5, fontWeight: 800,
