@@ -7,7 +7,7 @@ import { useState, type ReactNode } from "react";
 const white = (o: number) => `rgba(255,255,255,${o})`;
 
 export function CollapsibleCard({
-  title, subtitle, color = "#5A1790", badge, defaultOpen = false, children,
+  title, subtitle, color = "var(--brand-deep)", badge, defaultOpen = false, children,
 }: {
   title: string;
   subtitle?: string;

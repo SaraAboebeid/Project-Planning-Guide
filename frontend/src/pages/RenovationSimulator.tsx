@@ -46,11 +46,18 @@ const CITY_ID = "gothenburg"; // Sweden only - UK omits city_id, server auto-res
 const UK_TIER_SELECTIONS_KEY = "UK::RefurbTier";
 
 const COMPONENT_COLORS: Record<string, string> = {
-  "Walls": "#721CB8", "Windows": "#E8880C", "Doors": "#4ECDC4", "Floor": "#4A90E2",
+  "Walls": "var(--brand)", "Windows": "#E8880C", "Doors": "#4ECDC4", "Floor": "#4A90E2",
   "Roof": "#4ECDC4", "Balcony": "#2FB477", "Vertical Extension (New Floor)": "#F97316",
 };
 
+/* Package totals run to millions, where every digit past the first few is false
+   precision - the unit rates are catalogue averages and the quantities come from
+   a shoebox. Show MSEK to one decimal above a million, kSEK above ten thousand,
+   and exact SEK only for the per-m2 rates where the digits are real. */
 function fmtSEK(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} MSEK`;
+  if (abs >= 10_000) return `${Math.round(n / 1_000).toLocaleString("sv-SE")} kSEK`;
   return n.toLocaleString("sv-SE", { maximumFractionDigits: 0 }) + " SEK";
 }
 
@@ -256,10 +263,14 @@ function appliedUValues(
    per-component U — mirrors tools/idf/defaults.py (DEFAULT_U_*). Maps a Sweden
    area-line-item key to the U-override component's baseline U-value; null means
    the line item isn't a U-override component (e.g. Doors, Balcony). */
-function baselineUForKey(key: string): number | null {
-  if (key === "Walls" || key === "VertExt::Walls") return 0.40;
-  if (key === "Roof" || key === "VertExt::Roof") return 0.30;
-  if (key === "Windows") return 1.80;
+function baselineUForKey(key: string, geo?: ResolvedBuildingGeometry | null): number | null {
+  // The building's own TABULA U where it has one; the shoebox defaults
+  // (tools/idf/defaults.py) only as a fallback. Scoring every building against
+  // the same generic baseline made the "recommended for this building"
+  // shortlist identical everywhere, which is not what it claims to be.
+  if (key === "Walls" || key === "VertExt::Walls") return geo?.tabulaUWall ?? 0.40;
+  if (key === "Roof" || key === "VertExt::Roof") return geo?.tabulaURoof ?? 0.30;
+  if (key === "Windows") return geo?.tabulaUWin ?? 1.80;
   if (key === "Floor" || key === "VertExt::Floor") return 0.40;
   return null;
 }
@@ -332,7 +343,7 @@ function LineItemPicker({
   /** The building's current U for this component; drives improve/worsen flags. */
   baselineU: number | null;
 }) {
-  const color = COMPONENT_COLORS[item.parentComponent] ?? "#721CB8";
+  const color = COMPONENT_COLORS[item.parentComponent] ?? "var(--brand)";
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   if (items.length === 0) {
     return <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>No catalogue materials found for this item.</p>;
@@ -527,7 +538,7 @@ function UkTierPicker({
       {REFURB_TIERS.map(({ key, label }) => {
         const tier = archetype[key];
         const checked = selectedTier === key;
-        const color = "#721CB8";
+        const color = "var(--brand)";
         const rate = UK_PLACEHOLDER_RATES[key];
         const estCost = footprintM2 != null ? Math.round(rate.costGbpPerM2 * footprintM2) : null;
         const estCarbon = footprintM2 != null ? Math.round(rate.carbonKgCo2ePerM2 * footprintM2) : null;
@@ -931,11 +942,21 @@ export default function RenovationSimulator() {
     project.supplierDiscountPct ? items.map((it) => ({ ...it, costSEK: it.costSEK != null ? it.costSEK * discountMul : it.costSEK })) : items;
   const activeCatalogue = activeItem ? discountItems(itemsForLineItem(activeItem)) : [];
   const activeBoverket = activeItem ? (boverketByComponent[activeItem.boverketComponent] ?? []) : [];
+  /* Everything in the picker describes the building selected in 4.1: its
+     quantities, its as-built U, and therefore its recommendations. "All
+     buildings" uses the first as the representative one. */
+  const pickedIdx = targetIdx === "all" ? 0 : targetIdx;
+  const pickedGeo = geometries[pickedIdx] ?? geometries[0] ?? null;
+
   const activeRecommendations = useMemo(
-    () => (activeItem ? recommendationsForLineItem(activeCatalogue, activeBoverket, project.selectedKpis, baselineUForKey(activeItem.key)) : {}),
-    [activeItem, activeCatalogue, activeBoverket, project.selectedKpis]
+    () => (activeItem ? recommendationsForLineItem(activeCatalogue, activeBoverket, project.selectedKpis, baselineUForKey(activeItem.key, pickedGeo)) : {}),
+    // pickedGeo included: the recommendations are scored against THAT building's
+    // as-built U, so they must recompute when the 4.1 selection changes.
+    [activeItem, activeCatalogue, activeBoverket, project.selectedKpis, pickedGeo]
   );
-  const activeQuantity = activeItem && geometries[0] ? computeAreaForLineItem(activeItem, geometries[0], wwrByIndex[0] ?? null, manualOverrides) : null;
+  const activeQuantity = activeItem && pickedGeo
+    ? computeAreaForLineItem(activeItem, pickedGeo, wwrByIndex[pickedIdx] ?? null, manualOverrides)
+    : null;
 
   const itemByCode = useMemo(() => {
     const mul = 1 - Math.min(90, Math.max(0, project.supplierDiscountPct || 0)) / 100;
@@ -1064,7 +1085,7 @@ export default function RenovationSimulator() {
   const activeCombos = packageCombosList.filter((c) => !excludedCombos.has(comboKey(c)));
 
   /* ── add a new package ─────────────────────────────────────────────────── */
-  const PACKAGE_COLORS = ["#721CB8", "#4ECDC4", "#E8880C", "#2FB477", "#F97316", "#5FA5FF"];
+  const PACKAGE_COLORS = ["var(--brand)", "#4ECDC4", "#E8880C", "#2FB477", "#F97316", "#5FA5FF"];
 
   // Short material label for auto-naming, e.g. "300 blown glass wool".
   function matShort(it?: WikellsItem): string {
@@ -1313,7 +1334,7 @@ export default function RenovationSimulator() {
 
     const comps: OptimizeComponentInput[] = [];
     for (const li of lineItems) {
-      const baseU = baselineUForKey(li.key);
+      const baseU = baselineUForKey(li.key, geometries[repIdx] ?? pickedGeo);
       if (baseU == null) continue; // not a U-override component
       const area = computeAreaForLineItem(li, repGeo, wwrByIndex[repIdx] ?? null, manualOverrides);
       if (area == null || area <= 0) continue;
@@ -1614,7 +1635,7 @@ export default function RenovationSimulator() {
                       {groupLabel}
                     </div>
                     {items.map((item) => {
-                      const color = COMPONENT_COLORS[item.parentComponent] ?? "#721CB8";
+                      const color = COMPONENT_COLORS[item.parentComponent] ?? "var(--brand)";
                       const isActive = activeItemKey === item.key;
                       const cfgCount = configs.filter((c) => c.componentKey === item.key).length;
                       return (
@@ -1648,7 +1669,7 @@ export default function RenovationSimulator() {
             </div>
 
             {activeItem && (
-              <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: `1px solid ${COMPONENT_COLORS[activeItem.parentComponent] ?? "#721CB8"}33` }}>
+              <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: `1px solid ${COMPONENT_COLORS[activeItem.parentComponent] ?? "var(--brand)"}33` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{activeItem.label}</h3>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
@@ -1702,10 +1723,10 @@ export default function RenovationSimulator() {
 
                   {(draftMode === "layers" && kindForKey(activeItem.key)) ? (
                     <>
-                      {baselineUForKey(activeItem.key) != null && (
+                      {baselineUForKey(activeItem.key, pickedGeo) != null && (
                         <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", marginBottom: 8, lineHeight: 1.5 }}>
                           Compose the assembly layer by layer — the live U-value updates as you go.
-                          {" "}Aim <strong style={{ color: "#4ECDC4" }}>below U {baselineUForKey(activeItem.key)!.toFixed(2)}</strong> to improve this building's {activeItem.label.toLowerCase()}.
+                          {" "}Aim <strong style={{ color: "#4ECDC4" }}>below U {baselineUForKey(activeItem.key, pickedGeo)!.toFixed(2)}</strong> to improve this building's {activeItem.label.toLowerCase()}.
                         </div>
                       )}
                       <AssemblyBuilder
@@ -1730,7 +1751,7 @@ export default function RenovationSimulator() {
                         onToggle={toggleCatalogueConfig}
                         recommendations={activeRecommendations}
                         boverketResources={activeBoverket}
-                        baselineU={baselineUForKey(activeItem.key)}
+                        baselineU={baselineUForKey(activeItem.key, pickedGeo)}
                       />
                     </>
                   )}

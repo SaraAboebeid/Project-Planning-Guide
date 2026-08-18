@@ -3,7 +3,7 @@
 /* ── Design tokens — custom dashboard palette ── */
 @theme {
   /* Brand anchors */
-  --color-navy: #721CB8;
+  --color-navy: var(--brand);
   --color-navy-dark: #421869;
   --color-teal: #995BD5;
   /* Supporting scale — unified to the "good" family (colour-blind-tuned) */
@@ -17,7 +17,7 @@
   --color-muted: #64748b;
 
   /* PPG aliases */
-  --color-ppg-navy: #721CB8;
+  --color-ppg-navy: var(--brand);
   --color-ppg-navy-dark: #421869;
   --color-ppg-teal: #995BD5;
   --color-ppg-lime: #2FB477;
@@ -101,8 +101,29 @@ body {
   color: var(--sidebar-icon-hover-color) !important;
 }
 
+/* Brand purple as a token, because bright mode inverts the whole app: the
+   literal #721CB8 came out of `invert(1) hue-rotate(180deg)` as #FEA8FF - bright
+   pink - which is where the pink on every page came from. The bright value is
+   pre-compensated so it RENDERS as purple after that transform. Two forms
+   because rgba() tints cannot take a hex variable. */
+:root {
+  --brand: #721CB8;
+  --brand-rgb: 114, 28, 184;
+  --brand-deep: #5A1790;
+  --brand-dark: #421869;
+}
+
 /* ── Bright mode (global) ─────────────────────────────────────────────── */
 body.bright-mode {
+  /* Inverts back to a true purple rather than pink. */
+  /* Bright mode keeps the brand purple as-is, so the inversion renders it as
+     the pink the tool has always used here. Overriding it produced a purple
+     that was not wanted; the tokens stay in place so the shade is a one-line
+     change if that is ever revisited. */
+  --brand: #721CB8;
+  --brand-rgb: 114, 28, 184;
+  --brand-deep: #5A1790;
+  --brand-dark: #421869;
   background: #f6f8fc;
   --sidebar-icon-color: #4b5563;
   --sidebar-icon-hover-color: #374151;
@@ -130,6 +151,13 @@ body.bright-mode [data-no-theme-invert="true"] {
    render them black — the correct mark for a light background. */
 body.bright-mode img.brand-logo {
   filter: none;
+}
+
+/* Opt an element out of the app-wide inversion: applying the same filter again
+   cancels it, so the element renders exactly as authored. For notices styled
+   with light Tailwind palettes, which the inversion otherwise turns near-black. */
+body.bright-mode .theme-preserve {
+  filter: invert(1) hue-rotate(180deg);
 }
 
 /* Native <select> popups are drawn by the OS, OUTSIDE the page's filter layer,
@@ -179,12 +207,12 @@ body.bright-mode .sidebar-theme-icon {
    reads as clickable. */
 .wizard-shell .ppg-card {
   background: rgba(13, 17, 23, 0.80);
-  border-color: rgba(114, 28, 184, 0.45);
+  border-color: rgba(var(--brand-rgb), 0.45);
   color: rgba(255,255,255,0.88);
   box-shadow: none;
 }
 .wizard-shell .ppg-card:hover {
-  border-color: rgba(114, 28, 184, 0.45);
+  border-color: rgba(var(--brand-rgb), 0.45);
   box-shadow: none;
 }
 
@@ -266,7 +294,7 @@ body.bright-mode .sidebar-theme-icon {
 .wizard-shell .ppg-btn-secondary {
   background: rgba(255,255,255,0.07) !important;
   color: rgba(255,255,255,0.80) !important;
-  border-color: #721CB8 !important;
+  border-color: var(--brand) !important;
 }
 
 /* Chevron / icon components */
@@ -283,7 +311,7 @@ body.bright-mode .sidebar-theme-icon {
   font-size: 0.875rem;
   font-weight: 600;
   color: #fff;
-  background: linear-gradient(135deg, #421869 0%, #721CB8 100%);
+  background: linear-gradient(135deg, #421869 0%, var(--brand) 100%);
   box-shadow: 0 1px 3px rgba(66, 24, 105, 0.24);
   transition: opacity 0.15s, box-shadow 0.15s;
   cursor: pointer;
@@ -305,7 +333,7 @@ body.bright-mode .sidebar-theme-icon {
   font-weight: 500;
   color: #475569;
   background: #fff;
-  border: 1px solid #721CB8;
+  border: 1px solid var(--brand);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: background 0.15s, border-color 0.15s;
   cursor: pointer;
@@ -322,14 +350,14 @@ body.bright-mode .sidebar-theme-icon {
   text-align: center;
   border: 1px solid;
 }
-.ppg-stat-navy { background: rgba(114, 28, 184, 0.10); border-color: rgba(114, 28, 184, 0.24); }
+.ppg-stat-navy { background: rgba(var(--brand-rgb), 0.10); border-color: rgba(var(--brand-rgb), 0.24); }
 .ppg-stat-teal { background: rgba(153, 91, 213, 0.10); border-color: rgba(153, 91, 213, 0.25); }
 .ppg-stat-green { background: rgba(47,180,119, 0.12); border-color: rgba(47,180,119, 0.35); }
 
 /* ── Accent line reusable ── */
 .ppg-accent-line {
   height: 3px;
-  background: linear-gradient(90deg, #2FB477 0%, #509724 50%, #721CB8 100%);
+  background: linear-gradient(90deg, #2FB477 0%, #509724 50%, var(--brand) 100%);
 }
 
 /* ── Section heading ── */
@@ -353,8 +381,8 @@ body.bright-mode .sidebar-theme-icon {
   outline: none;
 }
 .ppg-input:focus {
-  border-color: #721CB8;
-  box-shadow: 0 0 0 3px rgba(114, 28, 184, 0.14);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(var(--brand-rgb), 0.14);
 }
 
 /* Remove dashboard icons (lucide only) while keeping chart SVGs intact */
@@ -424,10 +452,10 @@ a[href]:focus-visible,
    box-shadow (which would block the generic hover ring), so give it its own
    growing purple glow on hover / press — !important to beat the inline style. */
 .ppg-start-cta:hover {
-  box-shadow: 0 10px 34px rgba(114, 28, 184, 0.7) !important;
+  box-shadow: 0 10px 34px rgba(var(--brand-rgb), 0.7) !important;
 }
 .ppg-start-cta:active {
-  box-shadow: 0 3px 12px rgba(114, 28, 184, 0.5) !important;
+  box-shadow: 0 3px 12px rgba(var(--brand-rgb), 0.5) !important;
 }
 
 /* Disabled / non-clickable: clearly NOT interactive. */

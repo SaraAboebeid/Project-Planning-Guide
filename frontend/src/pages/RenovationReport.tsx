@@ -133,7 +133,7 @@ function recordToLookup(r: BuildingRecord): BuildingLookup {
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
 const COMP_COLORS: Record<string, string> = {
-  "Walls": "#721CB8", "Windows": "#E8880C", "Doors": "#4ECDC4",
+  "Walls": "var(--brand)", "Windows": "#E8880C", "Doors": "#4ECDC4",
   "Floor": "#4A90E2", "Roof": "#4ECDC4", "Balcony": "#2FB477",
   "Structure (Columns & Beams)": "#E2483B", "Vertical Extension (New Floor)": "#F97316",
 };
@@ -377,7 +377,7 @@ export default function RenovationReport() {
         name: `Pkg ${r.packageIndex}`,
         energyUse: r.energyUse,
         saving: r.saving,
-        fill: i === 0 ? "#2FB477" : i === 1 ? "#4ECDC4" : "rgba(114,28,184,0.7)",
+        fill: i === 0 ? "#2FB477" : i === 1 ? "#4ECDC4" : "rgba(var(--brand-rgb),0.7)",
       })),
     ];
   }, [simResults, baselineEU]);
@@ -749,12 +749,12 @@ export default function RenovationReport() {
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {Object.entries(result.components).map(([comp, item]) => (
             <div key={comp} style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: COMP_COLORS[comp] ?? "#721CB8", flexShrink: 0, alignSelf: "center" }} />
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: COMP_COLORS[comp] ?? "var(--brand)", flexShrink: 0, alignSelf: "center" }} />
               <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", flexShrink: 0 }}>{comp}</span>
               <span style={{ fontSize: 10, color: "rgba(255,255,255,0.75)", flex: 1, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={layerText(item) || item.description}>
                 {item.description || item.code}
               </span>
-              {item.uValue != null && <Badge color={COMP_COLORS[comp] ?? "#721CB8"}>U {item.uValue.toFixed(2)}</Badge>}
+              {item.uValue != null && <Badge color={COMP_COLORS[comp] ?? "var(--brand)"}>U {item.uValue.toFixed(2)}</Badge>}
             </div>
           ))}
         </div>
@@ -839,7 +839,7 @@ export default function RenovationReport() {
 
       {/* ── 1. Project Summary ── */}
       <Card>
-        <SectionTitle icon={<FileText size={15} color="#721CB8" />} title="Project Summary" />
+        <SectionTitle icon={<FileText size={15} color="var(--brand)" />} title="Project Summary" />
         {/* The funnel, in the tool's own order — how many buildings were selected,
             how many were prioritised, how many simulated, how many packages tested.
             Without it the rest of the report is a pile of tables with no thread. */}
@@ -982,10 +982,10 @@ export default function RenovationReport() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {Object.entries(materials).filter(([, codes]) => codes.length > 0).map(([comp, codes]) => (
               <div key={comp} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: COMP_COLORS[comp] ?? "#721CB8", flexShrink: 0 }} />
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: COMP_COLORS[comp] ?? "var(--brand)", flexShrink: 0 }} />
                 <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)", minWidth: 140 }}>{comp}</span>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 5, flex: 1 }}>
-                  {codes.map(c => <Badge key={c} color={COMP_COLORS[comp] ?? "#721CB8"}>{c}</Badge>)}
+                  {codes.map(c => <Badge key={c} color={COMP_COLORS[comp] ?? "var(--brand)"}>{c}</Badge>)}
                 </div>
                 <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{codes.length} option{codes.length !== 1 ? "s" : ""}</span>
               </div>
@@ -1095,7 +1095,7 @@ export default function RenovationReport() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {Object.entries(r.components).map(([comp, item]) => (
                     <div key={comp} style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 5 }}>
-                      <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 5, flexShrink: 0, background: `${COMP_COLORS[comp] ?? "#721CB8"}22`, color: COMP_COLORS[comp] ?? "#721CB8", border: `1px solid ${COMP_COLORS[comp] ?? "#721CB8"}44` }}>
+                      <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 5, flexShrink: 0, background: `${COMP_COLORS[comp] ?? "var(--brand)"}22`, color: COMP_COLORS[comp] ?? "var(--brand)", border: `1px solid ${COMP_COLORS[comp] ?? "var(--brand)"}44` }}>
                         {comp}
                       </span>
                       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>
@@ -1132,7 +1132,7 @@ export default function RenovationReport() {
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
               {Object.entries(bestBalanced.components).map(([comp, item]) => (
-                <span key={comp} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 7, background: `${COMP_COLORS[comp] ?? "#721CB8"}22`, color: COMP_COLORS[comp] ?? "#721CB8", border: `1px solid ${COMP_COLORS[comp] ?? "#721CB8"}44`, fontWeight: 600 }}>
+                <span key={comp} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 7, background: `${COMP_COLORS[comp] ?? "var(--brand)"}22`, color: COMP_COLORS[comp] ?? "var(--brand)", border: `1px solid ${COMP_COLORS[comp] ?? "var(--brand)"}44`, fontWeight: 600 }}>
                   {comp}: {item.description}{layerText(item) ? ` (${layerText(item)})` : ""}
                 </span>
               ))}

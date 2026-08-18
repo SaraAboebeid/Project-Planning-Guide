@@ -13,6 +13,30 @@ const FLOOR_HEIGHT_M = 3.2;
 // estimated window COUNT for costing purposes.
 const TYPICAL_WINDOW_AREA_M2 = 1.4;
 
+/* Window-to-wall ratio fallback, mirroring tools/idf/defaults.py's
+   DEFAULT_WWR_BY_USE. TABULA does not publish a WWR - it gives U-values and
+   construction periods - so the honest fallback is the ratio the EnergyPlus
+   shoebox itself assumed for this use category. Using the same number keeps the
+   cost quantity and the simulated geometry describing one building rather than
+   two. Kept in step with the generator's table by hand; they are both small. */
+const DEFAULT_WWR_BY_USE: Record<string, number> = {
+  bostad_enfamilj: 0.15,
+  bostad_flerfamilj: 0.20,
+  verksamhet: 0.30,
+  samhalle: 0.25,
+  industri: 0.08,
+  ovrigt: 0.15,
+  komplement: 0.08,
+};
+const DEFAULT_WWR_FALLBACK = 0.15;
+
+/** Glazed fraction of the façade: the surveyed value when the WWR tool has one
+ *  for this building, otherwise the use-category default the simulation used. */
+export function effectiveWwr(geometry: ResolvedBuildingGeometry, wwr: WWRRecord | null): number {
+  if (wwr && wwr.average_wwr > 0) return wwr.average_wwr / 100;
+  return DEFAULT_WWR_BY_USE[geometry.useCat ?? ""] ?? DEFAULT_WWR_FALLBACK;
+}
+
 export interface ResolvedBuildingGeometry {
   lat: number;
   lon: number;
@@ -95,14 +119,20 @@ export function computeAreaForLineItem(
   if (manual != null) return manual;
 
   switch (item.key) {
-    case "Walls":
-      return geometry.wallAreaM2;
+    case "Walls": {
+      // Gross perimeter x height includes the window openings. Cladding those
+      // openings was inflating both cost and embodied carbon by the glazed
+      // fraction - about a fifth on a typical flerbostadshus - and, when a
+      // package replaced the windows too, charging for the same area twice.
+      if (geometry.wallAreaM2 == null) return null;
+      return Math.round(geometry.wallAreaM2 * (1 - effectiveWwr(geometry, wwr)));
+    }
     case "Roof":
     case "Floor":
       return geometry.footprintM2;
     case "Windows": {
-      if (!geometry.wallAreaM2 || !wwr) return null;
-      const windowAreaM2 = geometry.wallAreaM2 * (wwr.average_wwr / 100);
+      if (!geometry.wallAreaM2) return null;
+      const windowAreaM2 = geometry.wallAreaM2 * effectiveWwr(geometry, wwr);
       return Math.max(1, Math.round(windowAreaM2 / TYPICAL_WINDOW_AREA_M2));
     }
     case "Doors":

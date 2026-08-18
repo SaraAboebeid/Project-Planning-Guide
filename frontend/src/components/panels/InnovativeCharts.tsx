@@ -144,7 +144,7 @@ export function SankeyFlowView() {
         <ResponsiveContainer width="100%" height="100%">
           <Sankey
             data={data}
-            node={{ fill: "#5A1790", stroke: "#fff", strokeWidth: 2 }}
+            node={{ fill: "var(--brand-deep)", stroke: "#fff", strokeWidth: 2 }}
             link={{ stroke: "#2FB477", opacity: 0.5 }}
             nodePadding={50}
             margin={{ top: 20, right: 120, bottom: 20, left: 120 }}

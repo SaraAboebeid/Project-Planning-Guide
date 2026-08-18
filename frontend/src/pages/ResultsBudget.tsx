@@ -29,7 +29,7 @@ const PHASE_SPLIT: [string, number][] = [
   ["Validation & QA",      0.15],
   ["Reporting",            0.10],
 ];
-const TL_COLORS = ["#5A1790", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
+const TL_COLORS = ["var(--brand-deep)", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
 
 function fmt(d: Date) { return d.toISOString().slice(0, 10); }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
@@ -38,7 +38,7 @@ function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDat
 const CONSULTANT_RATES: Record<string, number> = {
   SEK: 1400, EUR: 140, USD: 150, GBP: 130, NOK: 1500, DKK: 1050,
 };
-const PIE_COLORS = ["#5A1790", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
+const PIE_COLORS = ["var(--brand-deep)", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
 
 function fmtNum(n: number) { return n.toLocaleString(); }
 
@@ -230,7 +230,7 @@ export default function ResultsBudget() {
       {/* Summary stat strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { value: String(totalDelivs),          label: "Deliverables",  color: "text-[#5A1790]", bg: "bg-[#5A1790]/8" },
+          { value: String(totalDelivs),          label: "Deliverables",  color: "text-[var(--brand-deep)]", bg: "bg-[var(--brand-deep)]/8" },
           { value: `${userTotalHours} hrs`,       label: "Est. Effort",   color: "text-[#6E2AAE]", bg: "bg-[#6E2AAE]/10" },
           { value: `${userWeeks} wk`,             label: "Duration",      color: "text-[#509724]", bg: "bg-[#2FB477]/20" },
           { value: `${fmtNum(serviceCost)} ${currency}`, label: "Service Cost", color: "text-[#3a6e1a]", bg: "bg-[#509724]/10" },
@@ -255,7 +255,7 @@ export default function ResultsBudget() {
                 onClick={() => setSelectedPkgId(t.pkg.id)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
                   selectedPkgId === t.pkg.id
-                    ? "border-[#5A1790] bg-[#5A1790]/8 text-[#5A1790]"
+                    ? "border-[var(--brand-deep)] bg-[var(--brand-deep)]/8 text-[var(--brand-deep)]"
                     : "border-slate-200 text-slate-500 hover:border-slate-300"
                 }`}
               >
@@ -288,7 +288,7 @@ export default function ResultsBudget() {
               type="date"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
-              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5A1790]/30"
+              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-deep)]/30"
             />
           </div>
           <button
@@ -364,7 +364,7 @@ export default function ResultsBudget() {
         {/* Top summary */}
         <div className="grid grid-cols-1 gap-3 mb-4">
           {[
-            { v: `${fmtNum(serviceCost)} ${currency}`, l: "Service Cost",  c: "text-[#5A1790]", bg: "bg-[#5A1790]/8" },
+            { v: `${fmtNum(serviceCost)} ${currency}`, l: "Service Cost",  c: "text-[var(--brand-deep)]", bg: "bg-[var(--brand-deep)]/8" },
           ].map(s => (
             <div key={s.l} className={`rounded-xl border border-slate-200 px-3 py-2.5 text-center ${s.bg}`}>
               <div className={`text-lg font-bold ${s.c}`}>{s.v}</div>
@@ -416,7 +416,7 @@ export default function ResultsBudget() {
               </tr>
               <tr className="bg-slate-50">
                 <td className="px-4 py-2.5 font-semibold text-slate-800">Total Service Cost</td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-bold text-[#5A1790]">{fmtNum(serviceCost)} {currency}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-bold text-[var(--brand-deep)]">{fmtNum(serviceCost)} {currency}</td>
               </tr>
             </tbody>
           </table>
@@ -428,7 +428,7 @@ export default function ResultsBudget() {
         <div className="flex gap-3">
           <button
             onClick={handleCreateReport}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5A1790] text-white font-semibold text-sm shadow hover:bg-[#5c16a0] transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--brand-deep)] text-white font-semibold text-sm shadow hover:bg-[#5c16a0] transition-colors"
           >
             <Download className="w-4 h-4" />
             Create Report

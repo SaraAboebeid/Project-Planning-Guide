@@ -18,7 +18,7 @@ const FLOW_DATA: Record<string, {
     color: "#4ECDC4",
     steps: [
       {
-        n: 1, label: "Define Project", color: "#721CB8",
+        n: 1, label: "Define Project", color: "var(--brand)",
         subNodes: [
           { label: "Project type: Energy Community", type: "input" },
           { label: "Systems: PV, Battery, Grid", type: "input" },
@@ -62,10 +62,10 @@ const FLOW_DATA: Record<string, {
     ],
   },
   "Renovation Planning": {
-    color: "#721CB8",
+    color: "var(--brand)",
     steps: [
       {
-        n: 1, label: "Define Project", color: "#721CB8",
+        n: 1, label: "Define Project", color: "var(--brand)",
         subNodes: [
           { label: "Project type: Renovation", type: "input" },
           { label: "Systems: Envelope, HVAC, Windows", type: "input" },
@@ -116,7 +116,7 @@ const FLOW_DATA: Record<string, {
     color: "#2FB477",
     steps: [
       {
-        n: 1, label: "Define Project", color: "#721CB8",
+        n: 1, label: "Define Project", color: "var(--brand)",
         subNodes: [
           { label: "Project type: Renewable Energy", type: "input" },
           { label: "Systems: PV, Wind, Storage", type: "input" },
@@ -161,7 +161,7 @@ const FLOW_DATA: Record<string, {
 };
 
 const SUB_COLORS: Record<SubNodeType, string> = {
-  input:    "#721CB8",
+  input:    "var(--brand)",
   db:       "#4A90E2",
   estimate: "#E8880C",
   engine:   "#4ECDC4",
@@ -186,7 +186,7 @@ const GRID9 = "1fr 28px 1fr 28px 1fr 28px 1fr 28px 1fr";
 
 const TAB_COLORS: Record<string, string> = {
   "Energy Community Planning": "#4ECDC4",
-  "Renovation Planning":       "#721CB8",
+  "Renovation Planning":       "var(--brand)",
   "Renewable Energy Planning": "#2FB477",
 };
 
@@ -440,9 +440,9 @@ const PATHWAYS = [
     key: "Renovation Planning",
     label: "Renovation",
     sub: "Planning",
-    color: "#721CB8",
-    bgActive: "#721CB8",
-    borderActive: "#721CB8",
+    color: "var(--brand)",
+    bgActive: "var(--brand)",
+    borderActive: "var(--brand)",
     Icon: Hammer,
     outputs: [
       { n: "01", text: "Retrofit priority ranking (MCDA)" },
@@ -494,7 +494,7 @@ const ENGINE_TAGS = [
   { label: "Regret / Hurwicz",      color: "#4A90E2" },
   { label: "Sensitivity OAT",       color: "#4A90E2" },
   { label: "TABULA Archetypes",     color: "#4ECDC4" },
-  { label: "Wikells Cost DB",       color: "#721CB8" },
+  { label: "Wikells Cost DB",       color: "var(--brand)" },
   { label: "Boverket Klimatdb",     color: "#2FB477" },
   { label: "Nord Pool spot price",  color: "#4A90E2" },
 ];
@@ -725,7 +725,7 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
   const total = params.reduce((s, p) => s + p.rangeKwh, 0);
   const top3 = params.slice(0, 3);
   const rest = params.slice(3);
-  const typeColor = activeType === "Renovation Planning" ? "#721CB8"
+  const typeColor = activeType === "Renovation Planning" ? "var(--brand)"
     : activeType === "Energy Community Planning" ? "#4ECDC4" : "#2FB477";
 
   return (

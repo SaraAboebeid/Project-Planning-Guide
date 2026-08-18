@@ -41,7 +41,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               Reload page
             </button>
             <button onClick={() => { try { sessionStorage.clear(); localStorage.removeItem("ppg-wizard-v1"); } catch { /**/ } location.href = "/"; }}
-              style={{ padding: "8px 16px", borderRadius: 8, border: 0, background: "#5A1790", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+              style={{ padding: "8px 16px", borderRadius: 8, border: 0, background: "var(--brand-deep)", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
               Reset session &amp; reload
             </button>
             <button onClick={() => this.setState({ error: null })}

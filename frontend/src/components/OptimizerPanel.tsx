@@ -109,7 +109,7 @@ export default function OptimizerPanel({
   }, [result, validatedKeys]);
 
   return (
-    <div style={{ borderRadius: 14, background: "rgba(114,28,184,0.06)", border: "1px solid rgba(114,28,184,0.28)", overflow: "hidden" }}>
+    <div style={{ borderRadius: 14, background: "rgba(var(--brand-rgb),0.06)", border: "1px solid rgba(var(--brand-rgb),0.28)", overflow: "hidden" }}>
       {/* No "optimize" button — the curve recomputes live as materials are
           picked (see the effect above). The header just shows status. */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px" }}>
@@ -192,8 +192,8 @@ export default function OptimizerPanel({
                   <div style={{ marginLeft: "auto", display: "flex", gap: 7 }}>
                     <button onClick={() => setShowParallel(v => !v)}
                       style={{ fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
-                        border: `1px solid ${showParallel ? "#5A1790" : "rgba(255,255,255,0.14)"}`,
-                        background: showParallel ? "#5A1790" : "transparent", color: showParallel ? "#fff" : white(0.6) }}>
+                        border: `1px solid ${showParallel ? "var(--brand-deep)" : "rgba(255,255,255,0.14)"}`,
+                        background: showParallel ? "var(--brand-deep)" : "transparent", color: showParallel ? "#fff" : white(0.6) }}>
                       {showParallel ? "Hide parallel view" : "＋ Parallel view"}
                     </button>
                     <button onClick={() => setMaximized(true)} title="Maximise the chart"
@@ -232,7 +232,7 @@ export default function OptimizerPanel({
                 <div onClick={() => setMaximized(false)}
                   style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(5,7,12,0.9)", display: "flex", flexDirection: "column", padding: 20 }}>
                   <div onClick={e => e.stopPropagation()}
-                    style={{ background: "#0d1117", border: "1px solid rgba(114,28,184,0.4)", borderRadius: 14, padding: "16px 20px", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                    style={{ background: "#0d1117", border: "1px solid rgba(var(--brand-rgb),0.4)", borderRadius: 14, padding: "16px 20px", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Pareto frontier</span>
                       <span style={{ fontSize: 11, color: white(0.45) }}>
@@ -261,8 +261,8 @@ export default function OptimizerPanel({
                 {([["energy_kwh_m2_yr", "Energy"], ["total_cost", "Cost"], ["total_carbon", "Carbon"]] as const).map(([k, lbl]) => (
                   <button key={k} onClick={() => setSort(k)} style={{
                     fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
-                    border: `1px solid ${sort === k ? "#5A1790" : "rgba(255,255,255,0.12)"}`,
-                    background: sort === k ? "#5A1790" : "transparent",
+                    border: `1px solid ${sort === k ? "var(--brand-deep)" : "rgba(255,255,255,0.12)"}`,
+                    background: sort === k ? "var(--brand-deep)" : "transparent",
                     color: sort === k ? "#fff" : white(0.55),
                   }}>{lbl}</button>
                 ))}

@@ -167,13 +167,13 @@ export default function LandingPage() {
         { label: "buildings",      value: ukStats ? ukStats.buildings.toLocaleString("en-US") : "—", color: "#4A90E2" },
         { label: "EPC matched",    value: ukStats ? ukStats.withEpc.toLocaleString("en-US") : "—",   color: "#2FB477" },
         { label: "EHS estimated",  value: ukStats ? ukStats.estimated.toLocaleString("en-US") : "—", color: "#4ECDC4" },
-        { label: "districts",      value: ukStats ? String(ukStats.districts) : "—",                 color: "#721CB8" },
+        { label: "districts",      value: ukStats ? String(ukStats.districts) : "—",                 color: "var(--brand)" },
       ]
     : [
         { label: "3D buildings",     value: seVal("buildings", "92,973"),     color: "#4A90E2" },
         { label: "EPC matched",      value: seVal("epc_match", "85,670"),     color: "#2FB477" },
         { label: "TABULA matched",   value: seVal("tabula_match", "26,257"),  color: "#4ECDC4" },
-        { label: "Boplats listings", value: boplatsListings,                  color: "#721CB8" },
+        { label: "Boplats listings", value: boplatsListings,                  color: "var(--brand)" },
       ];
 
   useEffect(() => {
@@ -306,7 +306,7 @@ export default function LandingPage() {
               {/* Badges row */}
               <div className="flex items-center gap-3 mb-5">
                 <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-white/90
-                                 bg-[#721CB8]/40 border border-[#721CB8]/50 backdrop-blur-sm
+                                 bg-[var(--brand)]/40 border border-[var(--brand)]/50 backdrop-blur-sm
                                  px-2.5 py-1 rounded-md pointer-events-none select-none no-hover-shadow">
                   {(selectedCity || country.name)} 3D Viewer
                 </span>
@@ -333,7 +333,7 @@ export default function LandingPage() {
                   className="ppg-start-cta flex items-center gap-2 px-6 py-3 rounded-xl text-[13px] font-bold
                              text-white cursor-pointer border-0 transition-all duration-150
                              hover:-translate-y-0.5 hover:brightness-115 active:translate-y-0 active:brightness-95"
-                  style={{ background: "linear-gradient(135deg, #421869 0%, #721CB8 100%)", boxShadow: "0 4px 20px rgba(114,28,184,0.45)" }}
+                  style={{ background: "linear-gradient(135deg, var(--brand-dark) 0%, var(--brand) 100%)", boxShadow: "0 4px 20px rgba(var(--brand-rgb),0.45)" }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                   Start Planning
@@ -353,14 +353,14 @@ export default function LandingPage() {
                   className="flex-1 rounded-2xl p-3 text-left border no-hover-shadow"
                   style={{
                     background: "rgba(13,17,40,0.82)",
-                    borderColor: "rgba(114,28,184,0.34)",
+                    borderColor: "rgba(var(--brand-rgb),0.34)",
                     boxShadow: "0 2px 14px rgba(0,0,0,0.35)",
                     backdropFilter: "blur(12px)",
                   }}
                 >
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold"
-                          style={{ background: "rgba(114,28,184,0.38)", border: "1px solid rgba(114,28,184,0.7)", color: "#fff" }}>
+                          style={{ background: "rgba(var(--brand-rgb),0.38)", border: "1px solid rgba(var(--brand-rgb),0.7)", color: "#fff" }}>
                       {step.n}
                     </span>
                     <span style={{ color: "#8FF0E8" }}><Icon d={step.icon} size={15} /></span>

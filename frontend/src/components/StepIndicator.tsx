@@ -19,8 +19,8 @@ export default function StepIndicator() {
               onClick={() => navigate(s.path)}
               className={clsx(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all whitespace-nowrap",
-                isActive && "bg-gradient-to-r from-[#421869] to-[#5A1790] text-white shadow-sm",
-                isDone && !isActive && "text-[#5A1790] hover:bg-[#5A1790]/5",
+                isActive && "bg-gradient-to-r from-[var(--brand-dark)] to-[var(--brand-deep)] text-white shadow-sm",
+                isDone && !isActive && "text-[var(--brand-deep)] hover:bg-[var(--brand-deep)]/5",
                 !isActive && !isDone && "text-slate-400 hover:text-slate-600"
               )}
             >
@@ -28,7 +28,7 @@ export default function StepIndicator() {
                 className={clsx(
                   "w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold",
                   isActive && "bg-white/20 text-white",
-                  isDone && !isActive && "bg-[#5A1790]/10 text-[#5A1790]",
+                  isDone && !isActive && "bg-[var(--brand-deep)]/10 text-[var(--brand-deep)]",
                   !isActive && !isDone && "bg-slate-100 text-slate-400"
                 )}
               >

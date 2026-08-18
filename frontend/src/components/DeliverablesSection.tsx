@@ -31,11 +31,11 @@ export default function DeliverablesSection({ projectType, systemsInScope }: Pro
     <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <FileText className="w-4 h-4 text-[#5A1790]" />
+        <FileText className="w-4 h-4 text-[var(--brand-deep)]" />
         <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
           Expected Deliverables
         </span>
-        <span className="ml-auto text-xs font-semibold text-[#5A1790] bg-[#5A1790]/8 rounded-full px-2.5 py-0.5">
+        <span className="ml-auto text-xs font-semibold text-[var(--brand-deep)] bg-[var(--brand-deep)]/8 rounded-full px-2.5 py-0.5">
           {totalItems} items
         </span>
       </div>

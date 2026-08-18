@@ -150,7 +150,7 @@ export default function AssemblyBuilder({
       <div style={{ position: "relative" }}>
         <button onClick={() => setAddOpen((o) => !o)}
           style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "5px 11px",
-            borderRadius: 8, cursor: "pointer", background: "rgba(114,28,184,0.18)", border: "1px solid rgba(114,28,184,0.45)", color: "#D9C3F2" }}>
+            borderRadius: 8, cursor: "pointer", background: "rgba(var(--brand-rgb),0.18)", border: "1px solid rgba(var(--brand-rgb),0.45)", color: "#D9C3F2" }}>
           <Plus size={12} /> Add layer
         </button>
         {addOpen && (

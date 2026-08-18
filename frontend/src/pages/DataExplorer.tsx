@@ -142,7 +142,7 @@ const SOURCES: DataSource[] = [
     name: "Boplats Listings",
     description: "Live rental housing listings from Boplats Göteborg. Updated daily — addresses, rents, areas, and images.",
     iconD: IC.boplats,
-    accent: "#5A1790",
+    accent: "var(--brand-deep)",
     count: "297",
     countLabel: "active listings",
     status: "live",
@@ -411,7 +411,7 @@ function AddressFilter({ onFilter }: { onFilter: (addr: string) => void }) {
       </div>
       <button onClick={() => onFilter(val)} style={{
         padding: "9px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-        background: "rgba(114,28,184,0.35)", border: "1px solid rgba(114,28,184,0.5)",
+        background: "rgba(var(--brand-rgb),0.35)", border: "1px solid rgba(var(--brand-rgb),0.5)",
         color: "#fff", cursor: "pointer",
       }}>
         Search
@@ -737,8 +737,8 @@ export default function DataExplorer() {
           <button key={f} onClick={() => setStatusFilter(f)} style={{
             padding: "5px 14px", borderRadius: 99, fontSize: 11, fontWeight: 600, cursor: "pointer",
             textTransform: "capitalize",
-            background: statusFilter === f ? "#5A1790" : "rgba(255,255,255,0.06)",
-            border: `1px solid ${statusFilter === f ? "#5A1790" : "rgba(255,255,255,0.10)"}`,
+            background: statusFilter === f ? "var(--brand-deep)" : "rgba(255,255,255,0.06)",
+            border: `1px solid ${statusFilter === f ? "var(--brand-deep)" : "rgba(255,255,255,0.10)"}`,
             color: statusFilter === f ? "#fff" : "rgba(255,255,255,0.55)",
           }}>{f === "all" ? `All (${SOURCES.length})` : f}</button>
         ))}

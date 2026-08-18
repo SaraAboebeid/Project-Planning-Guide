@@ -29,7 +29,7 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
   const pill = (
     <span style={{
       padding: "2px 10px", borderRadius: 99, fontSize: 10.5, fontWeight: 700,
-      background: "rgba(114,28,184,0.35)", border: "1px solid rgba(114,28,184,0.6)", color: "#fff",
+      background: "rgba(var(--brand-rgb),0.35)", border: "1px solid rgba(var(--brand-rgb),0.6)", color: "#fff",
     }}>{countryName}</span>
   );
 

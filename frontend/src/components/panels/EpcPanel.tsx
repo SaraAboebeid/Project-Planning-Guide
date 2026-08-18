@@ -123,9 +123,9 @@ export default function EpcPanel() {
                 <Line
                   type="monotone"
                   dataKey="avg_kwh"
-                  stroke="#5A1790"
+                  stroke="var(--brand-deep)"
                   strokeWidth={2.5}
-                  dot={{ fill: "#5A1790", r: 5 }}
+                  dot={{ fill: "var(--brand-deep)", r: 5 }}
                   activeDot={{ r: 7, fill: "#2FB477" }}
                 />
               </LineChart>
@@ -170,7 +170,7 @@ export default function EpcPanel() {
                   contentStyle={{ fontSize: 12, borderRadius: 8 }}
                 />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-                <Bar name="Avg Performance (kWh/m²)" dataKey="avgPerf" fill="#5A1790" radius={[4, 4, 0, 0]} />
+                <Bar name="Avg Performance (kWh/m²)" dataKey="avgPerf" fill="var(--brand-deep)" radius={[4, 4, 0, 0]} />
                 <Bar name="Building Count" dataKey="count" fill="#2FB477" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

@@ -75,7 +75,7 @@ const TOOLS = [
     id: "epsm",
     title: "EPSM",
     subtitle: "Energy Performance Simulation Manager",
-    color: "#5A1790",
+    color: "var(--brand-deep)",
     status: "external",
     icon: Zap,
     description:
@@ -217,9 +217,9 @@ function StatusBadge({ status }: { status: string }) {
       letterSpacing: 1.2,
       padding: "3px 8px",
       borderRadius: 100,
-      background: isExt ? "rgba(114,28,184,0.15)" : "rgba(78,205,196,0.12)",
+      background: isExt ? "rgba(var(--brand-rgb),0.15)" : "rgba(78,205,196,0.12)",
       color: isExt ? "#a060e8" : "#4ECDC4",
-      border: `1px solid ${isExt ? "rgba(114,28,184,0.3)" : "rgba(78,205,196,0.25)"}`,
+      border: `1px solid ${isExt ? "rgba(var(--brand-rgb),0.3)" : "rgba(78,205,196,0.25)"}`,
     }}>
       {isExt ? "EXTERNAL TOOL" : "INTEGRATED"}
     </span>
@@ -470,7 +470,7 @@ export default function AnalysisTools() {
           {[
             { label: `${TOOLS.length} tools`, sub: "total", color: "#4ECDC4" },
             { label: `${TOOLS.filter(t => t.status === "integrated").length}`, sub: "integrated", color: "#2FB477" },
-            { label: `${TOOLS.filter(t => t.status === "external").length}`, sub: "external", color: "#5A1790" },
+            { label: `${TOOLS.filter(t => t.status === "external").length}`, sub: "external", color: "var(--brand-deep)" },
           ].map(p => (
             <div key={p.label} style={{
               display: "flex", alignItems: "center", gap: 8,

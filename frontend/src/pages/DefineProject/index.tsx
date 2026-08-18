@@ -245,6 +245,10 @@ export default function DefineProject() {
         bboxRows: rows,
         lookedUpBuilding: null,
         lookedUpBuildings: [],
+        // A drawn selection replaces a named district. Leaving the district set
+        // meant Step 2 kept loading the district's buildings and quietly ignored
+        // the box the user had just drawn.
+        district: null,
         currentBbox: bbox,
         selectionPolygon: null,
       });
@@ -282,6 +286,10 @@ export default function DefineProject() {
         bboxRows: rows,
         lookedUpBuilding: null,
         lookedUpBuildings: [],
+        // A drawn selection replaces a named district. Leaving the district set
+        // meant Step 2 kept loading the district's buildings and quietly ignored
+        // the box the user had just drawn.
+        district: null,
         currentBbox: bbox,
         selectionPolygon: polygon,
       });
@@ -582,9 +590,9 @@ export default function DefineProject() {
             <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "1.4px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>Project type</div>
             <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
               <svg width="34" height="34" viewBox="0 0 52 52" fill="none" style={{ flexShrink: 0 }}>
-                <rect x="10" y="18" width="32" height="26" rx="1" stroke="#5A1790" strokeWidth="1.5" fill="none"/>
-                <path d="M6 20L26 6l20 14" stroke="#5A1790" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="20" y="30" width="12" height="14" rx="1" stroke="#5A1790" strokeWidth="1.5" fill="none"/>
+                <rect x="10" y="18" width="32" height="26" rx="1" stroke="var(--brand-deep)" strokeWidth="1.5" fill="none"/>
+                <path d="M6 20L26 6l20 14" stroke="var(--brand-deep)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="20" y="30" width="12" height="14" rx="1" stroke="var(--brand-deep)" strokeWidth="1.5" fill="none"/>
                 <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
                 <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
               </svg>
@@ -611,9 +619,9 @@ export default function DefineProject() {
               ),
               "Renovation Planning": (
                 <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-                  <rect x="10" y="18" width="32" height="26" rx="1" stroke="#5A1790" strokeWidth="1.5" fill="none"/>
-                  <path d="M6 20L26 6l20 14" stroke="#5A1790" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <rect x="20" y="30" width="12" height="14" rx="1" stroke="#5A1790" strokeWidth="1.5" fill="none"/>
+                  <rect x="10" y="18" width="32" height="26" rx="1" stroke="var(--brand-deep)" strokeWidth="1.5" fill="none"/>
+                  <path d="M6 20L26 6l20 14" stroke="var(--brand-deep)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <rect x="20" y="30" width="12" height="14" rx="1" stroke="var(--brand-deep)" strokeWidth="1.5" fill="none"/>
                   <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
                   <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
                 </svg>
@@ -1392,7 +1400,7 @@ export default function DefineProject() {
             </div>
           )}
           {locationValid && !buildingLoading && project.bboxStats && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <div className="theme-preserve mt-2 flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
               <span>✓</span>
               <span><span className="font-semibold">{project.bboxStats.count.toLocaleString()} buildings</span> found in area. Full data shown in Step 2.</span>
             </div>
