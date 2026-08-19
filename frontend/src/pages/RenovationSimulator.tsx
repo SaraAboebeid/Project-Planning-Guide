@@ -263,6 +263,22 @@ function appliedUValues(
    per-component U — mirrors tools/idf/defaults.py (DEFAULT_U_*). Maps a Sweden
    area-line-item key to the U-override component's baseline U-value; null means
    the line item isn't a U-override component (e.g. Doors, Balcony). */
+/** Shared empty list so "no configurations yet" keeps a stable identity. */
+const EMPTY_CONFIGS: ComponentConfig[] = [];
+
+/** Wikells writes assemblies in trade shorthand. Expand the parts that are not
+ *  guessable — "EW" (exterior wall), "CLT" (cross-laminated timber) and the
+ *  M-number, which materialProperties.ts already decodes as the nominal
+ *  insulation thickness in mm. The original string stays in the tooltip. */
+function readableAssembly(description: string): string {
+  return description
+    .replace(/^EW/, "Exterior wall:")
+    .replace(/^IW/, "Interior wall:")
+    .replace(/CLT (\d+)/g, "$1 mm cross-laminated timber (CLT)")
+    .replace(/M(\d+)\+(\d+)/g, "$1+$2 mm insulation")
+    .replace(/M(\d+)/g, "$1 mm insulation");
+}
+
 function baselineUForKey(key: string, geo?: ResolvedBuildingGeometry | null): number | null {
   // The building's own TABULA U where it has one; the shoebox defaults
   // (tools/idf/defaults.py) only as a fallback. Scoring every building against
@@ -419,7 +435,8 @@ function LineItemPicker({
 
         <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ fontSize: 11, color: hovered ? "#fff" : "rgba(255,255,255,0.7)", lineHeight: 1.25,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.description}</span>
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            title={it.description}>{readableAssembly(it.description)}</span>
           <span style={{ display: "flex", gap: 3, overflow: "hidden", whiteSpace: "nowrap", alignItems: "center" }}>
             {tags.map((t) => {
               const bal = t === "Balanced";
@@ -711,7 +728,16 @@ export default function RenovationSimulator() {
      building's configurations. "All buildings" keeps its own set. */
   const [configsByBuilding, setConfigsByBuilding] = useState<Record<string, ComponentConfig[]>>({});
   const cfgKey = targetIdx === "all" ? "all" : String(targetIdx);
-  const configs = configsByBuilding[cfgKey] ?? [];
+  /* Stable identity matters here: `?? []` handed back a NEW array on every
+     render for a building with no saved configs, which invalidated every memo
+     downstream — including the optimizer's `input`. Its effect keys off that
+     object, so the Pareto front was re-requested (after a 450 ms debounce) on
+     each render, making the curve slow to settle and the Run button feel like it
+     needed several clicks while the tree re-rendered underneath it. */
+  const configs = useMemo(
+    () => configsByBuilding[cfgKey] ?? EMPTY_CONFIGS,
+    [configsByBuilding, cfgKey],
+  );
   const setConfigs = (updater: ComponentConfig[] | ((prev: ComponentConfig[]) => ComponentConfig[])) =>
     setConfigsByBuilding((prev) => ({
       ...prev,

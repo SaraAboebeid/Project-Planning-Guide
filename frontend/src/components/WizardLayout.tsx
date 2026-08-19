@@ -249,7 +249,17 @@ export default function WizardLayout() {
 
   const mainRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
+    // Reset twice: once now, once after layout. A step whose content arrives
+    // asynchronously (Step 3 waits on geometry and baseline lookups) can grow
+    // after this effect runs, which left the new page opening part-scrolled.
+    // Also reset the window, since not every step scrolls inside <main>.
+    const toTop = () => {
+      mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
+      window.scrollTo({ top: 0, behavior: "instant" });
+    };
+    toTop();
+    const raf = requestAnimationFrame(toTop);
+    return () => cancelAnimationFrame(raf);
   }, [location.pathname]);
 
   return (

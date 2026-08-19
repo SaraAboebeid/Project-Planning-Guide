@@ -127,7 +127,16 @@ function scoreBuilding(b: BuildingRecord, sizePct: number | null): SubScore {
   const confidence = (y != null ? 0.5 : 0) + (sizePct != null ? 0.5 : 0);
   const bits: string[] = [];
   if (y != null) bits.push(`built ${y}`);
-  if (sizePct != null) bits.push(`size p${Math.round(sizePct * 100)}`);
+  // "size p100" read as a statistical percentile, which it is not - it is this
+  // building's position between the smallest and largest in the CURRENT
+  // selection. Say that in words, and show the area it is derived from.
+  if (sizePct != null) {
+    const a = heatedArea(b);
+    const where = sizePct >= 0.99 ? "largest here"
+                : sizePct <= 0.01 ? "smallest here"
+                : `${Math.round(sizePct * 100)}% of the size range here`;
+    bits.push(a != null ? `${Math.round(a).toLocaleString("sv-SE")} m² (${where})` : `size: ${where}`);
+  }
   return { value, confidence, note: bits.join(", ") || "characteristics n/a", available: true };
 }
 

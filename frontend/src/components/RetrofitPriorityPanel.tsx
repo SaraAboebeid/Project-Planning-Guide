@@ -7,6 +7,29 @@ import {
   type CriterionWeights, type CriterionKey, type PriorityInput, type PriorityResult, type SubScore,
 } from "../utils/retrofitPriority";
 
+/* The four scoring columns overlap in ways the labels do not convey - "energy
+   performance" and "renovation potential" both involve energy, and size feeds
+   two of them. These read straight from the scoring in utils/retrofitPriority.ts;
+   keep them in step if the weights there change. */
+const CRITERION_HELP: Record<string, { what: string; from: string }> = {
+  E: {
+    what: "How much energy the building uses NOW, relative to the others in the selection.",
+    from: "Metered kWh/m2.yr where available, otherwise inferred from the EPC class.",
+  },
+  F: {
+    what: "Condition of the facade from the photos analysed in 2.2 - cracks, spalling, corrosion and the like.",
+    from: "The ML defect detector plus the AI second opinion. Buildings with no photos score a dash, and their weight is spread across the other three.",
+  },
+  C: {
+    what: "How likely the building is to be dated, and how much of it there is.",
+    from: "60% construction year, 40% size percentile.",
+  },
+  R: {
+    what: "How much a retrofit could realistically RECOVER - not how bad the building is, but how much is left to gain.",
+    from: "60% energy headroom (consumption above a 70 kWh/m2.yr target), 25% wall U-value (0.15-1.0 W/m2K), 15% size percentile. A building already near 70 scores low even if it is large.",
+  },
+};
+
 const CRITS: CriterionKey[] = ["E", "F", "C", "R"];
 // The 6 pairwise comparisons for AHP (upper triangle of the 4×4 matrix).
 const AHP_PAIRS: [CriterionKey, CriterionKey][] = [["E","F"],["E","C"],["E","R"],["F","C"],["F","R"],["C","R"]];
@@ -46,6 +69,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
 
   /* items.length changes when the Step 2 selection changes. Keep the default
      honest for the new list, but never overwrite a number the user set. */
+  const [helpCrit, setHelpCrit] = useState<string | null>(null);
   const touchedTopN = useRef(false);
   useEffect(() => {
     if (touchedTopN.current) {
@@ -163,6 +187,27 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
         </button>
       </div>
 
+      {/* Explanation for whichever criterion's info icon was clicked. Inline and
+          above the table so it never reflows the rows underneath. */}
+      {helpCrit && CRITERION_HELP[helpCrit] && (
+        <div className="rounded-lg px-3 py-2.5"
+          style={{ background: `${CRITERION_COLORS[helpCrit as CriterionKey]}14`,
+                   border: `1px solid ${CRITERION_COLORS[helpCrit as CriterionKey]}44` }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[12px] font-bold" style={{ color: CRITERION_COLORS[helpCrit as CriterionKey], flex: 1 }}>
+              {CRITERION_LABELS[helpCrit as CriterionKey]}
+            </span>
+            <button onClick={() => setHelpCrit(null)} title="Close"
+              className="text-white/45 hover:text-white/80"
+              style={{ background: "transparent", border: 0, cursor: "pointer", padding: 0, lineHeight: 1, fontSize: 13 }}>×</button>
+          </div>
+          <div className="text-[11px] text-white/70 leading-relaxed">{CRITERION_HELP[helpCrit]!.what}</div>
+          <div className="text-[10.5px] text-white/45 leading-relaxed mt-1">
+            <b className="text-white/60">Based on:</b> {CRITERION_HELP[helpCrit]!.from}
+          </div>
+        </div>
+      )}
+
       {/* Ranked table */}
       <div className="overflow-x-auto rounded-lg border border-white/8">
         <table className="w-full text-[11px] border-collapse">
@@ -173,7 +218,16 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
               <th className="px-2 py-2 font-semibold w-28">Priority</th>
               {CRITS.map(k => (
                 <th key={k} className="px-2 py-2 font-semibold" style={{ color: CRITERION_COLORS[k] }}>
-                  {CRITERION_LABELS[k]}
+                  <span className="inline-flex items-center gap-1">
+                    {CRITERION_LABELS[k]}
+                    <button
+                      onClick={() => setHelpCrit((cur) => (cur === k ? null : k))}
+                      title={`What ${CRITERION_LABELS[k].toLowerCase()} means`}
+                      className="opacity-60 hover:opacity-100"
+                      style={{ background: "transparent", border: 0, cursor: "pointer", color: "inherit", padding: 0, lineHeight: 1 }}>
+                      <Info className="w-3 h-3" />
+                    </button>
+                  </span>
                 </th>
               ))}
               <th className="px-2 py-2 font-semibold w-20">Data coverage</th>
