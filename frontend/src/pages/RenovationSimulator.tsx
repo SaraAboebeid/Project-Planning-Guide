@@ -1560,6 +1560,8 @@ export default function RenovationSimulator() {
           : Math.round(saving * 0.2);
         return {
           packageIndex: i + 1,
+          name: p.name,
+          buildingLabel: p.buildings.length === 1 ? (p.buildings[0]?.address ?? null) : null,
           components: Object.fromEntries(Object.entries(p.selections).map(([k, s]) => {
             const it = itemByCode[s.wikellsCode];
             const layers = s.layers?.length
@@ -2210,7 +2212,7 @@ export default function RenovationSimulator() {
               {[
                 { k: "exp", l: "" },
                 { k: "pkg", l: "Package" },
-                { k: "cost", l: "Cost" },
+                { k: "cost", l: "Cost", sub: "installed capex — materials + labour (Wikells), one-off" },
                 { k: "carbon", l: "Carbon" },
                 { k: "heat", l: "Heating", sub: "kWh/m²·yr" },
                 { k: "total", l: "Total energy", sub: "heating + hot water + cooling + lighting + equipment, kWh/m²·yr" },

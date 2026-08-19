@@ -510,7 +510,7 @@ export default function RenovationReport() {
       return `
       <div class="best">
         <div class="best-h">${esc(label)} <span class="why">${esc(why)}</span></div>
-        <div class="best-n">Package ${r.packageIndex}</div>
+        <div class="best-n">Package ${r.packageIndex}${r.buildingLabel ? ` · ${esc(r.buildingLabel)}` : " · all buildings"}</div>
         <table class="mat">
           <thead><tr><th>Component</th><th>Material / assembly</th><th>U-value</th></tr></thead>
           <tbody>
@@ -622,13 +622,14 @@ export default function RenovationReport() {
   ${bestBlock("Best balanced", bestBalanced, "weighted 40% energy / 30% carbon / 30% cost")}
 
   <h2>All simulated packages</h2>
-  <table><thead><tr><th>#</th><th>Materials</th><th>Energy</th><th>Saving</th><th>Cost</th><th>CO₂e saved</th></tr></thead><tbody>
+  <table><thead><tr><th>#</th><th>Building</th><th>Materials</th><th>Energy</th><th>Saving</th><th>Cost</th><th>CO₂e saved</th></tr></thead><tbody>
   ${simResults.length ? simResults.map((r) => `<tr>
       <td>${r.packageIndex}</td>
+      <td>${esc(r.buildingLabel ?? "all buildings")}</td>
       <td>${esc(materialsOf(r).map((m) => `${m.component}: ${m.buildup || m.desc}`).join("; ") || "—")}</td>
       <td>${r.energyUse.toFixed(1)}</td><td>${r.saving.toFixed(1)}</td>
       <td>${sek(r.cost)}</td><td>${Math.round(r.carbonSaving).toLocaleString("sv-SE")}</td></tr>`).join("")
-    : `<tr><td colspan="6" class="muted">No packages simulated.</td></tr>`}
+    : `<tr><td colspan="7" class="muted">No packages simulated.</td></tr>`}
   </tbody></table>
 
   ${goalAssessment ? `
@@ -670,6 +671,7 @@ export default function RenovationReport() {
   <div class="foot">
     Energy from EnergyPlus (EPSM) single-zone shoebox simulation · U-values per EN ISO 6946 ·
     cost from Wikells Sektionsfakta · embodied carbon from Boverket Klimatdatabas ·
+    ${project.supplierDiscountPct ? `All material costs are net of a ${project.supplierDiscountPct}% supplier discount entered in Step 4. ` : ""}Costs are installed capex (materials + labour); they exclude energy, maintenance and replacement.
     baseline energy class from Boverket EPC. Hot water is a Sveby standard draw profile played
     back through EnergyPlus, not a prediction. Cooling reads 0 because EPSM&#39;s end-use table
     carries only electricity and district heating; the hourly trace does show ideal-loads
@@ -1093,6 +1095,11 @@ export default function RenovationReport() {
               }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? "#2FB477" : "rgba(255,255,255,0.2)" }}>{i === 0 ? "★" : `#${i + 1}`}</span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {/* Which building this package is for — identical materials on
+                      two buildings were otherwise indistinguishable here. */}
+                  <span style={{ fontSize: 10, fontWeight: 700, color: r.buildingLabel ? "#4ECDC4" : "rgba(255,255,255,0.35)" }}>
+                    {r.buildingLabel ?? "All buildings"}
+                  </span>
                   {Object.entries(r.components).map(([comp, item]) => (
                     <div key={comp} style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 5 }}>
                       <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 5, flexShrink: 0, background: `${COMP_COLORS[comp] ?? "var(--brand)"}22`, color: COMP_COLORS[comp] ?? "var(--brand)", border: `1px solid ${COMP_COLORS[comp] ?? "var(--brand)"}44` }}>

@@ -258,6 +258,8 @@ export default function OptimizerPanel({
 
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, marginTop: 16, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 11, color: white(0.4) }}>Sort by:</span>
+                {/* "Cost" here is life-cycle, unlike the capex-only Cost in 4.3 —
+                    the two answer different questions and can rank differently. */}
                 {([["energy_kwh_m2_yr", "Energy"], ["total_cost", "Cost"], ["total_carbon", "Carbon"]] as const).map(([k, lbl]) => (
                   <button key={k} onClick={() => setSort(k)} style={{
                     fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
@@ -293,7 +295,8 @@ export default function OptimizerPanel({
                     <tr style={{ color: white(0.45), textAlign: "left" }}>
                       <th style={{ padding: "6px 8px", fontWeight: 600 }}>Package (selected options)</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Energy</th>
-                      <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Cost (life-cycle)</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}
+                          title="Life-cycle cost = installed capex + discounted energy over the study period (op_cost = demand x energy price x annuity factor). NOT the same as the capex-only Cost column in the results table below.">Cost (life-cycle)</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Carbon (life-cycle)</th>
                     </tr>
                   </thead>

@@ -46,6 +46,13 @@ export interface RenovationBaselineResult {
 
 export interface RenovationPackageResult {
   packageIndex: number;
+  /** The package's own name, which carries the building suffix for a package
+   *  built for one building. Without it the report showed "Package 3" and two
+   *  packages with identical materials for different buildings were
+   *  indistinguishable. Optional: results saved before this existed have none. */
+  name?: string;
+  /** Set when the package targets a single building; null for portfolio-wide. */
+  buildingLabel?: string | null;
   components: Record<string, {
     code: string;
     description: string;
