@@ -121,7 +121,12 @@ function recordToLookup(r: BuildingRecord): BuildingLookup {
   const approxPerimeter = r.footprint_m2 ? 4 * Math.sqrt(r.footprint_m2) : null;
   return {
     address: r.address || null, height: r.height_m, floors: r.floors,
-    area_atemp: null, footprint_m2: r.footprint_m2, use_cat: r.building_use,
+    // The record carries Atemp from the EPC; dropping it made the report's
+    // Area column read "—" for every bbox-selected building even though the
+    // data was there. Fall back to footprint x floors, which is the same
+    // heated-area convention Step 3/4 use for the shoebox.
+    area_atemp: r.atemp ?? (r.footprint_m2 && r.floors ? Math.round(r.footprint_m2 * r.floors) : null),
+    footprint_m2: r.footprint_m2, use_cat: r.building_use,
     wall_perimeter_m: null,
     wall_area_m2: approxPerimeter && r.height_m ? approxPerimeter * r.height_m : null,
     roof_area_m2: r.footprint_m2, floor_area_m2: r.footprint_m2,
@@ -894,7 +899,7 @@ export default function RenovationReport() {
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>Area</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{b.area_atemp ? `${b.area_atemp} m²` : "—"}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{b.area_atemp ? `${Math.round(b.area_atemp).toLocaleString("sv-SE")} m²` : "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>Energy class</div>
