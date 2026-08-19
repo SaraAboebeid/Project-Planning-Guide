@@ -129,6 +129,11 @@
     'viewer/js/comfort.js',      // outdoor thermal comfort (UTCI + solar MRT disc)
     ...(profile.country === 'se' ? ['viewer/js/scb_layers.js'] : []),
     'viewer/js/city_switcher.js',
+    // Wires the Display panel's basemap thumbnails. It was never in this list,
+    // so the file was served but never executed: the thumbnails had no click
+    // handlers and switching display mode did nothing. Loaded last, after
+    // layers.js has bound the hidden .base-btn radios it delegates to.
+    'viewer/js/display_controls.js',
   ];
 
   for (const src of scripts) {

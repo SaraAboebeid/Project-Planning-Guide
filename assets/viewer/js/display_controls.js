@@ -74,15 +74,12 @@
     thumbs.forEach((btn) => {
       btn.addEventListener('click', () => {
         const mode = btn.getAttribute('data-mode');
-        const radio = document.getElementById('btn-base-' + mode);
-        if (radio) {
-          if (radio.classList.contains('active')) return;   // already on it
-          // Go through the radio's own handler (layers.js) so the selection,
-          // the basemap and the badge all move together.
-          radio.click();
-        } else if (mode !== activeMode()) {
-          window.setBasemap(mode);                          // viewer without the radios
-        }
+        if (mode === activeMode()) return;                  // already on it
+        // Call setBasemap directly rather than clicking the hidden radio:
+        // setBasemap already toggles .base-btn.active itself (see cesium.js), so
+        // the badge still follows, and this does not depend on layers.js having
+        // successfully bound its listeners.
+        window.setBasemap(mode);
         syncThumbs();
       });
     });
