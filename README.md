@@ -52,11 +52,14 @@ Project Planning Guide/
 | `/` | `frontend/src/pages/LandingPage.tsx` | Home / entry screen |
 | `/step/1` | `frontend/src/pages/DefineProject/index.tsx` | Define project type, name, country, scale |
 | `/step/2` | `frontend/src/pages/DataCoverage.tsx` | Review data availability & coverage |
-| `/step/3` | `frontend/src/pages/DataAssumptions.tsx` | Set data assumptions & proxies |
-| `/step/4` | `frontend/src/pages/Recommendations.tsx` | Analysis method recommendations |
-| `/step/5` | `frontend/src/pages/ExpectedResults.tsx` | Expected outputs & KPI targets |
-| `/step/6` | `frontend/src/pages/Timeline.tsx` | Project timeline |
-| `/step/7` | `frontend/src/pages/Budget.tsx` | Tasks & cost breakdown |
+| `/step/3` | `BaselineSetup.tsx` — or `DataAssumptions.tsx` | Select buildings & run the baseline — or set assumptions |
+| `/step/4` | `RenovationSimulator.tsx` — or `StepScenarios.tsx` | Renovation packages, cost & carbon — or community scenarios |
+| `/step/5` | `RenovationReport.tsx` — or `ResultsBudget.tsx` | Report — or results & budget |
+| `/budget` | `frontend/src/pages/Budget.tsx` | Tasks & cost breakdown |
+
+**Steps 3–5 branch on project type.** The first file in each row is the
+Renovation track; the second is the Energy-Community / Renewable-Energy track.
+The switch lives in `Step3Router` … `Step5Router` in `frontend/src/App.tsx`.
 
 All page files live in `frontend/src/pages/`. Open any file and edit directly — Vite hot-reloads instantly.
 
