@@ -157,6 +157,11 @@ else:
 
 st.divider()
 st.caption(
+    "Going deeper: `NOTEBOOK.md` at the repository root holds the full method "
+    "write-up — every threshold, the reasoning behind it and how it fails. "
+    "`CODEMAP.md` maps the code file by file; page 2 renders it."
+)
+st.caption(
     "Edit page text in `logbook_content.py`. Layout helpers are in "
     "`scripts/ui_utils.py`. Pages under `pages/` are intentionally thin."
 )

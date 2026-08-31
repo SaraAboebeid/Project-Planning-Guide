@@ -4,9 +4,14 @@
 Every entry below was read from the file itself (module docstring, header comment,
 route decorator or import graph) rather than from memory.
 
-Companion docs: [README.md](README.md) for the project pitch,
+Companion docs: **[NOTEBOOK.md](NOTEBOOK.md)** for the methods in full — why each
+step is done that way, with thresholds, rationale and failure modes;
+[README.md](README.md) for the project pitch,
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for failure modes,
 [docker/README.md](docker/README.md) for containers.
+
+This file answers *where is the code*. The notebook answers *why is it done this
+way*. The [logbook](logbook/) is the browsable stage-by-stage version of both.
 
 > **Stale-doc warning.** [CHANGELOG.md](CHANGELOG.md) and several `HOW_TO_*` /
 > `*_RULES_ENGINE*` files still describe the original **Streamlit** app (v1.0.0,

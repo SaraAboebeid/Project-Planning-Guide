@@ -4,20 +4,58 @@
    aligned with the dashboard theme.
    ============================================================= */
 
+/* LIGHT SIDEBAR.
+   The tokens below drive the left sidebar, which is now a white surface. The
+   panels that float over the 3D scene (#hover-card, #vt-panel, #facade-panel,
+   …) stay dark and are re-asserted with literal colours in the correction
+   block at the bottom of this file — they share these tokens, so flipping the
+   tokens alone would have left dark text on their dark backgrounds.
+
+   To go back to a dark sidebar: restore the values commented beside each token
+   and delete the "LIGHT SIDEBAR CORRECTIONS" block at the end. */
 :root {
-  --sb-bg: #0d1117;
-  --sb-surface: rgba(255, 255, 255, 0.05);
-  --sb-surface-2: rgba(255, 255, 255, 0.09);
-  --sb-border: rgba(255, 255, 255, 0.08);
-  --sb-border-strong: rgba(114, 28, 184, 0.44);
-  --sb-text: rgba(255, 255, 255, 0.9);
-  --sb-muted: rgba(255, 255, 255, 0.56);
-  --sb-faint: rgba(255, 255, 255, 0.35);
+  --sb-bg: #FFFFFF;                          /* was #0d1117 */
+  --sb-surface: rgba(15, 17, 23, 0.045);     /* was rgba(255,255,255,0.05) */
+  --sb-surface-2: rgba(15, 17, 23, 0.085);   /* was rgba(255,255,255,0.09) */
+  --sb-border: rgba(15, 17, 23, 0.12);       /* was rgba(255,255,255,0.08) */
+  --sb-border-strong: rgba(114, 28, 184, 0.45);
+  --sb-text: rgba(15, 17, 23, 0.88);         /* was rgba(255,255,255,0.9) */
+  --sb-muted: rgba(15, 17, 23, 0.58);        /* was rgba(255,255,255,0.56) */
+  --sb-faint: rgba(15, 17, 23, 0.46);        /* was rgba(255,255,255,0.35) */
   --sb-accent: #721cb8;
   --sb-accent-dark: #421869;
   --sb-accent-light: #995bd5;
   --sb-success: #2FB477;
-  --sb-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+  --sb-shadow: 0 18px 40px rgba(15, 17, 23, 0.16);  /* was 0 24px 48px rgba(0,0,0,.4) */
+
+  /* Light-surface-safe variants. #995bd5 on white is ~4.0:1 and #2FB477 is
+     ~2.8:1 — both too low for the small bold numerals they were used on, so
+     the sidebar uses these instead while the dark panels keep the originals. */
+  --sb-accent-on-light: #6D28D9;
+  --sb-success-on-light: #1F8A5B;
+  --sb-tint: rgba(114, 28, 184, 0.10);
+  --sb-tint-strong: rgba(114, 28, 184, 0.16);
+  --sb-hairline: rgba(15, 17, 23, 0.09);
+
+  /* SECOND TOKEN FAMILY — do not miss this one.
+     main.css carries its own sidebar palette, --map-sidebar-*, under a
+     "MAP SIDEBAR THEME OVERRIDES — EDIT HERE" banner. About 50 rules use it,
+     including `.legend-row > span` (the Building Use Type labels),
+     `.analysis-result`, `.filter-wrap`, `.switch-row` and `.lp-subhead`.
+     It is used ONLY by left-sidebar selectors — nothing floating over the map
+     reads it — so it is safe to flip wholesale here. This file loads after
+     gothenburg_3d.css, so these win. */
+  --map-sidebar-bg: #FFFFFF;                          /* was rgba(13,17,23,0.94) */
+  --map-sidebar-surface: rgba(15, 17, 23, 0.045);     /* was rgba(255,255,255,0.05) */
+  --map-sidebar-surface-strong: rgba(15, 17, 23, 0.085); /* was rgba(255,255,255,0.08) */
+  --map-sidebar-border: rgba(15, 17, 23, 0.12);       /* was rgba(255,255,255,0.10) */
+  --map-sidebar-border-strong: rgba(114, 28, 184, 0.45);
+  --map-sidebar-text: rgba(15, 17, 23, 0.88);         /* was rgba(255,255,255,0.92) */
+  --map-sidebar-muted: rgba(15, 17, 23, 0.58);        /* was rgba(255,255,255,0.58) */
+  --map-sidebar-faint: rgba(15, 17, 23, 0.46);        /* was rgba(255,255,255,0.36) */
+  --map-sidebar-accent: #721CB8;
+  --map-sidebar-accent-2: #6D28D9;                    /* was #995BD5 — too pale on white */
+  --map-sidebar-success: #1F8A5B;                     /* was #37D39A — ~2.2:1 on white */
 }
 
 /* Left sidebar shell */
@@ -625,4 +663,148 @@ a[href]:hover,
 [onclick]:hover {
   filter: brightness(1.12);
   transition: filter 0.15s ease;
+}
+
+/* =============================================================
+   LIGHT SIDEBAR CORRECTIONS
+   Everything above was written for a dark sidebar. These rules fix the
+   places that assumed it — white text on tinted hovers, white-alpha
+   hairlines, white-alpha placeholders — and re-assert the dark treatment
+   on the panels that float over the 3D scene.
+   Delete this whole block to return to the dark sidebar.
+   ============================================================= */
+
+/* ── 1. Purple header keeps light text ──────────────────────── */
+/* .lp-sub is matched later by the muted group, so it needs restating here or
+   the subtitle turns dark-on-purple. */
+#lp-header .lp-sub,
+#lp-header .lp-title {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+#lp-header .lp-title { color: #fff !important; }
+
+/* ── 2. Hover / active states ───────────────────────────────── */
+/* A 20% purple tint over white is very pale, so #fff labels vanished.
+   Dark purple text on a pale tint instead. */
+.lp-tab:hover,
+.btn:hover,
+.sub-btn:hover,
+.tool-btn:hover:not(:disabled),
+.tool-btn.pvgis-btn:hover:not(:disabled),
+#btn-reset:hover,
+.base-btn:hover,
+.overlay-btn:hover,
+.analysis-tools-group .tool-btn:hover:not(:disabled) {
+  background: var(--sb-tint) !important;
+  color: var(--sb-accent-on-light) !important;
+  border-color: var(--sb-border-strong) !important;
+}
+
+.btn.active,
+.sub-btn.active,
+.base-btn.active,
+.overlay-btn.active {
+  background: var(--sb-tint-strong) !important;
+  color: var(--sb-accent-on-light) !important;
+}
+
+/* .lp-tab.active keeps solid #721cb8 with white text — that contrast is fine. */
+
+/* ── 3. Hairlines and dividers ──────────────────────────────── */
+.lp-divider,
+.tool-btn,
+.tool-btn.pvgis-btn,
+#btn-reset,
+.analysis-tools-group .tool-btn {
+  border-bottom-color: var(--sb-hairline) !important;
+}
+.lp-divider { background: var(--sb-hairline) !important; }
+.result-item { border-bottom-color: var(--sb-hairline) !important; }
+.base-indicator,
+.overlay-check { border-color: rgba(15, 17, 23, 0.28) !important; }
+
+/* ── 4. Small text that was white-alpha ─────────────────────── */
+#search-input::placeholder { color: rgba(15, 17, 23, 0.38) !important; }
+.info-btn { color: rgba(15, 17, 23, 0.32) !important; }
+.tool-btn:disabled { color: rgba(15, 17, 23, 0.42) !important; }
+.layer-pill {
+  background: rgba(15, 17, 23, 0.06) !important;
+  border: 1px solid rgba(15, 17, 23, 0.10) !important;
+  color: rgba(15, 17, 23, 0.62) !important;
+}
+
+/* ── 5. Accessible accents on the white surface ─────────────── */
+.stat-num { color: var(--sb-accent-on-light) !important; }
+.stat-num-2 { color: var(--sb-success-on-light) !important; }
+.info-btn:hover { color: var(--sb-accent-on-light) !important; }
+
+/* ── 6. Sidebar popups follow the sidebar ───────────────────── */
+/* These open FROM the sidebar, so they go light with it. */
+#search-results {
+  background: #FFFFFF !important;
+  border: 1px solid var(--sb-border) !important;
+  box-shadow: 0 12px 28px rgba(15, 17, 23, 0.14) !important;
+}
+#search-results .result-item { color: var(--sb-text) !important; }
+#search-results .result-item:hover { background: var(--sb-tint) !important; }
+
+#info-tooltip {
+  background: #FFFFFF !important;
+  border: 1px solid var(--sb-border) !important;
+  color: rgba(15, 17, 23, 0.82) !important;
+  box-shadow: 0 16px 34px rgba(15, 17, 23, 0.16) !important;
+}
+#info-tooltip .it-title { color: rgba(15, 17, 23, 0.92) !important; }
+#info-tooltip .it-source {
+  color: rgba(15, 17, 23, 0.5) !important;
+  border-top-color: var(--sb-hairline) !important;
+}
+
+/* ── 7. Panels floating over the 3D scene stay dark ─────────── */
+/* They read the same tokens, so without this they would inherit dark text on
+   their dark backgrounds. Literal colours here, deliberately token-free. */
+#hover-card,
+#vt-panel,
+#vt-disr-panel,
+#vt-park-panel,
+#token-panel,
+#perf-panel,
+#wwr-panel,
+#facade-panel {
+  background: rgba(13, 17, 23, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.42) !important;
+}
+
+#vt-panel *,
+#vt-disr-panel *,
+#vt-park-panel *,
+#token-panel *,
+#perf-panel *,
+#wwr-panel *,
+#facade-panel *,
+#hover-card * {
+  border-bottom-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+#vt-panel .vt-dest,
+#vt-disr-panel .vt-disr-title,
+#facade-panel .fi-val,
+#perf-panel .result-item,
+#wwr-panel .result-item {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+#vt-panel .sub, #vt-disr-panel .sub, #vt-park-panel .sub,
+#token-panel .sub, #perf-panel .sub, #wwr-panel .sub, #facade-panel .sub,
+#vt-panel-title, #vt-disr-count, #vt-park-title, #wwr-breakdown,
+#zoom-label, #token-panel div {
+  color: rgba(255, 255, 255, 0.56) !important;
+}
+
+#token-input {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
 }

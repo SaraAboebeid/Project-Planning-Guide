@@ -322,10 +322,15 @@ Certificates are joined to footprints **geometrically**. Method in full on
 | With a TABULA archetype | 26,257 | 28% |
 | Tagged with a primärområde | ~75,719 | 81% |
 
-**Cadastral and address joins were investigated and cannot raise this coverage.**
-The limit is that the EPC register and the footprint set disagree about what
-constitutes one building, not that the join key is weak. Recorded here so the
-question is not reopened from scratch.
+**Cadastral and address joins cannot raise this coverage** on the
+EUBUCCO-to-footprint link, because **EUBUCCO carries no cadastral id and no
+address** — there is no key to join on, so the link has to be spatial. This is a
+property of the data, not a gap in effort. Recorded here so the question is not
+reopened from scratch.
+
+Cadastral ids *are* used, but on the certificate side: to build a property-level
+aggregation that lets one shared declaration reach the property's other heated
+buildings. See **4. Sweden Pipeline**.
 """,
             "files": ["data_pipeline.py", "tools/se/geocode_epc.py", "tools/se/ingest_districts.py"],
         },
@@ -399,8 +404,9 @@ single cadastral building into parts — every claimant overlapping at least 30%
 keeps it. Weak and fallback claimants are dropped **only** when a strong
 claimant exists; if none do, the single best-overlapping building wins.
 
-This replaced an earlier centroid-based method, which mis-assigned certificates
-wherever a centroid fell outside its own concave footprint.
+This replaced an earlier nearest-centroid method, which in dense blocks gave a
+building the certificate of a *neighbour*. Measured: the centroid method handed
+**~1,800 buildings** a certificate for a footprint their polygon never touches.
 """,
             "files": ["data_pipeline.py"],
         },
@@ -1155,9 +1161,9 @@ runs end to end. They must never be presented as real figures.
             "title": "Coverage ceilings",
             "badge": "metadata",
             "body": """
-**Swedish EPC matching is geometric only.** Cadastral and address joins were
-investigated and cannot raise coverage, because the register and the footprint
-set disagree about what one building is.
+**Swedish EPC matching is geometric only** — because EUBUCCO carries no cadastral
+id and no address, so there is no key on which to join it to the footprint
+registry. Cadastral and address joins cannot raise coverage on that link.
 
 **TABULA coverage is 28%.** Roughly seven in ten Gothenburg buildings have no
 archetype match and fall back to defaults.
