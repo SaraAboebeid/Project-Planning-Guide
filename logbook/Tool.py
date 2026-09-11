@@ -41,13 +41,13 @@ st.info(
 st.subheader("Contents")
 
 STAGE_GROUPS = [
-    ("Data", ["data_portal", "script_browser", "provenance"]),
+    ("Data", ["data_portal", "scraped_data", "provenance", "script_browser"]),
     # Sweden and the UK are built by separate chains — different geometry
     # source, different certificate join — so they get a page each.
     ("Pipelines", ["sweden_pipeline", "uk_pipeline", "digital_twin"]),
     ("Modelling", ["shoebox_idf", "simulation"]),
+    ("Analysis", ["analysis_index", "climate_env", "facade_ml", "viewer_layers"]),
     ("Decision support", ["prioritisation", "optimisation", "decision"]),
-    ("Analysis", ["facade_ml", "climate_env", "viewer_layers"]),
     ("Record", ["limitations", "project_team"]),
 ]
 

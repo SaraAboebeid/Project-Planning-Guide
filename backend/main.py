@@ -114,6 +114,29 @@ def health():
     return {"status": "ok"}
 
 
+# ── Viewer config ───────────────────────────────────────────────────────────
+# CARTO's basemaps.cartocdn.com needs an API key. Without one it still answers
+# 200, but stamps "API KEY REQUIRED" across every tile - so the viewer's map
+# (and the landing-page hero, which iframes the viewer) degraded silently.
+# The key lives in .env as CARTO_API and reaches the viewer only through here,
+# as ready-made tile templates. It is not secret in the server-side sense -
+# CARTO's own examples put it in client tile URLs, so the browser sees it
+# regardless - the point is that it stays out of committed source. With no key,
+# light/dark are omitted and the viewer keeps its keyless Esri canvases.
+@app.get("/api/viewer-config")
+def viewer_config():
+    key = os.environ.get("CARTO_API", "").strip().strip("\"'")
+    basemaps: dict[str, dict] = {}
+    if key:
+        credit = "© OpenStreetMap contributors © CARTO"
+        for mode, style in (("light", "light_all"), ("dark", "dark_all")):
+            basemaps[mode] = {
+                "tiles": [f"https://a.basemaps.cartocdn.com/{style}/{{z}}/{{x}}/{{y}}.png?key={key}"],
+                "credit": credit,
+            }
+    return {"basemaps": basemaps, "basemap_provider": "carto" if key else "esri"}
+
+
 def _resolve_facade_ml_url(default: str | None = None) -> str:
     """Resolve facade ML URL from env with backward-compatible aliases.
 
@@ -4559,6 +4582,179 @@ async def delete_facade_image(image_id: str):
     if existed:
         path.unlink()
     return {"deleted": existed}
+
+
+# ── Street View facade capture ──────────────────────────────────────────────
+#
+# Pulls a street-level image of ONE facade so it can be fed to the same defect
+# detector as an uploaded photo. Nothing is written to disk on the way through:
+# Google's Maps Platform terms cover displaying imagery, not accumulating a local
+# copy of it, so the JPEG lives in the response and the browser tab only. What
+# survives is the derived annotation - exactly as for a phone photo.
+#
+# Aiming is the hard part, not fetching. Geocoding an address yields a point, not
+# a view of the building, and a request with no heading routinely returns the
+# building on the OTHER side of the street. So: step off the building toward the
+# facade of interest, ask which panorama is actually there, then point that
+# panorama's camera back at the building centroid.
+
+STREETVIEW_BASE = "https://maps.googleapis.com/maps/api/streetview"
+
+# Where the camera must STAND to see a given facade. A north facade is the wall
+# facing north, so it is only visible from the north - camera looking south.
+_FACADE_CAMERA_SIDE = {"north": 0.0, "east": 90.0, "south": 180.0, "west": 270.0}
+
+# Street View's standard tier caps a single request at 640x640. Detail therefore
+# comes from NARROWING the field of view, not from asking for a bigger image:
+# the underlying panoramas are high resolution, so a 25 deg crop resolves roughly
+# 4x finer than the 90 deg default. Multi-tile requests sweep several such crops
+# across the facade and cost one call each.
+_STREETVIEW_MAX_SIZE = "640x640"
+
+
+def _bearing_deg(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Initial great-circle bearing from point 1 to point 2, degrees clockwise from north."""
+    from math import radians, degrees, sin, cos, atan2
+
+    p1, p2 = radians(lat1), radians(lat2)
+    dlon = radians(lon2 - lon1)
+    y = sin(dlon) * cos(p2)
+    x = cos(p1) * sin(p2) - sin(p1) * cos(p2) * cos(dlon)
+    return (degrees(atan2(y, x)) + 360.0) % 360.0
+
+
+def _offset_latlon(lat: float, lon: float, bearing_deg: float, meters: float) -> tuple[float, float]:
+    """Move a point `meters` along `bearing_deg`. Flat-earth approximation - fine
+    at the tens-of-metres scale this is used at."""
+    from math import radians, degrees, sin, cos
+
+    r = 6371000.0
+    dlat = degrees((meters * cos(radians(bearing_deg))) / r)
+    dlon = degrees((meters * sin(radians(bearing_deg))) / (r * cos(radians(lat))))
+    return lat + dlat, lon + dlon
+
+
+@app.get("/api/streetview/facade")
+async def streetview_facade(
+    lat: float = Query(..., description="Building centroid latitude"),
+    lon: float = Query(..., description="Building centroid longitude"),
+    orientation: str | None = Query(None, description="north|east|south|west - which facade to photograph"),
+    heading: float | None = Query(None, description="Explicit camera heading; overrides `orientation`"),
+    fov: float = Query(30.0, ge=10.0, le=120.0, description="Narrower = more detail, less facade"),
+    pitch: float = Query(12.0, ge=-90.0, le=90.0, description="Tilt up to catch upper storeys"),
+    standoff_m: float = Query(20.0, ge=5.0, le=80.0, description="How far off the building to look for a panorama"),
+    tiles: int = Query(1, ge=1, le=5, description="Sweep N narrow-FOV shots across the facade"),
+):
+    """Fetch street-level imagery of one facade, aimed at the building.
+
+    Returns `{images:[{b64, heading, fov, pitch}], pano:{...}}` as base64 rather
+    than raw bytes so the capture date and true heading travel with the image
+    (the CORS config here exposes no custom headers), and so the frontend can
+    hand the bytes straight to /api/facade-detect like an upload.
+    """
+    import base64, httpx
+
+    key = os.environ.get("GOOGLE_MAPS_API_KEY", "").strip()
+    if not key:
+        raise HTTPException(
+            503,
+            "Street View not configured. Add GOOGLE_MAPS_API_KEY to .env and enable the "
+            "'Street View Static API' on that Google Cloud project.",
+        )
+
+    if heading is None:
+        if orientation not in _FACADE_CAMERA_SIDE:
+            raise HTTPException(400, f"Pass `heading`, or an `orientation` in {sorted(_FACADE_CAMERA_SIDE)}")
+        camera_side = _FACADE_CAMERA_SIDE[orientation]
+    else:
+        # An explicit heading says where the camera LOOKS; it stands opposite that.
+        camera_side = (heading + 180.0) % 360.0
+
+    # Stand off the building on the side of the facade we want to see.
+    search_lat, search_lon = _offset_latlon(lat, lon, camera_side, standoff_m)
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        # Metadata first: it is free and unmetered, so a "no coverage here" answer
+        # costs nothing, whereas a blind image request bills for a grey placeholder.
+        meta_r = await client.get(
+            f"{STREETVIEW_BASE}/metadata",
+            params={"location": f"{search_lat},{search_lon}",
+                    "radius": max(35.0, standoff_m * 1.5), "source": "outdoor", "key": key},
+        )
+        meta = meta_r.json()
+        status = meta.get("status")
+        if status != "OK":
+            raise HTTPException(404, {
+                "ZERO_RESULTS": f"No Street View coverage within {max(35.0, standoff_m * 1.5):.0f} m of the {orientation or 'requested'} facade.",
+                "OVER_QUERY_LIMIT": "Google Street View quota exceeded for this key.",
+                "REQUEST_DENIED": "Google denied the request - check the key is unrestricted for this API and Street View Static API is enabled.",
+            }.get(status, f"Street View metadata returned {status}."))
+
+        pano_loc = meta.get("location") or {}
+        pano_lat, pano_lon = float(pano_loc.get("lat", search_lat)), float(pano_loc.get("lng", search_lon))
+        # The panorama sits where Google's car actually drove, which is not where we
+        # asked. Re-derive the heading from its true position or the shot drifts off
+        # the building - the single biggest cause of useless facade captures.
+        aim = _bearing_deg(pano_lat, pano_lon, lat, lon)
+
+        # Sweep the tiles across the facade, centred on the aim, so N narrow crops
+        # cover roughly the same width one wide shot would - at N times the detail.
+        headings = [aim] if tiles == 1 else [
+            (aim - fov * (tiles - 1) / 2 + fov * i) % 360.0 for i in range(tiles)
+        ]
+
+        images = []
+        for h in headings:
+            img_r = await client.get(
+                STREETVIEW_BASE,
+                params={"size": _STREETVIEW_MAX_SIZE, "location": f"{pano_lat},{pano_lon}",
+                        "heading": round(h, 2), "pitch": pitch, "fov": fov,
+                        "source": "outdoor", "return_error_code": "true", "key": key},
+            )
+            if img_r.status_code != 200:
+                continue
+            images.append({
+                "b64": base64.b64encode(img_r.content).decode(),
+                "heading": round(h, 2), "fov": fov, "pitch": pitch,
+                "bytes": len(img_r.content),
+            })
+
+    if not images:
+        raise HTTPException(502, "Street View returned no usable image for this facade.")
+
+    return {
+        "images": images,
+        "orientation": orientation,
+        "pano": {
+            "lat": pano_lat, "lon": pano_lon,
+            "date": meta.get("date"),          # 'YYYY-MM' - imagery age matters for condition
+            "pano_id": meta.get("pano_id"),
+            "copyright": meta.get("copyright"),
+            "distance_m": round(_haversine_m(pano_lat, pano_lon, lat, lon), 1),
+        },
+        # Ground sampling distance: how much wall one pixel covers. Below ~2 mm/px
+        # hairline cracks are plausible; at 8 mm/px only staining, spalling and
+        # gross cracking survive. Surfaced so the UI never oversells a capture.
+        "mm_per_px": round(_streetview_mm_per_px(
+            _haversine_m(pano_lat, pano_lon, lat, lon), fov), 1),
+    }
+
+
+def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    from math import radians, sin, cos, asin, sqrt
+
+    p1, p2 = radians(lat1), radians(lat2)
+    dp, dl = p2 - p1, radians(lon2 - lon1)
+    a = sin(dp / 2) ** 2 + cos(p1) * cos(p2) * sin(dl / 2) ** 2
+    return 2 * 6371000.0 * asin(sqrt(a))
+
+
+def _streetview_mm_per_px(distance_m: float, fov_deg: float, px: int = 640) -> float:
+    """Millimetres of facade per image pixel, for an image `px` wide at `fov_deg`."""
+    from math import radians, tan
+
+    width_m = 2.0 * max(distance_m, 1.0) * tan(radians(fov_deg) / 2.0)
+    return (width_m * 1000.0) / px
 
 
 _VISION_DEFECT_CLASSES = ("crack", "leakage", "abscission", "corrosion", "bulge")

@@ -55,7 +55,8 @@ let ION_TOKEN = localStorage.getItem('cesium_ion_token') ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4NmE0YWM4NS1hMjI0LTRiY2YtOGFkYS0yOGNiNTA2ZGM2MGIiLCJpZCI6NDI3NDMzLCJzdWIiOiJzYXJhYWJvIiwiaXNzIjoiaHR0cHM6Ly9pb24uY2VzaXVtLmNvbSIsImF1ZCI6IkJ1aWxkaW5ncyIsImlhdCI6MTc3Nzk4NDUwMn0.YfKFn0wvu95IcXJORmvmhTMAQ44-y8_qoajP_339Y4o';
 if (ION_TOKEN) Cesium.Ion.defaultAccessToken = ION_TOKEN;
 
-// Viewer with globe — CartoDB Light as default basemap
+// Viewer with globe — CARTO Positron (keyed via /api/viewer-config),
+// with Esri Light Gray Canvas as the keyless fallback
 const viewer = new Cesium.Viewer('cesium-container', {
   timeline:false, animation:false, baseLayerPicker:false,
   geocoder:false, homeButton:false, sceneModePicker:false,
@@ -71,14 +72,95 @@ viewer.scene.skyAtmosphere = new Cesium.SkyAtmosphere();
 // any gap looks deliberate.
 viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0d1117');
 
-// Replace default imagery with CartoDB Positron (light/subtle — ideal for data overlays)
-viewer.imageryLayers.removeAll();
-viewer.imageryLayers.addImageryProvider(
-  new Cesium.UrlTemplateImageryProvider({
-    url: 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-    credit: '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
+// ──────────────────────────────────────────────────────────────
+// Flat basemaps
+//
+// These were CartoDB Positron / Dark Matter. CARTO's basemaps.cartocdn.com
+// began requiring an API key, and it does NOT fail when one is absent - it
+// returns HTTP 200 with "API KEY REQUIRED" stamped across every tile (a ~5 KB
+// placeholder in place of a ~10 KB tile). The map therefore degraded silently,
+// and the watermark showed through the landing-page hero too, which embeds
+// this viewer in an iframe.
+//
+// Esri's Canvas basemaps are the closest keyless equivalent to Positron. Two
+// differences to respect:
+//   1. Esri templates are {z}/{y}/{x} - NOT the {z}/{x}/{y} CARTO used.
+//   2. Esri splits the canvas into a Base layer plus a separate Reference
+//      layer carrying the labels, where CARTO's *_all bundled both. Each entry
+//      is therefore a LIST, drawn bottom-to-top.
+// ──────────────────────────────────────────────────────────────
+const ESRI_BASE = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+const BASEMAP_TILES = {
+  light: [
+    ESRI_BASE + '/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    ESRI_BASE + '/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+  ],
+  dark: [
+    ESRI_BASE + '/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    ESRI_BASE + '/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+  ],
+  satellite: [ESRI_BASE + '/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+};
+const BASEMAP_CREDITS = {
+  light:     'Esri, HERE, Garmin, \u00a9 OpenStreetMap contributors',
+  dark:      'Esri, HERE, Garmin, \u00a9 OpenStreetMap contributors',
+  satellite: 'Esri, DigitalGlobe, GeoEye',
+};
+
+// One code path for every flat basemap, so the three places that used to paste
+// the same provider inline cannot drift apart again.
+function applyBasemap(type) {
+  const urls = BASEMAP_TILES[type] || BASEMAP_TILES.light;
+  const credit = BASEMAP_CREDITS[type] || BASEMAP_CREDITS.light;
+  viewer.imageryLayers.removeAll();
+  for (const url of urls) {
+    viewer.imageryLayers.addImageryProvider(
+      new Cesium.UrlTemplateImageryProvider({ url, credit })
+    );
+  }
+}
+
+applyBasemap('light');
+
+// Thumbnails in the Display panel point at one sample tile of each basemap.
+// They were hard-coded CARTO URLs, so they showed the watermark too. Redraw
+// them from BASEMAP_TILES so they always match what the map will really load.
+function refreshBasemapThumbs() {
+  for (const mode of ['light', 'dark', 'satellite']) {
+    const img = document.querySelector('.bm-thumb[data-mode="' + mode + '"] .bm-thumb-img');
+    const tpl = BASEMAP_TILES[mode] && BASEMAP_TILES[mode][0];
+    if (!img || !tpl) continue;
+    // Gothenburg at z12. Substituting by name handles both CARTO's
+    // {z}/{x}/{y} and Esri's {z}/{y}/{x}.
+    const url = tpl.replace('{z}', '12').replace('{x}', '2184').replace('{y}', '1240');
+    img.style.backgroundImage = "url('" + url + "')";
+  }
+}
+
+// The CARTO key lives in .env (CARTO_API), never in this file. The backend
+// hands out keyed tile templates from /api/viewer-config. Until it answers -
+// or if it cannot, e.g. under launch.py's static server, which has no /api -
+// the keyless Esri canvases above stay in use, so the map is never blank and
+// never watermarked.
+fetch('/api/viewer-config', { cache: 'no-store' })
+  .then(r => (r.ok ? r.json() : null))
+  .then(cfg => {
+    const bm = cfg && cfg.basemaps;
+    if (!bm) return;
+    let upgraded = false;
+    for (const mode of Object.keys(bm)) {
+      const tiles = bm[mode] && bm[mode].tiles;
+      if (!Array.isArray(tiles) || !tiles.length) continue;
+      BASEMAP_TILES[mode] = tiles;
+      if (bm[mode].credit) BASEMAP_CREDITS[mode] = bm[mode].credit;
+      upgraded = true;
+    }
+    // Swap only when a flat basemap we just upgraded is on screen; photo mode
+    // and the terrain drape manage their own imagery.
+    if (upgraded && bm[_currentBasemap]) applyBasemap(_currentBasemap);
   })
-);
+  .catch(() => { /* keep the Esri fallback */ })
+  .finally(refreshBasemapThumbs);
 
 // ─────────────────────────────────────────────────────────────────
 // Basemap switching — called by layers.js base-map radio buttons
@@ -128,23 +210,11 @@ window.setBasemap = function(type) {
       if (window.vegetationReground) window.vegetationReground();
       if (window.roofsRebuild) window.roofsRebuild();
     }
-    viewer.imageryLayers.removeAll();
-    const tileUrls = {
-      light:     'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-      dark:      'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-      satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    };
-    const credits = {
-      light:     '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
-      dark:      '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
-      satellite: 'Esri, DigitalGlobe, GeoEye',
-    };
     if (validType === 'terrain') {
+      viewer.imageryLayers.removeAll();
       _addTerrainImagery();
-    } else if (tileUrls[validType]) {
-      viewer.imageryLayers.addImageryProvider(
-        new Cesium.UrlTemplateImageryProvider({ url: tileUrls[validType], credit: credits[validType] })
-      );
+    } else if (BASEMAP_TILES[validType]) {
+      applyBasemap(validType);
     }
   }
 };
@@ -491,13 +561,7 @@ document.getElementById('btn-tiles').addEventListener('click', () => {
     // Restore previous basemap if photo was active
     if (_currentBasemap === 'photo') {
       _currentBasemap = 'light';
-      viewer.imageryLayers.removeAll();
-      viewer.imageryLayers.addImageryProvider(
-        new Cesium.UrlTemplateImageryProvider({
-          url: 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-          credit: '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
-        })
-      );
+      applyBasemap('light');
       document.dispatchEvent(new CustomEvent('basemapReset'));
     }
   }

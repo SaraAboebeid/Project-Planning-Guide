@@ -3,14 +3,34 @@
 #      booli_listings.db (accumulates — keeps history of what's new each week)
 #   2) regenerate frontend/public/booli_data.json (what the Data Explorer reads;
 #      served live via the bind-mounted web container — just refresh the browser).
-# NOTE: the Apify actor is PAID — this is scheduled WEEKLY on purpose. Emails
-# saraabo@chalmers.se on failure (reuses boplats_notify.py; needs SMTP in .env).
+# Weekly cadence is kept to stay polite to booli.se, not for cost: booli_scraper.py
+# is now a DIRECT scraper reading the page's __NEXT_DATA__ payload, with no paid
+# Apify actor involved (the old header here still claimed one).
+# Emails saraabo@chalmers.se on failure (reuses boplats_notify.py; needs SMTP in .env).
 $ErrorActionPreference = 'Continue'
-$proj = '/app'
-$py   = '/usr/local/bin/python3'
+# The Docker refactor put CONTAINER paths ('/app', '/usr/local/bin/python3') into
+# this PowerShell script, which cannot run on Windows at all. Those belong in
+# refresh_booli.sh, which already handles them via PPG_PROJECT_ROOT/PPG_PYTHON.
+$proj = if ($env:PROJECT_ROOT) {
+    $env:PROJECT_ROOT
+} elseif ($PSScriptRoot) {
+    Split-Path $PSScriptRoot -Parent   # this script lives in <root>\tools
+} else {
+    (Get-Location).Path
+}
+$py   = 'C:\Users\saraabo\AppData\Local\Programs\Python\Python312\python.exe'
 $log  = Join-Path $proj 'tools\booli_refresh.log'
 
 Set-Location $proj
+$logDir = Split-Path $log -Parent
+if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
+
+if (-not (Test-Path (Join-Path $proj 'booli_scraper.py'))) {
+    $msg = "booli refresh ABORTED: '$proj' is not the project root (booli_scraper.py not found)."
+    ("`n===== {0} : {1} =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $msg) | Add-Content $log
+    Write-Error $msg
+    exit 2
+}
 ("`n===== {0} : booli weekly refresh start =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')) | Add-Content $log
 
 & $py booli_scraper.py    *>> $log ; $scrapeExit = $LASTEXITCODE

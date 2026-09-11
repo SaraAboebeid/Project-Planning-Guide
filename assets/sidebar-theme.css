@@ -6,10 +6,11 @@
 
 /* LIGHT SIDEBAR.
    The tokens below drive the left sidebar, which is now a white surface. The
-   panels that float over the 3D scene (#hover-card, #vt-panel, #facade-panel,
-   …) stay dark and are re-asserted with literal colours in the correction
-   block at the bottom of this file — they share these tokens, so flipping the
-   tokens alone would have left dark text on their dark backgrounds.
+   hover card, Facade Inspector and WWR panel are white too (section 7a at the
+   bottom). The transit, parking, token and performance panels still float dark
+   over the 3D scene (section 7b) - they share these tokens, so they are
+   re-asserted there with literal colours, or they would get dark text on
+   their dark backgrounds.
 
    To go back to a dark sidebar: restore the values commented beside each token
    and delete the "LIGHT SIDEBAR CORRECTIONS" block at the end. */
@@ -760,17 +761,96 @@ a[href]:hover,
   border-top-color: var(--sb-hairline) !important;
 }
 
-/* ── 7. Panels floating over the 3D scene stay dark ─────────── */
-/* They read the same tokens, so without this they would inherit dark text on
-   their dark backgrounds. Literal colours here, deliberately token-free. */
+/* ── 7. Floating panels ──────────────────────────────────────── */
+
+/* 7a. Hover card, Facade Inspector and its WWR panel are LIGHT, like the
+   sidebar. The viewer's base .panel was always white (--surface #FFFFFF in
+   main.css), the hover-card markup sets background:#ffffff, and ui.js writes
+   its text in dark purple / slate for a white card. An earlier override here
+   painted them near-black, which left that text barely readable. */
 #hover-card,
+#wwr-panel,
+#facade-panel {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(114, 28, 184, 0.22) !important;
+  color: rgba(15, 17, 23, 0.88) !important;
+  box-shadow: 0 16px 38px rgba(15, 17, 23, 0.18) !important;
+}
+
+#hover-card *,
+#wwr-panel *,
+#facade-panel * {
+  border-bottom-color: var(--sb-hairline) !important;
+}
+
+#wwr-panel h2,
+#facade-panel h2 {
+  color: rgba(15, 17, 23, 0.92) !important;
+}
+
+#wwr-panel .sub,
+#facade-panel .sub,
+#wwr-breakdown,
+#zoom-label {
+  color: rgba(15, 17, 23, 0.58) !important;
+}
+
+#facade-panel .fi-val,
+#wwr-panel .result-item {
+  color: rgba(15, 17, 23, 0.88) !important;
+}
+
+/* Inspector pieces that were tuned for a dark window. The canvas placeholder
+   fills are painted in facade_inspector.js and were changed there to match. */
+.fi-manual {
+  background: #F8FAFC !important;
+  border-color: #C4B5FD !important;
+}
+.fi-cardinals-label {
+  color: rgba(15, 17, 23, 0.55) !important;   /* was --faint: ~2.5:1 at 9px */
+}
+/* Restated with !important so the base rule below cannot flatten them. */
+.facade-thumb          { border-color: #E2E8F0 !important; }
+.facade-thumb.active   { border-color: #A78BFA !important; }
+.facade-thumb.captured { border-color: #22C55E !important; }
+
+/* Primary actions: pale-lilac text (#c4b5fd / #ecd9ff) only worked on black.
+   Solid purple with white text reads on white and still marks "do this". */
+.fi-primary,
+#btn-manual-capture,
+#btn-wwr-save {
+  background: #6D28D9 !important;
+  border-color: #6D28D9 !important;
+  color: #FFFFFF !important;
+}
+.fi-primary:hover,
+#btn-manual-capture:hover,
+#btn-wwr-save:hover {
+  background: #5B21B6 !important;
+  border-color: #5B21B6 !important;
+  color: #FFFFFF !important;
+}
+
+/* Defects keeps its red identity; pale pink text (#f9a8b4) was for black. */
+.fi-defects {
+  background: rgba(230, 25, 75, 0.07) !important;
+  border-color: #E6194B !important;
+  color: #B4163F !important;
+}
+.fi-defects:hover {
+  background: rgba(230, 25, 75, 0.13) !important;
+  color: #9F1239 !important;
+}
+
+/* 7b. Transit, parking, token and performance panels still float dark. Their
+   JS-built contents have not been checked against a white background yet, so
+   they are left as they were. They read the same --sb-* tokens as the light
+   sidebar, so they are re-asserted here with literal, token-free colours. */
 #vt-panel,
 #vt-disr-panel,
 #vt-park-panel,
 #token-panel,
-#perf-panel,
-#wwr-panel,
-#facade-panel {
+#perf-panel {
   background: rgba(13, 17, 23, 0.96) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   color: rgba(255, 255, 255, 0.88) !important;
@@ -781,25 +861,20 @@ a[href]:hover,
 #vt-disr-panel *,
 #vt-park-panel *,
 #token-panel *,
-#perf-panel *,
-#wwr-panel *,
-#facade-panel *,
-#hover-card * {
+#perf-panel * {
   border-bottom-color: rgba(255, 255, 255, 0.07) !important;
 }
 
 #vt-panel .vt-dest,
 #vt-disr-panel .vt-disr-title,
-#facade-panel .fi-val,
-#perf-panel .result-item,
-#wwr-panel .result-item {
+#perf-panel .result-item {
   color: rgba(255, 255, 255, 0.88) !important;
 }
 
 #vt-panel .sub, #vt-disr-panel .sub, #vt-park-panel .sub,
-#token-panel .sub, #perf-panel .sub, #wwr-panel .sub, #facade-panel .sub,
-#vt-panel-title, #vt-disr-count, #vt-park-title, #wwr-breakdown,
-#zoom-label, #token-panel div {
+#token-panel .sub, #perf-panel .sub,
+#vt-panel-title, #vt-disr-count, #vt-park-title,
+#token-panel div {
   color: rgba(255, 255, 255, 0.56) !important;
 }
 
@@ -807,4 +882,24 @@ a[href]:hover,
   background: rgba(255, 255, 255, 0.05) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* ── 8. Loading screen ─────────────────────────────────────── */
+/* White, to match the sidebar and panels (was #0f1117 in main.css). The lime
+   title (#96D74C) and pale spinner arc (#a78bfa) were picked for the old
+   near-black background and are ~1.7:1 on white, so both move to the brand
+   purple. Lives here rather than in gothenburg_3d.css, which build.py
+   regenerates; both the Gothenburg and UK viewers load this file. */
+#loading {
+  background: #FFFFFF !important;
+}
+#loading h1 {
+  color: #6D28D9 !important;
+}
+#loading p {
+  color: #64748B !important;
+}
+.spinner {
+  border-color: rgba(114, 28, 184, 0.15) !important;
+  border-top-color: #6D28D9 !important;
 }

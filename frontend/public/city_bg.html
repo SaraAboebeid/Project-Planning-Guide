@@ -88,12 +88,20 @@
         viewer.scene.globe = new Cesium.Globe(Cesium.Ellipsoid.WGS84);
         viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0d14');
       }
-      viewer.imageryLayers.addImageryProvider(
-        new Cesium.UrlTemplateImageryProvider({
-          url: 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-          credit: '© OpenStreetMap contributors © CARTO',
-        })
-      );
+      // CARTO watermarks every tile ("API KEY REQUIRED") unless given a key.
+      // The key lives in .env and comes from /api/viewer-config - the same
+      // endpoint the 3D viewer uses. If that is unreachable, fall back to
+      // Esri's keyless dark canvas so the hero is never watermarked.
+      fetch('/api/viewer-config', { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : null)).catch(() => null)
+        .then(cfg => {
+          const dark = cfg && cfg.basemaps && cfg.basemaps.dark;
+          const useCarto = !!(dark && dark.tiles && dark.tiles.length);
+          viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider(useCarto
+            ? { url: dark.tiles[0], credit: dark.credit || '\u00a9 OpenStreetMap contributors \u00a9 CARTO' }
+            : { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                credit: 'Esri, HERE, Garmin, \u00a9 OpenStreetMap contributors' }));
+        });
       startSlowRotation();
     }
 

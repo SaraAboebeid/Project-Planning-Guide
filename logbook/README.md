@@ -57,11 +57,20 @@ and per-page Markdown export.
 | 9 | Retrofit Prioritisation | method |
 | 10 | Optimisation Process | method |
 | 11 | Decision Analysis under Uncertainty | method |
-| 12 | Façade Inspection & Defect ML | method |
+| 12 | **AI, ML & Vision Models** | method |
 | 13 | Climate & Environmental Analysis | method |
 | 14 | Viewer Layers & Visualisation | result |
 | 15 | Known Limitations | metadata |
 | 16 | Project Team & Credits | metadata |
+| 17 | **Scraped Market Data** | raw |
+| 18 | **Analysis Inventory** | method |
+
+Pages 17 and 18 were added after the first sixteen, so they sit at the end of the
+sidebar. The home page groups them logically regardless — Scraped Market Data
+under *Data*, Analysis Inventory under *Analysis*. Renumbering would require
+renaming files in `pages/` and updating every `**N. Title**` cross-reference, so
+it is deliberately deferred; `scripts/check_content.py` will catch any mismatch
+if you do renumber.
 
 Sweden and the UK get a page each because the chains genuinely differ: Sweden
 takes footprints from EUBUCCO and joins certificates **geometrically**; the UK

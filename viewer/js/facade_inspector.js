@@ -95,7 +95,8 @@ document.getElementById('btn-inspect').addEventListener('click', () => {
   // Clear cardinal canvases
   for (const d of DIRS) {
     const ctx = document.getElementById('canvas-'+d).getContext('2d');
-    ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,200,150);
+    // Light placeholder to match the white inspector window (was #1a1a2e).
+    ctx.fillStyle = '#f1f5f9'; ctx.fillRect(0,0,200,150);
     ctx.fillStyle = '#475569'; ctx.font = '11px Inter';
     ctx.textAlign = 'center'; ctx.fillText('Click to capture', 100, 75);
   }
@@ -103,8 +104,10 @@ document.getElementById('btn-inspect').addEventListener('click', () => {
   const mc = document.getElementById('canvas-manual');
   mc.width = 520; mc.height = 120;
   const mctx = mc.getContext('2d');
-  mctx.fillStyle = '#0d0d1a'; mctx.fillRect(0, 0, mc.width, mc.height);
-  mctx.fillStyle = '#a78bfa'; mctx.font = '600 13px Inter';
+  // Light placeholder + dark-purple prompt for the white window (were
+  // #0d0d1a and #a78bfa, tuned for the old black one).
+  mctx.fillStyle = '#f8fafc'; mctx.fillRect(0, 0, mc.width, mc.height);
+  mctx.fillStyle = '#6d28d9'; mctx.font = '600 13px Inter';
   mctx.textAlign = 'center';
   mctx.fillText('Click  \u{1F4F7} Draw & Capture  then drag a box', mc.width / 2, mc.height / 2 - 8);
   mctx.fillText('over the building area you want to analyse', mc.width / 2, mc.height / 2 + 12);

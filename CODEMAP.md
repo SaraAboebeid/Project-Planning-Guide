@@ -421,7 +421,7 @@ it cannot affect the tool.
 | [logbook/logbook_content.py](logbook/logbook_content.py) | **All prose** — the only file to edit for wording |
 | [logbook/scripts/ui_utils.py](logbook/scripts/ui_utils.py) | Layout, repo introspection, markdown/zip export |
 | [logbook/scripts/check_content.py](logbook/scripts/check_content.py) | Validates numbering, page files, cited paths and cross-references |
-| [logbook/pages/](logbook/pages/) | 16 pages, ordered by numeric prefix; intentionally thin |
+| [logbook/pages/](logbook/pages/) | 18 pages, ordered by numeric prefix; intentionally thin |
 | [logbook/run.bat](logbook/run.bat) · [setup.bat](logbook/setup.bat) | Launch on :8501 / create the venv |
 
 Page 2 (*Script Browser*) renders **this file** live, so the logbook cannot

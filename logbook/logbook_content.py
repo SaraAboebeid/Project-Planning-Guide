@@ -50,6 +50,69 @@ documented separately.
     },
     "sections": [
         {
+            "title": "How every source is reached — transport, auth, format",
+            "badge": "metadata",
+            "body": """
+The reference table. Read this before adding a source, moving the tool to
+another machine, or debugging "why is this layer empty".
+
+**Downloaded once, then held locally** — no runtime dependency:
+
+| Source | Transport | Auth | Format |
+|---|---|---|---|
+| EUBUCCO | anonymous S3, `s3.eubucco.com/eubucco/v0.2/buildings/parquet/nuts_id=<NUTS2>/` | none | Parquet |
+| Swedish energideklaration | local file, opened **read-only** | none | DuckDB (~461 MB) |
+| Lantmäteriet footprints | supplied alongside the certificate register | `LANTMATERIET_USER` / `_PASSWORD` in `.env` | in the DuckDB |
+| DTCC LiDAR | `compute.dtcc.chalmers.se:8000` | none (open) | laser tiles, EPSG:3006 |
+| English Housing Survey | gov.uk publication download | none | OpenDocument `.ods` |
+| TABULA England | BRE brochure, parsed once | none | PDF → JSON |
+| Wikells catalogue | local file | none | JSON |
+| EPW weather | local file, one per city | none | EPW |
+
+**Called live at runtime** — these fail if the network, a key or the upstream is down:
+
+| Source | Endpoint | Auth |
+|---|---|---|
+| UK EPC | `get-energy-performance-data.communities.gov.uk` `GET /api/domestic/search` | **Bearer `UK_EPC_API_TOKEN`** (GOV.UK One Login) |
+| OpenStreetMap | Overpass — `overpass-api.de`, falling back to `overpass.kumi.systems` | none |
+| PVGIS | `re.jrc.ec.europa.eu` (EC Joint Research Centre) | none |
+| SCB | `api.scb.se` + WFS at `geodata.scb.se` | none |
+| Boverket klimatdatabas | REST client, cached | see API terms |
+| Västtrafik | `ext-api.vasttrafik.se` | **OAuth2 client credentials** — `VASTTRAFIK_CLIENT_ID` / `_SECRET` |
+| Trafikverket | `api.trafikinfo.trafikverket.se` | **`TRAFIKVERKET_API_KEY`** |
+| Electricity price (SE) | `elprisetjustnu.se` — Nord Pool day-ahead, zone SE3 | none |
+| Electricity price (UK) | `api.octopus.energy` — Agile half-hourly | none |
+| Geocoding | `nominatim.openstreetmap.org` | none, results cached |
+| Göteborg districts | Göteborgs Stad ArcGIS FeatureServer | none |
+| Anthropic | `api.anthropic.com/v1/messages` | **`ANTHROPIC_API_KEY`** |
+| OpenAI | `api.openai.com/v1/chat/completions` | **`OPENAI_API_KEY`** |
+
+**Scraped** — see **17. Scraped Market Data** for the full method:
+
+| Source | Technique | Cadence |
+|---|---|---|
+| Boplats | `requests` + BeautifulSoup over server-rendered HTML | daily |
+| Booli | reads the `__NEXT_DATA__` JSON payload out of the Next.js page | weekly |
+
+**Internal services** the backend proxies to, not third parties:
+
+| Service | Configured by | Port |
+|---|---|---|
+| EPSM (EnergyPlus) | `EPSM_BASE_URL` | 8010 |
+| Façade defect ML | `FACADE_ML_URL` / `FACADE_MODEL_URL` | 8020 |
+
+> **Two Overpass hosts is deliberate.** The public instance rate-limits
+> aggressively, so a mirror is configured as a fallback. A pipeline run that
+> stalls on geometry is usually Overpass throttling, not a bug.
+
+**Secrets** all live in the gitignored `.env`: `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, `UK_EPC_API_TOKEN`, `LANTMATERIET_USER` / `_PASSWORD`,
+`VASTTRAFIK_CLIENT_ID` / `_SECRET`, `TRAFIKVERKET_API_KEY`. Never commit one;
+print names or lengths only when checking they exist.
+""",
+            "files": ["backend/config.py", "backend/main.py"],
+        },
+        {
             "title": "SE · Building geometry — EUBUCCO",
             "badge": "raw",
             "body": """
@@ -963,52 +1026,177 @@ recommendation. Results carry through to the Step 5 report.
 # ─────────────────────────────────────────────────────────────────────────────
 FACADE_ML = {
     "number": 12,
-    "title": "Façade Inspection & Defect ML",
+    "title": "AI, ML & Vision Models",
     "stage": "method",
     "purpose": """
-Assessing envelope condition from photographs — both a machine-learning defect
-detector and a vision-model estimate of window-to-wall ratio.
+The three learned components in the tool: a **trained object detector** for
+façade defects, a **vision model** estimating window-to-wall ratio from a
+photograph, and a **tool-calling assistant** that answers questions against the
+project's own datasets.
+
+All three are optional. Each degrades to something explicit — a heuristic, a
+disabled button, or a refusal — rather than to a fabricated number.
 """,
+    "overview": {
+        "title": "Three components, three different risk profiles",
+        "subtitle": "Two hosted APIs and one local model, all fenced off from the core.",
+        "items": [
+            ("Defect detector", "Local, trained, deterministic. Own torch process on :8020."),
+            ("WWR vision", "Hosted LLM. Claude first, then GPT-4.1, then a heuristic."),
+            ("Data assistant", "Hosted LLM with 11 tools over real datasets — it queries, it does not recall."),
+            ("Fenced off", "None of them can change a simulation result; they produce inputs a user can see and override."),
+        ],
+    },
     "sections": [
         {
-            "title": "Defect detection",
+            "title": "Façade defect detection — the trained model",
             "badge": "method",
             "body": """
-A trained crack and defect detector runs as a **separate service on the host**
-(`:8020`) using its own torch environment; the app's backend proxies to it via
-`/api/facade-detect`. Keeping it out of the backend process avoids loading torch
-into the API server.
+**Where it runs.** A standalone FastAPI service on the **host**, port `8020`
+(`FACADE_ML_PORT`), inside its own torch environment. The app's backend proxies
+to it via `/api/facade-detect`.
 
-Detected defect load feeds the **F** criterion in the prioritisation score
-(**9. Retrofit Prioritisation**), so a photo upload changes the ranking.
+**Why a separate process.** Keeping torch out of the API server means the
+backend starts in seconds, carries no CUDA dependency, and runs at all on a
+machine where the model cannot. The trade-off is one more thing to start —
+`tools/ml/run_facade_service.ps1`.
 
-Uploads are available both in the 3D viewer and in Step 2 of the wizard.
+**The model.** A checkpoint from a separate ML project, loaded from
+`outputs/mbdd2025_pretrained/best.pt` (overridable via `FACADE_MODEL`), built by
+`facade_ml.models.detection.build_detection_model(num_classes=…, fpn_v2=…)` — an
+**FPN-based object detector**. The checkpoint records a **best score of 0.77**.
+Loaded with `map_location="cpu"`.
+
+**Five defect classes**, from `facade_ml.data.voc.VOC_CLASSES`:
+
+| Class | Severity weight in scoring |
+|---|---|
+| `crack` | 1.00 |
+| `bulge` | 1.00 |
+| `corrosion` | 0.75 |
+| `abscission` | 0.75 |
+| `leakage` | 0.60 |
+
+**Where the output goes.** Detected defect load drives the **F** criterion in
+the prioritisation score (**9. Retrofit Prioritisation**) through a saturating
+curve, so uploading a photograph changes the ranking. Structural defects (crack,
+bulge) are weighted above surface ones deliberately.
+
+**An important scoring rule:** until a building has been inspected, F is marked
+unavailable and **left out of the composite entirely**, with the other criteria
+re-weighted. An un-inspected building is not assumed to be in good condition —
+nor in bad.
+
+Uploads are available in both the 3D viewer and Step 2 of the wizard.
 """,
             "files": [
                 "tools/ml/facade_detect_service.py",
+                "tools/ml/run_facade_service.ps1",
                 "frontend/src/components/FacadeDefectPanel.tsx",
+                "frontend/src/utils/retrofitPriority.ts",
             ],
         },
         {
-            "title": "Window-to-wall ratio from vision",
+            "title": "Window-to-wall ratio — the vision model",
             "badge": "method",
             "body": """
-In the viewer, the camera flies to a façade, the user drags a rubber-band crop,
-and a GPT-4 vision call estimates the window-to-wall ratio. Estimates are saved
-to a WWR database so a façade is assessed once and reused.
+**The interaction.** In the viewer the camera flies to a façade, the user drags
+a rubber-band crop, and the cropped image is sent for estimation. Results
+persist to a WWR database so a façade is assessed once and reused.
 
-WWR matters because it is both a strong driver of heating demand and one of the
-attributes least often present in the source registers.
+**Three-tier fallback**, in strict priority order:
+
+| Tier | Model | Endpoint | Result tag |
+|---|---|---|---|
+| 1 | `claude-sonnet-4-5` | `api.anthropic.com/v1/messages` (`anthropic-version: 2023-06-01`) | `claude-sonnet-4-5-vision` |
+| 2 | `gpt-4.1` | `api.openai.com/v1/chat/completions` | `gpt-4.1-vision` |
+| 3 | heuristic | — | `"Heuristic estimate (no OPENAI_API_KEY configured)."` |
+
+**The tier matters and is recorded.** Every saved estimate carries its `source`,
+so a Claude-derived number, a GPT-derived number and a heuristic guess are
+distinguishable after the fact. `/api/status` reports which provider is
+configured.
+
+**Why WWR specifically.** It strongly drives heating demand and is one of the
+attributes least often present in any register — Sweden's `buildings.json` has
+no per-building WWR field at all. Without an estimate the model falls back to a
+use-category default (0.15–0.30 depending on use), which is a much weaker
+assumption than looking at the actual building.
 """,
             "files": [
                 "viewer/js/facade_inspector.js",
                 "viewer/js/facade_comparison.js",
                 "data/wwr_database.json",
+                "frontend/src/config/materialProperties.ts",
             ],
         },
+        {
+            "title": "The data assistant — tool calling, not recall",
+            "badge": "method",
+            "body": """
+`POST /api/chat`, surfaced as the "Ask the data" widget. Bilingual and
+**data-grounded**: it does not answer from model knowledge, it calls tools that
+query the project's own datasets and answers from what comes back.
+
+**Provider.** Prefers OpenAI `gpt-4o` (function-calling loop, `temperature 0.2`),
+with an Anthropic path as the alternative.
+
+**Eleven tools:**
+
+| Tool | Reaches |
+|---|---|
+| `list_datasets` | what data exists at all |
+| `get_city_overview` | city-level aggregates |
+| `list_districts` · `get_district_stats` | the 96 primärområden |
+| `find_buildings_by_address` | individual buildings |
+| `get_epc_dataset_info` · `search_epc_fields` | the 1.88 M-row certificate register |
+| `get_booli_sales` · `get_boplats_rentals` | the scraped market data (**17. Scraped Market Data**) |
+| `get_scb_datasets` | Statistics Sweden |
+| `recommend_retrofit` | the agentic path — address → optimiser → options → EnergyPlus |
+
+**`recommend_retrofit` is different in kind** from the other ten. The rest are
+read-only lookups; this one runs the actual pipeline — resolves an address,
+calls the optimiser, produces candidate options and validates them. It is the
+one tool whose answer costs real compute.
+
+**Why `temperature 0.2`.** The assistant's job is to report figures accurately,
+not to write well. Low temperature reduces the chance of a plausible-sounding
+number that the tools did not return.
+
+**Design intent.** The grounding rule is what makes it acceptable in a
+decision-support tool at all: an LLM that recalled Swedish building statistics
+from training data would be confidently wrong in ways nobody could audit. One
+that must call `search_epc_fields` and quote the result can be checked.
+""",
+            "files": [
+                "frontend/src/components/ChatWidget.tsx",
+                "scripts/fetch_epc_db.py",
+            ],
+        },
+        {
+            "title": "Keys, and what happens without them",
+            "badge": "metadata",
+            "body": """
+| Key | Powers | Absent |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | WWR tier 1, assistant alternative | falls to tier 2 |
+| `OPENAI_API_KEY` | WWR tier 2, assistant preferred | WWR falls to the heuristic; assistant unavailable |
+| *(neither)* | — | `/api/status` reports `configured: false`, `provider: null` |
+
+Keys live in the gitignored `.env`. Never commit one, and never echo a value —
+print names or lengths only when checking they exist.
+
+**No learned component is on the critical path.** A simulation, an optimisation
+and a prioritisation ranking all complete with every key absent — the
+prioritisation simply re-weights around the missing F criterion, and the shoebox
+uses a default WWR. That is deliberate: the tool must produce a defensible
+answer without any AI at all.
+""",
+        },
     ],
-    "todo": "Model architecture, training set size and validation metrics for the "
-            "defect detector — these live in the separate ML project, not this repo.",
+    "todo": "Still from the separate ML project, not this repo: the training set "
+            "(MBDD2025) size and composition, the exact detector backbone, and what "
+            "metric the recorded best score of 0.77 refers to (mAP, and at which IoU).",
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1182,6 +1370,335 @@ than hiding them once a value looks reasonable.
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+SCRAPED_DATA = {
+    "number": 17,
+    "title": "Scraped Market Data",
+    "stage": "raw",
+    "purpose": """
+The two housing-market feeds the tool scrapes itself — **Boplats** (first-hand
+rentals) and **Booli** (sales and sold prices) — in full: how each site is
+reached, what is stored, how often it runs, and whether it is running right now.
+
+Everything else in the tool arrives via a file download or an official API
+(**1. Data Portal**). These two are the only sources we scrape, which makes them
+the only ones that can break because someone else changed a web page.
+""",
+    "overview": {
+        "title": "Two scrapers, two very different techniques",
+        "subtitle": "Both write SQLite, then export JSON for the Data Explorer.",
+        "items": [
+            ("Boplats", "Server-rendered HTML parsed with BeautifulSoup. 1,018 rentals held."),
+            ("Booli", "Next.js site — the JSON payload is read out of the page itself. 243 listings held."),
+            ("Accumulating", "Both keep first_seen / last_seen per record, so history builds up rather than being overwritten."),
+            ("Fragile by nature", "A layout change upstream breaks them, unlike an API contract."),
+        ],
+    },
+    "sections": [
+        {
+            "title": "Boplats — first-hand rentals",
+            "badge": "raw",
+            "body": """
+**Target.** `https://boplats.se/sok?types=1hand&area=508A8CB406FE001F00030A60`
+— the `area` token is Gothenburg; `types=1hand` restricts to first-hand
+contracts, which is the segment with regulated rents and therefore the
+meaningful one for renovation economics.
+
+**Technique.** Plain `requests` plus **BeautifulSoup** over server-rendered
+HTML. No browser automation, no API.
+
+**Politeness.** `REQUEST_DELAY = 1.2` seconds between requests, with a
+desktop-browser `User-Agent`.
+
+**Stored** in `boplats_apartments.db`, table `apartments` — **1,018 rows**,
+15 columns:
+
+`id · url · address · area_name · rooms · size_m2 · floor_current ·
+floor_total · rent_sek · move_in_date · apply_by · floorplan_image_path ·
+floorplan_image_url · first_seen · last_seen`
+
+**Floor plans** are downloaded to `boplats_images/<apartment_id>.jpg`, then
+synced into `assets/boplats_images` and `frontend/public/boplats_images`.
+
+**Why `floor_current` / `floor_total` matter.** They are the only routine source
+in the whole tool for *which storey* a dwelling is on — relevant to both
+retrofit sequencing and comfort, and absent from EUBUCCO and the certificates.
+
+**Modes.** `--watch 60` re-scrapes on an interval; `--export` dumps the database
+to JSON without scraping.
+""",
+            "files": [
+                "boplats_scraper.py",
+                "boplats_to_assets.py",
+                "boplats_apartments.db",
+                "assets/boplats_data.json",
+            ],
+        },
+        {
+            "title": "Booli — sales, sold prices and upcoming",
+            "badge": "raw",
+            "body": """
+**Technique — the interesting part.** Booli is a **Next.js** site: every search
+page ships its own data as JSON inside
+`<script id="__NEXT_DATA__">` (Apollo normalised state). The scraper reads
+`Listing` (for-sale / upcoming) and `SoldProperty` (sold) entities straight out
+of that payload rather than parsing rendered HTML.
+
+**Why that is better here.** The embedded payload is the same data the page
+renders from, so it carries typed fields — coordinates, tenure, fees, energy
+class — that would have to be scraped back out of formatted text otherwise. It
+is also more stable than the DOM: a visual redesign usually leaves the payload
+shape intact.
+
+**No paid API.** An earlier iteration used a paid Apify actor. The current
+scraper is direct — worth knowing, because the weekly cadence was originally
+chosen to limit paid calls and is now purely about being polite.
+
+**Status paths.** `till-salu` (for sale) and `slutpriser` (sold). *Upcoming* is
+not a separate path — it is derived from the `upcomingSale` flag on the
+for-sale set.
+
+**Images** come from the CDN pattern `https://bcdn.se/images/cache/{id}_1280x0.webp`.
+
+**Configuration**, all via `.env`:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `BOOLI_AREA_IDS` | *(required)* | comma-separated area ids — find one by searching booli.se and copying `areaIds=` from the URL |
+| `BOOLI_MAX_ITEMS` | 200 | cap per area **and** status |
+| `BOOLI_MAX_PAGES` | 20 | page cap per area and status |
+| `BOOLI_DELAY` | 1.5 s | between requests |
+| `BOOLI_STATUSES` | all | subset of `for_sale,sold,upcoming` |
+
+**Stored** in `booli_listings.db`, table `listings` — **243 rows**, 28 columns,
+including `latitude` / `longitude`, `energy_class`, `sold_price`, `sold_date`,
+`sqm_price`, `construction_year`, `monthly_fee`, `agency_name`, and the complete
+**`raw_json`** of each record.
+
+**Keeping `raw_json` is deliberate.** The parsed columns are a lossy projection
+of a payload that changes shape upstream; retaining the original means a new
+field can be back-filled from data already collected instead of re-scraping.
+
+> **Cloudflare.** Booli sits behind it. This works at city volume with polite
+> delays. Scraping all of Sweden would very likely be challenged or blocked and
+> may breach Booli's terms — the scraper's own docstring says to throttle hard
+> and prefer per-city runs. Treat that as a constraint, not a suggestion.
+""",
+            "files": [
+                "booli_scraper.py",
+                "booli_to_assets.py",
+                "booli_listings.db",
+                "assets/booli_data.json",
+            ],
+        },
+        {
+            "title": "From database to the app",
+            "badge": "processed",
+            "body": """
+Each scraper is paired with an exporter that writes **two** copies of the JSON —
+`assets/` and `frontend/public/` — because the viewer reads one and the React
+Data Explorer reads the other.
+
+`frontend/public/` is bind-mounted into the web container, so a refreshed export
+is picked up **live**: no rebuild, just a browser refresh.
+
+Boplats exports collapse to **unique addresses** (684 at the last successful
+run) rather than one row per listing, since several listings can share an
+entrance.
+""",
+            "files": [
+                "assets/boplats_data.json",
+                "assets/booli_data.json",
+                "frontend/public/boplats_data.json",
+                "frontend/public/booli_data.json",
+            ],
+        },
+        {
+            "title": "Scheduling — and the outage found on 2026-09-03",
+            "badge": "metadata",
+            "body": """
+**Intended cadence:** Boplats daily at 03:00, Booli weekly.
+
+**Actual state when checked on 2026-09-03:**
+
+| Feed | Newest record | Age |
+|---|---|---|
+| Boplats | `last_seen` 2026-08-17 06:53 | 17 days |
+| Booli | `last_seen` 2026-07-30 13:44 | 35 days |
+
+The Windows task **`PPG-Boplats-Daily-Refresh`** was firing correctly every day
+— it ran that morning at 03:16 and reported exit code **0** — while doing
+nothing at all.
+
+**Root cause.** Commit `e2f95ee3` (2026-08-17, *"Refactor project path
+resolution in PowerShell scripts for flexibility"*) replaced a hardcoded project
+root with a fallback chain:
+
+```powershell
+$proj = if ($env:PROJECT_ROOT) { $env:PROJECT_ROOT }
+        elseif ($PSScriptRoot)  { $PSScriptRoot }      # ← resolves to <root>\\tools
+        else { (Get-Location).Path }
+```
+
+The script lives in `tools\\`, so `$PSScriptRoot` **is** `<root>\\tools`, not the
+project root. `PROJECT_ROOT` is not set at process, user or machine level, so
+that middle branch always won. Consequently the scraper was invoked as
+`tools\\boplats_scraper.py` (which does not exist) and the log was directed at
+`tools\\tools\\boplats_refresh.log` — a directory that does not exist, so
+`Add-Content` silently failed too.
+
+**Why no alert.** The failure-email branch redirects its own output to the same
+unwritable log and calls `boplats_notify.py`, which was equally unreachable from
+the wrong directory. And the scheduled task reports the **PowerShell process**
+exit code, which is 0 regardless. So: firing daily, succeeding on paper, doing
+nothing, alerting nobody, for 17 days.
+
+**Booli was worse.** The same day's commit `deb0312d` (*"Update paths … for
+Docker compatibility"*) wrote **container** paths into the PowerShell script —
+`$proj = '/app'` and `$py = '/usr/local/bin/python3'` — which cannot run on
+Windows at all. Those belong in `refresh_booli.sh`, which already handles them
+properly via `PPG_PROJECT_ROOT` / `PPG_PYTHON`. There is also **no
+`PPG-Booli-Weekly` scheduled task registered**, despite the script header naming
+one, so Booli has had no automation regardless.
+
+**Fixed on 2026-09-03:** both `.ps1` scripts now resolve the root with
+`Split-Path $PSScriptRoot -Parent`, create the log directory before writing, and
+**abort loudly with exit 2** if the resolved directory does not contain the
+scraper. The `.sh` variants were already correct and were not touched.
+
+**Still outstanding:** no Booli scheduled task exists, and the disabled legacy
+task `Boplats Database` (last run 2026-07-30, result 1) is still registered.
+""",
+            "files": [
+                "tools/refresh_boplats.ps1",
+                "tools/refresh_booli.ps1",
+                "tools/refresh_boplats.sh",
+                "tools/refresh_booli.sh",
+                "boplats_notify.py",
+                "tools/boplats_refresh.log",
+            ],
+        },
+        {
+            "title": "What this teaches about scheduled work",
+            "badge": "metadata",
+            "body": """
+Three properties the outage lacked, worth applying to any future job:
+
+1. **A scheduled task's exit code is not the job's exit code.** The wrapper must
+   propagate failure, and the check must be on *data freshness*, not on whether
+   the task ran.
+2. **A path fallback that silently resolves to the wrong place is worse than a
+   hardcoded path.** The hardcoded version was inflexible but visibly correct;
+   the "flexible" version was invisibly wrong.
+3. **Alerting that shares a failure mode with the thing it monitors is not
+   alerting.** The notifier could not run for exactly the reason the job could
+   not run.
+
+A freshness assertion — *newest `last_seen` is younger than 48 hours* — would
+have caught this on day two.
+""",
+        },
+    ],
+    "todo": "Register a PPG-Booli-Weekly scheduled task, remove the disabled "
+            "legacy 'Boplats Database' task, and add a data-freshness check that "
+            "alerts on stale last_seen rather than on task exit code.",
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+ANALYSIS_INVENTORY = {
+    "number": 18,
+    "title": "Analysis Inventory",
+    "stage": "method",
+    "purpose": """
+Every analysis the tool can run, in one table: where it executes, what method it
+uses, where that method came from, and whether it is built in or an external
+service. Each has its own page for the detail — this is the index.
+""",
+    "overview": {
+        "title": "Four families",
+        "subtitle": "Grouped by what they compute, not by which page they appear on.",
+        "items": [
+            ("Building energy", "Demand and retrofit performance — EnergyPlus and the analytic degree-day model."),
+            ("Environmental", "Sun, radiation and outdoor comfort around a point."),
+            ("Urban", "Network and greenness measures over the city."),
+            ("Decision support", "Ranking, optimising and choosing under uncertainty."),
+        ],
+    },
+    "sections": [
+        {
+            "title": "The full inventory",
+            "badge": "method",
+            "table": [
+                ["Analysis", "Runs in", "Method", "Origin"],
+                ["EnergyPlus simulation", "EPSM service :8010", "Full building energy simulation of a single-zone shoebox", "External — EPSM, Chalmers"],
+                ["Optimisation (Pareto front)", "Backend /api/optimize", "Enumerate combinations, degree-day physics, skyline sweep on cost/carbon/energy", "Adapted from DT4PED"],
+                ["Retrofit prioritisation (MCDA)", "Browser, client-side", "Weighted expert-rule score over four criteria; AHP weights", "Built in"],
+                ["Decision under uncertainty", "Browser, client-side", "Minimax regret, uncertainty range, Hurwicz over price scenarios", "Built in"],
+                ["Retrofit scenario analyser", "Browser + backend", "Package comparison against a simulated baseline", "Built in"],
+                ["Life-cycle assessment", "Browser + Boverket API", "Embodied carbon from emission factors plus operational carbon", "Built in"],
+                ["Heating-system comparison", "Browser, client-side", "Economics on top of an unchanged demand; SPF catalogue", "Built in"],
+                ["Sun hours", "Backend /api/analysis/sun-hours", "Direct-sun hours over a ground disc; compact astronomical sun position", "Built in, clean-room"],
+                ["Incident radiation", "Backend /api/analysis/incident-radiation", "Cumulative irradiation, EPW-driven sky matrix", "Built in, clean-room"],
+                ["Thermal comfort (UTCI)", "Backend /api/analysis/thermal-comfort", "UTCI plus solar mean radiant temperature", "Built in, on pythermalcomfort"],
+                ["Rooftop PV yield", "PVGIS (external API)", "Orientation- and tilt-aware annual yield", "External — EC PVGIS"],
+                ["Space-syntax centrality", "Backend /api/urban/space-syntax", "Street-network centrality, pure Python", "Built in"],
+                ["Green index / green areas", "Backend /api/urban/green-areas", "Distance-decay greenness from OSM polygons", "Built in"],
+                ["TABULA archetype matching", "Pipeline + backend", "Lookup by construction period and building type", "External typology, own matcher"],
+                ["Façade defect detection", "Host ML service :8020", "Object detection over façade photographs", "External ML project"],
+                ["Window-to-wall ratio", "Backend, vision model", "Vision-model estimate from a cropped façade image", "Built in prompt, hosted model"],
+                ["Data assistant", "Backend /api/chat", "Tool-calling LLM over the project's own datasets", "Built in"],
+                ["Sensitivity analysis", "Precomputed, browser", "One-at-a-time and global SA over model parameters", "Built in"],
+            ],
+        },
+        {
+            "title": "Built in versus external",
+            "badge": "metadata",
+            "body": """
+Only four things in the list are not this project's own code:
+
+| External | What it is | Consequence |
+|---|---|---|
+| **EPSM** | containerised EnergyPlus manager, :8010 | needs Docker running; its end-use schema limits what we can report (**15. Known Limitations**) |
+| **PVGIS** | European Commission solar API | network dependency; results cached per orientation |
+| **Façade defect model** | trained detector from a separate ML project | needs its own torch environment on the host |
+| **Vision / chat models** | hosted LLM APIs | need API keys; degrade to a heuristic or refuse rather than failing hard |
+
+Everything else runs from source in this repository, which is why the methods
+can be documented to the level of individual thresholds elsewhere in this
+logbook.
+""",
+        },
+        {
+            "title": "Where each one surfaces in the app",
+            "badge": "result",
+            "table": [
+                ["Surface", "Analyses available there"],
+                ["3D viewer", "Sun hours · incident radiation · thermal comfort · space syntax · green index · rooftop PV · WWR estimate · façade comparison · EnergyPlus shoebox run"],
+                ["Wizard step 2", "Retrofit prioritisation · façade defect detection"],
+                ["Wizard step 3", "Baseline EnergyPlus simulation"],
+                ["Wizard step 4", "Optimisation · decision under uncertainty · heating-system comparison · LCA"],
+                ["Analysis Tools page", "The registry itself, with per-method attribution"],
+                ["Data Explorer", "Scraped market data · SCB statistics · EPC dataset queries"],
+                ["Chat widget", "The data assistant, over all of the above datasets"],
+            ],
+            "files": ["frontend/src/pages/AnalysisTools.tsx"],
+        },
+        {
+            "title": "Status flags in the app's own registry",
+            "badge": "metadata",
+            "body": """
+`AnalysisTools.tsx` carries a `status` per method. As of 2026-09-03 eight are
+`integrated` — PVGIS, WWR estimation, façade defect detection, the optimisation
+model, MCDA prioritisation, decision under uncertainty, the retrofit scenario
+analyser and LCA — and one, **EPSM**, is `external`.
+
+Nothing in that registry is currently flagged as planned or unavailable, so the
+registry and this inventory agree.
+""",
+        },
+    ],
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 PROJECT_TEAM = {
     "number": 16,
     "title": "Project Team & Credits",
@@ -1331,4 +1848,6 @@ PAGES = {
     "viewer_layers":   VIEWER_LAYERS,
     "limitations":     LIMITATIONS,
     "project_team":    PROJECT_TEAM,
+    "scraped_data":    SCRAPED_DATA,
+    "analysis_index":  ANALYSIS_INVENTORY,
 }
