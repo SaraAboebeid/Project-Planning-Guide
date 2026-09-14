@@ -38,10 +38,41 @@ and per-page Markdown export.
 | `Tool.py` | Entry point — builds the grouped sidebar with `st.navigation`, nothing else |
 | `home.py` | The home page (sidebar entry "Tool") — contents, live repository state, consistency check |
 | `logbook_content.py` | **All prose, plus the sidebar groups (`NAV`, at the bottom). This is the file to edit.** |
-| `scripts/ui_utils.py` | Layout helpers, file introspection, Markdown/zip export |
+| `file_viewer.py` | The **File viewer** page (sidebar: Reference → File viewer, URL `file?path=…`) |
+| `scripts/ui_utils.py` | Layout helpers, file links, Markdown/zip export |
+| `scripts/file_preview.py` | The viewer's previews, one per file format |
 | `scripts/check_content.py` | Validator — run it after editing content |
 | `pages/` | One file per page, named `<number>_<Name>.py`; intentionally thin |
-| `requirements.txt` | `streamlit`, `pandas` |
+| `requirements.txt` | `streamlit`, `pandas`, `duckdb` |
+
+## Opening a script or data file
+
+Every file path in the logbook is a link (purple, dotted underline) that opens
+the **File viewer** in a new tab. The viewer always shows the version on disk
+now, read-only:
+
+| File | What the viewer shows |
+|---|---|
+| Scripts and config (`.py`, `.ts`, `.tsx`, `.js`, `.ps1`, `.yml` …) | the full source with syntax highlighting and line numbers |
+| Markdown | rendered, with a tab for the source |
+| JSON / GeoJSON | the records as a table, how many records fill each field, the structure |
+| DuckDB, SQLite, GeoPackage | tables with row counts, the first 100 rows, the columns |
+| Parquet | the first rows and the column types |
+| EPW weather | the station, a year-at-a-glance summary, the hourly rows |
+| LAS / LAZ laser tiles | point count, extent, file creation date (from the header) |
+| CSV, zip, OpenDocument spreadsheets, images, folders | a table, the member list, the sheet names, the image, the folder contents |
+
+Each file also gets **Open in VS Code** (this computer only), a link to the
+**committed version on GitHub** when the file is tracked (with a note if the
+local copy has uncommitted changes), and a download button for files up to
+50 MB.
+
+**What it will open.** The logbook also listens on the network address, so the
+viewer is deliberately *not* a general way into the repository: it opens only
+files the logbook cites — section file lists, dataset cards, file-like `code`
+in the text, and the links in `CODEMAP.md` — plus anything inside a cited
+folder. `.env` files, keys, `.git` and virtual environments are refused even
+if cited. To make a new file viewable, cite it on a page.
 
 ## Pages
 
@@ -62,19 +93,18 @@ Everything else applies to both countries.
 | | 3 | Pipelines — *Sweden / United Kingdom tabs* | interim |
 | | 4 | Scraped Market Data (Boplats & Booli, Sweden only) | raw |
 | **Methods** | 5 | Digital Twin Construction | processed |
-| | 6 | Shoebox & IDF Generation | method |
-| | 7 | Simulation Process | method |
-| | 8 | Retrofit Prioritisation | method |
-| | 9 | Optimisation Process | method |
-| | 10 | Decision Analysis under Uncertainty | method |
-| | 11 | AI, ML & Vision Models | method |
-| | 12 | Climate & Environmental Analysis | method |
-| | 13 | Viewer Layers & Visualisation | result |
-| | 14 | Analysis Inventory | method |
-| **Reference** | 15 | Services, Keys & Access | metadata |
-| | 16 | Script Browser | metadata |
-| | 17 | Known Limitations | metadata |
-| | 18 | Project Team & Credits | metadata |
+| | 6 | Energy Simulation — EPSM & IDF | method |
+| | 7 | Retrofit Prioritisation | method |
+| | 8 | Optimisation Process | method |
+| | 9 | Decision Analysis under Uncertainty | method |
+| | 10 | AI, ML & Vision Models | method |
+| | 11 | Climate & Environmental Analysis | method |
+| | 12 | Viewer Layers & Visualisation | result |
+| | 13 | Analysis Inventory | method |
+| **Reference** | 14 | Services, Keys & Access | metadata |
+| | 15 | Script Browser | metadata |
+| | 16 | Known Limitations | metadata |
+| | 17 | Project Team & Credits | metadata |
 
 *Services, Keys & Access* holds what is tool-wide rather than per country — the
 simulation and ML services, the AI providers, the map tiles and the list of

@@ -18,6 +18,7 @@ import subprocess
 import zipfile
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 import pandas as pd
 import streamlit as st
@@ -70,6 +71,10 @@ def inject_css() -> None:
           .lb-chip { display:inline-block; padding:0.08rem 0.55rem; border-radius:999px;
                      font-size:0.76rem; font-weight:700; margin-right:4px; }
           .lb-dim { color:#94a3b8; font-size:0.82rem; }
+          /* links into the file viewer */
+          a.lb-file { text-decoration:none; }
+          a.lb-file code { color:#6D28D9; border-bottom:1px dotted #a78bfa; }
+          a.lb-file:hover code { background:#F2EAFB; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -137,13 +142,190 @@ def file_status_table(paths: list[str]) -> pd.DataFrame:
     return pd.DataFrame([file_facts(p) for p in paths])
 
 
+# ── file viewer links ────────────────────────────────────────────────────────
+# Every script or data path the logbook cites links to the File viewer page
+# (file_viewer.py, url "file"), which shows the file as it is on disk now.
+#
+# The logbook also listens on the network address, so the viewer only opens
+# files the logbook itself cites (plus anything inside a cited folder) and
+# refuses secrets outright - it is not a general way to read the repository.
+
+VIEWER_URL = "file"
+
+
+def is_blocked(rel: str) -> bool:
+    """Never shown, cited or not: env files, keys, VCS internals."""
+    parts = rel.replace("\\", "/").lower().split("/")
+    name = parts[-1]
+    if any(p in (".git", "node_modules", "__pycache__", ".venv") for p in parts):
+        return True
+    if name.startswith(".env") and name != ".env.example":
+        return True
+    return name.endswith((".pem", ".key", ".pfx", ".p12")) or name.startswith(("id_rsa", "credentials"))
+
+
+def _norm_rel(token: str) -> str | None:
+    """A repo-relative posix path for an existing, unblocked file or folder -
+    or None. Rejects anything that could escape the repository."""
+    t = str(token).strip().replace("\\", "/").rstrip("/")
+    if (not t or len(t) > 260 or t.startswith(("/", "http")) or ":" in t
+            or ".." in t or any(c in t for c in "*<>?|\"")):
+        return None
+    p = (REPO_ROOT / t).resolve()
+    try:
+        rel = p.relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        return None
+    return rel if rel and p.exists() and not is_blocked(rel) else None
+
+
+_CODE_SPAN = re.compile(r"`([^`\n]+)`")
+_MD_LINK = re.compile(r"(\[[^\]\n]+\])\(([^)\s]+)\)")
+
+
+def _looks_like_path(t: str) -> bool:
+    return "/" in t or bool(re.search(r"\.[A-Za-z0-9]{1,8}$", t.strip()))
+
+
+@st.cache_data(show_spinner=False, ttl=60)
+def cited_paths() -> tuple[str, ...]:
+    """Every repo path the logbook cites: section file lists, dataset cards,
+    file-like `code spans` in the prose, and the links in CODEMAP.md (which the
+    Script Browser renders)."""
+    from logbook_content import PAGES  # lazy: logbook_content never imports us
+
+    found: set[str] = set()
+
+    def add(token: str, allow_dir: bool) -> None:
+        rel = _norm_rel(token)
+        if rel and (allow_dir or (REPO_ROOT / rel).is_file()):
+            found.add(rel)
+
+    prose: list[str] = []
+    for page in PAGES.values():
+        parts = list(page["tabs"]) if page.get("tabs") else [(None, page)]
+        prose.append(page.get("purpose", ""))
+        for _, part in parts:
+            prose += [part.get("purpose", ""), part.get("todo", "") or ""]
+            for sec in part.get("sections", []):
+                for rel in sec.get("files", []):
+                    add(rel, allow_dir=True)
+                ds = sec.get("dataset") or {}
+                for rel in list(ds.get("local", [])) + list(ds.get("processed_by", [])):
+                    add(rel, allow_dir=True)
+                prose.append(sec.get("body", ""))
+                prose += [str(v) for v in ds.values() if isinstance(v, str)]
+                prose += [str(v) for v in ds.get("used_in", [])]
+    codemap = REPO_ROOT / "CODEMAP.md"
+    if codemap.exists():
+        text = codemap.read_text(encoding="utf-8", errors="replace")
+        prose.append(text)
+        for _, target in _MD_LINK.findall(text):
+            if not target.startswith(("http", "#", "mailto:")):
+                add(target.split("#")[0], allow_dir=True)
+    # file-like code spans: files only - a bare `data` must not open a folder
+    for text in prose:
+        for token in _CODE_SPAN.findall(text or ""):
+            if _looks_like_path(token):
+                add(token, allow_dir=False)
+    return tuple(sorted(found))
+
+
+@st.cache_data(show_spinner=False, ttl=60)
+def _cited_index() -> tuple[frozenset, tuple, dict]:
+    cited = cited_paths()
+    dirs = tuple(r for r in cited if (REPO_ROOT / r).is_dir())
+    by_name: dict[str, list[str]] = {}
+    for r in cited:
+        by_name.setdefault(r.rsplit("/", 1)[-1], []).append(r)
+    return frozenset(cited), dirs, by_name
+
+
+def is_allowed(rel: str) -> bool:
+    """The viewer opens a path only if the logbook cites it, or it lies inside
+    a cited folder."""
+    if not rel or is_blocked(rel):
+        return False
+    cited, dirs, _ = _cited_index()
+    return rel in cited or any(rel.startswith(d + "/") for d in dirs)
+
+
+def link_target(token: str) -> str | None:
+    """Repo path a `code span` should link to, or None. A bare file name
+    (`ingest_epc.py`) links when exactly one cited file has that name."""
+    t = str(token).strip()
+    if not _looks_like_path(t):
+        return None
+    rel = _norm_rel(t)
+    if rel and is_allowed(rel):
+        return rel
+    if "/" in t.strip("/") and rel is None:
+        tail = t.replace("\\", "/").strip("/")
+        _, _, by_name = _cited_index()
+        hits = [r for r in by_name.get(tail.rsplit("/", 1)[-1], []) if r.endswith("/" + tail)]
+        return hits[0] if len(hits) == 1 else None
+    _, _, by_name = _cited_index()
+    hits = by_name.get(t, [])
+    return hits[0] if len(hits) == 1 else None
+
+
+def viewer_href(rel: str) -> str:
+    return f"{VIEWER_URL}?path={quote(rel, safe='/')}"
+
+
+def file_link_html(rel: str, label: str | None = None) -> str:
+    """<a><code>path</code></a> into the viewer, flagged red if missing."""
+    lab = html.escape(label or rel)
+    target = link_target(rel)
+    if target:
+        return (f"<a class='lb-file' href='{viewer_href(target)}' target='_blank' "
+                f"title='Open in the file viewer'><code>{lab}</code></a>")
+    ok = (REPO_ROOT / rel).exists()
+    return f"<code>{lab}</code>" + ("" if ok else " <span class='lb-missing'>missing</span>")
+
+
+def linkify_markdown(text: str) -> str:
+    """Turn file-like `code spans` into viewer links, leaving fenced code
+    blocks and existing links alone."""
+    if not text:
+        return text
+    chunks = re.split(r"(```.*?```)", text, flags=re.S)
+    for i, chunk in enumerate(chunks):
+        if chunk.startswith("```"):
+            continue
+
+        def sub(m: re.Match) -> str:
+            # already the label of a markdown link: [`x`](...)
+            if m.start() > 0 and chunk[m.start() - 1] == "[" and chunk[m.end():m.end() + 2] == "](":
+                return m.group(0)
+            target = link_target(m.group(1))
+            return f"[`{m.group(1)}`]({viewer_href(target)})" if target else m.group(0)
+
+        chunks[i] = _CODE_SPAN.sub(sub, chunk)
+    return "".join(chunks)
+
+
+def linkify_repo_links(text: str) -> str:
+    """Point CODEMAP-style [label](repo/path) links at the viewer (they would
+    otherwise resolve against the logbook's own URL and 404)."""
+    def sub(m: re.Match) -> str:
+        label, target = m.group(1), m.group(2)
+        if target.startswith(("http", "#", "mailto:")):
+            return m.group(0)
+        rel = _norm_rel(target.split("#")[0])
+        return f"{label}({viewer_href(rel)})" if rel and is_allowed(rel) else m.group(0)
+    return _MD_LINK.sub(sub, linkify_markdown(text))
+
+
 def show_files(paths: list[str]) -> None:
     """Render a live file table and shout about anything missing."""
     if not paths:
         return
     df = file_status_table(paths)
     missing = df[df["Status"] == "MISSING"]["Path"].tolist()
-    show_dataframe_safe(df)
+    df["Open"] = [viewer_href(t) if (t := link_target(p)) else "" for p in paths]
+    show_dataframe_safe(df, column_config={
+        "Open": st.column_config.LinkColumn("Open", display_text="view ↗")})
     if missing:
         st.markdown(
             "<span class='lb-missing'>Not found in the repository: "
@@ -173,7 +355,12 @@ def _inline(text: str) -> str:
     """Escape, then honour `code`, **bold** and *italic* — HTML blocks get no
     markdown."""
     s = html.escape(str(text).strip())
-    s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+
+    def code(m: re.Match) -> str:
+        raw = html.unescape(m.group(1))
+        return file_link_html(raw) if link_target(raw) else f"<code>{m.group(1)}</code>"
+
+    s = re.sub(r"`([^`]+)`", code, s)
     s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
     return re.sub(r"\*([^*]+)\*", r"<em>\1</em>", s)
 
@@ -195,8 +382,7 @@ def local_updated(paths: tuple[str, ...]) -> str:
 
 
 def _path_html(rel: str) -> str:
-    ok = (REPO_ROOT / rel).exists()
-    return f"<code>{html.escape(rel)}</code>" + ("" if ok else " <span class='lb-missing'>missing</span>")
+    return file_link_html(rel)
 
 
 def dataset_card(ds: dict) -> None:
@@ -421,7 +607,7 @@ def render_page(page: dict) -> None:
         # One page per topic, one tab per country: Sweden and the UK are built
         # from different sources, so their content is never interleaved.
         if page.get("purpose"):
-            st.markdown(page["purpose"])
+            st.markdown(linkify_markdown(page["purpose"]))
         labels = [label for label, _ in page["tabs"]]
         for tab, (label, part) in zip(st.tabs(labels), page["tabs"]):
             with tab:
@@ -444,7 +630,7 @@ def _render_body(page: dict, key: str) -> None:
         # Plain st.markdown, NOT an HTML wrapper: Streamlit does not parse
         # markdown inside raw HTML, so a wrapper leaks literal ** and ` into
         # the rendered page.
-        st.markdown(page["purpose"])
+        st.markdown(linkify_markdown(page["purpose"]))
 
     if page.get("overview"):
         ov = page["overview"]
@@ -466,17 +652,18 @@ def _render_body(page: dict, key: str) -> None:
                 if sec.get("dataset"):
                     dataset_card(sec["dataset"])
                 if sec.get("body"):
-                    st.markdown(sec["body"])
+                    st.markdown(linkify_markdown(sec["body"]))
                 if sec.get("table"):
                     rows = sec["table"]
                     show_dataframe_safe(pd.DataFrame(rows[1:], columns=rows[0]))
-                # A dataset card already names its scripts; the repository
-                # statistics table (lines / size / commit) is for code pages.
-                # Process pages ("code_refs": "inline") just name the scripts.
+                # Scripts and data are named as links into the File viewer. The
+                # repository statistics table (lines / size / last commit) says
+                # nothing about the data or the method, so it is off by default;
+                # a page can still ask for it with "code_refs": "table".
                 if sec.get("files") and not sec.get("dataset"):
-                    if page.get("code_refs") == "inline":
+                    if page.get("code_refs", "inline") == "inline":
                         st.markdown(
-                            "<span class='lb-dim'>Scripts:</span> "
+                            "<span class='lb-dim'>Scripts and data:</span> "
                             + " · ".join(_path_html(p) for p in sec["files"]),
                             unsafe_allow_html=True)
                     else:

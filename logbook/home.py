@@ -30,7 +30,7 @@ st.markdown(
 st.info(
     "This project is a continuation of **DT4PED — Digital Twin for Positive "
     "Energy Districts**, upscaling that approach from a single district to "
-    "national and European level. See **18. Project Team & Credits**.",
+    "national and European level. See **17. Project Team & Credits**.",
     icon="🧭",
 )
 
@@ -156,7 +156,7 @@ st.divider()
 st.caption(
     "Going deeper: `NOTEBOOK.md` at the repository root holds the full method "
     "write-up — every threshold, the reasoning behind it and how it fails. "
-    "`CODEMAP.md` maps the code file by file; page 16 renders it."
+    "`CODEMAP.md` maps the code file by file; page 15 renders it."
 )
 st.caption(
     "Edit page text in `logbook_content.py`; the sidebar groups are `NAV` at the "

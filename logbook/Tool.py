@@ -47,4 +47,9 @@ for header, keys in NAV:
         for key in keys
     ]
 
+# Every file path on the other pages links to file?path=<repo path>.
+navigation.setdefault("Reference", []).append(
+    st.Page(LOGBOOK_DIR / "file_viewer.py", title="File viewer", url_path="file")
+)
+
 st.navigation(navigation).run()

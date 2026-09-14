@@ -425,7 +425,7 @@ it cannot affect the tool.
 | [logbook/pages/](logbook/pages/) | 18 pages, `<number>_<Name>.py`; intentionally thin |
 | [logbook/run.bat](logbook/run.bat) · [setup.bat](logbook/setup.bat) | Launch on :8501 / create the venv |
 
-Page 16 (*Script Browser*) renders **this file** live, so the logbook cannot
+Page 15 (*Script Browser*) renders **this file** live, so the logbook cannot
 drift from the code map. Pages resolve their `files` lists against the real
 repository on load and flag anything missing in red.
 
@@ -433,7 +433,7 @@ repository on load and flag anything missing in red.
 differ — 1. Data Sources, 2. Coverage & Quality, 3. Pipelines — are single
 pages with a *Sweden* tab and a *United Kingdom* tab (`"tabs"` in
 `logbook_content.py`, rendered with `st.tabs` by `render_page`). The sidebar
-groups are *Data & pipelines* (1–4), *Methods* (5–14) and *Reference* (15–18).
+groups are *Data & pipelines* (1–4), *Methods* (5–13) and *Reference* (14–17).
 The chains differ fundamentally — see §6 above:
 Sweden takes footprints from EUBUCCO and joins certificates geometrically; the
 UK takes footprints from OpenStreetMap via Overpass and joins by UPRN or
@@ -446,6 +446,11 @@ dataset (29 — 19 Sweden, 10 UK) giving publisher and link, connection type
 publisher's version, our copy's date (read from disk on load), how it is stored,
 its stage and where it is used (`"dataset"` in `logbook_content.py`, rendered by
 `dataset_card` in `scripts/ui_utils.py`, validated by `check_content.py`).
+
+**Every file path is a link into the File viewer** (`logbook/file_viewer.py`,
+previews in `logbook/scripts/file_preview.py`): full source for scripts, and a
+format-aware preview for data (DuckDB/SQLite tables, JSON records, Parquet, EPW,
+LAZ headers). It opens only files the logbook cites and refuses `.env` and keys.
 
 Start it with `logbook\run.bat` (or `run.bat 8502` for a different port).
 

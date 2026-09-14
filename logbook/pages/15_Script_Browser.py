@@ -14,7 +14,10 @@ from logbook_content import PAGES  # noqa: E402
 from scripts.ui_utils import (  # noqa: E402
     REPO_ROOT,
     badge,
+    file_link_html,
     inject_css,
+    linkify_markdown,
+    linkify_repo_links,
     make_markdown_download,
     overview_card,
 )
@@ -36,11 +39,11 @@ for sec in page.get("sections", []):
         if sec.get("badge"):
             st.markdown(badge(sec["badge"]), unsafe_allow_html=True)
         if sec.get("body"):
-            st.markdown(sec["body"])
+            st.markdown(linkify_markdown(sec["body"]))
         if sec.get("files"):
-            st.caption("Where this lives in the repository")
-            for rel in sec["files"]:
-                st.write(f"- `{rel}`")
+            st.markdown("<span class='lb-dim'>Scripts:</span> "
+                        + " · ".join(file_link_html(rel) for rel in sec["files"]),
+                        unsafe_allow_html=True)
 
 codemap = REPO_ROOT / "CODEMAP.md"
 
@@ -69,9 +72,10 @@ st.divider()
 if query:
     hits = [ln for ln in text.splitlines() if query.lower() in ln.lower()]
     st.caption(f"{len(hits)} matching line(s) in CODEMAP.md")
-    st.markdown(chr(10).join(hits) if hits else "_No matches._")
+    st.markdown(linkify_repo_links(chr(10).join(hits)) if hits else "_No matches._")
 else:
-    st.markdown(text)
+    # every file named in the map opens in the File viewer
+    st.markdown(linkify_repo_links(text))
 
 st.divider()
 make_markdown_download(page)

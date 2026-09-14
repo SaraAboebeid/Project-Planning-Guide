@@ -249,8 +249,8 @@ handle takes an exclusive lock and blocks the backend.
                 "access": "Downloaded once",
                 "connection": " `POST /get_lidar` on the DTCC compute server, no key. Tiles are saved locally in SWEREF99 TM (EPSG:3006).",
                 "format": "72 `.laz` point-cloud tiles, 6.57 GB",
-                "source_version": "Not stated by DTCC. The tile name prefixes `19B002` (32 tiles) and `20B008` (40 tiles) suggest scans from 2019 and 2020 — **our inference, not stated by the publisher**.",
-                "source_short": "not stated (likely 2019–20)",
+                "source_version": "Not stated by DTCC. The tile headers say the 32 `19B002` tiles were written on **2020-11-16** and the 40 `20B008` tiles on **2021-10-06** (1.23 billion points in total). The scan dates are not in the header; the prefixes suggest scan campaigns in 2019 and 2020 — **our inference**.",
+                "source_short": "tiles written 2020-11 / 2021-10",
                 "local": ["data/dtcc"],
                 "refresh": "Downloaded once; not refreshed.",
                 "stored_as": "Raw tiles on disk. Three layers are computed from them into static files: `dtcc_vegetation.json` (826,039 trees, 31,849 shrubs), `roofs_gothenburg.json` (41,895 roofs) and `terrain_hillshade.png`.",
@@ -914,7 +914,7 @@ source, and is deliberately not scraped.
                 "refresh": "To be replaced by a real UK cost and carbon source.",
                 "stored_as": "Constants compiled into the frontend.",
                 "stage": "synthetic",
-                "stage_note": "Exists only so the UK track runs end to end. Must never be presented as real — see **17. Known Limitations**.",
+                "stage_note": "Exists only so the UK track runs end to end. Must never be presented as real — see **16. Known Limitations**.",
                 "used_in": [
                     "Step 4 — cost and carbon of UK renovation packages",
                     "They also reach the Step 5 report, where they are **labelled SEK** — a known bug",
@@ -1094,7 +1094,7 @@ Housing Survey 2024-25.
 # SHARED REFERENCE
 # ─────────────────────────────────────────────────────────────────────────────
 ACCESS = {
-    "number": 15,
+    "number": 14,
     "title": "Services, Keys & Access",
     "nav_title": "Services, keys & access",
     "stage": "metadata",
@@ -1130,7 +1130,7 @@ running before anything else — that has been the cause every time so far.
 | Anthropic | `api.anthropic.com/v1/messages` | **`ANTHROPIC_API_KEY`** |
 | OpenAI | `api.openai.com/v1/chat/completions` | **`OPENAI_API_KEY`** |
 
-What each one is used for is on **11. AI, ML & Vision Models**.
+What each one is used for is on **10. AI, ML & Vision Models**.
 """,
         },
         {
@@ -1171,7 +1171,7 @@ Never commit one; print names or lengths only when checking they exist.
 
 # ─────────────────────────────────────────────────────────────────────────────
 SCRIPT_BROWSER = {
-    "number": 16,
+    "number": 15,
     "title": "Script Browser",
     "stage": "metadata",
     "purpose": """
@@ -1621,59 +1621,261 @@ DIGITAL_TWIN = {
     "title": "Digital Twin Construction",
     "stage": "processed",
     "purpose": """
-How the processed data becomes a navigable 3D city. `build.py` assembles the
-viewer from source; the browser never loads `viewer/` directly.
+How the digital twin is put together: the 3D city in which every building
+carries its own data, and on which every layer and analysis sits. This page
+follows the process — from the building data the pipelines produce, through how
+the viewer is assembled and served, how the buildings are drawn, to how the
+layers and analyses attach to them — and describes each of the viewers the tool
+uses. The data itself is on **1. Data Sources** and **3. Pipelines**.
 """,
     "overview": {
-        "title": "Build chain",
-        "subtitle": "Source files are assembled into a single HTML artifact.",
+        "title": "From registers to a city you can click",
+        "subtitle": "Four layers of the twin, bottom to top.",
         "items": [
-            ("Sources", "viewer/index.html, viewer/js/*.js, viewer/styles/main.css."),
-            ("Assembly", "build.py inlines them into assets/<city>_3d.html."),
-            ("Data", "buildings.json plus the LiDAR and context layers."),
-            ("Render", "Cesium with Google photorealistic 3D tiles as an optional base."),
+            ("Building data", "One record per building — outline, height, use, energy class, year, U-values, district — written by the pipelines."),
+            ("Viewer", "One Cesium code base, assembled per country; the same code draws Gothenburg and the UK."),
+            ("Layers", "Basemaps, LiDAR vegetation, roofs and terrain, streets, statistics and live transport feeds."),
+            ("Analyses", "Run on the backend for a clicked building or point; the result is drawn back into the scene and, for some, saved to that building."),
         ],
     },
     "sections": [
         {
-            "title": "Why the viewer is built, not served",
-            "badge": "method",
+            "title": "What the twin is made of",
             "body": """
-`viewer/js/*.js` are **classic scripts sharing globals** — deliberately no
-`import`/`export`. Editing them changes nothing on its own: `build.py` inlines
-everything into `assets/<city>_3d.html`, and that file is what the browser
-loads.
+The twin is **generated from data, not modelled by hand.** Every building on
+screen is one record of the building payload, and everything the viewer shows
+about a building — its colour, its info card, the inputs to its analyses — is
+read from that record.
 
-Working rule: `node --check <file>` to validate, then `python build.py`. In
-development the Vite server also serves the built viewer directly, so
-`launch.py` is only needed for the standalone page.
+| Part of the twin | Where it comes from | File the viewer reads |
+|---|---|---|
+| Building outline and height | EUBUCCO (Sweden), OpenStreetMap + EUBUCCO (UK) | `frontend/public/buildings.json`, `frontend/public/uk/buildings_<district>.json` |
+| Use, energy class, year, heated area | energideklaration (Sweden), EPC register or survey estimate (UK) | same record |
+| Envelope U-values | TABULA archetypes | same record |
+| District | Göteborg primärområden | same record |
+| Trees, roofs, terrain | DTCC LiDAR | `assets/dtcc_vegetation.json`, `assets/roofs_gothenburg.json`, `assets/terrain_hillshade.png` |
+| Streets, green areas, statistics, transport | OpenStreetMap, SCB, Västtrafik, Trafikverket — fetched when a layer is switched on | nothing stored |
+| Analysis results | computed by the backend on request | `data/simulation_database.sqlite3`, `data/wwr_database.json`, `data/pvgis_database.json` |
+
+How the building records are produced is on **3. Pipelines**; how complete
+they are is on **2. Coverage & Quality**.
 """,
-            "files": ["build.py", "viewer/index.html", "viewer/js", "assets/gothenburg_3d.html"],
+            "files": ["frontend/public/buildings.json", "frontend/public/uk/cities.json", "data/simulation_database.sqlite3"],
         },
         {
-            "title": "Rendering ~93k buildings without killing the tab",
-            "badge": "method",
+            "title": "The viewers — where the twin is shown",
             "body": """
-One Cesium `Entity` per building does not work — at this scale it exhausts
-memory and freezes the tab. The viewer instead uses **one batched `Primitive`**
-with per-instance colour, and carries `id: { _dataIdx: i }` so picking still
-resolves back to the underlying record.
+| Viewer | What it is | Where in the tool |
+|---|---|---|
+| **Gothenburg 3D** (`assets/gothenburg_3d.html`) | The full twin: 92,973 buildings with every layer and analysis | the 3D viewer page (`/viewer`); Step 2's "3D view" buttons |
+| **United Kingdom 3D** (`assets/uk_3d.html`) | The same code with the UK profile: city pills switch between the five districts; grey Cesium OSM Buildings massing is on by default so the small districts sit in their city; the Swedish-only layers (Västtrafik, Trafikverket, SCB) are not loaded | the UK 3D viewer page (`/viewer/uk`) |
+| **City backdrop** (`frontend/public/city_bg.html`) | A light Cesium page with no building data: Google photorealistic 3D tiles and a dark basemap, camera set from the URL so one file serves every city | the landing page hero and the workspace chooser's city previews |
+| **Step 1 map** (`frontend/src/components/LocationMap.tsx`) | A 2D Leaflet map on OpenStreetMap tiles: address search, the municipality outline (dissolved from the 96 districts by the backend), the chosen district, and a check that the selection lies inside Gothenburg | Step 1 — choosing the buildings or area |
 
-Related constraint: `buildings.json` is **57 MB**, so it is fetched with
-`cache: 'default'`. Forcing `'no-store'` re-downloads it on every reload.
+The two 3D viewers are embedded in the React app as frames
+(`frontend/src/pages/MapViewer.tsx`, `frontend/src/pages/UKMapViewer.tsx`) and
+can also be opened on their own.
 """,
-            "files": ["viewer/js/cesium.js", "viewer/js/bootstrap.js"],
+            "files": [
+                "assets/gothenburg_3d.html",
+                "assets/uk_3d.html",
+                "frontend/public/city_bg.html",
+                "frontend/src/components/LocationMap.tsx",
+                "frontend/src/pages/MapViewer.tsx",
+                "frontend/src/pages/UKMapViewer.tsx",
+                "frontend/src/pages/DataCoverage.tsx",
+            ],
         },
         {
-            "title": "One viewer, two countries",
-            "badge": "processed",
+            "title": "How the viewer is assembled",
             "body": """
-`bootstrap.js` resolves the active country and city, loads that location's
-payload, then wires the remaining scripts in a fixed order. Sweden and the UK
-share the same viewer code and the same `assets/` output; only the payload and
-the profile differ — which is exactly what the UK pipeline's schema match buys.
+1. **The pipelines write the building payloads** — Sweden's `buildings.json`,
+   the UK's per-district files plus `cities.json` (see **3. Pipelines**).
+2. **`build.py` assembles one viewer per country from one template.** It reads
+   `viewer/index.html` and `viewer/styles/main.css`, copies the viewer scripts
+   to `assets/viewer/js/`, and writes three files per country:
+   `assets/<country>_3d.html` (the page), `_3d.css`, and `_3d.meta.js`. The
+   meta file carries the **profile** — the cities, where the camera starts,
+   which payload to load, the construction eras and their colours — and, for
+   Sweden, the legend's summary figures. Options: `--se` or `--uk` for one
+   country, `--skip-pipeline` to re-render the page without re-running the
+   Swedish data pipeline.
+3. **In the browser, `bootstrap.js` boots the twin.** It reads the profile,
+   picks the city (`?city=`), takes an optional focus area from Step 2
+   (`?bbox=`), downloads the payload — about 57 MB for Gothenburg, cached
+   between reloads of the same build — and then loads about twenty viewer
+   scripts in a fixed order. The Swedish-only scripts are skipped for the UK.
+   The scripts share global variables rather than importing one another,
+   which is why the order matters.
+4. **It is served three ways, all from `assets/`:** by the backend
+   (`/gothenburg_3d.html`, `/uk_3d.html`) in production, by the Vite dev server
+   in development (it streams the same files), and on its own by `launch.py`
+   at port 8765.
+
+> **The served copy is ahead of the source.** `build.py` copies only 17
+> scripts; the newer ones — vegetation, roofs, street network, sun hours,
+> incident radiation, thermal comfort, display controls — exist only in
+> `assets/viewer/js/`, and the served `bootstrap.js` loads a script the source
+> copy does not. Running `build.py` now would overwrite the served bootstrap
+> with the older source and drop those layers. Edit both copies until
+> `viewer/` is brought level.
 """,
-            "files": ["viewer/js/bootstrap.js", "viewer/js/city_switcher.js", "assets/uk_3d.html"],
+            "files": [
+                "build.py",
+                "viewer/index.html",
+                "viewer/styles/main.css",
+                "assets/viewer/js/bootstrap.js",
+                "viewer/js/bootstrap.js",
+                "launch.py",
+                "frontend/vite.config.ts",
+            ],
+        },
+        {
+            "title": "How about 93,000 buildings are drawn",
+            "body": """
+1. **Each record becomes an extruded outline** — the footprint raised to the
+   building's height (at least 3 m; floors × 3 m or 6 m if the height is
+   missing), coloured by the chosen mode: **use type**, **energy class** or
+   **construction era**. Buildings with no value for that mode are grey.
+2. **Batched, not one object per building.** The outlines are grouped into
+   batches of 12,000 and handed to the graphics card as a few large Cesium
+   primitives, tessellated in background workers. One Cesium entity per
+   building — the obvious way — exhausted the browser's memory at this size
+   and crashed the tab. Each outline keeps its record's index, so a click still
+   resolves to the right building.
+3. **Nearest first.** Batches are ordered by distance from the camera, so the
+   district on screen fills in almost at once and the edges stream in behind a
+   usable map.
+4. **Standing on the real ground.** Flat basemaps are drawn at height 0. On the
+   photorealistic basemap (or with OSM Buildings) the viewer samples the real
+   ground height from the 3D tiles into a grid and lifts each building onto
+   it; if that sampling is slow it retries in the background and only redraws
+   if the buildings would move by more than half a metre.
+5. **Photorealistic mode.** Over Google's textured city the coloured boxes
+   would hide the very façades you came to look at, so they are hidden, and a
+   click is turned into a building through a grid index of the footprints.
+
+Changing the colour mode or the ground alignment redraws the whole city from
+the payload — there is no partial update.
+""",
+            "files": ["assets/viewer/js/cesium.js", "assets/viewer/js/legend.js", "assets/viewer/js/ui.js"],
+        },
+        {
+            "title": "Layers — what sits on the twin",
+            "body": """
+| Layer | Data | Script | Where |
+|---|---|---|---|
+| Basemaps: light, dark | CARTO tiles, keyed through the backend (`/api/viewer-config`); Esri Canvas if no key | `assets/viewer/js/cesium.js`, `assets/viewer/js/layers.js` | anywhere |
+| Basemap: satellite | Esri World Imagery | `assets/viewer/js/cesium.js` | anywhere |
+| Basemap: terrain | LiDAR shaded relief (`assets/terrain_hillshade.png`) | `assets/viewer/js/cesium.js` | Gothenburg |
+| Basemap: photorealistic 3D | Google 3D tiles through Cesium ion, loaded on demand | `assets/viewer/js/cesium.js` | anywhere |
+| Context massing | Cesium OSM Buildings | `assets/viewer/js/cesium.js` | on by default in the UK |
+| Trees and shrubs | `assets/dtcc_vegetation.json` — drawn only near the camera | `assets/viewer/js/vegetation.js` | Gothenburg |
+| Pitched roofs | `assets/roofs_gothenburg.json` — a gable cap between eave and ridge | `assets/viewer/js/roofs.js` | Gothenburg |
+| Roads, street network | OpenStreetMap through the backend (`/api/osm/roads`) | `assets/viewer/js/roads.js`, `assets/viewer/js/street_network.js` | anywhere |
+| Green index, green accessibility, heat-island proxy | OpenStreetMap green areas | `assets/viewer/js/urban_analysis.js` | anywhere; heat island Sweden only |
+| Income and demographics | SCB, fetched per layer | `assets/viewer/js/scb_layers.js` | Sweden |
+| Public transport: stops, live vehicles, disruptions, parking | Västtrafik | `assets/viewer/js/vasttrafik.js`, `assets/viewer/js/trafik_canvas.js` | Gothenburg |
+| Traffic cameras, flow, road conditions | Trafikverket | `assets/viewer/js/trafikverket.js` | Sweden |
+| Legend and best/worst cards | computed live from the loaded buildings | `assets/viewer/js/legend.js` | anywhere |
+| Address search | Nominatim | `assets/viewer/js/search.js` | anywhere |
+
+The text behind every (i) button is kept in one file,
+`assets/viewer/js/layer_docs.js`. The full layer list is on
+**12. Viewer Layers & Visualisation**.
+""",
+            "files": ["assets/viewer/js/layers.js", "assets/viewer/js/layer_docs.js", "assets/sidebar-theme.css"],
+        },
+        {
+            "title": "Analyses — how they plug into the twin",
+            "body": """
+Every analysis follows the same pattern: **select a building or click a
+point → the viewer sends its location (and the building's record) to a
+backend endpoint → the backend computes → the result is drawn back into the
+scene or the building's info card → some results are saved to that building.**
+When a building is clicked, the viewer first looks for saved results within
+25 m, so earlier analyses reappear without re-running.
+
+| Analysis | Trigger | Backend | Shown as | Saved to |
+|---|---|---|---|---|
+| Energy simulation (EnergyPlus shoebox through EPSM) | selected building | `/api/simulation-submit`, `-status`, `-results` | demand by end use in the info card | `data/simulation_database.sqlite3` — the same store Step 4's calculator reads |
+| Window-to-wall ratio (vision model on a façade view) | façade inspector: fly to a façade, crop it | `/api/estimate-wwr`, `/api/wwr-save` | ratio per façade | `data/wwr_database.json` |
+| Façade defects (crack detector) | façade inspector | `/api/facade-detect` (on-host model service) | boxes on the façade image | — |
+| Rooftop solar PV | selected building | `/api/pvgis` → PVGIS 5.2 | yield in the info card | `data/pvgis_database.json`, when the user saves |
+| Direct sun hours | click a point | `/api/analysis/sun-hours` | coloured ground disc; a slider scrubs the day | — |
+| Incident solar radiation | click a point | `/api/analysis/incident-radiation` | ground disc in kWh/m², per season | — |
+| Outdoor thermal comfort (UTCI) | click a point | `/api/analysis/thermal-comfort` | ground disc, per hour or share of a season | — |
+
+Methods in full: **6. Energy Simulation — EPSM & IDF**, **10. AI, ML & Vision Models**,
+**11. Climate & Environmental Analysis**.
+""",
+            "files": [
+                "assets/viewer/js/energy_sim.js",
+                "assets/viewer/js/facade_inspector.js",
+                "assets/viewer/js/pvgis.js",
+                "assets/viewer/js/sunhours.js",
+                "assets/viewer/js/incident.js",
+                "assets/viewer/js/comfort.js",
+                "backend/simdb.py",
+                "backend/sun_hours.py",
+                "backend/incident_radiation.py",
+                "backend/thermal_comfort.py",
+                "data/wwr_database.json",
+            ],
+        },
+        {
+            "title": "How the twin connects to the planning steps",
+            "body": """
+1. **Step 1** — the user picks buildings, a district or an area on the 2D map;
+   the boundary check keeps the choice inside Gothenburg.
+2. **Step 2** — the "3D view" button for the selection opens the Gothenburg
+   twin framed on it (`?bbox=`). The button on a single building's card passes
+   its position as `?lat=&lon=&zoom=`, which the viewer **does not read** — it
+   opens at the city's default view instead (a bug).
+3. **Steps 3–4** — simulations run for a building from the viewer and from the
+   renovation calculator land in the same simulation store, so either side
+   finds the other's results.
+
+The UK twin is opened from its own viewer page; the steps' 3D buttons point at
+the Gothenburg viewer.
+""",
+            "files": ["frontend/src/components/LocationMap.tsx", "frontend/src/pages/DataCoverage.tsx", "backend/simdb.py"],
+        },
+        {
+            "title": "Written but not connected, and limitations",
+            "body": """
+**Built but never loaded** — these files exist in `assets/viewer/js/` but no
+viewer loads them:
+
+| Script | What it would add |
+|---|---|
+| `assets/viewer/js/market.js` | the Booli sales and Boplats rents overlay |
+| `assets/viewer/js/space_syntax.js` | street-network centrality (backend: `backend/space_syntax.py`) |
+| `assets/viewer/js/country_profile.js` | a country insights panel |
+| `assets/viewer/js/facade_comparison.js` | comparing façades within and across buildings |
+
+The **Malmö** payload (`assets/buildings_malmo.json`, no energy data) is not
+loaded by any viewer either.
+
+**Limitations**
+
+- The LiDAR layers, live transport and statistics exist for Gothenburg or
+  Sweden only; the UK twin is buildings, streets and analyses.
+- The served viewer is ahead of its source (see *How the viewer is assembled*).
+- The Cesium ion access token is written into `assets/viewer/js/cesium.js`.
+  A browser token is visible to anyone who opens the viewer by design, so it
+  should be restricted to the tool's web address in the Cesium ion account.
+- Every colour or alignment change redraws the whole city.
+- Step 2's single-building "3D view" link does not focus on the building (see
+  above).
+""",
+            "files": [
+                "assets/viewer/js/market.js",
+                "assets/viewer/js/space_syntax.js",
+                "assets/viewer/js/country_profile.js",
+                "assets/viewer/js/facade_comparison.js",
+                "backend/space_syntax.py",
+            ],
         },
     ],
 }
@@ -1681,115 +1883,305 @@ the profile differ — which is exactly what the UK pipeline's schema match buys
 # ─────────────────────────────────────────────────────────────────────────────
 SHOEBOX_IDF = {
     "number": 6,
-    "title": "Shoebox & IDF Generation",
+    "title": "Energy Simulation — EPSM & IDF",
+    "nav_title": "Energy simulation (EPSM)",
     "stage": "method",
     "purpose": """
-How one building record becomes an EnergyPlus input file. This is the bridge
-between the city-scale database and the physics engine, and it is where most
-modelling assumptions enter.
-""",
-    "sections": [
-        {
-            "title": "The shoebox abstraction",
-            "badge": "method",
-            "body": """
-Each building is reduced to a **single-zone "shoebox"**: the real footprint ring
-is projected from lon/lat into local metres and extruded, giving true orientation
-and true envelope areas while keeping one thermal zone.
-
-The projection reuses the same equirectangular local-metre convention as the
-rest of the pipeline, so geometry stays consistent between the viewer and the
-simulation.
-""",
-            "files": ["tools/idf/generate_idf.py", "tools/idf/geometry.py"],
-        },
-        {
-            "title": "Where the numbers come from",
-            "badge": "method",
-            "body": """
-Priority order for every envelope property:
-
-1. the building's own record (measured or certificate-derived),
-2. its TABULA archetype,
-3. `tools/idf/defaults.py`.
-
-Keeping the fallbacks in one module means every assumption used in place of real
-data is in a single readable file rather than scattered through the generator.
-""",
-            "files": ["tools/idf/defaults.py"],
-        },
-        {
-            "title": "Domestic hot water",
-            "badge": "method",
-            "body": """
-DHW is modelled explicitly — Sveby use intensity driving a `WaterHeater:Mixed`
-object, surfacing in EPSM output as *Water Systems*.
-
-> **Comparability warning.** Totals now include hot water. Runs produced before
-> DHW was added are **not comparable** to runs produced after it. Check the run
-> date before placing two figures side by side.
-""",
-        },
-    ],
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-SIMULATION = {
-    "number": 7,
-    "title": "Simulation Process",
-    "stage": "method",
-    "purpose": """
-How baselines and renovation packages are actually simulated: EnergyPlus via
-EPSM, submitted as batches, cached in SQLite so a building is never simulated
-twice for the same configuration.
+How a building in the tool becomes an EnergyPlus simulation: **what EPSM is**,
+**how the tool is connected to it**, how an **IDF** (EnergyPlus input file) is
+generated for each building — including with the **new materials of a
+renovation package** — sent to EPSM and the results brought back, how the
+results are stored and reused, **where every file is**, and the known gaps.
 """,
     "overview": {
-        "title": "Simulation flow",
-        "subtitle": "From selected buildings to stored results.",
+        "title": "The round trip",
+        "subtitle": "Every simulation in the tool follows these five steps.",
         "items": [
-            ("Generate", "One shoebox IDF per building per variant."),
-            ("Submit", "Batch to EPSM, the containerised EnergyPlus service on :8010."),
-            ("Poll", "Batch status until every run completes."),
-            ("Store", "Results into data/simulation_database.sqlite3."),
-            ("Look up", "Later requests hit the cache instead of re-running."),
+            ("Choose", "A building in the 3D viewer, the baseline list in Step 3, or a renovation package in Step 4."),
+            ("Build the IDF", "Our backend writes one shoebox IDF per building from its record — and, for a package, the package's new U-values."),
+            ("Send", "The IDFs and the city's weather file are uploaded to EPSM in one request."),
+            ("Simulate", "EPSM queues the runs and starts EnergyPlus 23.2 for each building."),
+            ("Bring back", "Our backend fetches the results, corrects the per-m² figures and stores them per building and package."),
         ],
     },
     "sections": [
         {
-            "title": "EPSM",
-            "badge": "method",
+            "title": "What EPSM is",
             "body": """
-EPSM is run from `docker-compose.epsm.yml` and comprises a backend, a worker, a
-Postgres database and Redis. The app talks to it on **:8010**.
+**EPSM — Energy Performance Simulation Manager** — is an open-source web
+service developed at Chalmers (Sanjay Somanath, lead developer; Alexander
+Hollberg, principal investigator — see **17. Project Team & Credits**). It
+takes EnergyPlus input files and a weather file over an HTTP API, queues them,
+runs EnergyPlus, and turns EnergyPlus's output into energy-use tables per end
+use. Source: <https://github.com/snjsomnath/epsm>.
 
-When simulations fail, check Docker Desktop is running before anything else —
-that has been the cause every time so far.
+The tool uses EPSM **only as a local simulation engine**: its own web
+interface and web server are left out, and nobody opens it directly. It runs
+as four containers from `docker-compose.epsm.yml`:
+
+| Container | Image | Role |
+|---|---|---|
+| `epsm_backend` | `ghcr.io/snjsomnath/epsm-backend:latest` | EPSM's API (Django): receives runs, reports status, serves results — on port **8010** of this computer |
+| `epsm_worker` | the same image, running Celery | takes runs off the queue (two at a time) and starts EnergyPlus |
+| `epsm_db` | `postgres:15-alpine` | EPSM's own records of runs and results |
+| `epsm_redis` | `redis:7-alpine` | the job queue between the API and the worker |
+| *(one per run)* | `nrel/energyplus:23.2.0` | EnergyPlus itself — the worker starts it as a separate container through the Docker socket |
+
+EPSM is the physics engine; everything that decides *what* is simulated — the
+geometry, the U-values, the assumptions — is ours and lives in `tools/idf/`.
 """,
             "files": ["docker-compose.epsm.yml"],
         },
         {
-            "title": "The results cache",
-            "badge": "processed",
+            "title": "How the tool is connected to EPSM",
             "body": """
-Results live in a SQLite datastore (**2.0 GB** and growing) that replaced an
-earlier flat JSON file. Eleven backend routes cover submit, status, results,
-batch handling, time series and lookup.
+**The browser never talks to EPSM.** The viewer and the wizard call our own
+backend, and only the backend calls EPSM, at `EPSM_BASE_URL`
+(`http://localhost:8010` by default; `http://host.docker.internal:8010` when
+our backend itself runs in Docker).
 
-The baseline batch lookup is what makes the wizard feel instant: Step 4 compares
-packages against an already-simulated baseline rather than re-running it.
+| Our backend route | Called by | What it does |
+|---|---|---|
+| `/api/simulation-submit` | the 3D viewer (one building) | builds one IDF and submits it |
+| `/api/simulation-batch-submit` | Step 3 baseline, Step 4 packages, the AI assistant's recommendation check | builds one IDF per building and submits them all in **one** request |
+| `/api/simulation-status/{id}`, `/api/simulation-batch-status/{id}` | the pollers (every 3–4 s) | ask EPSM for progress; when a run finishes, fetch and store its results |
+| `/api/simulation-results/{id}`, `/api/simulation-timeseries/{id}` | result views | stored results; hourly profiles, aggregated |
+| `/api/simulation-lookup`, `-lookup-all`, `/api/simulation-database` | viewer, Step 4 | find stored runs within 25 m of a building |
+
+The EPSM API calls behind them:
+
+| EPSM endpoint | Used for |
+|---|---|
+| `POST /api/simulation/run/` | upload `idf_files` (one or many) plus `weather_file`; for a batch, `parallel=true` with up to 8 workers |
+| `GET /api/simulation/{id}/status/` | queued / running / completed / failed, with progress |
+| `GET /api/simulation/{id}/results/` | one building's results |
+| `GET /api/simulation/{id}/parallel-results/` | a batch's results, each tagged with its position (`idf_idx`) so it can be matched back to its building |
+
+**Starting it:** Docker Desktop must be running, then
+`docker compose -f docker-compose.epsm.yml up -d`. When simulations fail, a
+stopped Docker Desktop has been the cause every time so far.
+
+**Notes from the setup:** the two EPSM services run as root so they can start
+EnergyPlus containers through Docker Desktop's socket on Windows; the
+database is a stock Postgres (EPSM migrates its own schema on start-up); the
+passwords in the compose file are local-development values, not for a
+server. `docker ps` shows the worker as *unhealthy* — a false alarm: it
+inherits the API's web health check, which a worker does not answer, and its
+log shows runs completing normally.
+""",
+            "files": ["backend/main.py", "docker-compose.epsm.yml", "frontend/src/api/client.ts"],
+        },
+        {
+            "title": "Step by step: from a building to an IDF",
+            "body": """
+Done by `build_shoebox_idf()` in `tools/idf/generate_idf.py`, once per
+building per run:
+
+1. **Find the building's real outline.** The viewer sends the whole record;
+   the wizard sends only a position, and the backend takes the nearest
+   building with geometry within 150 m in that city's payload — geometry is
+   never trusted from the browser.
+2. **Pick the weather file** for the city: Gothenburg-Landvetter TMYx
+   2011–2025; London City for the four London districts; Doncaster-Sheffield
+   for Rotherham (all in `data/epw/`).
+3. **Geometry — the shoebox.** The footprint is projected from longitude and
+   latitude into local metres and extruded to the building's full height as
+   **one thermal zone**: a roof, a ground floor, and one wall per footprint
+   edge (edges shorter than 0.3 m are skipped). Orientation and envelope areas
+   are real; the interior is not subdivided.
+4. **Windows.** One window per wall at the window-to-wall ratio: the ratio the
+   façade inspector measured for that building, if one was saved; otherwise a
+   default by use — 15% houses, 20% flats, 30% commercial, 25% public, 8%
+   industry and outbuildings.
+5. **Envelope.** U-values for wall, roof, window and floor, in this order: the
+   **renovation package's value** if one is given → the building's **TABULA**
+   value → the **defaults** (wall 0.40, roof 0.30, window 1.80, floor
+   0.40 W/m²K). Each opaque element becomes **one equivalent layer** whose
+   thermal resistance is R = 1/U − 0.13 − 0.04 m²K/W (the inside and outside
+   surface films are taken out, because EnergyPlus adds its own); the floor on
+   the ground only loses the inside film. Windows are a simple glazing system
+   with that U-value and a solar heat gain coefficient of 0.60.
+6. **People, lights and equipment** by use type, scaled to the **total** floor
+   area of all storeys, with simple daily schedules (residential, commercial,
+   other).
+7. **Heating and cooling** to 21 °C and 25 °C all year by an *ideal loads*
+   system — a stand-in that exactly meets the demand, with no real boiler or
+   heat pump — and infiltration of 0.5 air changes per hour.
+8. **Hot water** — see below.
+9. **Outputs.** The list of output variables is copied verbatim from EPSM's
+   own test building, because EPSM's results parser looks for those exact
+   names; plus the SQLite and summary-table outputs.
+
+The IDF starts with a comment block (from `tools/idf/templates/shoebox.idf.j2`)
+recording the building, floors, floor area, WWR, the U-values and the
+hot-water intensity used — so an IDF found later still says what went into it.
+""",
+            "files": [
+                "tools/idf/generate_idf.py",
+                "tools/idf/geometry.py",
+                "tools/idf/defaults.py",
+                "tools/idf/templates/shoebox.idf.j2",
+                "data/epw",
+            ],
+        },
+        {
+            "title": "New materials: how a renovation package becomes a new IDF",
+            "body": """
+This is the loop that lets the tool test a renovation: the chosen materials
+are turned into U-values, a new IDF is generated for every building with those
+U-values, and the new IDFs go back to EPSM.
+
+**a) The user chooses materials in Step 4** (Sweden), per component — walls,
+roof, windows, floor, or the new-extension variants:
+
+- **a catalogue assembly** from Wikells, which carries its own U-value
+  (`frontend/src/config/wikellsData.ts`), or
+- **an assembly built layer by layer** in the assembly builder: each layer is
+  a material with a thickness and a design conductivity λ (EN ISO 10456 /
+  Swedish BBR values, `frontend/src/config/assemblyLayers.ts`). The U-value is
+  computed from the stack, **U = 1 / (Rsi + Rse + Σ d/λ)** per EN ISO 6946,
+  with the parallel-path correction where studs bridge the insulation. A
+  built-up U-value **replaces** the catalogue value.
+
+**b) The package becomes U-value overrides.** Each component's U-value is
+mapped to one of `u_wall_override`, `u_roof_override`, `u_win_override`,
+`u_floor_override` (`overridesFromSeSelections` in
+`frontend/src/pages/RenovationSimulator.tsx`).
+
+**c) One batch per package.** The package is submitted with its own
+`package_id`, the same list of buildings as the baseline, and its overrides.
+The backend regenerates **every building's IDF** with the overrides replacing
+the baseline U-values — they never add to them, so an uninsulated choice with
+a higher U-value than the building has today makes the energy use go up, as
+it should. The results table shows the U-values each package applied.
+
+**d) Compared against the baseline.** Step 3 runs the same buildings once with
+`package_id = baseline` and no overrides; every package result is stored under
+its own id, so each building has a baseline and one row per package.
+
+**What reaches EnergyPlus is the U-value, not the layers.** The IDF represents
+the whole new assembly as one equivalent layer with the right U-value. The
+layers' order, thermal mass and moisture behaviour are therefore not
+simulated — a steady-state screening, not a hygrothermal model.
+
+**United Kingdom:** there is no layer picking; the overrides come from the
+TABULA England refurbishment levels (*standard* and *ambitious*) for wall,
+roof and window (`frontend/public/uk/tabula_gb.json`).
+
+**AI assistant:** when it recommends a retrofit it runs one EPSM check of its
+best option through the same batch route (`package_id = recommend`).
+""",
+            "files": [
+                "frontend/src/pages/RenovationSimulator.tsx",
+                "frontend/src/components/AssemblyBuilder.tsx",
+                "frontend/src/config/assemblyLayers.ts",
+                "frontend/src/config/wikellsData.ts",
+                "frontend/src/pages/BaselineSetup.tsx",
+                "frontend/public/uk/tabula_gb.json",
+            ],
+        },
+        {
+            "title": "What comes back, and how it is stored",
+            "body": """
+1. **EPSM returns** energy per end use — heating, cooling, lighting,
+   equipment, water systems — plus the hourly traces behind them.
+2. **Per-m² figures are recomputed.** EPSM divides by the zone's floor, which
+   for a one-zone shoebox is only the **footprint**; the backend divides by the
+   **total floor area** (floors × footprint, or the certificate's area). For a
+   20-storey building that is the difference between 948 and 47 kWh/m²·yr.
+3. **Stored** per building and package in `data/simulation_database.sqlite3`
+   through `backend/simdb.py` (SQLite in WAL mode, so a batch finishing all at
+   once cannot lose records). The browser only receives the summary figures;
+   hourly profiles are served aggregated.
+
+**Reuse.** The viewer and Step 4 look for stored runs within 25 m of a building
+before running anything, and Step 4 compares every package against the
+building's already-simulated baseline rather than re-running it — which is
+what makes the wizard feel instant.
+
+**The store on 2026-09-14:** 2,053 runs since 2026-07-15 — 1,904 completed and
+149 still marked *queued* (never reconciled) — of which 724 baselines and
+1,329 package runs, across 253 packages and 353 batches. The file is 1.95 GB,
+almost all of it the raw hourly traces; the summary figures take 0.6 MB.
 """,
             "files": ["backend/simdb.py", "data/simulation_database.sqlite3"],
         },
         {
-            "title": "Known gap — district cooling",
-            "badge": "metadata",
+            "title": "Where the files are",
             "body": """
-EPSM's end-use rows carry **no district-cooling column**. Ideal-loads cooling is
-therefore reported as **0** in every total, even though the simulation trace
-shows it is not zero.
+| What | Where |
+|---|---|
+| The IDF generator | `tools/idf/generate_idf.py` |
+| Footprint projection and surface geometry | `tools/idf/geometry.py` |
+| Every default and assumption (U-values, WWR, gains, setpoints, hot water, outputs) | `tools/idf/defaults.py` |
+| The IDF's header comment | `tools/idf/templates/shoebox.idf.j2` |
+| Weather files | `data/epw/` |
+| Our routes and the EPSM client | `backend/main.py` — the section "Energy simulation (EPSM)" |
+| The results store | `backend/simdb.py` → `data/simulation_database.sqlite3` |
+| The EPSM containers | `docker-compose.epsm.yml` |
+| Step 3 baseline run | `frontend/src/pages/BaselineSetup.tsx` |
+| Step 4 packages and overrides | `frontend/src/pages/RenovationSimulator.tsx` |
+| Layer-by-layer assemblies | `frontend/src/components/AssemblyBuilder.tsx`, `frontend/src/config/assemblyLayers.ts` |
+| Single-building run in the viewer | `assets/viewer/js/energy_sim.js` |
+| **The generated IDFs** | **not in the repository** — they are built in memory. EPSM keeps each run's IDFs and weather file in its Docker volume `epsm_media`, under `/app/media/simulation_files/<run id>/` (411 runs, 706 MB on 2026-09-14) |
+| EPSM's own run records | Postgres, Docker volume `epsm_pgdata` |
 
-Any cooling-inclusive figure from this tool is currently understated. See
-**17. Known Limitations**.
+To look at an IDF that was actually simulated, copy it out of the container:
+
+```bash
+docker exec epsm_backend ls -t /app/media/simulation_files | head
+docker cp epsm_backend:/app/media/simulation_files/<run id>/building_0.idf .
+```
+""",
+            "files": ["tools/idf/generate_idf.py", "assets/viewer/js/energy_sim.js", "backend/simdb.py"],
+        },
+        {
+            "title": "Domestic hot water",
+            "body": """
+Hot water is a stand-alone water heater (`WaterHeater:Mixed`) on district
+heating, drawing a daily profile sized so the year adds up to a **Sveby**
+standard intensity: 25 kWh/m² for dwellings (Göteborg's 72,133 declared
+hot-water figures have a median of 23.6), 10 for schools and care, 2 for
+offices and industry, 0 for outbuildings. EPSM reports it as *Water Systems*.
+
+EnergyPlus does not predict hot-water use here — it plays back the figure it
+is given. Its purpose is that the tool's totals cover the same end uses as an
+energy declaration.
+
+> **Comparability warning.** Runs made before hot water was added contain none,
+> so they are **not comparable** with later runs. Check the run date before
+> placing two figures side by side.
+""",
+            "files": ["tools/idf/defaults.py"],
+        },
+        {
+            "title": "Known gap — cooling reads 0",
+            "body": """
+EPSM's end-use table carries **no district-cooling column**. The ideal-loads
+system's cooling is therefore reported as **0** in every total, even though
+the EnergyPlus output shows it is not zero. Any cooling-inclusive figure from
+this tool is currently understated. See **16. Known Limitations**.
+""",
+        },
+        {
+            "title": "Limitations",
+            "body": """
+- **One zone for the whole building** — no floor-by-floor or room-level
+  temperatures, and no shading from neighbouring buildings (only the
+  building's own surfaces are in the IDF).
+- **U-values only** — no thermal mass, layer order or moisture; renovation
+  materials enter as their U-value.
+- **Demand, not delivered energy** — the ideal-loads system meets the load
+  exactly; the heating system's efficiency is handled elsewhere (Step 4's
+  heating-system comparison), not in EnergyPlus.
+- **Constant setpoints and simple schedules** — 21 °C / 25 °C all year.
+- **Cooling reads 0** in every total — see *Known gap — cooling reads 0*.
+- **UK buildings use Swedish assumptions** for hot water and internal gains.
+- **EPSM is pulled as `latest`**, not a fixed version, so a new EPSM release
+  could change results without any change on our side.
+- **149 runs are stuck as *queued*** in the store and were never reconciled.
+- A comment in `backend/main.py` says the London districts use the Heathrow
+  weather file; they actually use the London City file.
 """,
         },
     ],
@@ -1797,59 +2189,229 @@ Any cooling-inclusive figure from this tool is currently understated. See
 
 # ─────────────────────────────────────────────────────────────────────────────
 PRIORITISATION = {
-    "number": 8,
+    "number": 7,
     "title": "Retrofit Prioritisation",
     "stage": "method",
     "purpose": """
-Which buildings to renovate first. A hybrid expert-rule and MCDA scoring model
-that ranks a portfolio in Step 2 and feeds the top-N forward into the baseline
-and simulation steps.
+Which buildings to renovate first. In Step 2 every selected building gets a
+priority score from 0 to 100, built from four criteria whose relative weights
+are set with the **Analytic Hierarchy Process (AHP)**. The top-ranked buildings
+(three by default) are carried into the Step 3 baseline and Step 4 renovation
+packages. This page covers how each criterion is scaled, how AHP turns
+judgements into weights, why this method was adopted, and the research it
+rests on.
 """,
+    "overview": {
+        "title": "The method in four steps",
+        "subtitle": "A weighted-sum multi-criteria score with AHP weights.",
+        "items": [
+            ("Score", "Each building gets four sub-scores (0–100) by explicit rules — energy, façade condition, characteristics, renovation potential."),
+            ("Weigh", "The user compares the criteria two at a time on Saaty's 1–9 scale; AHP turns the six judgements into four weights and checks their consistency."),
+            ("Combine", "Priority = the weighted sum of the sub-scores; a criterion with no data is left out and the others re-weighted."),
+            ("Carry forward", "The top N buildings (default 3) go on to simulation in Steps 3–4."),
+        ],
+    },
     "sections": [
         {
-            "title": "The scoring model",
-            "badge": "method",
+            "title": "Why this method was adopted",
             "body": """
-Each building scores 0–100 under four criterion groups, combined into one
-weighted priority score:
+Four properties of the task decided the method; the reasoning is recorded in
+the code and the methods notebook (`NOTEBOOK.md`, section 9):
 
-$$P = w_E \\cdot E + w_F \\cdot F + w_C \\cdot C + w_R \\cdot R$$
+1. **It is a multi-criteria decision.** "Renovate first" has no single
+   measure: a building can be energy-poor but in good condition, or in poor
+   condition with little energy to save. The criteria pull in different
+   directions, so the ranking has to trade them off explicitly — the domain of
+   multi-criteria decision analysis (MCDA).
+2. **There is no training data.** No dataset records which buildings *should*
+   have been renovated first, so a model fitted to outcomes is not possible.
+   Each sub-score is therefore an **explicit rule** against a stated
+   threshold.
+3. **Every rank must be explainable.** In a planning meeting "why is this
+   building third?" needs an answer in words. A weighted sum of transparent
+   sub-scores gives one: each row shows its sub-scores and the two criteria
+   that drive its rank.
+4. **The weights are a value judgement, not a fact.** How much energy matters
+   against condition is the stakeholders' call. Setting four percentages
+   directly is hard to justify; comparing two criteria at a time ("is energy
+   more important than façade condition, and by how much?") is a judgement
+   people can make and defend. **AHP** turns those pairwise judgements into
+   weights and — unlike typing weights in — **tests whether the judgements
+   are consistent** with each other.
 
-with weights normalised to sum to 1.
-
-| | Criterion | Meaning |
-|---|---|---|
-| **E** | Energy performance | energy use / EPC class — worse implies higher priority |
-| **F** | Façade / envelope | ML defect load, or building-age proxy where no photo exists |
-| **C** | Building characteristics | vintage and heated size — older and larger implies higher |
-| **R** | Retrofit potential | energy headroom, envelope poorness, scale |
-
-Sub-scores are **transparent expert rules** against benchmarked thresholds
-rather than a fitted model, so every number can be explained back to the user.
-Each sub-score also carries a **confidence** reflecting data availability, which
-keeps missing data visible instead of silently scoring zero.
+The maths is light on purpose: it runs in the browser over thousands of
+buildings, so changing a judgement re-ranks the list instantly.
 """,
-            "files": [
-                "frontend/src/utils/retrofitPriority.ts",
-                "frontend/src/components/RetrofitPriorityPanel.tsx",
-            ],
+            "files": ["frontend/src/utils/retrofitPriority.ts", "NOTEBOOK.md"],
         },
         {
-            "title": "Weights and presets",
-            "badge": "method",
+            "title": "The research it rests on",
             "body": """
-Weights are set directly or derived from expert pairwise judgements via **AHP**.
-Four presets ship:
+| Source | What it contributes |
+|---|---|
+| T. L. Saaty (1977), *A scaling method for priorities in hierarchical structures*, **Journal of Mathematical Psychology** 15(3), 234–281, doi:10.1016/0022-2496(77)90033-5 | The Analytic Hierarchy Process itself: the 1–9 pairwise scale, reciprocal comparison matrices, priority weights, the consistency index and the random index used to judge consistency |
+| G. Crawford & C. Williams (1985), *A note on the analysis of subjective judgment matrices*, **Journal of Mathematical Psychology** 29(4), 387–405 | The **geometric-mean** way of deriving the weights from the matrix, which is the one the tool uses |
+| A. N. Nielsen, R. L. Jensen, T. S. Larsen & S. B. Nissen (2016), *Early stage decision support for sustainable building renovation — A review*, **Building and Environment** 103, 165–181 | Places **weighting of criteria** among the six areas where decision support is needed in early-stage renovation planning |
+| *Multi-criteria decision-making for energy building renovation: comparing exterior wall structures with the AHP, ANP, utility analysis, and TOPSIS*, **Building and Environment** (2025) | A recent example of AHP applied to energy-renovation decisions, compared with other MCDA methods |
 
-| Preset | wE | wF | wC | wR |
+> **What is not recorded.** The repository does not say which studies guided
+> the choice at the time, nor whose pairwise judgements — if any — produced
+> the four weight presets. The table above gives the standard sources for the
+> method, not a record of that decision. The thresholds inside the sub-scores
+> (next section) are also stated in the code without a cited source.
+""",
+        },
+        {
+            "title": "The four criteria and how each is scaled",
+            "body": """
+Every sub-score is put on the same **0–100 scale, where higher means higher
+priority**, so the four can be added. Each also carries a **confidence**
+(0–1) that says how much real data it rests on.
+
+**E — Energy performance** *(worse ⇒ higher priority)*
+
+| Data available | Score | Confidence |
+|---|---|---|
+| Measured energy use *e* (kWh/m²·yr) | linear: 0 at **60**, 100 at **250**, clamped | 1.0 |
+| Only the energy class | A 8 · B 22 · C 35 · D 50 · E 66 · F 83 · G 100 | 0.7 |
+| Neither | 50 (neutral) | 0 |
+
+The code calls 60 / 250 kWh/m²·yr "a Swedish residential rule of thumb"
+(≤ 60 excellent, ≥ 250 very poor).
+
+**F — Façade / envelope condition** *(more severe defects ⇒ higher priority)*
+
+Defects found by the façade inspection (**10. AI, ML & Vision Models**) are
+weighted by severity — **crack 1.0, bulge 1.0** (structural), **corrosion
+0.75, abscission 0.75**, **leakage 0.6** — and summed into a *load*, which is
+passed through a **saturating curve**:
+
+$$F = 100 \\times \\left(1 - e^{-\\text{load}/4}\\right)$$
+
+| Weighted load | 1 | 2 | 4 | 8 | 12 |
+|---|---|---|---|---|---|
+| F | 22 | 39 | 63 | 86 | 95 |
+
+Saturating, because a handful of severe defects already means "poor", and a
+straight count would let a building with more photographs outrank a genuinely
+worse one. **F is only scored once a building has been inspected**; until
+then it is left out (see *Combining*).
+
+**C — Building characteristics** *(older and larger ⇒ higher priority)*
+
+C = 0.6 × age score + 0.4 × size score.
+
+| Built | before 1945 | 1945–1975 | 1976–1990 | 1991–2005 | 2006 or later | unknown |
+|---|---|---|---|---|---|---|
+| Age score | 85 | 78 | 55 | 32 | 15 | 50 |
+
+The **size score** is the building's heated area (Atemp, else footprint ×
+floors) placed between the smallest (0) and largest (100) building **in the
+current selection** — a min–max scaling, not a national percentile, so it
+changes when the selection changes. Confidence 0.5 for a known year plus 0.5
+for a known area.
+
+**R — Renovation potential** *(more to gain ⇒ higher priority)*
+
+R = weighted mean of whatever is available:
+
+| Part | Scaling | Weight |
+|---|---|---|
+| Savings headroom | energy use above **70 kWh/m²·yr**, linear 0 → 180 kWh/m² ↦ 0 → 100 | 0.60 |
+| Wall poorness | wall U-value, linear **0.15 → 1.0 W/m²K** ↦ 0 → 100 | 0.25 |
+| Scale | the size score above | 0.15 |
+
+When only the energy class is known, its letter stands in for the energy use
+(A 55 · B 85 · C 105 · D 135 · E 165 · F 200 · G 240 kWh/m²·yr). A building
+already close to 70 scores low even if it is large — R measures what is left
+to gain, not how bad the building is.
+""",
+            "files": ["frontend/src/utils/retrofitPriority.ts"],
+        },
+        {
+            "title": "The weights — AHP step by step",
+            "body": """
+**a) Six pairwise judgements.** For each pair of criteria — E–F, E–C, E–R, F–C,
+F–R, C–R — the user moves a slider on **Saaty's scale**: 1 = equally
+important, 3 = moderately, 5 = strongly, 7 = very strongly, 9 = extremely
+more important, to either side (the slider positions −8 … +8 map to 1/9 … 9).
+
+**b) The comparison matrix.** The judgements fill a 4 × 4 matrix *A* with
+$a_{ii} = 1$ and reciprocals below the diagonal ($a_{ji} = 1 / a_{ij}$).
+
+**c) The weights** are the normalised **geometric means** of the rows
+(Crawford & Williams 1985):
+
+$$w_k = \\frac{\\left(\\prod_j a_{kj}\\right)^{1/n}}{\\sum_i \\left(\\prod_j a_{ij}\\right)^{1/n}}, \\qquad n = 4$$
+
+For consistent judgements this equals Saaty's principal-eigenvector weights.
+
+**d) The consistency check** (Saaty 1977):
+
+$$\\lambda_{max} \\approx \\frac{1}{n}\\sum_i \\frac{(A w)_i}{w_i}, \\quad CI = \\frac{\\lambda_{max} - n}{n - 1}, \\quad CR = \\frac{CI}{RI}, \\quad RI = 0.90 \\ (n = 4)$$
+
+A consistency ratio **CR ≤ 0.10** is accepted; above that the panel flags the
+judgements as inconsistent (for example "E beats F, F beats C, but C beats E").
+
+**Worked example** — energy 3× façade, 5× characteristics, 2× potential;
+façade 3× characteristics and equal to potential; potential 3×
+characteristics:
+
+| | E | F | C | R | **Weight** |
+|---|---|---|---|---|---|
+| E | 1 | 3 | 5 | 2 | **48.4%** |
+| F | 1/3 | 1 | 3 | 1 | **20.7%** |
+| C | 1/5 | 1/3 | 1 | 1/3 | **8.0%** |
+| R | 1/2 | 1 | 3 | 1 | **22.9%** |
+
+$\\lambda_{max}$ = 4.034, CI = 0.011, **CR = 0.013** — consistent.
+
+**The default.** AHP is the panel's default mode, and with every slider at
+"equal" it gives **25% to each criterion**. The alternative, *direct* mode,
+takes weights from sliders or one of four presets:
+
+| Preset (direct mode) | E | F | C | R |
 |---|---|---|---|---|
-| Balanced (default) | 0.35 | 0.30 | 0.15 | 0.20 |
+| Balanced | 0.35 | 0.30 | 0.15 | 0.20 |
 | Energy-first | 0.55 | 0.15 | 0.10 | 0.20 |
 | Condition-first | 0.20 | 0.50 | 0.15 | 0.15 |
 | Cost-effectiveness | 0.25 | 0.15 | 0.10 | 0.50 |
 
-The maths is deliberately light so it runs client-side over thousands of
-buildings without a round trip.
+Whichever mode is used, the weights are normalised to sum to 1.
+""",
+            "files": ["frontend/src/utils/retrofitPriority.ts", "frontend/src/components/RetrofitPriorityPanel.tsx"],
+        },
+        {
+            "title": "Combining: the priority score",
+            "body": """
+$$P = \\sum_{k \\in \\text{available}} \\tilde w_k \\, S_k, \\qquad \\tilde w_k = \\frac{w_k}{\\sum_{j \\in \\text{available}} w_j}$$
+
+- **Only criteria with data count.** Until a building's façade has been
+  inspected, F is left out and its weight is spread over E, C and R in
+  proportion — with equal weights each of the three then counts 33%. An
+  un-inspected building is not assumed to be in good condition, nor in bad.
+- **Confidence** of the whole score is the same weighted mean of the
+  criterion confidences, shown next to every rank, so a score resting on a
+  missing energy figure is visibly weaker than one resting on a measured one.
+- **Drivers** — the two criteria that contribute most to a building's score —
+  are written next to it in words, e.g. *"Energy performance: 212 kWh/m²·yr"*.
+- The list is sorted by P; the **top N** (default 3, adjustable) are flagged
+  and carried into Step 3. The full ranking can be exported as CSV.
+""",
+            "files": ["frontend/src/components/RetrofitPriorityPanel.tsx", "frontend/src/components/MethodEquationsPanel.tsx"],
+        },
+        {
+            "title": "Limitations, and what could be improved",
+            "body": """
+| Limitation | Improvement |
+|---|---|
+| The thresholds (60 / 250, 70, 0.15–1.0 W/m²K, the age bands) carry no cited source | anchor them to Boverket's energy requirements and the energy-class definitions, and record the source next to each |
+| Swedish energy classes are defined **relative to the new-build requirement** for the building's type, not as fixed kWh, so one kWh figure per letter is an approximation | derive E from the class boundaries of the building's own type |
+| Whose judgement produced the presets is not recorded | run an AHP session with the stakeholders, and store the judgements, the date and the CR with the project |
+| Size is scaled within the current selection, so the same building's C and R change with the selection | offer a fixed reference (e.g. the city's size distribution) as an option |
+| Inspected buildings are ranked on four criteria, un-inspected ones on three | show the inspected / not-inspected status beside the rank (already visible as "—" in the F column) |
+| No check of how stable the ranking is to the weights | a sensitivity view: how many ranks change if each weight moves ±10% |
+| AHP here combines one person's judgements | for a group, combine individual judgements (e.g. by geometric mean) before deriving the weights |
 """,
         },
     ],
@@ -1857,64 +2419,299 @@ buildings without a round trip.
 
 # ─────────────────────────────────────────────────────────────────────────────
 OPTIMISATION = {
-    "number": 9,
+    "number": 8,
     "title": "Optimisation Process",
     "stage": "method",
     "purpose": """
-Finding renovation packages that trade cost, carbon and energy well. An
-analytic enumeration and Pareto filter runs first; only the winners are then
-validated in EnergyPlus.
+How Step 4 finds the renovation packages that trade **life-cycle cost**,
+**global warming potential** and **energy demand** best: the source of the
+model, the model itself — decision variables, constraints, objectives and every
+equation with what it means — how time enters it, the process step by step,
+and a worked example.
 """,
+    "overview": {
+        "title": "The optimiser in five steps",
+        "subtitle": "Fast physics over every combination; EnergyPlus only for the winners.",
+        "items": [
+            ("Collect options", "Every saved build-up per envelope component, plus a free \"keep as-built\" option; anything worse than as-built is dropped."),
+            ("Anchor", "The part of the energy use a renovation cannot change is derived from the building's own EnergyPlus baseline."),
+            ("Score everything", "Every combination is scored for energy, life-cycle cost and carbon over the 30-year study period."),
+            ("Keep the Pareto front", "Only packages that no other package beats on all three objectives are kept."),
+            ("Validate", "The lowest-energy package on the front runs in EnergyPlus automatically; any other runs with one click."),
+        ],
+    },
     "sections": [
         {
-            "title": "Enumerate, then filter",
-            "badge": "method",
+            "title": "Source of the model",
             "body": """
-Every component contributes one option to a combination. The optimiser
-enumerates the combinations, evaluates each with **degree-day physics**, and
-returns the non-dominated front on **(cost, carbon, energy)**.
+The optimisation model was developed by **Jenny Enerbäck** and **Ann-Brith
+Strömberg** (Chalmers, Mathematical Sciences) for **DT4PED — Digital Twin for
+Positive Energy Districts**, Sweden, the project led at Chalmers by **Liane
+Thuvander**, which we worked on. This tool uses the model from that same source
+and implements it for the renovation packages in Step 4.
 
-This stage is fast and analytic by design — the expensive EnergyPlus validation
-is applied only to the front, not to the whole combinatorial space.
-
-The Pareto filter uses a sorted skyline sweep rather than pairwise comparison,
-which matters at this data scale.
+Published in: S. Abouebeid, J. Enerbäck, E. Malakhatka, A.-B. Strömberg,
+D. Sindelar, M. Mazidi, A. Sridhar, H. Wallbaum & L. Thuvander (2026), *Urban
+building energy modelling and multi-objective optimization for PED transition
+in an existing neighbourhood in Sweden*, **Energy and Buildings**. The
+attribution is also kept in the tool (`frontend/src/config/optimizationAssumptions.ts`,
+and the Analysis page).
 """,
-            "files": ["backend/main.py", "frontend/src/components/OptimizerPanel.tsx"],
+            "files": ["frontend/src/config/optimizationAssumptions.ts", "frontend/src/pages/AnalysisTools.tsx"],
         },
         {
-            "title": "Anchoring to the real baseline",
-            "badge": "method",
+            "title": "The optimisation model",
             "body": """
-A fixed load `Q_fixed` — everything a retrofit cannot change — is derived from
-the **measured EPSM baseline** rather than assumed:
+A **multi-objective mixed-integer linear model**: choose one renovation option
+for every envelope component of a building so as to minimise life-cycle cost,
+global warming potential and energy demand at the same time.
 
-```
-q_fixed = baseline_total_kwh − baseline_heat_transfer × f_dh
-```
+**Indices and sets**
 
-This forces the analytic physics curve to pass through the known baseline point
-when every component is left at its as-built U-value, so the fast model and the
-simulation agree at the anchor.
+| Symbol | Meaning |
+|---|---|
+| $c \\in \\mathcal{C}$ | envelope components — walls, roof, windows, floor (and the new-extension variants) |
+| $o \\in O_c$ | the options for component *c*: the build-ups saved in Step 4, plus **keep as-built** |
+| $y = 1, \\dots, N$ | the years of the study period |
 
-Discounting uses a present-value annuity factor over the study period:
-$$\\text{annuity} = \\sum_{y=1}^{N} \\frac{1}{(1+r)^y}$$
+**Parameters**
+
+| Symbol | Meaning | Value / source |
+|---|---|---|
+| $A_c$ | area of component *c* (m²) | from the building's geometry and window-to-wall ratio |
+| $A_{floor}$ | heated floor area (m²) | footprint × floors |
+| $U_{c,o}$ | U-value of option *o* (W/m²K) | Wikells catalogue, or computed from the layers (EN ISO 6946); keep = the as-built U |
+| $C^{inv}_{c,o}$ | investment cost of option *o* over $A_c$ (SEK) | Wikells cost per m² × $A_c$; keep = 0 |
+| $G^{emb}_{c,o}$ | embodied carbon of option *o* over $A_c$ (kg CO₂e) | Boverket climate database per m² × $A_c$; keep = 0 |
+| $L_{c,o}$ | service life of option *o* (years) | `materialProperties.ts` — used only by the replacement terms, see below |
+| *HDD* | heating degree-days (K·day/yr) | 3,300 at base 15.5 °C (Eurostat; Gothenburg estimate, provisional) |
+| *p* | energy price (SEK/kWh) | today's day-ahead spot price, zone SE3; 0.8 if the feed is down |
+| $f_{CO_2}$ | operational emission factor (kg CO₂e/kWh) | 0.022 — Göteborg Energi district heating 2025 |
+| *r* | real discount rate | 3% — EU cost-optimal framework (Delegated Regulation 244/2012) |
+| *N* | study period (years) | 30 |
+| $E_{base}$ | the building's simulated baseline (kWh/m²·yr) | EnergyPlus baseline from Step 3 |
+
+**Decision variables**
+
+$$x_{c,o} \\in \\{0, 1\\} \\qquad x_{c,o} = 1 \\text{ if option } o \\text{ is chosen for component } c$$
+
+**Constraint — exactly one option per component**
+
+$$\\sum_{o \\in O_c} x_{c,o} = 1 \\qquad \\forall c \\in \\mathcal{C}$$
+
+**Objectives — all three minimised**
+
+$$\\min \\; \\big( \\, C(x), \\; G(x), \\; E(x) \\, \\big)$$
+
+- **C — life-cycle cost** (SEK, present value): investment + discounted
+  energy cost over *N* years (+ discounted replacements).
+- **G — global warming potential** (kg CO₂e): embodied carbon + operational
+  carbon over *N* years (+ embodied carbon of replacements).
+- **E — energy demand** (kWh/m²·yr).
+
+The three conflict — the cheapest package saves little energy, and the
+insulation that saves the most energy carries the most embodied carbon — so
+there is no single optimum. The result is the **Pareto front**: every package
+that no other package matches or beats on all three objectives.
 """,
         },
         {
-            "title": "Why non-improving options are excluded",
-            "badge": "method",
+            "title": "The equations, and what they mean",
             "body": """
-A synthetic **"keep as-built"** option lets the optimiser decide a component is
-not worth touching — essential for an honest cost/carbon trade-off.
+**Eq. 1 — Transmission heat-loss coefficient** — the watts the envelope loses per
+degree of temperature difference:
 
-Any catalogue option **worse than as-built is dropped and reported, never
-silently ignored**. This exists because the Wikells catalogue mixes complete
-insulated assemblies (roof plus 340 mm insulation, U=0.11) with bare coverings
-and uninsulated build-ups (TRP roof on masonite beams, U=3.37; "M0" studs with
-no insulation, U=1.75). Those are single layers, not whole-component retrofits.
-Offering them as retrofits made the optimiser propose packages that *increased*
-heating demand several-fold.
+$$H_{tr}(x) = \\sum_{c} \\sum_{o \\in O_c} A_c \\, U_{c,o} \\, x_{c,o} \\qquad [\\text{W/K}]$$
+
+Better insulation → lower U → lower $H_{tr}$.
+
+**Eq. 2 — Degree-hour factor** — turns a W/K loss into kWh per year at this
+location:
+
+$$F_{dh} = \\frac{24 \\cdot HDD}{1000} \\qquad [\\text{kWh per (W/K) per year}]$$
+
+*HDD* is the yearly sum of how far the daily mean temperature falls below the
+base temperature; 24 turns days into hours, 1000 Wh into kWh. With 3,300
+K·day/yr, $F_{dh}$ = **79.2**.
+
+**Eq. 3 — Annual energy use** — a fixed part plus the envelope losses:
+
+$$Q(x) = Q_{fixed} + H_{tr}(x) \\cdot F_{dh} \\qquad [\\text{kWh/yr}]$$
+
+$Q_{fixed}$ is everything an envelope renovation cannot change — hot water,
+ventilation, lighting, appliances, and the net effect of solar and internal
+gains.
+
+**Eq. 4 — The anchor** — $Q_{fixed}$ is taken from the building's own EnergyPlus
+baseline rather than assumed:
+
+$$Q_{fixed} = \\max\\Big(0,\\; E_{base} \\cdot A_{floor} \\; - \\; \\sum_c A_c \\, U_{c,base} \\cdot F_{dh}\\Big)$$
+
+With every component kept as built, equation 3 returns exactly the simulated
+baseline, so the fast model and the simulation agree at the starting point and
+every saving is measured from a real figure. If the baseline is smaller than
+the envelope losses alone imply, the anchor cannot hold, and the optimiser
+reports `anchor_ok = false` rather than showing impossible numbers.
+
+**Eq. 5 — Energy objective**
+
+$$E(x) = \\frac{Q(x)}{A_{floor}} \\qquad [\\text{kWh/m}^2\\text{yr}]$$
+
+**Eq. 6 — Cost objective — life-cycle cost** (present value, SEK):
+
+$$C(x) = \\underbrace{\\sum_c \\sum_o C^{inv}_{c,o}\\, x_{c,o}}_{\\text{investment, year 0}} \\; + \\; \\underbrace{\\sum_c \\sum_o \\sum_{k \\ge 1,\\; kL_{c,o} < N} \\frac{C^{inv}_{c,o}\\, x_{c,o}}{(1+r)^{k L_{c,o}}}}_{\\text{replacements}} \\; + \\; \\underbrace{\\sum_{y=1}^{N} \\frac{Q(x)\\, p}{(1+r)^{y}}}_{\\text{energy cost}}$$
+
+The investment is paid today; a replacement is paid in the year the option
+reaches the end of its service life, discounted to today; the energy bill is
+paid every year and discounted year by year.
+
+**Eq. 7 — Carbon objective — global warming potential** (kg CO₂e):
+
+$$G(x) = \\underbrace{\\sum_c \\sum_o G^{emb}_{c,o}\\, x_{c,o}}_{\\text{embodied, year 0}} \\; + \\; \\underbrace{\\sum_c \\sum_o \\sum_{k \\ge 1,\\; kL_{c,o} < N} G^{emb}_{c,o}\\, x_{c,o}}_{\\text{replacements}} \\; + \\; \\underbrace{\\sum_{y=1}^{N} Q(x)\\, f_{CO_2}}_{\\text{operational}}$$
+
+Carbon is **not discounted**: a kilogram emitted in year 30 warms the climate
+as much as one emitted today.
+
+**Eq. 8 — Pareto dominance** — package *a* dominates package *b* when
+
+$$C_a \\le C_b, \\quad G_a \\le G_b, \\quad E_a \\le E_b, \\quad \\text{with at least one strictly smaller.}$$
+
+The Pareto front is every package that no other package dominates.
+
+> **Implemented now:** the investment, energy-cost, embodied and operational
+> terms. The **replacement terms** (with the service lives $L_{c,o}$) are part
+> of the documented model but are **not yet computed** by `/api/optimize`; the
+> service-life table in `materialProperties.ts` is ready for them. With the
+> current table and a 30-year study period they would add nothing yet: the
+> shortest service lives are 30 years (renders, bitumen roof membranes), so no
+> option ends its life *before* year 30. They start to matter with a longer
+> study period or shorter-lived options.
+""",
+            "files": ["backend/main.py", "frontend/src/config/optimizationAssumptions.ts", "frontend/src/config/materialProperties.ts"],
+        },
+        {
+            "title": "Time in the model",
+            "body": """
+| Aspect | How time is handled |
+|---|---|
+| **Study period** | *N* = 30 years |
+| **Time step** | one year — the model uses the annual energy use *Q(x)*, the same every year |
+| **When costs fall** | investment at year 0 (not discounted); energy costs at the end of each year *y* = 1 … 30; replacements in year $kL_{c,o}$ |
+| **Discounting** | real rate *r* = 3%, applied to costs only |
+| **Annuity factor** | the constant yearly energy cost is discounted in one step: $\\sum_{y=1}^{N} \\frac{p\\,Q}{(1+r)^y} = p\\,Q \\cdot AF$, with $AF = \\sum_{y=1}^{N} (1+r)^{-y}$ = **19.600** for 3% and 30 years — 1 SEK a year for 30 years is worth 19.60 SEK today |
+| **Carbon over time** | summed, not discounted: operational carbon = $N \\cdot Q \\cdot f_{CO_2}$ |
+| **Energy price over time** | constant at today's spot price; how the choice holds up under low, medium and high future prices is tested afterwards in **9. Decision Analysis under Uncertainty** |
+| **Weather** | one typical year (the degree-days, and the TMYx weather file of the EnergyPlus baseline) — no climate change over the 30 years |
+
+**Computation time.** The model is solved exactly by evaluating every
+combination. Measured on this computer: about **0.02 s for 10,000
+combinations** and **0.2 s at the 100,000-combination cap**, so the curve can
+be recomputed live, 0.45 s after any change of material. Validating a package
+in EnergyPlus takes much longer — a median of about **12 s** per batch from
+submission to result (half of 342 recorded batches took 6–36 s).
+""",
+        },
+        {
+            "title": "Step by step — what happens in Step 4",
+            "body": """
+**a) Options.** The user saves build-ups per component in Step 4. Each carries
+a U-value, a cost per m² (Wikells) and an embodied carbon per m² (Boverket's
+climate database, through the Wikells-to-Boverket mapping). The optimiser uses
+**every** saved build-up of every component.
+
+**b) The building.** It optimises one representative building — the chosen
+target, or the first when "all" is selected — with its component areas and
+floor area.
+
+**c) The baseline.** It waits until that building's EnergyPlus baseline
+(Step 3) has finished, and takes $E_{base}$ from it.
+
+**d) Filter.** A free **keep as-built** option (baseline U, no cost, no carbon)
+is added to every component, so a component can be left alone. Any option with
+a **higher U-value than as-built** is dropped and listed in
+`excluded_options` — the Wikells catalogue mixes complete insulated assemblies
+with bare coverings (e.g. a roof sheet on masonite beams, U 3.37), and offering
+those as renovations made packages *increase* demand.
+
+**e) Enumerate and score.** Every combination is formed — the product of the
+option counts, e.g. 4 wall × 6 roof choices = 24 — up to **100,000**
+(`truncated` flags the cap). Each is scored with equations 1–7, and
+combinations with identical (cost, carbon, energy) are merged.
+
+**f) Pareto filter.** Points are sorted by cost; a point is kept unless an
+already-kept point is at least as good on carbon and energy — a "skyline"
+sweep, which avoids comparing every pair.
+
+**g) Present.** The cheapest, lowest-carbon and lowest-energy packages are
+tagged. At most 24 front points are returned — the tagged ones plus an even
+spread across the rest — with the "do nothing" baseline and a cloud of up to
+3,000 evaluated points so the chart can show the front forming. The chart's
+axes follow the KPIs chosen in Step 1 (by default cost across, carbon up,
+energy as colour); a parallel-coordinates view is optional.
+
+**h) Validate in EnergyPlus.** The **lowest-energy** package on the front is
+sent to EPSM automatically as an *"Optimal · …"* package; any other point runs
+with a click. Validated packages join the hand-built ones in the Step 4 results
+table, then go on to **9. Decision Analysis under Uncertainty** and the Step 5
+report. How a package becomes an IDF is on **6. Energy Simulation — EPSM & IDF**.
+
+The AI assistant's `recommend_retrofit` runs the same optimiser for an address
+and checks its best-balance pick in EnergyPlus the same way.
+""",
+            "files": [
+                "frontend/src/pages/RenovationSimulator.tsx",
+                "frontend/src/components/OptimizerPanel.tsx",
+                "frontend/src/components/ParetoChart.tsx",
+                "frontend/src/components/ParallelCoordinates.tsx",
+                "frontend/src/components/OptimizationAssumptions.tsx",
+            ],
+        },
+        {
+            "title": "A worked example",
+            "body": """
+*Illustrative inputs* (made-up areas, prices and carbon — not Wikells or
+Boverket values), with the tool's real parameters and formulas: a 1,000 m²
+building with a simulated baseline of 150 kWh/m²·yr; walls 800 m² at U 0.40,
+roof 250 m² at U 0.30, windows 160 m² at U 1.80.
+
+**Anchor:** $H_{tr,base}$ = 800·0.40 + 250·0.30 + 160·1.80 = **683 W/K**;
+envelope losses = 683 × 79.2 = **54,094 kWh/yr**; baseline = 150 × 1,000 =
+**150,000 kWh/yr**; so $Q_{fixed}$ = **95,906 kWh/yr** — the part no envelope
+measure can touch.
+
+**Options:** walls — EPS 100 mm (U 0.20) or mineral wool 195 mm (U 0.15); roof
+— loft wool 400 mm (U 0.10); windows — triple glazing (U 0.90); each plus
+*keep*: 3 × 2 × 2 = **12 combinations**, of which **10 are on the front**.
+
+| Package | Energy (kWh/m²·yr) | Life-cycle cost (MSEK) | Carbon (t CO₂e) | On front |
+|---|---|---|---|---|
+| Keep everything | 150.0 | 2.35 | 99.0 | yes — cheapest |
+| Roof only | 146.0 | 2.38 | 97.9 | yes — lowest carbon |
+| EPS walls | 137.3 | 2.87 | 105.0 | yes |
+| Triple glazing only | 138.6 | 3.21 | 101.1 | **no** — mineral-wool walls beat it on all three |
+| Mineral-wool walls + roof | 130.2 | 3.17 | 98.6 | yes |
+| Mineral-wool walls + roof + triple glazing | 118.8 | 4.03 | 100.7 | yes — lowest energy |
+
+**What it shows.** With three objectives most packages are on the front: each
+is best at *some* trade-off. And because Gothenburg's district heating emits
+only 0.022 kg CO₂e/kWh, 30 years of operation (≈ 99 t) is similar in size to
+the embodied carbon of a deep renovation — so deep packages save energy but
+barely lower, or even raise, total carbon. The front makes that trade-off
+visible instead of hiding it in one score.
+""",
+        },
+        {
+            "title": "Limitations, and what could be improved",
+            "body": """
+| Limitation | Improvement |
+|---|---|
+| The replacement terms are not yet computed (with 30 years and the current service lives of ≥ 30 years they would be zero anyway) | add them using `materialProperties.ts`, so that longer study periods and shorter-lived options are handled |
+| One price and one emission factor apply to **all** energy — the electricity spot price and the district-heating factor are applied to heating, hot water, lighting and equipment alike | split *Q* into heat (district-heating price and factor) and electricity (spot price and grid factor) |
+| The physics is linear in U: it ignores changes in solar gains, thermal mass and airtightness | mitigated by validating the winners in EnergyPlus; could re-anchor on each validated result |
+| One representative building; its winning package is then applied to every targeted building | optimise per building, or per archetype |
+| The degree-days figure is marked provisional | use SMHI station data for Gothenburg-Landvetter |
+| Constant energy price and a typical weather year for 30 years | price scenarios in **9. Decision Analysis under Uncertainty**; future-climate weather files already exist in `data/epw/` |
+| Sweden only — the UK has no real cost or carbon data | a real UK cost and carbon source (see **1. Data Sources**) |
 """,
         },
     ],
@@ -1922,7 +2719,7 @@ heating demand several-fold.
 
 # ─────────────────────────────────────────────────────────────────────────────
 DECISION_ANALYSIS = {
-    "number": 10,
+    "number": 9,
     "title": "Decision Analysis under Uncertainty",
     "stage": "method",
     "purpose": """
@@ -1970,110 +2767,210 @@ recommendation. Results carry through to the Step 5 report.
 
 # ─────────────────────────────────────────────────────────────────────────────
 FACADE_ML = {
-    "number": 11,
+    "number": 10,
     "title": "AI, ML & Vision Models",
     "stage": "method",
     "purpose": """
-The three learned components in the tool: a **trained object detector** for
-façade defects, a **vision model** estimating window-to-wall ratio from a
-photograph, and a **tool-calling assistant** that answers questions against the
-project's own datasets.
-
-All three are optional. Each degrades to something explicit — a heuristic, a
-disabled button, or a refusal — rather than to a fabricated number.
+The learned components in the tool. Most of this page is about **façade
+inspection**: how a trained defect detector and general vision-language models
+look at images of a building's façade — photos uploaded in Step 2, or views
+captured in the 3D viewer — to find defects and to estimate the window-to-wall
+ratio. The last sections cover the data assistant. None of these components is
+needed for a simulation, an optimisation or a ranking to complete.
 """,
     "overview": {
-        "title": "Three components, three different risk profiles",
-        "subtitle": "Two hosted APIs and one local model, all fenced off from the core.",
+        "title": "Façade inspection at a glance",
+        "subtitle": "One trained model, two general vision models, two image sources.",
         "items": [
-            ("Defect detector", "Local, trained, deterministic. Own torch process on :8020."),
-            ("WWR vision", "Hosted LLM. Claude first, then GPT-4.1, then a heuristic."),
-            ("Data assistant", "Hosted LLM with 11 tools over real datasets — it queries, it does not recall."),
-            ("Fenced off", "None of them can change a simulation result; they produce inputs a user can see and override."),
+            ("Images", "Photos uploaded per façade (N, E, S, W) in Step 2, or views captured from the 3D viewer."),
+            ("Defect detector", "A Faster R-CNN (ResNet-50 + FPN) trained on the MBDD2025 building-defect dataset; five defect classes; runs as a local service."),
+            ("Second opinion", "A vision-language model marks defects too; its boxes are only added where the detector found nothing."),
+            ("Window-to-wall ratio", "A vision-language model estimates the glazed share and counts balconies; saved values feed the energy simulation."),
         ],
     },
     "sections": [
         {
-            "title": "Façade defect detection — the trained model",
-            "badge": "method",
+            "title": "Where the images come from",
             "body": """
-**Where it runs.** A standalone FastAPI service on the **host**, port `8020`
-(`FACADE_ML_PORT`), inside its own torch environment. The app's backend proxies
-to it via `/api/facade-detect`.
+| Source | How the image is made | Where the result goes |
+|---|---|---|
+| **Step 2 photo upload** | The user drops photos into four façade slots per building (north, east, south, west). Large photos are scaled to at most 1,280 px on the longest side. A sensitivity setting chooses the detector's threshold: high 0.30, **medium 0.45 (default)**, low 0.60. | defect boxes drawn on the photo; the annotated photo is stored in `data/facade_images/` for the Step 5 report; a per-building summary feeds the **F** criterion of **7. Retrofit Prioritisation** |
+| **3D viewer — façade inspector** | For the selected building the camera flies to each façade, far enough back to fit the building's height (+10%) and width, at mid-height, looking straight at the wall. *Capture all* grabs the four views; *Draw & capture* lets the user drag a crop box. The selection tint and outline are hidden during the grab so they cannot skew the model. | window-to-wall ratio and balconies (saved to `data/wwr_database.json`); defect boxes on the captured view |
+| **Google Street View** (`/api/streetview/facade`) | The backend looks for the nearest panorama on the right side of the façade, re-aims at the building from where the car actually drove, and can sweep up to five narrow shots across it. It reports the panorama date and how many **millimetres of wall one pixel covers** — below about 2 mm/px hairline cracks are plausible; at 8 mm/px only staining, spalling and gross cracking survive. | **written but not connected** — no screen calls it yet, and it needs `GOOGLE_MAPS_API_KEY` |
 
-**Why a separate process.** Keeping torch out of the API server means the
-backend starts in seconds, carries no CUDA dependency, and runs at all on a
-machine where the model cannot. The trade-off is one more thing to start —
-`tools/ml/run_facade_service.ps1`.
+**The viewer image is a render, not a photograph.** On the photorealistic
+basemap the capture shows Google's textured 3D mesh — a surface built from
+aerial photographs, with smoothed detail; on the flat basemaps it shows the
+coloured box. Window estimation works on the mesh; defect detection is far
+more reliable on real photographs (Step 2).
+""",
+            "files": [
+                "frontend/src/components/FacadeDefectPanel.tsx",
+                "assets/viewer/js/facade_inspector.js",
+                "backend/main.py",
+            ],
+        },
+        {
+            "title": "The defect detector — the trained model",
+            "body": """
+**Architecture.** A **Faster R-CNN** object detector with a **ResNet-50**
+backbone and a **Feature Pyramid Network (FPN)** — torchvision's
+`fasterrcnn_resnet50_fpn`. It works in two stages: a region-proposal network
+suggests areas that may contain a defect, then each area is classified and
+its box refined. The feature pyramid lets it find both small defects (a
+crack) and large ones (a leakage stain) in the same image.
 
-**The model.** A checkpoint from a separate ML project, loaded from
-`outputs/mbdd2025_pretrained/best.pt` (overridable via `FACADE_MODEL`), built by
-`facade_ml.models.detection.build_detection_model(num_classes=…, fpn_v2=…)` — an
-**FPN-based object detector**. The checkpoint records a **best score of 0.77**.
-Loaded with `map_location="cpu"`.
+**Transfer learning.** Training started from weights pre-trained on the COCO
+image dataset; the classification head was replaced with one for **five
+defect classes plus background**.
 
-**Five defect classes**, from `facade_ml.data.voc.VOC_CLASSES`:
+**Training data — MBDD2025.** A public dataset of building-surface defects
+photographed by drones: **14,471 images** (up to 1280 × 720) of six structure
+types — steel, reinforced concrete, wood, brick, masonry and brick-concrete —
+in urban and rural settings, labelled with boxes for five classes:
 
-| Class | Severity weight in scoring |
+| Class | What it means | Severity weight in prioritisation |
+|---|---|---|
+| `crack` | cracks and fractures in render, masonry or concrete | 1.00 |
+| `bulge` | bulging, deformation, detachment of the surface | 1.00 |
+| `corrosion` | rust, corroded metal, exposed rebar | 0.75 |
+| `abscission` | spalling, flaking, missing render, tiles or brick | 0.75 |
+| `leakage` | water staining, damp, efflorescence, biological growth | 0.60 |
+
+**The training run** (in the separate ML project, `C:\\Users\\saraabo\\Desktop\\ML`):
+
+| Setting | Value |
 |---|---|
-| `crack` | 1.00 |
-| `bulge` | 1.00 |
-| `corrosion` | 0.75 |
-| `abscission` | 0.75 |
-| `leakage` | 0.60 |
+| Split | random 70 / 15 / 15 %, seed 42 → **10,129 training / 2,170 validation / 2,172 test** images |
+| Hardware | Chalmers' Vera cluster (C3SE), one NVIDIA A40 GPU |
+| Optimiser | AdamW, learning rate 5 × 10⁻⁵, batch size 8, **20 epochs** |
+| Model kept | the epoch with the best validation score → `outputs/mbdd2025_pretrained/best.pt` (472 MB, 16 July 2026) |
+| Other runs | a baseline trained from scratch (10 epochs), and a "v2" with the FPN-v2 backbone, data augmentation and 30 epochs — neither deployed, and the v2 result is not recorded |
 
-**Where the output goes.** Detected defect load drives the **F** criterion in
-the prioritisation score (**8. Retrofit Prioritisation**) through a saturating
-curve, so uploading a photograph changes the ranking. Structural defects (crack,
-bulge) are weighted above surface ones deliberately.
+**What "best score 0.77" means.** It is the **mean F1 on the validation set**
+at an overlap (IoU) of at least 0.5: a predicted box counts as correct when it
+overlaps a labelled box of the same class by 50% or more; precision and recall
+are averaged over the five classes and combined into F1. It is **not mAP**,
+and **no test-set result or per-class figures were recorded**. The split
+shuffles individual images, so near-identical frames from one drone flight can
+land in both training and validation, which would flatter the score — the ML
+project's own README lists this as a check still to do.
 
-**An important scoring rule:** until a building has been inspected, F is marked
-unavailable and **left out of the composite entirely**, with the other criteria
-re-weighted. An un-inspected building is not assumed to be in good condition —
-nor in bad.
+**How it runs.** `tools/ml/facade_detect_service.py` loads the checkpoint (on
+CPU) and serves `POST /detect` on port **8020**, returning boxes, labels and
+scores above a threshold; start it with `tools/ml/run_facade_service.ps1`. The
+backend forwards images to it (`/api/facade-detect`). It is a separate
+process so the main backend never has to carry PyTorch.
 
-Uploads are available in both the 3D viewer and Step 2 of the wizard.
+**Research basis.**
+
+| Source | Used for |
+|---|---|
+| S. Ren, K. He, R. Girshick & J. Sun (2015), *Faster R-CNN: Towards real-time object detection with region proposal networks*, NeurIPS 28 | the detector architecture |
+| T.-Y. Lin, P. Dollár, R. Girshick, K. He, B. Hariharan & S. Belongie (2017), *Feature pyramid networks for object detection*, CVPR | the feature pyramid |
+| T.-Y. Lin et al. (2014), *Microsoft COCO: Common objects in context*, ECCV | the pre-trained starting weights |
+| *A dataset of building surface defects collected by UAVs for machine learning-based detection*, **Scientific Data** (2025) — <https://www.nature.com/articles/s41597-025-06318-5> | the MBDD2025 training data and its five classes |
+
+**Caveat — the domain gap.** The model learned from real drone photographs.
+It has not been tested on the tool's own inputs — phone photos of Gothenburg
+façades, or renders of the 3D mesh — and hairline cracks rarely survive in a
+render.
 """,
             "files": [
                 "tools/ml/facade_detect_service.py",
                 "tools/ml/run_facade_service.ps1",
-                "frontend/src/components/FacadeDefectPanel.tsx",
                 "frontend/src/utils/retrofitPriority.ts",
             ],
         },
         {
-            "title": "Window-to-wall ratio — the vision model",
-            "badge": "method",
+            "title": "The second opinion — a vision-language model marks defects",
             "body": """
-**The interaction.** In the viewer the camera flies to a façade, the user drags
-a rubber-band crop, and the cropped image is sent for estimation. Results
-persist to a WWR database so a façade is assessed once and reused.
+In Step 2, with **AI assist** on (the default), every photo goes to the
+detector **and**, in parallel, to a general vision-language model
+(`/api/facade-vision`):
 
-**Three-tier fallback**, in strict priority order:
+1. **Model:** Claude Sonnet 4.5 if an Anthropic key is set, otherwise OpenAI
+   GPT-4o.
+2. **Prompt:** it is told to act as a façade-condition inspector giving a
+   second opinion, is given a definition of each of the five classes, and must
+   return JSON boxes (normalised 0–1), a confidence and a short note per
+   defect — and nothing if there are none.
+3. **Merge rule:** every detector box is kept; a vision-model box is **added
+   only if it overlaps no detector box by more than 0.45 (IoU)**. It can add
+   what the detector missed, but it cannot duplicate or overrule it. Each box
+   keeps its source (*ml* or *ai*) on screen.
+4. **If the detector is down,** the vision model's boxes are used alone so the
+   inspection still produces a result.
 
-| Tier | Model | Endpoint | Result tag |
-|---|---|---|---|
-| 1 | `claude-sonnet-4-5` | `api.anthropic.com/v1/messages` (`anthropic-version: 2023-06-01`) | `claude-sonnet-4-5-vision` |
-| 2 | `gpt-4.1` | `api.openai.com/v1/chat/completions` | `gpt-4.1-vision` |
-| 3 | heuristic | — | `"Heuristic estimate (no OPENAI_API_KEY configured)."` |
-
-**The tier matters and is recorded.** Every saved estimate carries its `source`,
-so a Claude-derived number, a GPT-derived number and a heuristic guess are
-distinguishable after the fact. `/api/status` reports which provider is
-configured.
-
-**Why WWR specifically.** It strongly drives heating demand and is one of the
-attributes least often present in any register — Sweden's `buildings.json` has
-no per-building WWR field at all. Without an estimate the model falls back to a
-use-category default (0.15–0.30 depending on use), which is a much weaker
-assumption than looking at the actual building.
+The vision model's boxes are approximate, and its confidences are
+self-reported, not calibrated like the detector's scores.
 """,
-            "files": [
-                "viewer/js/facade_inspector.js",
-                "viewer/js/facade_comparison.js",
-                "data/wwr_database.json",
-                "frontend/src/config/materialProperties.ts",
-            ],
+            "files": ["frontend/src/components/FacadeDefectPanel.tsx", "backend/main.py"],
+        },
+        {
+            "title": "Window-to-wall ratio and balconies — the vision model",
+            "body": """
+**Why.** The window-to-wall ratio (WWR) strongly drives heating demand, and no
+register holds it per building. Without an estimate the energy simulation uses
+a default by use (15–30%, see **6. Energy Simulation — EPSM & IDF**).
+
+**How.** Each captured façade view (JPEG, cropped to the building) is sent to
+`/api/estimate-wwr` together with the façade direction and the building's
+address, year, use and energy class. The model is asked, as an architectural
+analyst, for (1) the percentage of the visible façade that is glazed and
+(2) the number of balconies on the dominant building and their area, returned
+as JSON with a confidence and a one-line note.
+
+| Order | Model | Result tag |
+|---|---|---|
+| 1 | Claude Sonnet 4.5 (Anthropic) | `claude-sonnet-4-5-vision` |
+| 2 | GPT-4.1 (OpenAI) | `gpt-4.1-vision` |
+| 3 | a rule, when no model answers: a base by use (houses 18%, flats 28%, commercial 45%, public 38%, industry 10%, outbuildings 5%, other 22%), adjusted by era (−3 to +5) and energy class (+5 for A to −3 for G), kept within 5–75% | `low` confidence |
+
+The per-façade results are **averaged** for the building and the balconies
+**summed**. When the user saves, the record — with its source tag — goes to
+`data/wwr_database.json`, and the viewer's energy simulation then uses that
+ratio instead of the default. There is also a quick pixel-count estimate in
+the viewer (dark, unsaturated pixels read as glass) used when blending the
+four captures.
+
+No comparison against measured window areas has been recorded, so the
+estimates' accuracy is unknown.
+""",
+            "files": ["assets/viewer/js/facade_inspector.js", "data/wwr_database.json", "backend/main.py"],
+        },
+        {
+            "title": "Status today, and what could be improved",
+            "body": """
+**On 2026-09-14:**
+
+- The **detector service is not running** (nothing answers on port 8020), so
+  Step 2 falls back to the vision model alone and the viewer's *Defects* button
+  reports an error. Start it with `tools/ml/run_facade_service.ps1`.
+- Only the **OpenAI** key is set, so window estimates come from GPT-4.1 and the
+  second opinion from GPT-4o. The WWR store holds 1 saved estimate; 2 annotated
+  façade photos are stored.
+- The viewer's *Defects* button has **two click handlers**, so one click sends
+  the image twice — once to `/api/facade-detect` (boxes drawn, threshold 0.5)
+  and once to `/api/facade-defects` (threshold 0.3), which reports "model not
+  connected" unless `FACADE_ML_URL` is set, and it is not.
+- The **Street View** capture and `assets/viewer/js/facade_comparison.js` are
+  written but not connected.
+- The trained model lives **outside this repository**
+  (`C:\\Users\\saraabo\\Desktop\\ML`, 472 MB), so it is not versioned with the
+  tool.
+
+| Improvement | Why |
+|---|---|
+| Evaluate on the held-out test set, per class, and report mAP too | the only recorded figure is a validation F1 |
+| Split by flight or site rather than by image | removes near-duplicate frames from validation |
+| Test on a small labelled set of the tool's own images (phone photos, mesh renders) | the model has never been checked on the images it actually receives |
+| Fine-tune on street-level façade photographs | MBDD2025 is drone imagery of mixed structures |
+| Connect the Street View capture, with its mm-per-pixel warning | real, dated photographs without a site visit |
+| Remove the duplicate *Defects* handler | one click, one request, one result |
+| Compare WWR estimates with measured window areas for a sample of buildings | the estimates' accuracy is unknown |
+""",
+            "files": ["tools/ml/run_facade_service.ps1", "assets/viewer/js/facade_comparison.js"],
         },
         {
             "title": "The data assistant — tool calling, not recall",
@@ -2124,9 +3021,13 @@ that must call `search_epc_fields` and quote the result can be checked.
             "body": """
 | Key | Powers | Absent |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | WWR tier 1, assistant alternative | falls to tier 2 |
-| `OPENAI_API_KEY` | WWR tier 2, assistant preferred | WWR falls to the heuristic; assistant unavailable |
+| `ANTHROPIC_API_KEY` | WWR (Claude Sonnet 4.5), defect second opinion (Claude Sonnet 4.5), assistant alternative | falls back to OpenAI |
+| `OPENAI_API_KEY` | WWR (GPT-4.1), defect second opinion (GPT-4o), assistant preferred | WWR falls to the rule; no second opinion; assistant unavailable |
 | *(neither)* | — | `/api/status` reports `configured: false`, `provider: null` |
+| `FACADE_ML_URL` | where the backend finds the defect detector (the direct route defaults to `host.docker.internal:8020`) | the viewer's JSON route reports "model not connected" |
+| `GOOGLE_MAPS_API_KEY` | the Street View capture (not connected yet) | the endpoint returns 503 |
+
+On 2026-09-14 only `OPENAI_API_KEY` is set on this machine.
 
 Keys live in the gitignored `.env`. Never commit one, and never echo a value —
 print names or lengths only when checking they exist.
@@ -2139,14 +3040,11 @@ answer without any AI at all.
 """,
         },
     ],
-    "todo": "Still from the separate ML project, not this repo: the training set "
-            "(MBDD2025) size and composition, the exact detector backbone, and what "
-            "metric the recorded best score of 0.77 refers to (mAP, and at which IoU).",
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 CLIMATE_ENV = {
-    "number": 12,
+    "number": 11,
     "title": "Climate & Environmental Analysis",
     "stage": "method",
     "purpose": """
@@ -2197,7 +3095,7 @@ all three.
 
 # ─────────────────────────────────────────────────────────────────────────────
 VIEWER_LAYERS = {
-    "number": 13,
+    "number": 12,
     "title": "Viewer Layers & Visualisation",
     "stage": "result",
     "purpose": """
@@ -2212,7 +3110,7 @@ city-specific versus available anywhere OSM has coverage.
                 ["Layer", "Source", "Availability"],
                 ["Building colour modes", "EUBUCCO / OSM + certificates + TABULA", "any built city"],
                 ["Roads / street network", "OpenStreetMap", "anywhere"],
-                ["Space-syntax centrality", "OSM network, computed in backend", "anywhere"],
+                ["Space-syntax centrality", "OSM network, computed in backend", "written but not loaded in any viewer"],
                 ["Green index / green areas", "OpenStreetMap", "anywhere"],
                 ["Vegetation (trees, shrubs)", "DTCC LiDAR", "Gothenburg only"],
                 ["Roof form", "DTCC LiDAR", "Gothenburg only"],
@@ -2220,7 +3118,7 @@ city-specific versus available anywhere OSM has coverage.
                 ["SCB demographics / income", "Statistics Sweden WFS", "Sweden only"],
                 ["Transit (stops, live vehicles)", "Västtrafik", "Gothenburg only"],
                 ["Traffic cameras & conditions", "Trafikverket", "Sweden only"],
-                ["Market data (sales, rents)", "Booli + Boplats", "Gothenburg only"],
+                ["Market data (sales, rents)", "Booli + Boplats", "written but not loaded in any viewer"],
             ],
             "files": ["viewer/js/layers.js", "viewer/js/legend.js", "viewer/js/layer_docs.js"],
         },
@@ -2239,7 +3137,7 @@ a hue there rather than per component, or the palette drifts apart.
 
 # ─────────────────────────────────────────────────────────────────────────────
 LIMITATIONS = {
-    "number": 17,
+    "number": 16,
     "title": "Known Limitations",
     "stage": "metadata",
     "purpose": """
@@ -2551,7 +3449,7 @@ have caught this on day two.
 
 # ─────────────────────────────────────────────────────────────────────────────
 ANALYSIS_INVENTORY = {
-    "number": 14,
+    "number": 13,
     "title": "Analysis Inventory",
     "stage": "method",
     "purpose": """
@@ -2603,7 +3501,7 @@ Only four things in the list are not this project's own code:
 
 | External | What it is | Consequence |
 |---|---|---|
-| **EPSM** | containerised EnergyPlus manager, :8010 | needs Docker running; its end-use schema limits what we can report (**17. Known Limitations**) |
+| **EPSM** | containerised EnergyPlus manager, :8010 | needs Docker running; its end-use schema limits what we can report (**16. Known Limitations**) |
 | **PVGIS** | European Commission solar API | network dependency; not cached — a result is kept only when a user saves it |
 | **Façade defect model** | trained detector from a separate ML project | needs its own torch environment on the host |
 | **Vision / chat models** | hosted LLM APIs | need API keys; degrade to a heuristic or refuse rather than failing hard |
@@ -2646,7 +3544,7 @@ registry and this inventory agree.
 
 # ─────────────────────────────────────────────────────────────────────────────
 PROJECT_TEAM = {
-    "number": 18,
+    "number": 17,
     "title": "Project Team & Credits",
     "stage": "metadata",
     "purpose": """
@@ -2710,6 +3608,24 @@ retrofit prioritisation and investment decisions.
             "files": ["frontend/src/pages/ProjectTeam.tsx"],
         },
         {
+            "title": "Credited collaborators — EPSM",
+            "badge": "metadata",
+            "body": """
+Every EnergyPlus simulation in the tool runs on **EPSM**, the Energy
+Performance Simulation Manager developed at Chalmers. Its developers are
+credited here; they are not part of the core project team. How the tool uses
+EPSM is on **6. Energy Simulation — EPSM & IDF**.
+""",
+            "table": [
+                ["Name", "Role", "Contribution"],
+                ["Sanjay Somanath", "Lead developer, EPSM",
+                 "Developed EPSM, the simulation manager that queues and runs every EnergyPlus simulation in the tool and returns its energy-use results."],
+                ["Alexander Hollberg", "Principal investigator, EPSM",
+                 "Principal investigator for EPSM at Chalmers."],
+            ],
+            "files": ["docker-compose.epsm.yml"],
+        },
+        {
             "title": "Data and method sources used in the tool",
             "badge": "metadata",
             "body": """
@@ -2748,8 +3664,8 @@ adapted, integrated, or run as external services, and are credited accordingly.
 | **Optimisation model** | Adapted from earlier DT4PED work | Jenny Enerbäck and Ann-Brith Strömberg for the optimisation logic; Liane Thuvander as project lead in the research context |
 | **3D viewer / web visualisation stack** | Integration of geospatial and web technologies into the project environment | Project-level implementation within this repository and the digital twin workflow |
 
-The simulation workflow is documented in **7. Simulation Process** and the
-optimisation logic in **9. Optimisation Process**. Those pages are the
+The simulation workflow is documented in **6. Energy Simulation — EPSM & IDF** and the
+optimisation logic in **8. Optimisation Process**. Those pages are the
 technical counterparts to this attributions page.
 """,
             "files": ["frontend/src/pages/AnalysisTools.tsx", "logbook/logbook_content.py"],
@@ -2792,7 +3708,7 @@ Where every dataset in the tool comes from, how the tool is connected to it,
 how up to date it is, how it is stored and where it is used — one card per
 dataset. Sweden and the United Kingdom draw on almost entirely different
 sources, so each has its own tab. Services and keys shared by both are on
-**15. Services, Keys & Access**.
+**14. Services, Keys & Access**.
 """,
     "tabs": [("Sweden", SE_DATA), ("United Kingdom", UK_DATA)],
 }
@@ -2837,7 +3753,6 @@ PAGES = {
     # Methods - apply to both countries
     "digital_twin":    DIGITAL_TWIN,
     "shoebox_idf":     SHOEBOX_IDF,
-    "simulation":      SIMULATION,
     "prioritisation":  PRIORITISATION,
     "optimisation":    OPTIMISATION,
     "decision":        DECISION_ANALYSIS,
@@ -2857,7 +3772,7 @@ PAGES = {
 # enforces it.
 NAV = [
     ("Data & pipelines", ["data_sources", "coverage", "pipelines", "scraped_data"]),
-    ("Methods", ["digital_twin", "shoebox_idf", "simulation", "prioritisation",
+    ("Methods", ["digital_twin", "shoebox_idf", "prioritisation",
                  "optimisation", "decision", "facade_ml", "climate_env",
                  "viewer_layers", "analysis_index"]),
     ("Reference", ["access", "script_browser", "limitations", "project_team"]),

@@ -1323,9 +1323,12 @@ Genuinely not established. Listed rather than guessed at.
 
 ## Method
 
-- **Façade defect model.** Architecture, training set size, and validation
-  metrics live in the separate ML project, not this repository. Without them the
-  F criterion's reliability cannot be stated.
+- **Façade defect model.** Now traced (logbook page 10): Faster R-CNN
+  ResNet-50-FPN, COCO-pretrained, fine-tuned on MBDD2025 (14,471 UAV images,
+  split 10,129 / 2,170 / 2,172). The recorded 0.77 is the *validation mean F1*
+  at IoU ≥ 0.5, not mAP. Still open: no test-set or per-class result, a random
+  image-level split that may leak near-duplicate frames, and no check on the
+  tool's own images (phone photos, mesh renders).
 - **AHP weights.** The four presets are in the code, but whose pairwise
   judgements produced them, and when, is not recorded.
 - **`f_dh` and `carbon_factor_heat`.** The optimiser's degree-day factor and heat
