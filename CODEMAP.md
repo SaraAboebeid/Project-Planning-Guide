@@ -440,6 +440,13 @@ UK takes footprints from OpenStreetMap via Overpass and joins by UPRN or
 postcode plus house number, falling back to English Housing Survey band priors.
 Only the output schema is shared, which is why one viewer renders both.
 
+**Data Sources is written as dataset cards**, not code-file tables: one card per
+dataset (29 — 19 Sweden, 10 UK) giving publisher and link, connection type
+(live API / downloaded once / fetched & cached / scraped / synthetic), the
+publisher's version, our copy's date (read from disk on load), how it is stored,
+its stage and where it is used (`"dataset"` in `logbook_content.py`, rendered by
+`dataset_card` in `scripts/ui_utils.py`, validated by `check_content.py`).
+
 Start it with `logbook\run.bat` (or `run.bat 8502` for a different port).
 
 ---

@@ -171,7 +171,7 @@ handle takes an exclusive lock and blocks the backend.
                 "stage": "reference",
                 "stage_note": "Published U-values per construction period and building type, used wherever a building has no measured data.",
                 "used_in": [
-                    "City build — **26,257** Gothenburg buildings matched to an archetype",
+                    "City build — **18,251** Gothenburg buildings (single- and multi-family, built up to 2005) get archetype U-values",
                     "Step 2 — archetype columns",
                     "Step 3 — envelope U-values in the generated EnergyPlus model",
                     "Step 4 — the optimiser's baseline U-values",
@@ -499,67 +499,169 @@ handle takes an exclusive lock and blocks the backend.
 SE_COVERAGE = {
     "title": "Sweden · Coverage & Quality",
     "stage": "metadata",
+    "code_refs": "inline",
     "purpose": """
-How well the Swedish data actually matches the buildings, and what that means
-for any Swedish figure. Read this before quoting a Swedish number outside the
-project.
+What exactly the Swedish model knows about its buildings, how many buildings
+that is, what is missing and why, what the tool falls back on, and what could
+be improved. Every figure was counted from the payload the tool serves
+(`frontend/public/buildings.json`) on 2026-09-14. Read this before quoting a
+Swedish number outside the project.
 """,
     "overview": {
-        "title": "Why coverage and quality matter",
-        "subtitle": "Coverage and vintage differ per source.",
+        "title": "In four lines",
+        "subtitle": "Gothenburg — 92,973 buildings.",
         "items": [
-            ("Coverage is partial", "Not every building has a certificate, and matching is imperfect."),
-            ("Vintage matters", "A certificate from 2009 and one from 2024 describe different buildings."),
-            ("Fallbacks look like data", "An inferred value renders the same as a measured one unless the source is stated."),
-            ("Not comparable with the UK", "Sweden matches certificates geometrically, the UK by address."),
+            ("Area", "A rectangle over central Gothenburg (11.85–12.10 °E, 57.62–57.80 °N) — not the whole municipality, and it takes in edges of neighbouring municipalities."),
+            ("Energy data", "26,263 buildings (28%) have a real energy class and energy use — but they make up 57% of the built footprint area, because large buildings are the ones that are declared."),
+            ("Use type", "85,670 buildings (92%) know their use; 28,397 of those are outbuildings such as garages and sheds."),
+            ("Malmö", "A Malmö model (49,601 buildings) exists but carries no energy data at all, and nothing in the tool loads it."),
         ],
     },
     "sections": [
         {
-            "title": "Matching coverage",
-            "badge": "processed",
+            "title": "What is covered — field by field",
             "body": """
-Certificates are joined to footprints **geometrically**. Method in full on
-**3. Pipelines** (Sweden tab).
+| What the tool knows | Buildings | Share | Comes from | When it is missing |
+|---|---|---|---|---|
+| Footprint and height | 92,973 | 100% | EUBUCCO | height = floors × 3.2 m, else 3.2 m (1,276 buildings, 1.4%) |
+| Use type (andamål) | 85,670 | 92.1% | Lantmäteriet footprint, matched by overlap | shown as "Other / unknown" |
+| Address or property designation | 74,322 | 79.9% | certificate address, else the property's fastighetsbeteckning | blank |
+| **Energy class and energy use (kWh/m²·yr)** | **26,263** | **28.2%** | energideklaration | **none — shown as no data** |
+| Heated floor area (Atemp) | 26,263 | 28.2% | energideklaration | none |
+| Construction year | 26,257 | 28.2% | energideklaration only | none — so no archetype either |
+| Number of floors | 19,814 | 21.3% | energideklaration | the height still comes from EUBUCCO |
+| TABULA U-values (wall, roof, window) | 18,251 | 19.6% | TABULA, by year and house type | none for non-residential, post-2005 or unknown-year buildings |
+| District (primärområde) | 75,719 | 81.4% | Göteborgs Stad districts | the other 17,254 lie outside Göteborg's 96 districts |
 
-| Quantity | Count | Share |
-|---|---|---|
-| Buildings in the Gothenburg payload | 92,973 | 100% |
-| With a matched EPC | 85,670 | 92% |
-| With a TABULA archetype | 26,257 | 28% |
-| Tagged with a primärområde | ~75,719 | 81% |
+**"Matched" is not the same as "has energy data".** 85,670 buildings matched a
+Lantmäteriet footprint, but 59,407 of those footprints carry no energy
+declaration — the match gives them a use type and often an address, nothing
+more. Earlier versions of this logbook quoted the 92% as certificate coverage;
+the energy coverage is 28%.
 
-**Cadastral and address joins cannot raise this coverage** on the
-EUBUCCO-to-footprint link, because **EUBUCCO carries no cadastral id and no
-address** — there is no key to join on, so the link has to be spatial. This is a
-property of the data, not a gap in effort. Recorded here so the question is not
-reopened from scratch.
-
-Cadastral ids *are* used, but on the certificate side: to build a property-level
-aggregation that lets one shared declaration reach the property's other heated
-buildings. See **3. Pipelines** (Sweden tab).
+**Energy classes present:** A 241 · B 2,075 · C 4,292 · D 6,565 · E 8,033 ·
+F 3,317 · G 1,740.
 """,
-            "files": ["data_pipeline.py", "tools/se/geocode_epc.py", "tools/se/ingest_districts.py"],
+            "files": ["frontend/public/buildings.json"],
+        },
+        {
+            "title": "What is missing — and why",
+            "body": """
+**66,710 buildings have no energy figure.** By footprint size:
+
+| Footprint | Buildings without energy data | All buildings of that size |
+|---|---|---|
+| under 30 m² (sheds, garages, kiosks) | 23,249 | 24,947 |
+| 30–100 m² | 19,153 | 23,540 |
+| 100–500 m² | 21,567 | 35,441 |
+| 500 m² and over | 2,741 | 9,045 |
+
+Measured by area instead of by count, **57.4% of the 24.2 km² of footprint
+has energy data** — the large buildings are well covered, the small ones are
+not.
+
+Why buildings end up without data:
+
+1. **They were never declared.** Energy declarations are only required in
+   certain situations (new builds, sales, rentals, larger public buildings),
+   so many small houses and every unheated outbuilding have none.
+2. **The declaration has expired out of the extract.** The extract only holds
+   declarations approved from 2015-07-04 — declarations are valid for ten
+   years, so it most likely contains only the currently valid ones (**our
+   reading, not stated in the data**).
+3. **The declaration never reached a footprint.** A declaration only reaches a
+   building through a Lantmäteriet footprint. About 38% of Gothenburg's
+   declared properties have none that carries it (blank or unmatched
+   property id, or only a garage), and the geocoding rescue step recovers only
+   part of those — see **3. Pipelines**.
+4. **The footprints disagree.** EUBUCCO and Lantmäteriet draw buildings
+   differently; a building whose outline overlaps the declared footprint by
+   less than 5% and lies more than 20 m from it is left without data rather
+   than given a neighbour's certificate.
+
+**Districts:** all 17,254 untagged buildings lie outside the 96 district
+polygons — they are in neighbouring municipalities (Mölndal, Partille …)
+that the rectangle takes in. 5,709 of them nevertheless have energy data,
+because certificate matching is not limited to Göteborg municipality.
+""",
+            "files": ["data_pipeline.py", "tools/se/ingest_districts.py"],
+        },
+        {
+            "title": "Fallbacks — what the tool uses when data is missing",
+            "body": """
+| Missing | Fallback | Buildings affected |
+|---|---|---|
+| Declaration not on the building's own footprint | the property's shared declaration (the one covering the most addresses), copied to the property's other **heated** buildings — never to outbuildings | part of the 26,263 |
+| Declaration on no footprint at all | located by the property's footprint centroid or a geocoded address, then given to the nearest building **without data** within 40 m | part of the 26,263 |
+| Building overlaps no footprint | nearest footprint within 20 m of the building outline | part of the 85,670 |
+| Height | floors × 3.2 m, then a flat 3.2 m; anything over 100 m is capped | 1,276 at 3.2 m; 4 capped |
+| U-values | TABULA archetype for the building's period and house type (single- or multi-family) | 18,251 |
+| Use type | "Other / unknown" | 7,945 |
+| Energy class / energy use | **none** — the tool does not invent a Swedish energy figure | 66,710 |
+
+The fallbacks are deliberately one-sided: a certificate may be moved to a
+building that has none, but never onto a building that already has its own,
+and one certificate is never spread across neighbours.
+""",
+            "files": ["data_pipeline.py"],
         },
         {
             "title": "Vintage — how old the data is",
-            "badge": "metadata",
             "body": """
-Read from the database itself (`epc_sweden.duckdb`, the approval date
-`Godkänd`) on 2026-09-14:
+Read from the database itself (`epc_sweden.duckdb`, approval date `Godkänd`):
 
 | Extract | Rows | Declarations | Approved from | Approved to |
 |---|---|---|---|---|
 | Whole of Sweden | 1,883,795 | — | 2015-07-04 | 2025-06-30 |
 | Göteborg (kommun 1480) | 90,956 | 25,842 | 2015-07-06 | 2025-06-30 |
 
-So **every Swedish certificate in the tool is between about 1 and 11 years
-old**, and nothing approved after 30 June 2025 is included. A building renovated
-since its declaration still shows the pre-renovation figures.
+So every Swedish certificate in the tool is **between about 1 and 11 years
+old**, and nothing approved after 30 June 2025 is included. A building
+renovated since its declaration still shows the pre-renovation figures.
 
-The Lantmäteriet footprints that sit in the same file run to 2025-05-10, and the
-EUBUCCO geometry is release v0.2. Per-dataset dates are on
-**1. Data Sources** (Sweden tab).
+The Lantmäteriet footprints in the same file run to 2025-05-10; the building
+geometry is EUBUCCO v0.2. Per-dataset dates are on **1. Data Sources**
+(Sweden tab).
+""",
+        },
+        {
+            "title": "Limitations",
+            "body": """
+- **Not the whole municipality.** The model is a rectangle; the district
+  polygons reach well beyond it (11.58–12.24 °E, 57.50–57.87 °N), so outer
+  parts of Göteborg are not in the model, and neighbouring municipalities are.
+- **Neighbouring buildings can share one certificate.** Where a property's
+  declaration is copied to its other heated buildings, they show identical
+  figures — these are not independent measurements, and the payload does not
+  mark which ones are copies.
+- **Construction year comes only from the certificate**, so 72% of buildings
+  have no age — and therefore no archetype.
+- **TABULA covers only single- and multi-family houses built up to 2005** (10
+  archetypes). Offices, schools, shops and post-2005 buildings get no U-values.
+- **Heights are EUBUCCO estimates**, not measurements. LiDAR roof heights exist
+  for 41,895 buildings but are only used for drawing roofs in the viewer.
+- **Multi-part buildings keep only their largest part**, and outlines are
+  simplified by up to about 5 m.
+- **Malmö has no energy data** — most likely because the Lantmäteriet
+  footprints in the database cover the Gothenburg area only (source codes
+  `GOT`, `UDV`), so Malmö buildings have nothing to match against.
+- **Cannot be rebuilt today** — the Gothenburg EUBUCCO source file is no longer
+  on disk.
+""",
+        },
+        {
+            "title": "What could be improved",
+            "body": """
+| Idea | What it would fix | Effort |
+|---|---|---|
+| Ask Boverket for a fresh extract, and keep the script that builds the database in the repository | certificates after June 2025; a reproducible database | low |
+| Clip to the municipality boundary (the district polygons) instead of a rectangle | outer Göteborg missing, neighbours included | low |
+| Mark copied (property-level) certificates in the payload | shared figures mistaken for independent measurements | low |
+| Fill construction year and floors from EUBUCCO where the certificate has none (check how complete EUBUCCO's Swedish fields are first) | 72% without age, so more buildings get an archetype | medium |
+| Use the LiDAR eave and ridge heights in the energy model | modelled heights for 41,895 buildings | medium |
+| Add a non-residential and post-2005 archetype source, e.g. Boverket's BETSI building-stock survey | no U-values for offices, schools, new buildings | medium |
+| Get Lantmäteriet footprints for Malmö (the account keys already exist in `.env`, unused) | Malmö has no energy data | medium |
+| A clearly labelled statistical estimate for undeclared houses, like the UK's survey fallback | 66,710 buildings with no energy figure | high |
 """,
         },
     ],
@@ -603,8 +705,8 @@ sites on 2026-09-14.
                 "access": "Fetched & cached",
                 "connection": " The UK pipeline queries `overpass-api.de` only (no fallback host) and caches the answer per district in `data/uk_raw/osm_<district>_v2.json`; later runs reuse the cache. No key.",
                 "format": "JSON (Overpass)",
-                "source_version": "Edited continuously; no versions. **Our extracts:** London 2026-07-16, Rotherham 2026-07-29.",
-                "source_short": "London 07-16 · Rotherham 07-29",
+                "source_version": "Edited continuously; no versions. **Our extracts:** London 2026-07-16, Rotherham 2026-08-03.",
+                "source_short": "London 07-16 · Rotherham 08-03",
                 "local": [
                     "data/uk_raw/osm_london_kings_cross_v2.json",
                     "data/uk_raw/osm_london_westminster_v2.json",
@@ -733,10 +835,13 @@ source, and is deliberately not scraped.
                 "used_in": ["Rotherham payload only — certificate coverage"],
             },
             "body": """
-> **Not reproducible yet.** The script that did this calibration is **not in
-> the repository**, and the 91% class accuracy quoted for it has no evidence
-> on disk. Treat the Rotherham coverage figure as a result that cannot be re-run
-> until the script is recovered.
+> **Not reproducible yet.** The scripts that did this calibration are **not
+> in the repository** (they lived in a temporary working folder). The accuracy
+> quoted for it — 91% exact energy class, 100% within one band, against a
+> ground-truth calibration spreadsheet — was measured then, but the spreadsheet
+> is not in the repository either, so it cannot be re-checked. Treat the
+> Rotherham figures as a result that cannot be re-run until the scripts are
+> recovered.
 """,
         },
         {
@@ -823,64 +928,163 @@ source, and is deliberately not scraped.
 UK_COVERAGE = {
     "title": "UK · Coverage & Quality",
     "stage": "metadata",
+    "code_refs": "inline",
     "purpose": """
-How well the UK data matches the buildings, and what that means for any UK
-figure. UK coverage is not comparable with Sweden's — the join is by address,
-and unmatched buildings fall back to survey averages.
+What exactly the UK model knows about its buildings, how many buildings that
+is, what is missing and why, what the tool falls back on, and what could be
+improved. Every figure was counted from the payloads the tool serves
+(`frontend/public/uk/buildings_<district>.json`) on 2026-09-14. UK coverage is
+not comparable with Sweden's: the join is by address, and residential
+buildings without a certificate get a survey-based estimate.
 """,
     "overview": {
-        "title": "Why UK figures need care",
-        "subtitle": "What a UK number does and does not tell you.",
+        "title": "In four lines",
+        "subtitle": "Five districts — 22,203 buildings.",
         "items": [
-            ("Coverage depends on the token", "Without UK_EPC_API_TOKEN every building falls back to survey averages."),
-            ("Matched vs inferred", "A band-prior building carries a survey statistic, not a measurement."),
-            ("Vintage matters", "A certificate from 2009 and one from 2024 describe different buildings."),
-            ("Not comparable with Sweden", "The UK joins certificates by address, Sweden geometrically."),
+            ("Area", "Four 900 m circles in central London (7,720 buildings) and a 4 km circle over Rotherham (14,483). Birmingham and Nottingham are not built."),
+            ("Real certificate", "8,895 buildings (40%) — 1,071 in London (14%), 7,824 in Rotherham (54%)."),
+            ("Survey estimate", "7,494 homes (34%) carry an energy band drawn from the English Housing Survey, not a measurement."),
+            ("No band at all", "5,814 buildings (26%) — every one of them non-residential or of unknown type."),
         ],
     },
     "sections": [
         {
-            "title": "Matching coverage",
-            "badge": "processed",
+            "title": "How each district is covered",
             "body": """
-The UK join is **address-based, not geometric** — UPRN where OSM carries one,
-otherwise postcode plus house number. Method in full on **3. Pipelines** (United Kingdom tab).
+| District | Circle | Buildings | Real certificate | Survey estimate | No band |
+|---|---|---|---|---|---|
+| London — King's Cross | 900 m | 3,018 | 319 (10.6%) | 1,499 (49.7%) | 1,200 (39.8%) |
+| London — Westminster | 900 m | 1,590 | 177 (11.1%) | 533 (33.5%) | 880 (55.3%) |
+| London — Canary Wharf | 900 m | 1,283 | 455 (35.5%) | 436 (34.0%) | 392 (30.6%) |
+| London — Southwark | 900 m | 1,829 | 120 (6.6%) | 612 (33.5%) | 1,097 (60.0%) |
+| Rotherham | 4 km | 14,483 | 7,824 (54.0%) | 4,414 (30.5%) | 2,245 (15.5%) |
+| **Total** | | **22,203** | **8,895 (40.1%)** | **7,494 (33.8%)** | **5,814 (26.2%)** |
 
-Two consequences for any UK figure:
+**On the map all three look alike.** A survey-estimate building is coloured by
+a band just like a certified one. **Most London buildings are estimated or
+blank, not measured.**
 
-1. **Coverage depends on the API token.** Without `UK_EPC_API_TOKEN` the
-   certificate lookup returns nothing and every building falls back to English
-   Housing Survey band priors. The output still looks complete.
-2. **Matched and inferred buildings are different things.** A band-prior
-   building carries a survey-derived distribution, not a measurement.
-
-`tools/uk/sample_epc_matches.py` prints a reviewable sample of matches per
-district — the intended way to audit quality before trusting a district's
-numbers.
+Canary Wharf is highest in London because it is dominated by newer residential
+towers, where every flat has a certificate. Rotherham is high because its
+certificates were pinned to buildings through OS Open UPRN — but the script
+that did that is not in the repository (see **1. Data Sources**, United
+Kingdom tab), and the Rotherham figures in `cities.json` are older than the
+payload.
 """,
-            "files": ["tools/uk/ingest_epc.py", "tools/uk/sample_epc_matches.py"],
+            "files": ["frontend/public/uk/cities.json"],
         },
         {
-            "title": "Match rate per district",
-            "badge": "metadata",
+            "title": "What is covered — field by field",
             "body": """
-Counted from the district payloads in `frontend/public/uk/`. Every building
-without a matched certificate carries an English Housing Survey band prior
-instead.
+| What the tool knows | Comes from | London (7,720) | Rotherham (14,483) | When it is missing |
+|---|---|---|---|---|
+| Footprint | OpenStreetMap | 100% | 100% | — |
+| Height and floors | OSM tags, else EUBUCCO | floors 89.6% | floors 99.3% | levels × 3 m, else a default by use (3–12 m) |
+| EUBUCCO match (height, type) | nearest EUBUCCO building within 25 m | 6,100 (79.0%) | 14,381 (99.3%) | OSM tags only |
+| Energy band (real or estimated) | certificate, else survey | 4,151 (53.8%) | 12,238 (84.5%) | no band |
+| SAP score, energy use, floor area | certificate only | 1,071 (13.9%) | 7,824 SAP / 575 energy use and area | none |
+| Construction year | OSM `start_date`, EUBUCCO, certificate age band | **109 (1.4%)** | 7,588 (52.4%) | an era drawn from the survey, used for U-values only |
+| TABULA U-values | TABULA England | 3,963 (51.3%) | 12,112 (83.6%) — 556 from a real year | none for non-residential buildings |
+| Heating system description | full certificate (`--epc-details` runs only) | 823 (10.7%) | 394 (2.7%) | none |
+| Address | OSM tags, else the certificate | 4,683 (60.7%) | 2,240 (15.5%) | blank |
+| Postcode | OSM tags or address points | 3,360 (43.5%) | 1,371 (9.5%) | cannot be joined by postcode |
+| UPRN | OSM `ref:GB:uprn` | 1,059 (13.7%) | 3,083 (21.3%) | cannot be joined by UPRN |
+| Main fuel | — | 0% | 0% | the field exists but is never filled |
 
-| District | Buildings | With a matched certificate | On a band prior |
-|---|---|---|---|
-| London — King's Cross | 3,018 | 10.6% | 89.4% |
-| London — Westminster | 1,590 | 11.1% | 88.9% |
-| London — Canary Wharf | 1,283 | 35.5% | 64.5% |
-| London — Southwark | 1,829 | 6.6% | 93.4% |
-| Rotherham | 14,483 | 54.0% | 46.0% |
+A block of flats is one building on the map but holds many certificates: in
+London **15,815 certificates** are aggregated onto 1,071 buildings (modal band,
+mean SAP) — 11,744 of them onto 455 Canary Wharf buildings alone.
+""",
+            "files": ["tools/uk/uk_data_pipeline.py"],
+        },
+        {
+            "title": "What is missing — and why",
+            "body": """
+1. **Non-residential buildings never get a band.** The pipeline only queries
+   the *domestic* certificate register, and the survey fallback describes
+   homes only — so offices, shops, schools, garages and buildings of unknown
+   type without a certificate stay blank. That is the whole "No band" column:
+   5,814 buildings.
+2. **Many buildings carry no usable address.** The join needs a UPRN or a
+   postcode plus house number. In London only 43.5% of buildings have a
+   postcode and 13.7% a UPRN — even after borrowing addresses from OSM address
+   points inside each footprint.
+3. **Generic OSM tags.** Most London buildings are tagged only
+   `building=yes` (King's Cross 1,438, Southwark 949, Westminster 910), so
+   their type comes from EUBUCCO or not at all.
+4. **Construction year is almost unknown in London** (1.4%), because OSM rarely
+   carries it and EUBUCCO's UK construction year is under 1% populated.
+5. **Heating detail needs a second, slower run** (`--epc-details`), which has
+   only been done for part of the certificates.
+""",
+            "files": ["tools/uk/uk_data_pipeline.py", "tools/uk/ingest_epc.py"],
+        },
+        {
+            "title": "Fallbacks — what the tool uses when data is missing",
+            "body": """
+| Missing | Fallback | Buildings affected |
+|---|---|---|
+| Certificate, **residential** building | English Housing Survey band distribution — by age band if the year is known, else by dwelling type, else by region — and **one band drawn from it**, the same every rebuild | 7,494 |
+| Certificate, non-residential building | **none** — no band | 5,814 |
+| Construction year (for U-values only) | an era drawn from the survey's dwelling-age distribution; the displayed year stays empty | 15,489 |
+| Height | OSM height tag → EUBUCCO estimate → levels × 3 m → a default by use (3–12 m) | — |
+| Building type | EUBUCCO subtype replaces a generic `building=yes` | — |
+| Cost and carbon | synthetic placeholders — see **1. Data Sources** | all UK buildings |
 
-**Most London buildings are inferred, not measured.** Rotherham is higher
-because its certificates were pinned to buildings through OS Open UPRN, but
-the script that did that is not in the repository — see **1. Data Sources**
-(United Kingdom tab). The Rotherham figures in `cities.json` are older than the
-payload and should not be quoted.
+**Why one band is drawn instead of the distribution:** it keeps the record in
+the same shape as a certified building, so the viewer and wizard need no UK
+special case. The price is that a single estimated building's band means
+little; only averages over many buildings are meaningful.
+""",
+            "files": ["tools/uk/uk_data_pipeline.py", "tools/uk/ingest_ehs.py"],
+        },
+        {
+            "title": "Vintage — how old the data is",
+            "body": """
+The certificate cache holds **60,786 certificate records**, registered between
+**2011-04-18 and 2026-07-29** (median November 2019). 17,395 of them (29%)
+were registered in 2011–2015, so they are more than ten years old — past a UK
+certificate's ten-year validity.
+
+**Older, replaced certificates are not filtered out.** The join keeps every
+certificate found for an address, so where a flat has been re-certified its
+old and new certificates both count towards the building's band.
+
+OSM geometry: London extracts 2026-07-16, Rotherham 2026-08-03. Survey: English
+Housing Survey 2024-25.
+""",
+            "files": ["tools/uk/ingest_epc.py"],
+        },
+        {
+            "title": "Limitations",
+            "body": """
+- **Estimated bands look like real ones** on the map and in the wizard.
+- **Only homes are certified in the model** — non-domestic certificates are not
+  fetched.
+- **U-values rest on a guessed era** for almost every London building.
+- **Superseded certificates count** alongside current ones.
+- **Circles, not administrative areas** — a 900 m radius around a point cuts
+  through blocks and streets.
+- **Rotherham cannot be reproduced** (calibration script missing), and its
+  heating and floor-area detail is sparse (2.7% and 4.0%).
+- **Cost and carbon are synthetic** — any UK cost or carbon figure is a
+  placeholder.
+""",
+        },
+        {
+            "title": "What could be improved",
+            "body": """
+| Idea | What it would fix | Effort |
+|---|---|---|
+| Keep only the newest certificate per dwelling (by UPRN or address) | superseded certificates skewing a building's band | low |
+| Mark estimated buildings visually, or show the band distribution instead of one drawn band | estimates mistaken for measurements | low |
+| Re-run with `--epc-details` for all certificates | heating system known for only 3–11% | low |
+| Refresh `cities.json` from the payloads | stale Rotherham statistics | low |
+| Recover the Rotherham OS Open UPRN script and apply the same method to London | London certificate coverage of 7–36%; Rotherham not reproducible | medium |
+| Fetch non-domestic certificates too (the service also publishes them — check the API) | 5,814 non-residential buildings with no band | medium |
+| Use the certificate's construction-age band more widely, and other age sources | 1.4% known year in London | medium |
+| Build Birmingham and Nottingham (already configured) | two focus cities missing | medium |
+| A real UK cost and carbon source | synthetic placeholders | high |
 """,
         },
     ],
@@ -1006,119 +1210,217 @@ be updated in one place and then re-read without a separate manual sync step.
 SWEDEN_PIPELINE = {
     "title": "Sweden Pipeline",
     "stage": "interim",
+    "code_refs": "inline",
     "purpose": """
-How Swedish registers become the payload the viewer and wizard read. Almost all
-of it happens in one module, `data_pipeline.py`, which is imported by twelve
-other scripts and is the piece to understand first.
-
-The UK chain is **completely different** — different geometry source, different
-join method. It is on the **United Kingdom** tab of this page.
+How the Swedish registers become the building model the viewer and the wizard
+read — step by step: what is loaded, how it is cleaned, how certificates are
+matched to buildings by overlap, what happens when they do not match, and what
+is written out. The UK chain is completely different and is on the **United
+Kingdom** tab. What the result covers is on **2. Coverage & Quality**.
 """,
     "overview": {
         "title": "The pipeline in order",
-        "subtitle": "EUBUCCO in, buildings.json out.",
+        "subtitle": "EUBUCCO footprints in, one record per building out.",
         "items": [
-            ("Load geometry", "EUBUCCO footprints for the city bounding box."),
-            ("Match EPC", "Polygon-overlap join between certificates and footprints."),
-            ("Fall back", "Nearest-neighbour, then cached forward geocoding."),
-            ("Match archetypes", "TABULA lookup by construction year and use category."),
-            ("Tag districts", "Primärområde from the city's ArcGIS service."),
-            ("Emit", "assets/buildings.json — 57 MB, ~92,973 records."),
+            ("Load and crop", "EUBUCCO buildings for the region, cut to a rectangle over central Gothenburg."),
+            ("Prepare certificates", "Declarations linked to Lantmäteriet footprints, plus a shared declaration per property."),
+            ("Match by overlap", "Each building takes the footprint that covers most of it."),
+            ("Rescue the unmatched", "Declarations with no footprint are placed by property or address."),
+            ("Classify and add archetypes", "Use type from the declaration; TABULA U-values by year and house type."),
+            ("Clean up and write", "Heights, areas, simplified outlines; then districts are tagged."),
         ],
     },
     "sections": [
         {
-            "title": "EPC to building matching — the overlap method",
-            "badge": "method",
+            "title": "Step 1 — Load and crop the buildings",
             "body": """
-Each building takes the certificate footprint that covers the **largest share of
-its own area**. Two thresholds govern the join:
+1. Read the EUBUCCO file for the region (`SE23` for Gothenburg — parquet,
+   or a GeoPackage if that is what is on disk).
+2. Reproject to WGS84 (EPSG:4326).
+3. Keep only buildings inside the city's rectangle — for Gothenburg
+   11.85–12.10 °E, 57.62–57.80 °N — which leaves **92,973 buildings**.
 
-```
-OVERLAP_MIN    = 0.05   # below this, prefer the proximity fallback
-OVERLAP_STRONG = 0.30   # confident same-building; also the dedup cutoff
-```
+The rectangle, the EUBUCCO file and the list of region municipalities for each
+city live in one registry, so a new city is a configuration entry, not new
+code.
+""",
+            "files": ["data_pipeline.py", "tools/se/se_cities.py"],
+        },
+        {
+            "title": "Step 2 — Prepare the certificates",
+            "body": """
+Done in one SQL query against the certificate database
+(`epc_sweden.duckdb`, opened read-only):
 
-Buildings overlapping nothing fall back to the nearest footprint. When several
-buildings claim one certificate — which happens legitimately where OSM splits a
-single cadastral building into parts — every claimant overlapping at least 30%
-keeps it. Weak and fallback claimants are dropped **only** when a strong
-claimant exists; if none do, the single best-overlapping building wins.
+1. **Link declarations to footprints.** Lantmäteriet stores the declaration's
+   id (`FormularId`) on the footprint it belongs to. Each declaration is reduced
+   to one row: energy use, energy class, heated area (Atemp), construction
+   year, floors, and *all* of its entrance addresses.
+2. **Build a shared declaration per property.** One declaration often covers a
+   whole property — several buildings and entrances — but Lantmäteriet links
+   it to only one footprint. For each property (`fastighetsbeteckning`) in the
+   region's 14 municipalities, the declaration covering the most addresses is
+   chosen and given to the property's other **heated** footprints that have no
+   declaration of their own. Outbuildings (`Komplement…`) never receive it.
+3. **Pick the display address.** The entrance whose house number matches the
+   footprint's, else the declaration's first address, else the property's.
+4. Keep only footprints within 200 m of the city rectangle.
+""",
+            "files": ["data_pipeline.py", "data/sensitivity/epc_sweden.duckdb"],
+        },
+        {
+            "title": "Step 3 — Match certificates to buildings by overlap",
+            "body": """
+EUBUCCO has no property id and no address, so the only possible link to a
+declared footprint is geometric. Both layers are projected to SWEREF 99 TM
+(EPSG:3006) so areas and distances are in metres.
 
-This replaced an earlier nearest-centroid method, which in dense blocks gave a
-building the certificate of a *neighbour*. Measured: the centroid method handed
-**~1,800 buildings** a certificate for a footprint their polygon never touches.
+1. **Intersect** every EUBUCCO building with every Lantmäteriet footprint.
+2. **Best footprint:** each building takes the footprint with the largest
+   shared area.
+3. **Accept** it if that shared area is at least **5%** of the building
+   (`OVERLAP_MIN`) — this still catches outlines that are merely offset.
+4. **Proximity fallback:** a building that overlaps nothing takes the nearest
+   footprint whose centroid lies within **20 m** of the building's *outline*
+   (not its centroid — a centroid test missed small footprints on the edge of
+   large buildings).
+5. **Never spread one certificate across neighbours.** When several buildings
+   claim the same declared footprint, every building overlapping it by at
+   least **30%** (`OVERLAP_STRONG`) keeps it — a genuine split, where OSM draws
+   one building in parts. Weaker and fallback claimants are dropped. If no
+   claimant reaches 30%, only the single best-overlapping building keeps it.
+
+This replaced a nearest-centroid method, which in dense blocks gave buildings
+their *neighbour's* certificate: measured, about **1,800 buildings** received a
+certificate for a footprint their outline never touches.
 """,
             "files": ["data_pipeline.py"],
         },
         {
-            "title": "Geocoding fallback",
-            "badge": "interim",
+            "title": "Step 4 — Rescue certificates that never reached a footprint",
             "body": """
-Certificates that neither overlap nor sit near a footprint are pushed through a
-**cached** forward geocoder. The cache is committed
-(`data/epc_geocode_cache.json`) so a rebuild does not re-hit the geocoding
-service and results stay reproducible.
+About 38% of Gothenburg's declared properties never land on a footprint in
+Step 3 (a blank or unmatched property id, or only a garage). Their buildings
+would stay blank despite having a real certificate, so:
+
+1. Take every Göteborg declaration that is not linked to any footprint.
+2. **Locate it** by the centroid of its property's footprints, where the
+   property has any; otherwise by its address, geocoded once through Nominatim
+   and cached (`data/epc_geocode_cache.json`, 12,202 addresses) so rebuilds
+   are reproducible and do not call the service again.
+3. **Attach it** to the nearest building that still has **no** energy data,
+   within **40 m**. Matching is one-to-one both ways: each building keeps only
+   its nearest declaration, and each declaration lands on only one building.
+
+A rescued declaration never overwrites a building matched in Step 3.
 """,
-            "files": ["tools/se/geocode_epc.py", "data/epc_geocode_cache.json"],
+            "files": ["data_pipeline.py", "tools/se/geocode_epc.py"],
         },
         {
-            "title": "District tagging — and the trap",
-            "badge": "processed",
+            "title": "Step 5 — Classify use and add archetypes",
             "body": """
-Buildings are tagged with their **primärområde** (96 official Gothenburg
-neighborhoods) from the city's public ArcGIS FeatureServer.
+**Use type.** The footprint's purpose (`andamål`) is mapped by keyword to seven
+categories — single-family, multi-family, commercial, industrial, public,
+outbuilding, other — with å/ä/ö folded so spelling variants match.
 
-> **`build.py` wipes these tags.** It regenerates `buildings.json` from scratch,
-> so district tagging must be re-run immediately afterwards:
+**TABULA archetype.**
+
+1. Construction year → period: up to 1960, 1961–75, 1976–85, 1986–95,
+   1996–2005, after 2005.
+2. Use type → house type: single-family (SFH) or multi-family (MFH). Anything
+   else gets no archetype.
+3. Look up (house type, period) among the 10 Swedish archetypes → U-values for
+   wall, roof and window, construction descriptions and the reference heat
+   demand. After-2005 buildings get none — TABULA's Swedish typology stops at
+   2005.
+
+**Performance within its period.** Each building's energy use is ranked
+against other buildings of the same period, between the 2nd and 98th
+percentile, giving a 0–1 score the viewer uses for "best and worst of its era".
+""",
+            "files": ["data_pipeline.py", "utils/tabula_matching.py"],
+        },
+        {
+            "title": "Step 6 — Clean up geometry and heights, write the payload",
+            "body": """
+1. **Footprint area** in m², computed in SWEREF 99 TM.
+2. **Simplify outlines** (tolerance 0.00005°, about 3–5 m) keeping topology,
+   and keep only the largest part of a multi-part building.
+3. **Height:** EUBUCCO's height; if missing or zero, floors × 3.2 m; if still
+   missing, 3.2 m. Anything over 100 m is capped.
+4. **Addresses** are cleaned of flat, garage and parking suffixes
+   (`LGH`, `GAR`, `P-PLATS`…); a building with no address shows its property
+   designation instead.
+5. Write one record per building to `buildings.json`, plus summary cards
+   (best and worst per period, class and use) and a separate layer of the
+   declared footprints themselves.
+""",
+            "files": ["data_pipeline.py", "tools/se/build_city.py"],
+        },
+        {
+            "title": "Step 7 — Tag districts (and the trap)",
+            "body": """
+Each building's centroid is tested against the 96 primärområde polygons
+(point-in-polygon, spatial index); the building gets the district's name, or
+nothing if it falls outside all of them — **75,719 of 92,973** are tagged.
+
+> **Rebuilding wipes these tags.** Step 6 regenerates `buildings.json` from
+> scratch, so district tagging must be re-run immediately afterwards:
 >
 > ```bash
 > python build.py && python tools/se/ingest_districts.py
 > ```
 >
-> Skip it and `primary_area` drops to zero, which silently breaks the
-> neighborhood picker and the chat assistant's district tools. Expect roughly
-> **75,719 of 92,973** buildings tagged after a correct run.
+> Skip it and the district field empties, which silently breaks the
+> neighbourhood picker and the AI assistant's district questions.
 """,
-            "files": ["tools/se/ingest_districts.py", "data/districts"],
+            "files": ["tools/se/ingest_districts.py", "data/districts/gbg_primaromraden.geojson"],
         },
         {
-            "title": "Vegetation, roofs and terrain",
-            "badge": "processed",
+            "title": "LiDAR layers — vegetation, roofs, terrain",
             "body": """
-Three separate passes over the LiDAR tiles produce viewer layers: tree and shrub
-points, per-building roof geometry, and a terrain hillshade. A water mask is
-generated in the terrain pass and then used to remove vegetation that the point
-cloud placed on the river, harbour and canals.
+Three passes over the 72 DTCC laser tiles (SWEREF 99 TM) produce viewer
+layers. Gothenburg only.
 
-This whole stage is Gothenburg-only; no other city in the tool has LiDAR.
+**Vegetation.** The tiles are not classified for vegetation, so it is
+separated by rule: an unclassified point with **two or more laser returns**
+(the beam passed through foliage) at **0.5–45 m** above ground. Candidates
+inside a building footprint are dropped (roof edges and antennas also give
+two returns). Trees are the local maxima of a 1 m canopy-height model
+(position, height, crown); shrubs are low vegetation of 0.5–2.5 m on a coarser
+grid.
+
+**Water mask and terrain.** Water points (class 9) form a mask that removes
+"trees in the river"; ground points (class 2) form a terrain model, rendered as
+a shaded-relief image for the viewer's terrain basemap.
+
+**Roofs.** For each building, the laser points inside its footprint give the
+eave height (30th percentile of roof heights) and the ridge height (92nd); the
+ridge direction is the footprint's long axis. Roofs rising less than 1.5 m are
+treated as flat. Result: 41,895 pitched roofs.
 """,
             "files": [
                 "tools/se/dtcc_vegetation.py",
-                "tools/se/dtcc_roofs.py",
                 "tools/se/dtcc_terrain_water.py",
-                "tools/se/filter_vegetation_water.py",
+                "tools/se/dtcc_roofs.py",
             ],
         },
         {
             "title": "Adding another Swedish city",
-            "badge": "method",
             "body": """
-`tools/se/se_cities.py` is the **single source of truth**. Register the city
-there, then:
+Register the city (rectangle, EUBUCCO file, municipalities) in the city
+registry, then:
 
 ```bash
 python tools/se/download_eubucco_city.py <slug>
 python tools/se/build_city.py <slug>
 ```
 
-Malmö is already built (`assets/buildings_malmo.json`).
+Malmö was built this way (49,601 buildings), but has **no energy data** — most
+likely because the Lantmäteriet footprints that Steps 2–4 depend on are only
+in the database for the Gothenburg area. See **2. Coverage & Quality**.
 """,
-            "files": [
-                "tools/se/se_cities.py",
-                "tools/se/build_city.py",
-                "tools/se/download_eubucco_city.py",
-            ],
+            "files": ["tools/se/se_cities.py", "tools/se/download_eubucco_city.py", "tools/se/build_city.py"],
         },
     ],
 }
@@ -1127,122 +1429,188 @@ Malmö is already built (`assets/buildings_malmo.json`).
 UK_PIPELINE = {
     "title": "UK Pipeline",
     "stage": "interim",
+    "code_refs": "inline",
     "purpose": """
-The UK chain is built separately from the Swedish one and shares almost nothing
-with it: **OpenStreetMap** geometry rather than EUBUCCO, an **address-based**
-certificate join rather than a geometric one, and a **survey-based fallback**
-where no certificate matches.
-
-What the two chains *do* share is the output schema — which is the whole point.
+How the UK building model is built — step by step. It shares almost nothing
+with the Swedish chain: **OpenStreetMap** geometry instead of EUBUCCO, an
+**address-based** certificate join instead of an overlap match, and a
+**survey-based estimate** where no certificate matches. What it does share is
+the output: every UK record has exactly the shape of a Gothenburg record, so
+the same viewer and wizard draw both with no UK special case. What the result
+covers is on **2. Coverage & Quality**.
 """,
     "overview": {
-        "title": "Four steps",
-        "subtitle": "Built for four London districts and Rotherham; Birmingham and Nottingham are configured but not built.",
+        "title": "The pipeline in order",
+        "subtitle": "Run per district: four in London, one in Rotherham.",
         "items": [
-            ("Footprints", "Pull building geometry from OpenStreetMap via Overpass."),
-            ("Certificates", "Join EPCs by UPRN, or postcode plus house number."),
-            ("Fallback", "Where nothing matches, apply English Housing Survey band priors."),
-            ("Emit", "Records in exactly the schema the Gothenburg viewer already renders."),
+            ("Buildings and address points", "OpenStreetMap footprints and address nodes in a circle around the district centre."),
+            ("Candidate addresses", "Each building's own address plus the address points inside it."),
+            ("Fetch certificates", "Every postcode found is looked up in the national certificate register."),
+            ("Join by address", "UPRN, or postcode plus building number; a block's certificates are combined."),
+            ("Enrich and add archetypes", "EUBUCCO height and type; TABULA U-values."),
+            ("Estimate the rest", "Homes without a certificate get a band from the English Housing Survey."),
         ],
     },
     "sections": [
         {
-            "title": "Why the schema match matters",
-            "badge": "method",
+            "title": "Step 1 — Fetch buildings and address points",
             "body": """
-Step 4 is the design decision. Because UK records are emitted in the **same
-shape as `assets/buildings.json`**, the existing viewer draws UK buildings with
-no changes — same legend, same colour modes, same façade inspector. Only the
-data source and the camera position differ.
+1. One Overpass query per district: every building (ways and multipolygon
+   relations) **and every node carrying a house number**, within a circle
+   around the district centre — 900 m for the London districts, 4 km for
+   Rotherham, 1,200 m configured for Birmingham and Nottingham.
+2. The answer is cached (`data/uk_raw/osm_<district>_v2.json`); a rebuild
+   reuses it unless `--refresh` is given. Busy answers (429/504) are retried
+   three times with a growing wait.
+3. Each building's outline is its outer ring — for a multipolygon, the longest
+   outer ring.
 
-That is why a completely different acquisition chain did not require a second
-viewer.
-
-```bash
-python tools/uk/uk_data_pipeline.py                 # all cities
-python tools/uk/uk_data_pipeline.py --city london
-python tools/uk/uk_data_pipeline.py --refresh       # ignore the Overpass cache
-```
-
-Outputs land in `frontend/public/uk/`: `buildings_<city>.json` per city, plus
-`cities.json` carrying the registry and per-city stats.
+The address nodes matter: in dense areas most building polygons carry no
+address at all; the address sits on a separate point inside the building.
 """,
             "files": ["tools/uk/uk_data_pipeline.py", "tools/uk/cities.py"],
         },
         {
-            "title": "The certificate join",
-            "badge": "method",
+            "title": "Step 2 — Collect candidate addresses per building",
             "body": """
-Two keys, in order of confidence:
+1. Start with the building's own tags (`addr:housenumber`, `addr:postcode`,
+   `ref:GB:uprn`).
+2. Add every address node that lies **inside the footprint or within about
+   2.5 m of its edge** (spatial index, so this is fast) — close enough to catch
+   points drawn on the wall, not so wide that it reaches the neighbour.
+3. **Normalise.** Postcodes are upper-cased and re-spaced (`ng1  5fs` →
+   `NG1 5FS`); OSM's multi-value tags are split on `;`. House numbers keep the
+   first number (`10-14` → `10`).
+""",
+            "files": ["tools/uk/uk_data_pipeline.py", "tools/uk/ingest_epc.py"],
+        },
+        {
+            "title": "Step 3 — Fetch the certificates",
+            "body": """
+1. Collect every distinct postcode from buildings **and** address nodes — many
+   postcodes appear only on address nodes.
+2. Look each one up in the national register (`/api/domestic/search`, bearer
+   token `UK_EPC_API_TOKEN`); each answer is cached on disk per postcode.
+3. Optionally (`--epc-details`) fetch each certificate in full for floor area,
+   property type, heating system and energy use — one extra request per
+   certificate, so it is slow and has only been run for part of them.
+4. **Find the building number in the certificate's address**, stripping flat
+   prefixes: `Flat 6, 123 Poplar High Street` → building **123**, not flat 6.
 
-1. **UPRN** — OSM's `ref:GB:uprn` tag matched against the `uprn` field on the
-   certificate record. Unambiguous where present.
-2. **Postcode plus house number** — parsed from the certificate's
-   `addressLine1..4`.
-
-The endpoint contract was verified against the authoritative API spec rather
-than documentation prose:
-
-```
-GET /api/domestic/search?postcode=...&current_page=1&page_size=5000
-```
-
-**The token is not optional in practice.** Without `UK_EPC_API_TOKEN` every
-lookup returns empty and the run completes anyway on band priors alone — quietly
-producing a survey-derived result that looks like a measured one.
+Without a token the lookups are skipped and the run still finishes — on survey
+estimates alone, which look complete.
 """,
             "files": ["tools/uk/ingest_epc.py"],
         },
         {
-            "title": "Band priors — the fallback",
-            "badge": "interim",
+            "title": "Step 4 — Join certificates to buildings by address",
             "body": """
-Where no certificate matches, the building is assigned a band distribution from
-the **English Housing Survey 2024-25** by dwelling age and type, and a
-cost-to-band-C figure from the same source.
+For every candidate address of a building:
 
-This keeps every UK building analysable, but a band-prior building carries a
-population statistic, not a measurement. Any UK aggregate mixes the two.
+1. **UPRN** — the certificate's property reference against OSM's
+   `ref:GB:uprn`. Unambiguous where present.
+2. **Postcode + building number** — the normalised pair from Step 2 against
+   the pair parsed from the certificate in Step 3.
+
+All certificates reached this way are collected and de-duplicated by
+certificate number. A block of flats holds many certificates but is one
+building on the map, so they are **combined**:
+
+| Building value | From its certificates |
+|---|---|
+| Energy band | the most common band |
+| SAP score, energy use | the mean |
+| Floor area | the sum |
+| Heating system, fuel, property type | the most common value |
+| Heat pump, solar PV, mains gas | the majority yes/no |
+| Construction year | OSM `start_date`, else EUBUCCO, else the mean of the certificates' age bands (letter codes decoded to mid-years, e.g. `D` 1950–66 → 1958) |
+| Display name | the building's own OSM address, else the most common certificate address with the flat number removed |
+
+No date filter is applied: an older certificate that a newer one has replaced
+still counts.
 """,
-            "files": ["tools/uk/ingest_ehs.py"],
+            "files": ["tools/uk/uk_data_pipeline.py", "tools/uk/ingest_epc.py"],
         },
         {
-            "title": "EUBUCCO as attributes only",
-            "badge": "interim",
+            "title": "Step 5 — Enrich with EUBUCCO and add a TABULA archetype",
             "body": """
-UK EUBUCCO supplies height, floors, construction year and type — never the
-footprint. Download granularity is **NUTS2** (`UKI3`), not NUTS3; NUTS3-keyed
-URLs 404. Rows carry a NUTS3 `region_id` so filtering is still precise.
+**EUBUCCO** is used for attributes only, never for the outline. Each OSM
+building takes the nearest EUBUCCO building centroid within **25 m**.
 
-Per-city file names are listed in `cities.py` under `eubucco_file`.
+- **Height:** OSM `height` / `building:height` → EUBUCCO height → levels × 3 m
+  → a default by use (houses 6 m, flats 12 m, commercial 9 m, industrial 8 m,
+  outbuildings 3 m).
+- **Floors:** OSM `building:levels` → EUBUCCO floors.
+- **Type:** a generic OSM `building=yes` is replaced by EUBUCCO's subtype; a
+  specific OSM tag (house, apartments, office …) always wins.
+
+**TABULA archetype** (27 England archetypes):
+
+1. House type from EUBUCCO's subtype — terraced and semi-detached → *Terraced
+   house*, detached → *Single Family House*, apartment → *Multi Family House*;
+   without a subtype, houses default to terraced (the most common English
+   dwelling) and flats to multi-family.
+2. Period from the real construction year. **Where there is none**, homes get
+   an era drawn from the survey's dwelling-age distribution, weighted by stock
+   size — used only for the lookup; the displayed year stays empty.
+3. Look up (type, period) → U-values for wall, roof, window and door, and the
+   archetype's energy use. Non-residential buildings get none.
 """,
-            "files": ["tools/uk/ingest_eubucco.py"],
+            "files": ["tools/uk/uk_data_pipeline.py", "tools/uk/ingest_eubucco.py", "tools/uk/ingest_tabula.py"],
         },
         {
-            "title": "Auditing a district before trusting it",
-            "badge": "method",
+            "title": "Step 6 — Estimate a band where no certificate matched",
+            "body": """
+Only for **residential** buildings. The prior comes from the English Housing
+Survey 2024-25, most specific first:
+
+1. by **age band**, if the building's year is known;
+2. else by **dwelling type** (from the OSM tag: detached, semi-detached,
+   terraced, bungalow, flat);
+3. else the **region's** band distribution (London, Yorkshire and the Humber …).
+
+One band is then **drawn** from that distribution. The draw uses a hash of the
+building's OSM id, so the same building gets the same band on every rebuild.
+The record is marked `epc_source = ehs_prior_age / _type / _region`, so
+estimated and certified buildings can be told apart in the data.
+
+Non-residential buildings without a certificate get **no band**.
+""",
+            "files": ["tools/uk/uk_data_pipeline.py", "tools/uk/ingest_ehs.py"],
+        },
+        {
+            "title": "Step 7 — Write the payload",
+            "body": """
+One record per building to `frontend/public/uk/buildings_<district>.json`, in
+the Gothenburg schema plus UK fields (SAP, postcode, UPRN, certificate count,
+heating details, `epc_source`). Per-district statistics go to `cities.json`.
+
+```bash
+python tools/uk/uk_data_pipeline.py                        # all districts
+python tools/uk/uk_data_pipeline.py --city london_kings_cross
+python tools/uk/uk_data_pipeline.py --refresh              # ignore the OSM cache
+python tools/uk/uk_data_pipeline.py --epc-details          # full certificates
+```
+
+**Rotherham** went one step further: its certificates were pinned to buildings
+city-wide through OS Open UPRN, raising certificate coverage from about 4%
+(575 buildings) to 54% (7,735 records marked `EPC register (OS UPRN
+city-wide)`). The method: postcodes around the buildings → all their
+certificates → each certificate's UPRN → its coordinates in OS Open UPRN →
+the nearest EUBUCCO building within 30 m. **The scripts for that step are not
+in the repository** — they lived in a temporary working folder — so it cannot
+be re-run.
+""",
+            "files": ["tools/uk/uk_data_pipeline.py"],
+        },
+        {
+            "title": "Checking a district before trusting it",
             "body": """
 `sample_epc_matches.py` prints a handful of building-to-certificate matches per
 district and writes a JSON sample. Run it after any pipeline change — it is the
-only practical check that the address join is landing on the right buildings.
+practical way to see whether the address join lands on the right buildings.
 """,
             "files": ["tools/uk/sample_epc_matches.py"],
-        },
-        {
-            "title": "What the UK track does not have",
-            "badge": "metadata",
-            "body": """
-| Capability | Sweden | UK |
-|---|---|---|
-| LiDAR vegetation, roofs, terrain | yes | no |
-| District / neighborhood tagging | yes | no |
-| Live transit and traffic layers | yes | no |
-| Market listings (sales, rents) | yes | no |
-| Real cost and carbon data | yes | **no — synthetic placeholders** |
-
-See **17. Known Limitations**.
-""",
-            "files": ["frontend/src/config/ukPlaceholderCostCarbon.ts"],
         },
     ],
 }
@@ -2420,9 +2788,10 @@ DATA_SOURCES = {
     "title": "Data Sources",
     "stage": "raw",
     "purpose": """
-Every dataset the tool ingests, what it covers and where it physically sits.
-Sweden and the United Kingdom draw on almost entirely different sources, so each
-has its own tab. Services and keys shared by both are on
+Where every dataset in the tool comes from, how the tool is connected to it,
+how up to date it is, how it is stored and where it is used — one card per
+dataset. Sweden and the United Kingdom draw on almost entirely different
+sources, so each has its own tab. Services and keys shared by both are on
 **15. Services, Keys & Access**.
 """,
     "tabs": [("Sweden", SE_DATA), ("United Kingdom", UK_DATA)],
@@ -2433,12 +2802,13 @@ COVERAGE = {
     "title": "Coverage & Quality",
     "stage": "metadata",
     "purpose": """
-How far each country's numbers can be trusted: how many buildings match a real
-certificate, what happens to the ones that don't, and how old the underlying
-records are. Read this before quoting a number outside the project — and note
-that Swedish and UK coverage figures are **not comparable**: Sweden matches
-certificates to buildings geometrically, the UK by address. Where each dataset
-comes from is on **1. Data Sources**.
+How far each country's numbers can be trusted: what exactly is covered and for
+how many buildings, what is missing and why, what the tool falls back on, how
+old the records are, the limitations, and what could be improved. Read this
+before quoting a number outside the project — and note that Swedish and UK
+coverage figures are **not comparable**: Sweden matches certificates to
+buildings geometrically, the UK by address. Where each dataset comes from is on
+**1. Data Sources**; how it is processed is on **3. Pipelines**.
 """,
     "tabs": [("Sweden", SE_COVERAGE), ("United Kingdom", UK_COVERAGE)],
 }
@@ -2448,10 +2818,11 @@ PIPELINES = {
     "title": "Pipelines",
     "stage": "interim",
     "purpose": """
-How each country's raw registers become the payload the viewer and the wizard
-read. The two chains share almost nothing — different geometry source,
-different certificate join — except the output schema, which is why one viewer
-renders both.
+How each country's raw registers become the building model the viewer and the
+wizard read, step by step — loading, cleaning, matching certificates to
+buildings, and what happens when they do not match. The two chains share almost
+nothing — different geometry source, different certificate join — except the
+output schema, which is why one viewer renders both.
 """,
     "tabs": [("Sweden", SWEDEN_PIPELINE), ("United Kingdom", UK_PIPELINE)],
 }

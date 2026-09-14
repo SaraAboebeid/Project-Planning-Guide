@@ -241,7 +241,9 @@ England* (BRE, September 2014) rather than transcribed by hand, so the numbers
 can be traced to a page.
 
 **Coverage is the weak point:** *live* — 26,257 of 92,973 Gothenburg buildings
-(28%) match an archetype. See §4.4 for why, and §14.
+(28%) have a construction period, but only **18,251 (19.6%)** get archetype
+U-values: TABULA's Swedish typology covers single- and multi-family houses
+built up to 2005 only. See §4.4 for why, and §14.
 
 ## 3.6 English Housing Survey 2024-25
 
@@ -457,7 +459,9 @@ construction descriptions.
 **`post-2005` returns no archetype by design** — buildings that new are assumed
 to be described adequately by their own data rather than by a typology.
 
-**Coverage:** *live* 26,257 / 92,973 (28%). The binding constraint is that
+**Coverage:** *live* 26,257 / 92,973 (28%) have a period; **18,251 (19.6%)**
+get U-values — the 3,510 post-2005 buildings and every non-residential building
+fall outside the typology. The binding constraint is that
 matching needs **both** a construction year (which comes from the certificate, so
 only certificated buildings have one) **and** a mapped use category.
 

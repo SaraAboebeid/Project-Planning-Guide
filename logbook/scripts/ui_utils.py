@@ -472,9 +472,16 @@ def _render_body(page: dict, key: str) -> None:
                     show_dataframe_safe(pd.DataFrame(rows[1:], columns=rows[0]))
                 # A dataset card already names its scripts; the repository
                 # statistics table (lines / size / commit) is for code pages.
+                # Process pages ("code_refs": "inline") just name the scripts.
                 if sec.get("files") and not sec.get("dataset"):
-                    st.caption("Where this lives in the repository")
-                    show_files(sec["files"])
+                    if page.get("code_refs") == "inline":
+                        st.markdown(
+                            "<span class='lb-dim'>Scripts:</span> "
+                            + " · ".join(_path_html(p) for p in sec["files"]),
+                            unsafe_allow_html=True)
+                    else:
+                        st.caption("Where this lives in the repository")
+                        show_files(sec["files"])
 
     if page.get("todo"):
         st.warning("**Still to fill in:** " + page["todo"])

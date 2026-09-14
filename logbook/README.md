@@ -94,6 +94,25 @@ text in `UK_*` / `UK_PIPELINE` — edit those. They look like ordinary pages but
 have no `number`, because they are tabs, not sidebar entries. To give another
 page country tabs, give it a `tabs` list the same way.
 
+**Dataset cards** (Data Sources). A section describing a *dataset* carries a
+`"dataset": {...}` dict instead of a `files` list, and renders as a card about
+the data rather than a table of code files:
+
+| Field | What goes in it |
+|---|---|
+| `publisher`, `link` | who publishes it, and where |
+| `access` | `Live API` · `Downloaded once` · `Fetched & cached` · `Scraped` · `Derived` · `Synthetic` |
+| `connection`, `format` | endpoint / bucket / page, key needed, file format |
+| `source_version` | the publisher's own version or update date — write "not stated by the publisher" rather than guessing, and mark inferences as such |
+| `local`, `refresh` | paths of our copy (its date is **read from disk** when the page loads) and how it is refreshed |
+| `stored_as` | database, file cache, static JSON, or not stored |
+| `stage`, `stage_note` | `raw` · `processed` · `reference` (lookup table of published values) · `synthetic` (made-up numbers) … |
+| `used_in`, `processed_by` | where in the tool it is used, and the scripts that transform it |
+
+`source_short` / `copy_short` are short forms for the automatic **At a glance**
+table each tab gets. The validator checks required fields, allowed values, that
+URLs are URLs and that `local` / `processed_by` paths exist.
+
 **To move a page between groups or reorder the sidebar:** edit `NAV` at the
 bottom of `logbook_content.py`. Page numbers must then be renumbered to read
 1, 2, 3… down the sidebar (rename the matching `pages/` files too) — the
