@@ -35,57 +35,73 @@ and per-page Markdown export.
 
 | Path | What it is |
 |---|---|
-| `Tool.py` | Entry point — contents, live repository state, consistency check. Its filename is the first sidebar entry, so it reads "Tool" |
-| `logbook_content.py` | **All prose. This is the file to edit.** |
+| `Tool.py` | Entry point — builds the grouped sidebar with `st.navigation`, nothing else |
+| `home.py` | The home page (sidebar entry "Tool") — contents, live repository state, consistency check |
+| `logbook_content.py` | **All prose, plus the sidebar groups (`NAV`, at the bottom). This is the file to edit.** |
 | `scripts/ui_utils.py` | Layout helpers, file introspection, Markdown/zip export |
 | `scripts/check_content.py` | Validator — run it after editing content |
-| `pages/` | One file per page, ordered by numeric prefix; intentionally thin |
+| `pages/` | One file per page, named `<number>_<Name>.py`; intentionally thin |
 | `requirements.txt` | `streamlit`, `pandas` |
 
 ## Pages
 
-| # | Page | Stage |
-|---|---|---|
-| 1 | Data Portal | raw |
-| 2 | Script Browser | metadata |
-| 3 | Data Provenance & Access | metadata |
-| 4 | **Sweden Pipeline** | interim |
-| 5 | **UK Pipeline** | interim |
-| 6 | Digital Twin Construction | processed |
-| 7 | Shoebox & IDF Generation | method |
-| 8 | Simulation Process | method |
-| 9 | Retrofit Prioritisation | method |
-| 10 | Optimisation Process | method |
-| 11 | Decision Analysis under Uncertainty | method |
-| 12 | **AI, ML & Vision Models** | method |
-| 13 | Climate & Environmental Analysis | method |
-| 14 | Viewer Layers & Visualisation | result |
-| 15 | Known Limitations | metadata |
-| 16 | Project Team & Credits | metadata |
-| 17 | **Scraped Market Data** | raw |
-| 18 | **Analysis Inventory** | method |
+Sweden and the UK are built by separate chains from different sources —
+Sweden takes footprints from EUBUCCO and joins certificates **geometrically**;
+the UK takes footprints from **OpenStreetMap** and joins certificates **by
+address** (UPRN, or postcode plus house number), falling back to English Housing
+Survey band priors. Only the output schema is shared.
 
-Pages 17 and 18 were added after the first sixteen, so they sit at the end of the
-sidebar. The home page groups them logically regardless — Scraped Market Data
-under *Data*, Analysis Inventory under *Analysis*. Renumbering would require
-renaming files in `pages/` and updating every `**N. Title**` cross-reference, so
-it is deliberately deferred; `scripts/check_content.py` will catch any mismatch
-if you do renumber.
+So the three topics where they differ are single pages with a **Sweden** tab and
+a **United Kingdom** tab at the top, rather than alternating SE / UK sections.
+Everything else applies to both countries.
 
-Sweden and the UK get a page each because the chains genuinely differ: Sweden
-takes footprints from EUBUCCO and joins certificates **geometrically**; the UK
-takes footprints from **OpenStreetMap** and joins certificates **by address**
-(UPRN, or postcode plus house number), falling back to English Housing Survey
-band priors. Only the output schema is shared.
+| Group | # | Page | Stage |
+|---|---|---|---|
+| **Data & pipelines** | 1 | Data Sources — *Sweden / United Kingdom tabs* | raw |
+| | 2 | Coverage & Quality — *Sweden / United Kingdom tabs* | metadata |
+| | 3 | Pipelines — *Sweden / United Kingdom tabs* | interim |
+| | 4 | Scraped Market Data (Boplats & Booli, Sweden only) | raw |
+| **Methods** | 5 | Digital Twin Construction | processed |
+| | 6 | Shoebox & IDF Generation | method |
+| | 7 | Simulation Process | method |
+| | 8 | Retrofit Prioritisation | method |
+| | 9 | Optimisation Process | method |
+| | 10 | Decision Analysis under Uncertainty | method |
+| | 11 | AI, ML & Vision Models | method |
+| | 12 | Climate & Environmental Analysis | method |
+| | 13 | Viewer Layers & Visualisation | result |
+| | 14 | Analysis Inventory | method |
+| **Reference** | 15 | Services, Keys & Access | metadata |
+| | 16 | Script Browser | metadata |
+| | 17 | Known Limitations | metadata |
+| | 18 | Project Team & Credits | metadata |
+
+*Services, Keys & Access* holds what is tool-wide rather than per country — the
+simulation and ML services, the AI providers, the map tiles and the list of
+keys in `.env`.
 
 ## How to edit
 
 **To change text:** open `logbook_content.py` and edit the relevant dict. Each
-page is `{number, title, stage, purpose, overview?, sections[], todo?}`. Section
-bodies are plain Markdown.
+page is `{number, title, nav_title?, stage, purpose, overview?, sections[], todo?}`.
+Section bodies are plain Markdown. `nav_title` is an optional shorter label for
+the sidebar.
+
+**Tabbed pages** (Data Sources, Coverage & Quality, Pipelines) have
+`"tabs": [("Sweden", SE_DATA), ("United Kingdom", UK_DATA)]` instead of their own
+sections. The Swedish text is in the `SE_*` / `SWEDEN_PIPELINE` dicts and the UK
+text in `UK_*` / `UK_PIPELINE` — edit those. They look like ordinary pages but
+have no `number`, because they are tabs, not sidebar entries. To give another
+page country tabs, give it a `tabs` list the same way.
+
+**To move a page between groups or reorder the sidebar:** edit `NAV` at the
+bottom of `logbook_content.py`. Page numbers must then be renumbered to read
+1, 2, 3… down the sidebar (rename the matching `pages/` files too) — the
+validator below tells you exactly what is out of step.
 
 **To add a page:** add a dict to `logbook_content.py`, register it in the `PAGES`
-mapping at the bottom, then create `pages/N_Title.py` containing:
+mapping, add its key to the right group in `NAV`, then create
+`pages/<number>_<Name>.py` containing:
 
 ```python
 import sys
@@ -109,10 +125,15 @@ description in a logbook is worse than an acknowledged gap.
 ```
 
 It checks that page numbers are contiguous, that every page has a file in
-`pages/`, that every cited path still exists in the repository, and — the one
-that actually bites — that every `**N. Title**` cross-reference points at a page
-that really has that number. Renumbering pages silently invalidates references
-to them, and there is no other way to notice.
+`pages/`, that the sidebar (`NAV`) lists every page exactly once and in number
+order, that every cited path still exists in the repository, and — the one that
+actually bites — that every `**N. Title**` cross-reference points at a page that
+really has that number. Renumbering pages silently invalidates references to
+them, and there is no other way to notice.
+
+The NAV check matters because the sidebar is built with `st.navigation`, which
+switches off Streamlit's automatic `pages/` discovery: a page left out of `NAV`
+does not error, it simply disappears.
 
 ## Two design choices worth knowing
 

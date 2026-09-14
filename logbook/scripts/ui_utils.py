@@ -11,9 +11,12 @@ deleted — which is exactly how the old Streamlit docs in this repo went stale.
 """
 from __future__ import annotations
 
+import html
 import io
+import re
 import subprocess
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -30,6 +33,11 @@ STAGE_COLORS = {
     "metadata":  ("#4A90E2", "#EAF2FC"),
     "method":    ("#6E2AAE", "#F2EAFB"),
     "result":    ("#0F766E", "#E6F4F1"),
+    # dataset stages on Data Sources: a lookup table (TABULA, Wikells, …) is
+    # neither raw observation nor our processing, and made-up numbers must
+    # never be mistaken for data
+    "reference": ("#0E7490", "#E0F2F7"),
+    "synthetic": ("#B91C1C", "#FEE2E2"),
 }
 
 
@@ -49,6 +57,19 @@ def inject_css() -> None:
           .lb-card ol { margin:0; padding-left:1.15rem; line-height:1.55; font-size:0.95rem; }
           .lb-purpose { font-size:1.02rem; line-height:1.6; }
           .lb-missing { color:#E2483B; font-weight:600; }
+          /* dataset card (Data Sources) */
+          .lb-ds { width:100%; border-collapse:collapse; margin:0.4rem 0 0.9rem 0;
+                   font-size:0.92rem; line-height:1.5; }
+          .lb-ds th { width:205px; text-align:left; vertical-align:top; font-weight:600;
+                      color:#475569; padding:7px 12px 7px 0; border-bottom:1px solid #eef0f3; }
+          .lb-ds td { vertical-align:top; padding:7px 0; border-bottom:1px solid #eef0f3;
+                      color:#0f172a; }
+          .lb-ds ul { margin:0; padding-left:1.1rem; }
+          .lb-ds li { margin:0 0 2px 0; }
+          .lb-ds code { font-size:0.84rem; }
+          .lb-chip { display:inline-block; padding:0.08rem 0.55rem; border-radius:999px;
+                     font-size:0.76rem; font-weight:700; margin-right:4px; }
+          .lb-dim { color:#94a3b8; font-size:0.82rem; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -132,6 +153,119 @@ def show_files(paths: list[str]) -> None:
         )
 
 
+# ── dataset cards (Data Sources) ─────────────────────────────────────────────
+# A section may carry a "dataset" dict describing the DATA rather than the code:
+# where it comes from, how it is connected, how fresh it is, how the tool stores
+# it and where it is used. When present it replaces the repository file table
+# (lines / size / last commit), which says nothing about the data itself.
+
+ACCESS_COLORS = {
+    "Live API":        ("#1D4ED8", "#E0EAFF"),
+    "Downloaded once": ("#6E2AAE", "#F2EAFB"),
+    "Fetched & cached": ("#0E7490", "#E0F2F7"),
+    "Scraped":         ("#B45309", "#FFF4E5"),
+    "Derived":         ("#0F766E", "#E6F4F1"),
+    "Synthetic":       ("#B91C1C", "#FEE2E2"),
+}
+
+
+def _inline(text: str) -> str:
+    """Escape, then honour `code`, **bold** and *italic* — HTML blocks get no
+    markdown."""
+    s = html.escape(str(text).strip())
+    s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+    s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
+    return re.sub(r"\*([^*]+)\*", r"<em>\1</em>", s)
+
+
+@st.cache_data(show_spinner=False, ttl=300)
+def local_updated(paths: tuple[str, ...]) -> str:
+    """Newest last-modified date across repo paths (a folder counts its newest
+    file). Read live, so the card reports what is on disk today."""
+    newest = None
+    for rel in paths:
+        p = REPO_ROOT / rel
+        if not p.exists():
+            continue
+        stamps = ([f.stat().st_mtime for f in p.rglob("*") if f.is_file()]
+                  if p.is_dir() else [p.stat().st_mtime])
+        if stamps:
+            newest = max(stamps + ([newest] if newest else []))
+    return datetime.fromtimestamp(newest).strftime("%Y-%m-%d") if newest else "not on disk"
+
+
+def _path_html(rel: str) -> str:
+    ok = (REPO_ROOT / rel).exists()
+    return f"<code>{html.escape(rel)}</code>" + ("" if ok else " <span class='lb-missing'>missing</span>")
+
+
+def dataset_card(ds: dict) -> None:
+    rows: list[str] = []
+
+    def row(label: str, value: str) -> None:
+        rows.append(f"<tr><th>{label}</th><td>{value}</td></tr>")
+
+    src = _inline(ds.get("publisher", "—"))
+    if ds.get("link"):
+        url = html.escape(ds["link"])
+        src += f"<br><a href='{url}' target='_blank'>{url}</a>"
+    row("Source", src)
+
+    access = ds.get("access", "—")
+    fg, bg = ACCESS_COLORS.get(access, ("#334155", "#F1F5F9"))
+    how = f"<span class='lb-chip' style='color:{fg};background:{bg}'>{html.escape(access)}</span>"
+    if ds.get("connection"):
+        how += _inline(ds["connection"])
+    row("How it is connected", how)
+    if ds.get("format"):
+        row("Format", _inline(ds["format"]))
+    row("Source version / last updated",
+        _inline(ds.get("source_version", "not stated by the publisher")))
+
+    if ds.get("local"):
+        ours = (f"<strong>{local_updated(tuple(ds['local']))}</strong> "
+                f"<span class='lb-dim'>(read from disk now)</span>")
+        if ds.get("refresh"):
+            ours += "<br>" + _inline(ds["refresh"])
+        row("Our copy last updated", ours)
+    elif ds.get("refresh"):
+        row("Our copy last updated", _inline(ds["refresh"]))
+
+    if ds.get("stored_as"):
+        row("Stored in the tool as", _inline(ds["stored_as"]))
+    if ds.get("stage"):
+        row("Data stage", badge(ds["stage"]) + (" " + _inline(ds["stage_note"])
+                                                 if ds.get("stage_note") else ""))
+    if ds.get("used_in"):
+        row("Where it is used",
+            "<ul>" + "".join(f"<li>{_inline(u)}</li>" for u in ds["used_in"]) + "</ul>")
+    if ds.get("processed_by"):
+        row("Processed by", ", ".join(_path_html(p) for p in ds["processed_by"]))
+
+    st.markdown(f"<table class='lb-ds'>{''.join(rows)}</table>", unsafe_allow_html=True)
+
+
+def dataset_summary(sections: list[dict]) -> None:
+    """'At a glance' table built from the dataset cards, so it cannot drift
+    from them."""
+    rows = []
+    for sec in sections:
+        ds = sec.get("dataset")
+        if not ds:
+            continue
+        rows.append({
+            "Dataset": sec["title"],
+            "Connection": ds.get("access", "—"),
+            "Source version / updated": ds.get("source_short", ds.get("source_version", "—")),
+            "Our copy": (local_updated(tuple(ds["local"])) if ds.get("local")
+                         else ds.get("copy_short", "live")),
+            "Stage": ds.get("stage", "—"),
+        })
+    if rows:
+        st.markdown("**At a glance**")
+        show_dataframe_safe(pd.DataFrame(rows))
+
+
 # ── dataframes ───────────────────────────────────────────────────────────────
 
 def sanitize_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -169,21 +303,39 @@ def show_dataframe_safe(df: pd.DataFrame, **kwargs) -> None:
 
 # ── export ───────────────────────────────────────────────────────────────────
 
-def page_markdown(page: dict) -> str:
-    """Flatten one page's content dict to standalone markdown."""
-    md = [f"# {page['number']}. {page['title']}", ""]
-    if page.get("stage"):
-        md += [f"*Stage: {page['stage']}*", ""]
-    md += [page.get("purpose", "").strip(), ""]
-    ov = page.get("overview")
+def _content_parts(page: dict) -> list[tuple[str | None, dict]]:
+    """(tab label, content dict) pairs. A plain page is one part with no label;
+    a tabbed page ("tabs": [(label, dict), ...]) is one part per tab."""
+    return list(page["tabs"]) if page.get("tabs") else [(None, page)]
+
+
+def _body_markdown(part: dict, level: int) -> list[str]:
+    """Purpose, overview and sections of one content dict, headings at `level`."""
+    h = "#" * level
+    md = [part.get("purpose", "").strip(), ""]
+    ov = part.get("overview")
     if ov:
-        md += [f"## {ov['title']}", "", ov.get("subtitle", ""), ""]
+        md += [f"{h} {ov['title']}", "", ov.get("subtitle", ""), ""]
         md += [f"{i}. **{lab}** — {txt}" for i, (lab, txt) in enumerate(ov["items"], 1)]
         md += [""]
-    for sec in page.get("sections", []):
-        md += [f"## {sec['title']}", ""]
+    for sec in part.get("sections", []):
+        md += [f"{h} {sec['title']}", ""]
         if sec.get("badge"):
             md += [f"*{sec['badge']}*", ""]
+        ds = sec.get("dataset")
+        if ds:
+            cells = [("Source", ds.get("publisher", "—") + (f" — {ds['link']}" if ds.get("link") else "")),
+                     ("How it is connected", ds.get("access", "—") + (f" — {ds['connection']}" if ds.get("connection") else "")),
+                     ("Format", ds.get("format", "")),
+                     ("Source version / last updated", ds.get("source_version", "not stated by the publisher")),
+                     ("Our copy last updated", local_updated(tuple(ds["local"])) if ds.get("local") else ds.get("refresh", "")),
+                     ("Stored in the tool as", ds.get("stored_as", "")),
+                     ("Data stage", ds.get("stage", "") + (f" — {ds['stage_note']}" if ds.get("stage_note") else "")),
+                     ("Where it is used", "; ".join(ds.get("used_in", []))),
+                     ("Processed by", ", ".join(f"`{p}`" for p in ds.get("processed_by", [])))]
+            md += ["| | |", "|---|---|"]
+            md += [f"| **{k}** | {str(v).replace('|', '/')} |" for k, v in cells if v]
+            md += [""]
         md += [sec.get("body", "").strip(), ""]
         if sec.get("table"):
             hdr = sec["table"][0]
@@ -196,6 +348,24 @@ def page_markdown(page: dict) -> str:
             md += ["**Files**", ""]
             md += [f"- `{f}`" for f in sec["files"]]
             md += [""]
+    if part.get("todo"):
+        md += [f"> **Still to fill in:** {part['todo']}", ""]
+    return md
+
+
+def page_markdown(page: dict) -> str:
+    """Flatten one page's content dict to standalone markdown. A tabbed page
+    exports every tab in turn, each under its own heading."""
+    md = [f"# {page['number']}. {page['title']}", ""]
+    if page.get("stage"):
+        md += [f"*Stage: {page['stage']}*", ""]
+    if page.get("tabs"):
+        md += [page.get("purpose", "").strip(), ""]
+        for label, part in page["tabs"]:
+            md += [f"## {label}", ""]
+            md += _body_markdown(part, level=3)
+    else:
+        md += _body_markdown(page, level=2)
     md += ["---", "", f"*Exported from the Project Planning Guide logbook — page "
                       f"{page['number']}, {page['title']}.*"]
     return "\n".join(md)
@@ -216,8 +386,9 @@ def make_page_bundle_download(page: dict) -> None:
     slug = page["title"].lower().replace(" ", "_").replace("/", "-")
     buf = io.BytesIO()
     cited = []
-    for sec in page.get("sections", []):
-        cited += sec.get("files", [])
+    for _, part in _content_parts(page):
+        for sec in part.get("sections", []):
+            cited += sec.get("files", [])
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr(f"{page['number']:02d}_{slug}.md", page_markdown(page))
         for rel in dict.fromkeys(cited):
@@ -246,6 +417,29 @@ def render_page(page: dict) -> None:
     if page.get("stage"):
         st.markdown(badge(page["stage"]), unsafe_allow_html=True)
 
+    if page.get("tabs"):
+        # One page per topic, one tab per country: Sweden and the UK are built
+        # from different sources, so their content is never interleaved.
+        if page.get("purpose"):
+            st.markdown(page["purpose"])
+        labels = [label for label, _ in page["tabs"]]
+        for tab, (label, part) in zip(st.tabs(labels), page["tabs"]):
+            with tab:
+                _render_body(part, key=f"{page['number']}_{label}")
+    else:
+        _render_body(page, key=str(page["number"]))
+
+    st.divider()
+    c1, c2 = st.columns(2)
+    with c1:
+        make_markdown_download(page)
+    with c2:
+        make_page_bundle_download(page)
+
+
+def _render_body(page: dict, key: str) -> None:
+    """Purpose, overview, sections and todo of one content dict — a whole plain
+    page, or one tab of a tabbed page. `key` keeps widget ids unique per tab."""
     if page.get("purpose"):
         # Plain st.markdown, NOT an HTML wrapper: Streamlit does not parse
         # markdown inside raw HTML, so a wrapper leaks literal ** and ` into
@@ -257,30 +451,30 @@ def render_page(page: dict) -> None:
         overview_card(ov["title"], ov.get("subtitle", ""), ov["items"])
 
     sections = page.get("sections", [])
+    if any(sec.get("dataset") for sec in sections):
+        st.write("")
+        dataset_summary(sections)
     if sections:
         st.write("")
         expand_all = st.checkbox("Expand all sections", value=False,
-                                 key=f"expand_{page['number']}")
+                                 key=f"expand_{key}")
         for sec in sections:
             label = sec["title"]
             with st.expander(label, expanded=expand_all):
-                if sec.get("badge"):
+                if sec.get("badge") and not sec.get("dataset"):
                     st.markdown(badge(sec["badge"]), unsafe_allow_html=True)
+                if sec.get("dataset"):
+                    dataset_card(sec["dataset"])
                 if sec.get("body"):
                     st.markdown(sec["body"])
                 if sec.get("table"):
                     rows = sec["table"]
                     show_dataframe_safe(pd.DataFrame(rows[1:], columns=rows[0]))
-                if sec.get("files"):
+                # A dataset card already names its scripts; the repository
+                # statistics table (lines / size / commit) is for code pages.
+                if sec.get("files") and not sec.get("dataset"):
                     st.caption("Where this lives in the repository")
                     show_files(sec["files"])
 
     if page.get("todo"):
         st.warning("**Still to fill in:** " + page["todo"])
-
-    st.divider()
-    c1, c2 = st.columns(2)
-    with c1:
-        make_markdown_download(page)
-    with c2:
-        make_page_bundle_download(page)

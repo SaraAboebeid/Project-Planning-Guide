@@ -6,15 +6,35 @@ Every word shown in the logbook lives here. The page modules under ``pages/``
 contain no text at all — they just call ``render_page`` with one of the dicts
 below, so you never have to touch Streamlit code to change wording.
 
+The sidebar is grouped by NAV at the bottom of this file. The three topics
+where Sweden and the UK differ - data sources, coverage, pipelines - are
+single pages with a tab per country (DATA_SOURCES, COVERAGE, PIPELINES).
+
 Schema
 ------
-number   int    position in the sidebar
+number   int    page number; must follow NAV order (bottom of file)
 title    str    page title
+nav_title str?  short sidebar label (defaults to title)
+tabs     list?  [(label, content_dict), ...] - one tab per country; each
+                content dict has purpose / overview / sections / todo but
+                no number of its own
 stage    str    one of raw | interim | processed | metadata | method | result
 purpose  str    markdown paragraph under the title
 overview dict   {title, subtitle, items: [(label, text), ...]}
-sections list   [{title, badge?, body?, table?, files?}, ...]
+sections list   [{title, badge?, dataset?, body?, table?, files?}, ...]
 todo     str?   rendered as a visible warning — use it, don't invent content
+
+dataset  dict   (Data Sources) describes the DATA, not the code, and replaces the
+                repository file table. Required: publisher, access, source_version,
+                stored_as, stage, used_in. Optional: link, connection, format,
+                source_short, local (paths - "our copy" date is read from disk),
+                refresh, copy_short, stage_note, processed_by.
+                access: Live API | Downloaded once | Fetched & cached | Scraped |
+                        Derived | Synthetic
+                stage adds: reference (lookup table of published values) and
+                            synthetic (made-up numbers)
+                A tab with dataset cards gets an automatic "At a glance" table.
+                Unknowns: say "not stated by the publisher"; mark inferences.
 
 ``files`` entries are repo-relative paths. They are resolved against the real
 repository when the page loads, so a path that no longer exists is flagged in
@@ -25,279 +45,929 @@ Numbers quoted below were read from the repository and the running app on
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
-DATA_PORTAL = {
-    "number": 1,
-    "title": "Data Portal",
+# SWEDEN — tab content for DATA_SOURCES / COVERAGE / PIPELINES below
+# ─────────────────────────────────────────────────────────────────────────────
+SE_DATA = {
+    "title": "Sweden · Data Sources",
     "stage": "raw",
     "purpose": """
-Every dataset the tool ingests, what it covers and where it physically sits.
-This is the inventory page. Licensing and match quality are on
-**3. Data Provenance**; what actually happens to the data is on
-**4. Sweden Pipeline** and **5. UK Pipeline**, which work differently and are
-documented separately.
+One card per dataset the Swedish track uses: **who publishes it, the link, how
+the tool is connected to it** (live API, a one-off download, a scrape), **how
+fresh the publisher's data is and how fresh our copy is, how the tool stores
+it, whether it is raw, processed or reference data, and where in the tool it is
+used**. Matching quality is on the Sweden tab of **2. Coverage & Quality**;
+what is done to the data is on the Sweden tab of **3. Pipelines**.
+
+"Our copy last updated" is read from the files on disk each time this page
+loads. Everything else was checked against the repository and the publishers'
+sites on 2026-09-14.
 """,
     "overview": {
-        "title": "Dataset Overview",
-        "subtitle": "From open registers to the payloads the viewer extrudes.",
+        "title": "How to read the connection types",
+        "subtitle": "Only a live API can break the tool at run time.",
         "items": [
-            ("Building geometry", "EUBUCCO in Sweden; OpenStreetMap via Overpass in the UK."),
-            ("Energy performance", "Swedish energideklaration register; UK EPC open-data service."),
-            ("Archetypes & surveys", "EPISCOPE/TABULA typologies, and the English Housing Survey for UK band priors."),
-            ("Cost & carbon", "Wikells construction catalogue and Boverket's klimatdatabas."),
-            ("Remote sensing", "DTCC airborne LiDAR — vegetation, roof form and terrain. Gothenburg only."),
-            ("Context & market", "SCB statistics, OSM networks, Västtrafik and Trafikverket feeds, Booli and Boplats listings."),
+            ("Live API", "Called while the tool runs. Always current; fails if the network, a key or the service is down. Usually not stored."),
+            ("Downloaded once", "Fetched or bought once and kept on disk. No run-time dependency, but it ages until someone re-downloads it."),
+            ("Scraped", "Read off a public web page by our own script, on a schedule."),
+            ("Stage", "raw = as the publisher delivered it · processed = changed by our pipeline · reference = a lookup table of published values."),
+        ],
+    },
+    "sections": [
+        # ── buildings ──────────────────────────────────────────────────────
+        {
+            "title": "Building footprints — EUBUCCO",
+            "dataset": {
+                "publisher": "EUBUCCO — European building stock database (Potsdam Institute for Climate Impact Research and TU Berlin)",
+                "link": "https://eubucco.com/",
+                "access": "Downloaded once",
+                "connection": " Anonymous S3 bucket `s3://eubucco/v0.2/buildings/parquet/nuts_id=<NUTS2>/` at `s3.eubucco.com` — no key. One file per NUTS2 region (Gothenburg is `SE23`, Malmö `SE22`), clipped to the city's bounding box.",
+                "format": "GeoParquet",
+                "source_version": "Release **v0.2**. EUBUCCO does not state a release date for v0.2 (v0.1 was published on Zenodo on 2022-10-20).",
+                "source_short": "v0.2 (date not stated)",
+                "local": ["frontend/public/buildings.json", "assets/buildings.json"],
+                "refresh": "Rebuilt by hand. **The Gothenburg source extract (`data/eubucco/SE23.parquet`) is no longer on disk**, so the Gothenburg payload cannot be rebuilt until it is downloaded again; only the Malmö extract is present.",
+                "stored_as": "A static JSON payload the browser loads directly — **92,973 buildings**. The backend reads `frontend/public/buildings.json` (24 fields, incl. the district); the 3D viewer reads `assets/buildings.json` (23 fields). Not a database.",
+                "stage": "processed",
+                "stage_note": "The raw parquet is clipped and deduplicated, then joined to certificates, TABULA archetypes and districts before it reaches the tool.",
+                "used_in": [
+                    "Steps 1–5 — every building the planner can select",
+                    "3D viewer — the extruded city model",
+                    "Data Explorer",
+                    "AI assistant — building lookups",
+                ],
+                "processed_by": ["tools/se/download_eubucco_city.py", "tools/se/build_city.py", "data_pipeline.py"],
+            },
+            "body": """
+EUBUCCO merges OpenStreetMap, Microsoft Building Footprints and national
+registries into one footprint per building, with estimates of height, floors,
+construction year and type, and a per-field source tag. In Sweden it supplies
+the footprint polygon itself.
+""",
+        },
+        {
+            "title": "Energy performance certificates — Boverket energideklarationer",
+            "dataset": {
+                "publisher": "Boverket (Swedish National Board of Housing, Building and Planning) — the national register of energy declarations",
+                "link": "https://www.boverket.se/",
+                "access": "Downloaded once",
+                "connection": " A bulk extract from Boverket (the `std_uttag` files) loaded into a local DuckDB database. Boverket offers no public bulk download — access is by agreement. `scripts/fetch_epc_db.py` only unpacks or downloads the finished database (`EPC_DB_URL`); **the script that built it from the extract is not in the repository**.",
+                "format": "DuckDB, 483 MB — table `epc`, **1,883,795 rows × 262 columns**",
+                "source_version": "Boverket's register is updated daily (06:00). **Our extract** holds certificates approved between **2015-07-04 and 2025-06-30**.",
+                "source_short": "extract to 2025-06-30",
+                "local": ["data/sensitivity/epc_sweden.duckdb"],
+                "refresh": "Not refreshed — a one-off extract. A newer one means rebuilding the database and re-running the city build.",
+                "stored_as": "A local **database** the backend queries on request (opened read-only). The matched certificate fields are also copied into `buildings.json` at build time.",
+                "stage": "raw",
+                "stage_note": "Kept as delivered. The link from certificate to building is a processed product and lives in `buildings.json`.",
+                "used_in": [
+                    "City build — energy class, specific energy and heated area per building",
+                    "Step 2 — heating-system column (`/api/epc/heating`)",
+                    "Data Explorer — EPC card (`/api/epc/snapshot`)",
+                    "Building passport (`/api/epc/passport`)",
+                    "AI assistant — questions over the whole register",
+                ],
+                "processed_by": ["scripts/fetch_epc_db.py", "data_pipeline.py", "backend/main.py"],
+            },
+            "body": """
+Open it **read-only** (`duckdb.connect(path, read_only=True)`) — a writable
+handle takes an exclusive lock and blocks the backend.
+""",
+        },
+        {
+            "title": "Certificate footprints — Lantmäteriet",
+            "dataset": {
+                "publisher": "Lantmäteriet (Swedish mapping, cadastral and land registration authority) — building footprints",
+                "link": "https://www.lantmateriet.se/",
+                "access": "Downloaded once",
+                "connection": " Arrived **inside** the same DuckDB file as the certificates — 374,403 footprints, source codes `GOT` and `UDV`. No script in the repository fetches it, and the `LANTMATERIET_USER` / `_PASSWORD` keys in `.env` are **not read by any code**.",
+                "format": "Table in `epc_sweden.duckdb`",
+                "source_version": "Lantmäteriet updates its building data continuously. **Our copy** holds footprint versions valid from 2011-03-22 to **2025-05-10**.",
+                "source_short": "copy to 2025-05-10",
+                "local": ["data/sensitivity/epc_sweden.duckdb"],
+                "refresh": "Not refreshed.",
+                "stored_as": "Database table next to the certificates.",
+                "stage": "raw",
+                "stage_note": "Gives each certificate a polygon, which is what lets certificates be matched to EUBUCCO buildings by overlap.",
+                "used_in": ["City build — the overlap match between certificates and buildings (see **3. Pipelines**)"],
+                "processed_by": ["data_pipeline.py"],
+            },
+        },
+        {
+            "title": "Archetypes — TABULA / EPISCOPE (Sweden)",
+            "dataset": {
+                "publisher": "TABULA / EPISCOPE (EU Intelligent Energy Europe projects) — Swedish residential building typology",
+                "link": "https://webtool.building-typology.eu/",
+                "access": "Scraped",
+                "connection": " Scraped once from the TABULA WebTool on **2026-02-03**.",
+                "format": "JSON — 10 Swedish archetypes",
+                "source_version": "Swedish typology matrix dated 2011-12-20, brochure 2012-02-10. The typology is no longer updated.",
+                "source_short": "2011-12 (frozen)",
+                "local": [
+                    "data/sensitivity/FW_ Map selection in notebook/tabula_swedish_data.json",
+                    "data/sensitivity/FW_ Map selection in notebook/tabula_webtool_scraped.json",
+                ],
+                "refresh": "No refresh needed — the source is frozen.",
+                "stored_as": "JSON lookup table. The matched archetype is written into each building in `buildings.json`.",
+                "stage": "reference",
+                "stage_note": "Published U-values per construction period and building type, used wherever a building has no measured data.",
+                "used_in": [
+                    "City build — **26,257** Gothenburg buildings matched to an archetype",
+                    "Step 2 — archetype columns",
+                    "Step 3 — envelope U-values in the generated EnergyPlus model",
+                    "Step 4 — the optimiser's baseline U-values",
+                ],
+                "processed_by": ["utils/tabula_matching.py"],
+            },
+        },
+        # ── cost, carbon, materials ────────────────────────────────────────
+        {
+            "title": "Construction costs — Wikells Sektionsfakta",
+            "dataset": {
+                "publisher": "Wikells Byggberäkningar AB — *Sektionsfakta* cost catalogue",
+                "link": "https://www.wikells.se/",
+                "access": "Downloaded once",
+                "connection": " Cost line items copied from the Sektionsfakta catalogue (a paid product, not an API) into a JSON file and a frontend table.",
+                "format": "JSON (95 items) + TypeScript table `wikellsData.ts` (262 codes)",
+                "source_version": "Wikells revises prices every spring and autumn. Our figures are documented as **Sektionsfakta 2024**.",
+                "source_short": "Sektionsfakta 2024",
+                "local": ["data/wikells_catalogue.json", "frontend/src/config/wikellsData.ts"],
+                "refresh": "Updated by hand; not linked to Wikells' price revisions.",
+                "stored_as": "Static files bundled with the app — no database.",
+                "stage": "reference",
+                "used_in": [
+                    "Step 4 — cost of each renovation measure, and the optimiser",
+                    "Step 5 — cost figures in the report",
+                    "Data Explorer",
+                ],
+                "processed_by": ["frontend/src/config/wikellsCarbonMapping.ts"],
+            },
+        },
+        {
+            "title": "Material service life & insulation thickness",
+            "dataset": {
+                "publisher": "Published references, each value tagged with its source: BBSR *Nutzungsdauern von Bauteilen* (German federal service-life table), RICS/BCIS *Life Expectancy of Building Components*, ISO 15686-1, the Paroc thickness guide, EWI Store trade guidance, and Wikells",
+                "link": "https://www.nachhaltigesbauen.de/austausch/nutzungsdauern-von-bauteilen/",
+                "access": "Downloaded once",
+                "connection": " Values typed by hand into a TypeScript table. Every entry carries a `sourceId` pointing at its reference in the file's `SOURCES` list.",
+                "format": "TypeScript (`materialProperties.ts`)",
+                "source_version": "BBSR table dated 24.02.2017 (a 2025 re-survey raised external insulation systems from 40 to at least 50 years; the file still uses 40); RICS/BCIS 2018; ISO 15686-1:2011.",
+                "source_short": "BBSR 2017 · RICS 2018",
+                "local": ["frontend/src/config/materialProperties.ts"],
+                "refresh": "Updated by hand.",
+                "stored_as": "Static table compiled into the frontend.",
+                "stage": "reference",
+                "used_in": [
+                    "Step 4 — the renovation calculator reads insulation thickness from each Wikells assembly (`parseAssemblyParts`)",
+                    "The service-life table (`SERVICE_LIFE`, `enrichWikellsItem`) is defined but **not imported anywhere** — no screen uses the service lives yet",
+                ],
+            },
+        },
+        {
+            "title": "Embodied carbon — Boverket klimatdatabas",
+            "dataset": {
+                "publisher": "Boverket — Klimatdatabas (national climate database for building materials)",
+                "link": "https://api.boverket.se/klimatdatabas/api/Klimat/v2",
+                "access": "Live API",
+                "connection": " REST API, no key. Asks for the latest version (falls back to `02.07.000`) and keeps the answer in backend memory until the backend restarts.",
+                "format": "JSON",
+                "source_version": "Version **02.07.000**, in force since 2026-01-21. Boverket revises it about once a year.",
+                "source_short": "v02.07.000 (2026-01-21)",
+                "copy_short": "live (memory)",
+                "refresh": "Fetched on first use after each backend start.",
+                "stored_as": "Not stored — held in backend memory only.",
+                "stage": "reference",
+                "used_in": ["Step 4 — embodied carbon of renovation measures (Wikells items are mapped to Boverket resources)"],
+                "processed_by": ["utils/boverket_api.py", "frontend/src/config/wikellsCarbonMapping.ts"],
+            },
+        },
+        # ── environment ────────────────────────────────────────────────────
+        {
+            "title": "Airborne LiDAR — DTCC (Chalmers)",
+            "dataset": {
+                "publisher": "Digital Twin Cities Centre (DTCC), Chalmers — serving airborne laser-scan tiles",
+                "link": "http://compute.dtcc.chalmers.se:8000",
+                "access": "Downloaded once",
+                "connection": " `POST /get_lidar` on the DTCC compute server, no key. Tiles are saved locally in SWEREF99 TM (EPSG:3006).",
+                "format": "72 `.laz` point-cloud tiles, 6.57 GB",
+                "source_version": "Not stated by DTCC. The tile name prefixes `19B002` (32 tiles) and `20B008` (40 tiles) suggest scans from 2019 and 2020 — **our inference, not stated by the publisher**.",
+                "source_short": "not stated (likely 2019–20)",
+                "local": ["data/dtcc"],
+                "refresh": "Downloaded once; not refreshed.",
+                "stored_as": "Raw tiles on disk. Three layers are computed from them into static files: `dtcc_vegetation.json` (826,039 trees, 31,849 shrubs), `roofs_gothenburg.json` (41,895 roofs) and `terrain_hillshade.png`.",
+                "stage": "raw",
+                "stage_note": "The tiles are raw; the three viewer layers are processed products.",
+                "used_in": ["3D viewer only — trees and shrubs, roof shapes, terrain shading. **Gothenburg only.**"],
+                "processed_by": [
+                    "tools/se/dtcc_vegetation.py",
+                    "tools/se/dtcc_roofs.py",
+                    "tools/se/dtcc_terrain_water.py",
+                    "tools/se/filter_vegetation_water.py",
+                ],
+            },
+        },
+        {
+            "title": "Weather — EPW (Gothenburg)",
+            "dataset": {
+                "publisher": "Climate.OneBuilding.Org — TMYx typical weather years built from weather-station records",
+                "link": "https://climate.onebuilding.org/",
+                "access": "Downloaded once",
+                "format": "EnergyPlus Weather (EPW) — one typical year, hourly",
+                "source_version": "File in use: `SWE_VG_Gothenburg-Landvetter.AP.025260_TMYx.2011-2025.epw` (a typical year built from 2011–2025 records). Climate.OneBuilding last updated its TMYx files in March 2026.",
+                "source_short": "TMYx 2011–2025",
+                "local": ["data/epw/SWE_VG_Gothenburg-Landvetter.AP.025260_TMYx.2011-2025.epw"],
+                "refresh": "Replaced by hand. The future-climate files in `data/epw/` (2050 and 2080 scenarios) and the older TMYx files are on disk but **not used**.",
+                "stored_as": "A file on disk, read by the simulation service and the analyses.",
+                "stage": "raw",
+                "used_in": [
+                    "Steps 3–4 — EnergyPlus simulation through EPSM",
+                    "3D viewer — building energy simulation",
+                    "Incident-radiation and thermal-comfort analyses (the sun-hours analysis does **not** use it)",
+                ],
+            },
+        },
+        {
+            "title": "Solar potential — PVGIS",
+            "dataset": {
+                "publisher": "European Commission, Joint Research Centre — PVGIS",
+                "link": "https://re.jrc.ec.europa.eu/pvg_tools/en/",
+                "access": "Live API",
+                "connection": " The backend forwards the request to `re.jrc.ec.europa.eu/api/v5_2/PVcalc` — no key.",
+                "format": "JSON",
+                "source_version": "The tool calls **PVGIS 5.2**. The current release is **5.3** (2024-09-25); 5.2 is still served.",
+                "source_short": "calls 5.2 (5.3 current)",
+                "copy_short": "live",
+                "refresh": "Live. A result is written to `data/pvgis_database.json` only when a user presses save in the viewer — none has been saved yet.",
+                "stored_as": "Not stored, unless saved by the user (JSON file).",
+                "stage": "raw",
+                "stage_note": "The output of the Commission's own PV model, used as returned.",
+                "used_in": ["3D viewer only — rooftop PV yield for the selected building"],
+                "processed_by": ["backend/main.py", "viewer/js/pvgis.js"],
+            },
+        },
+        # ── context & mobility ─────────────────────────────────────────────
+        {
+            "title": "Statistics — SCB",
+            "dataset": {
+                "publisher": "Statistics Sweden (SCB)",
+                "link": "https://www.scb.se/",
+                "access": "Live API",
+                "connection": " Table `TAB6684` over SCB's statistics API (`api.scb.se/OV0104/v2beta/api/v2/…`) and map layers over SCB's WFS (`geodata.scb.se/geoserver/stat/wfs`) — no key.",
+                "format": "JSON / GeoJSON",
+                "source_version": "Household income for **2024** on **DeSO 2025** areas (published early 2025). The WFS serves SCB's current layers.",
+                "source_short": "income 2024 · DeSO 2025",
+                "copy_short": "live",
+                "refresh": "Fetched each time a layer is switched on.",
+                "stored_as": "Not stored.",
+                "stage": "raw",
+                "used_in": ["3D viewer only — income and demographic overlays by DeSO area"],
+                "processed_by": ["backend/main.py", "viewer/js/scb_layers.js"],
+            },
+        },
+        {
+            "title": "Roads & green areas — OpenStreetMap",
+            "dataset": {
+                "publisher": "OpenStreetMap contributors, queried through the Overpass API",
+                "link": "https://www.openstreetmap.org/",
+                "access": "Live API",
+                "connection": " The backend tries `overpass-api.de`, then `overpass.kumi.systems`, then `maps.mail.ru` — the main host rate-limits hard. No key.",
+                "format": "JSON (Overpass)",
+                "source_version": "Edited continuously; no versions. A query returns the map as it is at that moment.",
+                "source_short": "continuous",
+                "local": ["assets/gothenburg_greenspaces.json"],
+                "refresh": "Roads are fetched live. Green areas were fetched once into `gothenburg_greenspaces.json` (22,851 areas).",
+                "stored_as": "Roads not stored; green areas as a static JSON file.",
+                "stage": "raw",
+                "used_in": [
+                    "3D viewer — road centrelines, street network and green areas",
+                    "Space-syntax analysis is written but **not loaded** in the viewer",
+                ],
+                "processed_by": ["backend/main.py"],
+            },
+        },
+        {
+            "title": "District boundaries — Göteborg primärområden",
+            "dataset": {
+                "publisher": "Göteborgs Stad — primärområden (the city's 96 statistical districts)",
+                "access": "Downloaded once",
+                "connection": " Downloaded from Göteborgs Stad's public ArcGIS map service. **The exact service URL is not recorded in the repository.**",
+                "format": "GeoJSON — 96 districts",
+                "source_version": "The district division in force since 2025-01-01.",
+                "source_short": "division of 2025-01-01",
+                "local": ["data/districts/gbg_primaromraden.geojson"],
+                "refresh": "Not refreshed. The tagging must be re-run after every Swedish city build, or the district field empties.",
+                "stored_as": "GeoJSON file. Each building's district is written into `buildings.json` — **75,719** buildings tagged.",
+                "stage": "reference",
+                "used_in": [
+                    "Step 1 — neighbourhood picker and boundary",
+                    "Step 5 — the report",
+                    "AI assistant — district questions",
+                ],
+                "processed_by": ["tools/se/ingest_districts.py"],
+            },
+        },
+        {
+            "title": "Public transport — Västtrafik",
+            "dataset": {
+                "publisher": "Västtrafik (public transport authority, Västra Götaland)",
+                "link": "https://developer.vasttrafik.se/",
+                "access": "Live API",
+                "connection": " OAuth2 with `VASTTRAFIK_CLIENT_ID` / `_SECRET` from `.env`. The backend calls `ext-api.vasttrafik.se` — journey planner `pr/v4`, traffic situations `ts/v1`, parking `spp/v3` and `geo/v3`.",
+                "format": "JSON",
+                "source_version": "Live — journey-planner API v4.",
+                "source_short": "live (API v4)",
+                "copy_short": "live",
+                "refresh": "Every request goes to Västtrafik.",
+                "stored_as": "Not stored.",
+                "stage": "raw",
+                "used_in": ["3D viewer — stops, departures, vehicle positions, disruptions and parking", "Data Explorer"],
+                "processed_by": ["backend/main.py"],
+            },
+        },
+        {
+            "title": "Roads & traffic — Trafikverket",
+            "dataset": {
+                "publisher": "Trafikverket (Swedish Transport Administration) — Trafikinfo API",
+                "link": "https://api.trafikinfo.trafikverket.se/",
+                "access": "Live API",
+                "connection": " `api.trafikinfo.trafikverket.se/v2/data.json` with `TRAFIKVERKET_API_KEY` from `.env`. Answers are cached for 60 s in the backend.",
+                "format": "JSON",
+                "source_version": "Live — API v2.",
+                "source_short": "live (API v2)",
+                "local": ["trafikverket.db", "frontend/public/trafikverket_data.json"],
+                "refresh": "Live for the viewer. A one-off snapshot also sits in `trafikverket.db` and `trafikverket_data.json`.",
+                "stored_as": "Live answers not stored; the snapshot is SQLite plus a JSON export.",
+                "stage": "raw",
+                "used_in": ["3D viewer — traffic cameras and road conditions", "Data Explorer"],
+                "processed_by": ["backend/main.py", "trafikverket_scraper.py"],
+            },
+        },
+        # ── market ─────────────────────────────────────────────────────────
+        {
+            "title": "Rental listings — Boplats",
+            "dataset": {
+                "publisher": "Boplats Göteborg — the region's rental-housing queue",
+                "link": "https://www.boplats.se/sok?types=1hand&area=508A8CB406FE001F00030A60",
+                "access": "Scraped",
+                "connection": " `requests` + BeautifulSoup over the public search page. Runs daily at 03:00 as the Windows task `PPG-Boplats-Daily-Refresh`. Full method on **4. Scraped Market Data**.",
+                "format": "HTML → SQLite → JSON",
+                "source_version": "Live listings — Boplats adds and removes flats continuously.",
+                "source_short": "live listings",
+                "local": ["boplats_apartments.db", "frontend/public/boplats_data.json"],
+                "refresh": "Daily at 03:00. 1,253 listings in the database on 2026-09-14.",
+                "stored_as": "**Database** — SQLite (`boplats_apartments.db`), accumulated run by run; exported to `boplats_data.json` for the frontend.",
+                "stage": "raw",
+                "used_in": [
+                    "Data Explorer — rental market",
+                    "Landing page — listings pill",
+                    "Steps 1–2 — rent columns",
+                    "AI assistant — rental questions",
+                    "The 3D viewer's market overlay (`market.js`) is written but **not loaded**",
+                ],
+                "processed_by": ["boplats_scraper.py", "tools/refresh_boplats.ps1"],
+            },
+        },
+        {
+            "title": "Sale listings — Booli",
+            "dataset": {
+                "publisher": "Booli — property sale listings",
+                "link": "https://www.booli.se/",
+                "access": "Scraped",
+                "connection": " Reads the `__NEXT_DATA__` JSON embedded in each search page — no paid API. Full method on **4. Scraped Market Data**.",
+                "format": "HTML → SQLite → JSON",
+                "source_version": "Live listings.",
+                "source_short": "live listings",
+                "local": ["booli_listings.db", "frontend/public/booli_data.json"],
+                "refresh": "**One run so far**, on 2026-07-30 (243 listings). No scheduled refresh is installed yet.",
+                "stored_as": "**Database** — SQLite (`booli_listings.db`), exported to `booli_data.json`.",
+                "stage": "raw",
+                "used_in": [
+                    "Data Explorer — sale market",
+                    "Landing page",
+                    "AI assistant — sale-price questions",
+                ],
+                "processed_by": ["booli_scraper.py", "tools/refresh_booli.ps1"],
+            },
+        },
+        {
+            "title": "Electricity price — elprisetjustnu.se",
+            "dataset": {
+                "publisher": "elprisetjustnu.se — a free feed of Swedish day-ahead spot prices. The prices come from **ENTSO-E** (the tool's own labels say Nord Pool, which is inaccurate).",
+                "link": "https://www.elprisetjustnu.se/",
+                "access": "Live API",
+                "connection": " `elprisetjustnu.se/api/v1/prices/{YYYY}/{MM}-{DD}_{zone}.json`, no key. Zone SE3 (Gothenburg) by default; 0.8 SEK/kWh is used if the feed is down.",
+                "format": "JSON",
+                "source_version": "Daily; the next day's prices appear from about 13:00.",
+                "source_short": "daily",
+                "copy_short": "live",
+                "refresh": "Fetched when needed.",
+                "stored_as": "Not stored.",
+                "stage": "raw",
+                "used_in": [
+                    "Step 4 — the optimiser's reference energy price (Sweden only)",
+                    "Step 4 — decision analysis under price scenarios (display only)",
+                    "The heating-system comparison uses fixed tariffs, **not** this feed",
+                ],
+                "processed_by": ["backend/main.py"],
+            },
+        },
+        {
+            "title": "Address search — Nominatim",
+            "dataset": {
+                "publisher": "OpenStreetMap Foundation — Nominatim geocoder",
+                "link": "https://nominatim.openstreetmap.org/",
+                "access": "Live API",
+                "connection": " Called directly from the browser (Step 1 map), the viewer's search box and the backend (`/api/geocode`, reverse lookups) — **not cached**. Separately, certificate addresses were geocoded once at build time into `data/epc_geocode_cache.json`.",
+                "format": "JSON",
+                "source_version": "Live OpenStreetMap data. The usage policy allows at most 1 request per second.",
+                "source_short": "live",
+                "local": ["data/epc_geocode_cache.json"],
+                "refresh": "Run-time lookups are not stored. The certificate cache was built once — 12,202 addresses, 47 unresolved.",
+                "stored_as": "Run time: not stored. Build time: a JSON cache.",
+                "stage": "raw",
+                "used_in": [
+                    "Step 1 — address autocomplete and CSV address upload",
+                    "3D viewer — place search",
+                    "City build — locating certificates that match no footprint",
+                ],
+                "processed_by": ["tools/se/geocode_epc.py", "frontend/src/components/LocationMap.tsx", "backend/main.py"],
+            },
+        },
+    ],
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+SE_COVERAGE = {
+    "title": "Sweden · Coverage & Quality",
+    "stage": "metadata",
+    "purpose": """
+How well the Swedish data actually matches the buildings, and what that means
+for any Swedish figure. Read this before quoting a Swedish number outside the
+project.
+""",
+    "overview": {
+        "title": "Why coverage and quality matter",
+        "subtitle": "Coverage and vintage differ per source.",
+        "items": [
+            ("Coverage is partial", "Not every building has a certificate, and matching is imperfect."),
+            ("Vintage matters", "A certificate from 2009 and one from 2024 describe different buildings."),
+            ("Fallbacks look like data", "An inferred value renders the same as a measured one unless the source is stated."),
+            ("Not comparable with the UK", "Sweden matches certificates geometrically, the UK by address."),
         ],
     },
     "sections": [
         {
-            "title": "How every source is reached — transport, auth, format",
+            "title": "Matching coverage",
+            "badge": "processed",
+            "body": """
+Certificates are joined to footprints **geometrically**. Method in full on
+**3. Pipelines** (Sweden tab).
+
+| Quantity | Count | Share |
+|---|---|---|
+| Buildings in the Gothenburg payload | 92,973 | 100% |
+| With a matched EPC | 85,670 | 92% |
+| With a TABULA archetype | 26,257 | 28% |
+| Tagged with a primärområde | ~75,719 | 81% |
+
+**Cadastral and address joins cannot raise this coverage** on the
+EUBUCCO-to-footprint link, because **EUBUCCO carries no cadastral id and no
+address** — there is no key to join on, so the link has to be spatial. This is a
+property of the data, not a gap in effort. Recorded here so the question is not
+reopened from scratch.
+
+Cadastral ids *are* used, but on the certificate side: to build a property-level
+aggregation that lets one shared declaration reach the property's other heated
+buildings. See **3. Pipelines** (Sweden tab).
+""",
+            "files": ["data_pipeline.py", "tools/se/geocode_epc.py", "tools/se/ingest_districts.py"],
+        },
+        {
+            "title": "Vintage — how old the data is",
             "badge": "metadata",
             "body": """
-The reference table. Read this before adding a source, moving the tool to
-another machine, or debugging "why is this layer empty".
+Read from the database itself (`epc_sweden.duckdb`, the approval date
+`Godkänd`) on 2026-09-14:
 
-**Downloaded once, then held locally** — no runtime dependency:
+| Extract | Rows | Declarations | Approved from | Approved to |
+|---|---|---|---|---|
+| Whole of Sweden | 1,883,795 | — | 2015-07-04 | 2025-06-30 |
+| Göteborg (kommun 1480) | 90,956 | 25,842 | 2015-07-06 | 2025-06-30 |
 
-| Source | Transport | Auth | Format |
+So **every Swedish certificate in the tool is between about 1 and 11 years
+old**, and nothing approved after 30 June 2025 is included. A building renovated
+since its declaration still shows the pre-renovation figures.
+
+The Lantmäteriet footprints that sit in the same file run to 2025-05-10, and the
+EUBUCCO geometry is release v0.2. Per-dataset dates are on
+**1. Data Sources** (Sweden tab).
+""",
+        },
+    ],
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# UNITED KINGDOM — tab content for DATA_SOURCES / COVERAGE / PIPELINES below
+# ─────────────────────────────────────────────────────────────────────────────
+UK_DATA = {
+    "title": "UK · Data Sources",
+    "stage": "raw",
+    "purpose": """
+One card per dataset the UK track uses — publisher, link, how the tool is
+connected to it, how fresh the data is, how it is stored, its stage and where
+it is used. The UK shares almost nothing with Sweden: a different geometry
+source, a different certificate register, and a survey-based fallback where no
+certificate matches. Matching quality is on the United Kingdom tab of
+**2. Coverage & Quality**; the method is on the United Kingdom tab of
+**3. Pipelines**.
+
+"Our copy last updated" is read from the files on disk each time this page
+loads. Everything else was checked against the repository and the publishers'
+sites on 2026-09-14.
+""",
+    "overview": {
+        "title": "What is built",
+        "subtitle": "Five districts, each a static payload in frontend/public/uk/.",
+        "items": [
+            ("London", "King's Cross (3,018 buildings), Westminster (1,590), Canary Wharf (1,283), Southwark (1,829)."),
+            ("Rotherham", "The whole town — 14,483 buildings."),
+            ("Not built", "Birmingham and Nottingham are configured but have no payload."),
+            ("Fetched & cached", "The two UK web sources (OpenStreetMap and the EPC service) are called by the pipeline, not by the running tool; their answers are cached on disk."),
+        ],
+    },
+    "sections": [
+        {
+            "title": "Building footprints — OpenStreetMap",
+            "dataset": {
+                "publisher": "OpenStreetMap contributors, queried through the Overpass API",
+                "link": "https://www.openstreetmap.org/",
+                "access": "Fetched & cached",
+                "connection": " The UK pipeline queries `overpass-api.de` only (no fallback host) and caches the answer per district in `data/uk_raw/osm_<district>_v2.json`; later runs reuse the cache. No key.",
+                "format": "JSON (Overpass)",
+                "source_version": "Edited continuously; no versions. **Our extracts:** London 2026-07-16, Rotherham 2026-07-29.",
+                "source_short": "London 07-16 · Rotherham 07-29",
+                "local": [
+                    "data/uk_raw/osm_london_kings_cross_v2.json",
+                    "data/uk_raw/osm_london_westminster_v2.json",
+                    "data/uk_raw/osm_london_canary_wharf_v2.json",
+                    "data/uk_raw/osm_london_southwark_v2.json",
+                    "data/uk_raw/osm_rotherham_v2.json",
+                ],
+                "refresh": "Only when the pipeline is re-run for a district with its cache deleted.",
+                "stored_as": "Processed into one static JSON payload per district, `frontend/public/uk/buildings_<district>.json`. Not a database.",
+                "stage": "raw",
+                "stage_note": "OSM is used because it carries the `ref:GB:uprn` address tag, which makes an address-based certificate join possible.",
+                "used_in": ["3D viewer — UK districts", "Steps 1–4 for UK buildings"],
+                "processed_by": ["tools/uk/uk_data_pipeline.py", "tools/uk/cities.py"],
+            },
+        },
+        {
+            "title": "Energy performance certificates — UK EPC service",
+            "dataset": {
+                "publisher": "Ministry of Housing, Communities & Local Government — *Get energy performance data* (Beta)",
+                "link": "https://get-energy-performance-data.communities.gov.uk/",
+                "access": "Fetched & cached",
+                "connection": " `api.get-energy-performance-data.communities.gov.uk` — `/api/domestic/search` and `/api/certificate`, with a bearer token (`UK_EPC_API_TOKEN`, from a GOV.UK One Login account). Called by the pipeline at build time; every answer is cached on disk. The running tool never calls it.",
+                "format": "JSON",
+                "source_version": "The API is updated daily (bulk CSV monthly). It replaced `epc.opendatacommunities.org`, retired on 30 May 2026. In March 2026 the publisher removed the `LMK_KEY` field, which `ingest_epc.py` still reads — **the next uncached run may fail; not yet tested**.",
+                "source_short": "daily (cache 14 Jul–3 Aug 2026)",
+                "local": ["data/uk_raw/epc_cache", "data/uk_raw/epc_detail_cache"],
+                "refresh": "3,303 cached searches and 45,570 cached certificates, fetched 14 Jul – 3 Aug 2026.",
+                "stored_as": "A file cache on disk (one JSON per request). Matched certificates are copied into the district payloads.",
+                "stage": "raw",
+                "used_in": ["3D viewer — energy class of UK buildings", "Steps 1–4 — energy performance of UK buildings"],
+                "processed_by": ["tools/uk/ingest_epc.py", "tools/uk/sample_epc_matches.py"],
+            },
+            "body": """
+Without a token the pipeline still completes, but every building falls back to
+English Housing Survey averages — a plausible-looking but survey-derived result.
+`gov.uk/find-energy-certificate` is a per-property lookup page, not a bulk
+source, and is deliberately not scraped.
+""",
+        },
+        {
+            "title": "Building attributes — EUBUCCO (UK)",
+            "dataset": {
+                "publisher": "EUBUCCO — European building stock database (Potsdam Institute for Climate Impact Research and TU Berlin)",
+                "link": "https://eubucco.com/",
+                "access": "Downloaded once",
+                "connection": " Anonymous S3 at `s3.eubucco.com/eubucco/v0.2/buildings/parquet/nuts_id=<NUTS2>/` — no key. Downloaded per NUTS2 region: `UKI3`, `UKI4` (London), `UKG3`, `UKF1`, `UKE3`.",
+                "format": "GeoParquet",
+                "source_version": "Release **v0.2** — no release date stated by EUBUCCO.",
+                "source_short": "v0.2 (date not stated)",
+                "local": [
+                    "data/eubucco/UKI3.parquet",
+                    "data/eubucco/UKI4.parquet",
+                    "data/eubucco/UKG3.parquet",
+                    "data/eubucco/UKF1.parquet",
+                    "data/eubucco/UKE3.parquet",
+                ],
+                "refresh": "Downloaded once, 13–15 Jul 2026.",
+                "stored_as": "Parquet files on disk; the attributes are copied into the district payloads.",
+                "stage": "raw",
+                "stage_note": "Used **only for attributes** — height, floors, construction year, type. The footprints come from OpenStreetMap.",
+                "used_in": ["UK pipeline — building height, floors, age and type"],
+                "processed_by": ["tools/uk/ingest_eubucco.py"],
+            },
+        },
+        {
+            "title": "English Housing Survey 2024-25",
+            "dataset": {
+                "publisher": "Ministry of Housing, Communities & Local Government — English Housing Survey, headline findings annex tables",
+                "link": "https://www.gov.uk/government/statistics/annex-tables-for-english-housing-survey-2024-to-2025-headline-findings-on-housing-quality-and-energy-efficiency",
+                "access": "Downloaded once",
+                "connection": " The two annex spreadsheets (Chapter 1 housing quality, Chapter 2 energy efficiency) downloaded from gov.uk.",
+                "format": "OpenDocument spreadsheets (`.ods`) → JSON",
+                "source_version": "Published 29 January 2026. The survey is annual.",
+                "source_short": "2024-25 (pub. 2026-01-29)",
+                "local": [
+                    "data/uk_raw/ehs_2024_25_ch1_housing_quality.ods",
+                    "data/uk_raw/ehs_2024_25_ch2_energy_efficiency.ods",
+                ],
+                "refresh": "Replace when the 2025-26 tables are published.",
+                "stored_as": "Parsed into three JSON files in `frontend/public/uk/`: `ehs_2024_25.json` (all tables), `epc_band_priors.json` (band distribution by dwelling age and type) and `retrofit_cost_band_c.json` (cost to reach band C).",
+                "stage": "reference",
+                "stage_note": "Survey statistics used as priors — never a measurement of a particular building.",
+                "used_in": [
+                    "UK pipeline — band priors for every building without a matched certificate",
+                    "UK Data Explorer",
+                ],
+                "processed_by": ["tools/uk/ingest_ehs.py"],
+            },
+        },
+        {
+            "title": "Archetypes — TABULA England",
+            "dataset": {
+                "publisher": "TABULA / EPISCOPE — *Building Typology Brochure: England* (BRE)",
+                "link": "https://episcope.eu/building-typology/country/gb/",
+                "access": "Downloaded once",
+                "connection": " The brochure PDF (`GB_TABULA_TypologyBrochure_BRE.pdf`) parsed by script rather than typed by hand, so every U-value traces back to a page.",
+                "format": "PDF → JSON (27 archetypes)",
+                "source_version": "Brochure dated 23.09.2014. The typology is no longer updated.",
+                "source_short": "2014-09 (frozen)",
+                "local": ["frontend/public/uk/tabula_gb.json"],
+                "refresh": "No refresh needed — the source is frozen.",
+                "stored_as": "Static JSON the frontend loads.",
+                "stage": "reference",
+                "used_in": [
+                    "Step 4 — the optimiser's baseline U-values for UK buildings",
+                    "The backend endpoint `/api/uk/tabula` also serves it, but nothing calls it",
+                ],
+                "processed_by": ["tools/uk/ingest_tabula.py", "frontend/src/utils/ukArchetype.ts"],
+            },
+        },
+        {
+            "title": "Address points — OS Open UPRN (Rotherham)",
+            "dataset": {
+                "publisher": "Ordnance Survey — OS Open UPRN",
+                "link": "https://www.ordnancesurvey.co.uk/products/os-open-uprn",
+                "access": "Downloaded once",
+                "connection": " The national file downloaded as a zip, then cut down to Rotherham.",
+                "format": "Zipped CSV → JSON",
+                "source_version": "Ordnance Survey publishes a new release every six weeks. **Our copy:** release `osopenuprn_202606`.",
+                "source_short": "release 2026-06",
+                "local": ["data/os/openuprn_gb.zip", "data/os/uprn_rotherham.json", "data/os/rotherham_epc_certs.json"],
+                "refresh": "Not refreshed.",
+                "stored_as": "Files on disk; the result is baked into `buildings_rotherham.json`.",
+                "stage": "raw",
+                "stage_note": "Used to pin certificates to OSM buildings across the whole of Rotherham, raising coverage to 54% of 14,483 buildings.",
+                "used_in": ["Rotherham payload only — certificate coverage"],
+            },
+            "body": """
+> **Not reproducible yet.** The script that did this calibration is **not in
+> the repository**, and the 91% class accuracy quoted for it has no evidence
+> on disk. Treat the Rotherham coverage figure as a result that cannot be re-run
+> until the script is recovered.
+""",
+        },
+        {
+            "title": "Weather — EPW (London & Rotherham)",
+            "dataset": {
+                "publisher": "Climate.OneBuilding.Org — TMYx typical weather years built from weather-station records",
+                "link": "https://climate.onebuilding.org/",
+                "access": "Downloaded once",
+                "format": "EnergyPlus Weather (EPW) — one typical year, hourly",
+                "source_version": "London: `GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw`. Rotherham: the Doncaster-Sheffield file, whose header says **2011–2022** although its name says 2011–2025. Climate.OneBuilding last updated its TMYx files in March 2026.",
+                "source_short": "TMYx 2011–2025",
+                "local": [
+                    "data/epw/GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
+                    "data/epw/GBR_ENG_Doncaster.Sheffield-Hood.AP.034054_TMYx.2011-2025.epw",
+                ],
+                "refresh": "Replaced by hand.",
+                "stored_as": "Files on disk, read by the simulation service.",
+                "stage": "raw",
+                "used_in": ["Steps 3–4 — EnergyPlus simulation of UK buildings through EPSM"],
+            },
+        },
+        {
+            "title": "Electricity price — Octopus Agile",
+            "dataset": {
+                "publisher": "Octopus Energy — public tariff API (Agile half-hourly rates)",
+                "link": "https://octopus.energy/agile/",
+                "access": "Live API",
+                "connection": " `api.octopus.energy/v1/products/AGILE-24-04-03/…`, region C (London), no key, not cached. £0.23/kWh is used if the feed is down.",
+                "format": "JSON",
+                "source_version": "Half-hourly prices, published daily. The product the tool asks for, `AGILE-24-04-03`, is **no longer on sale** (the current one is `AGILE-24-10-01`); it still returns prices.",
+                "source_short": "daily (old product code)",
+                "copy_short": "live",
+                "refresh": "Fetched each time the panel opens.",
+                "stored_as": "Not stored.",
+                "stage": "raw",
+                "used_in": [
+                    "UK Data Explorer — the optimisation assumptions panel",
+                    "Step 4 does **not** use a live price for UK buildings",
+                ],
+                "processed_by": ["backend/main.py"],
+            },
+        },
+        {
+            "title": "Solar potential & address search — PVGIS, Nominatim",
+            "dataset": {
+                "publisher": "European Commission JRC (PVGIS) and the OpenStreetMap Foundation (Nominatim) — the same services as on the Sweden tab",
+                "link": "https://re.jrc.ec.europa.eu/pvg_tools/en/",
+                "access": "Live API",
+                "connection": " PVGIS through the backend (`/api/v5_2/PVcalc`); Nominatim directly from the browser. No keys, no cache.",
+                "format": "JSON",
+                "source_version": "Live. PVGIS is called at version 5.2 (5.3 is current); Nominatim allows 1 request per second.",
+                "source_short": "live",
+                "copy_short": "live",
+                "stored_as": "Not stored.",
+                "stage": "raw",
+                "used_in": ["Step 1 — UK address search", "3D viewer — rooftop PV yield and place search"],
+                "processed_by": ["backend/main.py", "frontend/src/components/LocationMap.tsx"],
+            },
+        },
+        {
+            "title": "Cost & carbon — synthetic placeholders",
+            "dataset": {
+                "publisher": "None — made-up round numbers written for this project",
+                "access": "Synthetic",
+                "connection": " Hard-coded in `ukPlaceholderCostCarbon.ts`. No real UK cost and carbon source has been adopted yet.",
+                "format": "TypeScript constants",
+                "source_version": "Not applicable. Standard refurbishment **£180/m², 45 kgCO₂e/m²**; ambitious refurbishment **£320/m², 75 kgCO₂e/m²**.",
+                "source_short": "n/a — invented",
+                "local": ["frontend/src/config/ukPlaceholderCostCarbon.ts"],
+                "refresh": "To be replaced by a real UK cost and carbon source.",
+                "stored_as": "Constants compiled into the frontend.",
+                "stage": "synthetic",
+                "stage_note": "Exists only so the UK track runs end to end. Must never be presented as real — see **17. Known Limitations**.",
+                "used_in": [
+                    "Step 4 — cost and carbon of UK renovation packages",
+                    "They also reach the Step 5 report, where they are **labelled SEK** — a known bug",
+                ],
+            },
+        },
+    ],
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+UK_COVERAGE = {
+    "title": "UK · Coverage & Quality",
+    "stage": "metadata",
+    "purpose": """
+How well the UK data matches the buildings, and what that means for any UK
+figure. UK coverage is not comparable with Sweden's — the join is by address,
+and unmatched buildings fall back to survey averages.
+""",
+    "overview": {
+        "title": "Why UK figures need care",
+        "subtitle": "What a UK number does and does not tell you.",
+        "items": [
+            ("Coverage depends on the token", "Without UK_EPC_API_TOKEN every building falls back to survey averages."),
+            ("Matched vs inferred", "A band-prior building carries a survey statistic, not a measurement."),
+            ("Vintage matters", "A certificate from 2009 and one from 2024 describe different buildings."),
+            ("Not comparable with Sweden", "The UK joins certificates by address, Sweden geometrically."),
+        ],
+    },
+    "sections": [
+        {
+            "title": "Matching coverage",
+            "badge": "processed",
+            "body": """
+The UK join is **address-based, not geometric** — UPRN where OSM carries one,
+otherwise postcode plus house number. Method in full on **3. Pipelines** (United Kingdom tab).
+
+Two consequences for any UK figure:
+
+1. **Coverage depends on the API token.** Without `UK_EPC_API_TOKEN` the
+   certificate lookup returns nothing and every building falls back to English
+   Housing Survey band priors. The output still looks complete.
+2. **Matched and inferred buildings are different things.** A band-prior
+   building carries a survey-derived distribution, not a measurement.
+
+`tools/uk/sample_epc_matches.py` prints a reviewable sample of matches per
+district — the intended way to audit quality before trusting a district's
+numbers.
+""",
+            "files": ["tools/uk/ingest_epc.py", "tools/uk/sample_epc_matches.py"],
+        },
+        {
+            "title": "Match rate per district",
+            "badge": "metadata",
+            "body": """
+Counted from the district payloads in `frontend/public/uk/`. Every building
+without a matched certificate carries an English Housing Survey band prior
+instead.
+
+| District | Buildings | With a matched certificate | On a band prior |
 |---|---|---|---|
-| EUBUCCO | anonymous S3, `s3.eubucco.com/eubucco/v0.2/buildings/parquet/nuts_id=<NUTS2>/` | none | Parquet |
-| Swedish energideklaration | local file, opened **read-only** | none | DuckDB (~461 MB) |
-| Lantmäteriet footprints | supplied alongside the certificate register | `LANTMATERIET_USER` / `_PASSWORD` in `.env` | in the DuckDB |
-| DTCC LiDAR | `compute.dtcc.chalmers.se:8000` | none (open) | laser tiles, EPSG:3006 |
-| English Housing Survey | gov.uk publication download | none | OpenDocument `.ods` |
-| TABULA England | BRE brochure, parsed once | none | PDF → JSON |
-| Wikells catalogue | local file | none | JSON |
-| EPW weather | local file, one per city | none | EPW |
+| London — King's Cross | 3,018 | 10.6% | 89.4% |
+| London — Westminster | 1,590 | 11.1% | 88.9% |
+| London — Canary Wharf | 1,283 | 35.5% | 64.5% |
+| London — Southwark | 1,829 | 6.6% | 93.4% |
+| Rotherham | 14,483 | 54.0% | 46.0% |
 
-**Called live at runtime** — these fail if the network, a key or the upstream is down:
+**Most London buildings are inferred, not measured.** Rotherham is higher
+because its certificates were pinned to buildings through OS Open UPRN, but
+the script that did that is not in the repository — see **1. Data Sources**
+(United Kingdom tab). The Rotherham figures in `cities.json` are older than the
+payload and should not be quoted.
+""",
+        },
+    ],
+}
 
-| Source | Endpoint | Auth |
-|---|---|---|
-| UK EPC | `get-energy-performance-data.communities.gov.uk` `GET /api/domestic/search` | **Bearer `UK_EPC_API_TOKEN`** (GOV.UK One Login) |
-| OpenStreetMap | Overpass — `overpass-api.de`, falling back to `overpass.kumi.systems` | none |
-| PVGIS | `re.jrc.ec.europa.eu` (EC Joint Research Centre) | none |
-| SCB | `api.scb.se` + WFS at `geodata.scb.se` | none |
-| Boverket klimatdatabas | REST client, cached | see API terms |
-| Västtrafik | `ext-api.vasttrafik.se` | **OAuth2 client credentials** — `VASTTRAFIK_CLIENT_ID` / `_SECRET` |
-| Trafikverket | `api.trafikinfo.trafikverket.se` | **`TRAFIKVERKET_API_KEY`** |
-| Electricity price (SE) | `elprisetjustnu.se` — Nord Pool day-ahead, zone SE3 | none |
-| Electricity price (UK) | `api.octopus.energy` — Agile half-hourly | none |
-| Geocoding | `nominatim.openstreetmap.org` | none, results cached |
-| Göteborg districts | Göteborgs Stad ArcGIS FeatureServer | none |
-| Anthropic | `api.anthropic.com/v1/messages` | **`ANTHROPIC_API_KEY`** |
-| OpenAI | `api.openai.com/v1/chat/completions` | **`OPENAI_API_KEY`** |
-
-**Scraped** — see **17. Scraped Market Data** for the full method:
-
-| Source | Technique | Cadence |
-|---|---|---|
-| Boplats | `requests` + BeautifulSoup over server-rendered HTML | daily |
-| Booli | reads the `__NEXT_DATA__` JSON payload out of the Next.js page | weekly |
-
-**Internal services** the backend proxies to, not third parties:
+# ─────────────────────────────────────────────────────────────────────────────
+# SHARED REFERENCE
+# ─────────────────────────────────────────────────────────────────────────────
+ACCESS = {
+    "number": 15,
+    "title": "Services, Keys & Access",
+    "nav_title": "Services, keys & access",
+    "stage": "metadata",
+    "purpose": """
+The infrastructure every page relies on, whichever country: the services the
+backend talks to, the AI providers, the map tiles, and where the keys live.
+Country-specific sources and keys are on **1. Data Sources**, which has a
+tab per country.
+""",
+    "sections": [
+        {
+            "title": "Internal services",
+            "badge": "metadata",
+            "body": """
+Services the backend proxies to — ours, not third parties:
 
 | Service | Configured by | Port |
 |---|---|---|
 | EPSM (EnergyPlus) | `EPSM_BASE_URL` | 8010 |
 | Façade defect ML | `FACADE_ML_URL` / `FACADE_MODEL_URL` | 8020 |
 
-> **Two Overpass hosts is deliberate.** The public instance rate-limits
-> aggressively, so a mirror is configured as a fallback. A pipeline run that
-> stalls on geometry is usually Overpass throttling, not a bug.
-
-**Secrets** all live in the gitignored `.env`: `OPENAI_API_KEY`,
-`ANTHROPIC_API_KEY`, `UK_EPC_API_TOKEN`, `LANTMATERIET_USER` / `_PASSWORD`,
-`VASTTRAFIK_CLIENT_ID` / `_SECRET`, `TRAFIKVERKET_API_KEY`. Never commit one;
-print names or lengths only when checking they exist.
+EPSM runs in Docker. When energy simulations fail, check that Docker Desktop is
+running before anything else — that has been the cause every time so far.
 """,
-            "files": ["backend/config.py", "backend/main.py"],
+            "files": ["docker-compose.epsm.yml", "tools/ml/facade_detect_service.py"],
         },
         {
-            "title": "SE · Building geometry — EUBUCCO",
-            "badge": "raw",
+            "title": "AI providers",
+            "badge": "metadata",
             "body": """
-EUBUCCO v0.2 fuses OpenStreetMap, Microsoft Building Footprints and
-national registries into building height, floors, construction year and type
-estimates, with confidence bounds and a per-field source tag.
-
-In **Sweden** it supplies the footprint polygon itself. Regions are streamed as
-parquet from EUBUCCO's anonymous S3 bucket and clipped to each city's bounding
-box, so a city build never pulls the whole country.
-
-**Live figure:** the Gothenburg payload carries **92,973 buildings**.
-""",
-            "files": [
-                "data/eubucco",
-                "download_eubucco_sweden_v3.py",
-                "tools/se/download_eubucco_city.py",
-                "assets/buildings.json",
-            ],
-        },
-        {
-            "title": "UK · Building geometry — OpenStreetMap",
-            "badge": "raw",
-            "body": """
-The UK does **not** use EUBUCCO for geometry. Footprints come from
-**OpenStreetMap via the Overpass API**, because OSM carries the `ref:GB:uprn`
-tag that makes an address-based certificate join possible.
-
-EUBUCCO is still used in the UK, but purely as an **attribute** source for
-height, floors, construction year and type. Note its public bucket is organised
-at NUTS2 granularity (4 characters, e.g. `UKI3`), not NUTS3 — every NUTS3-keyed
-URL 404s. Individual rows carry their finer NUTS3 `region_id`, so filtering
-stays precise; only the download granularity is coarse.
-""",
-            "files": ["tools/uk/ingest_eubucco.py", "tools/uk/cities.py", "data/uk_raw"],
-        },
-        {
-            "title": "SE · Energy performance — energideklaration",
-            "badge": "raw",
-            "body": """
-The Swedish national EPC register, held locally as a DuckDB database
-(~461 MB, **1.88 million rows**). It backs both the per-building panels and the
-chat assistant's whole-dataset questions.
-
-Open it **read-only** (`duckdb.connect(path, read_only=True)`) — a writable
-handle takes an exclusive lock and blocks the backend.
-
-**Live figure:** **85,670** Gothenburg buildings carry a matched EPC.
-""",
-            "files": [
-                "data/sensitivity/epc_sweden.duckdb",
-                "scripts/fetch_epc_db.py",
-                "utils/location_data.py",
-            ],
-        },
-        {
-            "title": "UK · Energy performance — EPC open-data service",
-            "badge": "raw",
-            "body": """
-The official service at `get-energy-performance-data.communities.gov.uk`. It
-replaced `epc.opendatacommunities.org`, which was **retired on 30 May 2026**.
-
-`gov.uk/find-energy-certificate` is a per-property lookup UI, not a bulk source —
-it is deliberately not scraped.
-
-**Access needs a bearer token.** Sign in with GOV.UK One Login, copy the token
-from your account page, and set `UK_EPC_API_TOKEN` in the environment or the
-repo-root `.env`. Without a token, certificate lookups return nothing and the
-pipeline silently falls back to English Housing Survey band priors — so an
-untokened run produces a plausible-looking but survey-derived result.
-""",
-            "files": ["tools/uk/ingest_epc.py"],
-        },
-        {
-            "title": "Archetypes — TABULA / EPISCOPE",
-            "badge": "raw",
-            "body": """
-The EU EPISCOPE/TABULA building typologies give period- and type-specific
-U-values, used wherever a building has no measured data. The UK table is parsed
-from the real *Building Typology Brochure: England* (BRE, September 2014) rather
-than transcribed by hand.
-
-**Live figure:** **26,257** Gothenburg buildings matched to a TABULA archetype.
-""",
-            "files": ["utils/tabula_matching.py", "tools/uk/ingest_tabula.py"],
-        },
-        {
-            "title": "UK · English Housing Survey 2024-25",
-            "badge": "raw",
-            "body": """
-Headline annex tables (OpenDocument `.ods`, published by MHCLG, Chapter 2 —
-Energy Efficiency). Parsed into three products:
-
-| Output | Used for |
-|---|---|
-| `ehs_2024_25.json` | the full parsed tables |
-| `epc_band_priors.json` | band distribution by dwelling age and type |
-| `retrofit_cost_band_c.json` | cost to reach EER band C |
-
-The band priors are the fallback whenever a UK building has no matching
-certificate.
-""",
-            "files": ["tools/uk/ingest_ehs.py"],
-        },
-        {
-            "title": "Cost & carbon — Wikells and Boverket",
-            "badge": "raw",
-            "body": """
-**Wikells** supplies Swedish construction cost line items for renovation
-assemblies. **Boverket's klimatdatabas** supplies emission factors for the
-embodied-carbon side.
-
-UK cost and carbon are **synthetic placeholders** — see **15. Known
-Limitations**.
-""",
-            "files": [
-                "data/wikells_catalogue.json",
-                "utils/boverket_api.py",
-                "frontend/src/config/wikellsData.ts",
-                "frontend/src/config/wikellsCarbonMapping.ts",
-            ],
-        },
-        {
-            "title": "SE · Remote sensing — DTCC LiDAR",
-            "badge": "raw",
-            "body": """
-Airborne laser tiles served openly by DTCC at Chalmers
-(`compute.dtcc.chalmers.se:8000`, EPSG:3006 / SWEREF99 TM). Three products are
-derived: tree and shrub positions, per-building roof form (eave, ridge, azimuth)
-and a shaded-relief terrain image.
-
-At **6.3 GB** this is by far the largest input, and the reason the repository is
-heavy to clone. **Gothenburg only** — there is no UK equivalent.
-""",
-            "files": [
-                "data/dtcc",
-                "tools/se/dtcc_vegetation.py",
-                "tools/se/dtcc_roofs.py",
-                "tools/se/dtcc_terrain_water.py",
-            ],
-        },
-        {
-            "title": "Weather — EPW",
-            "badge": "raw",
-            "body": """
-EnergyPlus Weather files drive both the building simulations and the
-environmental analyses (sun hours, incident radiation, thermal comfort). One EPW
-is mapped per city.
-""",
-            "files": ["data/epw"],
-        },
-        {
-            "title": "SE · Context, mobility and market data",
-            "badge": "raw",
-            "body": """
-| Source | What it gives | Cadence |
+| Provider | Endpoint | Key |
 |---|---|---|
-| SCB (Statistics Sweden) | DeSO demographics and income, WFS overlays | static |
-| OpenStreetMap | road centrelines, green areas, street network for space syntax | on demand |
-| Västtrafik | stops, live vehicle positions, departures, disruptions, parking | live |
-| Trafikverket | traffic cameras and road conditions | on demand |
-| Boplats | first-hand rental listings | daily |
-| Booli | sale listings and prices | weekly |
+| Anthropic | `api.anthropic.com/v1/messages` | **`ANTHROPIC_API_KEY`** |
+| OpenAI | `api.openai.com/v1/chat/completions` | **`OPENAI_API_KEY`** |
 
-Boplats and Booli are scraped into SQLite, then exported to JSON for the Data
-Explorer. Booli is a Next.js site, so the scraper reads the data embedded in
-each search page — no paid API is used.
-
-**Live figure:** **1,018** Boplats listings in the current export.
+What each one is used for is on **11. AI, ML & Vision Models**.
 """,
-            "files": [
-                "boplats_scraper.py",
-                "booli_scraper.py",
-                "trafikverket_scraper.py",
-                "boplats_apartments.db",
-                "booli_listings.db",
-                "trafikverket.db",
-            ],
+        },
+        {
+            "title": "Map tiles in the 3D viewer",
+            "badge": "metadata",
+            "body": """
+| Layer | Source | Key |
+|---|---|---|
+| Light / Dark basemaps | CARTO (`basemaps.cartocdn.com`) | **`CARTO_API`** in `.env`, handed to the viewer by `/api/viewer-config` |
+| Fallback basemaps | Esri Canvas (`server.arcgisonline.com`) | none |
+| Photorealistic 3D | Google tiles via Cesium ion | ion token, currently inside `viewer/js/cesium.js` |
+
+Without a key, CARTO still answers but stamps **"API KEY REQUIRED"** across every
+tile. The viewer and the landing-page background therefore use CARTO only when
+`/api/viewer-config` supplies a key, and fall back to Esri otherwise.
+""",
+            "files": ["backend/main.py", "viewer/js/cesium.js", "frontend/public/city_bg.html"],
+        },
+        {
+            "title": "Secrets",
+            "badge": "metadata",
+            "body": """
+Every key lives in the gitignored `.env` at the repository root, and
+`.env.example` lists their names: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+`UK_EPC_API_TOKEN`, `LANTMATERIET_USER` / `_PASSWORD`, `VASTTRAFIK_CLIENT_ID` /
+`_SECRET`, `TRAFIKVERKET_API_KEY` and `CARTO_API`.
+
+The two Lantmäteriet keys are listed but **not read by any code** — the
+Lantmäteriet footprints arrived inside the certificate database (see
+**1. Data Sources**, Sweden tab).
+
+Never commit one; print names or lengths only when checking they exist.
+""",
+            "files": [".env.example", "backend/config.py"],
         },
     ],
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 SCRIPT_BROWSER = {
-    "number": 2,
+    "number": 16,
     "title": "Script Browser",
     "stage": "metadata",
     "purpose": """
@@ -333,99 +1003,7 @@ be updated in one place and then re-read without a separate manual sync step.
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-PROVENANCE = {
-    "number": 3,
-    "title": "Data Provenance & Access",
-    "stage": "metadata",
-    "purpose": """
-For each dataset: who published it, which version is in use, and how well it
-actually matches the buildings. This is the page to read before quoting any
-number outside the project.
-""",
-    "overview": {
-        "title": "Why provenance is tracked separately",
-        "subtitle": "Coverage and vintage differ per source and per country.",
-        "items": [
-            ("Coverage is partial", "Not every building has a certificate, and matching is imperfect."),
-            ("Vintage matters", "A certificate from 2009 and one from 2024 describe different buildings."),
-            ("Method differs by country", "Sweden matches geometrically, the UK by address — they are not comparable."),
-            ("Fallbacks look like data", "An inferred value renders the same as a measured one unless the source is stated."),
-        ],
-    },
-    "sections": [
-        {
-            "title": "Source register",
-            "badge": "metadata",
-            "table": [
-                ["Dataset", "Publisher", "Version / vintage"],
-                ["EUBUCCO", "eubucco.com", "v0.2"],
-                ["OpenStreetMap", "OSM contributors", "live, cached per Overpass run"],
-                ["SCB WFS layers", "Statistics Sweden", "—"],
-                ["Energideklaration", "Boverket", "see open question below"],
-                ["UK EPC", "MHCLG", "current service, from 30 May 2026"],
-                ["English Housing Survey", "MHCLG", "2024-25 headline annex tables"],
-                ["TABULA / EPISCOPE England", "BRE", "September 2014 brochure"],
-                ["Boverket klimatdatabas", "Boverket", "live API"],
-                ["Wikells", "Wikells Byggberäkningar", "—"],
-                ["DTCC LiDAR", "DTCC, Chalmers", "—"],
-                ["Booli / Boplats", "Booli AB / Boplats Göteborg", "weekly / daily scrape"],
-            ],
-        },
-        {
-            "title": "SE · Matching coverage",
-            "badge": "processed",
-            "body": """
-Certificates are joined to footprints **geometrically**. Method in full on
-**4. Sweden Pipeline**.
-
-| Quantity | Count | Share |
-|---|---|---|
-| Buildings in the Gothenburg payload | 92,973 | 100% |
-| With a matched EPC | 85,670 | 92% |
-| With a TABULA archetype | 26,257 | 28% |
-| Tagged with a primärområde | ~75,719 | 81% |
-
-**Cadastral and address joins cannot raise this coverage** on the
-EUBUCCO-to-footprint link, because **EUBUCCO carries no cadastral id and no
-address** — there is no key to join on, so the link has to be spatial. This is a
-property of the data, not a gap in effort. Recorded here so the question is not
-reopened from scratch.
-
-Cadastral ids *are* used, but on the certificate side: to build a property-level
-aggregation that lets one shared declaration reach the property's other heated
-buildings. See **4. Sweden Pipeline**.
-""",
-            "files": ["data_pipeline.py", "tools/se/geocode_epc.py", "tools/se/ingest_districts.py"],
-        },
-        {
-            "title": "UK · Matching coverage",
-            "badge": "processed",
-            "body": """
-The UK join is **address-based, not geometric** — UPRN where OSM carries one,
-otherwise postcode plus house number. Method in full on **5. UK Pipeline**.
-
-Two consequences for any UK figure:
-
-1. **Coverage depends on the API token.** Without `UK_EPC_API_TOKEN` the
-   certificate lookup returns nothing and every building falls back to English
-   Housing Survey band priors. The output still looks complete.
-2. **Matched and inferred buildings are different things.** A band-prior
-   building carries a survey-derived distribution, not a measurement.
-
-`tools/uk/sample_epc_matches.py` prints a reviewable sample of matches per
-district — the intended way to audit quality before trusting a district's
-numbers.
-""",
-            "files": ["tools/uk/ingest_epc.py", "tools/uk/sample_epc_matches.py"],
-        },
-    ],
-    "todo": "Per-district UK match rates (matched vs band-prior), and the exact "
-            "vintage window of the energideklaration extract in data/sensitivity/.",
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
 SWEDEN_PIPELINE = {
-    "number": 4,
     "title": "Sweden Pipeline",
     "stage": "interim",
     "purpose": """
@@ -434,7 +1012,7 @@ of it happens in one module, `data_pipeline.py`, which is imported by twelve
 other scripts and is the piece to understand first.
 
 The UK chain is **completely different** — different geometry source, different
-join method. It is on **5. UK Pipeline**.
+join method. It is on the **United Kingdom** tab of this page.
 """,
     "overview": {
         "title": "The pipeline in order",
@@ -547,7 +1125,6 @@ Malmö is already built (`assets/buildings_malmo.json`).
 
 # ─────────────────────────────────────────────────────────────────────────────
 UK_PIPELINE = {
-    "number": 5,
     "title": "UK Pipeline",
     "stage": "interim",
     "purpose": """
@@ -560,7 +1137,7 @@ What the two chains *do* share is the output schema — which is the whole point
 """,
     "overview": {
         "title": "Four steps",
-        "subtitle": "Run per focus city: London, Birmingham, Nottingham.",
+        "subtitle": "Built for four London districts and Rotherham; Birmingham and Nottingham are configured but not built.",
         "items": [
             ("Footprints", "Pull building geometry from OpenStreetMap via Overpass."),
             ("Certificates", "Join EPCs by UPRN, or postcode plus house number."),
@@ -663,7 +1240,7 @@ only practical check that the address join is landing on the right buildings.
 | Market listings (sales, rents) | yes | no |
 | Real cost and carbon data | yes | **no — synthetic placeholders** |
 
-See **15. Known Limitations**.
+See **17. Known Limitations**.
 """,
             "files": ["frontend/src/config/ukPlaceholderCostCarbon.ts"],
         },
@@ -672,7 +1249,7 @@ See **15. Known Limitations**.
 
 # ─────────────────────────────────────────────────────────────────────────────
 DIGITAL_TWIN = {
-    "number": 6,
+    "number": 5,
     "title": "Digital Twin Construction",
     "stage": "processed",
     "purpose": """
@@ -735,7 +1312,7 @@ the profile differ — which is exactly what the UK pipeline's schema match buys
 
 # ─────────────────────────────────────────────────────────────────────────────
 SHOEBOX_IDF = {
-    "number": 7,
+    "number": 6,
     "title": "Shoebox & IDF Generation",
     "stage": "method",
     "purpose": """
@@ -790,7 +1367,7 @@ object, surfacing in EPSM output as *Water Systems*.
 
 # ─────────────────────────────────────────────────────────────────────────────
 SIMULATION = {
-    "number": 8,
+    "number": 7,
     "title": "Simulation Process",
     "stage": "method",
     "purpose": """
@@ -844,7 +1421,7 @@ therefore reported as **0** in every total, even though the simulation trace
 shows it is not zero.
 
 Any cooling-inclusive figure from this tool is currently understated. See
-**15. Known Limitations**.
+**17. Known Limitations**.
 """,
         },
     ],
@@ -852,7 +1429,7 @@ Any cooling-inclusive figure from this tool is currently understated. See
 
 # ─────────────────────────────────────────────────────────────────────────────
 PRIORITISATION = {
-    "number": 9,
+    "number": 8,
     "title": "Retrofit Prioritisation",
     "stage": "method",
     "purpose": """
@@ -912,7 +1489,7 @@ buildings without a round trip.
 
 # ─────────────────────────────────────────────────────────────────────────────
 OPTIMISATION = {
-    "number": 10,
+    "number": 9,
     "title": "Optimisation Process",
     "stage": "method",
     "purpose": """
@@ -977,7 +1554,7 @@ heating demand several-fold.
 
 # ─────────────────────────────────────────────────────────────────────────────
 DECISION_ANALYSIS = {
-    "number": 11,
+    "number": 10,
     "title": "Decision Analysis under Uncertainty",
     "stage": "method",
     "purpose": """
@@ -1025,7 +1602,7 @@ recommendation. Results carry through to the Step 5 report.
 
 # ─────────────────────────────────────────────────────────────────────────────
 FACADE_ML = {
-    "number": 12,
+    "number": 11,
     "title": "AI, ML & Vision Models",
     "stage": "method",
     "purpose": """
@@ -1078,7 +1655,7 @@ Loaded with `map_location="cpu"`.
 | `leakage` | 0.60 |
 
 **Where the output goes.** Detected defect load drives the **F** criterion in
-the prioritisation score (**9. Retrofit Prioritisation**) through a saturating
+the prioritisation score (**8. Retrofit Prioritisation**) through a saturating
 curve, so uploading a photograph changes the ranking. Structural defects (crack,
 bulge) are weighted above surface ones deliberately.
 
@@ -1150,7 +1727,7 @@ with an Anthropic path as the alternative.
 | `list_districts` · `get_district_stats` | the 96 primärområden |
 | `find_buildings_by_address` | individual buildings |
 | `get_epc_dataset_info` · `search_epc_fields` | the 1.88 M-row certificate register |
-| `get_booli_sales` · `get_boplats_rentals` | the scraped market data (**17. Scraped Market Data**) |
+| `get_booli_sales` · `get_boplats_rentals` | the scraped market data (**4. Scraped Market Data**) |
 | `get_scb_datasets` | Statistics Sweden |
 | `recommend_retrofit` | the agentic path — address → optimiser → options → EnergyPlus |
 
@@ -1201,7 +1778,7 @@ answer without any AI at all.
 
 # ─────────────────────────────────────────────────────────────────────────────
 CLIMATE_ENV = {
-    "number": 13,
+    "number": 12,
     "title": "Climate & Environmental Analysis",
     "stage": "method",
     "purpose": """
@@ -1252,7 +1829,7 @@ all three.
 
 # ─────────────────────────────────────────────────────────────────────────────
 VIEWER_LAYERS = {
-    "number": 14,
+    "number": 13,
     "title": "Viewer Layers & Visualisation",
     "stage": "result",
     "purpose": """
@@ -1294,7 +1871,7 @@ a hue there rather than per component, or the palette drifts apart.
 
 # ─────────────────────────────────────────────────────────────────────────────
 LIMITATIONS = {
-    "number": 15,
+    "number": 17,
     "title": "Known Limitations",
     "stage": "metadata",
     "purpose": """
@@ -1371,8 +1948,9 @@ than hiding them once a value looks reasonable.
 
 # ─────────────────────────────────────────────────────────────────────────────
 SCRAPED_DATA = {
-    "number": 17,
+    "number": 4,
     "title": "Scraped Market Data",
+    "nav_title": "Market data (Sweden)",
     "stage": "raw",
     "purpose": """
 The two housing-market feeds the tool scrapes itself — **Boplats** (first-hand
@@ -1380,14 +1958,14 @@ rentals) and **Booli** (sales and sold prices) — in full: how each site is
 reached, what is stored, how often it runs, and whether it is running right now.
 
 Everything else in the tool arrives via a file download or an official API
-(**1. Data Portal**). These two are the only sources we scrape, which makes them
+(**1. Data Sources**). These two are the only sources we scrape, which makes them
 the only ones that can break because someone else changed a web page.
 """,
     "overview": {
         "title": "Two scrapers, two very different techniques",
         "subtitle": "Both write SQLite, then export JSON for the Data Explorer.",
         "items": [
-            ("Boplats", "Server-rendered HTML parsed with BeautifulSoup. 1,018 rentals held."),
+            ("Boplats", "Server-rendered HTML parsed with BeautifulSoup. 1,253 rentals held (2026-09-14)."),
             ("Booli", "Next.js site — the JSON payload is read out of the page itself. 243 listings held."),
             ("Accumulating", "Both keep first_seen / last_seen per record, so history builds up rather than being overwritten."),
             ("Fragile by nature", "A layout change upstream breaks them, unlike an API contract."),
@@ -1409,7 +1987,7 @@ HTML. No browser automation, no API.
 **Politeness.** `REQUEST_DELAY = 1.2` seconds between requests, with a
 desktop-browser `User-Agent`.
 
-**Stored** in `boplats_apartments.db`, table `apartments` — **1,018 rows**,
+**Stored** in `boplats_apartments.db`, table `apartments` — **1,253 rows** on 2026-09-14,
 15 columns:
 
 `id · url · address · area_name · rooms · size_m2 · floor_current ·
@@ -1605,7 +2183,7 @@ have caught this on day two.
 
 # ─────────────────────────────────────────────────────────────────────────────
 ANALYSIS_INVENTORY = {
-    "number": 18,
+    "number": 14,
     "title": "Analysis Inventory",
     "stage": "method",
     "purpose": """
@@ -1657,8 +2235,8 @@ Only four things in the list are not this project's own code:
 
 | External | What it is | Consequence |
 |---|---|---|
-| **EPSM** | containerised EnergyPlus manager, :8010 | needs Docker running; its end-use schema limits what we can report (**15. Known Limitations**) |
-| **PVGIS** | European Commission solar API | network dependency; results cached per orientation |
+| **EPSM** | containerised EnergyPlus manager, :8010 | needs Docker running; its end-use schema limits what we can report (**17. Known Limitations**) |
+| **PVGIS** | European Commission solar API | network dependency; not cached — a result is kept only when a user saves it |
 | **Façade defect model** | trained detector from a separate ML project | needs its own torch environment on the host |
 | **Vision / chat models** | hosted LLM APIs | need API keys; degrade to a heuristic or refuse rather than failing hard |
 
@@ -1700,7 +2278,7 @@ registry and this inventory agree.
 
 # ─────────────────────────────────────────────────────────────────────────────
 PROJECT_TEAM = {
-    "number": 16,
+    "number": 18,
     "title": "Project Team & Credits",
     "stage": "metadata",
     "purpose": """
@@ -1802,8 +2380,8 @@ adapted, integrated, or run as external services, and are credited accordingly.
 | **Optimisation model** | Adapted from earlier DT4PED work | Jenny Enerbäck and Ann-Brith Strömberg for the optimisation logic; Liane Thuvander as project lead in the research context |
 | **3D viewer / web visualisation stack** | Integration of geospatial and web technologies into the project environment | Project-level implementation within this repository and the digital twin workflow |
 
-The simulation workflow is documented in **8. Simulation Process** and the
-optimisation logic in **10. Optimisation Process**. Those pages are the
+The simulation workflow is documented in **7. Simulation Process** and the
+optimisation logic in **9. Optimisation Process**. Those pages are the
 technical counterparts to this attributions page.
 """,
             "files": ["frontend/src/pages/AnalysisTools.tsx", "logbook/logbook_content.py"],
@@ -1831,12 +2409,61 @@ provenance principles used throughout the rest of the project.
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# TABBED PAGES — one page per topic, one tab per country
+# ─────────────────────────────────────────────────────────────────────────────
+# Sweden and the UK are built from different sources by separate chains, so the
+# three topics where they differ carry a tab per country rather than alternating
+# SE / UK sections. Each tab's content is the SE_* / UK_* / *_PIPELINE dict above;
+# those dicts have no number of their own.
+DATA_SOURCES = {
+    "number": 1,
+    "title": "Data Sources",
+    "stage": "raw",
+    "purpose": """
+Every dataset the tool ingests, what it covers and where it physically sits.
+Sweden and the United Kingdom draw on almost entirely different sources, so each
+has its own tab. Services and keys shared by both are on
+**15. Services, Keys & Access**.
+""",
+    "tabs": [("Sweden", SE_DATA), ("United Kingdom", UK_DATA)],
+}
+
+COVERAGE = {
+    "number": 2,
+    "title": "Coverage & Quality",
+    "stage": "metadata",
+    "purpose": """
+How far each country's numbers can be trusted: how many buildings match a real
+certificate, what happens to the ones that don't, and how old the underlying
+records are. Read this before quoting a number outside the project — and note
+that Swedish and UK coverage figures are **not comparable**: Sweden matches
+certificates to buildings geometrically, the UK by address. Where each dataset
+comes from is on **1. Data Sources**.
+""",
+    "tabs": [("Sweden", SE_COVERAGE), ("United Kingdom", UK_COVERAGE)],
+}
+
+PIPELINES = {
+    "number": 3,
+    "title": "Pipelines",
+    "stage": "interim",
+    "purpose": """
+How each country's raw registers become the payload the viewer and the wizard
+read. The two chains share almost nothing — different geometry source,
+different certificate join — except the output schema, which is why one viewer
+renders both.
+""",
+    "tabs": [("Sweden", SWEDEN_PIPELINE), ("United Kingdom", UK_PIPELINE)],
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 PAGES = {
-    "data_portal":     DATA_PORTAL,
-    "script_browser":  SCRIPT_BROWSER,
-    "provenance":      PROVENANCE,
-    "sweden_pipeline": SWEDEN_PIPELINE,
-    "uk_pipeline":     UK_PIPELINE,
+    # Data & pipelines (the first three have a Sweden / United Kingdom tab each)
+    "data_sources":    DATA_SOURCES,
+    "coverage":        COVERAGE,
+    "pipelines":       PIPELINES,
+    "scraped_data":    SCRAPED_DATA,
+    # Methods - apply to both countries
     "digital_twin":    DIGITAL_TWIN,
     "shoebox_idf":     SHOEBOX_IDF,
     "simulation":      SIMULATION,
@@ -1846,8 +2473,21 @@ PAGES = {
     "facade_ml":       FACADE_ML,
     "climate_env":     CLIMATE_ENV,
     "viewer_layers":   VIEWER_LAYERS,
+    "analysis_index":  ANALYSIS_INVENTORY,
+    # Reference
+    "access":          ACCESS,
+    "script_browser":  SCRIPT_BROWSER,
     "limitations":     LIMITATIONS,
     "project_team":    PROJECT_TEAM,
-    "scraped_data":    SCRAPED_DATA,
-    "analysis_index":  ANALYSIS_INVENTORY,
 }
+
+# Sidebar structure: one header per group, pages in the order listed. Page
+# numbers must run 1..N in exactly this order - scripts/check_content.py
+# enforces it.
+NAV = [
+    ("Data & pipelines", ["data_sources", "coverage", "pipelines", "scraped_data"]),
+    ("Methods", ["digital_twin", "shoebox_idf", "simulation", "prioritisation",
+                 "optimisation", "decision", "facade_ml", "climate_env",
+                 "viewer_layers", "analysis_index"]),
+    ("Reference", ["access", "script_browser", "limitations", "project_team"]),
+]

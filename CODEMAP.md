@@ -417,23 +417,28 @@ it cannot affect the tool.
 
 | File | Role |
 |---|---|
-| [logbook/Tool.py](logbook/Tool.py) | Entry point — contents, live repo stats, consistency check. The filename is the first sidebar entry, so it reads "Tool" |
-| [logbook/logbook_content.py](logbook/logbook_content.py) | **All prose** — the only file to edit for wording |
+| [logbook/Tool.py](logbook/Tool.py) | Entry point — builds the grouped sidebar with `st.navigation` from `NAV` |
+| [logbook/home.py](logbook/home.py) | Home page (sidebar entry "Tool") — contents, live repo stats, consistency check |
+| [logbook/logbook_content.py](logbook/logbook_content.py) | **All prose** plus the sidebar groups (`NAV`) — the only file to edit for wording |
 | [logbook/scripts/ui_utils.py](logbook/scripts/ui_utils.py) | Layout, repo introspection, markdown/zip export |
-| [logbook/scripts/check_content.py](logbook/scripts/check_content.py) | Validates numbering, page files, cited paths and cross-references |
-| [logbook/pages/](logbook/pages/) | 18 pages, ordered by numeric prefix; intentionally thin |
+| [logbook/scripts/check_content.py](logbook/scripts/check_content.py) | Validates numbering, page files, sidebar coverage, cited paths and cross-references |
+| [logbook/pages/](logbook/pages/) | 18 pages, `<number>_<Name>.py`; intentionally thin |
 | [logbook/run.bat](logbook/run.bat) · [setup.bat](logbook/setup.bat) | Launch on :8501 / create the venv |
 
-Page 2 (*Script Browser*) renders **this file** live, so the logbook cannot
+Page 16 (*Script Browser*) renders **this file** live, so the logbook cannot
 drift from the code map. Pages resolve their `files` lists against the real
 repository on load and flag anything missing in red.
 
-**Sweden and the UK have a page each** (4 and 5) because the chains differ
-fundamentally — see §6 above: Sweden takes footprints from EUBUCCO and joins
-certificates geometrically; the UK takes footprints from OpenStreetMap via
-Overpass and joins by UPRN or postcode plus house number, falling back to
-English Housing Survey band priors. Only the output schema is shared, which is
-why one viewer renders both.
+**Country tabs, not country pages.** The three topics where Sweden and the UK
+differ — 1. Data Sources, 2. Coverage & Quality, 3. Pipelines — are single
+pages with a *Sweden* tab and a *United Kingdom* tab (`"tabs"` in
+`logbook_content.py`, rendered with `st.tabs` by `render_page`). The sidebar
+groups are *Data & pipelines* (1–4), *Methods* (5–14) and *Reference* (15–18).
+The chains differ fundamentally — see §6 above:
+Sweden takes footprints from EUBUCCO and joins certificates geometrically; the
+UK takes footprints from OpenStreetMap via Overpass and joins by UPRN or
+postcode plus house number, falling back to English Housing Survey band priors.
+Only the output schema is shared, which is why one viewer renders both.
 
 Start it with `logbook\run.bat` (or `run.bat 8502` for a different port).
 
