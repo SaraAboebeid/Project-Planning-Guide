@@ -1326,9 +1326,11 @@ Genuinely not established. Listed rather than guessed at.
 - **Façade defect model.** Now traced (logbook page 10): Faster R-CNN
   ResNet-50-FPN, COCO-pretrained, fine-tuned on MBDD2025 (14,471 UAV images,
   split 10,129 / 2,170 / 2,172). The recorded 0.77 is the *validation mean F1*
-  at IoU ≥ 0.5, not mAP. Still open: no test-set or per-class result, a random
-  image-level split that may leak near-duplicate frames, and no check on the
-  tool's own images (phone photos, mesh renders).
+  at IoU ≥ 0.5, not mAP. A test-set *sample* (150 of 2,172 images, evaluated
+  2026-09-15) gives mean F1 0.88 at threshold 0.5 (crack 0.82 … bulge 0.94).
+  Still open: the full test set, a random image-level split that may leak
+  near-duplicate frames, and no check on the tool's own images (phone photos,
+  mesh renders).
 - **AHP weights.** The four presets are in the code, but whose pairwise
   judgements produced them, and when, is not recorded.
 - **`f_dh` and `carbon_factor_heat`.** The optimiser's degree-day factor and heat

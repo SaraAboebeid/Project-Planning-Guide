@@ -2723,44 +2723,351 @@ DECISION_ANALYSIS = {
     "title": "Decision Analysis under Uncertainty",
     "stage": "method",
     "purpose": """
-Choosing between retrofit options when the future is unknown. Rather than
-assuming one energy price, options are evaluated across price scenarios and
-compared with three classic decision rules.
+How Step 4 helps choose between renovation packages when the future energy
+price — the biggest unknown in whether a renovation pays off — cannot be
+predicted. Each package is tested in three price futures; the results form a
+**payoff matrix**, which three classic decision rules read in different ways:
+**minimax regret**, the **uncertainty range** and the **Hurwicz criterion**.
+This page covers the whole process with its equations, sources, code and data,
+a worked example, and how **sensitivity analysis** fits in.
 """,
+    "overview": {
+        "title": "The decision analysis in five steps",
+        "subtitle": "No forecast needed — the rules work without probabilities.",
+        "items": [
+            ("Options", "Every renovation package that has an EnergyPlus result, plus \"keep as-built\" as the zero reference."),
+            ("Futures", "Three energy-price scenarios: Low, Medium and High (0.5 / 1.0 / 2.0 SEK/kWh by default, editable)."),
+            ("Payoff matrix", "The 30-year net present benefit of every package in every future."),
+            ("Three rules", "Minimax regret (safety-first), uncertainty range (most stable), Hurwicz (balanced, with an optimism setting α)."),
+            ("Decide and report", "The picks are shown side by side and saved to the Step 5 report."),
+        ],
+    },
     "sections": [
         {
-            "title": "The payoff matrix",
-            "badge": "method",
+            "title": "Why decision analysis under uncertainty",
             "body": """
-Each option — every package, plus the do-nothing baseline — is evaluated under
-Low, Medium and High energy-price scenarios. The outcome is the 30-year net
-present benefit:
+Whether a renovation pays back depends above all on what energy will cost over
+the next 30 years — and nobody can forecast that, nor put credible
+probabilities on it. Decision theory calls this **decision under uncertainty**
+(or *ignorance*), as opposed to *risk*, where probabilities are known.
 
-$$\\text{benefit}_i(s) = E^{saved}_i \\times price(s) \\times \\text{annuity} - I_i$$
+For this situation there are classic rules that rank options **without any
+probabilities**, each expressing a different attitude:
 
-where $E^{saved}_i$ is annual energy saved and $I_i$ the investment (zero for
-the baseline). Energy price is used as the scenario axis because it is the
-single biggest unknown driving a retrofit's payoff.
+- **Minimax regret** — "I don't want to look wrong in hindsight."
+- **Uncertainty range** — "I want a result I can rely on."
+- **Hurwicz** — "I want to weigh the best and worst case by how optimistic I am."
+
+The tool shows all three on purpose. Where they agree, the choice is robust;
+where they disagree is exactly where the decision needs human judgement rather
+than an automatic recommendation. The recommendation sentence in the panel
+uses minimax regret, the standard choice when the future is genuinely
+unknown.
+""",
+            "files": ["frontend/src/utils/regretAnalysis.ts"],
+        },
+        {
+            "title": "Step by step — the process in Step 4",
+            "body": """
+**a) Options.** Every renovation package with an EnergyPlus result — built by
+hand or picked from the optimiser (**8. Optimisation Process**) — becomes a
+row. Its energy $E_i$ is the average of its buildings' simulated
+kWh/m²·yr; its investment $I_i$ is the sum of its buildings' costs (Wikells).
+**Keep as-built** is added as the reference row. The analysis appears as soon
+as one package has a result (it is most useful with several); it is for
+Swedish projects.
+
+**b) Futures.** Three energy-price scenarios: **Low 0.5, Medium 1.0, High 2.0
+SEK/kWh** by default. The user can change them; today's spot price (zone SE3)
+is shown beside them for comparison.
+
+**c) Payoff matrix.** Each package's 30-year net present benefit is computed in
+each future (next section).
+
+**d) Decision rules.** From the matrix, each package's worst regret, outcome
+spread and Hurwicz score are computed, and each rule picks a package. **Keep
+as-built is shown but never picked** — the decision is *which* renovation to
+choose, and when renovations do not pay back on energy alone, "do nothing"
+would otherwise win every rule and say nothing about the choice.
+
+**e) Presentation.** The table shows the benefits per future (the best package
+in each future in green) and each package's worst regret; *Advanced* adds the
+outcome spread, the Hurwicz score and the α slider (default 0.5). The picks are
+tagged **★ Safety-first** (minimax regret), **★ Balanced choice** (Hurwicz) and
+**★ Most stable** (smallest range).
+
+**f) Report.** The whole result is saved and shown in the Step 5 report.
 """,
             "files": [
-                "frontend/src/utils/regretAnalysis.ts",
+                "frontend/src/pages/RenovationSimulator.tsx",
                 "frontend/src/components/DecisionAnalysisPanel.tsx",
+                "frontend/src/pages/RenovationReport.tsx",
             ],
         },
         {
-            "title": "Three decision rules",
-            "badge": "method",
+            "title": "The payoff matrix — equations",
             "body": """
-| Rule | Definition | Reads as |
-|---|---|---|
-| **Minimax regret** | regret = best-in-scenario − chosen; pick the smallest worst-case regret | least risk of having chosen wrong |
-| **Uncertainty range** | best − worst across scenarios | small range implies robust |
-| **Hurwicz** | $H = \\alpha \\cdot best + (1-\\alpha) \\cdot worst$ | α is optimism; α=0 is pure worst-case |
+**Annuity factor** — the present value of 1 SEK a year for *N* years at the
+real discount rate *r*:
 
-Presenting all three is deliberate: they can disagree, and where they disagree
-is exactly where the decision deserves human judgement rather than an automated
-recommendation. Results carry through to the Step 5 report.
+$$AF = \\sum_{y=1}^{N} \\frac{1}{(1+r)^y} = \\frac{1 - (1+r)^{-N}}{r}$$
+
+With *r* = 3% (EU cost-optimal framework, Delegated Regulation 244/2012) and
+*N* = 30 years, **AF = 19.600**.
+
+**Energy saved per year** by package *i*:
+
+$$S_i = \\max\\big(0,\\; E_0 - E_i\\big) \\cdot A_{floor} \\qquad [\\text{kWh/yr}]$$
+
+$E_0$ is the baseline's simulated energy (kWh/m²·yr), $E_i$ the package's, and
+$A_{floor}$ the total floor area of the selected buildings (footprint ×
+floors). A package that *increases* energy use is counted as saving nothing.
+
+**Payoff — the 30-year net present benefit** of package *i* in price future *s*:
+
+$$B_{i,s} = S_i \\cdot p_s \\cdot AF \\; - \\; I_i \\qquad [\\text{SEK}]$$
+
+The discounted value of 30 years of saved energy at price $p_s$, minus the
+investment. $B > 0$: the energy savings repay the investment in that future;
+$B < 0$: they do not (deep renovations are also done for the climate target,
+comfort and asset value). "Keep as-built" has $B = 0$ in every future.
+
+**The payoff matrix** — one row per package, one column per future:
+
+| | Low ($p_1$) | Medium ($p_2$) | High ($p_3$) |
+|---|---|---|---|
+| Package 1 | $B_{1,1}$ | $B_{1,2}$ | $B_{1,3}$ |
+| Package 2 | $B_{2,1}$ | $B_{2,2}$ | $B_{2,3}$ |
+| … | … | … | … |
+| Keep as-built | 0 | 0 | 0 |
 """,
+            "files": ["frontend/src/utils/regretAnalysis.ts", "frontend/src/config/optimizationAssumptions.ts"],
+        },
+        {
+            "title": "Rule 1 — Minimax regret (Savage)",
+            "body": """
+**Regret** is how much worse a package does than the best package *in that
+future* — the money you would regret leaving on the table once you know which
+future came true.
+
+$$B^{*}_s = \\max_{i \\in R} B_{i,s} \\qquad \\text{(the best renovation in future } s\\text{)}$$
+
+$$\\text{Regret}_{i,s} = B^{*}_s - B_{i,s} \\;\\ge 0$$
+
+$$MR_i = \\max_s \\, \\text{Regret}_{i,s} \\qquad \\text{(the package's worst regret)}$$
+
+$$\\text{Pick} = \\arg\\min_i \\; MR_i$$
+
+*R* is the set of renovation packages (keep as-built excluded). The pick is the
+package whose **worst miss** against the best alternative, in any future, is
+smallest: whichever future arrives, it is never far behind. Shown in the panel
+as *"Worst miss vs best"* and tagged **★ Safety-first**.
+
+**Use it** when prices cannot be predicted and looking wrong in hindsight is
+the main concern. Introduced by L. J. Savage (1951).
+""",
+        },
+        {
+            "title": "Rule 2 — Uncertainty range",
+            "body": """
+$$\\text{Range}_i = \\max_s B_{i,s} - \\min_s B_{i,s}, \\qquad \\text{Pick} = \\arg\\min_i \\; \\text{Range}_i$$
+
+How much a package's benefit swings between the cheap and the expensive future.
+A small range means the outcome is **predictable even if prices are not** —
+tagged **★ Most stable**, shown as *"Outcome spread"*.
+
+**Use it** when a dependable figure matters more than the highest possible
+return — a fixed budget, a business case. **Caution:** stable is not the same
+as good; a package can be stable because it saves little in any future. The
+range is also the simplest **sensitivity** measure of the payoff to the price
+(see below).
+""",
+        },
+        {
+            "title": "Rule 3 — The Hurwicz criterion",
+            "body": """
+$$H_i(\\alpha) = \\alpha \\cdot \\max_s B_{i,s} \\; + \\; (1 - \\alpha) \\cdot \\min_s B_{i,s}, \\qquad \\text{Pick} = \\arg\\max_i \\; H_i(\\alpha)$$
+
+A weighted blend of each package's best and worst outcome. **α is the
+decision-maker's optimism**, set with the slider (0 to 1, default 0.5):
+
+| α | Behaviour | Equivalent to |
+|---|---|---|
+| 0 | looks only at the worst case | Wald's **maximin** — the pure pessimist |
+| 0.5 | neutral: best and worst count equally | the default |
+| 1 | looks only at the best case | **maximax** — the pure optimist |
+
+Tagged **★ Balanced choice**, shown as *"Balanced score"*. **Use it** when
+you have a view on how prices will move. Proposed by L. Hurwicz (1951).
+""",
+        },
+        {
+            "title": "A worked example",
+            "body": """
+*Illustrative packages* (made-up energy and cost), with the tool's formulas and
+default prices: 1,000 m², baseline 150 kWh/m²·yr, AF = 19.600, α = 0.5.
+
+| Package | Energy (kWh/m²·yr) | Saving (kWh/yr) | Investment (SEK) |
+|---|---|---|---|
+| A — light: roof insulation | 140 | 10,000 | 150,000 |
+| B — medium: walls + roof | 125 | 25,000 | 500,000 |
+| C — deep: walls + roof + windows | 105 | 45,000 | 1,200,000 |
+
+**Payoff matrix** (net present benefit, MSEK) and the three rules:
+
+| Package | Low 0.5 | Medium 1.0 | High 2.0 | Regret L / M / H | Worst regret | Range | Hurwicz (0.5) |
+|---|---|---|---|---|---|---|---|
+| A | **−0.05** | **0.05** | 0.24 | 0 / 0 / 0.32 | 0.32 | **0.29** ★ | 0.10 |
+| B | −0.26 | −0.01 | 0.48 | 0.20 / 0.06 / 0.08 | **0.20** ★ | 0.74 | **0.11** ★ |
+| C | −0.76 | −0.32 | **0.56** | 0.71 / 0.36 / 0 | 0.71 | 1.32 | −0.10 |
+
+(Bold in the price columns = the best package in that future.)
+
+**Reading it.** A is best if prices stay low or medium, C only if they go
+high. **Minimax regret picks B**: it is never the best, but never far behind
+either (worst miss 0.20 MSEK). **The range picks A**: the most predictable
+result, but it saves the least. **Hurwicz at α = 0.5 picks B.** Three rules,
+two answers — which is itself the finding: the choice between A and B depends
+on how much weight the owner gives to the high-price future.
+""",
+        },
+        {
+            "title": "Sensitivity analysis — how it fits",
+            "body": """
+**Sensitivity analysis** asks how much an output changes when an input changes
+— which assumptions actually drive the answer (Saltelli et al., 2008). It is
+closely tied to decision analysis: the scenarios above *are* a sensitivity
+analysis on the energy price.
+
+**Already in the tool**
+
+| What | Sensitivity to | Where |
+|---|---|---|
+| The three price scenarios, editable | energy price | this panel |
+| The *Outcome spread* column | energy price (best − worst) | this panel |
+| The α slider | the decision-maker's optimism | this panel |
+| The live Pareto front | material choices | **8. Optimisation Process** |
+
+**Break-even points — derived from the payoff equation.** Because $B_{i,s}$ is
+linear in the price and α, the exact points where a conclusion flips can be
+written down. They are **not yet shown in the tool**; the values below are for
+the worked example.
+
+- **Payback price** — the price above which package *i* repays its investment:
+
+$$p^{*}_i = \\frac{I_i}{S_i \\cdot AF}$$
+
+  A **0.77**, B **1.02**, C **1.36** SEK/kWh.
+
+- **Swap price** — the price at which packages *i* and *j* give the same
+  benefit:
+
+$$p^{*}_{ij} = \\frac{I_i - I_j}{(S_i - S_j) \\cdot AF}$$
+
+  A and B swap at **1.19** SEK/kWh; B and C at **1.79**: below 1.19 A is best,
+  between 1.19 and 1.79 B, above 1.79 C.
+
+- **Switching α** — where two Hurwicz scores are equal
+  ($\\text{best}$, $\\text{worst}$ = each package's max and min benefit):
+
+$$\\alpha^{*}_{ij} = \\frac{\\text{worst}_j - \\text{worst}_i}{(\\text{best}_i - \\text{worst}_i) - (\\text{best}_j - \\text{worst}_j)}$$
+
+  Hurwicz picks A for α < 0.46, B for 0.46 – 0.86, C above 0.86.
+
+- **Discount rate** — enters only through the annuity factor: *AF* = 25.81 at
+  1%, 19.60 at 3%, 15.37 at 5%, 12.41 at 7%. In the example the minimax-regret
+  pick stays B at 1–3% but becomes A at 5% and above: the higher the discount
+  rate, the less future savings are worth, which favours the cheap package.
+
+**Exists but not connected**
+
+- `frontend/src/config/sensitivityData.ts` holds pre-computed **one-at-a-time
+  (OAT)** results for a Swedish multi-family archetype (baseline heating
+  226,335 kWh/yr) — each input varied alone, the others held at baseline:
+
+| Input varied | Spread of heating demand (kWh/yr) | Share of baseline |
+|---|---|---|
+| Roof shape and angle | 211,553 | 93% |
+| Infiltration rate | 139,434 | 62% |
+| Heating setpoint (19–23 °C) | 120,565 | 53% |
+| Construction quality | 78,284 | 35% |
+| Number of floors (3–5) | 72,158 | 32% |
+| Building length | 63,753 | 28% |
+| Building width | 52,824 | 23% |
+| Window-to-wall ratio | 30,601 | 14% |
+| Glazing quality | 23,350 | 10% |
+
+  They were ported from a file of the earlier Streamlit app that no longer
+  exists, so how they were produced is not recorded. They are shown only on
+  the energy-community / renewable-energy Step 3 page, which is currently
+  hidden — **so they never appear**.
+- The client has a `sensitivity` call to `/sensitivity/run`, but **the backend
+  has no such route**; and the note "Sobol indices will be generated when your
+  simulation runs" describes something not implemented.
+
+**What could be added**
+
+| Addition | What it answers |
+|---|---|
+| Show the payback and swap prices in the panel | "above what price does this package pay off, and when does another one win?" |
+| A tornado chart of the payoff: price, discount rate, investment ±20%, energy saving ±10% | which assumption the decision is most sensitive to |
+| An α sweep strip | how far the Hurwicz pick holds as optimism changes |
+| Re-run the OAT study on the current EnergyPlus model, or a global method (Sobol indices) | which building inputs drive the simulated energy |
+| Sensitivity of the prioritisation ranking to its weights | links to **7. Retrofit Prioritisation** |
+""",
+            "files": [
+                "frontend/src/config/sensitivityData.ts",
+                "frontend/src/components/panels/SensitivityPanel.tsx",
+                "frontend/src/pages/DataAssumptions.tsx",
+                "frontend/src/api/client.ts",
+            ],
+        },
+        {
+            "title": "Sources",
+            "body": """
+| Source | Used for |
+|---|---|
+| A. Wald (1950), *Statistical Decision Functions*, Wiley | the maximin rule (Hurwicz with α = 0) |
+| L. J. Savage (1951), *The theory of statistical decision*, **Journal of the American Statistical Association** 46(253), 55–67, doi:10.1080/01621459.1951.10500768 | regret and the minimax-regret rule |
+| L. Hurwicz (1951), *Optimality criteria for decision making under ignorance*, Cowles Commission Discussion Paper, Statistics No. 370 | the Hurwicz optimism–pessimism criterion |
+| R. D. Luce & H. Raiffa (1957), *Games and Decisions*, Wiley | the standard comparison of these criteria for decisions under uncertainty |
+| *Hedging uncertainty in energy efficiency strategies: a minimax regret analysis*, **Operational Research** (Springer), doi:10.1007/s12351-018-0409-y | an application of minimax regret to energy-efficiency choices under scenario uncertainty |
+| A. Saltelli et al. (2008), *Global Sensitivity Analysis: The Primer*, Wiley | sensitivity analysis — one-at-a-time and variance-based (Sobol) methods |
+| Commission Delegated Regulation (EU) No 244/2012 | the 3% real discount rate |
+
+> **Not recorded:** the source of the default scenario prices (0.5 / 1.0 /
+> 2.0 SEK/kWh). They bracket today's spot price but are not tied to a
+> published price outlook.
+""",
+        },
+        {
+            "title": "Code and data",
+            "body": """
+| File | What it does |
+|---|---|
+| `frontend/src/utils/regretAnalysis.ts` | the whole method: annuity factor, payoff matrix, regret, range, Hurwicz, the three picks |
+| `frontend/src/components/DecisionAnalysisPanel.tsx` | the panel: price inputs, α slider, table, tags and explanations |
+| `frontend/src/pages/RenovationSimulator.tsx` | builds the inputs (packages' energy and cost, floor area, prices, α) and saves the result for the report |
+| `frontend/src/pages/RenovationReport.tsx` | shows the saved analysis in the Step 5 report |
+| `frontend/src/config/optimizationAssumptions.ts` | the discount rate and the live price feed |
+
+**Data used:** the packages' simulated energy (EnergyPlus through EPSM, stored in
+`data/simulation_database.sqlite3`), their investment costs (Wikells), the
+buildings' floor areas, and today's spot price (elprisetjustnu.se) for
+comparison. No data is stored by the analysis itself beyond the project's
+Step 5 report.
+
+**Limitations**
+
+- Only **energy cost and investment** count: no embodied carbon, maintenance,
+  replacements, VAT, grid fee or energy tax — the spot price alone.
+- One **constant price** per scenario for 30 years; no price path.
+- A package's energy is the **plain average** of its buildings' kWh/m², not
+  weighted by floor area.
+- Three scenarios, **equally unweighted**: no probabilities by design.
+- Sweden only.
+""",
+            "files": ["frontend/src/utils/regretAnalysis.ts", "frontend/src/components/DecisionAnalysisPanel.tsx", "data/simulation_database.sqlite3"],
         },
     ],
 }
@@ -2780,15 +3087,33 @@ needed for a simulation, an optimisation or a ranking to complete.
 """,
     "overview": {
         "title": "Façade inspection at a glance",
-        "subtitle": "One trained model, two general vision models, two image sources.",
+        "subtitle": "One deployed trained model, general vision-language models, and a data assistant.",
         "items": [
             ("Images", "Photos uploaded per façade (N, E, S, W) in Step 2, or views captured from the 3D viewer."),
             ("Defect detector", "A Faster R-CNN (ResNet-50 + FPN) trained on the MBDD2025 building-defect dataset; five defect classes; runs as a local service."),
             ("Second opinion", "A vision-language model marks defects too; its boxes are only added where the detector found nothing."),
             ("Window-to-wall ratio", "A vision-language model estimates the glazed share and counts balconies; saved values feed the energy simulation."),
+            ("Data assistant", "A tool-calling language model that answers from the project's own data, in Swedish or English."),
         ],
     },
     "sections": [
+        {
+            "title": "Every AI and ML component at a glance",
+            "body": """
+| Component | Kind | Model | Runs | Input → output | Used by | Status |
+|---|---|---|---|---|---|---|
+| **Defect detector** | trained object detector | Faster R-CNN, ResNet-50 + FPN (41.4 M parameters), fine-tuned on MBDD2025 | locally, service on port 8020 (CPU) | façade image → boxes for crack, leakage, abscission, corrosion, bulge | Step 2 photos, viewer *Defects* → F criterion (**7. Retrofit Prioritisation**) | deployed; service must be started |
+| **Defect second opinion** | general vision-language model | Claude Sonnet 4.5, else GPT-4o | Anthropic / OpenAI API | façade image → boxes + note | Step 2 *AI assist* | deployed |
+| **Window-to-wall estimate** | general vision-language model | Claude Sonnet 4.5, else GPT-4.1, else a rule | Anthropic / OpenAI API | façade view + building facts → WWR %, balconies | viewer façade inspector → energy simulation | deployed |
+| **Data assistant** | tool-calling language model | GPT-4o, else Claude Sonnet 4.5 | OpenAI / Anthropic API | question → tool calls → answer | landing-page chat | deployed |
+| **Window/wall segmentation** | trained segmentation model | DeepLabv3, ResNet-50 (42.1 M parameters), trained on IRFS | — | façade photo → per-pixel wall / window / door / … → WWR | nothing yet | trained, **not deployed** |
+| **Thermal defect segmentation** | trained segmentation model | small U-Net, RGB + infrared input (7.8 M parameters), trained on BFDD | — | colour + thermal image pair → per-pixel defect mask | nothing yet | trained, **did not learn**, not deployed |
+
+The three trained models were built in the separate ML project
+(`C:\\Users\\saraabo\\Desktop\\ML`) on Chalmers' Vera cluster; only the defect
+detector is wired into the tool.
+""",
+        },
         {
             "title": "Where the images come from",
             "body": """
@@ -2883,6 +3208,73 @@ render.
             ],
         },
         {
+            "title": "Inside the defect detector — what happens to an image",
+            "body": """
+1. **Receive.** The backend forwards the image bytes to the service
+   (`POST /detect?threshold=…`); the service decodes it to RGB and scales pixel
+   values to 0–1.
+2. **Resize and normalise** (inside the model, torchvision's standard
+   transform): the image is resized so its shorter side is 800 px (longer side
+   at most 1,333 px) and normalised with the ImageNet mean and standard
+   deviation the backbone was pre-trained with.
+3. **Features.** The ResNet-50 backbone and the feature pyramid produce feature
+   maps at five scales, so small cracks and large stains are both visible to
+   the next stage.
+4. **Region proposals.** A region-proposal network slides anchors of 32–512 px
+   (aspect ratios 1:2, 1:1, 2:1) over every scale and keeps the most likely
+   object regions (up to 1,000 after non-maximum suppression).
+5. **Classify and refine.** Each proposal is pooled to a fixed size, classified
+   into background or one of the five defect classes, and its box refined.
+6. **Clean up.** Overlapping boxes of the same class are merged by non-maximum
+   suppression (IoU 0.5); at most 100 detections per image; the model's own
+   floor is a score of 0.05.
+7. **Threshold.** The service keeps detections at or above the requested
+   threshold — 0.30 / 0.45 / 0.60 from the Step 2 sensitivity setting, 0.50 in
+   the viewer — and returns boxes in pixels, labels and scores, highest first.
+8. **Into the ranking.** Step 2 counts the boxes per class; weighted by severity
+   they become the F criterion of **7. Retrofit Prioritisation**.
+
+Steps 2–6 are torchvision's `fasterrcnn_resnet50_fpn` defaults; nothing in the
+service changes them.
+""",
+            "files": ["tools/ml/facade_detect_service.py"],
+        },
+        {
+            "title": "Tested now — results on held-out test images",
+            "body": """
+No test-set result had ever been recorded for these models. On 2026-09-15 they
+were evaluated on this computer (CPU), on the **held-out test split** the
+models never saw during training, with the ML project's own dataset code and
+metrics.
+
+**Defect detector** (the deployed checkpoint) — a random sample of **150 of
+the 2,172 test images**; a detection is correct when it overlaps a labelled
+defect of the same class by at least 50% (IoU ≥ 0.5):
+
+| Class | Precision | Recall | F1 — at threshold 0.5 | F1 — all detections |
+|---|---|---|---|---|
+| crack | 0.82 | 0.81 | 0.82 | 0.72 |
+| leakage | 0.92 | 0.91 | 0.91 | 0.87 |
+| abscission | 0.79 | 0.78 | 0.78 | 0.73 |
+| corrosion | 0.95 | 0.92 | 0.93 | 0.90 |
+| bulge | 1.00 | 0.90 | 0.94 | 0.88 |
+| **mean** | **0.90** | **0.86** | **0.88** | **0.82** |
+
+At the viewer's threshold of 0.5 it finds **86%** of labelled defects, and
+**90%** of what it reports is a real defect. Without a threshold it finds more
+(recall 0.90) but with more false alarms (precision 0.76). Cracks and spalling
+(abscission) — thin or irregular shapes — are the hardest classes. Speed on
+this CPU: **about 3.3 s per image**.
+
+**How to read these numbers.** They come from drone photographs like the
+training data, with the image-level split that may put near-identical frames
+in training and test, so they are an **upper bound** for what the model does
+on the tool's own phone photos and 3D-mesh renders, which were never tested.
+The sample (150 images) gives an indication, not a final figure; the full test
+set takes about two hours on this CPU.
+""",
+        },
+        {
             "title": "The second opinion — a vision-language model marks defects",
             "body": """
 In Step 2, with **AI assist** on (the default), every photo goes to the
@@ -2940,6 +3332,105 @@ estimates' accuracy is unknown.
             "files": ["assets/viewer/js/facade_inspector.js", "data/wwr_database.json", "backend/main.py"],
         },
         {
+            "title": "Trained but not deployed — window segmentation and thermal defects",
+            "body": """
+The ML project trained two more models that the tool does not use yet.
+
+**Model 1 — Window/wall segmentation (IRFS): a measured window-to-wall ratio.**
+Instead of asking a language model, this model labels **every pixel** of a
+façade photo as wall, window, door, fence, plant or background, and the WWR is
+then counted:
+
+$$WWR = \\frac{\\text{window pixels}}{\\text{wall} + \\text{window} + \\text{door pixels}}$$
+
+- **Model:** DeepLabv3 with a ResNet-50 backbone (42.1 M parameters),
+  COCO-pretrained, images resized to 512 × 512.
+- **Data:** the **Irregular Facades (IRFS)** dataset — 1,057 photos of mainly
+  modernist façades with pixel labels for the six classes; split 739 / 158 /
+  160.
+- **Two versions:** v1 — 30 epochs, cross-entropy loss; v2 — 50 epochs, built
+  to fix v1's measured under-prediction on glazed façades with class-weighted
+  loss, an added Dice loss and oversampling of high-WWR photos.
+
+**Test results** (all 160 test photos, on this computer):
+
+| | v1 | v2 |
+|---|---|---|
+| Mean IoU over the six classes | 0.629 | **0.634** |
+| Window IoU / wall IoU | 0.686 / 0.851 | 0.686 / 0.850 |
+| **WWR error** (mean absolute) | **4.3 points** | 4.8 points |
+| WWR error on façades with WWR 0–10% (n = 36) | 2.9 | 3.2 |
+| WWR error on façades with WWR 20–35% (n = 45) | 4.1 | 4.7 |
+| WWR error on façades with WWR > 50% (n = 11) | 10.4 (under by 9.4) | 9.8 (under by 9.7) |
+| Speed on this CPU | ~1 s per image | ~2.4 s per image |
+
+**The finding:** v2 scores slightly better on pixels but **not on the WWR**,
+and it did **not** remove the under-prediction on heavily glazed façades — both
+versions read about 9–10 points too little glass there. For the WWR, **v1 is
+the better model**. With an average error of about 4 points on ordinary
+façades it is a strong, repeatable candidate to replace — or check — the
+language-model estimate, which has no measured accuracy.
+
+**Model 2 — Thermal defect segmentation (BFDD).** A small U-Net (7.8 M parameters)
+given the colour and infrared image stacked as four channels, so that damp,
+thermal bridges and detachment hidden behind an intact surface could show up.
+Data: the **BFDD** dataset of aligned RGB–infrared façade pairs (838 pairs
+locally, split 586 / 125 / 127; the published version describes 788). Trained
+for 40 epochs, but its **best validation score came at epoch 1** (mean IoU
+0.15): **it did not learn**, and is not usable as it stands.
+
+**Other detector runs, for comparison** (validation mean F1): trained from
+scratch 0.34; FPN-v2 backbone with augmentation 0.70; the deployed
+COCO-pretrained model **0.77** — the right one was deployed.
+
+**Sources**
+
+| Source | Used for |
+|---|---|
+| Wei, Hu et al., *Irregular Facades: A Dataset for Semantic Segmentation of the Free Facade of Modern Buildings* — <https://doaj.org/article/6001fb4bb8d44f93a355c83236da2272> | the IRFS training data and its six classes |
+| L.-C. Chen, G. Papandreou, F. Schroff & H. Adam (2017), *Rethinking atrous convolution for semantic image segmentation*, arXiv:1706.05587 | DeepLabv3 |
+| *BFDD: A Pixel-Level Aligned RGB-IR Image Dataset for Building Façade Defect Segmentation*, Mendeley Data — <https://data.mendeley.com/datasets/9ych7czvyg/1> | the thermal training data |
+| O. Ronneberger, P. Fischer & T. Brox (2015), *U-Net: Convolutional networks for biomedical image segmentation*, MICCAI (arXiv:1505.04597) | the U-Net |
+""",
+            "files": [],
+        },
+        {
+            "title": "Where images and data go — privacy and third parties",
+            "body": """
+| Component | What leaves this computer | Stored by the tool |
+|---|---|---|
+| Defect detector | **nothing** — the image goes to the local service on port 8020 and back | no (the service keeps nothing) |
+| Defect second opinion | the façade photo, to Anthropic or OpenAI | no |
+| Window-to-wall estimate | the façade view **plus the building's address, year, use and energy class**, to Anthropic or OpenAI | the saved estimate, in `data/wwr_database.json` |
+| Step 2 photos | — | the annotated photo, in `data/facade_images/` (at most 8 MB each), shown in the Step 5 report |
+| Data assistant | the conversation, and the tool results it quotes (building statistics, addresses, prices), to OpenAI or Anthropic | no — the history lives only in the browser tab and is lost on reload |
+| Street View capture (not connected) | the building's position, to Google | — |
+
+**What this means in practice.** Anything sent to a provider is handled under
+that provider's API terms, outside the project's control. Façade photos can
+show people, faces, vehicles and number plates — personal data under GDPR — so
+photos for the AI second opinion should be taken or cropped to show the wall
+only. The trained detector never sends an image anywhere, which makes it the
+safer choice for sensitive photographs.
+""",
+        },
+        {
+            "title": "Repeatability — does the same input give the same answer?",
+            "body": """
+| Component | Repeatable? | Why |
+|---|---|---|
+| Defect detector | **yes** | a fixed trained network; the same image and threshold always give the same boxes |
+| Window-to-wall estimate | **no** | the vision models are called without setting a temperature, so they sample at the provider's default; a second run on the same façade can give a different ratio. The tool saves one run. |
+| Defect second opinion | **no** | same reason |
+| Data assistant | mostly | temperature 0.2 on OpenAI (low, not zero); the numbers themselves come from the tools and are exact |
+| Provider models over time | **no** | `claude-sonnet-4-5`, `gpt-4.1` and `gpt-4o` are names the providers can update; the same call next year may use a newer model |
+
+For the WWR this matters, because the saved value goes into the energy
+simulation. Setting temperature 0 and averaging two or three calls per façade
+would make it stable.
+""",
+        },
+        {
             "title": "Status today, and what could be improved",
             "body": """
 **On 2026-09-14:**
@@ -2962,58 +3453,74 @@ estimates' accuracy is unknown.
 
 | Improvement | Why |
 |---|---|
-| Evaluate on the held-out test set, per class, and report mAP too | the only recorded figure is a validation F1 |
+| Evaluate on the full held-out test set, and report mAP too | only a 150-image test sample has been measured (see *Tested now*) |
 | Split by flight or site rather than by image | removes near-duplicate frames from validation |
 | Test on a small labelled set of the tool's own images (phone photos, mesh renders) | the model has never been checked on the images it actually receives |
 | Fine-tune on street-level façade photographs | MBDD2025 is drone imagery of mixed structures |
 | Connect the Street View capture, with its mm-per-pixel warning | real, dated photographs without a site visit |
 | Remove the duplicate *Defects* handler | one click, one request, one result |
 | Compare WWR estimates with measured window areas for a sample of buildings | the estimates' accuracy is unknown |
+| Deploy the IRFS v1 segmentation model for the window-to-wall ratio, next to (or instead of) the language model | a measured, repeatable WWR with a known error of about 4 points |
+| Set temperature 0 on the vision calls and average two or three runs | today the same façade can give a different WWR on each run |
+| Update or remove the figures in the assistant's system prompt | it states ~17,300 certified buildings; the data has 26,263 |
+| Retrain the thermal (BFDD) model with a pretrained backbone and the dataset's flight-aware split | the current one did not learn |
+| Keep the trained checkpoints and their evaluation results with the project | the models live outside the repository and their scores were not recorded |
 """,
             "files": ["tools/ml/run_facade_service.ps1", "assets/viewer/js/facade_comparison.js"],
         },
         {
             "title": "The data assistant — tool calling, not recall",
-            "badge": "method",
             "body": """
-`POST /api/chat`, surfaced as the "Ask the data" widget. Bilingual and
-**data-grounded**: it does not answer from model knowledge, it calls tools that
-query the project's own datasets and answers from what comes back.
+**Where:** the chat widget on the landing page (`POST /api/chat`). It answers
+in the language of the question — Swedish or English — about the Gothenburg
+building stock, the certificate register, the housing and rental markets and
+the SCB layers, and can recommend a retrofit for an address.
 
-**Provider.** Prefers OpenAI `gpt-4o` (function-calling loop, `temperature 0.2`),
-with an Anthropic path as the alternative.
+**How a question is answered:**
 
-**Eleven tools:**
+1. The browser sends the **whole conversation so far** (it keeps the history
+   itself; nothing is stored on the server).
+2. The backend adds a **system prompt** describing the data and the rules, and
+   the list of tools, and calls **GPT-4o** (temperature 0.2), or **Claude
+   Sonnet 4.5** if only an Anthropic key is set.
+3. When the model asks for a tool, the backend runs it on the project's own
+   data and returns the result; the model can call tools again — **up to six
+   rounds** — before it must answer.
+4. The final text goes back to the browser.
 
-| Tool | Reaches |
-|---|---|
-| `list_datasets` | what data exists at all |
-| `get_city_overview` | city-level aggregates |
-| `list_districts` · `get_district_stats` | the 96 primärområden |
-| `find_buildings_by_address` | individual buildings |
-| `get_epc_dataset_info` · `search_epc_fields` | the 1.88 M-row certificate register |
-| `get_booli_sales` · `get_boplats_rentals` | the scraped market data (**4. Scraped Market Data**) |
-| `get_scb_datasets` | Statistics Sweden |
-| `recommend_retrofit` | the agentic path — address → optimiser → options → EnergyPlus |
+**The rules in the system prompt:** always use the tools for numbers and never
+invent statistics; confirm through the tools whether a certificate field
+exists rather than declining; reply in the user's language; for retrofit
+questions present all three options with their energy reduction and cost; say
+politely when a question is outside the data.
 
-**`recommend_retrofit` is different in kind** from the other ten. The rest are
-read-only lookups; this one runs the actual pipeline — resolves an address,
-calls the optimiser, produces candidate options and validates them. It is the
-one tool whose answer costs real compute.
+**The eleven tools and the data each one reads:**
 
-**Why `temperature 0.2`.** The assistant's job is to report figures accurately,
-not to write well. Low temperature reduces the chance of a plausible-sounding
-number that the tools did not return.
+| Tool | Answers | Reads |
+|---|---|---|
+| `get_city_overview` | buildings, certificate coverage, energy, classes, year, area — whole city | `frontend/public/buildings.json` |
+| `get_district_stats` · `list_districts` | the same per primärområde; the 96 districts | `buildings.json` |
+| `find_buildings_by_address` | certificate data for matching addresses | `buildings.json` |
+| `get_epc_dataset_info` · `search_epc_fields` | which fields the national register has, and how many records fill each | `data/sensitivity/epc_sweden.duckdb` (read-only) |
+| `get_booli_sales` | sale prices, price per m², listings by area | `booli_listings.db` |
+| `get_boplats_rentals` | rents, rent per m², sizes by area | `boplats_apartments.db` |
+| `get_scb_datasets` | which SCB layers exist and their years | a fixed description (values are viewed on the map) |
+| `list_datasets` | what the assistant can answer | a fixed list |
+| `recommend_retrofit` | three packages — cheapest, lowest-energy, best balance — with the balanced one checked in EnergyPlus | the optimiser (**8. Optimisation Process**) and EPSM; takes about 15–30 s |
 
-**Design intent.** The grounding rule is what makes it acceptable in a
-decision-support tool at all: an LLM that recalled Swedish building statistics
-from training data would be confidently wrong in ways nobody could audit. One
-that must call `search_epc_fields` and quote the result can be checked.
+**Why tool calling.** An assistant that recalled Swedish building statistics
+from its training would be confidently wrong in ways nobody could check; one
+that must call `search_epc_fields` and quote the result can be audited. The low
+temperature serves the same goal: report figures, not prose.
+
+**A stale figure in the prompt.** The system prompt tells the model that
+certificates cover "~17,300 buildings"; the building data actually has
+**26,263** buildings with a certificate (28.2%). The tools return the right
+number, but a model that answers from the prompt instead of calling a tool
+would quote the old one. The prompt's figures should be updated, or removed so
+that only the tools supply numbers.
 """,
-            "files": [
-                "frontend/src/components/ChatWidget.tsx",
-                "scripts/fetch_epc_db.py",
-            ],
+            "files": ["frontend/src/components/ChatWidget.tsx", "backend/main.py", "frontend/public/buildings.json"],
         },
         {
             "title": "Keys, and what happens without them",
@@ -3048,46 +3555,783 @@ CLIMATE_ENV = {
     "title": "Climate & Environmental Analysis",
     "stage": "method",
     "purpose": """
-Outdoor environmental analysis around a clicked point: how much sun reaches the
-ground, how much radiation accumulates, and how comfortable it actually feels.
+How the 3D viewer analyses the outdoor environment around a point the user
+clicks: how many hours of **direct sun** reach the ground, how much **solar
+radiation** falls on the ground, roofs and façades over a season, and how warm
+or cold it actually **feels** outdoors (the UTCI). The page covers the shared
+engine, each analysis step by step with its equations and what they mean, a
+tested example in central Gothenburg, the sources, the code and data, and the
+limitations. The last part covers three city-wide layers — green index, green
+accessibility and a heat-island proxy — which are simple indices, not physical
+models.
 """,
+    "overview": {
+        "title": "The environmental analyses at a glance",
+        "subtitle": "One sun-position formula, one building height field, one 145-patch sky — three analyses.",
+        "items": [
+            ("Direct sun hours", "Hours of direct sun on the ground on one day, for a clear sky. Needs no weather file."),
+            ("Incident radiation", "kWh/m² per season from the typical-year weather file, on the ground or on roofs and façades."),
+            ("Thermal comfort", "The UTCI 'feels-like' temperature hour by hour, or the share of comfortable daytime hours per season."),
+            ("Green and heat layers", "City-wide green index, green accessibility and a heat-island proxy — indices, not temperatures."),
+            ("Clean-room engine", "Written from the published methods; the only outside library is pythermalcomfort (MIT)."),
+        ],
+    },
     "sections": [
         {
-            "title": "Clean-room implementation",
+            "title": "How an analysis runs in the viewer",
+            "body": """
+The three point analyses are buttons among the environmental tools of both 3D
+viewers (Gothenburg and the UK cities). They all work the same way:
+
+**a) Switch on** *Sun hours*, *Incident radiation* or *Thermal comfort*. A panel
+opens and the map waits for a click (Esc or *Exit analysis* ends it).
+
+**b) Click a point.** The viewer sends the point, the radius (slider: 60–400 m
+for sun hours, 60–350 m for the other two), the country and the city to the
+backend. The grid is always 5 m.
+
+**c) The backend** takes the city's buildings (Sweden: the Gothenburg building
+model; UK: the district's buildings) and, for radiation and comfort, the city's
+weather file, and computes every ground cell — or every roof and façade tile.
+
+**d) The viewer colours** the result as a disc of points, or as coloured roof and
+façade tiles. Choosing another season or hour only recolours; a new point or
+radius recomputes. In the photorealistic view the points are laid onto the 3D
+mesh, and points that land more than 3 m above the ground (on a roof or in a
+tree) are hidden.
+
+| Analysis | Choices in the panel | Endpoint | Colours |
+|---|---|---|---|
+| Direct sun hours | day: 21 June, 21 March (≈ 21 September), 21 December; *Sun hours* (whole day) or *Shadow at time* (one moment, with a time slider) | `/api/analysis/sun-hours` | blue (few hours) → yellow/orange (many), relative to the day's best cell |
+| Incident radiation | *Ground* or *Roofs & façades*; season: full year, summer, spring & autumn, winter | `/api/analysis/incident-radiation`, `/api/analysis/incident-surfaces` | blue → red, relative to the season's maximum |
+| Thermal comfort | *Hour of day* (the same three days, hour slider) or *Season comfort %* | `/api/analysis/thermal-comfort` | the ten UTCI stress categories; or red (0%) → green (100%) |
+
+The sun-hours and radiation colours are **relative** to each result's own
+maximum: compare two runs by their numbers, not by their colours.
+
+**Why clean-room.** The usual toolkit for this kind of analysis, Ladybug Tools,
+is AGPL-licensed; using its code would put that licence's obligations on the
+whole tool. The engine was therefore written directly from the published
+methods (listed under *Sources*), so the tool keeps its own licence (MIT, in
+`LICENSE`). The only outside library is `pythermalcomfort` (MIT licence), for the UTCI and
+the solar part of the mean radiant temperature.
+""",
+            "files": [
+                "assets/viewer/js/sunhours.js",
+                "assets/viewer/js/incident.js",
+                "assets/viewer/js/comfort.js",
+                "assets/viewer/js/bootstrap.js",
+                "backend/main.py",
+            ],
+        },
+        {
+            "title": "Inputs — buildings, trees and weather",
+            "body": """
+**Buildings.** Each building is its footprint polygon with one height — a flat
+extruded block. Sweden: `frontend/public/buildings.json`, the footprints and
+heights of the Gothenburg model (**5. Digital Twin Construction**); UK: the
+district's building file. A missing height is taken as floors × 3 m, and as
+6 m (two floors) when the floors are missing too. **The ground is flat:**
+building bases and ground cells are all at height 0; the terrain model is not
+used.
+
+**Trees.** Positions, heights and crown radii of individual trees from the DTCC
+laser-scan vegetation layer (`frontend/public/dtcc_vegetation.json`,
+Gothenburg only). They are used **only** in the roof-and-façade radiation
+analysis.
+
+**Weather.** A typical-year EnergyPlus weather file (EPW, TMYx from
+Climate.OneBuilding.Org) per city — the same files the energy simulation uses
+(**1. Data Sources**):
+
+| City | Weather file | Station |
+|---|---|---|
+| Gothenburg | `SWE_VG_Gothenburg-Landvetter.AP.025260_TMYx.2011-2025.epw` | Landvetter airport, 57.663 N 12.280 E, 155 m, about 20 km east of the centre; UTC+1 |
+| London (all four districts) | `GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw` | London City Airport |
+| Rotherham | `GBR_ENG_Doncaster.Sheffield-Hood.AP.034054_TMYx.2011-2025.epw` | Doncaster Sheffield airport |
+
+Values read from each of the 8,760 hourly rows (field numbers of the EPW
+format):
+
+| Field | Quantity | Used by |
+|---|---|---|
+| 2–4 | month, day, hour (1–24, local standard time; the hour *ending* at that time) | radiation, comfort |
+| 7 | dry-bulb air temperature $T_a$ (°C) | comfort |
+| 9 | relative humidity RH (%) | comfort |
+| 13 | infrared radiation from the sky on a horizontal surface $IR_h$ (W/m²) | comfort |
+| 15 | direct normal irradiance DNI (Wh/m² over the hour) | radiation, comfort |
+| 16 | diffuse horizontal irradiance DHI (Wh/m² over the hour) | radiation |
+| 22 | wind speed at 10 m $v_{10}$ (m/s) | comfort |
+
+The sun-hours analysis uses no weather at all.
+""",
+            "files": [
+                "frontend/public/buildings.json",
+                "frontend/public/dtcc_vegetation.json",
+                "data/epw",
+            ],
+        },
+        {
+            "title": "Shared engine a) — where the sun is",
+            "body": """
+All three analyses place the Sun with the low-precision formulae of the
+*Astronomical Almanac*, as published and tested by Michalsky (1988). For a
+moment in universal time *UT* (hours) and a site at latitude $\\varphi$ and
+longitude *lon* (degrees east):
+
+**Eq. 1 — days since the J2000 epoch**, from the Julian date *JD* (Meeus's
+calendar formula):
+
+$$n = JD - 2451545.0$$
+
+**Eq. 2 — the Sun's mean longitude and mean anomaly** (degrees):
+
+$$L = 280.460 + 0.9856474\\,n, \\qquad g = 357.528 + 0.9856003\\,n$$
+
+**Eq. 3 — ecliptic longitude and the tilt of Earth's axis:**
+
+$$\\lambda = L + 1.915\\sin g + 0.020\\sin 2g, \\qquad \\varepsilon = 23.439 - 0.0000004\\,n$$
+
+**Eq. 4 — right ascension and declination:**
+
+$$\\alpha = \\operatorname{atan2}(\\cos\\varepsilon\\sin\\lambda,\\ \\cos\\lambda), \\qquad \\delta = \\arcsin(\\sin\\varepsilon\\sin\\lambda)$$
+
+**Eq. 5 — sidereal time and hour angle:**
+
+$$GMST = 6.697375 + 0.0657098242\\,n + UT \\ \\text{(hours)}, \\qquad H = 15\\,GMST + lon - \\alpha$$
+
+**Eq. 6 — solar altitude:**
+
+$$\\sin\\beta = \\sin\\varphi\\sin\\delta + \\cos\\varphi\\cos\\delta\\cos H$$
+
+**Eq. 7 — solar azimuth**, clockwise from north:
+
+$$A = 180° + \\operatorname{atan2}\\left(\\sin H,\\ \\cos H\\sin\\varphi - \\tan\\delta\\cos\\varphi\\right)$$
+
+**What they mean.** $L$ and $g$ place the Sun on its yearly orbit; the two sine
+terms in $\\lambda$ correct for the orbit being an ellipse; $\\varepsilon$ is the
+tilt of Earth's axis that makes the seasons; $\\alpha$ and $\\delta$ are the
+Sun's position on the sky sphere; $H$ is how far Earth has turned since the Sun
+crossed the local meridian; $\\beta$ and $A$ are what someone standing at the
+site sees.
+
+**Accuracy.** Michalsky reports about 0.01° for 1950–2050. The code does not
+model atmospheric refraction, and counts the Sun as up only above 0.5°
+altitude.
+
+**Checks.**
+
+- At Gothenburg (57.71° N) the engine gives a noon altitude of 55.7° on
+  21 June and about 9° on 21 December — the textbook $90° - \\varphi \\pm 23.44°$
+  gives 55.7° and 8.9°.
+- With 30-minute steps it finds 18.0, 12.0 and 6.0 possible sun hours on
+  21 June, 21 March and 21 December. The day length from sunrise to sunset
+  in Gothenburg, which includes refraction, is roughly 18 h 05 min,
+  12 h 15 min and 6 h 30 min.
+- The difference is sun less than a degree above the horizon, which
+  buildings and terrain block anyway.
+""",
+            "files": ["backend/sun_hours.py"],
+        },
+        {
+            "title": "Shared engine b) — buildings as a height field, and the shadow test",
+            "body": """
+**a) Local frame.** Positions become metres east (*x*) and north (*y*) of the
+clicked point: $x = (lon - lon_0)\\cdot 111{,}320\\cos\\varphi_0$ and
+$y = (lat - lat_0)\\cdot 110{,}540$.
+
+**b) Buildings that can shade.** Every building whose footprint centre lies
+within $R + 550$ m of the point (roofs & façades: $R + 400$ m), where $R$ is the
+study radius.
+
+**c) Context radius** — how far away a building can still cast a shadow into
+the study area:
+
+**Eq. 8**
+
+$$R_{ctx} = R + \\min\\left(500,\\ \\frac{h_{max}}{\\tan 12°} + 20\\right) \\ \\text{m}$$
+
+with $h_{max}$ the tallest building found: far enough to catch every shadow while
+the Sun is at least 12° high. (Roofs & façades use 400 instead of 500.)
+
+**d) Height field.** A square grid with cells of $\\Delta$ = 5 m over
+$\\pm R_{ctx}$; each cell takes the greatest height of any footprint that
+contains its centre, $H(i,j)$.
+
+**e) Study cells.** The centres of the same grid inside the disc of radius $R$,
+leaving out cells inside a footprint ($H > 0.5$ m) — ground nobody can stand on.
+
+**f) Shadow test.** From each cell, step toward the Sun (or a sky patch) one
+grid cell at a time:
+
+**Eq. 9**
+
+$$\\text{blocked}(x) \\iff \\exists\\, k \\in \\{1,\\dots,K\\}:\\ H\\left(x + k\\Delta\\,\\hat u\\right) > z_0 + k\\Delta\\tan\\beta$$
+
+where $\\hat u = (\\sin A, \\cos A)$ is the horizontal direction toward the Sun,
+$z_0$ the start height (0 on the ground; the roof or wall point's height for
+surfaces) and $K = \\lceil R_{ctx}/\\Delta \\rceil$. For sky patches $K$ is also
+limited to $\\lceil h_{max}/(\\Delta\\tan\\beta)\\rceil + 1$: beyond that no
+building can reach the ray.
+
+**What it means.** A ray toward the Sun rises by $\\tan\\beta$ for every metre it
+travels. If any building along the way is taller than the ray at that
+distance, the point is in shadow. This is a **2.5-D** test: every building is a
+solid block of one height. Extruded buildings are handled exactly; overhangs,
+roof shapes, bridges and trees (except in the surface analysis) are not.
+""",
+            "files": ["backend/sun_hours.py", "backend/incident_radiation.py"],
+        },
+        {
+            "title": "Shared engine c) — the sky as 145 patches, and the cumulative sky matrix",
+            "body": """
+**The sky dome** is divided into the 145 patches of Tregenza (1987). There are
+seven bands, each 12° high, centred at altitudes 6°, 18°, 30°, 42°, 54°, 66° and
+78°. They hold 30, 30, 24, 24, 18, 12 and 6 patches, plus a zenith cap above 84°.
+
+**Eq. 10 — solid angle** of a patch in band *b* ($N_b$ patches, centre altitude
+$a_b$), and of the zenith cap:
+
+$$\\Omega_p = \\frac{2\\pi\\left[\\sin(a_b + 6°) - \\sin(a_b - 6°)\\right]}{N_b}, \\qquad \\Omega_{cap} = 2\\pi\\,(1 - \\sin 84°)$$
+
+Together they make exactly $2\\pi$ sr, the whole hemisphere.
+
+**The cumulative sky matrix** (Robinson & Stone 2004) sums a whole period of
+weather into one number per patch: the energy that would reach a surface facing
+that patch head-on, in kWh/m².
+
+**Eq. 11 — direct part.** For every hour *h* of the period with DNI > 0, the
+Sun's position at the **middle of the hour** is found with Eqs. 1–7 (EPW local
+standard time converted to UT). The hour's DNI is then added to the patch
+$p^*(h)$ whose centre is nearest to the Sun:
+
+$$D_p = \\sum_{h:\\ p^*(h) = p} DNI_h$$
+
+**Eq. 12 — diffuse part.** The sky is taken as **isotropic**: equally bright in
+every direction (Liu & Jordan 1963). A uniform sky of radiance $L_{sky}$ puts
+$\\pi L_{sky}$ on a horizontal surface, so $L_{sky} = DHI/\\pi$, and each patch
+contributes $L_{sky}\\,\\Omega_p$:
+
+$$F_p = \\frac{\\Omega_p}{\\pi}\\sum_h DHI_h$$
+
+**Eq. 13 — the matrix:**
+
+$$S_p = \\frac{D_p + F_p}{1000} \\ \\text{kWh/m}^2$$
+
+It is built once per season and weather file and kept in memory. **Seasons:**
+
+| Season | Months |
+|---|---|
+| Year | all twelve |
+| Summer | June–August |
+| Spring & autumn | March–May and September–November — six months, so its totals are about twice a three-month season's |
+| Winter | December–February |
+
+**Check against the weather file (Gothenburg).** For an unobstructed horizontal
+surface the matrix gives $\\sum_p S_p \\sin a_p$ = **1,039.7 kWh/m²·yr**. The
+EPW's own global horizontal radiation is **1,049.8 kWh/m²·yr**, so the two
+agree within 1%. Dividing the dome into patches adds +0.55% to the diffuse
+part.
+""",
+            "files": ["backend/incident_radiation.py"],
+        },
+        {
+            "title": "Analysis 1 — Direct sun hours",
             "badge": "method",
             "body": """
-Sun hours and incident radiation are **clean-room** implementations: the methods
-are the standard ones, but the code was written from the published methods
-rather than derived from Ladybug or any other existing environmental toolkit.
+**What it answers:** how many hours of direct sun each spot of ground *could*
+get on a given day if the sky were clear. This is the classic sun and shadow
+study used in planning.
 
-Sun position comes from a compact astronomical algorithm; the sky is discretised
-into a matrix built from the EPW file. Thermal comfort builds on the
-`pythermalcomfort` library.
+**a) Sun positions** for the chosen day, every 30 minutes (every 60 minutes if
+the disc has more than 5,000 cells). Only positions with the Sun above 0.5° are
+kept.
+
+**b) Height field and study cells**, as above. The backend accepts a radius of
+20–500 m and a grid of 2–20 m; the viewer sends 60–400 m and 5 m.
+
+**c) Shadow test** (Eq. 9) toward the Sun for every cell at every time step.
+
+**d) Sum the lit time:**
+
+**Eq. 14**
+
+$$S(x) = \\sum_t \\Delta t \\cdot \\mathbf{1}[x \\text{ is lit at } t] \\ \\text{hours}, \\qquad \\Delta t = 0.5 \\text{ h (or 1 h)}$$
+
+**e) Frames.** The lit/shaded pattern of every step is also returned, for the
+*Shadow at time* view's slider. The frames are labelled in local clock time: UTC+1
+in Sweden and UTC+0 in the UK, plus one hour in European summer time. The
+day's possible hours, $\\sum \\Delta t$, come back too.
+
+**What it means.** This is **potential**, astronomical sun: clouds are ignored,
+so it is an upper bound, not what the weather file would give. Two benchmarks
+use the same day the panel offers, 21 March:
+
+- **Sweden.** Practice often refers to Boverket's *Solklart* (1991): about five
+  hours of direct sun at the spring and autumn equinox for dwellings and
+  nearby outdoor spaces. Today's building rules (BBR) require access to direct
+  sunlight but set no number of hours.
+- **UK.** The BRE guide BR 209 recommends that at least half of a garden or
+  amenity space gets at least two hours of sun on 21 March.
+
+**Limits.** Only buildings cast shadows — not trees, not terrain. The
+resolution is 30 minutes and 5 m.
+""",
+            "files": ["backend/sun_hours.py", "assets/viewer/js/sunhours.js"],
+        },
+        {
+            "title": "Analysis 2 — Incident solar radiation on the ground, roofs and façades",
+            "badge": "method",
+            "body": """
+**What it answers:** how much solar energy (kWh/m²) reaches each spot over a
+season, using the typical year's real sunshine and cloud. On the ground it
+supports shading and greening decisions; on roofs and façades it shows the
+solar potential and the solar load.
+
+**Ground — step by step**
+
+**a) Sky matrices** for the four seasons (Eqs. 10–13) from the city's EPW.
+
+**b) Height field and ground cells** (radius 20–400 m, grid 2–20 m).
+
+**c) Visibility.** For each of the 145 patches, shadow-test every cell toward
+the patch centre (Eq. 9). The zenith cap is never blocked.
+
+**d) Sum over the sky:**
+
+**Eq. 15**
+
+$$I_s(x) = \\sum_p S_{p,s}\\ \\cos\\theta_p\\ V_p(x), \\qquad \\cos\\theta_p = \\sin a_p$$
+
+where $V_p(x)$ = 1 if the patch is visible from the cell and 0 if a building
+hides it; on level ground the incidence cosine is the sine of the patch
+altitude.
+
+**Roofs and façades — step by step**
+
+**a) Which buildings.** Buildings within $R$ + 400 m cast shadows. Buildings
+whose centre lies within $R$ + 30 m get surface tiles (radius up to 250 m,
+grid up to 10 m).
+
+**b) Roof tiles:** a $\\Delta \\times \\Delta$ grid inside each footprint at roof
+height, facing straight up.
+
+**c) Façade tiles:** each footprint edge of length *L* and height *h* is divided
+into $\\lceil L/\\Delta \\rceil \\times \\lceil h/\\Delta \\rceil$ tiles. Each
+tile's centre is moved 0.1 m out from the wall along its outward normal
+$\\hat n$, so the wall does not shade itself.
+
+**d) Trees:** a second height field holds tree tops. Each tree covers a square
+of $\\pm\\max(\\Delta, \\text{crown radius})$ around its trunk, at its height.
+
+**e) Sum over the sky:**
+
+**Eq. 16**
+
+$$I_s(x) = \\sum_p S_{p,s}\\ \\max(0,\\ \\hat n\\cdot\\hat v_p)\\ V_p(x)$$
+
+Here $\\hat v_p$ is the direction of the patch. $V_p$ = 0 if a building blocks
+the ray, $V_p = \\tau$ = 0.3 if only a tree crown does, and 1 otherwise. The ray
+starts at the tile's own height.
+
+**f) Output:** each tile as a 3-D quadrilateral with its four season values,
+drawn coloured in the viewer.
+
+**What the numbers mean.** They are the energy reaching the surface, including
+the diffuse sky, before any solar-panel efficiency. Reference values from the
+Gothenburg matrix for surfaces with nothing around them, in kWh/m²·yr:
+
+| Horizontal | South wall | West | East | North |
+|---|---|---|---|---|
+| 1,040 | 824 | 628 | 517 | 237 |
+
+The building's rooftop PV estimate in the tool does **not** come from this
+engine; it comes from PVGIS (**1. Data Sources**).
+
+**About the tree value.** τ = 0.3 is one fixed value, and where it came from is
+not recorded. Measurements on single street trees **in Gothenburg**
+(Konarska et al. 2014) found:
+
+| Crown | Share of direct sunlight let through |
+|---|---|
+| In leaf | 1.3–5.3% |
+| Leafless | 40–52% |
+
+So the model lets through too much sun in summer and too little in winter. A
+seasonal value — about 0.05 in leaf and about 0.45 leafless — would follow the
+measurements.
+""",
+            "files": ["backend/incident_radiation.py", "assets/viewer/js/incident.js"],
+        },
+        {
+            "title": "Analysis 3 — Outdoor thermal comfort (UTCI)",
+            "badge": "method",
+            "body": """
+**What it answers:** how warm or cold it feels to stand at a spot. Air
+temperature, humidity, wind and radiation (sun and shade) are combined into one
+"feels-like" temperature, the **UTCI**. In season mode the result is the share
+of daytime hours that are comfortable.
+
+**The UTCI.** The Universal Thermal Climate Index was developed in COST Action
+730 (Jendritzky et al. 2012). It is the air temperature of a *reference*
+environment that would cause the same physiological strain as the real
+conditions. The reference has calm air, a mean radiant temperature equal to
+the air temperature, and moderate humidity. The strain is computed with the
+UTCI-Fiala multi-node model of human thermoregulation and an adaptive clothing
+model. For practical use it is a sixth-order polynomial of about 200 terms
+fitted to that model (Bröde et al. 2012):
+
+**Eq. 17**
+
+$$UTCI = T_a + \\text{Offset}\\left(T_a,\\ T_{mrt} - T_a,\\ v_{10},\\ p_a\\right)$$
+
+with $p_a$ the water-vapour pressure from $T_a$ and RH. It is defined for air
+temperatures from −50 to +50 °C and winds of 0.5–17 m/s at 10 m. The tool
+computes outside these limits too, and raises wind below 0.5 m/s to 0.5 m/s.
+
+**The ten stress categories** (Błażejczyk et al. 2013) — the viewer's legend:
+
+| UTCI (°C) | Thermal stress |
+|---|---|
+| above +46 | extreme heat stress |
+| +38 to +46 | very strong heat stress |
+| +32 to +38 | strong heat stress |
+| +26 to +32 | moderate heat stress |
+| **+9 to +26** | **no thermal stress** (the "comfortable" band) |
+| 0 to +9 | slight cold stress |
+| −13 to 0 | moderate cold stress |
+| −27 to −13 | strong cold stress |
+| −40 to −27 | very strong cold stress |
+| below −40 | extreme cold stress |
+
+**Step by step, for every ground cell *x* and hour *h***
+
+**a) Geometry, once.** Build the height field and ground cells as for radiation
+(radius 20–400 m, grid 2–20 m). Shadow-test every cell toward each of the 145
+patches.
+
+**b) Sky view factor** — the share of the sky dome, weighted by solid angle,
+that is not blocked:
+
+**Eq. 18**
+
+$$SVF(x) = \\frac{1}{2\\pi}\\sum_p \\Omega_p\\,V_p(x)$$
+
+It is not cosine-weighted, as it would be for a flat surface, because a
+standing person receives radiation from every direction.
+
+**c) Sky temperature** from the EPW's infrared field, as in EnergyPlus:
+
+**Eq. 19**
+
+$$T_{sky} = \\left(\\frac{IR_h}{\\sigma}\\right)^{1/4}, \\qquad \\sigma = 5.67\\times10^{-8}\\ \\text{W/m}^2\\text{K}^4$$
+
+If the infrared value is missing, $T_{sky} = T_a - 20$ K.
+
+**d) Longwave mean radiant temperature.** A standing person in the open sees
+about half sky and half ground. The ground and walls are taken at air
+temperature:
+
+**Eq. 20**
+
+$$T_{mrt,lw} = \\left[f_{sky}\\,T_{sky}^4 + (1 - f_{sky})\\,T_a^4\\right]^{1/4}, \\qquad f_{sky} = 0.5\\,SVF$$
+
+with the temperatures in kelvin.
+
+**e) In sun?** Hour mode runs a shadow test toward the true Sun at the middle of
+the hour. Season mode uses the visibility of the sky patch that contains the
+Sun, so no new test is needed each hour.
+
+**f) Solar gain** — SolarCal (Arens et al. 2015; ASHRAE Standard 55,
+Appendix C), through `pythermalcomfort`'s `solar_gain`, for sunlit cells only:
+
+**Eq. 21**
+
+$$E_{sol} = f_{eff}\\left[0.5\\,f_{svv}\\,I_{diff} + f_p\\,f_{bes}\\,I_{dir} + 0.5\\,f_{svv}\\left(I_{dir}\\sin\\beta + I_{diff}\\right)R_{floor}\\right]$$
+
+**Eq. 22**
+
+$$ERF = E_{sol}\\,\\frac{\\alpha_{sw}}{\\alpha_{lw}}, \\qquad \\Delta T_{mrt} = \\frac{ERF}{f_{eff}\\,h_r}$$
+
+The three terms are the diffuse sky, the direct beam and the light reflected
+from the ground. *ERF* is the effective radiant field absorbed by the body;
+$\\Delta T_{mrt}$ is how much warmer the surroundings would have to be to give the
+same gain. The values used:
+
+| Symbol | Value | Meaning |
+|---|---|---|
+| $I_{dir}$ | the hour's DNI | direct beam |
+| $I_{diff}$ | 0.2 × $I_{dir}$ | the library's fixed assumption — **not** the EPW's DHI |
+| $f_{svv}$ | the cell's SVF | share of sky seen |
+| $f_{bes}$ | 1 | whole body in the sun |
+| $f_{eff}$ | 0.725 | radiating share of a standing body |
+| $f_p$ | ASHRAE table | projected area of a standing body, by sun altitude and SHARP (the Sun's horizontal angle to the front of the body) |
+| $R_{floor}$ | 0.25 | urban paving (the library's 0.6 is for indoor floors) |
+| $\\alpha_{sw}$, $\\alpha_{lw}$ | 0.7, 0.95 | short- and longwave absorptance of skin and clothing |
+| $h_r$ | 6 W/m²K | radiative heat-transfer coefficient |
+
+Body orientation is unknown, so $\\Delta T_{mrt}$ is averaged over SHARP = 0°,
+45°, 90°, 135° and 180°. It is tabulated at 41 SVF steps. Season mode also
+tabulates it by sun altitude (4° steps) at DNI = 1,000 W/m² and scales it by
+the hour's DNI/1,000. That scaling is exact, because every term is
+proportional to DNI.
+
+**g) Total mean radiant temperature:**
+
+**Eq. 23**
+
+$$T_{mrt} = T_{mrt,lw} + \\Delta T_{mrt}\\cdot\\mathbf{1}[\\text{sunlit}]$$
+
+**h) UTCI** (Eq. 17) with the hour's $T_a$ and RH, $v_{10} = \\max(0.5,$ EPW
+wind$)$ — the same for every cell — and the cell's own $T_{mrt}$. The result is
+sorted into the ten categories.
+
+**i) Season mode** — the share of daytime hours (Sun above the horizon) in the
+no-stress band:
+
+**Eq. 24**
+
+$$C_s(x) = \\frac{100}{N_s}\\sum_{h \\in s,\\ \\beta_h > 0} \\mathbf{1}\\left[9 \\le UTCI_h(x) \\le 26\\right] \\ \\%$$
+
+**What it means.** Across the disc only the **radiation** differs from cell to
+cell; air temperature, humidity and wind are the station's. The map therefore
+shows where sun, shade and an open or closed sky make the same weather feel
+warmer or colder.
+
+Hour mode shows 21 June, 21 March and 21 December of the typical year. Each is
+a single day, with whatever weather the file holds for it — not an average.
+The hour frames are labelled in **local standard time** from the EPW: the frame
+"12:00" covers 12:00–13:00 standard time, which is 13:00–14:00 on a Swedish
+summer clock. The sun-hours labels do include summer time.
+""",
+            "files": ["backend/thermal_comfort.py", "assets/viewer/js/comfort.js", "requirements.txt"],
+        },
+        {
+            "title": "Tested now — one site in central Gothenburg",
+            "badge": "result",
+            "body": """
+On 2026-09-15 all the analyses were run at **57.6985 N, 11.9690 E** (central
+Gothenburg), with a radius of 150 m (roofs & façades: 90 m) and a 5 m grid.
+That gives 1,947 ground cells, with 1,041 buildings in the shading context.
+Sun hours and radiation went through the running backend. Thermal comfort
+called the same engine directly, because the locally running backend is
+missing the `pythermalcomfort` library (see *Limitations*).
+
+**Direct sun hours**
+
+| Day | Possible | Best cell | Mean cell | Run time |
+|---|---|---|---|---|
+| 21 June | 18.0 h | 16.5 h | 9.5 h | 2.2 s (first call, loads the buildings) |
+| 21 March | 12.0 h | 10.5 h | 5.5 h | 0.6 s |
+| 21 December | 6.0 h | 4.0 h | 0.9 h | 0.5 s |
+
+On 21 March, **79%** of the cells get at least 2 hours (so the BR 209 test
+would pass) and **64%** get at least 5 hours (the *Solklart* level); **15%** get
+none.
+
+**Incident radiation on the ground** (kWh/m², 0.9 s)
+
+| Season | Best cell | Mean | Lowest |
+|---|---|---|---|
+| Year | 1,014 | 695 | 43 |
+| Summer | 473 | 333 | 19 |
+| Spring & autumn | 498 | 334 | 21 |
+| Winter | 45 | 28 | 3 |
+
+**Roofs and façades** (radius 90 m: 302 roof tiles, 1,727 façade tiles, 510
+buildings shading, 2.9 s)
+
+| | Year, mean (range) | Summer, mean | Winter, mean |
+|---|---|---|---|
+| Roofs | 992 (424–1,040) | 463 | 45 |
+| Façades | 183 (2–804) | 81 | 9 |
+
+The roofs get close to the unobstructed 1,040. The façades average less than
+the 237 of an open north wall: in a dense block most façades face narrow
+streets and courtyards.
+
+**Thermal comfort, 21 June** (hour mode; 3.9 s the first time, while the
+library compiles its numerical code, then 0.2 s)
+
+| Hour | Air | Wind | Sun | UTCI across the disc | Most cells |
+|---|---|---|---|---|---|
+| 03:00 | 7.7 °C | 1 m/s | 0.8° | 6.3 to 8.3 °C | slight cold stress |
+| 09:00 | 15.9 °C | 5 m/s | 45° | 6.3 to 18.5 °C | no thermal stress (78%) |
+| 12:00 | 17.4 °C | 5 m/s | 56° | 8.0 to 20.0 °C | no thermal stress (94%) |
+| 15:00 | 14.9 °C | 5 m/s | 41° | 5.2 to 15.7 °C | no thermal stress (65%) |
+| 21:00 | 13.5 °C | 4 m/s | below horizon | 5.3 to 7.1 °C | slight cold stress |
+
+At noon the same air feels about **12 °C** different between deep shade and
+open sun — the effect of radiation alone. On 21 December the Sun (at most 9°)
+barely reaches the ground, and the whole disc is in moderate cold stress all
+day.
+
+**Thermal comfort, season mode** (1.8 s) — share of daytime hours with no
+thermal stress:
+
+| Season | Daytime hours | Mean cell | Range across cells |
+|---|---|---|---|
+| Summer | 1,530 | 66.5% | 55–74% |
+| Spring & autumn | 2,217 | 19.3% | 11–26% |
+| Winter | 666 | 0.4% | 0–1% |
+| Year | 4,413 | 32.8% | 24–39% |
+""",
+        },
+        {
+            "title": "City-wide layers — green index, green accessibility and heat-island proxy",
+            "badge": "method",
+            "body": """
+These three layers are computed in the browser for the whole city, not around a
+clicked point. They are simple **indices**, not physical models. (The layers
+themselves are listed on **12. Viewer Layers & Visualisation**.)
+
+**Data.** Green areas from OpenStreetMap: parks, gardens, nature reserves,
+recreation grounds, grass, forest, meadow, wood, scrub and grassland.
+
+- **Gothenburg:** `assets/gothenburg_greenspaces.json`, 22,851 areas downloaded
+  once by `tools/scratch/python/_download_green_spaces.py` and stored only as
+  a centre point and an area.
+- **Other cities:** fetched live from the Overpass API through
+  `/api/urban/green-areas`.
+- **Filtering:** small areas are dropped by type — for example parks under
+  200 m², forest under 1,000 m² and grass under 2,000 m².
+- **Fallback:** if no green data loads, some building types (ancillary
+  buildings, low public buildings) stand in as green points.
+
+**Distance to green.** Each area is treated as a circle of the same area around
+its centre, with the radius capped at 300 m:
+
+**Eq. 25**
+
+$$d(x) = \\min_g\\ \\max\\left(0,\\ \\lVert x - c_g\\rVert - \\min\\left(\\sqrt{A_g/\\pi},\\ 300\\right)\\right)$$
+
+The cap is there because 1,652 of the areas have exactly 10,000,000 m². The
+download script caps multipolygon areas at 10 km², and it adds up each
+member way as if it were a closed ring. Without the cap these areas would mark
+almost the whole city as next to green.
+
+**a) Green index** (grid about 280 × 280 m):
+
+**Eq. 26**
+
+$$G(x) = e^{-d(x)/200}$$
+
+It is 1 inside green, 0.37 at 200 m and 0.14 at 400 m.
+
+**b) Green accessibility** (same grid) sorts each grid point into three bands:
+under 400 m, 400–800 m and over 800 m. The distance is a straight line, not a
+walk along streets. The legend shows the share of points in each band. For
+comparison, WHO Europe (2016) suggests green space of at least 0.5 ha within
+300 m straight-line distance of homes.
+
+**c) Heat-island proxy** (grid about 668 × 654 m; Sweden only) — the average
+building score in each cell, reduced near green:
+
+**Eq. 27**
+
+$$s_b = 0.5\\,E_b + 0.3\\,Y_b + 0.2\\,U_b, \\qquad s = \\bar{s}\\,\\left(1 - 0.35\\,e^{-d/300}\\right)$$
+
+Here $\\bar s$ is the mean of $s_b$ over the cell's buildings. The three scores
+are:
+
+- **Energy class** $E$: A = 0.05 up to G = 1.0; unknown 0.55.
+- **Age** $Y$: built 2005 or later 0.12, up to before 1950 0.85; unknown 0.55.
+- **Use** $U$: industry 1.0, business 0.70, public 0.60, multi-family 0.48,
+  single-family 0.38, ancillary 0.25, other 0.45.
+
+**What it is and what it is not.** A heat island is a difference in **air or
+surface temperature**. None of these inputs is a temperature: energy class and
+age describe heat loss through the building envelope, and the weights are not
+taken from a published source. Read the layer as "where older, less efficient,
+more industrial building stock lies far from green" — not as measured heat.
+""",
+            "files": [
+                "assets/viewer/js/urban_analysis.js",
+                "assets/gothenburg_greenspaces.json",
+                "tools/scratch/python/_download_green_spaces.py",
+            ],
+        },
+        {
+            "title": "Sources",
+            "body": """
+| Source | Used for |
+|---|---|
+| J. J. Michalsky (1988), *The Astronomical Almanac's algorithm for approximate solar position (1950–2050)*, **Solar Energy** 40(3), 227–235 | sun position, Eqs. 2–7 |
+| J. Meeus (1998), *Astronomical Algorithms*, 2nd ed., Willmann-Bell | the Julian date, Eq. 1 |
+| P. R. Tregenza (1987), *Subdivision of the sky hemisphere for luminance measurements*, **Lighting Research & Technology** 19(1), 13–14, doi:10.1177/096032718701900103 | the 145 sky patches, Eq. 10 |
+| D. Robinson & A. Stone (2004), *Irradiation modelling made simple: the cumulative sky approach and its applications*, PLEA 2004, Eindhoven | the cumulative sky matrix, Eqs. 11–13 |
+| B. Y. H. Liu & R. C. Jordan (1963), *The long-term average performance of flat-plate solar-energy collectors*, **Solar Energy** 7(2), 53–74 | the isotropic diffuse sky, Eq. 12 |
+| U.S. Department of Energy, *EnergyPlus Engineering Reference* — Climate calculations | sky temperature from the EPW infrared field, Eq. 19 |
+| G. Jendritzky, R. de Dear & G. Havenith (2012), *UTCI — Why another thermal index?*, **International Journal of Biometeorology** 56(3), 421–428 | the UTCI concept |
+| P. Bröde et al. (2012), *Deriving the operational procedure for the Universal Thermal Climate Index (UTCI)*, **International Journal of Biometeorology** 56(3), 481–494, doi:10.1007/s00484-011-0454-1 | the UTCI polynomial, Eq. 17 |
+| K. Błażejczyk et al. (2013), *An introduction to the Universal Thermal Climate Index (UTCI)*, **Geographia Polonica** 86(1), 5–10 | the ten stress categories |
+| E. Arens et al. (2015), *Modeling the comfort effects of short-wave solar radiation indoors*, **Building and Environment** 88, 3–9, doi:10.1016/j.buildenv.2014.09.004 | SolarCal, Eqs. 21–22 |
+| ANSI/ASHRAE Standard 55-2020, *Thermal Environmental Conditions for Human Occupancy*, Appendix C | the SolarCal procedure and projected-area factors |
+| F. Tartarini & S. Schiavon (2020), *pythermalcomfort: A Python package for thermal comfort research*, **SoftwareX** 12, 100578, doi:10.1016/j.softx.2020.100578 | the library used (version 2.10.0, MIT licence) |
+| J. Konarska et al. (2014), *Transmissivity of solar radiation through crowns of single urban trees — application for outdoor thermal comfort modelling*, **Theoretical and Applied Climatology** 117, 363–376, doi:10.1007/s00704-013-1000-3 | measured tree transmittance in Gothenburg |
+| F. Lindberg, B. Holmer & S. Thorsson (2008), *SOLWEIG 1.0 — Modelling spatial variations of 3D radiant fluxes and mean radiant temperature in complex urban settings*, **International Journal of Biometeorology** 52, 697–713, doi:10.1007/s00484-008-0162-7 | a fuller MRT model, validated in Gothenburg (suggested improvement) |
+| R. Perez, R. Seals & J. Michalsky (1993), *All-weather model for sky luminance distribution — preliminary configuration and validation*, **Solar Energy** 50(3), 235–245 | an anisotropic sky (suggested improvement) |
+| Boverket (1991), *Solklart* | Swedish sun-hours practice |
+| BRE (2022), *BR 209 — Site layout planning for daylight and sunlight: a guide to good practice* | UK sun benchmark for gardens and amenity spaces |
+| WHO Regional Office for Europe (2016), *Urban green spaces and health — a review of evidence* | the 300 m green-access benchmark |
+| Climate.OneBuilding.Org — TMYx typical weather years | the weather files |
+
+> **Not recorded:** the sources of the tree transmittance (0.3), the ground
+> reflectance (0.25), and the heat-island weights and scores.
+""",
+        },
+        {
+            "title": "Code and data",
+            "body": """
+| File | What it does |
+|---|---|
+| `backend/sun_hours.py` | sun position (Eqs. 1–7), the height field and shadow test, the sun-hours analysis |
+| `backend/incident_radiation.py` | Tregenza dome, EPW sky matrix, ground and roof/façade radiation, tree canopy |
+| `backend/thermal_comfort.py` | sky view factor, sky temperature, mean radiant temperature, SolarCal, UTCI; hour and season modes |
+| `backend/main.py` | the four `/api/analysis/*` endpoints; picks the buildings and the weather file per city (`CITY_TO_EPW`) |
+| `assets/viewer/js/sunhours.js`, `incident.js`, `comfort.js` | the panels, clicks, colours and mesh clamping in the viewer |
+| `assets/viewer/js/urban_analysis.js` | green index, green accessibility, heat-island proxy |
+| `assets/viewer/js/bootstrap.js` | loads these scripts in both viewers |
+| `requirements.txt` | pins `pythermalcomfort==2.10.0`; installed in the Docker backend image |
+
+**Data used:** the weather files in `data/epw/`, the buildings
+(`frontend/public/buildings.json`, UK district files), the trees
+(`frontend/public/dtcc_vegetation.json`) and the green areas
+(`assets/gothenburg_greenspaces.json`). **Nothing is stored:** every result is
+computed on the click. Only the EPW sky matrices are cached in memory.
 """,
             "files": [
                 "backend/sun_hours.py",
                 "backend/incident_radiation.py",
                 "backend/thermal_comfort.py",
+                "requirements.txt",
+                "data/epw",
             ],
         },
         {
-            "title": "The three analyses",
-            "badge": "result",
-            "table": [
-                ["Analysis", "Output", "Viewer layer"],
-                ["Direct sun hours", "Hours of direct sun over a ground disc, whole day in one call", "sunhours.js"],
-                ["Incident radiation", "Cumulative irradiation on the ground disc, EPW-driven", "incident.js"],
-                ["Thermal comfort", "UTCI plus solar mean radiant temperature; hour scrub or seasonal %", "comfort.js"],
-            ],
-            "files": ["viewer/js/sunhours.js", "viewer/js/incident.js", "viewer/js/comfort.js"],
-        },
-        {
-            "title": "Scope",
-            "badge": "metadata",
+            "title": "Limitations, and what could be improved",
             "body": """
-All three currently analyse a **ground disc** around a clicked point. Façade and
-roof surface analysis is the natural extension and is not yet implemented for
-all three.
+| Limitation | Effect | What could be done |
+|---|---|---|
+| Flat ground | Gothenburg is hilly: shading by terrain, and buildings on slopes, come out wrong | put the DTCC terrain model, already in the viewer, under the height field |
+| Buildings are blocks of one height | no roof shapes, overhangs or balconies; pitched roofs are treated as flat | use the DTCC roof forms (Gothenburg) |
+| Trees shade only the roof & façade analysis | tree-lined streets and parks look sunnier and hotter than they are in sun hours and comfort | add the tree height field, with transmittance, to both |
+| Tree transmittance fixed at 0.3 | too transparent in summer, too opaque in winter | seasonal values from Konarska et al. (2014): about 0.05 in leaf, 0.45 leafless |
+| Isotropic diffuse sky | the bright sky around the Sun and near the horizon is missing; façades differ too little by orientation | the Perez all-weather sky |
+| No reflected radiation | façades and street canyons get less than in reality | add ground and wall reflection |
+| Direct sun is put on the nearest patch centre (up to ~6° away) | small errors in the incidence angle and at shadow edges | use the exact Sun direction for the direct part, as hour-mode comfort already does |
+| Context radius sized for a 12° Sun | in December the Sun stays below 9° in Gothenburg, so long shadows from tall buildings farther away are missed | size the context from the day's lowest useful Sun |
+| Comfort: ground and walls at air temperature | sunlit paving and walls are far hotter than the air on summer afternoons, so UTCI in the sun is underestimated | surface temperatures from a simple energy balance, or SOLWEIG (Lindberg et al. 2008, validated in Gothenburg) |
+| Comfort: solar gain only in direct sun, with diffuse assumed as 0.2 × DNI | shaded cells and overcast hours get no shortwave radiation at all | use the EPW's diffuse radiation, and add diffuse and reflected light for shaded cells |
+| Comfort: the airport's 10 m wind for every cell | sheltered courtyards feel too cold, especially in the cold months | a sheltering or urban-roughness factor per cell, or CFD for key sites |
+| Airport station, about 20 km inland | no urban heat island in the air temperature | an urban weather file; the 2050 and 2080 files in `data/epw/` could show future heat stress |
+| Hour mode offers three single days | one day's weather in the typical year can be unusual | any date, or monthly averages |
+| Comfort hours labelled in standard time | a summer frame labelled 12:00 is 13:00 on the clock | the same summer-time rule the sun hours use |
+| Colour scales relative to each result | two runs cannot be compared by colour | fixed scales per season |
+| `pythermalcomfort` missing in the Python the local backend runs on | thermal comfort fails with a server error outside Docker | install from `requirements.txt`, and add it to `backend/requirements.txt` |
+| Heat-island proxy is not a temperature | can be read as measured heat | satellite land-surface temperature, or modelled UTCI as above |
+| Green distance is a straight line to a circle | underestimates walks across railways, water and main roads | network distance on the OSM street graph the space-syntax analysis already builds |
+| Nothing validated against measurements | accuracy on real sites is unknown | compare with sun and radiation measurements, and with the Gothenburg MRT field data behind SOLWEIG |
 """,
         },
     ],
