@@ -598,11 +598,12 @@ export default function RenovationReport() {
   ${funnelBlock}
 
   <h2>Baseline (as-built)</h2>
-  <table><thead><tr><th>Building</th><th>Energy class</th><th>Energy use</th><th>Heating</th></tr></thead><tbody>
+  <table><thead><tr><th>Building</th><th>Energy class</th><th>Energy use</th><th>Heating</th>${isUK ? "<th>Gas per home</th>" : ""}</tr></thead><tbody>
   ${baselines.length ? baselines.map((b) => `<tr>
       <td>${esc(b.address)}</td><td>${esc(b.eClass ?? "—")}</td>
-      <td>${b.energyUse.toFixed(1)} kWh/m²·yr</td><td>${b.heating.toFixed(1)} kWh/m²·yr</td></tr>`).join("")
-    : `<tr><td colspan="4" class="muted">No baseline simulation recorded.</td></tr>`}
+      <td>${b.energyUse.toFixed(1)} kWh/m²·yr</td><td>${b.heating.toFixed(1)} kWh/m²·yr</td>${isUK
+        ? `<td>${b.totalGasKwh != null ? `${Math.round(b.totalGasKwh / Math.max(1, b.dwellings ?? 1)).toLocaleString("en-GB")} kWh/yr` : "—"}</td>` : ""}</tr>`).join("")
+    : `<tr><td colspan="${isUK ? 5 : 4}" class="muted">No baseline simulation recorded.</td></tr>`}
   </tbody></table>
   ${baselineChart}
 

@@ -476,10 +476,23 @@ def build_shoebox_idf(
     # Efficiency 1.0 and zero standby loss are deliberate: the Sveby intensity
     # is already a DELIVERED figure including circulation losses, so adding
     # tank losses or a boiler efficiency on top would double-count.
-    # UK: hot water is left out for now (Sveby intensities are Swedish); totals
-    # and the metered-gas check compare space heating only.
-    dhw_kwh_m2 = 0.0 if (country or "").lower() == "gb" else D.DHW_KWH_M2_YR_BY_USE.get(use_cat or "", D.DEFAULT_DHW_KWH_M2_YR)
-    dhw_annual_kwh = dhw_kwh_m2 * total_floor_area
+    # UK homes: SAP 2012 Appendix J hot-water demand per dwelling (see
+    # D.uk_sap_dhw_kwh_per_dwelling), heated by gas at the boiler's efficiency in
+    # gas-boiler runs. It is a separate WaterHeater:Mixed, so its gas stays apart
+    # from the space-heating boiler that the metered-gas calibration targets.
+    # Other UK buildings get no hot water; Sweden keeps the Sveby intensities.
+    dhw_fuel, dhw_eff = "DistrictHeatingWater", 1.0
+    if uk_home:
+        homes = int(building.get("dwellings_est") or 1)
+        dhw_annual_kwh = D.uk_sap_dhw_kwh_per_dwelling(total_floor_area / homes) * homes
+        dhw_kwh_m2 = round(dhw_annual_kwh / total_floor_area, 1) if total_floor_area else 0.0
+        if gas_boiler:
+            dhw_fuel, dhw_eff = "NaturalGas", float(boiler_efficiency or building.get("boiler_efficiency_epc") or D.UK_BOILER_EFFICIENCY)
+    elif (country or "").lower() == "gb":
+        dhw_kwh_m2, dhw_annual_kwh = 0.0, 0.0
+    else:
+        dhw_kwh_m2 = D.DHW_KWH_M2_YR_BY_USE.get(use_cat or "", D.DEFAULT_DHW_KWH_M2_YR)
+        dhw_annual_kwh = dhw_kwh_m2 * total_floor_area
     if dhw_annual_kwh > 0:
         dhw_peak_flow = _dhw_peak_flow_m3_s(dhw_annual_kwh, D.DHW_DAY_PATTERN)
         # Capacity to meet the peak draw instantaneously, doubled so a cold
@@ -499,7 +512,7 @@ def build_shoebox_idf(
             (round(max(dhw_peak_w * 2.0, 1000.0), 1), "Heater Maximum Capacity {W}"),
             (0, "Heater Minimum Capacity {W}"), (None, "Heater Ignition Minimum Flow Rate {m3/s}"),
             (None, "Heater Ignition Delay {s}"),
-            ("DistrictHeatingWater", "Heater Fuel Type"), (1.0, "Heater Thermal Efficiency"),
+            (dhw_fuel, "Heater Fuel Type"), (round(dhw_eff, 3), "Heater Thermal Efficiency"),
             (None, "Part Load Factor Curve Name"),
             (0, "Off Cycle Parasitic Fuel Consumption Rate {W}"), (None, "Off Cycle Parasitic Fuel Type"),
             (0, "Off Cycle Parasitic Heat Fraction to Tank"),

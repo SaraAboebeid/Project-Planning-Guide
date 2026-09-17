@@ -57,6 +57,12 @@ export interface ResolvedBuildingGeometry {
   tabulaUWin: number | null;
   // UK only - distinguishes TABULA types that share wall/roof/window U-values.
   tabulaUFloor: number | null;
+  // UK only: fabric as the EPCs describe it today, the heated (simulated) floor
+  // area and construction year. Null for Sweden.
+  currentU?: { wall: number | null; roof: number | null; win: number | null; floor: number | null };
+  heatedAreaM2?: number | null;
+  yearBuilt?: number | null;
+  floors?: number | null;
 }
 
 function isBuildingLookup(b: BuildingLookup | BuildingRecord): b is BuildingLookup {
@@ -89,6 +95,10 @@ export function resolveBuildingGeometry(
       tabulaURoof: building.tabula_u_roof,
       tabulaUWin: building.tabula_u_win,
       tabulaUFloor: building.tabula_u_floor ?? null,
+      currentU: { wall: building.u_wall_epc ?? null, roof: building.u_roof_epc ?? null, win: building.u_win_epc ?? null, floor: building.u_floor_epc ?? null },
+      heatedAreaM2: building.heated_area_m2 ?? null,
+      yearBuilt: building.year,
+      floors: building.floors,
     };
   }
   const approxPerimeter = building.footprint_m2 ? 4 * Math.sqrt(building.footprint_m2) : null;
@@ -108,6 +118,10 @@ export function resolveBuildingGeometry(
     tabulaURoof: building.u_roof,
     tabulaUWin: building.u_window,
     tabulaUFloor: building.u_floor ?? null,
+    currentU: { wall: building.u_wall_epc ?? null, roof: building.u_roof_epc ?? null, win: building.u_win_epc ?? null, floor: building.u_floor_epc ?? null },
+    heatedAreaM2: building.heated_area_m2 ?? null,
+    yearBuilt: building.year_built,
+    floors: building.floors,
   };
 }
 

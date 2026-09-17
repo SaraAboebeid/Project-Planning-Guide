@@ -2,9 +2,10 @@
 Check the EnergyPlus (EPSM) baseline against METERED consumption: DESNZ
 postcode-level domestic gas, median kWh per meter.
 
-Sample: gas-heated houses with exactly one certified dwelling (so one building
-~ one gas meter), in postcodes DESNZ publishes (>= 5 meters), at most one house
-per postcode. Each is simulated as-built through the running backend
+Sample (--kind houses): gas-heated houses with exactly one certified dwelling
+(so one building ~ one gas meter). --kind flats: gas-heated blocks with two or
+more certified flats, compared per average flat. Both: postcodes DESNZ publishes
+(>= 5 meters), at most one building per postcode. Each is simulated as-built through the running backend
 (/api/simulation-batch-submit, needs EPSM on :8010), then
 
     simulated space-heating gas per home = boiler gas use / homes in footprint
@@ -63,13 +64,18 @@ def main() -> None:
     ap.add_argument("--boiler-eff", type=float, default=0.85,
                     help="seasonal efficiency of the existing gas boiler (typical in-use value)")
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--kind", choices=("houses", "flats"), default="houses")
     ap.add_argument("--out", type=Path)
     args = ap.parse_args()
 
     blds = json.loads((ROOT / "frontend" / "public" / "uk" / f"buildings_{args.city}.json").read_text(encoding="utf-8"))
+    def is_kind(b: dict) -> bool:
+        pt = (b.get("property_type") or "").lower()
+        if args.kind == "houses":
+            return b.get("epc_dwellings") == 1 and "house" in pt
+        return (b.get("epc_dwellings") or 0) >= 2 and ("flat" in pt or "maisonette" in pt)
     cands = [b for b in blds
-             if b.get("epc_dwellings") == 1 and "house" in (b.get("property_type") or "").lower()
-             and b.get("main_fuel") == "mains gas" and (b.get("desnz_gas_meters") or 0) >= 5
+             if is_kind(b) and b.get("main_fuel") == "mains gas" and (b.get("desnz_gas_meters") or 0) >= 5
              and b.get("desnz_gas_median_kwh") and b.get("floor_area_m2") and b.get("heated_area_m2")]
     random.Random(args.seed).shuffle(cands)
     sample, seen = [], set()
@@ -110,12 +116,16 @@ def main() -> None:
         homes = res.get("dwellings") or b.get("dwellings_est") or 1
         # The certified home's share of the building's heated area (EPC floor areas);
         # gas-boiler runs report the boiler's own gas, ideal loads fall back to heat / efficiency.
-        share = (b["floor_area_m2"] / b["heated_area_m2"]) if b.get("floor_area_m2") and b.get("heated_area_m2") else 1 / homes
+        # floor_area_m2 is the SUM of the certified homes' EPC areas: one house, or the flats' average share.
+        share = (b["floor_area_m2"] / (b.get("epc_dwellings") or 1) / b["heated_area_m2"]) \
+            if b.get("floor_area_m2") and b.get("heated_area_m2") else 1 / homes
         building_gas = res["gas_kwh"] if res.get("gas_kwh") is not None else res["heating_kwh"] / args.boiler_eff
         sim_gas = building_gas * share
         metered_heating = SPACE_HEATING_SHARE * b["desnz_gas_median_kwh"]
         out.append({
             "postcode": b["desnz_postcode"], "property_type": b.get("property_type"), "year": b.get("year"),
+            "epc_stale": b.get("epc_stale"), "epc_median_year": b.get("epc_median_year"),
+            "boiler_efficiency_epc": b.get("boiler_efficiency_epc"), "certified_homes": b.get("epc_dwellings"),
             "eclass": b.get("eclass"), "sap": b.get("sap"), "floors": b.get("floors"),
             "homes_in_footprint": homes, "party_walls": len(b.get("party_wall_midpoints") or []),
             "fabric": {k: b.get(k) for k in ("u_wall_epc", "u_roof_epc", "u_win_epc", "u_floor_epc")},
@@ -146,6 +156,11 @@ def main() -> None:
     for o in out:
         by_type.setdefault(o["property_type"], []).append(o["ratio"])
     summary["median_ratio_by_type"] = {k: (len(v), round(statistics.median(v), 2)) for k, v in by_type.items()}
+    by_age: dict[str, list] = {}
+    for o in out:
+        by_age.setdefault("certificates before 2016" if o["epc_stale"] else "certificates 2016+", []).append(o["ratio"])
+    summary["median_ratio_by_certificate_age"] = {k: (len(v), round(statistics.median(v), 2)) for k, v in by_age.items()}
+    summary["kind"] = args.kind
     print(json.dumps(summary, indent=1))
     if args.out:
         args.out.write_text(json.dumps({"summary": summary, "buildings": out}, indent=1), encoding="utf-8")

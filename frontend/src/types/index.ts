@@ -115,6 +115,14 @@ export interface BuildingRecord {
   dec_metered_kwh?: Record<string, number> | null;
   desnz_gas_median_kwh?: number | null;
   desnz_electricity_median_kwh?: number | null;
+  heated_area_m2?: number | null;
+  heated_area_source?: string | null;
+  dwellings_est?: number | null;
+  epc_stale?: boolean | null;
+  u_wall_epc?: number | null;
+  u_roof_epc?: number | null;
+  u_win_epc?: number | null;
+  u_floor_epc?: number | null;
 }
 
 /** Saved AI WWR record from the local database */
@@ -221,6 +229,19 @@ export interface BuildingLookup {
   desnz_electricity_median_kwh?: number | null;
   desnz_electricity_meters?: number | null;
   epc_dwellings_count?: number | null;
+  /** Floor area measured to the outside of the walls: OSM footprint x floors. */
+  gross_floor_area_m2?: number | null;
+  /** Floor area the energy model simulates (UK: EPC total floor areas). */
+  heated_area_m2?: number | null;
+  heated_area_source?: "epc_sum" | "epc_plus_estimate" | "ratio_estimate" | "nondomestic_epc" | "gross" | null;
+  dwellings_est?: number | null;
+  boiler_efficiency_epc?: number | null;
+  epc_median_year?: number | null;
+  epc_stale?: boolean | null;
+  u_wall_epc?: number | null;
+  u_roof_epc?: number | null;
+  u_win_epc?: number | null;
+  u_floor_epc?: number | null;
 }
 
 export interface EpcPoint {

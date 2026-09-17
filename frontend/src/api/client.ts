@@ -257,6 +257,11 @@ export const api = {
           lighting_kwh_m2_yr: number | null; equipment_kwh_m2_yr: number | null;
           dhw_kwh_m2_yr: number | null; total_kwh_m2_yr: number | null;
           floors: number; footprint_m2: number; total_floor_area_m2: number;
+          /** UK gas-boiler runs: "gas_boiler"; otherwise "ideal_loads". */
+          heating_system?: string;
+          gas_kwh?: number | null; dhw_gas_kwh?: number | null; total_gas_kwh?: number | null;
+          pumps_kwh?: number; dwellings?: number;
+          gas_kwh_per_dwelling?: number | null; total_kwh_per_dwelling?: number;
         } | null;
         error: string | null;
       }>;
@@ -283,7 +288,29 @@ export const api = {
     if (!res.ok || d.detail) throw new Error(d.detail || `Vision model error (${res.status})`);
     return d as FacadeDetectResponse;
   },
+
+  /* ── Street View capture of one facade — backend aims at the real wall ── */
+  streetviewFacade: async (lat: number, lon: number, orientation: string, country = "se", framing: "facade" | "detail" | "fit" = "facade"): Promise<StreetViewFacadeResponse> => {
+    const qs = new URLSearchParams({ lat: String(lat), lon: String(lon), orientation, country, framing });
+    const res = await fetch(`${BASE}/streetview/facade?${qs}`);
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(typeof d.detail === "string" ? d.detail : `Street View error (${res.status})`);
+    return d as StreetViewFacadeResponse;
+  },
 };
+
+export interface StreetViewFacadeResponse {
+  images: { b64: string; heading: number; fov: number; pitch: number; bytes: number; width?: number; height?: number }[];
+  orientation: string | null;
+  pano: { lat: number; lon: number; date: string | null; pano_id: string; copyright: string | null; distance_m: number };
+  facade: {
+    aimed_at: "footprint_wall" | "centroid"; normal_deg: number; width_m: number | null; off_normal_deg: number;
+    panoramas_considered: number; unblocked_by_buildings?: number;
+    /** Present for framing=facade: stitched from `tiles` shots and flattened onto the wall plane. */
+    rectified?: boolean; tiles?: number; coverage?: number; height_m?: number;
+  };
+  mm_per_px: number;
+}
 
 export interface FacadeDetection {
   label: string; score: number; box: [number, number, number, number];

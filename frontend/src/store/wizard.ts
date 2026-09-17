@@ -42,6 +42,13 @@ export interface RenovationBaselineResult {
   airLeakage: number;
   eClass: string | null;
   eClassFromEpc: boolean;
+  /** UK gas-boiler runs: annual gas (kWh) for the whole building and per home. */
+  gasKwh?: number | null;
+  totalGasKwh?: number | null;
+  gasKwhPerDwelling?: number | null;
+  dwellings?: number | null;
+  heatedAreaM2?: number | null;
+  heatingSystem?: string | null;
 }
 
 export interface RenovationPackageResult {
@@ -118,6 +125,9 @@ export interface RenovationCalcBuildingResult {
   heatingKwhM2Yr: number | null;
   coolingKwhM2Yr: number | null;
   totalKwhM2Yr: number | null;
+  /** UK gas-boiler runs: space heating + hot water gas, whole building (kWh/yr). */
+  totalGasKwh?: number | null;
+  dwellings?: number | null;
   costSEK: number | null;
   carbonKgCO2e: number | null;
   error: string | null;

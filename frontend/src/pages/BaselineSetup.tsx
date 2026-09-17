@@ -308,6 +308,12 @@ export default function BaselineSetup() {
               airLeakage: 0,
               eClass: src?.eclass ?? null,
               eClassFromEpc: !!src?.eclass,
+              gasKwh: r?.gas_kwh ?? null,
+              totalGasKwh: r?.total_gas_kwh ?? null,
+              gasKwhPerDwelling: r?.gas_kwh_per_dwelling ?? null,
+              dwellings: r?.dwellings ?? null,
+              heatedAreaM2: r?.total_floor_area_m2 ?? null,
+              heatingSystem: r?.heating_system ?? null,
             };
           });
           setProject({ baselineStatus: "done", renovationBaselineResults: mapped, baselineBatchId: batch_id });
@@ -738,6 +744,16 @@ export default function BaselineSetup() {
                     </div>
                   ))}
                 </div>
+                {/* UK gas-boiler runs: fuel actually burnt, which is what a gas meter reads. */}
+                {r.totalGasKwh != null && (
+                  <div style={{ marginTop: 8, fontSize: 11.5, color: "rgba(255,255,255,0.65)" }}>
+                    <b style={{ color: "#E8880C" }}>Gas use:</b>{" "}
+                    {Math.round(r.totalGasKwh).toLocaleString("en-GB")} kWh/yr for the building
+                    {r.dwellings && r.dwellings > 0 ? <> · <b style={{ color: "#fff" }}>{Math.round(r.totalGasKwh / r.dwellings).toLocaleString("en-GB")} kWh/yr per home</b> ({r.dwellings} home{r.dwellings === 1 ? "" : "s"})</> : null}
+                    {r.gasKwh != null && <> · space heating {Math.round(r.gasKwh).toLocaleString("en-GB")}, hot water {Math.round(r.totalGasKwh - r.gasKwh).toLocaleString("en-GB")}</>}
+                    {r.heatedAreaM2 != null && <> · simulated heated area {Math.round(r.heatedAreaM2).toLocaleString("en-GB")} m²</>}
+                  </div>
+                )}
               </div>
             ))}
             {project.baselineBatchId && (
@@ -746,6 +762,14 @@ export default function BaselineSetup() {
                 addresses={results.map((r, i) => r.address || `Building ${i + 1}`)}
               />
             )}
+            {project.country === "United Kingdom" ? (
+            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
+              * Real EnergyPlus (EPSM) output for UK homes: a gas boiler with radiators (efficiency from the EPC heating
+              rating), SAP intermittent heating calibrated to DESNZ metered postcode gas, hot water from SAP 2012
+              Appendix J, simulated at the heated area (the homes' EPC floor areas) rather than the gross OSM
+              footprint. Per-m² figures are per heated m². Proceed to Step 4 to test refurbishment tiers.
+            </p>
+            ) : (
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
               * Real EnergyPlus (EPSM) output. Hot water is simulated from a Sveby standard draw profile for the
               building's use category (25 kWh/m²·yr for dwellings — the Göteborg EPC median is 23.6), so it is a
@@ -753,6 +777,7 @@ export default function BaselineSetup() {
               dwellings of the same size. Infiltration is modelled too, but EnergyPlus reports it inside heating
               rather than as its own end use. Proceed to Step 4 to test renovation packages against this baseline.
             </p>
+            )}
           </div>
         )}
 

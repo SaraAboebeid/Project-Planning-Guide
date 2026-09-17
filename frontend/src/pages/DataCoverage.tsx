@@ -610,6 +610,15 @@ type BKey = keyof BuildingLookup;
    page is fixed to its step, so it should not depend on navigation state. */
 const STEP_NUMBER = 2;
 
+/** UK heated area provenance (tools/uk/anchor_epc_uprn.py assign_heated_area). */
+const HEATED_AREA_SOURCE_LABEL: Record<string, string> = {
+  epc_sum: "sum of the homes' EPC floor areas",
+  epc_plus_estimate: "EPC floor areas + estimated uncertified homes",
+  ratio_estimate: "estimated: no certificate, gross × typical Rotherham ratio",
+  nondomestic_epc: "non-domestic certificate floor area",
+  gross: "no certificate: gross floor area",
+};
+
 const FIELD_MAP: Record<string, BKey> = {
   // Renovation Planning
   r_fp:    "footprint_m2",
@@ -2015,6 +2024,27 @@ function BuildingDataBanner({
         </div>
       </div>
 
+      {/* UK: which area is simulated, and how old the certificates are */}
+      {isUK && building.heated_area_m2 != null && (
+        <div className="mx-3 mb-2 rounded-lg border border-sky-700/30 bg-sky-900/10 px-3 py-2 text-[11px] text-white/70 space-y-1">
+          <div title="Footprint = OSM outline (may cover a semi pair or terrace row). Heated area = the floor area the energy model simulates, from the homes' EPC total floor areas.">
+            <b className="text-sky-300">Areas:</b>{" "}
+            footprint {Math.round(building.footprint_m2 ?? 0).toLocaleString("en-GB")} m² (OSM outline)
+            {building.gross_floor_area_m2 != null && <> · gross {Math.round(building.gross_floor_area_m2).toLocaleString("en-GB")} m² (footprint × floors)</>}
+            {" · "}<b className="text-white/85">heated {Math.round(building.heated_area_m2).toLocaleString("en-GB")} m²</b>
+            {" "}({HEATED_AREA_SOURCE_LABEL[building.heated_area_source ?? ""] ?? "source unknown"})
+            {building.dwellings_est ? <> · {building.dwellings_est} home{building.dwellings_est === 1 ? "" : "s"}</> : null}
+          </div>
+          {(building.epc_median_year != null || building.boiler_efficiency_epc != null) && (
+            <div>
+              {building.epc_median_year != null && <>Certificates from {building.epc_median_year}
+                {building.epc_stale && <span className="text-amber-300"> — older than 2016, fabric and heating may predate later upgrades</span>}</>}
+              {building.boiler_efficiency_epc != null && <>{building.epc_median_year != null ? " · " : ""}gas boiler efficiency {Math.round(building.boiler_efficiency_epc * 100)}% (from the EPC heating rating, approximate)</>}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* UK: measured consumption and non-domestic certificates, read-only */}
       {isUK && (building.desnz_gas_median_kwh != null || building.desnz_electricity_median_kwh != null || building.dec_band || building.nd_epc_band) && (
         <div className="mx-3 mb-3 rounded-lg border border-emerald-700/30 bg-emerald-900/10 px-3 py-2 text-[11px] text-white/70 space-y-1">
@@ -2277,14 +2307,15 @@ export default function DataCoverage() {
   // (canonical carried-forward set), falling back to single/multi address lookups.
   const facadeBuildings = useMemo<FacadeBuilding[]>(() => {
     const rows = activeCovRows.length ? activeCovRows : bboxRows;
-    const src: { address: string | null; cadastral_id?: string | null }[] =
-      rows.length ? rows : buildings.map(b => ({ address: b.address }));
+    const src: { address: string | null; cadastral_id?: string | null; lat?: number | null; lon?: number | null }[] =
+      rows.length ? rows : buildings.map(b => ({ address: b.address, lat: b.lat, lon: b.lon }));
     const keys = makeBuildingKeys(src);
+    const country = project.country === "United Kingdom" ? "gb" : "se";
     return src.map((b, i) => {
       const nice = isCadastralId(b.address, b.cadastral_id) ? null : formatAddress(b.address);
-      return { key: keys[i]!, label: nice || `Building ${i + 1}` };
+      return { key: keys[i]!, label: nice || `Building ${i + 1}`, lat: b.lat ?? null, lon: b.lon ?? null, country };
     });
-  }, [activeCovRows, bboxRows, buildings]);
+  }, [activeCovRows, bboxRows, buildings, project.country]);
 
   // Retrofit prioritization operates on the real building rows (bbox / neighborhood
   // selection), aligned 1:1 with facadeBuildings so façade summaries map by key.

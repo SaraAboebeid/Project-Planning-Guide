@@ -6,6 +6,8 @@ window-to-wall-ratio field at all).
 """
 from __future__ import annotations
 
+import math
+
 FLOOR_HEIGHT_M = 3.2  # matches buildings.json's own floors-from-height convention
 
 # Envelope U-values (W/m2K), used only when the building record's own
@@ -145,11 +147,26 @@ UK_SAP_SETBACK_C = 10.0
 UK_BOILER_EFFICIENCY = 0.85
 # Hourly outputs read back from EPSM's hourly_timeseries for the gas-boiler plant.
 GAS_BOILER_OUTPUT_VARIABLES = [
+    "Water Heater NaturalGas Energy",
+    "Water Heater Heating Energy",
     "Boiler NaturalGas Energy",
     "Boiler Heating Energy",
     "Baseboard Total Heating Energy",
     "Pump Electricity Energy",
 ]
+def uk_sap_dhw_kwh_per_dwelling(tfa_m2: float) -> float:
+    """Annual hot-water heat (kWh) for one dwelling, SAP 2012 Appendix J:
+      occupancy N = 1 + 1.76(1 - exp(-0.000349 (TFA-13.9)^2)) + 0.0013 (TFA-13.9)  (TFA > 13.9, else 1)
+      daily volume V = 25 N + 36 litres
+      energy content = 4.190 x V x 365 x dT / 3600, dT = 37.0 K (annual mean of Table J1)
+      plus distribution loss 15% of the energy content.
+    Storage/combi losses are left to the heater efficiency."""
+    n = 1.0 if tfa_m2 <= 13.9 else (1 + 1.76 * (1 - math.exp(-0.000349 * (tfa_m2 - 13.9) ** 2)) + 0.0013 * (tfa_m2 - 13.9))
+    litres_day = 25 * n + 36
+    content = 4.190 * litres_day * 365 * 37.0 / 3600
+    return content * 1.15
+
+
 UK_SAP_WEEKDAY_HEATING: list[tuple[str, float]] = [
     ("07:00", UK_SAP_SETBACK_C), ("09:00", UK_SAP_HEATING_C),
     ("16:00", UK_SAP_SETBACK_C), ("23:00", UK_SAP_HEATING_C), ("24:00", UK_SAP_SETBACK_C),

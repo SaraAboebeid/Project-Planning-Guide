@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   Upload, Loader2, X, ChevronDown, ChevronUp,
-  Building2, Sparkles, Maximize2, Download,
+  Building2, Sparkles, Maximize2, Download, Camera,
 } from "lucide-react";
 import { api, type FacadeDetectResponse, type FacadeDetection } from "../api/client";
 import {
@@ -32,11 +32,17 @@ const colorFor = (label: string) => DEFECT_COLORS[label] ?? "#ffe119";
 
 const MAX_UPLOAD_DIM = 1280;
 
-export interface FacadeBuilding { key: string; label: string; }
+export interface FacadeBuilding {
+  key: string; label: string;
+  /** Address point - enables Street View capture (the backend finds the footprint). */
+  lat?: number | null; lon?: number | null; country?: "se" | "gb";
+}
 
 interface ImgEntry {
   id: string; name: string; url: string; blob: Blob;
   orientation: FacadeOrientation;
+  /** Street View imagery is analysed but never persisted (Google Maps Platform terms). */
+  source: "upload" | "streetview";
   status: "idle" | "running" | "done" | "error";
   result: FacadeDetectResponse | null; error: string | null; ms: number | null;
   /** Set once the annotated render has been persisted for the Step 5 report. */
@@ -320,6 +326,8 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
   const [threshold, setThreshold] = useState(0.45);
   const [aiAssist, setAiAssist] = useState(true);
   const [lightbox, setLightbox] = useState<{ entry: ImgEntry; label: string } | null>(null);
+  /** Street View capture state per facade slot, keyed "<building>|<orientation>". */
+  const [svSlots, setSvSlots] = useState<Record<string, { busy: boolean; error: string | null }>>({});
   const warmed = useRef(false);
 
   // Warm on mount: the panel only mounts once its wizard section is opened, so
@@ -424,8 +432,10 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
 
       // Persist the annotated render so Step 5 can show it after a reload. A
       // failure here must not fail the detection the user is looking at - the
-      // photo simply stays session-only and is left out of the report.
-      if (doneEntry) {
+      // photo simply stays session-only and is left out of the report. Street View
+      // captures always stay session-only: Google's terms do not allow keeping
+      // copies of the imagery, so only the defect counts reach the store.
+      if (doneEntry && doneEntry.source !== "streetview") {
         try {
           const annotated = await renderAnnotatedBlob(doneEntry);
           if (annotated) {
@@ -453,11 +463,41 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
     for (const f of files) {
       const blob = await prepImage(f);
       const entry: ImgEntry = {
-        id: nextId(), name: f.name, url: URL.createObjectURL(blob), blob, orientation,
+        id: nextId(), name: f.name, url: URL.createObjectURL(blob), blob, orientation, source: "upload",
         status: "idle", result: null, error: null, ms: null, savedUrl: null,
       };
       setImages(key, prev => [...prev, entry]);
       void runDetection(key, entry.id, blob);
+    }
+  };
+
+  /** Pull this facade from Street View and run it through the same detection.
+   *  The backend returns the WHOLE wall: several shots from one panorama stitched
+   *  and flattened onto the wall plane, so verticals stay straight. */
+  const captureStreetView = async (b: FacadeBuilding, orientation: FacadeOrientation) => {
+    if (b.lat == null || b.lon == null) return;
+    const slotKey = `${b.key}|${orientation}`;
+    setSvSlots(prev => ({ ...prev, [slotKey]: { busy: true, error: null } }));
+    setExpanded(prev => new Set(prev).add(b.key));
+    try {
+      const res = await api.streetviewFacade(b.lat, b.lon, orientation, b.country ?? "se");
+      const shot = res.images[0]!;
+      const bytes = Uint8Array.from(atob(shot.b64), c => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: "image/jpeg" });
+      const entry: ImgEntry = {
+        id: nextId(),
+        // The name carries what matters for trusting the result: imagery age and
+        // how much wall one pixel covers (hairline cracks need ~2 mm/px).
+        name: `Street View ${res.pano.date ?? ""} · ${Math.round(res.mm_per_px)} mm/px`,
+        url: URL.createObjectURL(blob), blob, orientation, source: "streetview",
+        status: "idle", result: null, error: null, ms: null, savedUrl: null,
+      };
+      setImages(b.key, prev => [...prev, entry]);
+      setSvSlots(prev => ({ ...prev, [slotKey]: { busy: false, error: null } }));
+      void runDetection(b.key, entry.id, blob);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSvSlots(prev => ({ ...prev, [slotKey]: { busy: false, error: msg } }));
     }
   };
 
@@ -613,6 +653,22 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
                             <input type="file" accept="image/*" multiple style={{ display: "none" }}
                               onChange={ev => { if (ev.target.files) void addFiles(b.key, orientation, ev.target.files); ev.currentTarget.value = ""; }} />
                           </label>
+                          {b.lat != null && b.lon != null && (
+                            <>
+                              <button onClick={() => void captureStreetView(b, orientation)}
+                                disabled={svSlots[slotKey]?.busy}
+                                title="Fetch the whole facade from Google Street View (stitched and straightened) and run defect detection on it. Takes ~5-10 s. Not saved to the report."
+                                className="flex items-center justify-center gap-1.5 py-1.5 mx-1.5 mb-1.5 rounded-md border border-white/12 hover:border-sky-500/50 hover:bg-sky-600/10 transition disabled:opacity-50">
+                                {svSlots[slotKey]?.busy
+                                  ? <Loader2 className="w-3.5 h-3.5 text-sky-300 animate-spin" />
+                                  : <Camera className="w-3.5 h-3.5 text-sky-300" />}
+                                <span className="text-[10px] text-white/60">Capture from Street View</span>
+                              </button>
+                              {svSlots[slotKey]?.error && (
+                                <div className="text-[10px] text-amber-300/90 px-2 pb-1.5 leading-snug">{svSlots[slotKey]!.error}</div>
+                              )}
+                            </>
+                          )}
                         </div>
                       );
                     })}

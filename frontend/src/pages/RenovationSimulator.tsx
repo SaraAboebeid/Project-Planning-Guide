@@ -18,7 +18,7 @@ import {
   loadUkArchetypes, findUkArchetype, REFURB_TIERS,
   type TabulaArchetypeGB, type RefurbTierKey,
 } from "../utils/ukArchetype";
-import { fmtGBP, ukTierCostCarbon, UK_COST_CARBON_SOURCE_NOTE, UK_COST_PRICE_BASIS, type UkQuantities } from "../config/ukCostCarbon";
+import { fmtGBP, ukTierCostCarbon, ukMeasureOptions, UK_COST_CARBON_SOURCE_NOTE, UK_COST_PRICE_BASIS, type UkQuantities, type UkMeasureOption } from "../config/ukCostCarbon";
 import { useWizardStepNav } from "../components/wizardNav";
 import OptimizerPanel from "../components/OptimizerPanel";
 import AssemblyBuilder from "../components/AssemblyBuilder";
@@ -519,6 +519,33 @@ function ukQuantitiesFor(g: ResolvedBuildingGeometry, wwr: WWRRecord | null): Uk
   };
 }
 
+/** UK optimiser element areas, measured on the building as SIMULATED: the
+ *  footprint is scaled to the heated area (tools/idf/generate_idf.py), so walls
+ *  shrink with the square root of that factor and roof/floor with the factor. */
+function ukOptimiserAreas(g: ResolvedBuildingGeometry, wwr: WWRRecord | null) {
+  const floors = Math.max(1, g.floors ?? 1);
+  const footprint = g.footprintM2 ?? 0;
+  const heated = g.heatedAreaM2 ?? footprint * floors;
+  const scale = footprint > 0 ? heated / (footprint * floors) : 1;
+  const r = effectiveWwr(g, wwr);
+  const wallGross = (g.wallAreaM2 ?? 0) * Math.sqrt(scale);
+  return { heated, Walls: wallGross * (1 - r), Windows: wallGross * r, Roof: heated / floors, Floor: heated / floors };
+}
+
+const UK_OPT_COMPONENTS = ["Walls", "Roof", "Windows", "Floor"] as const;
+
+function ukOptionsFor(g: ResolvedBuildingGeometry, wwr: WWRRecord | null): Record<string, UkMeasureOption[]> {
+  const a = ukOptimiserAreas(g, wwr);
+  const cur = g.currentU ?? { wall: null, roof: null, win: null, floor: null };
+  const current: Record<string, number> = {
+    Walls: cur.wall ?? g.tabulaUWall ?? 1.6, Roof: cur.roof ?? g.tabulaURoof ?? 2.3,
+    Windows: cur.win ?? g.tabulaUWin ?? 2.8, Floor: cur.floor ?? g.tabulaUFloor ?? 0.7,
+  };
+  // Cavity walls were standard from about 1930; earlier houses are mostly solid brick.
+  const cavity = (g.yearBuilt ?? 1950) >= 1930;
+  return Object.fromEntries(UK_OPT_COMPONENTS.map((k) => [k, ukMeasureOptions(k, current[k]!, a[k], cavity)]));
+}
+
 /* ─── UK refurbishment-tier picker (whole-building, not per-component) ────── */
 function UkTierPicker({
   archetype, selectedTier, onSelect, quantities, buildingCount, uSource,
@@ -800,6 +827,8 @@ export default function RenovationSimulator() {
                   heatingKwhM2Yr: row.results?.heating_kwh_m2_yr ?? b.heatingKwhM2Yr,
                   coolingKwhM2Yr: row.results?.cooling_kwh_m2_yr ?? b.coolingKwhM2Yr,
                   totalKwhM2Yr: row.results?.total_kwh_m2_yr ?? b.totalKwhM2Yr,
+                  totalGasKwh: row.results?.total_gas_kwh ?? b.totalGasKwh ?? null,
+                  dwellings: row.results?.dwellings ?? b.dwellings ?? null,
                   error: row.error ?? b.error,
                 };
               }),
@@ -1519,8 +1548,41 @@ export default function RenovationSimulator() {
      searches every combination on the fast physics; winners are validated in
      EPSM via validateOptimizerPick below. */
   const optimizerInput = useMemo((): { input: { components: OptimizeComponentInput[]; params: OptimizeParams } | null; disabledReason?: string } => {
-    if (isUK) return { input: null, disabledReason: "The optimizer currently supports Sweden (Wikells cost/carbon) only." };
     const repIdx = targetIdx === "all" ? 0 : targetIdx;
+    if (isUK) {
+      const g = geometries[repIdx];
+      if (!g) return { input: null, disabledReason: "No building resolved yet." };
+      const baseTotal = baselinePkg?.buildings[repIdx]?.totalKwhM2Yr ?? null;
+      if (baseTotal == null) return { input: null, disabledReason: "Waiting for the baseline EnergyPlus run to finish…" };
+      const areas = ukOptimiserAreas(g, wwrByIndex[repIdx] ?? null);
+      if (!areas.heated) return { input: null, disabledReason: "Heated floor area unknown for this building." };
+      const opts = ukOptionsFor(g, wwrByIndex[repIdx] ?? null);
+      const cur = g.currentU;
+      const baseU: Record<string, number> = {
+        Walls: cur?.wall ?? g.tabulaUWall ?? 1.6, Roof: cur?.roof ?? g.tabulaURoof ?? 2.3,
+        Windows: cur?.win ?? g.tabulaUWin ?? 2.8, Floor: cur?.floor ?? g.tabulaUFloor ?? 0.7,
+      };
+      const comps: OptimizeComponentInput[] = UK_OPT_COMPONENTS
+        .filter((k) => (opts[k] ?? []).length > 0 && areas[k] > 0)
+        .map((k) => ({
+          key: k, area_m2: Math.round(areas[k]), baseline_u: baseU[k]!,
+          options: opts[k]!.map((o) => ({ code: `uk:${o.code}`, label: o.label, u_value: o.uValue, cost: o.costGbp, carbon: o.carbonKgCo2e })),
+        }));
+      if (comps.length === 0) return { input: null, disabledReason: "This building's certificates already describe insulated fabric - no measure would lower its U-values." };
+      // The optimiser values USEFUL heat: a gas-heated home pays gas / boiler efficiency per kWh of heat.
+      const eff = 0.85;
+      const gas = ukHvac?.carriers.gas;
+      const params: OptimizeParams = {
+        f_dh: (24 * (assumptionValue("UK", "degree_days") ?? 2108)) / 1000,
+        energy_price: Math.round(((gas?.tariffSek ?? 0.0727) / eff) * 1000) / 1000,
+        carbon_factor_heat: Math.round(((gas?.carbonKgPerKwh ?? 0.213) / eff) * 1000) / 1000,
+        discount_rate: assumptionValue("UK", "discount_rate") ?? 0.035,
+        study_period_yr: 30,
+        floor_area_m2: Math.round(areas.heated),
+        baseline_total_kwh_m2_yr: baseTotal,
+      };
+      return { input: { components: comps, params } };
+    }
     const repGeo = geometries[repIdx];
     if (!repGeo) return { input: null, disabledReason: "No building resolved yet." };
     const baseTotal = baselinePkg?.buildings[repIdx]?.totalKwhM2Yr ?? null;
@@ -1565,7 +1627,7 @@ export default function RenovationSimulator() {
       baseline_total_kwh_m2_yr: baseTotal,
     };
     return { input: { components: comps, params } };
-  }, [isUK, targetIdx, geometries, baselinePkg, lineItems, configs, wwrByIndex, manualOverrides, boverketAll, livePriceSek]);
+  }, [isUK, ukHvac, targetIdx, geometries, baselinePkg, lineItems, configs, wwrByIndex, manualOverrides, boverketAll, livePriceSek]);
 
   // Which optimizer picks are already validated (as a package) — keyed by the
   // touched (non-"keep") component→material selections, matching the panel.
@@ -1590,6 +1652,7 @@ export default function RenovationSimulator() {
   // build-up (single Wikells row OR layer-composed assembly).
   function validateOptimizerPick(point: OptimizePoint, opts?: { auto?: boolean }) {
     if (geometries.length === 0) return;
+    if (isUK) return validateUkOptimizerPick(point, opts);
     const cfgById = new Map(configs.map((c) => [c.id, c]));
     const touched = Object.entries(point.selections)
       .filter(([, code]) => code !== "__keep__")
@@ -1637,6 +1700,39 @@ export default function RenovationSimulator() {
         && Math.abs(p.buildings[0]!.lon - g.lon) < 1e-6;
     };
     const kept = opts?.auto ? packages.filter((p) => !p.auto || !sameTarget(p)) : packages;
+    setProject({ renovationCalcPackages: [...kept, pkg] });
+    submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
+  }
+
+  /** UK Pareto pick -> package: each chosen measure becomes a U-value override,
+   *  re-costed per building on that building's own simulated areas. */
+  function validateUkOptimizerPick(point: OptimizePoint, opts?: { auto?: boolean }) {
+    const repIdx = targetIdx === "all" ? 0 : targetIdx;
+    const rep = geometries[repIdx];
+    if (!rep) return;
+    const repOpts = ukOptionsFor(rep, wwrByIndex[repIdx] ?? null);
+    const touched = Object.entries(point.selections)
+      .filter(([, code]) => code.startsWith("uk:"))
+      .map(([key, code]) => [key, (repOpts[key] ?? []).find((o) => `uk:${o.code}` === code)] as const)
+      .filter((e): e is readonly [string, UkMeasureOption] => !!e[1]);
+    if (touched.length === 0) return;
+    const selections: Record<string, RenovationCalcSelection> = Object.fromEntries(
+      touched.map(([key, o]) => [key, { wikellsCode: `uk:${o.code}`, quantity: 0, customUValue: o.uValue, customLabel: o.label }]),
+    );
+    const name = `Optimal · ${touched.map(([, o]) => o.label).join(" + ")}` + targetSuffix();
+    const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
+    const buildingRows = makeBuildingRows(targetEntries, (g, i) => {
+      const own = ukOptionsFor(g, wwrByIndex[i] ?? null);
+      let cost = 0, carbon = 0, any = false;
+      for (const [key, o] of touched) {
+        const m = (own[key] ?? []).find((x) => x.code === o.code);
+        if (m) { cost += m.costGbp; carbon += m.carbonKgCo2e; any = true; }
+      }
+      return any ? { costSEK: Math.round(cost), carbonKgCO2e: Math.round(carbon) } : { costSEK: null, carbonKgCO2e: null };
+    });
+    const id = `pkg-opt-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const pkg: RenovationCalcPackage = { id, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows, ...(opts?.auto ? { auto: true } : {}) };
+    const kept = opts?.auto ? packages.filter((p) => !p.auto) : packages;
     setProject({ renovationCalcPackages: [...kept, pkg] });
     submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
   }
@@ -2202,6 +2298,34 @@ export default function RenovationSimulator() {
             </div>
           )}
 
+          {/* UK multi-objective optimiser: mixes wall / loft / glazing / floor
+              measures per component (DESNZ costs, DESNZ insulation carbon) on the
+              building's own EPC fabric; each validated pick runs in EPSM. */}
+          {isUK && openStage === 1 && (
+            <div>
+              <button
+                onClick={() => setOptimizerOpen((o) => !o)}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: 0, cursor: "pointer",
+                  color: "rgba(255,255,255,0.45)", fontSize: 11.5, fontWeight: 700, padding: "6px 0" }}>
+                <ChevronDown size={13} style={{ transform: optimizerOpen ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} />
+                Advanced — multi-objective optimiser
+                <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.3)" }}>
+                  · mix measures per component, Pareto front over cost, carbon &amp; energy
+                </span>
+              </button>
+              {optimizerOpen && (
+                <OptimizerPanel
+                  input={optimizerInput.input}
+                  disabledReason={optimizerInput.disabledReason}
+                  onValidate={validateOptimizerPick}
+                  currency="GBP"
+                  validatedKeys={validatedKeys}
+                  selectedKpis={project.selectedKpis}
+                />
+              )}
+            </div>
+          )}
+
           {/* The trade-off curve now updates live from the same picks, so it's a
               companion view (not a separate "run this instead" tool). */}
           {!isUK && hasEnvelope && openStage === 2 && (
@@ -2437,7 +2561,15 @@ export default function RenovationSimulator() {
                           <span>{b.costSEK == null ? "—" : isUK ? fmtGBP(b.costSEK) : fmtSEK(b.costSEK)}</span>
                           <span>{b.carbonKgCO2e == null ? "—" : `${b.carbonKgCO2e.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
                           <span>{b.heatingKwhM2Yr ?? "—"}</span>
-                          <span>{b.totalKwhM2Yr ?? "—"}</span>
+                          <span>
+                            {b.totalKwhM2Yr ?? "—"}
+                            {/* UK gas-boiler runs: what a household's gas meter would read. */}
+                            {isUK && b.totalGasKwh != null && (
+                              <span style={{ display: "block", fontSize: 9.5, color: "#E8880C" }}>
+                                gas {Math.round(b.totalGasKwh / Math.max(1, b.dwellings ?? 1)).toLocaleString("en-GB")} kWh/yr per home
+                              </span>
+                            )}
+                          </span>
                           {(() => {
                             const done = isBuildingSettled(b);
                             return (

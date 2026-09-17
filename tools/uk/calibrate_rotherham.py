@@ -56,8 +56,14 @@ def set_params(heat_c: float, ach: float) -> None:
     D.UK_INFILTRATION_ACH = ach
 
 
-def run_batch(buildings: list[dict]) -> list[float | None]:
-    """Boiler natural-gas kWh per building (gas-boiler plant), in input order."""
+def run_batch(buildings: list[dict], chunk: int = 60) -> list[float | None]:
+    """Boiler natural-gas kWh per building (gas-boiler plant), in input order.
+    EPSM (Django) rejects uploads of more than 100 files, so large samples go in chunks."""
+    if len(buildings) > chunk:
+        out: list[float | None] = []
+        for start in range(0, len(buildings), chunk):
+            out += run_batch(buildings[start:start + chunk], chunk)
+        return out
     files = [("idf_files", (f"b_{i}.idf", build_shoebox_idf(b, "gb", "rotherham", str(EPW), building_name=f"b{i}",
                                                            heating_system="gas_boiler").encode(), "text/plain"))
              for i, b in enumerate(buildings)]
@@ -66,11 +72,15 @@ def run_batch(buildings: list[dict]) -> list[float | None]:
     r.raise_for_status()
     sid = r.json()["simulation_id"]
     while True:
-        st = requests.get(f"{EPSM}/api/simulation/{sid}/status/", timeout=60).json()
+        try:
+            st = requests.get(f"{EPSM}/api/simulation/{sid}/status/", timeout=120).json()
+        except requests.RequestException:
+            time.sleep(15)  # EPSM busy (e.g. storing results) - ask again rather than abandon the run
+            continue
         if st.get("status") in ("completed", "failed"):
             break
         time.sleep(10)
-    res = requests.get(f"{EPSM}/api/simulation/{sid}/parallel-results/", timeout=600).json()
+    res = requests.get(f"{EPSM}/api/simulation/{sid}/parallel-results/", timeout=900).json()
     items = res if isinstance(res, list) else res.get("results") or []
     out: list[float | None] = [None] * len(buildings)
     for it in items:

@@ -401,6 +401,17 @@ def _uk_building_response(best: dict, footprint, perimeter_m, wall_area_m2, c_la
         "desnz_electricity_median_kwh": _clean(best.get("desnz_electricity_median_kwh")),
         "desnz_electricity_meters": best.get("desnz_electricity_meters"),
         "epc_dwellings_count": best.get("epc_dwellings"),
+        # Areas: footprint = OSM outline; heated = what the energy model simulates.
+        "gross_floor_area_m2": _clean(best.get("gross_floor_area_m2")),
+        "heated_area_m2": _clean(best.get("heated_area_m2")),
+        "heated_area_source": best.get("heated_area_source"),
+        "dwellings_est": best.get("dwellings_est"),
+        "boiler_efficiency_epc": _clean(best.get("boiler_efficiency_epc")),
+        # Fabric as the certificates describe it today (tools/uk/epc_fabric.py).
+        "u_wall_epc": _clean(best.get("u_wall_epc")), "u_roof_epc": _clean(best.get("u_roof_epc")),
+        "u_win_epc": _clean(best.get("u_win_epc")), "u_floor_epc": _clean(best.get("u_floor_epc")),
+        "epc_median_year": best.get("epc_median_year"),
+        "epc_stale": best.get("epc_stale"),
         "has_epc":       bool(best.get("has_epc")),
         "lat":           round(c_lat, 6),
         "lon":           round(c_lon, 6),
@@ -950,6 +961,12 @@ def _uk_bbox_row(b: dict, lat: float, lon: float) -> dict:
         "dec_metered_kwh": b.get("dec_metered_kwh"),
         "desnz_gas_median_kwh": b.get("desnz_gas_median_kwh"),
         "desnz_electricity_median_kwh": b.get("desnz_electricity_median_kwh"),
+        "heated_area_m2": b.get("heated_area_m2"),
+        "heated_area_source": b.get("heated_area_source"),
+        "dwellings_est": b.get("dwellings_est"),
+        "epc_stale": b.get("epc_stale"),
+        "u_wall_epc": b.get("u_wall_epc"), "u_roof_epc": b.get("u_roof_epc"),
+        "u_win_epc": b.get("u_win_epc"), "u_floor_epc": b.get("u_floor_epc"),
         "boplats_listings": None,
         "boplats_avg_rent_sek": None,
         "boplats_avg_rent_per_m2_sek": None,
@@ -2856,6 +2873,12 @@ def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], bu
     # use from the hourly series instead (tools/idf/defaults.GAS_BOILER_OUTPUT_VARIABLES).
     gas_kwh = _hourly_sum_kwh(hourly, "_Boiler_NaturalGas_Energy_J")
     boiler_heat_kwh = _hourly_sum_kwh(hourly, "_Boiler_Heating_Energy_J")
+    # UK hot water on gas (separate water heater); its heat lands on "Water Systems"
+    # only when it burns district heating, so read it from the hourly series too.
+    dhw_gas_kwh = _hourly_sum_kwh(hourly, "_Water_Heater_NaturalGas_Energy_J")
+    dhw_heat_kwh = _hourly_sum_kwh(hourly, "_Water_Heater_Heating_Energy_J")
+    if dhw_heat_kwh is not None and dhw_kwh == 0.0:
+        dhw_kwh = dhw_heat_kwh
     heating_system = "gas_boiler" if gas_kwh is not None else "ideal_loads"
     if boiler_heat_kwh is not None and heating_kwh == 0.0:
         heating_kwh = boiler_heat_kwh
@@ -2876,7 +2899,11 @@ def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], bu
         "pumps_kwh": round(pumps_kwh, 1),
         # heating_kwh is heat DELIVERED; gas_kwh is fuel burnt by the boiler (None for ideal loads).
         "heating_system": heating_system,
+        # gas_kwh = space-heating boiler only (what the metered-gas calibration targets);
+        # dhw_gas_kwh = hot water; total_gas_kwh = both.
         "gas_kwh": round(gas_kwh, 1) if gas_kwh is not None else None,
+        "dhw_gas_kwh": round(dhw_gas_kwh, 1) if dhw_gas_kwh is not None else None,
+        "total_gas_kwh": round((gas_kwh or 0) + (dhw_gas_kwh or 0), 1) if gas_kwh is not None or dhw_gas_kwh is not None else None,
         "gas_kwh_m2_yr": round(gas_kwh / total_floor_area, 1) if gas_kwh is not None and total_floor_area else None,
         "total_kwh": round(total_kwh, 1),
         "heating_kwh_m2_yr": _per_m2(heating_kwh),
@@ -4933,32 +4960,226 @@ def _offset_latlon(lat: float, lon: float, bearing_deg: float, meters: float) ->
     return lat + dlat, lon + dlon
 
 
+# A panorama further than this off the wall's normal sees the facade too obliquely
+# to be worth a request - and past ~90 deg it is looking at a different wall.
+_SV_MAX_OFF_NORMAL_DEG = 65.0
+# Measured on 32 Gothenburg facades: every usable capture came from <= 36 m; from
+# >= 40 m the view was a hedge, trees or a fragment of wall every time.
+_SV_MAX_DISTANCE_M = 40.0
+_SV_CAMERA_HEIGHT_M = 2.5   # Street View car mast, roughly
+
+
+def _angle_diff_deg(a: float, b: float) -> float:
+    return abs((a - b + 180.0) % 360.0 - 180.0)
+
+
+def _parse_footprint(raw: str | None) -> list[tuple[float, float]] | None:
+    """Outer ring [(lon, lat), ...] from a JSON ring, polygon or multipolygon."""
+    if not raw:
+        return None
+    try:
+        ring = json.loads(raw)
+    except ValueError:
+        raise HTTPException(400, "`footprint` must be JSON: [[lon,lat],...]")
+    # Descend polygon/multipolygon nesting until we hold a list of coordinate pairs.
+    while isinstance(ring, list) and ring and isinstance(ring[0], list) and ring[0] and isinstance(ring[0][0], list):
+        ring = ring[0]
+    try:
+        pts = [(float(p[0]), float(p[1])) for p in ring]
+    except (TypeError, ValueError, IndexError):
+        raise HTTPException(400, "`footprint` must be JSON: [[lon,lat],...]")
+    return pts if len(pts) >= 3 else None
+
+
+def _footprint_facade(ring: list[tuple[float, float]], camera_side: float):
+    """The wall of `ring` that faces `camera_side`.
+
+    Returns (mid_lat, mid_lon, normal_deg, width_m) for the edge maximising
+    length x cos(angle to camera_side), or None if no wall faces within 60 deg.
+    A building is rarely aligned to the compass, so "the north facade" means the
+    wall whose outward normal is closest to north - not a point due north of the
+    centroid, which on an L- or U-shaped block can be a courtyard.
+    """
+    from math import radians, degrees, cos, atan2, hypot
+
+    lat0 = sum(p[1] for p in ring) / len(ring)
+    lon0 = sum(p[0] for p in ring) / len(ring)
+    kx, ky = 111320.0 * cos(radians(lat0)), 110540.0
+    xy = [((lon - lon0) * kx, (lat - lat0) * ky) for lon, lat in ring]
+    if xy[0] == xy[-1]:
+        xy = xy[:-1]
+    n = len(xy)
+    area2 = sum(xy[i][0] * xy[(i + 1) % n][1] - xy[(i + 1) % n][0] * xy[i][1] for i in range(n))
+    best = None
+    for i in range(n):
+        (x1, y1), (x2, y2) = xy[i], xy[(i + 1) % n]
+        dx, dy = x2 - x1, y2 - y1
+        length = hypot(dx, dy)
+        if length < 2.0:
+            continue
+        # Outward normal: right of travel for a counter-clockwise ring, left for clockwise.
+        nx, ny = (dy, -dx) if area2 > 0 else (-dy, dx)
+        normal = (degrees(atan2(nx, ny)) + 360.0) % 360.0
+        off = _angle_diff_deg(normal, camera_side)
+        if off > 60.0:
+            continue
+        score = length * cos(radians(off))
+        if best is None or score > best[0]:
+            mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+            best = (score, lat0 + my / ky, lon0 + mx / kx, normal, length)
+    return best[1:] if best else None
+
+
+# Coarse grid (~550 m x 600 m cells) over each building set, so looking up the
+# footprint under a point checks a few hundred polygons instead of the whole city.
+_SV_FOOTPRINT_GRID: dict[str, dict[tuple[int, int], list]] = {}
+
+
+def _sv_outer_ring(coords) -> list[tuple[float, float]] | None:
+    ring = coords
+    while isinstance(ring, list) and ring and isinstance(ring[0], list) and ring[0] and isinstance(ring[0][0], list):
+        ring = ring[0]
+    try:
+        return [(float(p[0]), float(p[1])) for p in ring] if ring and len(ring) >= 3 else None
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
+def _sv_near_footprints(lat: float, lon: float, country: str) -> list[tuple]:
+    """Footprints around a point as (ring, c_lat, c_lon, height, bbox) - the
+    containing grid cell and its 8 neighbours, i.e. everything within ~500 m."""
+    try:
+        if _is_uk(country):
+            set_id = "gb:" + _resolve_uk_city_id(lat, lon)
+            rows = _get_uk_buildings_list(set_id[3:])
+        else:
+            set_id, rows = "se", _get_buildings_list()
+    except HTTPException:
+        return []
+    grid = _SV_FOOTPRINT_GRID.get(set_id)
+    if grid is None:
+        grid = {}
+        for b in rows:
+            ring = _sv_outer_ring(b.get("coordinates") or [])
+            if not ring:
+                continue
+            c_lat = sum(p[1] for p in ring) / len(ring)
+            c_lon = sum(p[0] for p in ring) / len(ring)
+            bbox = (min(p[0] for p in ring), min(p[1] for p in ring), max(p[0] for p in ring), max(p[1] for p in ring))
+            grid.setdefault((int(c_lat * 200), int(c_lon * 100)), []).append((ring, c_lat, c_lon, b.get("height"), bbox))
+        _SV_FOOTPRINT_GRID[set_id] = grid
+    gy, gx = int(lat * 200), int(lon * 100)
+    return [e for dy in (-1, 0, 1) for dx in (-1, 0, 1) for e in grid.get((gy + dy, gx + dx), [])]
+
+
+def _segments_cross(ax, ay, bx, by, cx, cy, dx, dy) -> bool:
+    d1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+    d2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax)
+    d3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx)
+    d4 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx)
+    return (d1 > 0) != (d2 > 0) and (d3 > 0) != (d4 > 0)
+
+
+def _sv_visible_fraction(pano_lat: float, pano_lon: float, wall_lat: float, wall_lon: float,
+                         normal_deg: float, width_m: float, target_ring, near: list[tuple]) -> float:
+    """Share of sight lines from the panorama to the wall that no OTHER building blocks.
+
+    Measured on central Gothenburg: panoramas 35-55 m off a wall almost always
+    looked straight into the building in between, and the capture showed that
+    building instead. Trees are not modelled here.
+    """
+    if pano_lat == wall_lat and pano_lon == wall_lon:
+        return 1.0
+    t_lat = sum(p[1] for p in target_ring) / len(target_ring) if target_ring else None
+    t_lon = sum(p[0] for p in target_ring) / len(target_ring) if target_ring else None
+    lo_lon, hi_lon = sorted((pano_lon, wall_lon))
+    lo_lat, hi_lat = sorted((pano_lat, wall_lat))
+    pad = 0.0005   # ~50 m, the wall's half-width can reach past the midpoint
+    blockers = [e for e in near
+                if not (t_lat is not None and abs(e[1] - t_lat) < 1e-6 and abs(e[2] - t_lon) < 1e-6)
+                and e[4][0] <= hi_lon + pad and e[4][2] >= lo_lon - pad
+                and e[4][1] <= hi_lat + pad and e[4][3] >= lo_lat - pad]
+    # Footprints that overlap the target are parts/duplicates of the same building
+    # (EUBUCCO has these, e.g. Mataregatan 4) - they cover the wall itself, so
+    # counting them as blockers rejects perfectly clear views.
+    if target_ring:
+        blockers = [e for e in blockers
+                    if not (any(_point_in_poly(x, y, target_ring) for x, y in e[0])
+                            or any(_point_in_poly(x, y, e[0]) for x, y in target_ring))]
+    # Sight targets: along the wall (inset from the corners), stood 0.5 m proud of
+    # it so the target's own outline never counts as a blocker.
+    samples = [s * (width_m or 0.0) for s in (-0.4, -0.2, 0.0, 0.2, 0.4)] if width_m else [0.0]
+    visible = 0
+    for s in samples:
+        p_lat, p_lon = _offset_latlon(wall_lat, wall_lon, normal_deg + 90.0, s)
+        p_lat, p_lon = _offset_latlon(p_lat, p_lon, normal_deg, 0.5)
+        blocked = False
+        for ring, *_ in blockers:
+            if _point_in_poly(p_lon, p_lat, ring):
+                continue   # the sight point is inside it: same building complex, not in the way
+            n = len(ring)
+            for i in range(n):
+                (x1, y1), (x2, y2) = ring[i], ring[(i + 1) % n]
+                if _segments_cross(pano_lon, pano_lat, p_lon, p_lat, x1, y1, x2, y2):
+                    blocked = True
+                    break
+            if blocked:
+                break
+        visible += not blocked
+    return visible / len(samples)
+
+
+def _sv_lookup_footprint(lat: float, lon: float, country: str) -> tuple[list[tuple[float, float]], float | None] | None:
+    """(outer ring, height) of the building under - or within 25 m of - a point.
+
+    Lets callers that only hold an address point (the wizard's building rows)
+    still get wall-aimed captures without shipping polygons around.
+    """
+    near = _sv_near_footprints(lat, lon, country)
+    for ring, _, _, h, _ in near:
+        if _point_in_poly(lon, lat, ring):
+            return ring, h
+    best = min(near, key=lambda e: _haversine_m(lat, lon, e[1], e[2]), default=None)
+    if best and _haversine_m(lat, lon, best[1], best[2]) <= 25.0:
+        return best[0], best[3]
+    return None
+
+
 @app.get("/api/streetview/facade")
 async def streetview_facade(
     lat: float = Query(..., description="Building centroid latitude"),
     lon: float = Query(..., description="Building centroid longitude"),
     orientation: str | None = Query(None, description="north|east|south|west - which facade to photograph"),
     heading: float | None = Query(None, description="Explicit camera heading; overrides `orientation`"),
-    fov: float = Query(30.0, ge=10.0, le=120.0, description="Narrower = more detail, less facade"),
-    pitch: float = Query(12.0, ge=-90.0, le=90.0, description="Tilt up to catch upper storeys"),
+    fov: float | None = Query(None, ge=10.0, le=120.0, description="Explicit FOV; else set by `framing`"),
+    pitch: float | None = Query(None, ge=-90.0, le=90.0, description="Explicit pitch; else set by `framing`"),
+    framing: str = Query("detail", description="detail = fov 30 / pitch 12 (best for defect detection); "
+                                                "fit = one wide tilted shot; facade = stitched, rectified whole wall"),
     standoff_m: float = Query(20.0, ge=5.0, le=80.0, description="How far off the building to look for a panorama"),
     tiles: int = Query(1, ge=1, le=5, description="Sweep N narrow-FOV shots across the facade"),
+    footprint: str | None = Query(None, description="JSON outer ring [[lon,lat],...] - aims at the actual wall"),
+    height_m: float | None = Query(None, ge=1.0, le=300.0, description="Building height, for auto pitch/fov"),
+    country: str = Query("se", description="se|gb - which building set to look the footprint up in"),
 ):
     """Fetch street-level imagery of one facade, aimed at the building.
 
-    Returns `{images:[{b64, heading, fov, pitch}], pano:{...}}` as base64 rather
-    than raw bytes so the capture date and true heading travel with the image
-    (the CORS config here exposes no custom headers), and so the frontend can
-    hand the bytes straight to /api/facade-detect like an upload.
+    Returns `{images:[{b64, heading, fov, pitch}], pano:{...}, facade:{...}}` as
+    base64 rather than raw bytes so the capture date and true heading travel with
+    the image (the CORS config here exposes no custom headers), and so the
+    frontend can hand the bytes straight to /api/facade-detect like an upload.
+
+    Refuses (404) rather than returning a shot of the wrong wall: every candidate
+    panorama must stand in front of the requested facade.
     """
     import base64, httpx
+    from math import degrees, atan, atan2, cos, radians
 
-    key = os.environ.get("GOOGLE_MAPS_API_KEY", "").strip()
+    key = (os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("STREET_VIEW_API_KEY") or "").strip()
     if not key:
         raise HTTPException(
             503,
-            "Street View not configured. Add GOOGLE_MAPS_API_KEY to .env and enable the "
-            "'Street View Static API' on that Google Cloud project.",
+            "Street View not configured. Add GOOGLE_MAPS_API_KEY (or STREET_VIEW_API_KEY) to .env and "
+            "enable the 'Street View Static API' on that Google Cloud project.",
         )
 
     if heading is None:
@@ -4969,32 +5190,165 @@ async def streetview_facade(
         # An explicit heading says where the camera LOOKS; it stands opposite that.
         camera_side = (heading + 180.0) % 360.0
 
-    # Stand off the building on the side of the facade we want to see.
-    search_lat, search_lon = _offset_latlon(lat, lon, camera_side, standoff_m)
+    # Target: the midpoint of the real wall when a footprint is given, else the centroid.
+    wall = None
+    ring = _parse_footprint(footprint)
+    if not ring:
+        found = _sv_lookup_footprint(lat, lon, country)
+        if found:
+            ring = found[0]
+            height_m = height_m or found[1]
+    if ring:
+        wall = _footprint_facade(ring, camera_side)
+    if wall:
+        target_lat, target_lon, normal, width_m = wall
+    else:
+        target_lat, target_lon, normal, width_m = lat, lon, camera_side, None
+
+    # Candidate search points in front of the wall: two standoffs, and along a wide
+    # facade a point either side too. Metadata is free and unmetered, so casting a
+    # wider net costs nothing - only the final image request bills.
+    tangent = (normal + 90.0) % 360.0
+    laterals = [0.0] + ([-width_m / 3, width_m / 3] if width_m and width_m > 15 else [])
+    searches = []
+    for s in (standoff_m, standoff_m * 1.75):
+        for d in laterals:
+            p = _offset_latlon(target_lat, target_lon, normal, s)
+            if d:
+                p = _offset_latlon(p[0], p[1], tangent, d)
+            # Google rejects a decimal radius ("35.0") with INVALID_REQUEST - must be an integer.
+            searches.append((p, int(round(max(20.0, s * 0.8)))))
 
     async with httpx.AsyncClient(timeout=30) as client:
-        # Metadata first: it is free and unmetered, so a "no coverage here" answer
-        # costs nothing, whereas a blind image request bills for a grey placeholder.
-        meta_r = await client.get(
-            f"{STREETVIEW_BASE}/metadata",
-            params={"location": f"{search_lat},{search_lon}",
-                    "radius": max(35.0, standoff_m * 1.5), "source": "outdoor", "key": key},
-        )
-        meta = meta_r.json()
-        status = meta.get("status")
-        if status != "OK":
-            raise HTTPException(404, {
-                "ZERO_RESULTS": f"No Street View coverage within {max(35.0, standoff_m * 1.5):.0f} m of the {orientation or 'requested'} facade.",
-                "OVER_QUERY_LIMIT": "Google Street View quota exceeded for this key.",
-                "REQUEST_DENIED": "Google denied the request - check the key is unrestricted for this API and Street View Static API is enabled.",
-            }.get(status, f"Street View metadata returned {status}."))
+        panos: dict[str, dict] = {}
+        statuses = set()
+        for (s_lat, s_lon), radius in searches:
+            meta = (await client.get(
+                f"{STREETVIEW_BASE}/metadata",
+                params={"location": f"{s_lat},{s_lon}", "radius": radius, "source": "outdoor", "key": key},
+            )).json()
+            statuses.add(meta.get("status"))
+            # Only Google's own car/trekker imagery. Business-uploaded photospheres
+            # ("(c) Restaurang ...") pass `source=outdoor` yet are often interiors.
+            if meta.get("status") == "OK" and "Google" not in (meta.get("copyright") or ""):
+                continue
+            if meta.get("status") == "OK" and meta.get("pano_id") not in panos:
+                panos[meta["pano_id"]] = meta
+        for bad, msg in (("REQUEST_DENIED", "Google denied the request - check the key is unrestricted for this API and Street View Static API is enabled."),
+                         ("OVER_QUERY_LIMIT", "Google Street View quota exceeded for this key.")):
+            if bad in statuses and not panos:
+                raise HTTPException(404, msg)
 
-        pano_loc = meta.get("location") or {}
-        pano_lat, pano_lon = float(pano_loc.get("lat", search_lat)), float(pano_loc.get("lng", search_lon))
         # The panorama sits where Google's car actually drove, which is not where we
-        # asked. Re-derive the heading from its true position or the shot drifts off
-        # the building - the single biggest cause of useless facade captures.
-        aim = _bearing_deg(pano_lat, pano_lon, lat, lon)
+        # asked. Keep only those genuinely in front of the wall, then prefer the most
+        # head-on and nearest. Without this the "nearest panorama" is routinely on a
+        # different street, photographing a different wall - or a tree.
+        # Buildings between panorama and wall are checked against the footprints;
+        # a panorama lying INSIDE a footprint is in a tunnel/passage under it.
+        near = _sv_near_footprints(target_lat, target_lon, country) if wall else []
+        scored, n_in_front, n_blocked, n_far = [], 0, 0, 0
+        for pid, meta in panos.items():
+            loc = meta.get("location") or {}
+            p_lat, p_lon = float(loc["lat"]), float(loc["lng"])
+            dist = _haversine_m(p_lat, p_lon, target_lat, target_lon)
+            off = _angle_diff_deg(_bearing_deg(target_lat, target_lon, p_lat, p_lon), normal)
+            max_dist = _SV_MAX_DISTANCE_M if wall else _SV_MAX_DISTANCE_M + 20.0
+            if off > _SV_MAX_OFF_NORMAL_DEG or dist < 4.0:
+                continue
+            if dist > max_dist:
+                n_far += 1
+                continue
+            n_in_front += 1
+            visible = 1.0
+            if wall:
+                if any(e[4][0] <= p_lon <= e[4][2] and e[4][1] <= p_lat <= e[4][3] and _point_in_poly(p_lon, p_lat, e[0])
+                       for e in near):
+                    n_blocked += 1
+                    continue
+                visible = _sv_visible_fraction(p_lat, p_lon, target_lat, target_lon, normal, width_m, ring, near)
+                if visible < 0.6:
+                    n_blocked += 1
+                    continue
+            scored.append((off + 0.8 * max(0.0, dist - 10.0) + 40.0 * (1.0 - visible),
+                           off, dist, p_lat, p_lon, meta, visible))
+        if not scored:
+            side = orientation or "requested"
+            if not panos:
+                raise HTTPException(404, f"No Street View coverage in front of the {side} facade.")
+            if n_in_front and n_blocked == n_in_front:
+                raise HTTPException(404, f"Every Street View panorama facing the {side} facade has another "
+                                         f"building in the way - no clear view from the street.")
+            if n_far:
+                raise HTTPException(404, f"The only Street View panoramas facing the {side} facade are more than "
+                                         f"{max_dist:.0f} m away - too far for a usable view.")
+            raise HTTPException(404, f"Street View panoramas nearby all stand beside or behind the "
+                                     f"{side} facade, not in front of it - no usable view.")
+        _, off, dist, pano_lat, pano_lon, meta, visible = min(scored, key=lambda t: t[0])
+
+        aim = _bearing_deg(pano_lat, pano_lon, target_lat, target_lon)
+
+        pano_info = {
+            "lat": pano_lat, "lon": pano_lon,
+            "date": meta.get("date"),          # 'YYYY-MM' - imagery age matters for condition
+            "pano_id": meta.get("pano_id"),
+            "copyright": meta.get("copyright"),
+            "distance_m": round(dist, 1),
+        }
+        facade_info = {
+            "aimed_at": "footprint_wall" if wall else "centroid",
+            "lat": round(target_lat, 7), "lon": round(target_lon, 7),
+            "normal_deg": round(normal, 1),
+            "width_m": round(width_m, 1) if width_m else None,
+            "off_normal_deg": round(off, 1),   # 0 = head-on; up to 65 accepted
+            "unblocked_by_buildings": round(visible, 2),   # share of sight lines clear of other footprints
+            "panoramas_considered": len(panos),
+        }
+
+        # "facade": the whole wall, straight-on. One wide tilted shot keystones
+        # badly, so stitch a grid of shots from this one panorama and resample
+        # them onto the wall plane (backend/streetview_rectify.py).
+        # Without a footprint there is no wall plane to rectify onto; fall through
+        # to a single "detail" shot rather than failing.
+        if framing == "facade" and wall:
+            from backend.streetview_rectify import plan_tiles, rectify
+            import asyncio
+
+            plan = plan_tiles(pano_lat, pano_lon, target_lat, target_lon, normal, width_m, height_m or 12.0)
+
+            async def _tile(h: float, p: float) -> bytes | None:
+                r = await client.get(STREETVIEW_BASE, params={
+                    "size": _STREETVIEW_MAX_SIZE, "pano": meta["pano_id"], "heading": round(h, 2),
+                    "pitch": round(p, 2), "fov": plan["fov"], "return_error_code": "true", "key": key})
+                return r.content if r.status_code == 200 else None
+
+            jpegs = await asyncio.gather(*(_tile(h, p) for h, p in plan["tiles"]))
+            out = await asyncio.to_thread(rectify, plan, list(jpegs))
+            if not out:
+                raise HTTPException(502, "Street View returned no usable image for this facade.")
+            return {
+                "images": [{"b64": base64.b64encode(out["jpeg"]).decode(), "heading": round(aim, 2),
+                            "fov": plan["fov"], "pitch": 0.0, "bytes": len(out["jpeg"]),
+                            "width": out["width"], "height": out["height"]}],
+                "orientation": orientation, "pano": pano_info,
+                "facade": {**facade_info, "height_m": round(height_m or 12.0, 1),
+                           "tiles": len(plan["tiles"]), "coverage": round(out["coverage"], 3),
+                           "rectified": True},
+                "mm_per_px": round(out["mm_per_px"], 1),
+            }
+
+        # "detail" keeps a narrow crop: measured on 8 Gothenburg buildings, fitting
+        # the whole wall from a panorama ~10 m away clamps FOV at 90 and pitch past
+        # 40 deg - heavy keystoning and ~30% coarser mm/px, for no extra detections.
+        # "fit" is for an overview shot. Explicit values always win.
+        fit = framing == "fit"
+        if pitch is None:
+            pitch = (max(0.0, min(30.0, degrees(atan2(height_m / 2 - _SV_CAMERA_HEIGHT_M, dist))))
+                     if fit and height_m else 12.0)
+        if fov is None:
+            spans = [s for s in (width_m and width_m * cos(radians(off)), height_m) if s]
+            fov = (max(20.0, min(90.0, 1.15 * degrees(2 * atan(max(spans) / 2 / dist))))
+                   if fit and spans else 30.0)
+        pitch, fov = round(pitch, 1), round(fov, 1)
 
         # Sweep the tiles across the facade, centred on the aim, so N narrow crops
         # cover roughly the same width one wide shot would - at N times the detail.
@@ -5006,9 +5360,9 @@ async def streetview_facade(
         for h in headings:
             img_r = await client.get(
                 STREETVIEW_BASE,
-                params={"size": _STREETVIEW_MAX_SIZE, "location": f"{pano_lat},{pano_lon}",
+                params={"size": _STREETVIEW_MAX_SIZE, "pano": meta["pano_id"],
                         "heading": round(h, 2), "pitch": pitch, "fov": fov,
-                        "source": "outdoor", "return_error_code": "true", "key": key},
+                        "return_error_code": "true", "key": key},
             )
             if img_r.status_code != 200:
                 continue
@@ -5024,18 +5378,12 @@ async def streetview_facade(
     return {
         "images": images,
         "orientation": orientation,
-        "pano": {
-            "lat": pano_lat, "lon": pano_lon,
-            "date": meta.get("date"),          # 'YYYY-MM' - imagery age matters for condition
-            "pano_id": meta.get("pano_id"),
-            "copyright": meta.get("copyright"),
-            "distance_m": round(_haversine_m(pano_lat, pano_lon, lat, lon), 1),
-        },
+        "pano": pano_info,
+        "facade": facade_info,
         # Ground sampling distance: how much wall one pixel covers. Below ~2 mm/px
         # hairline cracks are plausible; at 8 mm/px only staining, spalling and
         # gross cracking survive. Surfaced so the UI never oversells a capture.
-        "mm_per_px": round(_streetview_mm_per_px(
-            _haversine_m(pano_lat, pano_lon, lat, lon), fov), 1),
+        "mm_per_px": round(_streetview_mm_per_px(dist, fov), 1),
     }
 
 
