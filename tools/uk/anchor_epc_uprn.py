@@ -69,6 +69,15 @@ BUILT_FORM = {"1": "Detached", "2": "Semi-detached", "3": "End-terrace", "4": "M
               "5": "Enclosed end-terrace", "6": "Enclosed mid-terrace"}
 RESIDENTIAL = ("bostad_enfamilj", "bostad_flerfamilj")
 
+# EPC main-heating energy-efficiency rating -> seasonal efficiency assumed for
+# a GAS boiler. The certificate carries the rating, not the boiler's SEDBUK
+# value, so this is an approximate, provisional mapping: "Very Good" ~ modern
+# A-rated condensing, "Good" ~ condensing, "Average" ~ older non-condensing,
+# "Poor"/"Very Poor" ~ old back boilers / gas fires.
+GAS_BOILER_EFF_BY_RATING = {"Very Good": 0.89, "Good": 0.85, "Average": 0.78, "Poor": 0.70, "Very Poor": 0.65}
+# Certificates older than this may predate later insulation or boiler upgrades.
+EPC_STALE_BEFORE_YEAR = 2016
+
 
 def sap_band(sap: float) -> str:
     return next((b for t, b in SAP_BANDS if sap >= t), "G")
@@ -216,6 +225,7 @@ def detail_from_bulk(row: dict) -> dict:
         "hotwater_description": row.get("hotwater_description") or None,
         "mains_gas_flag": {"Y": True, "N": False}.get((row.get("mains_gas_flag") or "").strip().upper()),
         "energy_consumption_kwh_m2_yr": num(row.get("energy_consumption_current")),
+        "mainheat_energy_eff": row.get("mainheat_energy_eff") or None,
         "has_heat_pump": ("heat pump" in heat.lower()) if heat else None,
         "has_solar_pv": (num(row.get("photo_supply")) or 0) > 0 if row.get("photo_supply") not in (None, "") else None,
         "fabric": epc_fabric.fabric_u(row),
@@ -539,6 +549,16 @@ def main() -> None:
                 b[f"{key}_epc"] = round(statistics.median(vals), 3) if vals else None
             if b.get("u_wall_epc") is not None:
                 stats["fabric_from_epc"] += 1
+            # Gas boiler efficiency from the certificates' heating rating (median over homes).
+            effs = [GAS_BOILER_EFF_BY_RATING[x["mainheat_energy_eff"]] for x in det
+                    if x.get("mainheat_energy_eff") in GAS_BOILER_EFF_BY_RATING
+                    and "gas" in (x.get("mainheat_description") or "").lower()]
+            b["boiler_efficiency_epc"] = round(statistics.median(effs), 3) if effs else None
+            # Age of the certificates the fabric and floor areas come from.
+            years = sorted(int(d["date"][:4]) for d in ds if d.get("date"))
+            b["epc_median_year"] = years[len(years) // 2] if years else None
+            b["epc_stale"] = bool(years) and years[len(years) // 2] < EPC_STALE_BEFORE_YEAR
+            stats["epc_stale"] += int(b["epc_stale"])
             if areas:
                 # Dwellings without a cached detail get the building's mean flat size.
                 b["floor_area_m2"] = round(statistics.mean(areas) * len(ds), 1)

@@ -527,7 +527,9 @@ def build_shoebox_idf(
         ]))
 
     if gas_boiler:
-        objects.extend(_gas_boiler_objects(zone_name, boiler_efficiency or D.UK_BOILER_EFFICIENCY))
+        # Explicit argument > the certificates' heating rating (tools/uk/anchor_epc_uprn.py) > default.
+        objects.extend(_gas_boiler_objects(zone_name, boiler_efficiency or building.get("boiler_efficiency_epc")
+                                           or D.UK_BOILER_EFFICIENCY))
     else:
         objects.extend(_ideal_loads_objects(zone_name))
 
