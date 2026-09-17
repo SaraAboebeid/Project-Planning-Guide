@@ -195,7 +195,7 @@ export default function DefineProject() {
       setAddressUploadMessage("Geocoding uploaded addresses…");
       const settled = await Promise.allSettled(
         uniqueAddresses.map(async (address) => {
-          const geo = await api.geocode(address);
+          const geo = await api.geocode(address, project.country);
           return { lat: geo.lat, lon: geo.lon, label: address };
         })
       );
@@ -235,8 +235,8 @@ export default function DefineProject() {
     setBuildingLoading(true);
     try {
       const [stats, rows] = await Promise.all([
-        api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west),
-        api.buildingsBboxList(bbox.north, bbox.south, bbox.east, bbox.west),
+        api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west, undefined, project.country),
+        api.buildingsBboxList(bbox.north, bbox.south, bbox.east, bbox.west, undefined, project.country),
       ]);
       if (reqId !== areaLookupSeq.current) return;
       // A rectangle supersedes any previously drawn free-form polygon.
@@ -277,8 +277,8 @@ export default function DefineProject() {
     setBuildingLoading(true);
     try {
       const [stats, rows] = await Promise.all([
-        api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west, polygon),
-        api.buildingsBboxList(bbox.north, bbox.south, bbox.east, bbox.west, polygon),
+        api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west, polygon, project.country),
+        api.buildingsBboxList(bbox.north, bbox.south, bbox.east, bbox.west, polygon, project.country),
       ]);
       if (reqId !== areaLookupSeq.current) return;
       setProject({
@@ -1262,7 +1262,7 @@ export default function DefineProject() {
                   type="text"
                   value={project.neighborhoodName}
                   onChange={(e) => setProject({ neighborhoodName: e.target.value })}
-                  placeholder="e.g. Askim, Backa, Eriksberg"
+                  placeholder={isSweden ? "e.g. Askim, Backa, Eriksberg" : "e.g. Eastwood, Kimberworth, Rawmarsh"}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
                 />
                 <p className="text-xs text-gray-500 mt-1">Name the district or neighborhood this project covers.</p>
@@ -1324,12 +1324,14 @@ export default function DefineProject() {
         <Card className="animate-fadeIn">
           <Label>Project Location</Label>
           <p className="text-sm text-white/65">
-            District scale uses the district selection above. The map below shows Gothenburg and the selected district boundary.
+            {isSweden
+              ? "District scale uses the district selection above. The map below shows Gothenburg and the selected district boundary."
+              : "There is no named-district list for this city yet, so a district name can't load buildings on its own."}
           </p>
           <p className="text-xs text-white/45 mt-2">
             {isSweden
               ? "Pick a Gothenburg district above to load its buildings in Step 2."
-              : "Enter the district name above to define the project area."}
+              : "To analyse a whole area, switch the scale to Building and use \u201cDraw box\u201d or \u201cDraw shape\u201d on the map \u2014 every building inside is loaded in Step 2."}
           </p>
           <div className="mt-3">
             <LocationMap

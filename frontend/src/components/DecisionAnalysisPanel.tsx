@@ -48,6 +48,7 @@ export default function DecisionAnalysisPanel({
   prices: number[]; setPrices: (p: number[]) => void;
   currentPrice: number;
 }) {
+  const cur = result.currency ?? "SEK";
   /* "Worst miss vs best" is the column that answers the question people actually
      have — how bad can this look in hindsight — and it is the one minimax regret
      is built on. Outcome spread is a second-order sensitivity check, and the
@@ -79,8 +80,11 @@ export default function DecisionAnalysisPanel({
       <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, color: white(0.35), textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-            Energy-price assumptions (SEK/kWh)
-            <span style={{ textTransform: "none", fontWeight: 400, letterSpacing: 0, color: "#B98BE8", marginLeft: 6 }}>· for comparison, today's price ≈ {currentPrice} SEK/kWh</span>
+            Energy-price assumptions ({cur}/kWh)
+            <span style={{ textTransform: "none", fontWeight: 400, letterSpacing: 0, color: "#B98BE8", marginLeft: 6 }}>· for comparison, today's price ≈ {currentPrice} {cur}/kWh</span>
+            {result.priceBasis && (
+              <span style={{ display: "block", textTransform: "none", fontWeight: 400, letterSpacing: 0, color: white(0.35), marginTop: 3 }}>{result.priceBasis}</span>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             {scenarios.map((s, i) => (
@@ -88,10 +92,10 @@ export default function DecisionAnalysisPanel({
                 {s.label}
                 <span style={{ fontSize: 9, color: white(0.3), marginTop: -2 }}>{scenarioHint(s.label, i)}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <input type="number" min={0} step={0.1} value={prices[i]}
+                  <input type="number" min={0} step={cur === "GBP" ? 0.01 : 0.1} value={prices[i]}
                     onChange={(e) => { const p = [...prices]; p[i] = Math.max(0, Number(e.target.value)); setPrices(p); }}
                     style={{ width: 62, background: "#0d1117", border: `1px solid ${white(0.15)}`, borderRadius: 6, padding: "4px 6px", color: "#fff", fontSize: 12 }} />
-                  <span style={{ fontSize: 9.5, color: white(0.35), whiteSpace: "nowrap" }}>SEK/kWh</span>
+                  <span style={{ fontSize: 9.5, color: white(0.35), whiteSpace: "nowrap" }}>{cur}/kWh</span>
                 </span>
               </label>
             ))}
@@ -236,7 +240,7 @@ export default function DecisionAnalysisPanel({
           );
         })}
         <div style={{ fontSize: 10.5, color: white(0.3), marginTop: 4, lineHeight: 1.6 }}>
-          Values are {result.studyPeriodYr}-yr net present benefit (SEK, in millions) — a negative number means the investment
+          Values are {result.studyPeriodYr}-yr net present benefit ({cur}, in millions) — a negative number means the investment
           isn't repaid by energy savings alone under that scenario (deep retrofits are also done for the climate target, comfort and
           asset value). <b style={{ color: white(0.45) }}>Green</b> = best retrofit in that future; <i>Keep as-built</i> is the
           do-nothing <b style={{ color: white(0.45) }}>0 reference</b>, so retrofits are ranked among themselves. Saved to the Step 5 report.

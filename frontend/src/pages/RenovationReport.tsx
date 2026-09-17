@@ -6,6 +6,7 @@ import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal } from ".
 import ClimateGoalPanel from "../components/ClimateGoalPanel";
 import ClimateGoalBuildingTable from "../components/ClimateGoalBuildingTable";
 import type { BuildingLookup, BuildingRecord } from "../types";
+import { fmtGBP, UK_COST_CARBON_SOURCE_NOTE } from "../config/ukCostCarbon";
 import {
   Building2, Leaf, DollarSign, Zap, CheckCircle2, Download, ScanSearch,
   Award, TrendingDown, Package, FileText, AlertTriangle, Target, Flame,
@@ -179,6 +180,10 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
 export default function RenovationReport() {
   const navigate = useNavigate();
   const { project } = useWizardStore();
+  // UK projects are costed in GBP from UK sources; everything else is Swedish.
+  const isUK = project.country === "United Kingdom";
+  const numLocale = isUK ? "en-GB" : "sv-SE";
+  const money = (n: number) => (isUK ? fmtGBP(n) : sek(n));
 
   const simResults   = project.renovationSimResults ?? [];
   const baselines    = project.renovationBaselineResults ?? [];
@@ -409,7 +414,7 @@ export default function RenovationReport() {
 
   function downloadPdf() {
     const esc = (s: unknown) => String(s ?? "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]!));
-    const sek = (n: number) => Math.round(n).toLocaleString("sv-SE") + " SEK";
+    const sek = (n: number) => isUK ? fmtGBP(n) : Math.round(n).toLocaleString(numLocale) + " SEK";
     // Absolute origin so the logos resolve from the Blob-URL document (relative
     // paths there point at the blob, not the app). Logos are white → dark banner.
     const origin = window.location.origin;
@@ -527,8 +532,8 @@ export default function RenovationReport() {
         <div class="kv">
           <span><b>${r.energyUse.toFixed(1)}</b> kWh/m²·yr</span>
           <span>saves <b>${r.saving.toFixed(1)}</b> kWh/m²·yr</span>
-          <span><b>${sek(r.cost)}</b></span>
-          <span><b>${Math.round(r.carbonSaving).toLocaleString("sv-SE")}</b> kg CO₂e saved</span>
+          <span><b>${money(r.cost)}</b></span>
+          <span><b>${Math.round(r.carbonSaving).toLocaleString(numLocale)}</b> kg CO₂e saved</span>
         </div>
       </div>`;
     };
@@ -586,7 +591,7 @@ export default function RenovationReport() {
     </div>
     <div class="cover-kicker">Building Renovation Analysis</div>
     <div class="cover-title">${esc(project.projectName || "Renovation Report")}</div>
-    <div class="cover-meta">${esc(locationText)} · ${buildings.length} building${buildings.length !== 1 ? "s" : ""} · ${esc(components.join(", ") || "no components")} · Generated ${new Date().toLocaleString("sv-SE")}</div>
+    <div class="cover-meta">${esc(locationText)} · ${buildings.length} building${buildings.length !== 1 ? "s" : ""} · ${esc(components.join(", ") || "no components")} · Generated ${new Date().toLocaleString(numLocale)}</div>
   </div>
   <div class="prepared"><span class="lbl">Prepared by</span><b>Chalmers Next Labs</b> — ${esc(team)}</div>
 
@@ -633,7 +638,7 @@ export default function RenovationReport() {
       <td>${esc(r.buildingLabel ?? "all buildings")}</td>
       <td>${esc(materialsOf(r).map((m) => `${m.component}: ${m.buildup || m.desc}`).join("; ") || "—")}</td>
       <td>${r.energyUse.toFixed(1)}</td><td>${r.saving.toFixed(1)}</td>
-      <td>${sek(r.cost)}</td><td>${Math.round(r.carbonSaving).toLocaleString("sv-SE")}</td></tr>`).join("")
+      <td>${money(r.cost)}</td><td>${Math.round(r.carbonSaving).toLocaleString(numLocale)}</td></tr>`).join("")
     : `<tr><td colspan="7" class="muted">No packages simulated.</td></tr>`}
   </tbody></table>
 
@@ -674,11 +679,17 @@ export default function RenovationReport() {
   <p class="sub" style="margin-top:4px">Values in kWh/m²·yr · pp = percentage points short of the −${buildingGoal.goal.reductionPct}% target.</p>` : ""}` : ""}
 
   <div class="foot">
-    Energy from EnergyPlus (EPSM) single-zone shoebox simulation · U-values per EN ISO 6946 ·
+    Energy from EnergyPlus (EPSM) single-zone shoebox simulation · ${isUK
+      ? `as-built and refurbished U-values from TABULA GB (BRE, EPISCOPE) · weather: Doncaster/Sheffield TMYx ·
+    ${esc(UK_COST_CARBON_SOURCE_NOTE)}
+    Baseline energy class, SAP, floor area and heating from the MHCLG EPC register (OGL v3.0), matched to buildings via OS Open UPRN;
+    buildings without a certificate carry a band estimated from the English Housing Survey 2024-25.
+    Hot water uses the tool's Swedish Sveby draw profile, not a UK SAP assumption.`
+      : `U-values per EN ISO 6946 ·
     cost from Wikells Sektionsfakta · embodied carbon from Boverket Klimatdatabas ·
     ${project.supplierDiscountPct ? `All material costs are net of a ${project.supplierDiscountPct}% supplier discount entered in Step 4. ` : ""}Costs are installed capex (materials + labour); they exclude energy, maintenance and replacement.
     baseline energy class from Boverket EPC. Hot water is a Sveby standard draw profile played
-    back through EnergyPlus, not a prediction. Cooling reads 0 because EPSM&#39;s end-use table
+    back through EnergyPlus, not a prediction.`} Cooling reads 0 because EPSM&#39;s end-use table
     carries only electricity and district heating; the hourly trace does show ideal-loads
     cooling, which a single-zone model with no openable windows overstates.
   </div>
@@ -780,7 +791,7 @@ export default function RenovationReport() {
           </div>
           <div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>Material cost</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.7)" }}>{sek(result.cost)}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.7)" }}>{money(result.cost)}</div>
           </div>
         </div>
       </div>
@@ -899,14 +910,14 @@ export default function RenovationReport() {
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>Area</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{b.area_atemp ? `${Math.round(b.area_atemp).toLocaleString("sv-SE")} m²` : "—"}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{b.area_atemp ? `${Math.round(b.area_atemp).toLocaleString(numLocale)} m²` : "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>Energy class</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{isUK && !b.has_epc && b.eclass ? "Energy class (est.)" : "Energy class"}</div>
                     <div style={{ fontSize: 13, fontWeight: 900, color: "#E8880C" }}>{b.eclass ?? "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>EPC energy</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{b.energy_source === "tabula_estimate" ? "TABULA estimate" : "EPC energy"}</div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{b.energy ? kwh(b.energy) : "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
@@ -1120,7 +1131,7 @@ export default function RenovationReport() {
                 <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.65)", textAlign: "right" }}>{kwh(r.energyUse)}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#2FB477", textAlign: "right" }}>−{kwh(r.saving)}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#4A90E2", textAlign: "right" }}>−{kg(r.carbonSaving)}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>{sek(r.cost)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>{money(r.cost)}</span>
               </div>
             ))}
           </div>
@@ -1153,13 +1164,13 @@ export default function RenovationReport() {
               This package achieves a <strong style={{ color: "#2FB477" }}>{kwh(bestBalanced.saving)} reduction</strong> in annual energy use
               (from {kwh(baselineEU)} to <strong style={{ color: "#E8880C" }}>{kwh(bestBalanced.energyUse)}</strong>),
               saving an estimated <strong style={{ color: "#4A90E2" }}>{kg(bestBalanced.carbonSaving)}</strong> of embodied carbon per year,
-              at a material cost of <strong style={{ color: "rgba(255,255,255,0.8)" }}>{sek(bestBalanced.cost)}</strong>.
+              at a material cost of <strong style={{ color: "rgba(255,255,255,0.8)" }}>{money(bestBalanced.cost)}</strong>.
             </p>
           </div>
           {bestCost && bestCost.packageIndex !== bestBalanced.packageIndex && (
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6, margin: "0 0 6px" }}>
               If cost is the primary constraint, <strong style={{ color: "#E8880C" }}>Package #{bestCost.packageIndex}</strong> offers the
-              lowest material cost at <strong style={{ color: "#E8880C" }}>{sek(bestCost.cost)}</strong> while still saving{" "}
+              lowest material cost at <strong style={{ color: "#E8880C" }}>{money(bestCost.cost)}</strong> while still saving{" "}
               <strong style={{ color: "#2FB477" }}>{kwh(bestCost.saving)}</strong>.
             </p>
           )}
@@ -1234,7 +1245,7 @@ export default function RenovationReport() {
                       <th key={s.key} style={th} title={scenarioHint(s.label, i)}>
                         {s.label}
                         <br />
-                        <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>{scenarioHint(s.label, i)} · {s.priceSek} SEK/kWh</span>
+                        <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>{scenarioHint(s.label, i)} · {s.priceSek} {ra.currency ?? "SEK"}/kWh</span>
                       </th>
                     ))}
                     <th style={th} title="Best minus worst across scenarios">Outcome spread</th>
@@ -1259,7 +1270,7 @@ export default function RenovationReport() {
               </table>
             </div>
             <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", marginTop: 10, lineHeight: 1.6 }}>
-              Values are {ra.studyPeriodYr}-year net present benefit (SEK, millions). Negative means the investment is not repaid by energy savings
+              Values are {ra.studyPeriodYr}-year net present benefit ({ra.currency ?? "SEK"}, millions). Negative means the investment is not repaid by energy savings
               in that future. "Balanced score" is the Hurwicz method shown in plain language.
             </p>
           </Card>
@@ -1271,7 +1282,8 @@ export default function RenovationReport() {
         const ha = project.heatingAnalysis!;
         const sel = ha.results.find((r) => r.id === ha.selectedId) ?? ha.results.find((r) => r.isBaseline) ?? ha.results[0];
         if (!sel) return null;
-        const fsek = (v: number) => { const a = Math.abs(v); return a >= 1e6 ? `${(v / 1e6).toFixed(2)} M` : a >= 1e4 ? `${Math.round(v / 1e3)} k` : `${Math.round(v).toLocaleString("sv-SE")}`; };
+        const fsek = (v: number) => { const a = Math.abs(v); return a >= 1e6 ? `${(v / 1e6).toFixed(2)} M` : a >= 1e4 ? `${Math.round(v / 1e3)} k` : `${Math.round(v).toLocaleString(numLocale)}`; };
+        const hcur = ha.currency ?? "SEK";
         const th2: React.CSSProperties = { padding: "6px 8px", fontWeight: 600, color: "rgba(255,255,255,0.45)", textAlign: "right", whiteSpace: "nowrap" };
         const td2: React.CSSProperties = { padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap", color: "rgba(255,255,255,0.8)" };
         return (
@@ -1281,9 +1293,9 @@ export default function RenovationReport() {
               On the building's <strong style={{ color: "#fff" }}>{Math.round(ha.heatingDemandKwhM2Yr)} kWh/m²·yr</strong> heat demand, the chosen system is{" "}
               <strong style={{ color: "#E8880C" }}>{sel.name}</strong>{sel.isBaseline ? " (the as-built baseline)" : ""} — delivering{" "}
               <strong style={{ color: "#fff" }}>{sel.deliveredKwhM2Yr} kWh/m²·yr</strong> at{" "}
-              <strong style={{ color: "#fff" }}>{fsek(sel.operatingCostYrSek)} SEK/yr</strong> and{" "}
+              <strong style={{ color: "#fff" }}>{fsek(sel.operatingCostYrSek)} {hcur}/yr</strong> and{" "}
               <strong style={{ color: "#4A90E2" }}>{fsek(sel.carbonYrKg)} kg CO₂e/yr</strong>
-              {sel.vsBaseline && !sel.isBaseline && <> ({sel.vsBaseline.opCostPct > 0 ? "+" : ""}{sel.vsBaseline.opCostPct}% cost, {sel.vsBaseline.carbonPct > 0 ? "+" : ""}{sel.vsBaseline.carbonPct}% carbon vs district heating)</>}.
+              {sel.vsBaseline && !sel.isBaseline && <> ({sel.vsBaseline.opCostPct > 0 ? "+" : ""}{sel.vsBaseline.opCostPct}% cost, {sel.vsBaseline.carbonPct > 0 ? "+" : ""}{sel.vsBaseline.carbonPct}% carbon vs {hcur === "GBP" ? "the existing gas boiler" : "district heating"})</>}.
             </p>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -1322,7 +1334,7 @@ export default function RenovationReport() {
               </table>
             </div>
             <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", marginTop: 10, lineHeight: 1.6 }}>
-              Heat demand from EnergyPlus (EPSM); system economics are a supply-side layer (delivered = demand ÷ SPF). Values are Swedish defaults — see the tool's Heating-system panel for sources.
+              Heat demand from EnergyPlus (EPSM); system economics are a supply-side layer (delivered = demand ÷ SPF). Values are {hcur === "GBP" ? "UK defaults (Ofgem price cap, DESNZ carbon factors and install costs)" : "Swedish defaults"} — see the tool's Heating-system panel for sources.
             </p>
           </Card>
         );

@@ -13,7 +13,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SS_API = '/api/urban/space-syntax';
-const SS_MAX_DEG = 0.03;   // clamp the analysis box (~3.3 km) so the compute stays fast
+// Clamp the analysis box so the compute stays interactive. Measured on the
+// Gothenburg network (2026-09-16): 0.03 (~3.3 km each way) did not finish a
+// betweenness run in 11 minutes; 0.012 took 47 s; 0.008 (~0.9 km, ~2,250
+// segments) takes ~17 s for betweenness, ~40 s for reach and ~100 s for
+// integration, which is exact closeness and the slowest. Zoom in and press
+// "Recompute for current view" to analyse a smaller area.
+const SS_MAX_DEG = 0.008;
 
 let _ssEntities = [];
 let _ssActive   = false;
@@ -59,7 +65,7 @@ function _ssBox() {
 async function _ssFetch() {
   if (_ssBusy) return;
   _ssBusy = true;
-  _ssSetStatus(`Computing ${SS_METRIC_LABEL[_ssMetric].toLowerCase()} on the street network… (a few seconds)`);
+  _ssSetStatus(`Computing ${SS_METRIC_LABEL[_ssMetric].toLowerCase()} on the street network… (betweenness ~20 s; integration can take a couple of minutes)`);
   try {
     const b = _ssBox();
     const url = `${SS_API}?south=${b.south.toFixed(4)}&north=${b.north.toFixed(4)}&west=${b.west.toFixed(4)}&east=${b.east.toFixed(4)}&metric=${_ssMetric}&radius=1000`;

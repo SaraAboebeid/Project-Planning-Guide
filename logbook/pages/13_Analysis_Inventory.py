@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from logbook_content import PAGES  # noqa: E402
+from scripts.analysis_gallery import render as gallery  # noqa: E402
 from scripts.ui_utils import render_page  # noqa: E402
 
-render_page(PAGES["analysis_index"])
+render_page(PAGES["analysis_index"], extra=gallery)

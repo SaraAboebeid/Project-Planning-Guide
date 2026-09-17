@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useWizardStore } from "../store/wizard";
 import { api } from "../api/client";
+import { ukViewerCityId } from "../config/countryNav";
 import { setWizardCanNext, setWizardNextError } from "../components/wizardNav";
 import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import FacadeDefectPanel, { type FacadeBuilding } from "../components/FacadeDefectPanel";
@@ -986,10 +987,19 @@ function BboxDataBanner({
   const [editDraftRows, setEditDraftRows] = useState<BuildingRecord[] | null>(null);
   // Current heating system per building (from the Boverket EPC), keyed by address.
   const [heating, setHeating]         = useState<Record<string, { system: string } | null>>({});
+  const country = useWizardStore(s => s.project.country);
+  const projectCity = useWizardStore(s => s.project.city);
   const PAGE_SIZE = 50;
 
   // Look up the current heating system for the loaded buildings (Gothenburg EPC).
+  // UK rows already carry it from their EPC certificates.
   useEffect(() => {
+    if (country === "United Kingdom") {
+      const byAddr: Record<string, { system: string } | null> = {};
+      for (const r of rows ?? []) if (r.address && r.heating_system) byAddr[r.address] = { system: r.heating_system };
+      setHeating(byAddr);
+      return;
+    }
     const addrs = Array.from(new Set(
       (rows ?? []).map(r => r.address).filter((a): a is string => !!a && !isCadastralId(a)),
     ));
@@ -997,7 +1007,7 @@ function BboxDataBanner({
     let alive = true;
     api.epcHeating(addrs).then(res => { if (alive) setHeating(res.results ?? {}); }).catch(() => { if (alive) setHeating({}); });
     return () => { alive = false; };
-  }, [rows]);
+  }, [rows, country]);
 
   // In district mode there are no precomputed aggregate stats, so derive them
   // from the fetched rows once they load.
@@ -1025,7 +1035,7 @@ function BboxDataBanner({
     try {
       const data = district
         ? await api.buildingsByDistrict(district)
-        : await api.buildingsBboxList(bbox!.north, bbox!.south, bbox!.east, bbox!.west, polygon ?? undefined);
+        : await api.buildingsBboxList(bbox!.north, bbox!.south, bbox!.east, bbox!.west, polygon ?? undefined, country);
       setRows(data);
       // Auto-select the whole selection (district or drawn shape) so Steps 3-4
       // simulate all of it (the user can still uncheck buildings to narrow).
@@ -1241,7 +1251,9 @@ function BboxDataBanner({
     } else if (bbox) {
       box = [bbox.north, bbox.south, bbox.east, bbox.west].join(",");
     }
-    return `/gothenburg_3d.html?bbox=${box}`;
+    return country === "United Kingdom"
+      ? `/uk_3d.html?city=${ukViewerCityId(projectCity)}&bbox=${box}`
+      : `/gothenburg_3d.html?bbox=${box}`;
   })();
 
   function togglePageAll() {
@@ -1804,7 +1816,13 @@ function BuildingDataBanner({
   const [heating, setHeating] = useState<{ system: string } | null>(null);
 
   const critical = projectType ? (BUILDING_CRITICAL[projectType] ?? new Set<keyof BuildingLookup>()) : new Set<keyof BuildingLookup>();
-  const viewerUrl = `/gothenburg_3d.html?lat=${building.lat}&lon=${building.lon}&zoom=17`;
+  const isUK = building.country === "gb";
+  const projectCity = useWizardStore(s => s.project.city);
+  // The UK viewer takes ?city=<id>&bbox=n,s,e,w (no lat/lon), so frame ~60 m around the building.
+  const d = 0.0006;
+  const viewerUrl = isUK
+    ? `/uk_3d.html?city=${ukViewerCityId(projectCity)}&bbox=${[building.lat + d, building.lat - d, building.lon + d, building.lon - d].join(",")}`
+    : `/gothenburg_3d.html?lat=${building.lat}&lon=${building.lon}&zoom=17`;
 
   const fields: { key: keyof BuildingLookup; label: string }[] = [
     { key: "use_cat",       label: "Use" },
@@ -1812,20 +1830,29 @@ function BuildingDataBanner({
     { key: "floors",        label: "Floors" },
     { key: "height",        label: "Height (m)" },
     { key: "footprint_m2",  label: "Footprint (m²)" },
-    { key: "eclass",        label: "Energy class" },
-    { key: "energy",        label: "Energy (kWh/m²)" },
+    { key: "eclass",        label: isUK && !building.has_epc && building.eclass ? "Energy class (est.)" : "Energy class" },
+    { key: "energy",        label: isUK && building.energy_source === "tabula_estimate" ? "Energy (kWh/m², TABULA est.)" : "Energy (kWh/m²)" },
     { key: "tabula_u_wall", label: "U-wall (W/m²K)" },
     { key: "tabula_u_win",  label: "U-win (W/m²K)" },
+    ...(isUK ? [
+      { key: "sap" as const,            label: "SAP rating" },
+      { key: "area_atemp" as const,     label: "Floor area (m², EPC)" },
+      { key: "property_type" as const,  label: "Dwelling type" },
+      { key: "tabula_u_roof" as const,  label: "U-roof (W/m²K)" },
+      { key: "tabula_u_floor" as const, label: "U-floor (W/m²K)" },
+    ] : []),
   ];
   // Numeric fields get coerced back to numbers on edit; the rest stay strings.
-  const NUMERIC = new Set<string>(["year", "floors", "height", "footprint_m2", "energy", "tabula_u_wall", "tabula_u_win"]);
+  const NUMERIC = new Set<string>(["year", "floors", "height", "footprint_m2", "energy", "tabula_u_wall", "tabula_u_win", "sap", "area_atemp", "tabula_u_roof", "tabula_u_floor"]);
 
   const missingCritical = fields.filter(
     f => critical.has(f.key) && (building[f.key] === null || building[f.key] === undefined)
   );
 
   // Look up the current heating system for this address (skip cadastral-only IDs).
+  // UK lookups already carry it from the building's EPC certificates.
   useEffect(() => {
+    if (isUK) { setHeating(building.heating_system ? { system: building.heating_system } : null); return; }
     const addr = building.address;
     if (!addr || isCadastralId(addr)) { setHeating(null); return; }
     let alive = true;
@@ -1833,7 +1860,7 @@ function BuildingDataBanner({
       .then(res => { if (alive) setHeating(res.results?.[addr] ?? null); })
       .catch(() => { if (alive) setHeating(null); });
     return () => { alive = false; };
-  }, [building.address]);
+  }, [building.address, building.heating_system, isUK]);
 
   // Write an edited field back into the store so Steps 3-4 (which read
   // lookedUpBuilding / lookedUpBuildings) pick up the override.
@@ -1900,9 +1927,10 @@ function BuildingDataBanner({
         <div className="flex items-center gap-2">
           <span className="text-base">🏗️</span>
           <span className="text-xs font-semibold text-purple-300">Data Available</span>
-          <span className="px-1.5 py-0.5 rounded-full bg-purple-900/50 text-purple-300 text-[9px] font-bold border border-purple-600/50">EUBUCCO</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-purple-900/50 text-purple-300 text-[9px] font-bold border border-purple-600/50">{isUK ? "OSM + EUBUCCO" : "EUBUCCO"}</span>
           {building.has_epc && (
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span>
+            <span title={isUK && building.epc_latest_date ? `EPC register - newest certificate ${building.epc_latest_date}` : undefined}
+              className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -1987,6 +2015,40 @@ function BuildingDataBanner({
         </div>
       </div>
 
+      {/* UK: measured consumption and non-domestic certificates, read-only */}
+      {isUK && (building.desnz_gas_median_kwh != null || building.desnz_electricity_median_kwh != null || building.dec_band || building.nd_epc_band) && (
+        <div className="mx-3 mb-3 rounded-lg border border-emerald-700/30 bg-emerald-900/10 px-3 py-2 text-[11px] text-white/70 space-y-1">
+          {(building.desnz_gas_median_kwh != null || building.desnz_electricity_median_kwh != null) && (
+            <div title="DESNZ postcode-level domestic gas and electricity statistics (OGL v3.0). Median metered annual use per meter in this postcode — a neighbourhood figure, not this building's own meter.">
+              <b className="text-emerald-300">Metered use, postcode {building.desnz_postcode} ({building.desnz_year}):</b>{" "}
+              {building.desnz_gas_median_kwh != null && <>gas {Math.round(building.desnz_gas_median_kwh).toLocaleString("en-GB")} kWh/yr per meter ({building.desnz_gas_meters} meters)</>}
+              {building.desnz_gas_median_kwh != null && building.desnz_electricity_median_kwh != null && " · "}
+              {building.desnz_electricity_median_kwh != null && <>electricity {Math.round(building.desnz_electricity_median_kwh).toLocaleString("en-GB")} kWh/yr per meter ({building.desnz_electricity_meters} meters)</>}
+              <span className="text-white/40"> — DESNZ median, not this building's own meter</span>
+            </div>
+          )}
+          {building.dec_band && (
+            <div>
+              <b className="text-emerald-300">Display Energy Certificate:</b> band {building.dec_band}
+              {building.dec_name ? ` · ${building.dec_name}` : ""}
+              {building.dec_property_type ? ` · ${building.dec_property_type}` : ""}
+              {building.dec_metered_kwh && Object.keys(building.dec_metered_kwh).length > 0 && (
+                <> · metered {Object.entries(building.dec_metered_kwh).map(([f, v]) => `${f.replace(/_/g, " ")} ${Math.round(v).toLocaleString("en-GB")} kWh`).join(", ")}
+                  {building.dec_period?.[0] ? ` (${building.dec_period[0]} to ${building.dec_period[1]})` : ""}</>
+              )}
+            </div>
+          )}
+          {building.nd_epc_band && (
+            <div>
+              <b className="text-emerald-300">Non-domestic EPC:</b> band {building.nd_epc_band}
+              {building.nd_property_type ? ` · ${building.nd_property_type}` : ""}
+              {building.nd_floor_area_m2 ? ` · ${Math.round(building.nd_floor_area_m2).toLocaleString("en-GB")} m²` : ""}
+              {building.nd_energy_kwh_m2_yr ? ` · modelled ${Math.round(building.nd_energy_kwh_m2_yr)} kWh/m²/yr` : ""}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Missing critical data warning */}
       {missingCritical.length > 0 && !editing && (
         <div className="mx-3 mb-3 flex items-start gap-2 rounded-lg bg-red-900/30 border border-red-700/40 px-3 py-2 text-xs text-red-400">
@@ -2003,7 +2065,7 @@ function BuildingDataBanner({
       <div className="px-3 pb-3">
         <a href={viewerUrl} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-400 hover:text-purple-300 underline underline-offset-2">
-          📷 Open Gothenburg 3D →
+          📷 {isUK ? "Open UK 3D viewer" : "Open Gothenburg 3D"} →
         </a>
       </div>
     </div>
@@ -2045,6 +2107,12 @@ function MultiBuildingDataBanner({
   // Current heating system per building, inferred from the Boverket EPC.
   const [heating, setHeating] = useState<Record<string, { system: string } | null>>({});
   useEffect(() => {
+    if (buildings.some(b => b.country === "gb")) {
+      const byAddr: Record<string, { system: string } | null> = {};
+      for (const b of buildings) if (b.address && b.heating_system) byAddr[b.address] = { system: b.heating_system };
+      setHeating(byAddr);
+      return;
+    }
     const addrs = Array.from(new Set(buildings.map(b => b.address).filter((a): a is string => !!a && !isCadastralId(a))));
     if (!addrs.length) { setHeating({}); return; }
     let alive = true;
@@ -2169,6 +2237,7 @@ export default function DataCoverage() {
             bbox.east,
             bbox.west,
             project.selectionPolygon ?? undefined,
+            project.country,
           );
           setBboxRows(rows);
           setProject({ bboxRows: rows, bboxStats: deriveStats(rows) });

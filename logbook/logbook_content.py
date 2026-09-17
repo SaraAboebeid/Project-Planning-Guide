@@ -339,7 +339,7 @@ handle takes an exclusive lock and blocks the backend.
                 "stage": "raw",
                 "used_in": [
                     "3D viewer — road centrelines, street network and green areas",
-                    "Space-syntax analysis is written but **not loaded** in the viewer",
+                    "Space-syntax analysis in the viewer — street-network centrality",
                 ],
                 "processed_by": ["backend/main.py"],
             },
@@ -1099,72 +1099,368 @@ ACCESS = {
     "nav_title": "Services, keys & access",
     "stage": "metadata",
     "purpose": """
-The infrastructure every page relies on, whichever country: the services the
-backend talks to, the AI providers, the map tiles, and where the keys live.
-Country-specific sources and keys are on **1. Data Sources**, which has a
-tab per country.
+Everything the tool depends on outside its own code: the services it calls, the
+keys those need, the ports each piece listens on, how it is deployed, and —
+most useful when something breaks — **what happens when a given service or key
+is missing**. Almost nothing here fails hard: the tool is written to degrade,
+which is convenient in use and confusing in diagnosis, so each entry says
+exactly how it degrades. Country-specific datasets are on **1. Data Sources**;
+the analyses that use these services are on **13. Analysis Inventory**.
+
+Checked against the code and probed live on this computer on 2026-09-16. No key
+value appears on this page or anywhere in the logbook.
 """,
+    "overview": {
+        "title": "Five kinds of dependency",
+        "subtitle": "Each fails differently, and each is listed with its failure behaviour.",
+        "items": [
+            ("Our own services", "EPSM for EnergyPlus (Docker, port 8010) and the façade ML service (port 8020). Both optional; both refuse politely when down."),
+            ("Services needing a key", "Västtrafik, Trafikverket, CARTO, the AI providers, Google Street View, the UK certificate register."),
+            ("Free public services", "OpenStreetMap (Overpass, Nominatim), PVGIS, SCB, Boverket's climate database, electricity spot prices, Esri basemaps."),
+            ("Things the browser fetches itself", "The Cesium library from a CDN, map tiles, the Swedish statistics map service — these bypass the backend entirely."),
+            ("Files on disk", "The certificate database, the simulation store, weather files, scraped market databases — they behave like services and fail like them."),
+        ],
+    },
     "sections": [
         {
-            "title": "Internal services",
-            "badge": "metadata",
+            "title": "Live status on this computer",
+            "badge": "result",
             "body": """
-Services the backend proxies to — ours, not third parties:
+Every service was called through the tool's own routes on **2026-09-16**. This
+is what a healthy install looks like, and the same checks diagnose a broken one.
 
-| Service | Configured by | Port |
+| Checked | Route used | Result |
 |---|---|---|
-| EPSM (EnergyPlus) | `EPSM_BASE_URL` | 8010 |
-| Façade defect ML | `FACADE_ML_URL` / `FACADE_MODEL_URL` | 8020 |
+| Backend | `/api/health` | **up** (0.2 s) |
+| AI provider | `/api/status` | **configured**, provider `openai` |
+| EnergyPlus (EPSM) | `/api/status` | **not reachable** — Docker Desktop is not running |
+| Façade defect ML | `/api/status` | **not reachable** — the service is not started |
+| Electricity spot price | `/api/energy-price?zone=SE3` | **live**, 0.7 s |
+| Västtrafik | `/api/vasttrafik/stops` | **live**, 1.9 s — the key pair works |
+| Trafikverket | `/api/trafikverket/data` | **live**, 1.3 s, 290 kB — the key works |
+| Statistics Sweden | `/api/scb/deso-income` | **live**, 4.8 s |
+| OpenStreetMap (Overpass) | `/api/osm/roads` | **live**, 0.7 s |
+| Address search (Nominatim) | `/api/geocode` | **live** |
+| Boverket climate database | `/api/boverket/materials` | **live**, 22 kB |
+| Solar yield (PVGIS) | `/api/pvgis` | **live**, 5 s |
+| UK building lookup | `/api/uk/building` | **live** (local files) |
 
-EPSM runs in Docker. When energy simulations fail, check that Docker Desktop is
-running before anything else — that has been the cause every time so far.
+**The one check worth remembering:** `GET /api/status` answers with the AI
+provider, EPSM and the façade ML service in one object. It is what the app's
+Settings → Connections panel reads, and it treats "any answer below a 500" as
+reachable.
 """,
-            "files": ["docker-compose.epsm.yml", "tools/ml/facade_detect_service.py"],
+            "files": ["backend/main.py"],
         },
         {
-            "title": "AI providers",
+            "title": "Keys — what each one unlocks, and life without it",
             "badge": "metadata",
             "body": """
-| Provider | Endpoint | Key |
-|---|---|---|
-| Anthropic | `api.anthropic.com/v1/messages` | **`ANTHROPIC_API_KEY`** |
-| OpenAI | `api.openai.com/v1/chat/completions` | **`OPENAI_API_KEY`** |
+All keys live in the gitignored `.env` at the repository root, loaded once when
+the backend starts. The scrapers parse the same file themselves. Docker passes
+it in with `env_file` and does not require it.
 
-What each one is used for is on **10. AI, ML & Vision Models**.
+| Key | Unlocks | Set here? | Without it |
+|---|---|---|---|
+| `OPENAI_API_KEY` | data assistant, window-to-wall estimates, façade vision | **yes** | assistant replies "not configured"; the window ratio falls back to a rule of thumb marked low confidence |
+| `ANTHROPIC_API_KEY` | the same three, tried *first* for the two vision ones | **no** | silently skipped, OpenAI is used instead |
+| `VASTTRAFIK_CLIENT_ID` + `_SECRET` | all public-transport layers | **yes** | every Västtrafik route answers 503 with a "register an app" message |
+| `TRAFIKVERKET_API_KEY` | road cameras, traffic flow, road conditions, rest stops | **yes** | 503; the viewer falls back to the stored `trafikverket_data.json` snapshot, labelled "offline" |
+| `CARTO_API` | the sharper Light/Dark basemaps | **yes** | the viewer keeps the keyless Esri basemaps — no error, slightly plainer map |
+| `UK_EPC_API_TOKEN` | UK certificate download during the pipeline | **yes** | the pipeline estimates bands from the English Housing Survey instead |
+| `GOOGLE_MAPS_API_KEY` | Street View façade capture | **no — and it is not in `.env.example`** | 503 telling you to add it; the only way to discover the key exists |
+| `BOOLI_AREA_IDS` (+ `BOOLI_MAX_ITEMS`, `_MAX_PAGES`, `_DELAY`, `_STATUSES`, `_DETAILS`) | which areas the Booli scraper covers, and its politeness limits | **yes** (areas) | nothing is scraped |
+| `SMTP_HOST` / `_USER` / `_PASSWORD` (+ `_PORT`, `_FROM`, `ALERT_EMAIL`) | failure emails from the scheduled scrapers | **no** | the job prints "SMTP not configured" and carries on — alerting never breaks a pipeline |
+| `EPC_DB_URL` / `EPC_DB_TOKEN` | downloading the 461 MB certificate database when a container starts | **no** | the download step prints instructions and exits cleanly; dataset-wide certificate questions are unavailable |
+| `EPSM_BASE_URL` | where the simulation service lives | default | `http://localhost:8010` |
+| `FACADE_ML_URL` (legacy alias `FACADE_MODEL_URL`) | where the defect detector lives | default | `http://host.docker.internal:8020` |
+| `EUBUCCO_DATA_DIR` | where building source data is read from | default | `data/eubucco` |
+| `PPG_API` | which backend this logbook's live examples call | default | `http://127.0.0.1:8080` |
+
+**How to check what is set** without revealing anything — print names and
+whether each has a value, never the value itself:
+
+```powershell
+Get-Content .env | Where-Object { $_ -match '^\\s*[A-Za-z_]\\w*\\s*=' } |
+  ForEach-Object { $n, $v = $_ -split '=', 2; "{0,-28} set={1}" -f $n.Trim(), [bool]$v.Trim() }
+```
+
+**Drift between `.env`, `.env.example` and the code**
+
+| Problem | Detail |
+|---|---|
+| Documented but never read | `LANTMATERIET_USER` and `LANTMATERIET_PASSWORD`. No Python reads them; the Lantmäteriet footprints arrived inside the certificate database. |
+| Set here but read nowhere | `ZENODO_API_TOKEN`. The only Zenodo references in the repository are two scripts that *print* a download page address. |
+| Read but undocumented | `GOOGLE_MAPS_API_KEY`, the façade ML variables, the SMTP group, `EPC_DB_URL` / `EPC_DB_TOKEN`, the Booli group, `EUBUCCO_DATA_DIR`, `PPG_API`. None appears in `.env.example`. |
+| A stale registration address | `.env.example` points UK certificate registrants at `epc.opendatacommunities.org`, retired on 2026-05-30. The live service is `get-energy-performance-data.communities.gov.uk`. |
+| A trap | `backend/config.py` looks like the configuration module but **nothing imports it**, and it reads `VT_CLIENT_ID` / `VT_CLIENT_SECRET` — names the real code does not use. Editing it to fix Västtrafik changes nothing. |
 """,
+            "files": [".env.example", "backend/config.py", "backend/main.py"],
         },
         {
-            "title": "Map tiles in the 3D viewer",
+            "title": "Our own services",
             "badge": "metadata",
             "body": """
-| Layer | Source | Key |
-|---|---|---|
-| Light / Dark basemaps | CARTO (`basemaps.cartocdn.com`) | **`CARTO_API`** in `.env`, handed to the viewer by `/api/viewer-config` |
-| Fallback basemaps | Esri Canvas (`server.arcgisonline.com`) | none |
-| Photorealistic 3D | Google tiles via Cesium ion | ion token, currently inside `viewer/js/cesium.js` |
+**a) The backend** — FastAPI under uvicorn. Its documented port is **8000**
+(what Docker and `launch.py` use); this logbook's live examples default to
+**8080**, which is how it is usually started by hand here. It serves the API,
+the two 3D viewer pages, and the built React app when `frontend/dist` exists.
+Cross-origin requests are wide open (`*`), which is fine behind the single-origin
+proxy and worth remembering if the backend is ever exposed directly. A custom
+error wrapper attaches the cross-origin header to unhandled 500s, because
+without it the browser reported a healthy backend as "not reachable".
 
-Without a key, CARTO still answers but stamps **"API KEY REQUIRED"** across every
-tile. The viewer and the landing-page background therefore use CARTO only when
-`/api/viewer-config` supplies a key, and fall back to Esri otherwise.
+**b) EPSM — the EnergyPlus simulation manager** (**6. Energy Simulation — EPSM
+& IDF**). A separate four-container stack: Django backend, a Celery worker,
+PostgreSQL and Redis. Both application containers run as root so they can reach
+the Docker socket and start `nrel/energyplus:23.2.0` containers as siblings.
+
+| Property | Value |
+|---|---|
+| Port | host **8010** → container 8000, chosen so it cannot collide with our backend |
+| Authentication | **none** between our backend and EPSM |
+| Committed credentials | the database password and Django secret are literals in the compose file, self-described as local-dev-only |
+| Our timeouts | 30 s submit · 15 s status · 120 s batch submit · 300 s for batch results |
+| Known trap | a 39-building batch returns about 57 MB of hourly traces; too short a timeout left batches stuck at "queued" forever, so a failed fetch is now treated as "not reconciled yet" and retried |
+
+When simulations fail, check Docker Desktop first — that has been the cause
+every time so far.
+
+**c) The façade defect service** — a small FastAPI app on port **8020** holding
+the trained detector (**10. AI, ML & Vision Models**), started by hand with
+`python tools/ml/facade_detect_service.py`. It offers `/health` and `/detect`,
+has no authentication, and loads its model from a path that defaults to a
+personal folder outside the repository. The backend proxies to it and answers
+503 with the exact command to start it.
+
+> **A deployment bug worth knowing:** in `docker-compose.prod.yml` the canonical
+> variable is set to `http://localhost:8020` while the legacy alias points at
+> `host.docker.internal`. The canonical one wins, so in production the backend
+> looks for the detector inside its own container, finds nothing, and quietly
+> returns the "no model connected" placeholder. The development stack has both
+> set correctly.
+
+**d) This logbook** — Streamlit on port **8501**, reading the repository
+directly and calling the backend only for the live examples.
 """,
-            "files": ["backend/main.py", "viewer/js/cesium.js", "frontend/public/city_bg.html"],
+            "files": ["docker-compose.epsm.yml", "tools/ml/facade_detect_service.py",
+                      "docker-compose.prod.yml", "logbook/scripts/live_requests.py"],
         },
         {
-            "title": "Secrets",
+            "title": "External services, and how each one fails",
             "badge": "metadata",
             "body": """
-Every key lives in the gitignored `.env` at the repository root, and
-`.env.example` lists their names: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
-`UK_EPC_API_TOKEN`, `LANTMATERIET_USER` / `_PASSWORD`, `VASTTRAFIK_CLIENT_ID` /
-`_SECRET`, `TRAFIKVERKET_API_KEY` and `CARTO_API`.
+Everything below is called **from the backend or a pipeline script**, so keys
+stay on the server.
 
-The two Lantmäteriet keys are listed but **not read by any code** — the
-Lantmäteriet footprints arrived inside the certificate database (see
-**1. Data Sources**, Sweden tab).
+**Maps, addresses and streets**
 
-Never commit one; print names or lengths only when checking they exist.
+| Service | Used for | Auth | Caching | When it fails |
+|---|---|---|---|---|
+| Nominatim (OpenStreetMap) | address search, reverse geocoding for building lists | none, identifying user-agent | in-memory, no expiry; the certificate geocoder also caches to disk and honours the one-request-per-second policy | search: 404 "address not found"; reverse lookups are skipped silently |
+| Overpass (OpenStreetMap) | street network, green areas, space syntax, the UK pipeline | none, identifying user-agent | per bounding box, in memory, no expiry | three mirrors are tried in turn; all failing gives 502. The main mirror rate-limits hard |
+| PVGIS (EU Joint Research Centre) | rooftop solar yield | none | none | PVGIS's own status code is passed through |
+
+**Energy, climate and materials**
+
+| Service | Used for | Auth | Caching | When it fails |
+|---|---|---|---|---|
+| elprisetjustnu.se (Nord Pool) | Swedish spot price | none | per zone and day | answers 200 with `live: false` and a note — never an error |
+| Octopus Agile | UK price | none | none | same pattern |
+| Boverket climate database | material carbon factors | none | for the life of the process | **catches every error and returns an empty list**, which looks exactly like "no materials for this component" |
+| Climate.OneBuilding (weather) | EPW files | — | files committed to `data/epw/` | no live call; a missing file is a 500 naming the file |
+
+**Swedish public data**
+
+| Service | Used for | Auth | Caching | When it fails |
+|---|---|---|---|---|
+| Västtrafik — token, journeys, disruptions, park & ride | live transit layers | OAuth2 client credentials, token cached until 30 s before expiry | none beyond the token | 503 without keys, 502 on a bad answer. The parking service sometimes replies with a bare number instead of an object; both shapes are now accepted |
+| Trafikverket traffic information | cameras, flow, conditions, parking | key inside the request body | 60 s | 503 without a key; on failure the error deliberately does **not** echo the request, because the key is in it |
+| Statistics Sweden (income table) | household income by area | none | per year, no expiry | 502 |
+
+**UK data**
+
+| Service | Used for | Auth | Caching | When it fails |
+|---|---|---|---|---|
+| Energy certificate register (GOV.UK) | certificates for UK buildings | bearer token | on disk, two caches | falls back to survey-based band estimates. Documented limit: the published quota is 6,000 requests per five minutes, but bursts are throttled after roughly 25–175 requests |
+| English Housing Survey | band and cost reference tables | none | downloaded files | manual download, documented in the ingest script |
+
+**AI providers** (**10. AI, ML & Vision Models**)
+
+| Provider | Models used | Timeouts | When it fails |
+|---|---|---|---|
+| Anthropic | Claude Sonnet for façade vision and chat | 30–60 s | falls through to OpenAI, then to a heuristic |
+| OpenAI | GPT-4o / GPT-4.1 for chat, window ratio, vision | 30–60 s | the assistant returns a polite message; nothing raises |
+| Google Street View Static API | façade images from the street | 30 s | 503 without a key; quota exhaustion is reported as such. Images are deliberately **not** cached to disk, because the terms cover display, not accumulation |
+
+**Scraped sites** (**4. Scraped Market Data**)
+
+| Site | Politeness | Note |
+|---|---|---|
+| Boplats | 1.2 s between requests, browser-like user-agent | daily refresh |
+| Booli | 1.5 s default, page and item caps | the script warns that Booli sits behind bot protection: modest per-city volume only, and scraping all of Sweden would likely breach its terms |
+
+**Bulk downloads** used when building the model: EUBUCCO from its S3 bucket
+(anonymous, and note the transfer is unencrypted), and Chalmers DTCC for the
+laser-scan tiles (open, plain HTTP, 10-minute timeout per tile, resumable).
 """,
-            "files": [".env.example", "backend/config.py"],
+            "files": ["backend/main.py", "utils/boverket_api.py", "tools/uk/ingest_epc.py",
+                      "booli_scraper.py", "boplats_scraper.py"],
+        },
+        {
+            "title": "What the browser fetches by itself",
+            "badge": "metadata",
+            "body": """
+These bypass the backend, so they fail even when the backend is healthy — and
+they are why the viewer needs internet access of its own.
+
+| Service | Used for | Key | When it fails |
+|---|---|---|---|
+| jsDelivr CDN | the CesiumJS library and its workers (version 1.143) | none | **the viewer cannot start**; it shows an error card. The app's Settings panel probes this |
+| Esri ArcGIS | Light, Dark, Satellite and hillshade basemaps | none — chosen for exactly that reason | tiles go blank |
+| CARTO | the sharper Light and Dark basemaps | `CARTO_API`, handed to the browser inside the tile address by `/api/viewer-config` | falls back to Esri. Without a key CARTO still answers, but stamps "API KEY REQUIRED" across every tile |
+| Cesium ion → Google | photorealistic 3D tiles, and OSM Buildings in the UK viewer | an ion token (see below) | the token panel opens; the flat map and buildings keep working |
+| Statistics Sweden map service | the twelve SCB layers (**12. Viewer Layers & Visualisation**) | none | the layer just does not appear |
+| Nominatim, OpenStreetMap tiles, Google Fonts | viewer search, the Leaflet map in Step 1, typography | none | search reports failure; tiles blank; fallback fonts |
+
+**The Cesium ion token.** It is a real credential and it is **hard-coded in the
+viewer script that is served to browsers**, with a user-supplied token in the
+browser's storage taking precedence when someone pastes one into the token
+panel. Two stale backup copies of that script sit next to it and are also
+served, because production mounts the whole folder over the image, so the token
+is reachable at three addresses. Moving it into the backend configuration —
+the way the CARTO key is handled — and deleting the backups would fix both.
+""",
+            "files": ["assets/viewer/js/cesium.js", "frontend/public/city_bg.html", "backend/main.py"],
+        },
+        {
+            "title": "Ports",
+            "badge": "metadata",
+            "table": [
+                ["Port", "What listens", "Mode", "Published"],
+                ["5173", "Vite development server (its own default)", "development, run directly", "local"],
+                ["5180", "Vite development server inside Docker — the single origin for app and viewer", "development, Docker", "yes"],
+                ["8000", "FastAPI backend", "both", "development only; in production only the proxy reaches it"],
+                ["8080", "nginx — the app, the viewer and the API proxy; the only public port", "production", "yes"],
+                ["8080", "the backend when started by hand here (the logbook's live examples default to it)", "this computer", "local"],
+                ["8010", "EPSM (its container's port 8000)", "simulation stack", "yes"],
+                ["5432 · 6379", "EPSM's PostgreSQL and Redis", "simulation stack", "no — internal to its network"],
+                ["8020", "façade defect ML service", "host", "local"],
+                ["8501", "this logbook", "host", "local"],
+                ["8765", "static launcher for `assets/` (`launch.py`)", "standalone", "local, loopback only"],
+            ],
+            "files": ["docker-compose.yml", "docker-compose.prod.yml", "docker-compose.epsm.yml",
+                      "docker/nginx.conf", "launch.py"],
+        },
+        {
+            "title": "How it is deployed",
+            "badge": "metadata",
+            "body": """
+Three Docker stacks, all optional for development.
+
+**a) Development** (`docker-compose.yml`): the backend with reload on 8000, and
+a Node container running Vite on 5180 that serves the React app *and* the
+viewer and proxies the API to the backend. One origin, so nothing needs a
+cross-origin exception. The repository is bind-mounted, so code changes are
+live. Before uvicorn starts, a script optionally downloads the certificate
+database.
+
+**b) Production** (`docker-compose.prod.yml`): the same backend without reload,
+not published, plus an nginx container on 8080 serving the built app, the
+viewer files, and proxying `/api` to the backend with a 300-second read timeout
+for long simulations. The image is built with Vite directly rather than
+`npm run build`, deliberately, because the project has a known type-check
+backlog.
+
+**c) Simulation** (`docker-compose.epsm.yml`): the EPSM stack described above.
+
+**Without Docker:** run the backend with uvicorn and the frontend with
+`npm run dev` (port 5173 by default, not the 5180 the documentation quotes), or
+use `launch.py`, which serves `assets/` on 8765 and starts the backend on 8000.
+
+> **`launch.py` no longer gives the viewer a working API.** The viewer asks for
+> `/api/...` relative to wherever it was loaded, so on port 8765 every analysis,
+> simulation and live layer gets a 404. Use the development server or the
+> production proxy for anything beyond looking at the buildings.
+
+**The build step and the served viewer.** `build.py` copies viewer scripts from
+`viewer/` into `assets/`, and `assets/` is what is served. Two scripts exist
+only in `assets/`, so a rebuild cannot refresh them. Keep both copies in step —
+this project edits both.
+""",
+            "files": ["docker-compose.yml", "docker-compose.prod.yml", "docker/Dockerfile.backend",
+                      "docker/Dockerfile.web", "docker/nginx.conf", "frontend/vite.config.ts",
+                      "launch.py", "build.py", "docker/README.md"],
+        },
+        {
+            "title": "Scheduled jobs and alerting",
+            "badge": "metadata",
+            "table": [
+                ["Job", "When", "How it is scheduled", "Credentials"],
+                ["Boplats refresh (scrape → database → served file)", "daily, 12:00", "systemd timer on Linux; a scheduled task on this computer", "none to scrape; SMTP for failure emails"],
+                ["Booli refresh", "Sundays, 03:30", "systemd timer; a Windows task", "the Booli area settings; SMTP for alerts"],
+                ["Trafikverket snapshot", "on demand", "no scheduler — run the scraper by hand", "the Trafikverket key"],
+                ["Certificate database download", "every container start", "part of the backend's start command", "the download address and token, both optional"],
+            ],
+            "body": """
+The alert mail is deliberately best-effort: if the mail settings are absent or
+the send fails, the job logs it and still reports success, so alerting can never
+be the reason a data refresh fails. The default recipient is the project's own
+address. The Windows wrappers hard-code an absolute path to a specific Python
+installation, which will need editing on another machine.
+""",
+            "files": ["deploy/systemd", "boplats_notify.py", "tools/refresh_booli.ps1",
+                      "scripts/fetch_epc_db.py"],
+        },
+        {
+            "title": "Files that behave like services",
+            "badge": "metadata",
+            "body": """
+These are opened at run time and fail like a service would. They can all be
+browsed in the **Data Explorer**.
+
+| File | Role | If missing |
+|---|---|---|
+| `data/simulation_database.sqlite3` | every EnergyPlus run and its results | created on demand. It replaced a flat JSON file that lost records when batches finished at the same time |
+| `data/sensitivity/epc_sweden.duckdb` | the national certificate register, opened read-only | the assistant answers gracefully; the certificate snapshot route reports "not available in this deployment" |
+| `boplats_apartments.db`, `booli_listings.db` | rents and sale prices | the market fields are simply absent |
+| `frontend/public/buildings.json` | the Swedish building model, read once and kept in memory | the first request fails with a 500 |
+| `frontend/public/uk/*.json` | UK buildings and reference tables | 404 naming the exact command that rebuilds them |
+| `data/epw/*.epw` | weather for simulation and analysis | 500 naming the missing file |
+| `data/wwr_database.json`, `data/pvgis_database.json` | saved window-ratio and solar results | treated as empty |
+
+**Caches are in memory and disappear on restart:** building data, reverse
+geocoding, Overpass answers, the income table and the spot price are all held
+without an expiry; only the Trafikverket cache (60 s) and the Västtrafik token
+(until just before it expires) have one. The first request after a restart is
+therefore always the slow one.
+""",
+            "files": ["backend/simdb.py", "data/sensitivity/epc_sweden.duckdb",
+                      "data/simulation_database.sqlite3"],
+        },
+        {
+            "title": "If something is broken, in order",
+            "badge": "metadata",
+            "body": """
+1. **`GET /api/status`** — names the AI provider and tells you whether EPSM and
+   the façade detector are reachable.
+2. **Simulations failing?** Docker Desktop, then the EPSM stack
+   (`docker compose -f docker-compose.epsm.yml up -d`), then port 8010.
+3. **A whole layer missing?** Check its key in the table above. Västtrafik and
+   Trafikverket say 503 plainly; CARTO and Anthropic degrade without a word.
+4. **"Backend not reachable" in the app?** Check which port the backend is on
+   (8000 or 8080) and what the frontend proxies to — the development proxy
+   defaults to 8000, and pointing it at the wrong port produces exactly this
+   message with a healthy backend behind it.
+5. **The viewer will not load at all?** The Cesium library comes from a public
+   CDN; if that is blocked nothing renders.
+6. **An analysis 500s?** Two Python packages the requirements pin have been
+   missing from the local environment in the past — see **13. Analysis
+   Inventory**.
+7. **Odd map or missing green layers?** The pre-built green-area file is served
+   only from `assets/`; some ways of running the viewer silently fall back to
+   approximations.
+""",
         },
     ],
 }
@@ -4338,45 +4634,506 @@ computed on the click. Only the EPW sky matrices are cached in memory.
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+SE_VIEWER = {
+    "title": "Sweden · Viewer Layers",
+    "stage": "result",
+    "purpose": """
+The Gothenburg viewer, `assets/gothenburg_3d.html`: every base map, layer and
+overlay that can be switched on, where its data comes from, whether it is live
+or pre-built, and how it is drawn and coloured. Sweden has far
+more layers than the UK: traffic from Västtrafik and Trafikverket, and
+statistics from SCB (Statistics Sweden), exist only here. Everything below was
+read from the served viewer code (`assets/viewer/js/`) and checked on
+2026-09-15.
+""",
+    "overview": {
+        "title": "Seven sidebar sections",
+        "subtitle": "In the order they appear; the numbers are added by the viewer itself.",
+        "items": [
+            ("Display", "Base map (Light, Dark, Satellite, Terrain relief, Photorealistic 3D) and the Color By choice."),
+            ("Building Analysis", "Click a building: its card, façade inspection, rooftop PV and an EnergyPlus run."),
+            ("Additional Layers", "Buildings and their legend, trees and shrubs, pitched roofs, the street network."),
+            ("Environmental Analysis", "Sun hours, incident radiation and thermal comfort around a clicked point."),
+            ("Traffic", "Västtrafik public transport (live vehicles, stops, disruptions, parking) and Trafikverket roads."),
+            ("Statistics", "Twelve SCB map layers — population, income, statistical zones, land use."),
+            ("Urban Analysis", "Green index, heat-island proxy, green accessibility and space-syntax centrality of the street network."),
+        ],
+    },
+    "sections": [
+        {
+            "title": "How the viewer is put together",
+            "body": """
+**The page and its profile.** `assets/gothenburg_3d.html` is the page;
+`assets/gothenburg_3d.meta.js` sets `VIEWER_PROFILE`: country `se`, one city,
+the building file `buildings.json`, and the Swedish construction eras.
+
+**The scripts.** `assets/viewer/js/bootstrap.js` loads the viewer scripts one
+after another. Four are loaded **only when the country is Sweden**:
+`trafik_canvas.js`, `vasttrafik.js`, `trafikverket.js` and `scb_layers.js`.
+Every other script is loaded in both viewers.
+
+**What decides Sweden-only.** Three mechanisms together:
+
+- the script list above;
+- the CSS class `se-only`, which hides controls outside Sweden;
+- controls that exist only in this HTML file: the Display thumbnails, the
+  Terrain relief map, the Environmental Analysis section, the Space Syntax
+  button and the compass / top-view buttons.
+
+| Script | What it adds |
+|---|---|
+| `cesium.js` | the 3D globe (Cesium 1.143, loaded from jsDelivr), base maps, buildings and their colours, picking, camera |
+| `ui.js` | the sidebar: section folding, the building card and hover card, the info (i) buttons |
+| `legend.js` | the building legend with counts, and the best / worst performer cards |
+| `layer_docs.js` | the text behind every (i) button |
+| `display_controls.js` | the base-map thumbnails, the Color By dropdown and the section numbers |
+| `vegetation.js`, `roofs.js`, `street_network.js` | trees and shrubs, pitched roofs, the OSM street network |
+| `sunhours.js`, `incident.js`, `comfort.js` | the three environmental analyses |
+| `vasttrafik.js`, `trafik_canvas.js` | public transport: stops, live vehicles, disruptions, parking |
+| `trafikverket.js` | road cameras, traffic flow, road conditions, rest stops |
+| `scb_layers.js` | the SCB statistics layers |
+| `urban_analysis.js` | green index, heat-island proxy, green accessibility |
+| `facade_inspector.js`, `pvgis.js`, `energy_sim.js` | the building analysis tools |
+| `search.js`, `city_switcher.js` | address search; the city pills (UK only) |
+
+The served copy in `assets/viewer/js/` is **ahead of** the source copy in
+`viewer/js/`, and `build.py` copies the source over the served files. Edit both
+copies, as this project does, or a rebuild will undo the newer viewer.
+""",
+            "files": ["assets/gothenburg_3d.html", "assets/gothenburg_3d.meta.js", "assets/viewer/js/bootstrap.js",
+                      "assets/viewer/js/cesium.js", "assets/viewer/js/ui.js", "build.py"],
+        },
+        {
+            "title": "Base maps and display modes",
+            "body": """
+| Base map | Source | Key needed | Notes |
+|---|---|---|---|
+| **Light** (default) | Esri Canvas Light Gray; CARTO `light_all` when the backend has `CARTO_API` set | none (CARTO: optional) | the (i) text says CartoDB, but the default is Esri |
+| **Dark** | Esri Dark Gray Canvas, or CARTO `dark_all` | none | |
+| **Satellite** | Esri World Imagery | none | |
+| **Terrain relief** | one hillshade image, `terrain_hillshade.png`, made from Lantmäteriet laser scanning via DTCC and draped flat | none | **Sweden only** |
+| **Photorealistic 3D** | Google Photorealistic 3D Tiles through Cesium ion | Cesium ion token | real roofs, trees and terrain in one mesh |
+
+**Flat versus 3D ground.** The globe itself is always a smooth ellipsoid; the
+viewer loads no terrain model.
+
+- **Flat maps** (Light, Dark, Satellite, Terrain relief): buildings, trees and
+  roofs stand at height 0, and the Color By dropdown is shown.
+- **Photorealistic 3D:** the viewer's own buildings, trees and roofs are hidden
+  because the Google mesh already contains them. Clicking a building then uses
+  a footprint index to find its record, and analysis points are laid onto the
+  mesh.
+
+**Automatic switches.** Switching on an SCB layer while in 3D moves the map to
+Satellite. SCB and Urban Analysis layers also turn the camera to look straight
+down.
+""",
+            "files": ["assets/viewer/js/cesium.js", "assets/viewer/js/display_controls.js",
+                      "frontend/public/terrain_hillshade.png"],
+        },
+        {
+            "title": "Buildings — the base layer and how they are coloured",
+            "body": """
+**Data.** `frontend/public/buildings.json`: 92,973 buildings from EUBUCCO
+footprints, Boverket certificates and TABULA. The page fetches it once and the
+browser caches it per build version. How it is built is on
+**5. Digital Twin Construction**.
+
+**Drawing.** Each building is an extruded footprint, drawn in chunks of 12,000.
+Its height is:
+
+- the recorded height;
+- else floors × 3 m;
+- else 6 m;
+- never less than 3 m.
+
+**Color By** — three modes. Buildings with no value for the chosen field are
+drawn dark grey.
+
+| Mode | Field | Colours |
+|---|---|---|
+| Asset type (default) | `use_cat` | single-family orange, multi-family yellow, business light blue, industrial red-brown, public green, ancillary grey, other purple |
+| Energy class | `eclass` A–G | A dark green · B green · C yellow-green · D yellow · E orange · F red · G dark red |
+| Year era | `tabula_period` | six TABULA periods: before 1960, 1961–75, 1976–85, 1986–95, 1996–2005, after 2005 |
+
+There is **no** colour mode for height, rent or sale price, heating system or
+certificate source.
+
+**Legend and performer cards.** Each legend row shows how many buildings have
+that value; in Year era it also shows the median kWh/m² of the era. Clicking a
+row opens the 15 best and 15 worst buildings of that group, and up to three
+can be compared. Their energy text is:
+
+- green below 100 kWh/m²;
+- amber below 200 kWh/m²;
+- red above that.
+
+**Building card** (click): address and all entrances, use, energy class,
+energy, year, footprint, height, floors, TABULA period, wall and window
+U-values. It also shows any saved PV, window-ratio and simulation results.
+
+**Hover card:** address, use, class, energy (orange above 150 kWh/m²), year,
+size and, for housing, the TABULA era and U-values.
+
+The two counters at the top ("85,670 EPC matched", "26,263 TABULA matched") and
+the subtitle "92,973 buildings" are **fixed text** in the HTML. They are right
+today but do not update when the data is rebuilt.
+""",
+            "files": ["frontend/public/buildings.json", "assets/viewer/js/legend.js", "assets/viewer/js/cesium.js"],
+        },
+        {
+            "title": "Additional layers — trees, pitched roofs, street network",
+            "body": """
+| Layer | Data | Live or built | How it is drawn |
+|---|---|---|---|
+| **Trees & shrubs** (on by default) | `frontend/public/dtcc_vegetation.json` — single trees and shrubs from laser scanning (DTCC), water areas filtered out | pre-built | brown trunk cylinders with green ellipsoid crowns, and shrub ellipsoids. Only drawn within 1.1–7 km of the view centre, at most 12,000 trees and 6,000 shrubs (the tallest kept). Hidden in 3D mode |
+| **Pitched roofs** (off by default) | `frontend/public/roofs_gothenburg.json` — eave and ridge height and ridge direction per building, from laser scanning | pre-built | gable caps in a slightly darker shade of the building's colour. Skipped for footprints that fill less than 72% of their bounding box |
+| **Street network** | `/api/osm/roads` → OpenStreetMap through Overpass (three mirror servers) | live, cached in the backend per area | cyan lines, 1.4–3.4 px wide by road class. Re-fetched 0.4 s after the camera stops, for up to ±0.04° around the view |
+| OSM Buildings | Cesium ion OSM Buildings | streamed | its switch is **hidden** in Sweden |
+
+The layers are built by `tools/se/dtcc_vegetation.py`, `tools/se/dtcc_roofs.py`
+and `tools/se/filter_vegetation_water.py`.
+""",
+            "files": ["assets/viewer/js/vegetation.js", "assets/viewer/js/roofs.js", "assets/viewer/js/street_network.js",
+                      "tools/se/dtcc_vegetation.py", "tools/se/dtcc_roofs.py"],
+        },
+        {
+            "title": "Building analysis and environmental analysis",
+            "body": """
+Clicking a building enables three tools:
+
+| Tool | What it does | Where it is documented |
+|---|---|---|
+| **Façade Inspection** | captures façade views, estimates the window-to-wall ratio with a vision model, detects defects, saves the ratio | **10. AI, ML & Vision Models** |
+| **Rooftop PV Estimate** | PVGIS yield for 80% of the footprint at 0.2 kWp/m², 35° tilt, facing south, 14% loss | **13. Analysis Inventory** |
+| **Run Energy Simulation** | an EnergyPlus shoebox run through EPSM | **6. Energy Simulation — EPSM & IDF** |
+
+**Environmental Analysis** holds sun hours, incident radiation and thermal
+comfort. They are run by clicking a point; method and equations are on
+**11. Climate & Environmental Analysis**, and recordings and live examples on
+**13. Analysis Inventory**.
+
+**Their panels are hard to read.** The panels were styled for the old dark
+sidebar: labels, readouts and legend text are white (`rgba(255,255,255,…)`)
+and now nearly vanish on the light sidebar.
+""",
+            "files": ["assets/viewer/js/facade_inspector.js", "assets/viewer/js/pvgis.js", "assets/viewer/js/energy_sim.js"],
+        },
+        {
+            "title": "Traffic — Västtrafik public transport",
+            "body": """
+All three layers go through the backend. The backend holds the Västtrafik
+OAuth2 credentials (`VASTTRAFIK_CLIENT_ID`, `VASTTRAFIK_CLIENT_SECRET`), so no
+key reaches the browser.
+
+| Layer | Endpoints | Refresh | How it is drawn |
+|---|---|---|---|
+| **Live Transit & Stops** | `/api/vasttrafik/stops`, `/positions`, `/journey/{ref}`, `/departures/{gid}` → Västtrafik Planera Resa v4 | vehicle positions every 5 s | stops as blue "B" icons with names. Trams and buses are drawn on a canvas as circles in their line colour, with a glow and a short trail, and a "VÄSTTRAFIK LIVE" count of trams and buses. Hovering a vehicle shows its next stops; clicking a stop opens its departures (line, destination, time, delay, cancellations) |
+| **Disruptions** | `/api/vasttrafik/disruptions` → Västtrafik traffic situations | fetched **once** per page load | a list in a side panel, not map markers. Severity dot: severe red, moderate orange, slight yellow; affected lines as badges |
+| **Commuter Parking** | `/api/vasttrafik/parking`, `/parking/{id}/availability` → Västtrafik parking API | availability on click; the list once per load | green "P" icons. Availability bar: green above 40% free, yellow above 15%, red below |
+
+The query area is fixed to Gothenburg in the backend. Keys and services are
+listed on **14. Services, Keys & Access**.
+""",
+            "files": ["assets/viewer/js/vasttrafik.js", "assets/viewer/js/trafik_canvas.js"],
+        },
+        {
+            "title": "Traffic — Trafikverket roads",
+            "body": """
+**Source.** One backend call, `/api/trafikverket/data`, fetches four object
+types from Trafikverket's open traffic API (trafikinfo v2) with the key
+`TRAFIKVERKET_API_KEY` and caches them for 60 s. If the API cannot be reached,
+the viewer uses the stored `trafikverket_data.json`, labelled "offline
+snapshot". A collector also keeps a snapshot in `trafikverket.db`, which can
+be browsed in the **Data Explorer → Traffic**.
+
+| Layer | Refresh | How it is drawn |
+|---|---|---|
+| **Traffic Cameras** | the photo refreshes every 30 s while its popup is open | blue camera icons; clicking opens the latest photo |
+| **Traffic Flow** | every 5 minutes | points 8–26 px by flow: green below 200 vehicles/h, amber 200–600, red above 600 |
+| **Road Conditions** | with the data | points coloured by condition code: green (normal), amber, red (worst) |
+| **Rest Stops & Parking** | with the data | P icons, green when open, grey otherwise |
+
+All four have hover tooltips.
+""",
+            "files": ["assets/viewer/js/trafikverket.js", "frontend/public/trafikverket_data.json", "trafikverket.db"],
+        },
+        {
+            "title": "Statistics — SCB",
+            "body": """
+**Source.** The browser asks Statistics Sweden's open map service directly (the
+WFS at `geodata.scb.se`), for a fixed box around Gothenburg and at most 10,000
+features, with no key needed. Household income is joined in the backend,
+`/api/scb/deso-income`, from SCB's statistics database (table TAB6684). A
+layer is fetched the first time it is switched on, then kept in the browser.
+
+**Twelve layers, 50 year versions** (a year menu per layer):
+
+| Layer | Drawn as |
+|---|---|
+| Population grid (1 km) | six classes: 1–49, 50–149, 150–299, 300–599, 600–999, 1,000+ inhabitants |
+| Household income (DeSO, median) | red → yellow → green from lowest to highest |
+| DeSO zones · RegSO zones | statistical area outlines |
+| Urban areas (tätorter) · Small settlements (småorter) | settlement outlines |
+| Green areas (grönområden) | green polygons |
+| Workplace, business and retail zones | fixed colour per group |
+| Holiday cottages (fritidshus) · Statistical grid (1 km) | outlines |
+
+Hovering shows the values. Switching a layer on moves a 3D view to Satellite and
+turns the camera to look straight down.
+
+The (i) text says 47 layers; the code has 12 groups with 50 year versions.
+""",
+            "files": ["assets/viewer/js/scb_layers.js"],
+        },
+        {
+            "title": "Urban analysis",
+            "body": """
+| Layer | What it is | Notes |
+|---|---|---|
+| **Green Index** | points on a ~280 m grid coloured by distance to the nearest green area, $e^{-d/200}$ | method on **11. Climate & Environmental Analysis** |
+| **Heat Island Proxy** | ~667 m cells, extruded 80 m, coloured by a building-stock score (energy class, age, use) lowered near green | not a temperature |
+| **Green Accessibility** | points in three distance bands: under 400 m, 400–800 m, over 800 m | straight-line distance |
+| **Space Syntax** | street segments coloured by centrality: betweenness (through-movement), integration (closeness) or reach (network within 1 km), with a Recompute control | see *Space syntax* below, and the live example on **13. Analysis Inventory** |
+
+**Data.** Green areas come from `assets/gothenburg_greenspaces.json`, 22,851
+OpenStreetMap areas. That file exists **only** in `assets/`.
+
+- **Where it fails:** the development server returns the viewer's HTML page
+  instead of the file (checked 2026-09-15), and the FastAPI backend does not
+  serve it either.
+- **Effect:** there the Green Index and Accessibility quietly fall back to
+  "building proxies" (some building types used as stand-ins for green).
+- **Where it works:** only when `assets/` is served directly (`launch.py`).
+""",
+            "files": ["assets/viewer/js/urban_analysis.js", "assets/gothenburg_greenspaces.json",
+                      "backend/space_syntax.py"],
+        },
+        {
+            "title": "Space syntax — street-network centrality",
+            "body": """
+Switched on from Urban Analysis. The viewer asks the backend for the streets in
+the current view and colours every segment by one of three measures; thicker,
+hotter lines are more central. It reads best from straight above — the analysis
+is two-dimensional.
+
+| Measure | What it answers | Computed as |
+|---|---|---|
+| **Betweenness** ("choice") | which streets carry through-movement: how often a street lies on the shortest path between other places | betweenness centrality, sampled from 500 source nodes on large networks (the result is then marked *approx.*) |
+| **Integration** | how central a street is — how close it is to everywhere else | closeness centrality, exact; the slowest of the three |
+| **Reach** | how much of the network is within 1 km of a street | number of intersections reachable within the radius |
+
+**The chain.** `assets/viewer/js/space_syntax.js` → `/api/urban/space-syntax` →
+OpenStreetMap streets through Overpass → `backend/space_syntax.py`, which builds
+a graph of intersections (nodes) and street segments (edges weighted by their
+length in metres) with `networkx`, computes the measure per node, and gives each
+segment the mean of its nodes. The response is plain GeoJSON with a `value` and a
+0–1 `value_norm` per segment, so the engine can later be swapped for the
+Spatial Morphology Group's Pstalgo without touching the viewer.
+
+**Area and speed.** The request is clamped to about 0.9 km each way around the
+view centre, which is roughly 2,250 segments and 7,800 intersections in central
+Gothenburg. Measured on this computer on 2026-09-16: **betweenness 17 s, reach
+about 40 s, integration 98 s**. The clamp matters: at 3.3 km each way a
+betweenness run did not finish in eleven minutes. Zoom in and press *Recompute
+for current view* to analyse a smaller area.
+
+**What it needs.** The `networkx` package in the backend environment (pinned in
+`requirements.txt`), and the Overpass service for the street download.
+""",
+            "files": ["assets/viewer/js/space_syntax.js", "backend/space_syntax.py"],
+        },
+        {
+            "title": "Info buttons, legends and layer docs",
+            "body": """
+**The (i) buttons.**
+
+- `layer_docs.js` holds a title, description and source for 23 layers.
+- `ui.js` fills each (i) button from it, unless the HTML already carries the
+  text.
+- One shared tooltip opens on click.
+- SCB rows build their own (i) buttons from the layer list.
+
+**Legends.** Each overlay draws its own: the building legend, the Urban
+Analysis legend, the analysis panels, the SCB status text, the Västtrafik
+canvas legend and the Trafikverket status line.
+
+**Sidebar memory.** Which sections are open is kept in the browser
+(`ppg.viewer.sections`). A folded section shows how many of its layers are on,
+and the Display header names the active base map.
+
+""",
+            "files": ["assets/viewer/js/layer_docs.js", "assets/viewer/js/legend.js", "assets/viewer/js/ui.js"],
+        },
+    ],
+}
+
+UK_VIEWER = {
+    "title": "UK · Viewer Layers",
+    "stage": "result",
+    "purpose": """
+The UK viewer, `assets/uk_3d.html`: one page for five areas — four London
+districts and Rotherham — with far fewer layers than Gothenburg. It has no
+traffic, no statistics, no terrain relief and no Environmental Analysis
+section (the three analyses sit under Building Analysis instead). This tab
+lists what is there and what is hidden or missing. Everything
+was read from the served code (`assets/viewer/js/`) and the UK building files
+on 2026-09-15.
+""",
+    "overview": {
+        "title": "What the UK viewer has",
+        "subtitle": "In sidebar order.",
+        "items": [
+            ("City pills", "King's Cross, Westminster, Canary Wharf, Southwark (all London) and Rotherham; switching reloads the page."),
+            ("Building Analysis", "The building card, façade inspection, rooftop PV, an EnergyPlus run — and sun hours, radiation and comfort."),
+            ("Base Map", "Light, Dark, Satellite, Photorealistic 3D — no Terrain relief."),
+            ("Additional Layers", "Buildings with Use type / Energy / Year era colours, OSM Buildings, the street network — and two Swedish layers that should not be there."),
+            ("Urban Analysis", "Green index and green accessibility from live OpenStreetMap data; no heat-island proxy, no space syntax."),
+        ],
+    },
+    "sections": [
+        {
+            "title": "How the viewer is put together",
+            "body": """
+**The page and its profile.** `assets/uk_3d.html` is the page;
+`assets/uk_3d.meta.js` sets `VIEWER_PROFILE`: country `gb`, five cities, one
+building file per city (`uk/buildings_<city>.json`), and the eight English
+Housing Survey age bands. The city pills (`city_switcher.js`) reload the page
+with `?city=`.
+
+**Scripts.** The same `bootstrap.js` list as Gothenburg, **without** the four
+Swedish scripts (`trafik_canvas.js`, `vasttrafik.js`, `trafikverket.js`,
+`scb_layers.js`).
+
+**Not in the UK viewer:**
+
+- the Display thumbnails, the Color By dropdown and the Terrain relief map;
+- the Environmental Analysis section;
+- Traffic and Statistics (hidden, and their scripts never load);
+- the heat-island proxy and Space Syntax;
+- the compass and top-view buttons.
+""",
+            "files": ["assets/uk_3d.html", "assets/uk_3d.meta.js", "assets/viewer/js/city_switcher.js",
+                      "assets/viewer/js/bootstrap.js"],
+        },
+        {
+            "title": "Base maps",
+            "body": """
+Four radio buttons, the same sources as Gothenburg:
+
+| Base map | Source | Key needed |
+|---|---|---|
+| **Light** (default) | Esri Canvas Light Gray, or CARTO with `CARTO_API` | none |
+| **Dark** | Esri Dark Gray Canvas, or CARTO | none |
+| **Satellite** | Esri World Imagery | none |
+| **Photorealistic 3D** | Google Photorealistic 3D Tiles through Cesium ion | Cesium ion token |
+
+There is no Terrain relief: the hillshade exists only for Gothenburg. As in
+Sweden, the globe has no terrain model, and the viewer's own buildings are
+hidden in 3D mode.
+""",
+            "files": ["assets/viewer/js/cesium.js", "assets/viewer/js/layers.js"],
+        },
+        {
+            "title": "Buildings — data and colours",
+            "body": """
+**Data.** One file per area, with OpenStreetMap footprints; how they are built
+is on the United Kingdom tab of **3. Pipelines**.
+
+| Area | File | Buildings | With a certificate | Class estimated from the English Housing Survey |
+|---|---|---|---|---|
+| King's Cross | `buildings_london_kings_cross.json` | 3,018 | 319 | 1,499 |
+| Westminster | `buildings_london_westminster.json` | 1,590 | 177 | 533 |
+| Canary Wharf | `buildings_london_canary_wharf.json` | 1,283 | 455 | 436 |
+| Southwark | `buildings_london_southwark.json` | 1,829 | 120 | 612 |
+| Rotherham | `buildings_rotherham.json` | 14,483 | 7,824 | 4,414 |
+| **Total** | | **22,203** | **8,895** | **7,494** |
+
+The energy class comes from the certificate register where an address matches.
+Otherwise it is estimated from the English Housing Survey band shares
+(`epc_source` starting with `ehs_prior`). The counters at the top are computed
+from the loaded file, unlike Gothenburg's fixed text. The Buildings (i) text
+still says "10,235 building footprints across 5 areas"; the files hold 22,203.
+
+**Colours** — three tabs: **Use type**, **Energy** and **Year era**. Use type
+and Energy use the same colours as Sweden. Year era uses the eight survey age
+bands: pre-1919, 1919–44, 1945–64, 1965–80, 1981–90, 1991–2002, 2003–13,
+post-2013.
+
+**Year era is mostly grey.** The colouring reads only `tabula_period`, but the
+legend counts `tabula_period` *or* `tabula_period_used`.
+
+- Only **7,697 of 22,203** buildings have `tabula_period`.
+- A further 8,530 have only `tabula_period_used`: they are counted in the legend
+  but drawn grey.
+- In the London districts almost nothing is coloured (King's Cross: 14 of
+  3,018).
+""",
+            "files": ["frontend/public/uk", "assets/viewer/js/legend.js", "assets/viewer/js/cesium.js"],
+        },
+        {
+            "title": "Additional layers",
+            "body": """
+| Layer | Data | Behaviour |
+|---|---|---|
+| **OSM Buildings** | Cesium ion OSM Buildings | switched on at start, but only visible in the Photorealistic 3D map |
+| **Street network** | `/api/osm/roads` → OpenStreetMap through Overpass | works as in Sweden: live, cached per area |
+| **Trees & shrubs** | the **Gothenburg** file `dtcc_vegetation.json` | should not be here: `vegetation.js` has no country check, so the Gothenburg trees are loaded. It is on by default but draws nothing near London or Rotherham |
+| **Pitched roofs** | the **Gothenburg** file `roofs_gothenburg.json` | should not be here: the roof file is matched to buildings by their position in the list, so switching it on would put Gothenburg roof shapes on unrelated UK buildings |
+""",
+            "files": ["assets/viewer/js/vegetation.js", "assets/viewer/js/roofs.js", "assets/viewer/js/street_network.js"],
+        },
+        {
+            "title": "Building analysis, including the environmental analyses",
+            "body": """
+**The building tools** are the same as in Sweden (façade inspection, rooftop PV,
+EnergyPlus run). The simulation is sent with country `gb` and the city, so it
+uses the London City or Doncaster Sheffield weather file.
+
+**Sun hours, incident radiation and thermal comfort** appear under Building
+Analysis, below a "Site analysis · click a point" label. The UK page has no
+Environmental Analysis section, so the scripts fall back to that group. They
+use the UK buildings and UK weather files; there is no tree shading, since
+trees exist only for Gothenburg. Sun-hours clock labels use UTC+0, plus one
+hour in summer. Methods are on **11. Climate & Environmental Analysis**.
+
+**Address search** (Nominatim) is limited to the UK and adds the city and
+"United Kingdom" to the query.
+""",
+            "files": ["assets/viewer/js/sunhours.js", "assets/viewer/js/search.js"],
+        },
+        {
+            "title": "Urban analysis",
+            "body": """
+**Green Index** and **Green Accessibility** work as in Sweden, with one
+difference in the data. There is no pre-built file: green areas are fetched
+live through `/api/urban/green-areas` from OpenStreetMap (Overpass), for a box
+of ±0.09° latitude and ±0.14° longitude around the view centre, and cached in
+the backend.
+
+**Heat Island Proxy** is hidden, because it needs Swedish certificate data.
+**Space Syntax** is not in the UK page at all.
+""",
+            "files": ["assets/viewer/js/urban_analysis.js", "backend/main.py"],
+        },
+    ],
+}
+
 VIEWER_LAYERS = {
     "number": 12,
     "title": "Viewer Layers & Visualisation",
     "stage": "result",
     "purpose": """
-Everything that can be switched on in the 3D viewer, and which layers are
-city-specific versus available anywhere OSM has coverage.
+Everything that can be switched on in the two 3D viewers: base maps, the
+building layer and its colours, extra layers, live traffic, statistics and
+analysis overlays. For each: where the data comes from, whether it is live or
+pre-built, and how it is drawn. Sweden and the UK have very
+different viewers — Gothenburg has traffic, SCB statistics, terrain relief and
+its own Environmental Analysis section — so each has its own tab. The analyses
+the viewers can run are on **13. Analysis Inventory**; the colour-vision
+palette of the web app is in `frontend/src/config/colors.ts`.
 """,
-    "sections": [
-        {
-            "title": "Layer inventory",
-            "badge": "result",
-            "table": [
-                ["Layer", "Source", "Availability"],
-                ["Building colour modes", "EUBUCCO / OSM + certificates + TABULA", "any built city"],
-                ["Roads / street network", "OpenStreetMap", "anywhere"],
-                ["Space-syntax centrality", "OSM network, computed in backend", "written but not loaded in any viewer"],
-                ["Green index / green areas", "OpenStreetMap", "anywhere"],
-                ["Vegetation (trees, shrubs)", "DTCC LiDAR", "Gothenburg only"],
-                ["Roof form", "DTCC LiDAR", "Gothenburg only"],
-                ["Terrain hillshade", "DTCC LiDAR", "Gothenburg only"],
-                ["SCB demographics / income", "Statistics Sweden WFS", "Sweden only"],
-                ["Transit (stops, live vehicles)", "Västtrafik", "Gothenburg only"],
-                ["Traffic cameras & conditions", "Trafikverket", "Sweden only"],
-                ["Market data (sales, rents)", "Booli + Boplats", "written but not loaded in any viewer"],
-            ],
-            "files": ["viewer/js/layers.js", "viewer/js/legend.js", "viewer/js/layer_docs.js"],
-        },
-        {
-            "title": "Colour and accessibility",
-            "badge": "metadata",
-            "body": """
-The semantic hues (green / red / amber) were retuned for colour-vision
-deficiency and are defined centrally in `frontend/src/config/colors.ts`. Change
-a hue there rather than per component, or the palette drifts apart.
-""",
-            "files": ["frontend/src/config/colors.ts"],
-        },
-    ],
+    "tabs": [("Sweden", SE_VIEWER), ("United Kingdom", UK_VIEWER)],
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -4697,18 +5454,24 @@ ANALYSIS_INVENTORY = {
     "title": "Analysis Inventory",
     "stage": "method",
     "purpose": """
-Every analysis the tool can run, in one table: where it executes, what method it
-uses, where that method came from, and whether it is built in or an external
-service. Each has its own page for the detail — this is the index.
+Every analysis the tool can run, one card each: where it lives in the tool,
+what it computes, what it runs on, and which page documents its method. The
+3D-viewer analyses come with a **recording** of them running in the real
+viewer, and every analysis the backend can run without writing anything has a
+**live example**. The example sends the same request the tool sends and draws
+the answer, so you can try another place, day or price. The tables below the
+cards are the index: where each analysis runs, what is built in and what is
+external, and where each appears in the app.
 """,
     "overview": {
-        "title": "Four families",
-        "subtitle": "Grouped by what they compute, not by which page they appear on.",
+        "title": "Seventeen analyses in five families",
+        "subtitle": "Grouped by what they compute, not by which page of the app shows them.",
         "items": [
-            ("Building energy", "Demand and retrofit performance — EnergyPlus and the analytic degree-day model."),
-            ("Environmental", "Sun, radiation and outdoor comfort around a point."),
-            ("Urban", "Network and greenness measures over the city."),
-            ("Decision support", "Ranking, optimising and choosing under uncertainty."),
+            ("Environmental", "Sun hours, incident radiation and outdoor comfort around a clicked point — recorded and live."),
+            ("Building energy and cost", "EnergyPlus through EPSM, the Pareto optimiser (live), rooftop PV (live), heating systems, LCA."),
+            ("Decision support", "Prioritising buildings and choosing packages under uncertainty — both run in the browser."),
+            ("Urban", "Space syntax — reactivated in the viewer, and live here — plus the city-wide green and heat indices."),
+            ("AI and data", "Façade defects, window-to-wall ratio, the data assistant and TABULA matching."),
         ],
     },
     "sections": [
@@ -4716,26 +5479,65 @@ service. Each has its own page for the detail — this is the index.
             "title": "The full inventory",
             "badge": "method",
             "table": [
-                ["Analysis", "Runs in", "Method", "Origin"],
-                ["EnergyPlus simulation", "EPSM service :8010", "Full building energy simulation of a single-zone shoebox", "External — EPSM, Chalmers"],
-                ["Optimisation (Pareto front)", "Backend /api/optimize", "Enumerate combinations, degree-day physics, skyline sweep on cost/carbon/energy", "Adapted from DT4PED"],
-                ["Retrofit prioritisation (MCDA)", "Browser, client-side", "Weighted expert-rule score over four criteria; AHP weights", "Built in"],
-                ["Decision under uncertainty", "Browser, client-side", "Minimax regret, uncertainty range, Hurwicz over price scenarios", "Built in"],
-                ["Retrofit scenario analyser", "Browser + backend", "Package comparison against a simulated baseline", "Built in"],
-                ["Life-cycle assessment", "Browser + Boverket API", "Embodied carbon from emission factors plus operational carbon", "Built in"],
-                ["Heating-system comparison", "Browser, client-side", "Economics on top of an unchanged demand; SPF catalogue", "Built in"],
-                ["Sun hours", "Backend /api/analysis/sun-hours", "Direct-sun hours over a ground disc; compact astronomical sun position", "Built in, clean-room"],
-                ["Incident radiation", "Backend /api/analysis/incident-radiation", "Cumulative irradiation, EPW-driven sky matrix", "Built in, clean-room"],
-                ["Thermal comfort (UTCI)", "Backend /api/analysis/thermal-comfort", "UTCI plus solar mean radiant temperature", "Built in, on pythermalcomfort"],
-                ["Rooftop PV yield", "PVGIS (external API)", "Orientation- and tilt-aware annual yield", "External — EC PVGIS"],
-                ["Space-syntax centrality", "Backend /api/urban/space-syntax", "Street-network centrality, pure Python", "Built in"],
-                ["Green index / green areas", "Backend /api/urban/green-areas", "Distance-decay greenness from OSM polygons", "Built in"],
-                ["TABULA archetype matching", "Pipeline + backend", "Lookup by construction period and building type", "External typology, own matcher"],
-                ["Façade defect detection", "Host ML service :8020", "Object detection over façade photographs", "External ML project"],
-                ["Window-to-wall ratio", "Backend, vision model", "Vision-model estimate from a cropped façade image", "Built in prompt, hosted model"],
-                ["Data assistant", "Backend /api/chat", "Tool-calling LLM over the project's own datasets", "Built in"],
-                ["Sensitivity analysis", "Precomputed, browser", "One-at-a-time and global SA over model parameters", "Built in"],
+                ["Analysis", "Runs in", "Method", "Origin", "Status on 2026-09-15"],
+                ["EnergyPlus simulation", "EPSM service :8010", "Full-year simulation of a single-zone shoebox model", "External — EPSM, Chalmers", "works; median 12 s per building in a batch"],
+                ["Optimisation (Pareto front)", "Backend /api/optimize", "Enumerate combinations, degree-day physics, skyline on cost/carbon/energy", "Adapted from DT4PED", "works; 71,820 combinations in under 2 s"],
+                ["Retrofit prioritisation (MCDA)", "Browser", "Weighted expert-rule score over four criteria; AHP weights", "Built in", "works"],
+                ["Decision under uncertainty", "Browser", "Minimax regret, uncertainty range, Hurwicz over price scenarios", "Built in", "works"],
+                ["Retrofit scenario analyser", "Browser + backend", "Package comparison against a simulated baseline", "Built in", "works"],
+                ["Life-cycle assessment", "Browser + Boverket API", "Embodied carbon from emission factors plus operational carbon", "Built in", "works"],
+                ["Heating-system comparison", "Browser", "Economics on top of an unchanged demand; SPF catalogue", "Built in", "works"],
+                ["Sun hours", "Backend /api/analysis/sun-hours", "Astronomical sun position + height-field shadow test", "Built in, clean-room", "works"],
+                ["Incident radiation", "Backend /api/analysis/incident-radiation, …/incident-surfaces", "EPW cumulative sky matrix, 145 patches", "Built in, clean-room", "works"],
+                ["Thermal comfort (UTCI)", "Backend /api/analysis/thermal-comfort", "UTCI + SolarCal mean radiant temperature", "Built in, on pythermalcomfort", "fails on the local backend: library not installed"],
+                ["Rooftop PV yield", "Backend /api/pvgis → EC PVGIS", "Orientation- and tilt-aware annual yield", "External — EC JRC", "works (live external call)"],
+                ["Space-syntax centrality", "Backend /api/urban/space-syntax", "Street-network centrality with networkx", "Built in", "works; the viewer layer was reconnected on 2026-09-16"],
+                ["Green index / accessibility / heat-island proxy", "Browser (urban_analysis.js)", "Distance to OSM green areas; building-stock score", "Built in", "works; indices, not temperatures"],
+                ["TABULA archetype matching", "Pipeline + backend", "Lookup by construction period and building type", "External typology, own matcher", "works"],
+                ["Façade defect detection", "Host ML service :8020", "Object detection over façade images", "External ML project", "service not running"],
+                ["Window-to-wall ratio", "Backend /api/estimate-wwr", "Vision-model estimate from a façade image", "Built-in prompt, hosted model", "works with API keys; saves store position 0,0"],
+                ["Data assistant", "Backend /api/chat", "Tool-calling LLM over the project's own datasets", "Built in", "works with API keys"],
             ],
+        },
+        {
+            "title": "How the recordings and live examples were made",
+            "body": """
+**Recordings.** Each animation is the real 3D viewer (the development server
+on port 5173), driven by a script in a headless browser:
+
+- **Place:** a fixed point in central Gothenburg (57.6985 N, 11.9690 E).
+- **Camera:** set by the script, which then switches the analysis on and runs
+  it through the real backend.
+- **Stepping:** the script moves the viewer's own time slider or clicks its
+  season buttons, reading the map image after each step.
+- **Rendering:** software rendering (no graphics card), so the tree layer was
+  switched off to keep it responsive.
+- **Cropping:** the sidebar is cropped out, because the analysis panels' white
+  text is unreadable on the light sidebar — a real viewer bug, listed on
+  **12. Viewer Layers & Visualisation**. The caption bar and colour key in each
+  animation are added afterwards and state what the panel would show.
+
+Thermal comfort could not come from the local backend, which is missing its
+library. Its one request was answered by the same engine,
+`backend/thermal_comfort.py`, run next to the browser.
+
+**Live examples.** The *Run it* panels call the backend at
+`http://127.0.0.1:8080`, or at the address in the `PPG_API` environment
+variable, with the same request body the tool sends. Only analyses that write
+nothing and cost nothing are offered:
+
+- **Not offered:** EnergyPlus runs are stored, and the AI models are paid
+  requests.
+- **External services:** PVGIS and the street-network download call them live,
+  just as the tool does.
+
+If the backend is unreachable, or answers with an error, a panel shows a
+**stored example** instead and says so. The stored examples were computed on
+2026-09-15 by the same code for the same Gothenburg point, and are kept in
+`logbook/assets/analysis/examples/`.
+""",
+            "files": ["logbook/scripts/analysis_gallery.py", "logbook/scripts/live_requests.py",
+                      "logbook/assets/analysis"],
         },
         {
             "title": "Built in versus external",
@@ -4753,22 +5555,31 @@ Only four things in the list are not this project's own code:
 Everything else runs from source in this repository, which is why the methods
 can be documented to the level of individual thresholds elsewhere in this
 logbook.
+
+**One missing Python package.** The backend running on this computer (the
+project's `.venv`) lacks `pythermalcomfort`, although `requirements.txt` pins
+it (2.10.0), so thermal comfort fails there with a server error while the
+Docker image, which installs `requirements.txt`, runs it. `networkx` was
+missing in the same way until 2026-09-16 and is now installed, which is what
+space syntax needs.
 """,
+            "files": ["requirements.txt"],
         },
         {
             "title": "Where each one surfaces in the app",
             "badge": "result",
             "table": [
                 ["Surface", "Analyses available there"],
-                ["3D viewer", "Sun hours · incident radiation · thermal comfort · space syntax · green index · rooftop PV · WWR estimate · façade comparison · EnergyPlus shoebox run"],
+                ["3D viewer — Sweden", "Environmental Analysis: sun hours · incident radiation · thermal comfort. Building Analysis: façade inspection (WWR, defects) · rooftop PV · EnergyPlus run. Urban Analysis: green index · heat-island proxy · green accessibility · space syntax"],
+                ["3D viewer — UK", "The same three environmental analyses, but placed under Building Analysis; green index and accessibility; no heat-island proxy, no space syntax"],
                 ["Wizard step 2", "Retrofit prioritisation · façade defect detection"],
                 ["Wizard step 3", "Baseline EnergyPlus simulation"],
                 ["Wizard step 4", "Optimisation · decision under uncertainty · heating-system comparison · LCA"],
                 ["Analysis Tools page", "The registry itself, with per-method attribution"],
-                ["Data Explorer", "Scraped market data · SCB statistics · EPC dataset queries"],
+                ["Data Explorer (app)", "Scraped market data · SCB statistics · EPC dataset queries"],
                 ["Chat widget", "The data assistant, over all of the above datasets"],
             ],
-            "files": ["frontend/src/pages/AnalysisTools.tsx"],
+            "files": ["frontend/src/pages/AnalysisTools.tsx", "assets/viewer/js/bootstrap.js"],
         },
         {
             "title": "Status flags in the app's own registry",
@@ -4779,8 +5590,9 @@ logbook.
 model, MCDA prioritisation, decision under uncertainty, the retrofit scenario
 analyser and LCA — and one, **EPSM**, is `external`.
 
-Nothing in that registry is currently flagged as planned or unavailable, so the
-registry and this inventory agree.
+The registry flags nothing as planned or unavailable. The inventory above shows
+what that hides: the façade defect service is not running, and thermal comfort
+fails on the local backend for want of one package.
 """,
         },
     ],

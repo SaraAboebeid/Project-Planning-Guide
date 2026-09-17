@@ -60,6 +60,20 @@ export const CITY_COORDS: Record<string, { lat: number; lon: number; zoom: numbe
   Rotherham: { lat: 53.4302, lon: -1.3568, zoom: 13 },
 };
 
+// The UK 3D viewer resolves its location from `?city=<id>` (see viewer/js/bootstrap.js),
+// but the city selector stores a city *name*. Map the name to the viewer's id so
+// selecting a city actually loads it - without this the viewer always fell back to
+// cities[0] (King's Cross). "London" opens on King's Cross; the other London
+// districts remain switchable from inside the viewer.
+const UK_VIEWER_CITY_ID: Record<string, string> = {
+  London: "london_kings_cross",
+  Rotherham: "rotherham",
+};
+
+export function ukViewerCityId(city: string | null | undefined): string {
+  return (city && UK_VIEWER_CITY_ID[city]) || "london_kings_cross";
+}
+
 // Country-level fallback center (no city selected, or a country with no
 // cities yet, e.g. Belgium/Ireland) - roughly each country's own centroid.
 export const COUNTRY_CENTER: Record<CountryCode, { lat: number; lon: number; zoom: number }> = {

@@ -38,12 +38,17 @@ and per-page Markdown export.
 | `Tool.py` | Entry point — builds the grouped sidebar with `st.navigation`, nothing else |
 | `home.py` | The home page (sidebar entry "Tool") — contents, live repository state, consistency check |
 | `logbook_content.py` | **All prose, plus the sidebar groups (`NAV`, at the bottom). This is the file to edit.** |
-| `file_viewer.py` | The **File viewer** page (sidebar: Reference → File viewer, URL `file?path=…`) |
+| `file_viewer.py` | The **File viewer** page (sidebar: Data & pipelines → File viewer, URL `file?path=…`) |
+| `data_explorer.py` | The **Data Explorer** page (sidebar: Data & pipelines → Data Explorer, URL `data-explorer`) — browse the tool's datasets read-only |
+| `scripts/explorer.py` | The Data Explorer's loaders, maps and charts (buildings, certificates, market, simulations, weather, traffic, reference tables) |
+| `scripts/analysis_gallery.py` | The Analysis Inventory's cards, recordings and live examples |
+| `scripts/live_requests.py` | The requests the live examples send to the backend (`PPG_API`, default `http://127.0.0.1:8080`), and their presets |
+| `assets/analysis/` | Recordings of the viewer analyses (`*.gif`) and the stored fallback results (`examples/*.json`) |
 | `scripts/ui_utils.py` | Layout helpers, file links, Markdown/zip export |
 | `scripts/file_preview.py` | The viewer's previews, one per file format |
 | `scripts/check_content.py` | Validator — run it after editing content |
 | `pages/` | One file per page, named `<number>_<Name>.py`; intentionally thin |
-| `requirements.txt` | `streamlit`, `pandas`, `duckdb` |
+| `requirements.txt` | `streamlit`, `pandas`, `duckdb` (Streamlit brings `altair` and `pydeck` for the charts and maps) |
 
 ## Opening a script or data file
 
@@ -92,6 +97,7 @@ Everything else applies to both countries.
 | | 2 | Coverage & Quality — *Sweden / United Kingdom tabs* | metadata |
 | | 3 | Pipelines — *Sweden / United Kingdom tabs* | interim |
 | | 4 | Scraped Market Data (Boplats & Booli, Sweden only) | raw |
+| | – | File viewer and Data Explorer — *interactive, unnumbered; they sit directly after Data Sources* | – |
 | **Methods** | 5 | Digital Twin Construction | processed |
 | | 6 | Energy Simulation — EPSM & IDF | method |
 | | 7 | Retrofit Prioritisation | method |
@@ -99,8 +105,8 @@ Everything else applies to both countries.
 | | 9 | Decision Analysis under Uncertainty | method |
 | | 10 | AI, ML & Vision Models | method |
 | | 11 | Climate & Environmental Analysis | method |
-| | 12 | Viewer Layers & Visualisation | result |
-| | 13 | Analysis Inventory | method |
+| | 12 | Viewer Layers & Visualisation — *Sweden / United Kingdom tabs* | result |
+| | 13 | Analysis Inventory — *recordings and live examples* | method |
 | **Reference** | 14 | Services, Keys & Access | metadata |
 | | 15 | Script Browser | metadata |
 | | 16 | Known Limitations | metadata |

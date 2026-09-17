@@ -594,7 +594,9 @@ def make_page_bundle_download(page: dict) -> None:
 
 # ── the standard page ────────────────────────────────────────────────────────
 
-def render_page(page: dict) -> None:
+def render_page(page: dict, extra=None) -> None:
+    """`extra`: optional callable drawn after the overview, before the sections -
+    for pages with interactive content (the Analysis Inventory gallery)."""
     st.set_page_config(page_title=page["title"], layout="wide")
     inject_css()
 
@@ -613,7 +615,7 @@ def render_page(page: dict) -> None:
             with tab:
                 _render_body(part, key=f"{page['number']}_{label}")
     else:
-        _render_body(page, key=str(page["number"]))
+        _render_body(page, key=str(page["number"]), extra=extra)
 
     st.divider()
     c1, c2 = st.columns(2)
@@ -623,7 +625,7 @@ def render_page(page: dict) -> None:
         make_page_bundle_download(page)
 
 
-def _render_body(page: dict, key: str) -> None:
+def _render_body(page: dict, key: str, extra=None) -> None:
     """Purpose, overview, sections and todo of one content dict — a whole plain
     page, or one tab of a tabbed page. `key` keeps widget ids unique per tab."""
     if page.get("purpose"):
@@ -635,6 +637,9 @@ def _render_body(page: dict, key: str) -> None:
     if page.get("overview"):
         ov = page["overview"]
         overview_card(ov["title"], ov.get("subtitle", ""), ov["items"])
+
+    if extra is not None:
+        extra()
 
     sections = page.get("sections", [])
     if any(sec.get("dataset") for sec in sections):

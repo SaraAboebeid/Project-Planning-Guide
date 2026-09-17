@@ -93,6 +93,7 @@ CITIES = [
         "lon": -1.3568,
         "radius_m": 4000,   # widened from 1200 m to reach the S61/S65 stock ~3.8 km out
         "local_authority": "Rotherham",
+        "la_code": "E08000018",  # ONS code - keys the EPC full-load CSV (ingest_epc_bulk.py)
         "eubucco_file": "UKE3.parquet",  # South Yorkshire (NUTS2)
     },
 ]

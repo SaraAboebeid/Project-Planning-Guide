@@ -100,6 +100,21 @@ export interface BuildingRecord {
   boplats_listings: number | null;
   boplats_avg_rent_sek: number | null;
   boplats_avg_rent_per_m2_sek: number | null;
+  // UK only (country=gb): see backend _uk_bbox_row.
+  energy_source?: "epc" | "tabula_estimate" | null;
+  epc_source?: string | null;
+  sap?: number | null;
+  u_floor?: number | null;
+  u_door?: number | null;
+  heating_system?: string | null;
+  main_fuel?: string | null;
+  property_type?: string | null;
+  postcode?: string | null;
+  nd_epc_band?: string | null;
+  dec_band?: string | null;
+  dec_metered_kwh?: Record<string, number> | null;
+  desnz_gas_median_kwh?: number | null;
+  desnz_electricity_median_kwh?: number | null;
 }
 
 /** Saved AI WWR record from the local database */
@@ -165,6 +180,47 @@ export interface BuildingLookup {
   lat: number;
   lon: number;
   dist_m: number;
+  // ── UK only (/api/uk/building) ──
+  country?: "gb";
+  postcode?: string | null;
+  floors_source?: "epc_property_type" | "height_estimate" | "eubucco" | null;
+  area_source?: "epc_sum" | "epc_mean_x_dwellings" | null;
+  year_source?: "epc_age_band" | "eubucco_osm" | null;
+  energy_source?: "epc" | "tabula_estimate" | null;
+  sap?: number | null;
+  /** "EPC register (OS UPRN)" / "epc" = real certificate; "ehs_prior_*" = estimated band */
+  epc_source?: string | null;
+  epc_dwellings?: number | null;
+  epc_latest_date?: string | null;
+  property_type?: string | null;
+  built_form?: string | null;
+  main_fuel?: string | null;
+  heating_system?: string | null;
+  hotwater_description?: string | null;
+  has_heat_pump?: boolean | null;
+  has_solar_pv?: boolean | null;
+  tabula_u_floor?: number | null;
+  tabula_u_door?: number | null;
+  /** Non-domestic EPC (SBEM asset rating) placed on this building. */
+  nd_epc_band?: string | null;
+  nd_property_type?: string | null;
+  nd_floor_area_m2?: number | null;
+  nd_energy_kwh_m2_yr?: number | null;
+  /** Display Energy Certificate: public buildings' metered operational rating. */
+  dec_band?: string | null;
+  dec_name?: string | null;
+  dec_property_type?: string | null;
+  dec_floor_area_m2?: number | null;
+  dec_metered_kwh?: Record<string, number> | null;
+  dec_period?: [string | null, string | null] | null;
+  /** DESNZ metered domestic consumption for the postcode — median kWh per meter. */
+  desnz_postcode?: string | null;
+  desnz_year?: number | null;
+  desnz_gas_median_kwh?: number | null;
+  desnz_gas_meters?: number | null;
+  desnz_electricity_median_kwh?: number | null;
+  desnz_electricity_meters?: number | null;
+  epc_dwellings_count?: number | null;
 }
 
 export interface EpcPoint {

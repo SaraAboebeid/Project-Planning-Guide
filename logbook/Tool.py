@@ -47,9 +47,15 @@ for header, keys in NAV:
         for key in keys
     ]
 
-# Every file path on the other pages links to file?path=<repo path>.
-navigation.setdefault("Reference", []).append(
-    st.Page(LOGBOOK_DIR / "file_viewer.py", title="File viewer", url_path="file")
-)
+# The two interactive, unnumbered tools sit with the data they open, directly
+# after Data Sources — not in Reference: a reader who has just seen where a
+# dataset comes from wants to look inside it, or at the script that built it.
+_tools = [
+    st.Page(LOGBOOK_DIR / "file_viewer.py", title="File viewer", url_path="file"),
+    st.Page(LOGBOOK_DIR / "data_explorer.py", title="Data Explorer", url_path="data-explorer"),
+]
+_group = navigation.setdefault("Data & pipelines", [])
+_after = next((i for i, p in enumerate(_group) if p.url_path == "data-sources"), len(_group) - 1)
+_group[_after + 1:_after + 1] = _tools
 
 st.navigation(navigation).run()

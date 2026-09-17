@@ -52,10 +52,20 @@ export interface OptimizeResponse {
   params_used: { annuity_factor: number; q_fixed_kwh_yr: number; study_period_yr: number };
 }
 
+export interface UkRetailRate {
+  unit_gbp_per_kwh: number | null;
+  standing_gbp_per_day: number | null;
+  valid_from: string | null;
+  next: { unit_gbp_per_kwh: number | null; standing_gbp_per_day: number | null; valid_from: string } | null;
+}
+
 export const api = {
   /** Geocode an address → { lat, lon, display_name } */
-  geocode: (address: string) =>
-    get<{ lat: number; lon: number; display_name: string }>("/geocode", { address }),
+  geocode: (address: string, country?: string | null) =>
+    get<{ lat: number; lon: number; display_name: string }>("/geocode", {
+      address,
+      ...(country === "United Kingdom" ? { country: "gb" } : country === "Sweden" ? { country: "se" } : {}),
+    }),
 
   /** Fetch nearby EPC snapshot */
   epcSnapshot: (lat: number, lon: number, radiusM: number) =>
@@ -93,20 +103,22 @@ export const api = {
       : get<BuildingLookup>("/building", { lat: String(lat), lon: String(lon) }),
 
   /** Aggregate EUBUCCO stats for all buildings in a bounding box */
-  lookupBuildingsBbox: (north: number, south: number, east: number, west: number, polygon?: string) =>
+  lookupBuildingsBbox: (north: number, south: number, east: number, west: number, polygon?: string, country?: string | null) =>
     get<BboxStats>("/buildings/bbox/stats", {
       north: String(north), south: String(south),
       east:  String(east),  west:  String(west),
       ...(polygon ? { polygon } : {}),
+      ...(country === "United Kingdom" ? { country: "gb" } : {}),
     }),
 
   /** Individual building records in a bounding box (optionally refined to a drawn
-   *  polygon), with Boplats data merged. `polygon` is "lon,lat;lon,lat;…". */
-  buildingsBboxList: (north: number, south: number, east: number, west: number, polygon?: string) =>
+   *  polygon), with Boplats data merged (Sweden). `polygon` is "lon,lat;lon,lat;…". */
+  buildingsBboxList: (north: number, south: number, east: number, west: number, polygon?: string, country?: string | null) =>
     get<BuildingRecord[]>("/buildings/bbox/list", {
       north: String(north), south: String(south),
       east:  String(east),  west:  String(west),
       ...(polygon ? { polygon } : {}),
+      ...(country === "United Kingdom" ? { country: "gb" } : {}),
     }),
 
   /** Named neighborhoods (Gothenburg primärområden) with building counts */
@@ -123,11 +135,17 @@ export const api = {
   chat: (messages: { role: "user" | "assistant"; content: string }[]) =>
     post<{ reply: string; configured: boolean }>("/chat", { messages }),
 
-  /** Live day-ahead electricity spot price (SE = Nord Pool via elprisetjustnu). */
-  energyPrice: (country = "se") =>
-    get<{ country: string; zone?: string; live: boolean; date?: string; unit?: string;
+  /** Live electricity price. SE = Nord Pool spot via elprisetjustnu; GB = Octopus Energy
+   *  for the city's region: Agile half-hourly (wholesale-tracking) + price-cap retail gas/electricity. */
+  energyPrice: (country = "se", city?: string | null) =>
+    get<{ country: string; zone?: string; region?: string; live: boolean; date?: string; unit?: string;
           average_price?: number | null; min_price?: number | null; max_price?: number | null;
-          note?: string; source?: string | null }>("/energy-price", { country }),
+          note?: string; source?: string | null;
+          retail?: {
+            product: string; note: string;
+            electricity: UkRetailRate; gas: UkRetailRate;
+          };
+        }>("/energy-price", { country, ...(city ? { city } : {}) }),
 
   /** Look up saved AI WWR for a building (null if none saved) */
   lookupWWR: (lat: number, lon: number) =>

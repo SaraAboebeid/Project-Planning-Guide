@@ -12,8 +12,12 @@
   const wrap = document.getElementById('city-switcher');
   if (!wrap || !profile) return;
 
-  const cities = profile.cities || [];
-  // A single-city country (Sweden) has nothing to switch between.
+  // Only switch between districts of the city being viewed: the app's own
+  // country/city selector picks the city, so Rotherham shows no London pills
+  // and London shows only its four districts.
+  const active0 = window.VIEWER_CITY || {};
+  const cities = (profile.cities || []).filter(c => !active0.name || c.name === active0.name);
+  // A single-district city (Rotherham, Gothenburg) has nothing to switch between.
   if (cities.length < 2) {
     wrap.style.display = 'none';
     return;

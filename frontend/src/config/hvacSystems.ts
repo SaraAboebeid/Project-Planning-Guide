@@ -16,7 +16,7 @@
  *   - Direct electric → 1.0.
  */
 
-export type Carrier = "district_heating" | "electricity" | "biomass";
+export type Carrier = "district_heating" | "electricity" | "biomass" | "gas";
 
 export interface EnergyCarrier {
   key: Carrier;
@@ -31,7 +31,7 @@ export interface EnergyCarrier {
 }
 
 /** Editable defaults — the Settings/assumptions can later override these. */
-export const CARRIERS: Record<Carrier, EnergyCarrier> = {
+export const CARRIERS: Record<Exclude<Carrier, "gas">, EnergyCarrier> = {
   district_heating: {
     key: "district_heating",
     label: "District heating (fjärrvärme)",
@@ -190,3 +190,25 @@ export const HVAC_SYSTEMS: HvacSystem[] = [
  *  heat demand to a design/peak kW for capex sizing. ~2000–2200 h is typical for
  *  the SW-coastal Swedish climate. Editable. */
 export const GOTHENBURG_EFLH = 2100;
+
+/** One country's heating comparison set. Money fields named *Sek hold the
+ *  catalogue's own `currency` (GBP for the UK) - the maths is currency-agnostic. */
+export interface HvacCatalogue {
+  currency: "SEK" | "GBP";
+  locale: string;
+  carriers: Partial<Record<string, EnergyCarrier>>;
+  systems: HvacSystem[];
+  eflh: number;
+  eflhNote: string;
+  baselineLabel: string;       // what "vs baseline" compares against
+  defaultSystemId: string;
+}
+
+export const SE_HVAC_CATALOGUE: HvacCatalogue = {
+  currency: "SEK", locale: "sv-SE",
+  carriers: CARRIERS, systems: HVAC_SYSTEMS,
+  eflh: GOTHENBURG_EFLH,
+  eflhNote: `${GOTHENBURG_EFLH} equivalent full-load hours (Gothenburg climate)`,
+  baselineLabel: "district heating",
+  defaultSystemId: "dh_keep",
+};

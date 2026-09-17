@@ -61,8 +61,22 @@ export function loadUkArchetypes(): Promise<TabulaArchetypeGB[]> {
 export function findUkArchetype(
   archetypes: TabulaArchetypeGB[],
   useCat: string | null,
-  period: string | null
+  period: string | null,
+  asBuilt?: { u_wall: number | null; u_roof: number | null; u_window: number | null; u_floor?: number | null }
 ): TabulaArchetypeGB | null {
+  // The data pipeline picks the TABULA type from the EPC dwelling type or
+  // EUBUCCO subtype (mostly "Terraced house"), which use_cat alone can't
+  // recover. When the building carries its as-built U-values, pick the
+  // archetype that produced exactly those, so the tiers refurbish the same one.
+  // Types share wall/roof/window values within an era; the floor U tells them apart.
+  if (period && asBuilt && asBuilt.u_wall != null) {
+    const same = archetypes.filter((a) => a.period === period
+      && a.as_built.u_wall === asBuilt.u_wall
+      && a.as_built.u_roof === asBuilt.u_roof
+      && a.as_built.u_window === asBuilt.u_window);
+    const byFloor = asBuilt.u_floor != null ? same.find((a) => a.as_built.u_floor === asBuilt.u_floor) : undefined;
+    if (byFloor ?? same[0]) return (byFloor ?? same[0])!;
+  }
   if (!useCat) return null;
   const sameCat = archetypes.filter((a) => a.use_cat === useCat);
   if (!sameCat.length) return null;

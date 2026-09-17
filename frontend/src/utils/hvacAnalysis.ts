@@ -11,7 +11,7 @@
  *   capex     = fixed + (perKw [+ groundLoop]) × design-kW      (design-kW = demand / EFLH)
  *   LCC       = capex + annuity·(op-cost + O&M) + PV(replacements)
  */
-import { HVAC_SYSTEMS, CARRIERS, GOTHENBURG_EFLH } from "../config/hvacSystems";
+import { SE_HVAC_CATALOGUE, type HvacCatalogue } from "../config/hvacSystems";
 
 export interface HvacInput {
   heatingDemandKwhM2Yr: number;   // useful heat demand per m²·yr (EPSM baseline heating)
@@ -19,6 +19,7 @@ export interface HvacInput {
   eflh?: number;                  // equivalent full-load hours (design-kW sizing)
   studyPeriodYr?: number;         // default 30
   discountRate?: number;          // default 0.03
+  catalogue?: HvacCatalogue;      // default Sweden/Gothenburg
 }
 
 export interface HvacDelta { opCostPct: number; carbonPct: number; deliveredPct: number; }
@@ -44,7 +45,8 @@ export function annuity(discountRate: number, years: number): number {
 }
 
 export function computeHvac(input: HvacInput): HvacOutcome {
-  const eflh = input.eflh ?? GOTHENBURG_EFLH;
+  const cat = input.catalogue ?? SE_HVAC_CATALOGUE;
+  const eflh = input.eflh ?? cat.eflh;
   const N = input.studyPeriodYr ?? 30;
   const r = input.discountRate ?? 0.03;
   const af = annuity(r, N);
@@ -52,9 +54,10 @@ export function computeHvac(input: HvacInput): HvacOutcome {
   const annualDemandKwh = Math.max(0, input.heatingDemandKwhM2Yr) * area;
   const designKw = eflh > 0 ? annualDemandKwh / eflh : 0;
 
-  const results: HvacResult[] = HVAC_SYSTEMS.map((sys) => {
+  const results: HvacResult[] = cat.systems.map((sys) => {
     const spf = sys.spf.base;
-    const carrier = CARRIERS[sys.carrier];
+    const carrier = cat.carriers[sys.carrier];
+    if (!carrier) throw new Error(`HVAC catalogue has no carrier "${sys.carrier}" for ${sys.id}`);
     const deliveredKwh = spf > 0 ? annualDemandKwh / spf : annualDemandKwh;
     const opCost = deliveredKwh * carrier.tariffSek;
     const carbon = deliveredKwh * carrier.carbonKgPerKwh;

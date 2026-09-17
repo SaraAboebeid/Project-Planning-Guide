@@ -98,13 +98,15 @@ const UK_SOURCES: Source[] = [
     id: "epc_register",
     name: "EPC Register — matched certificates (Rotherham)",
     description:
-      "Real Energy Performance Certificates from the MHCLG register, matched to buildings by UPRN via OS Open UPRN. " +
-      "For Rotherham this anchors 7,824 of 14,483 buildings (54%) with real EPC band, construction year, SAP and " +
-      "heating — validated against ground-truth surveys at 91% exact / 100% within one band.",
+      "Real Energy Performance Certificates from the MHCLG register, placed on building footprints via OS Open UPRN " +
+      "(each dwelling's newest certificate). For Rotherham this anchors 9,251 of 14,483 buildings (64%) — 75% of " +
+      "residential buildings — with real EPC band, SAP, construction year, floor area and heating. Checked against a " +
+      "landlord survey of 113 dwellings in 19 buildings: 93% exact band (95% per building), 100% within one band, " +
+      "SAP error 2.3 points — against 84% for always guessing the most common band (C).",
     accent: "#2FB477",
     iconD: IC.epc,
     status: "live",
-    fields: ["eclass", "year", "sap", "heating", "tabula_period", "epc_n_certs", "epc_source", "postcode"],
+    fields: ["eclass", "sap", "year", "floor_area_m2", "mainheat_description", "main_fuel", "epc_dwellings", "epc_latest_date", "epc_source"],
     sampleFn: async () => {
       const rows = await fetchJson<Record<string, unknown>[]>("/api/uk/buildings/rotherham");
       return rows
@@ -112,13 +114,14 @@ const UK_SOURCES: Source[] = [
         .slice(0, 8)
         .map((r) => ({
           eclass: r.eclass,
-          year: r.year,
           sap: r.sap,
-          heating: r.heating,
-          tabula_period: r.tabula_period,
-          epc_n_certs: r.epc_n_certs,
+          year: r.year,
+          floor_area_m2: r.floor_area_m2,
+          mainheat_description: r.mainheat_description,
+          main_fuel: r.main_fuel,
+          epc_dwellings: r.epc_dwellings,
+          epc_latest_date: r.epc_latest_date,
           epc_source: r.epc_source,
-          postcode: r.postcode,
         }));
     },
   },
@@ -195,22 +198,18 @@ const UK_SOURCES: Source[] = [
     id: "uk_cost_carbon",
     name: "Renovation Cost & Embodied Carbon",
     description:
-      "Two real candidate sources were reviewed and NOT wired in: the ICE Database Educational V5.0 " +
-      "(Circular Ecology / University of Bath) — real embodied-carbon-per-material data, but its license explicitly " +
-      "prohibits use “in software or tools (unless 100% a teaching aid only) or ... any carbon calculations” " +
-      "outside teaching/learning the subject, which this tool's real carbon math would violate; and the DBT/ONS " +
-      "“Construction Building Materials” bulletin — real, open (Crown copyright/OGL) data, but it publishes " +
-      "price indices and production volumes, not per-assembly £/m² unit costs, so it's the wrong shape of " +
-      "data for per-package costing. Until a properly-licensed UK cost/carbon source is wired in, the renovation " +
-      "calculator shows flat SYNTHETIC placeholder £/m² and kg CO₂e/m² rates per refurbishment " +
-      "tier — round, made-up numbers used only to test the pipeline end-to-end, not for real decisions.",
-    accent: "#E2483B",
+      "Install cost per measure from DESNZ's private-rented-homes impact assessment (2026, Table 20: fixed £ + £/m², " +
+      "2020 prices ex VAT, OGL v3.0). Embodied carbon (A1-A3) from Boverket klimatdatabas, whose licence permits use " +
+      "in tools — Swedish average products, because no UK per-measure dataset allows it (the ICE Database licence " +
+      "forbids use in software; ÖKOBAUDAT only allows unmodified redistribution). Insulation is sized to reach each " +
+      "TABULA tier's U-value. External doors are not costed.",
+    accent: "#E8880C",
     iconD: IC.tabula,
-    status: "placeholder",
-    fields: ["tier", "cost_gbp_per_m2", "carbon_kgco2e_per_m2", "note"],
+    status: "cached",
+    fields: ["measure", "fixed_gbp", "gbp_per_m2", "carbon_basis", "source"],
     sampleFn: async () => {
-      const { UK_PLACEHOLDER_SAMPLE } = await import("../config/ukPlaceholderCostCarbon");
-      return UK_PLACEHOLDER_SAMPLE;
+      const { UK_COST_CARBON_SAMPLE } = await import("../config/ukCostCarbon");
+      return UK_COST_CARBON_SAMPLE;
     },
   },
 ];

@@ -119,6 +119,44 @@ WATER_SPECIFIC_HEAT_J_KGK = 4186.0
 
 HEATING_SETPOINT_C = 21.0
 COOLING_SETPOINT_C = 25.0
+
+# UK homes (country "gb", residential use) follow SAP 10.2's standard heating
+# pattern instead of continuous 21 °C (the Gothenburg default above):
+#   - demand temperature 21 °C in the living area, 18 °C elsewhere (SAP Table 9);
+#     the single-zone shoebox uses the area-weighted mean with a typical
+#     living-area fraction of 0.3 (SAP Table 27 gives 0.2-0.35 by room count),
+#   - heating periods: weekdays 07:00-09:00 and 16:00-23:00 (9 h), weekends
+#     07:00-23:00 (16 h) (SAP Table 9),
+#   - outside those hours heating is off; a 10 °C frost setback stands in for
+#     "off" so an unheated zone can't free-fall unrealistically.
+UK_SAP_LIVING_AREA_FRACTION = 0.3
+# SAP's area-weighted demand temperature would be 18.9 °C; CALIBRATED to 19.5 °C
+# (with UK_INFILTRATION_ACH = 0.75) against DESNZ 2024 metered postcode gas for
+# Rotherham houses - tools/uk/calibrate_rotherham.py. Held-out 60 houses:
+# simulated space-heating gas / (0.75 x metered median) = 1.04 median,
+# interquartile 0.85-1.31, 53% within +/-25% (SAP defaults: 0.75, 38%).
+# Temperature and infiltration are confounded in the fit (18.9 °C / 1.0 ACH
+# scores alike); this pair was chosen as the best-centred on held-out houses.
+UK_SAP_HEATING_C = 19.5
+UK_INFILTRATION_ACH = 0.75
+UK_SAP_SETBACK_C = 10.0
+# Seasonal efficiency of an existing gas boiler when the certificate gives none
+# (typical in-use value; the metered-gas calibration also used 0.85).
+UK_BOILER_EFFICIENCY = 0.85
+# Hourly outputs read back from EPSM's hourly_timeseries for the gas-boiler plant.
+GAS_BOILER_OUTPUT_VARIABLES = [
+    "Boiler NaturalGas Energy",
+    "Boiler Heating Energy",
+    "Baseboard Total Heating Energy",
+    "Pump Electricity Energy",
+]
+UK_SAP_WEEKDAY_HEATING: list[tuple[str, float]] = [
+    ("07:00", UK_SAP_SETBACK_C), ("09:00", UK_SAP_HEATING_C),
+    ("16:00", UK_SAP_SETBACK_C), ("23:00", UK_SAP_HEATING_C), ("24:00", UK_SAP_SETBACK_C),
+]
+UK_SAP_WEEKEND_HEATING: list[tuple[str, float]] = [
+    ("07:00", UK_SAP_SETBACK_C), ("23:00", UK_SAP_HEATING_C), ("24:00", UK_SAP_SETBACK_C),
+]
 ACTIVITY_LEVEL_W_PER_PERSON = 120.0
 INFILTRATION_ACH = 0.5  # generic natural-infiltration default; no per-building airtightness data exists
 

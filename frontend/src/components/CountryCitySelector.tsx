@@ -6,7 +6,7 @@ import {
   countryEnabled,
   type CountryCode,
 } from "../config/countryNav";
-import { useWizardStore } from "../store/wizard";
+import { useWizardStore, LOCATION_SCOPED_RESET } from "../store/wizard";
 
 /* Country → city selector + account avatar. Rendered on every other page by
  * <TopBar/>; this store-driven variant is used in the wizard header (the wizard
@@ -22,11 +22,13 @@ export default function CountryCitySelector() {
   const city = cityEnabled(country, _city) ? _city : defaultCityFor(country);
 
   function selectCountry(id: CountryCode) {
+    if (id === country) return;
     const def = COUNTRIES.find((c) => c.id === id);
-    setProject({ country: def?.name ?? null, city: defaultCityFor(id) || null });
+    setProject({ ...LOCATION_SCOPED_RESET, country: def?.name ?? null, city: defaultCityFor(id) || null });
   }
   function selectCity(name: string) {
-    setProject({ city: name });
+    if (name === city) return;
+    setProject({ ...LOCATION_SCOPED_RESET, city: name });
   }
 
   const pill = {

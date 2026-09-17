@@ -107,9 +107,11 @@ def _floors_of(building: dict) -> int:
 
 
 def _total_floor_area_m2(building: dict, floors: int) -> float:
-    explicit = building.get("floor_area_m2")
-    if explicit:
-        return float(explicit)
+    # Always the modelled geometry (footprint x floors), never a record's own
+    # floor_area_m2: the shoebox's envelope, gains and hot water must describe
+    # the same building. UK records carry the EPC certificate area there, which
+    # covers only the certified dwellings (median 0.65x the footprint area in
+    # Rotherham) and inflated per-m2 heating ~1.5-4x when mixed with the geometry.
     footprint = building.get("footprint_m2") or 50.0
     return float(footprint) * floors
 
@@ -136,6 +138,29 @@ def _schedule_compact(name: str, type_limits: str, day_pattern: list[tuple[str, 
         fields.append((f"Until: {until}", "Field"))
         fields.append((value, "Field"))
     return obj("Schedule:Compact", fields)
+
+
+def _schedule_compact_week(name: str, type_limits: str, weekday: list[tuple[str, float]],
+                           weekend: list[tuple[str, float]]) -> str:
+    fields: list[tuple[Any, str]] = [(name, "Name"), (type_limits, "Schedule Type Limits Name"), ("Through: 12/31", "Field")]
+    for days, pattern in (("For: Weekdays", weekday), ("For: Weekends Holidays AllOtherDays", weekend)):
+        fields.append((days, "Field"))
+        for until, value in pattern:
+            fields.append((f"Until: {until}", "Field"))
+            fields.append((value, "Field"))
+    return obj("Schedule:Compact", fields)
+
+
+def _project_like_ring(points_lonlat: list, ring_lonlat: list) -> list[tuple[float, float]]:
+    """Project extra [lon, lat] points into the same local frame G.project_ring uses for this ring."""
+    if not points_lonlat:
+        return []
+    pts = ring_lonlat[:-1] if ring_lonlat[0] == ring_lonlat[-1] else ring_lonlat
+    lon0 = sum(p[0] for p in pts) / len(pts)
+    lat0 = sum(p[1] for p in pts) / len(pts)
+    mx = 111_320.0 * math.cos(math.radians(lat0))
+    my = 110_540.0
+    return [((p[0] - lon0) * mx, (p[1] - lat0) * my) for p in points_lonlat]
 
 
 def _day_pattern_mean(pattern: list[tuple[str, float]]) -> float:
@@ -195,6 +220,8 @@ def build_shoebox_idf(
     u_roof_override: Optional[float] = None,
     u_win_override: Optional[float] = None,
     u_floor_override: Optional[float] = None,
+    heating_system: str = "ideal",
+    boiler_efficiency: Optional[float] = None,
 ) -> str:
     """Return a complete EnergyPlus 23.2 IDF (as text) for one building.
 
@@ -212,14 +239,32 @@ def build_shoebox_idf(
 
     floors = _floors_of(building)
     footprint_m2 = float(building.get("footprint_m2") or 50.0)
-    total_floor_area = _total_floor_area_m2(building, floors)
+    # Heated area (UK: EPC total floor areas, tools/uk/anchor_epc_uprn.py
+    # assign_heated_area) is what gets simulated. The footprint keeps its shape
+    # and orientation but is scaled evenly about its centre until footprint x
+    # floors equals the heated area, so walls, roof, glazing, gains and air
+    # volume all describe the same heated building. Records without one
+    # (Sweden) are simulated at footprint x floors as before.
+    area_scale = 1.0
+    heated = building.get("heated_area_m2")
+    if heated and footprint_m2 > 0:
+        area_scale = max(0.1, min(2.0, (float(heated) / floors) / footprint_m2))
+        lin = math.sqrt(area_scale)
+        ring2d = [(x * lin, y * lin) for x, y in ring2d]
+        footprint_m2 *= area_scale
+    total_floor_area = footprint_m2 * floors
     use_cat = building.get("use_cat")
     gains = _gains_profile(use_cat)
 
-    u_wall = u_wall_override if u_wall_override is not None else (building.get("tabula_u_wall") or D.DEFAULT_U_WALL)
-    u_roof = u_roof_override if u_roof_override is not None else (building.get("tabula_u_roof") or D.DEFAULT_U_ROOF)
-    u_win = u_win_override if u_win_override is not None else (building.get("tabula_u_win") or D.DEFAULT_U_WIN)
-    u_floor = u_floor_override if u_floor_override is not None else D.DEFAULT_U_FLOOR
+    # u_*_epc (UK only) come from the certificates' own fabric descriptions
+    # (tools/uk/epc_fabric.py) and describe the building as it is today;
+    # tabula_u_* are uninsulated as-built archetype values.
+    u_wall = u_wall_override if u_wall_override is not None else (building.get("u_wall_epc") or building.get("tabula_u_wall") or D.DEFAULT_U_WALL)
+    u_roof = u_roof_override if u_roof_override is not None else (building.get("u_roof_epc") or building.get("tabula_u_roof") or D.DEFAULT_U_ROOF)
+    u_win = u_win_override if u_win_override is not None else (building.get("u_win_epc") or building.get("tabula_u_win") or D.DEFAULT_U_WIN)
+    # Only the UK payload carries tabula_u_floor (TABULA GB publishes it); Sweden keeps the default.
+    u_floor = u_floor_override if u_floor_override is not None else (building.get("u_floor_epc") or building.get("tabula_u_floor") or D.DEFAULT_U_FLOOR)
+    uk_home = (country or "").lower() == "gb" and use_cat in ("bostad_enfamilj", "bostad_flerfamilj")
     wwr = wwr_override if wwr_override is not None else D.DEFAULT_WWR_BY_USE.get(use_cat or "", D.DEFAULT_WWR_FALLBACK)
 
     name_base = _safe_name(building_name or building.get("address") or f"{city_id} building")
@@ -238,9 +283,13 @@ def build_shoebox_idf(
         ("FullExterior", "Solar Distribution"),
         (None, "Maximum Number of Warmup Days"), (None, "Minimum Number of Warmup Days"),
     ]))
+    # A real plant (gas boiler) autosizes its capacity and water flows from
+    # weather-file extreme periods; ideal loads need no sizing at all.
+    gas_boiler = heating_system == "gas_boiler"
+    sizing = "Yes" if gas_boiler else "No"
     objects.append(obj("SimulationControl", [
-        ("No", "Do Zone Sizing Calculation"), ("No", "Do System Sizing Calculation"),
-        ("No", "Do Plant Sizing Calculation"), ("No", "Run Simulation for Sizing Periods"),
+        (sizing, "Do Zone Sizing Calculation"), (sizing, "Do System Sizing Calculation"),
+        (sizing, "Do Plant Sizing Calculation"), ("No", "Run Simulation for Sizing Periods"),
         ("Yes", "Run Simulation for Weather File Run Periods"),
         ("No", "Do HVAC Sizing Simulation for Sizing Periods"),
         (1, "Maximum Number of HVAC Sizing Simulation Passes"),
@@ -321,14 +370,31 @@ def build_shoebox_idf(
         (None, "View Factor to Ground"),
     ] + _vertex_fields(G.floor_vertices(ring2d, 0.0))))
 
+    # Walls shared with a neighbouring footprint (semis, terraces) lose no heat:
+    # the data pipeline stores those edges' midpoints in lon/lat, projected here
+    # exactly like the ring itself (G.project_ring's centroid origin).
+    party_mids = [(x * math.sqrt(area_scale), y * math.sqrt(area_scale))
+                  for x, y in _project_like_ring(building.get("party_wall_midpoints") or [], ring)]
     n_edges = len(ring2d)
     window_count = 0
+    party_walls = 0
     for i in range(n_edges):
         p0, p1 = ring2d[i], ring2d[(i + 1) % n_edges]
         width = G.edge_length(p0, p1)
         if width < 0.3:
             continue  # degenerate/near-duplicate footprint vertex
         wall_name = f"{name_base}..Wall{i}"
+        mid = ((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2)
+        is_party = any(math.hypot(mid[0] - q[0], mid[1] - q[1]) < 1.0 for q in party_mids)
+        if is_party:
+            party_walls += 1
+            objects.append(obj("BuildingSurface:Detailed", [
+                (wall_name, "Name"), ("Wall", "Surface Type"), ("Wall Construction", "Construction Name"),
+                (zone_name, "Zone Name"), (None, "Space Name"), ("Adiabatic", "Outside Boundary Condition"),
+                (None, "Outside Boundary Condition Object"), ("NoSun", "Sun Exposure"), ("NoWind", "Wind Exposure"),
+                (None, "View Factor to Ground"),
+            ] + _vertex_fields(G.wall_vertices(p0, p1, 0.0, height))))
+            continue  # no windows in a party wall
         objects.append(obj("BuildingSurface:Detailed", [
             (wall_name, "Name"), ("Wall", "Surface Type"), ("Wall Construction", "Construction Name"),
             (zone_name, "Zone Name"), (None, "Space Name"), ("Outdoors", "Outside Boundary Condition"),
@@ -362,7 +428,11 @@ def build_shoebox_idf(
     objects.append(_schedule_compact(equip_sched, "Fractional", pattern))
     objects.append(_constant_schedule("Activity Level Schedule", "Activity Level", D.ACTIVITY_LEVEL_W_PER_PERSON))
     objects.append(_constant_schedule("Always On Schedule", "Fractional", 1))
-    objects.append(_constant_schedule(f"{zone_name} Heating Setpoint Schedule", "Temperature", D.HEATING_SETPOINT_C))
+    if uk_home:
+        objects.append(_schedule_compact_week(f"{zone_name} Heating Setpoint Schedule", "Temperature",
+                                              D.UK_SAP_WEEKDAY_HEATING, D.UK_SAP_WEEKEND_HEATING))
+    else:
+        objects.append(_constant_schedule(f"{zone_name} Heating Setpoint Schedule", "Temperature", D.HEATING_SETPOINT_C))
     objects.append(_constant_schedule(f"{zone_name} Cooling Setpoint Schedule", "Temperature", D.COOLING_SETPOINT_C))
     objects.append(_constant_schedule(f"{zone_name} Thermostat Schedule", f"{zone_name} Thermostat Schedule Type Limits", 4))
 
@@ -393,7 +463,7 @@ def build_shoebox_idf(
         (f"{zone_name} Infiltration", "Name"), (zone_name, "Zone or ZoneList or Space or SpaceList Name"),
         ("Always On Schedule", "Schedule Name"), ("AirChanges/Hour", "Design Flow Rate Calculation Method"),
         (None, "Design Flow Rate {m3/s}"), (None, "Flow per Zone Floor Area {m3/s-m2}"),
-        (None, "Flow per Exterior Surface Area {m3/s-m2}"), (D.INFILTRATION_ACH, "Air Changes per Hour"),
+        (None, "Flow per Exterior Surface Area {m3/s-m2}"), (D.UK_INFILTRATION_ACH if uk_home else D.INFILTRATION_ACH, "Air Changes per Hour"),
         (1, "Constant Term Coefficient"), (0, "Temperature Term Coefficient"),
         (0, "Velocity Term Coefficient"), (0, "Velocity Squared Term Coefficient"),
     ]))
@@ -406,7 +476,9 @@ def build_shoebox_idf(
     # Efficiency 1.0 and zero standby loss are deliberate: the Sveby intensity
     # is already a DELIVERED figure including circulation losses, so adding
     # tank losses or a boiler efficiency on top would double-count.
-    dhw_kwh_m2 = D.DHW_KWH_M2_YR_BY_USE.get(use_cat or "", D.DEFAULT_DHW_KWH_M2_YR)
+    # UK: hot water is left out for now (Sveby intensities are Swedish); totals
+    # and the metered-gas check compare space heating only.
+    dhw_kwh_m2 = 0.0 if (country or "").lower() == "gb" else D.DHW_KWH_M2_YR_BY_USE.get(use_cat or "", D.DEFAULT_DHW_KWH_M2_YR)
     dhw_annual_kwh = dhw_kwh_m2 * total_floor_area
     if dhw_annual_kwh > 0:
         dhw_peak_flow = _dhw_peak_flow_m3_s(dhw_annual_kwh, D.DHW_DAY_PATTERN)
@@ -454,6 +526,40 @@ def build_shoebox_idf(
             ("Domestic Hot Water", "End-Use Subcategory"),
         ]))
 
+    if gas_boiler:
+        objects.extend(_gas_boiler_objects(zone_name, boiler_efficiency or D.UK_BOILER_EFFICIENCY))
+    else:
+        objects.extend(_ideal_loads_objects(zone_name))
+
+    # ── output (verbatim block, see defaults.OUTPUT_VARIABLE_NAMES) ──
+    for var_name in D.OUTPUT_VARIABLE_NAMES + (D.GAS_BOILER_OUTPUT_VARIABLES if gas_boiler else []):
+        objects.append(obj("Output:Variable", [(None, "Key Value"), (var_name, "Variable Name"), ("Hourly", "Reporting Frequency")]))
+    objects.append(obj("Output:VariableDictionary", [("IDF", "Key Field"), ("Unsorted", "Sort Option")]))
+    objects.append(obj("OutputControl:Table:Style", [("HTML", "Column Separator"), ("JtoKWH", "Unit Conversion")]))
+    objects.append(obj("Output:Table:SummaryReports", [("AllSummary", "Report 1 Name")]))
+    objects.append(obj("Output:SQLite", [("SimpleAndTabular", "Option Type"), ("JtoKWH", "Unit Conversion for Tabular Data")]))
+
+    template = _TEMPLATE_ENV.get_template("shoebox.idf.j2")
+    meta = {
+        "building_name": name_base, "country": country, "city_id": city_id,
+        "floors": floors, "footprint_m2": round(footprint_m2, 1), "total_floor_area_m2": round(total_floor_area, 1),
+        "height_m": height, "use_cat": use_cat, "wwr": round(wwr, 3), "window_count": window_count,
+        "u_wall": round(u_wall, 3), "u_roof": round(u_roof, 3), "u_win": round(u_win, 3),
+        "dhw_kwh_m2_yr": dhw_kwh_m2,
+        "party_walls": party_walls,
+        "heating_schedule": "SAP 10.2 intermittent" if uk_home else f"continuous {D.HEATING_SETPOINT_C} C",
+        "fabric_source": "epc_description" if building.get("u_wall_epc") else "tabula_or_default",
+        "heating_system": heating_system,
+        "heated_area_m2": round(total_floor_area, 1),
+        "footprint_area_scale": round(area_scale, 3),
+    }
+    return template.render(meta=meta, objects=objects)
+
+
+def _ideal_loads_objects(zone_name: str) -> list[str]:
+    """Ideal loads: meets the zone load exactly at 100% efficiency (reported
+    under EnergyPlus's DistrictHeatingWater meter)."""
+    objects: list[str] = []
     # ── ideal-loads HVAC ────────────────────────────────────────────
     supply_node = f"{zone_name} Supply Node"
     exhaust_node = f"{zone_name} Exhaust Node"
@@ -505,21 +611,51 @@ def build_shoebox_idf(
     ]))
     objects.append(obj("NodeList", [(inlet_list, "Name"), (supply_node, "Node 1 Name")]))
     objects.append(obj("NodeList", [(exhaust_list, "Name"), (exhaust_node, "Node 1 Name")]))
+    return objects
 
-    # ── output (verbatim block, see defaults.OUTPUT_VARIABLE_NAMES) ──
-    for var_name in D.OUTPUT_VARIABLE_NAMES:
-        objects.append(obj("Output:Variable", [(None, "Key Value"), (var_name, "Variable Name"), ("Hourly", "Reporting Frequency")]))
-    objects.append(obj("Output:VariableDictionary", [("IDF", "Key Field"), ("Unsorted", "Sort Option")]))
-    objects.append(obj("OutputControl:Table:Style", [("HTML", "Column Separator"), ("JtoKWH", "Unit Conversion")]))
-    objects.append(obj("Output:Table:SummaryReports", [("AllSummary", "Report 1 Name")]))
-    objects.append(obj("Output:SQLite", [("SimpleAndTabular", "Option Type"), ("JtoKWH", "Unit Conversion for Tabular Data")]))
 
-    template = _TEMPLATE_ENV.get_template("shoebox.idf.j2")
-    meta = {
-        "building_name": name_base, "country": country, "city_id": city_id,
-        "floors": floors, "footprint_m2": round(footprint_m2, 1), "total_floor_area_m2": round(total_floor_area, 1),
-        "height_m": height, "use_cat": use_cat, "wwr": round(wwr, 3), "window_count": window_count,
-        "u_wall": round(u_wall, 3), "u_roof": round(u_roof, 3), "u_win": round(u_win, 3),
-        "dhw_kwh_m2_yr": dhw_kwh_m2,
-    }
-    return template.render(meta=meta, objects=objects)
+def _gas_boiler_objects(zone_name: str, efficiency: float) -> list[str]:
+    """Wet central heating: a natural-gas hot-water boiler feeding radiators
+    (hot-water baseboards) on a pumped loop, via HVACTemplate objects that
+    EnergyPlus's ExpandObjects turns into the full plant (EPSM runs with
+    --expandobjects). Capacities and flows autosize on the weather file's
+    winter/summer extreme weeks. Gas and delivered heat are reported hourly
+    (D.GAS_BOILER_OUTPUT_VARIABLES) because EPSM's end-use table parser keeps
+    only electricity and district heating."""
+    thermostat = f"{zone_name} Template Thermostat"
+    return [
+        obj("SizingPeriod:WeatherFileConditionType", [
+            ("Winter Extreme", "Name"), ("WinterExtreme", "Period Selection"), ("Monday", "Day of Week for Start Day"),
+            ("Yes", "Use Weather File Daylight Saving Period"), ("Yes", "Use Weather File Rain and Snow Indicators"),
+        ]),
+        obj("SizingPeriod:WeatherFileConditionType", [
+            ("Summer Extreme", "Name"), ("SummerExtreme", "Period Selection"), ("Monday", "Day of Week for Start Day"),
+            ("Yes", "Use Weather File Daylight Saving Period"), ("Yes", "Use Weather File Rain and Snow Indicators"),
+        ]),
+        obj("HVACTemplate:Thermostat", [
+            (thermostat, "Name"), (f"{zone_name} Heating Setpoint Schedule", "Heating Setpoint Schedule Name"),
+            (None, "Constant Heating Setpoint {C}"), (f"{zone_name} Cooling Setpoint Schedule", "Cooling Setpoint Schedule Name"),
+            (None, "Constant Cooling Setpoint {C}"),
+        ]),
+        obj("HVACTemplate:Zone:BaseboardHeat", [
+            (zone_name, "Zone Name"), (thermostat, "Template Thermostat Name"), (1.25, "Zone Heating Sizing Factor"),
+            ("HotWater", "Baseboard Heating Type"), (None, "Baseboard Heating Availability Schedule Name"),
+            ("autosize", "Baseboard Heating Capacity {W}"), (None, "Dedicated Outdoor Air System Name"),
+            # Fresh air already enters as infiltration; no separate ventilation.
+            ("Flow/Zone", "Outdoor Air Method"), (0, "Outdoor Air Flow Rate per Person {m3/s}"),
+            (0, "Outdoor Air Flow Rate per Zone Floor Area {m3/s-m2}"), (0, "Outdoor Air Flow Rate per Zone {m3/s}"),
+        ]),
+        obj("HVACTemplate:Plant:HotWaterLoop", [
+            (f"{zone_name} Hot Water Loop", "Name"), (None, "Pump Schedule Name"), ("Intermittent", "Pump Control Type"),
+            ("Default", "Hot Water Plant Operation Scheme Type"), (None, "Hot Water Plant Equipment Operation Schemes Name"),
+            (None, "Hot Water Setpoint Schedule Name"), (70, "Hot Water Design Setpoint {C}"),
+            ("ConstantFlow", "Hot Water Pump Configuration"),
+        ]),
+        obj("HVACTemplate:Plant:Boiler", [
+            (f"{zone_name} Gas Boiler", "Name"), ("HotWaterBoiler", "Boiler Type"), ("autosize", "Capacity {W}"),
+            (round(efficiency, 3), "Efficiency"), ("NaturalGas", "Fuel Type"), (None, "Priority"),
+            (1.2, "Sizing Factor"), (None, "Minimum Part Load Ratio"), (None, "Maximum Part Load Ratio"),
+            (None, "Optimum Part Load Ratio"), (None, "Water Outlet Upper Temperature Limit {C}"),
+            ("HotWater", "Template Plant Loop Type"),
+        ]),
+    ]

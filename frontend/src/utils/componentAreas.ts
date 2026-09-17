@@ -55,6 +55,8 @@ export interface ResolvedBuildingGeometry {
   tabulaUWall: number | null;
   tabulaURoof: number | null;
   tabulaUWin: number | null;
+  // UK only - distinguishes TABULA types that share wall/roof/window U-values.
+  tabulaUFloor: number | null;
 }
 
 function isBuildingLookup(b: BuildingLookup | BuildingRecord): b is BuildingLookup {
@@ -86,6 +88,7 @@ export function resolveBuildingGeometry(
       tabulaUWall: building.tabula_u_wall,
       tabulaURoof: building.tabula_u_roof,
       tabulaUWin: building.tabula_u_win,
+      tabulaUFloor: building.tabula_u_floor ?? null,
     };
   }
   const approxPerimeter = building.footprint_m2 ? 4 * Math.sqrt(building.footprint_m2) : null;
@@ -104,6 +107,7 @@ export function resolveBuildingGeometry(
     tabulaUWall: building.u_wall,
     tabulaURoof: building.u_roof,
     tabulaUWin: building.u_window,
+    tabulaUFloor: building.u_floor ?? null,
   };
 }
 

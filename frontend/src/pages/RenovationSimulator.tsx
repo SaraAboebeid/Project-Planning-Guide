@@ -5,10 +5,11 @@ import { climateGoalFor, assessAgainstGoal } from "../config/climateGoals";
 import ClimateGoalPanel from "../components/ClimateGoalPanel";
 import DecisionAnalysisPanel from "../components/DecisionAnalysisPanel";
 import HeatingSystemPanel from "../components/HeatingSystemPanel";
+import { ukHvacCatalogue, type UkRetailTariffs } from "../config/hvacSystemsUK";
 import { computeRegret, annuityFactor, type RegretOptionInput } from "../utils/regretAnalysis";
 import { api } from "../api/client";
 import { lineItemsFor, type AreaLineItem } from "../config/componentAreaLineItems";
-import { resolveBuildingGeometry, computeAreaForLineItem, quantityUnitLabel, type ResolvedBuildingGeometry } from "../utils/componentAreas";
+import { resolveBuildingGeometry, computeAreaForLineItem, quantityUnitLabel, effectiveWwr, type ResolvedBuildingGeometry } from "../utils/componentAreas";
 import { filterToBaselineShortlist } from "../utils/baselineShortlist";
 import type { BuildingLookup, BuildingRecord } from "../types";
 import { itemsForLineItem, estimateCarbon, recommendationsForLineItem, type RecTag } from "../utils/materialRecommendation";
@@ -17,7 +18,7 @@ import {
   loadUkArchetypes, findUkArchetype, REFURB_TIERS,
   type TabulaArchetypeGB, type RefurbTierKey,
 } from "../utils/ukArchetype";
-import { UK_PLACEHOLDER_RATES, fmtGBP } from "../config/ukPlaceholderCostCarbon";
+import { fmtGBP, ukTierCostCarbon, UK_COST_CARBON_SOURCE_NOTE, UK_COST_PRICE_BASIS, type UkQuantities } from "../config/ukCostCarbon";
 import { useWizardStepNav } from "../components/wizardNav";
 import OptimizerPanel from "../components/OptimizerPanel";
 import AssemblyBuilder from "../components/AssemblyBuilder";
@@ -32,10 +33,10 @@ import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRi
 
 /* Sweden/Gothenburg is the only geometry+cost+carbon-complete dataset - UK
  * buildings resolve via /api/uk/building and get real EPSM energy
- * simulation, but there's no UK cost/carbon catalogue equivalent to
- * Wikells/Boverket yet, so UK packages price via SYNTHETIC placeholder
- * rates (see ukPlaceholderCostCarbon.ts) and use TABULA GB's whole-building
- * refurbishment tiers in place of a per-component material picker.
+ * simulation. There's no UK per-component catalogue equivalent to
+ * Wikells, so UK packages use TABULA GB's whole-building refurbishment tiers
+ * in place of a material picker, costed per measure from openly licensed
+ * sources (see config/ukCostCarbon.ts).
  *
  * Every package here is submitted as ONE EPSM batch across every building
  * selected in Step 2 (see backend's /api/simulation-batch-submit) - not
@@ -189,6 +190,8 @@ function ukOverridesFromTier(tier: TabulaArchetypeGB[RefurbTierKey] | undefined 
   if (tier.u_wall != null) overrides.u_wall_override = tier.u_wall;
   if (tier.u_roof != null) overrides.u_roof_override = tier.u_roof;
   if (tier.u_window != null) overrides.u_win_override = tier.u_window;
+  if (tier.u_floor != null) overrides.u_floor_override = tier.u_floor;
+  // u_door has no counterpart: the EnergyPlus shoebox models no door surface.
   return overrides;
 }
 
@@ -506,14 +509,24 @@ function LineItemPicker({
   );
 }
 
+/** Element areas a UK tier is costed on: opaque wall, roof (footprint) and glazing. */
+function ukQuantitiesFor(g: ResolvedBuildingGeometry, wwr: WWRRecord | null): UkQuantities {
+  const r = effectiveWwr(g, wwr);
+  return {
+    wallNetM2: g.wallAreaM2 != null ? g.wallAreaM2 * (1 - r) : null,
+    roofM2: g.footprintM2,
+    windowM2: g.wallAreaM2 != null ? g.wallAreaM2 * r : null,
+  };
+}
+
 /* ─── UK refurbishment-tier picker (whole-building, not per-component) ────── */
 function UkTierPicker({
-  archetype, selectedTier, onSelect, footprintM2, buildingCount, uSource,
+  archetype, selectedTier, onSelect, quantities, buildingCount, uSource,
 }: {
   archetype: TabulaArchetypeGB | null;
   selectedTier: RefurbTierKey | null;
   onSelect: (tier: RefurbTierKey) => void;
-  footprintM2: number | null;
+  quantities: UkQuantities | null;
   buildingCount: number;
   uSource: string | null;
 }) {
@@ -556,9 +569,9 @@ function UkTierPicker({
         const tier = archetype[key];
         const checked = selectedTier === key;
         const color = "var(--brand)";
-        const rate = UK_PLACEHOLDER_RATES[key];
-        const estCost = footprintM2 != null ? Math.round(rate.costGbpPerM2 * footprintM2) : null;
-        const estCarbon = footprintM2 != null ? Math.round(rate.carbonKgCo2ePerM2 * footprintM2) : null;
+        const est = quantities ? ukTierCostCarbon(archetype.as_built, tier, quantities) : null;
+        const estCost = est?.costGbp ?? null;
+        const estCarbon = est?.carbonKgCo2e ?? null;
         return (
           <button
             key={key}
@@ -590,18 +603,29 @@ function UkTierPicker({
               </span>
               {estCost != null && estCarbon != null && (
                 <span style={{ fontSize: 11, color: "#E8880C" }}>
-                  ~{fmtGBP(estCost)} · ~{estCarbon.toLocaleString("en-GB")} kg CO₂e <i>(building 1, placeholder)</i>
+                  ~{fmtGBP(estCost)} · ~{estCarbon.toLocaleString("en-GB")} kg CO₂e <i>(building 1, {UK_COST_PRICE_BASIS})</i>
                 </span>
               )}
             </div>
+            {est && est.lines.length > 0 && (
+              <div style={{ paddingLeft: 23, marginTop: 5, display: "flex", flexDirection: "column", gap: 1 }}>
+                {est.lines.map((l) => (
+                  <span key={l.element} style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+                    {l.element}: {l.measure}
+                    {l.quantityM2 != null ? ` · ${Math.round(l.quantityM2).toLocaleString("en-GB")} m²` : ""}
+                    {l.costGbp != null ? ` · ${fmtGBP(l.costGbp)}` : ""}
+                    {l.carbonKgCo2e != null ? ` · ${Math.round(l.carbonKgCo2e).toLocaleString("en-GB")} kg CO₂e` : ""}
+                    {l.note ? ` (${l.note})` : ""}
+                  </span>
+                ))}
+              </div>
+            )}
           </button>
         );
       })}
       <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: 0 }}>
-        Cost and embodied carbon for UK packages are SYNTHETIC PLACEHOLDER figures (flat £/m² and kg CO₂e/m² rates,
-        not derived from any real dataset) shown only to test the calculator pipeline end-to-end - replace with a
-        real, licensed UK cost/carbon source before using these numbers for an actual decision. The energy columns
-        below come from a real EnergyPlus simulation using this tier's U-values, applied to every selected building.
+        {UK_COST_CARBON_SOURCE_NOTE} Quantities come from the building's footprint, wall area and window-to-wall ratio.
+        The energy columns below come from an EnergyPlus simulation using this tier's U-values, applied to every selected building.
       </p>
     </div>
   );
@@ -691,6 +715,8 @@ export default function RenovationSimulator() {
   // Live day-ahead spot price (SE) for the optimizer's operating-cost term;
   // falls back to the documented assumption value if the feed is unavailable.
   const [livePriceSek, setLivePriceSek] = useState<number | null>(null);
+  // UK: price-cap retail tariffs for the city's region (Octopus Energy API), GBP/kWh incl. VAT.
+  const [ukTariffs, setUkTariffs] = useState<(UkRetailTariffs & { zone: string | null }) | null>(null);
   const [packageName, setPackageName] = useState("");
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
   const [openStage, setOpenStage] = useState<number | null>(1);
@@ -922,7 +948,9 @@ export default function RenovationSimulator() {
         // era - so this matches the SAME archetype the building's as-built u-values
         // came from, rather than falling back to an arbitrary one when the era was
         // sampled (the common case - tabulaPeriod itself stays null for those).
-        setUkArchetype(findUkArchetype(archetypes, geometries[0]!.useCat, geometries[0]!.tabulaPeriodUsed));
+        const g0 = geometries[0]!;
+        setUkArchetype(findUkArchetype(archetypes, g0.useCat, g0.tabulaPeriodUsed ?? g0.tabulaPeriod,
+          { u_wall: g0.tabulaUWall, u_roof: g0.tabulaURoof, u_window: g0.tabulaUWin, u_floor: g0.tabulaUFloor }));
       }).catch(() => { /* no archetype match available */ });
     } else {
       const uniqueComponents = Array.from(new Set(lineItems.map((li) => li.boverketComponent)));
@@ -963,13 +991,24 @@ export default function RenovationSimulator() {
   }, []);
 
   useEffect(() => {
-    if (isUK) return;
     let active = true;
-    api.energyPrice("se").then((r) => {
-      if (active && r.live && r.average_price != null) setLivePriceSek(r.average_price);
-    }).catch(() => {});
+    if (isUK) {
+      api.energyPrice("gb", project.city).then((r) => {
+        if (!active || !r.retail) return;
+        setUkTariffs({
+          electricityGbpPerKwh: r.retail.electricity.unit_gbp_per_kwh,
+          gasGbpPerKwh: r.retail.gas.unit_gbp_per_kwh,
+          zone: r.zone ?? null,
+        });
+      }).catch(() => {});
+    } else {
+      api.energyPrice("se").then((r) => {
+        if (active && r.live && r.average_price != null) setLivePriceSek(r.average_price);
+      }).catch(() => {});
+    }
     return () => { active = false; };
-  }, [isUK]);
+  }, [isUK, project.city]);
+  const ukHvac = useMemo(() => (isUK ? ukHvacCatalogue(ukTariffs) : undefined), [isUK, ukTariffs]);
 
   /* ── derived: items/areas/recommendations for the active line item (Sweden only) ── */
   const activeItem = lineItems.find((li) => li.key === activeItemKey) ?? lineItems[0];
@@ -1332,17 +1371,16 @@ export default function RenovationSimulator() {
     if (geometries.length === 0 || !ukArchetype || !ukTier) return;
     const tier = ukArchetype[ukTier];
     const tierMeta = REFURB_TIERS.find((t) => t.key === ukTier)!;
-    const rate = UK_PLACEHOLDER_RATES[ukTier];
 
     const id = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
     const name = (packageName.trim() || tierMeta.label) + targetSuffix();
     const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
 
-    const buildingRows = makeBuildingRows(targetEntries, (g) => {
-      const footprint = g.footprintM2 ?? 0;
-      return footprint
-        ? { costSEK: Math.round(rate.costGbpPerM2 * footprint), carbonKgCO2e: Math.round(rate.carbonKgCo2ePerM2 * footprint) }
-        : { costSEK: null, carbonKgCO2e: null };
+    // UK money is GBP; the package row's field is still named costSEK (shared
+    // with Sweden) and every UK display formats it as £.
+    const buildingRows = makeBuildingRows(targetEntries, (g, idx) => {
+      const est = ukTierCostCarbon(ukArchetype.as_built, tier, ukQuantitiesFor(g, wwrByIndex[idx] ?? null));
+      return { costSEK: est.costGbp, carbonKgCO2e: est.carbonKgCo2e };
     });
 
     const pkg: RenovationCalcPackage = {
@@ -1353,6 +1391,10 @@ export default function RenovationSimulator() {
     setProject({ renovationCalcPackages: [...packages, pkg] });
     setPackageName("");
     setUkTier(null);
+    // Same as the Swedish Run: open Results so the run is visible.
+    justRanRef.current = true;
+    setOpenStage(3);
+    setTimeout(() => stageRefs.current[3]?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
     submitBatch(id, ukOverridesFromTier(tier), name, targetEntries);
   }
 
@@ -1408,7 +1450,25 @@ export default function RenovationSimulator() {
      Low/Medium/High energy-price scenarios, then rank by minimax regret, range
      and Hurwicz. Uncertain future prices → no single "best"; these rules help. */
   const [regretAlpha, setRegretAlpha] = useState(0.5);
-  const [regretPrices, setRegretPrices] = useState<number[]>([0.5, 1.0, 2.0]); // SEK/kWh Low/Med/High
+  const [regretPrices, setRegretPrices] = useState<number[]>([0.5, 1.0, 2.0]); // SEK/kWh Low/Med/High (GBP for UK)
+  /* UK homes mostly heat with gas, so one electricity price would overvalue
+     heating savings ~3x. Blend the two retail tariffs by the baseline's heating
+     share of total energy: heating at the gas price, the rest at electricity. */
+  const ukBlend = useMemo(() => {
+    if (!isUK || !ukHvac) return null;
+    const total = baselineAgg?.avgTotalKwhM2Yr, heat = baselineAgg?.avgHeatingKwhM2Yr;
+    if (total == null || heat == null || total <= 0) return null;
+    const share = Math.min(1, Math.max(0, heat / total));
+    const gas = ukHvac.carriers.gas!.tariffSek, elec = ukHvac.carriers.electricity!.tariffSek;
+    return { price: Math.round((share * gas + (1 - share) * elec) * 1000) / 1000, share, gas, elec };
+  }, [isUK, ukHvac, baselineAgg?.avgTotalKwhM2Yr, baselineAgg?.avgHeatingKwhM2Yr]);
+  const ukScenarioSeeded = useRef(false);
+  useEffect(() => {
+    if (!ukBlend || ukScenarioSeeded.current) return;
+    ukScenarioSeeded.current = true;
+    const p = ukBlend.price;
+    setRegretPrices([0.5, 1, 2].map((m) => Math.round(p * m * 100) / 100));
+  }, [ukBlend]);
   const totalFloorAreaM2 = useMemo(
     () => geometries.reduce((a, g) => a + (g.footprintM2 ?? 0) * Math.max(1, Math.round((g.height ?? 3.2) / 3.2)), 0),
     [geometries],
@@ -1426,16 +1486,23 @@ export default function RenovationSimulator() {
     return opts;
   }, [packages, baselineAgg?.avgTotalKwhM2Yr]);
   const regretResult = useMemo(() => {
-    if (isUK || regretOptions.length < 2 || baselineAgg?.avgTotalKwhM2Yr == null || totalFloorAreaM2 <= 0) return null;
+    if (regretOptions.length < 2 || baselineAgg?.avgTotalKwhM2Yr == null || totalFloorAreaM2 <= 0) return null;
+    if (isUK && !ukBlend) return null;
     const scenarios = [
       { key: "low", label: "Low", priceSek: regretPrices[0]! },
       { key: "med", label: "Medium", priceSek: regretPrices[1]! },
       { key: "high", label: "High", priceSek: regretPrices[2]! },
     ];
-    const af = annuityFactor(assumptionValue("SE", "discount_rate") ?? 0.03, 30);
-    return computeRegret(regretOptions, scenarios,
+    const af = annuityFactor(assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03, 30);
+    const res = computeRegret(regretOptions, scenarios,
       { baselineEnergyKwhM2: baselineAgg.avgTotalKwhM2Yr, totalFloorAreaM2, annuityFactor: af }, regretAlpha, 30, "");
-  }, [isUK, regretOptions, baselineAgg?.avgTotalKwhM2Yr, totalFloorAreaM2, regretPrices, regretAlpha]);
+    if (!isUK || !ukBlend) return res;
+    return {
+      ...res, currency: "GBP" as const,
+      priceBasis: `Blended £/kWh: ${Math.round(ukBlend.share * 100)}% of baseline energy is heating at the gas price (£${ukBlend.gas}/kWh), `
+        + `the rest at electricity (£${ukBlend.elec}/kWh) — Ofgem price cap, ${ukTariffs?.zone ?? "Yorkshire"}. Package costs are 2020 prices, ex VAT.`,
+    };
+  }, [isUK, ukBlend, ukTariffs?.zone, regretOptions, baselineAgg?.avgTotalKwhM2Yr, totalFloorAreaM2, regretPrices, regretAlpha]);
   // Persist to the store for the Step-5 report — only when the content changes.
   const regretSigRef = useRef<string>("");
   useEffect(() => {
@@ -1646,8 +1713,12 @@ export default function RenovationSimulator() {
       {geometries.length > 0 && (
         <>
           <div ref={(el) => { stageRefs.current[1] = el; }} style={{ scrollMarginTop: 80 }} />
-          <StageHeader n={1} title="Design assemblies"
-            hint={baselineAgg?.avgTotalKwhM2Yr != null
+          <StageHeader n={1} title={isUK ? "Choose refurbishment tier & run" : "Design assemblies"}
+            hint={isUK
+              ? (baselineAgg?.avgTotalKwhM2Yr != null
+                ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr · TABULA standard or ambitious refurbishment`
+                : "TABULA standard or ambitious refurbishment, simulated in EnergyPlus")
+              : baselineAgg?.avgTotalKwhM2Yr != null
               ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr · components in scope, build-ups saved per component`
               : "pick components, design build-ups, save them as configurations"}
             state={baselineAgg?.avgTotalKwhM2Yr != null ? "done" : "active"}
@@ -2106,8 +2177,18 @@ export default function RenovationSimulator() {
             </div>
           )}
 
-          {/* UK keeps the tier-based flow */}
-          {isUK && openStage === 2 && (
+          {/* UK keeps the tier-based flow. It lives in stage 1 because the
+              stage 2 header only exists for the Swedish assembly designer. */}
+          {isUK && openStage === 1 && (
+            <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(114,28,184,0.2)" }}>
+              <UkTierPicker
+                archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier}
+                quantities={geometries[0] ? ukQuantitiesFor(geometries[0], wwrByIndex[0] ?? null) : null} buildingCount={geometries.length}
+                uSource={geometries[0]?.tabulaUSource ?? null}
+              />
+            </div>
+          )}
+          {isUK && openStage === 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <input value={packageName} onChange={(e) => setPackageName(e.target.value)}
                 placeholder="Package name (optional)"
@@ -2238,8 +2319,10 @@ export default function RenovationSimulator() {
               {[
                 { k: "exp", l: "" },
                 { k: "pkg", l: "Package" },
-                { k: "cost", l: "Cost", sub: "installed capex — materials + labour (Wikells), one-off" },
-                { k: "carbon", l: "Carbon" },
+                { k: "cost", l: "Cost", sub: isUK
+                  ? `installed capex — DESNZ install costs, ${UK_COST_PRICE_BASIS}, one-off`
+                  : "installed capex — materials + labour (Wikells), one-off" },
+                { k: "carbon", l: "Carbon", sub: isUK ? "embodied A1-A3, Boverket" : undefined },
                 { k: "heat", l: "Heating", sub: "kWh/m²·yr" },
                 { k: "total", l: "Total energy", sub: "heating + hot water + cooling + lighting + equipment, kWh/m²·yr" },
                 { k: "status", l: "Status" },
@@ -2312,10 +2395,10 @@ export default function RenovationSimulator() {
                         </span>
                       )}
                     </span>
-                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && agg.totalCostSEK != null ? "Synthetic placeholder - not a real UK cost source" : undefined}>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && agg.totalCostSEK != null ? `DESNZ install costs, ${UK_COST_PRICE_BASIS}; doors not costed` : undefined}>
                       {agg.totalCostSEK == null ? "—" : isUK ? `${fmtGBP(agg.totalCostSEK)}*` : fmtSEK(agg.totalCostSEK)}
                     </span>
-                    <span style={{ fontSize: 12, color: "#4A90E2" }} title={isUK && agg.totalCarbonKgCO2e != null ? "Synthetic placeholder - not a real UK carbon source" : undefined}>
+                    <span style={{ fontSize: 12, color: "#4A90E2" }} title={isUK && agg.totalCarbonKgCO2e != null ? "Boverket klimatdatabas A1-A3 (Swedish products)" : undefined}>
                       {agg.totalCarbonKgCO2e == null ? "—" : isUK ? `${agg.totalCarbonKgCO2e.toLocaleString("en-GB")} kg*` : `${agg.totalCarbonKgCO2e.toLocaleString("sv-SE")} kg`}
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>
@@ -2375,7 +2458,7 @@ export default function RenovationSimulator() {
             )}
             {isUK && packages.some((p) => pkgAggregate(p).totalCostSEK != null) && (
               <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
-                * Synthetic placeholder cost/carbon (not a real UK data source) - see ukPlaceholderCostCarbon.ts.
+                * {UK_COST_CARBON_SOURCE_NOTE}
               </p>
             )}
             </>
@@ -2462,11 +2545,12 @@ export default function RenovationSimulator() {
           </>)}
 
           {/* Heating system — only when HVAC is a selected renovation component */}
-          {openStage === 3 && !isUK && hasHeating && baselineAgg?.avgHeatingKwhM2Yr != null && totalFloorAreaM2 > 0 && (
+          {openStage === 3 && hasHeating && baselineAgg?.avgHeatingKwhM2Yr != null && totalFloorAreaM2 > 0 && (
             <HeatingSystemPanel
               heatingDemandKwhM2Yr={baselineAgg.avgHeatingKwhM2Yr}
               floorAreaM2={totalFloorAreaM2}
-              discountRate={assumptionValue("SE", "discount_rate") ?? 0.03}
+              discountRate={assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03}
+              catalogue={ukHvac}
             />
           )}
 
@@ -2502,7 +2586,7 @@ export default function RenovationSimulator() {
                     setAlpha={setRegretAlpha}
                     prices={regretPrices}
                     setPrices={setRegretPrices}
-                    currentPrice={livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8}
+                    currentPrice={isUK ? (ukBlend?.price ?? 0) : (livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8)}
                   />
                 )}
 

@@ -324,11 +324,26 @@ def get_uk_building(lat: float = Query(...), lon: float = Query(...), city_id: s
         else None
     )
 
+    return _uk_building_response(best, footprint, perimeter_m, wall_area_m2, c_lat, c_lon, best_dist)
+
+
+def _uk_building_response(best: dict, footprint, perimeter_m, wall_area_m2, c_lat, c_lon, dist_m) -> dict:
+    height_val = best.get("height")
+    # EPC "energy_consumption_current" is the certificate's primary-energy
+    # intensity - the same kind of figure as Boverket's energiprestanda. Only
+    # fall back to the TABULA archetype estimate when no certificate has one.
+    epc_energy = _clean(best.get("energy_consumption_kwh_m2_yr"))
     return {
+        "country":       "gb",
         "address":       best.get("address"),
+        "postcode":      best.get("postcode"),
         "height":        _clean(height_val),
         "floors":        _clean(best.get("floors")),
+        # "epc_property_type" | "height_estimate" | "eubucco"
+        "floors_source": best.get("floors_source"),
         "area_atemp":    _clean(best.get("floor_area_m2")),  # UK's own EPC-sourced total floor area
+        # "epc_sum" | "epc_mean_x_dwellings" (some flats lacked a detailed certificate)
+        "area_source":   best.get("floor_area_source"),
         "footprint_m2":  _clean(footprint),
         "wall_perimeter_m": _clean(round(perimeter_m, 1)) if perimeter_m else None,
         "wall_area_m2":  _clean(wall_area_m2),
@@ -336,8 +351,22 @@ def get_uk_building(lat: float = Query(...), lon: float = Query(...), city_id: s
         "floor_area_m2": _clean(footprint),
         "use_cat":       best.get("use_cat"),
         "year":          _clean(best.get("year")),
-        "energy":        _clean(best.get("tabula_kwh_m2_yr")),  # UK has no measured "energy" field; TABULA estimate is the closest equivalent
+        "year_source":   best.get("year_source"),
+        "energy":        epc_energy if epc_energy is not None else _clean(best.get("tabula_kwh_m2_yr")),
+        "energy_source": "epc" if epc_energy is not None else ("tabula_estimate" if best.get("tabula_kwh_m2_yr") else None),
         "eclass":        best.get("eclass"),
+        "sap":           _clean(best.get("sap")),
+        # "EPC register (OS UPRN)" / "epc" = real certificate; "ehs_prior_*" = estimated band
+        "epc_source":    best.get("epc_source"),
+        "epc_dwellings": best.get("epc_dwellings"),
+        "epc_latest_date": best.get("epc_latest_date"),
+        "property_type": best.get("property_type"),
+        "built_form":    best.get("built_form"),
+        "main_fuel":     best.get("main_fuel"),
+        "heating_system": best.get("mainheat_description"),
+        "hotwater_description": best.get("hotwater_description"),
+        "has_heat_pump": best.get("has_heat_pump"),
+        "has_solar_pv":  best.get("has_solar_pv"),
         "tabula_period": best.get("tabula_period"),
         # Always populated when a TABULA match exists (real year OR an
         # EHS-sampled era) - unlike tabula_period above, which stays null for
@@ -351,10 +380,31 @@ def get_uk_building(lat: float = Query(...), lon: float = Query(...), city_id: s
         "tabula_u_wall": _clean(best.get("tabula_u_wall")),
         "tabula_u_roof": _clean(best.get("tabula_u_roof")),
         "tabula_u_win":  _clean(best.get("tabula_u_win")),
+        "tabula_u_floor": _clean(best.get("tabula_u_floor")),
+        "tabula_u_door": _clean(best.get("tabula_u_door")),
+        # Non-domestic EPC (SBEM asset rating) and DEC (metered operational rating), when present.
+        "nd_epc_band":   best.get("nd_epc_band"),
+        "nd_property_type": best.get("nd_property_type"),
+        "nd_floor_area_m2": _clean(best.get("nd_floor_area_m2")),
+        "nd_energy_kwh_m2_yr": _clean(best.get("nd_energy_kwh_m2_yr")),
+        "dec_band":      best.get("dec_band"),
+        "dec_name":      best.get("dec_name"),
+        "dec_property_type": best.get("dec_property_type"),
+        "dec_floor_area_m2": _clean(best.get("dec_floor_area_m2")),
+        "dec_metered_kwh": best.get("dec_metered_kwh"),
+        "dec_period":    best.get("dec_period"),
+        # DESNZ metered domestic consumption for the building's postcode (median per meter).
+        "desnz_postcode": best.get("desnz_postcode"),
+        "desnz_year":    best.get("desnz_year"),
+        "desnz_gas_median_kwh": _clean(best.get("desnz_gas_median_kwh")),
+        "desnz_gas_meters": best.get("desnz_gas_meters"),
+        "desnz_electricity_median_kwh": _clean(best.get("desnz_electricity_median_kwh")),
+        "desnz_electricity_meters": best.get("desnz_electricity_meters"),
+        "epc_dwellings_count": best.get("epc_dwellings"),
         "has_epc":       bool(best.get("has_epc")),
         "lat":           round(c_lat, 6),
         "lon":           round(c_lon, 6),
-        "dist_m":        round(best_dist, 1),
+        "dist_m":        round(dist_m, 1),
     }
 
 
@@ -494,13 +544,17 @@ def buildings_nearby(
 
 # ── Geocode (proxy to Nominatim) ────────────────────────────────────────────
 @app.get("/api/geocode")
-async def geocode(address: str = Query(...)):
+async def geocode(address: str = Query(...), country: str | None = Query(None)):
     import httpx
 
+    params = {"q": address, "format": "json", "limit": 1}
+    # Without a country filter "10 High Street" resolves anywhere in the world.
+    if country and country.lower() in ("gb", "uk", "se"):
+        params["countrycodes"] = "gb" if country.lower() in ("gb", "uk") else "se"
     async with httpx.AsyncClient() as client:
         r = await client.get(
             "https://nominatim.openstreetmap.org/search",
-            params={"q": address, "format": "json", "limit": 1},
+            params=params,
             headers={"User-Agent": "ProjectPlanningGuide/0.1"},
         )
         data = r.json()
@@ -832,6 +886,76 @@ def _point_in_poly(lon: float, lat: float, poly: list[tuple[float, float]]) -> b
     return inside
 
 
+def _is_uk(country: str | None) -> bool:
+    return (country or "").lower() in ("gb", "uk")
+
+
+def _uk_bbox_match(north: float, south: float, east: float, west: float, poly) -> list[tuple[dict, float, float]]:
+    """UK buildings whose centroid is in the bbox (and polygon), from the
+    district nearest the bbox centre."""
+    city_id = _resolve_uk_city_id((north + south) / 2, (east + west) / 2)
+    out = []
+    for b in _get_uk_buildings_list(city_id):
+        c_lat, c_lon = _polygon_centroid(b.get("coordinates") or [])
+        if c_lat == 0.0 and c_lon == 0.0:
+            continue
+        if south <= c_lat <= north and west <= c_lon <= east:
+            if poly and not _point_in_poly(c_lon, c_lat, poly):
+                continue
+            out.append((b, c_lat, c_lon))
+    return out
+
+
+def _uk_energy(b: dict):
+    """EPC primary-energy intensity when a certificate has one, else the TABULA
+    archetype estimate - same rule as /api/uk/building."""
+    v = b.get("energy_consumption_kwh_m2_yr")
+    return v if v is not None else b.get("tabula_kwh_m2_yr")
+
+
+def _uk_bbox_row(b: dict, lat: float, lon: float) -> dict:
+    """UK building in the BuildingRecord shape the area pages consume, plus the
+    UK-only fields they can show when present."""
+    return {
+        "address":         b.get("address") or "",
+        "all_addresses":   None,
+        "cadastral_id":    None,
+        "lat":             round(lat, 6),
+        "lon":             round(lon, 6),
+        "building_use":    b.get("use_cat"),
+        "primary_area":    None,
+        "year_built":      b.get("year"),
+        "height_m":        b.get("height"),
+        "floors":          b.get("floors"),
+        "atemp":           b.get("floor_area_m2"),
+        "footprint_m2":    b.get("footprint_m2"),
+        "energy_kwh_m2":   _uk_energy(b),
+        "energy_source":   "epc" if b.get("energy_consumption_kwh_m2_yr") is not None else ("tabula_estimate" if b.get("tabula_kwh_m2_yr") else None),
+        "epc_class":       b.get("eclass"),
+        "has_epc":         b.get("has_epc"),
+        "epc_source":      b.get("epc_source"),
+        "sap":             b.get("sap"),
+        "tabula_period":   b.get("tabula_period") or b.get("tabula_period_used"),
+        "u_wall":          b.get("tabula_u_wall"),
+        "u_roof":          b.get("tabula_u_roof"),
+        "u_window":        b.get("tabula_u_win"),
+        "u_floor":         b.get("tabula_u_floor"),
+        "u_door":          b.get("tabula_u_door"),
+        "heating_system":  b.get("mainheat_description"),
+        "main_fuel":       b.get("main_fuel"),
+        "property_type":   b.get("property_type") or b.get("nd_property_type") or b.get("dec_property_type"),
+        "postcode":        b.get("epc_postcode") or b.get("postcode"),
+        "nd_epc_band":     b.get("nd_epc_band"),
+        "dec_band":        b.get("dec_band"),
+        "dec_metered_kwh": b.get("dec_metered_kwh"),
+        "desnz_gas_median_kwh": b.get("desnz_gas_median_kwh"),
+        "desnz_electricity_median_kwh": b.get("desnz_electricity_median_kwh"),
+        "boplats_listings": None,
+        "boplats_avg_rent_sek": None,
+        "boplats_avg_rent_per_m2_sek": None,
+    }
+
+
 @app.get("/api/buildings/bbox/stats")
 def buildings_bbox_stats(
     north: float = Query(...),
@@ -839,6 +963,7 @@ def buildings_bbox_stats(
     east:  float = Query(...),
     west:  float = Query(...),
     polygon: str | None = Query(None),
+    country: str | None = Query(None),
 ):
     """Return aggregate EUBUCCO stats for every building whose centroid is inside
     the bbox. If a ``polygon`` (lon,lat;… vertices) is given, the bbox is used as
@@ -846,8 +971,13 @@ def buildings_bbox_stats(
     so an arbitrary drawn shape selects exactly its buildings."""
     from collections import Counter
     poly = _parse_polygon(polygon)
-    all_buildings = _get_buildings_list()
-    matched: list = []
+    if _is_uk(country):
+        # Normalise UK records to the Swedish keys the aggregation below reads.
+        matched = [{**b, "energy": _uk_energy(b)} for b, _, _ in _uk_bbox_match(north, south, east, west, poly)]
+        all_buildings = []
+    else:
+        all_buildings = _get_buildings_list()
+        matched = []
     for b in all_buildings:
         coords = b.get("coordinates") or []
         c_lat, c_lon = _polygon_centroid(coords)
@@ -1048,16 +1178,27 @@ def buildings_bbox_list(
     west:  float | None = Query(None),
     district: str | None = Query(None),
     polygon: str | None = Query(None),
+    country: str | None = Query(None),
 ):
     """Return individual building records, joined with Boplats rental data where available.
 
     Selection is by ``district`` name (Gothenburg primärområde), a bounding box
     (north/south/east/west), or — for an arbitrary drawn shape — a bbox plus a
     ``polygon`` (lon,lat;… vertices) which refines the bbox matches to those
-    whose centroid falls inside the polygon.
+    whose centroid falls inside the polygon. ``country=gb`` selects from the UK
+    district payloads instead (bbox/polygon only; no Boplats or UK districts).
     """
     import re, sqlite3, httpx
     from concurrent.futures import ThreadPoolExecutor, wait as fut_wait
+
+    if _is_uk(country):
+        if None in (north, south, east, west):
+            raise HTTPException(422, "UK area selection needs a bounding box")
+        rows = [_uk_bbox_row(b, la, lo) for b, la, lo in
+                _uk_bbox_match(north, south, east, west, _parse_polygon(polygon))]
+        if not rows:
+            raise HTTPException(404, "No buildings found in the drawn area" if polygon else "No buildings found in bounding box")
+        return rows
 
     # ── Match buildings by district name or bbox (optionally polygon-refined) ─
     all_buildings = _get_buildings_list()
@@ -2636,7 +2777,8 @@ async def _fetch_and_normalize_results(simulation_id: str, building_info: dict) 
         r.raise_for_status()
         raw = r.json()
     row = raw[0] if isinstance(raw, list) and raw else (raw if isinstance(raw, dict) else {})
-    result = _normalize_energy(row.get("energy_use") or {}, row.get("totalArea"), building_info)
+    result = _normalize_energy(row.get("energy_use") or {}, row.get("totalArea"), building_info,
+                               row.get("hourly_timeseries") or row.get("hourlyTimeseries"))
     result["raw"] = row
     return result
 
@@ -2672,14 +2814,27 @@ def _slim_record(record: dict) -> dict:
     return {**record, "results": _slim_results(record.get("results"))}
 
 
-def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], building_info: dict) -> dict:
+def _hourly_sum_kwh(hourly: Optional[dict], suffix: str) -> Optional[float]:
+    """Annual kWh of every EPSM hourly series ending in `suffix` (values in J).
+    EPSM keys hourly outputs as "<KEY>_<Variable_Name>_J"."""
+    series = ((hourly or {}).get("series") or {}) if isinstance(hourly, dict) else {}
+    hits = [v for k, v in series.items() if k.endswith(suffix)]
+    if not hits:
+        return None
+    return sum(x for vals in hits for x in vals if x) / 3.6e6
+
+
+def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], building_info: dict,
+                      hourly: Optional[dict] = None) -> dict:
     """Recompute per-m2 figures using our own total floor area (floors x
     footprint_m2), not EPSM's own per-m2 fields - see _fetch_and_normalize_results'
     docstring for why (EPSM normalizes by the single shoebox zone's floor
     surface alone, understating total floor area for multi-storey buildings)."""
     floors = _floors_of(building_info)
     footprint = building_info.get("footprint_m2") or footprint_from_epsm or 1.0
-    total_floor_area = building_info.get("floor_area_m2") or (float(footprint) * floors)
+    # Same area the shoebox was built with: the heated area when the record has
+    # one (UK - generate_idf scales the footprint to it), else footprint x floors.
+    total_floor_area = float(building_info.get("heated_area_m2") or float(footprint) * floors)
 
     def _kwh(category: str) -> float:
         return float((energy_use.get(category) or {}).get("total") or 0.0)
@@ -2694,7 +2849,17 @@ def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], bu
     # simulated without any hot-water draw at all, so 0 is their true value,
     # not a missing one.
     dhw_kwh = _kwh("Water Systems")
-    total_kwh = heating_kwh + cooling_kwh + lighting_kwh + equipment_kwh + dhw_kwh
+    pumps_kwh = _kwh("Pumps")
+
+    # Gas-boiler plant (UK homes): EPSM's end-use parser drops the natural-gas
+    # column, so "Heating" reads 0. Read the boiler's delivered heat and gas
+    # use from the hourly series instead (tools/idf/defaults.GAS_BOILER_OUTPUT_VARIABLES).
+    gas_kwh = _hourly_sum_kwh(hourly, "_Boiler_NaturalGas_Energy_J")
+    boiler_heat_kwh = _hourly_sum_kwh(hourly, "_Boiler_Heating_Energy_J")
+    heating_system = "gas_boiler" if gas_kwh is not None else "ideal_loads"
+    if boiler_heat_kwh is not None and heating_kwh == 0.0:
+        heating_kwh = boiler_heat_kwh
+    total_kwh = heating_kwh + cooling_kwh + lighting_kwh + equipment_kwh + dhw_kwh + pumps_kwh
 
     def _per_m2(kwh: float) -> Optional[float]:
         return round(kwh / total_floor_area, 1) if total_floor_area else None
@@ -2708,6 +2873,11 @@ def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], bu
         "lighting_kwh": round(lighting_kwh, 1),
         "equipment_kwh": round(equipment_kwh, 1),
         "dhw_kwh": round(dhw_kwh, 1),
+        "pumps_kwh": round(pumps_kwh, 1),
+        # heating_kwh is heat DELIVERED; gas_kwh is fuel burnt by the boiler (None for ideal loads).
+        "heating_system": heating_system,
+        "gas_kwh": round(gas_kwh, 1) if gas_kwh is not None else None,
+        "gas_kwh_m2_yr": round(gas_kwh / total_floor_area, 1) if gas_kwh is not None and total_floor_area else None,
         "total_kwh": round(total_kwh, 1),
         "heating_kwh_m2_yr": _per_m2(heating_kwh),
         "cooling_kwh_m2_yr": _per_m2(cooling_kwh),
@@ -2715,6 +2885,56 @@ def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], bu
         "equipment_kwh_m2_yr": _per_m2(equipment_kwh),
         "dhw_kwh_m2_yr": _per_m2(dhw_kwh),
         "total_kwh_m2_yr": _per_m2(total_kwh),
+        # UK: homes inside the footprint (OS Open UPRN address count, see
+        # tools/uk/anchor_epc_uprn.py) - OSM often draws a semi pair or a terrace
+        # row as one polygon, so per-home figures are what compare to one meter.
+        **_per_dwelling(building_info, heating_kwh, dhw_kwh, total_kwh, gas_kwh),
+    }
+
+
+def _heating_system_for(building: dict, country: str, requested: Optional[str]) -> str:
+    """UK homes heated by mains gas (91% of Rotherham's certificates, and the
+    default when a home has no certificate) are simulated with a real gas boiler
+    so EPSM returns gas use; everything else keeps ideal loads."""
+    if requested in ("ideal", "gas_boiler"):
+        return requested
+    if (country or "").lower() == "gb" and building.get("use_cat") in ("bostad_enfamilj", "bostad_flerfamilj") \
+            and (building.get("main_fuel") in (None, "mains gas")):
+        return "gas_boiler"
+    return "ideal"
+
+
+def _envelope_overrides(building: dict, country: str, req) -> dict:
+    """U-value overrides for the shoebox. UK refurbishment tiers are whole-building
+    TABULA targets; a building whose EPC fabric is already better (e.g. walls at
+    0.28 against a 0.6 tier) keeps its own value, so a "refurbishment" can never
+    make a building worse. Swedish overrides are explicit material choices and
+    pass through unchanged (Step 4 warns when one is worse than the baseline)."""
+    out = {
+        "u_wall_override": req.u_wall_override, "u_roof_override": req.u_roof_override,
+        "u_win_override": req.u_win_override, "u_floor_override": req.u_floor_override,
+    }
+    if (country or "").lower() != "gb":
+        return out
+    for key, fields in (("u_wall_override", ("u_wall_epc", "tabula_u_wall")), ("u_roof_override", ("u_roof_epc", "tabula_u_roof")),
+                        ("u_win_override", ("u_win_epc", "tabula_u_win")), ("u_floor_override", ("u_floor_epc", "tabula_u_floor"))):
+        current = next((building.get(f) for f in fields if building.get(f) is not None), None)
+        if out[key] is not None and current is not None:
+            out[key] = min(out[key], float(current))
+    return out
+
+
+def _per_dwelling(building_info: dict, heating_kwh: float, dhw_kwh: float, total_kwh: float,
+                  gas_kwh: Optional[float] = None) -> dict:
+    n = building_info.get("dwellings_est")
+    if not n:
+        return {}
+    return {
+        "dwellings": int(n),
+        "heating_kwh_per_dwelling": round(heating_kwh / n, 1),
+        "dhw_kwh_per_dwelling": round(dhw_kwh / n, 1),
+        "total_kwh_per_dwelling": round(total_kwh / n, 1),
+        "gas_kwh_per_dwelling": round(gas_kwh / n, 1) if gas_kwh is not None else None,
     }
 
 
@@ -2745,6 +2965,8 @@ class SimulationSubmitRequest(BaseModel):
     # behavior unchanged.
     package_id: str = "baseline"
     package_label: Optional[str] = None
+    # "ideal" | "gas_boiler"; None = gas boiler for gas-heated UK homes, ideal loads otherwise.
+    heating_system: Optional[str] = None
 
 
 class BatchBuildingSpec(BaseModel):
@@ -2765,6 +2987,8 @@ class SimulationBatchSubmitRequest(BaseModel):
     u_floor_override: Optional[float] = None
     package_id: str = "baseline"
     package_label: Optional[str] = None
+    # "ideal" | "gas_boiler"; None = gas boiler for gas-heated UK homes, ideal loads otherwise.
+    heating_system: Optional[str] = None
 
 
 @app.post("/api/simulation-submit")
@@ -2807,8 +3031,8 @@ async def submit_simulation(req: SimulationSubmitRequest):
         idf_text = build_shoebox_idf(
             building, req.country, city_id, str(epw_path),
             wwr_override=req.wwr_override, building_name=req.address,
-            u_wall_override=req.u_wall_override, u_roof_override=req.u_roof_override,
-            u_win_override=req.u_win_override, u_floor_override=req.u_floor_override,
+            heating_system=_heating_system_for(building, req.country, req.heating_system),
+            **_envelope_overrides(building, req.country, req),
         )
     except Exception as exc:
         raise HTTPException(400, f"IDF generation failed: {exc}")
@@ -2955,8 +3179,8 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
             idf_text = build_shoebox_idf(
                 rb["building"], req.country, city_id, str(epw_path),
                 wwr_override=req.wwr_override, building_name=rb["address"] or f"Building {i}",
-                u_wall_override=req.u_wall_override, u_roof_override=req.u_roof_override,
-                u_win_override=req.u_win_override, u_floor_override=req.u_floor_override,
+                heating_system=_heating_system_for(rb["building"], req.country, req.heating_system),
+                **_envelope_overrides(rb["building"], req.country, req),
             )
         except Exception as exc:
             raise HTTPException(400, f"IDF generation failed for building {i} ({rb['address']}): {exc}")
@@ -3057,6 +3281,7 @@ async def simulation_batch_status(batch_id: str):
                         _energy_use_dict_from_list(item.get("energy_uses")),
                         item.get("total_area"),
                         row.get("building_info") or {},
+                        item.get("hourly_timeseries"),
                     )
                     normalized["raw"] = item
                     simdb.update_by_epsm_id(
@@ -4329,48 +4554,122 @@ async def chat(req: ChatRequest):
 _ENERGY_PRICE_CACHE: dict = {}   # (country, date) -> payload
 
 
+# UK: Octopus Energy's public, no-auth API. Tariffs are priced per GSP group
+# (the 14 electricity distribution regions); Rotherham's S60/S61/S65 postcodes
+# are all group "_M" (Yorkshire), verified via /industry/grid-supply-points.
+_OCTOPUS = "https://api.octopus.energy/v1"
+_UK_REGION_NAMES = {
+    "A": "Eastern England", "B": "East Midlands", "C": "London", "D": "Merseyside & North Wales",
+    "E": "West Midlands", "F": "North Eastern England", "G": "North Western England",
+    "H": "Southern England", "J": "South Eastern England", "K": "South Wales",
+    "L": "South Western England", "M": "Yorkshire", "N": "Southern Scotland", "P": "Northern Scotland",
+}
+_UK_CITY_POSTCODE = {"rotherham": "S60 2QB", "london": "WC1H 9DP"}
+_OCTOPUS_CACHE: dict = {}  # key -> (fetched_at, value)
+
+
+async def _octopus_get(client, path: str, params: dict | None = None, ttl: int = 1800):
+    import time
+    key = (path, tuple(sorted((params or {}).items())))
+    hit = _OCTOPUS_CACHE.get(key)
+    if hit and time.time() - hit[0] < ttl:
+        return hit[1]
+    r = await client.get(f"{_OCTOPUS}{path}", params=params)
+    r.raise_for_status()
+    data = r.json()
+    _OCTOPUS_CACHE[key] = (time.time(), data)
+    return data
+
+
+def _current_rate(rows: list, now_iso: str, payment: str = "DIRECT_DEBIT") -> tuple[dict | None, dict | None]:
+    """(rate in force now, next scheduled rate) for one payment method. The API
+    lists future rates first (e.g. next quarter's price cap once announced)."""
+    rows = [r for r in rows if r.get("payment_method") in (payment, None)]
+    current = next((r for r in rows if r["valid_from"] <= now_iso and (r.get("valid_to") is None or r["valid_to"] > now_iso)), None)
+    future = sorted((r for r in rows if r["valid_from"] > now_iso), key=lambda r: r["valid_from"])
+    return current, (future[0] if future else None)
+
+
+async def _uk_energy_price(postcode: str | None, city: str | None) -> dict:
+    import httpx
+    from datetime import datetime, timezone
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    pc = (postcode or _UK_CITY_POSTCODE.get((city or "rotherham").lower()) or "S60 2QB").replace(" ", "").upper()
+    async with httpx.AsyncClient(timeout=15) as client:
+        gsp = await _octopus_get(client, "/industry/grid-supply-points/", {"postcode": pc}, ttl=86400)
+        group = ((gsp.get("results") or [{}])[0].get("group_id") or "_M").lstrip("_")
+
+        products = (await _octopus_get(client, "/products/", {"brand": "OCTOPUS_ENERGY", "is_business": "false", "page_size": 100}, ttl=86400))["results"]
+        def newest(pred):
+            cands = [p for p in products if pred(p)]
+            return max(cands, key=lambda p: p["available_from"])["code"] if cands else None
+        agile = newest(lambda p: p["code"].startswith("AGILE-") and "OUTGOING" not in p["code"])
+        flexible = newest(lambda p: p["code"].startswith("VAR-"))
+
+        out: dict = {
+            "country": "gb", "live": False, "unit": "GBP/kWh",
+            "region": group, "zone": f"GB region {group} ({_UK_REGION_NAMES.get(group, '?')})", "postcode": pc,
+            "source": "https://developer.octopus.energy/rest/ (Octopus Energy public API)",
+        }
+
+        # Wholesale-tracking half-hourly price: last 48 settlement periods of Agile.
+        if agile:
+            data = await _octopus_get(client, f"/products/{agile}/electricity-tariffs/E-1R-{agile}-{group}/standard-unit-rates/", {"page_size": 48}, ttl=900)
+            rows = [x for x in data.get("results") or [] if isinstance(x.get("value_exc_vat"), (int, float))]
+            if rows:
+                gbp = [x["value_exc_vat"] / 100 for x in rows]
+                out.update({
+                    "live": True,
+                    "average_price": round(sum(gbp) / len(gbp), 4),
+                    "min_price": round(min(gbp), 4), "max_price": round(max(gbp), 4),
+                    "hourly": [{"start": x["valid_from"], "gbp_per_kwh": round(x["value_exc_vat"] / 100, 4)} for x in rows],
+                    "wholesale_product": agile,
+                    "note": f"Octopus Agile ({agile}) half-hourly rate for region {group}, excl. VAT - tracks the GB day-ahead market.",
+                })
+
+        # What a household in the region actually pays: Flexible Octopus follows the Ofgem price cap.
+        if flexible:
+            retail: dict = {"product": flexible, "payment_method": "DIRECT_DEBIT",
+                            "note": "Flexible Octopus follows the Ofgem default tariff cap; prices include VAT."}
+            for fuel, tariff in (("electricity", f"electricity-tariffs/E-1R-{flexible}-{group}"),
+                                 ("gas", f"gas-tariffs/G-1R-{flexible}-{group}")):
+                units = await _octopus_get(client, f"/products/{flexible}/{tariff}/standard-unit-rates/", {"page_size": 100}, ttl=3600)
+                stand = await _octopus_get(client, f"/products/{flexible}/{tariff}/standing-charges/", {"page_size": 100}, ttl=3600)
+                u_now, u_next = _current_rate(units.get("results") or [], now_iso)
+                s_now, s_next = _current_rate(stand.get("results") or [], now_iso)
+                fmt = lambda r: round(r["value_inc_vat"] / 100, 5) if r else None
+                retail[fuel] = {
+                    "unit_gbp_per_kwh": fmt(u_now), "standing_gbp_per_day": fmt(s_now),
+                    "valid_from": u_now["valid_from"] if u_now else None,
+                    "next": ({"unit_gbp_per_kwh": fmt(u_next), "standing_gbp_per_day": fmt(s_next),
+                              "valid_from": u_next["valid_from"]} if u_next else None),
+                }
+            out["retail"] = retail
+            if not out["live"] and retail["electricity"]["unit_gbp_per_kwh"] is not None:
+                out.update({"live": True, "average_price": retail["electricity"]["unit_gbp_per_kwh"],
+                            "note": "Agile unavailable - retail price-cap electricity rate shown instead (incl. VAT)."})
+    return out
+
+
 @app.get("/api/energy-price")
-async def energy_price(country: str = Query("se"), zone: str = Query("SE3")):
-    """Day-ahead electricity spot price. country=se uses Nord Pool via
-    elprisetjustnu.se (zone SE1–SE4, Gothenburg=SE3). Returns the daily average
-    plus hourly series and the source. country=uk is pending a live UK source."""
+async def energy_price(country: str = Query("se"), zone: str = Query("SE3"),
+                       postcode: str | None = Query(None), city: str | None = Query(None)):
+    """Electricity price. country=se: Nord Pool day-ahead spot via
+    elprisetjustnu.se (zone SE1–SE4, Gothenburg=SE3). country=gb|uk: Octopus
+    Energy for the postcode's (or city's) region - Agile half-hourly wholesale-
+    tracking price plus the price-cap retail electricity and gas tariffs."""
     import httpx
     from datetime import date, timedelta
 
     c = country.lower()
-    if c == "uk":
-        # Octopus Agile — a free, no-auth half-hourly UK tariff that tracks the
-        # wholesale (day-ahead) price; region "C" = London. value_exc_vat (p/kWh)
-        # is the wholesale-tracking rate, comparable to the SE spot (excl. VAT).
-        url = ("https://api.octopus.energy/v1/products/AGILE-24-04-03/"
-               "electricity-tariffs/E-1R-AGILE-24-04-03-C/standard-unit-rates/?page_size=48")
+    if c in ("gb", "uk"):
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                r = await client.get(url)
-            data = r.json() if r.status_code == 200 else {}
-            results = data.get("results") or []
-        except Exception:  # noqa: BLE001
-            results = []
-        pkwh = [row.get("value_exc_vat") for row in results
-                if isinstance(row.get("value_exc_vat"), (int, float))]
-        if not pkwh:
-            return {"country": "uk", "live": False,
-                    "note": "UK price temporarily unavailable from the source.",
-                    "source": "https://octopus.energy/agile/"}
-        gbp = [round(p / 100.0, 4) for p in pkwh]  # p/kWh -> GBP/kWh
-        return {
-            "country": "uk",
-            "zone": "GB (region C, London)",
-            "live": True,
-            "unit": "GBP/kWh",
-            "average_price": round(sum(gbp) / len(gbp), 4),
-            "min_price": min(gbp),
-            "max_price": max(gbp),
-            "hourly": [{"start": row.get("valid_from"), "gbp_per_kwh": round(row["value_exc_vat"] / 100.0, 4)}
-                       for row in results if isinstance(row.get("value_exc_vat"), (int, float))],
-            "note": "Octopus Agile half-hourly rate (tracks GB wholesale/day-ahead), excl. VAT.",
-            "source": "https://octopus.energy/agile/ (tracks GB wholesale)",
-        }
+            return await _uk_energy_price(postcode, city)
+        except Exception as exc:  # noqa: BLE001
+            return {"country": "gb", "live": False,
+                    "note": f"UK price temporarily unavailable from the source ({exc.__class__.__name__}).",
+                    "source": "https://developer.octopus.energy/rest/"}
 
     z = zone.upper()
     if not z.startswith("SE") or z not in {"SE1", "SE2", "SE3", "SE4"}:

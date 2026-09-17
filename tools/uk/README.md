@@ -85,6 +85,47 @@ certificate*, which can be thousands of extra requests. It's opt-in:
 python tools/uk/uk_data_pipeline.py --city <new_id> --epc-details
 ```
 
+## Rotherham: anchoring EPCs by UPRN, and validating
+
+The address join above reaches only ~4% of Rotherham, because most footprints
+carry no address. `anchor_epc_uprn.py` places every certificate spatially
+instead: certificate UPRN → OS Open UPRN coordinates → the footprint it falls
+in. It starts from the untouched pipeline output
+(`buildings_rotherham.json.bak-20260730`), so it can be re-run at any time:
+
+```
+python tools/uk/anchor_epc_uprn.py --fetch   # fill EPC caches from the API first (hours; resumable)
+python tools/uk/anchor_epc_uprn.py           # rebuild offline from the caches
+python tools/uk/validate_rotherham.py        # compare against the landlord survey
+```
+
+Extra inputs in `data/os/`: `openuprn_gb.zip` (OS Open UPRN) and
+`codepo_gb.zip` (OS Code-Point Open — every postcode in the radius, so blocks
+whose postcode isn't nearest to any footprint are still fetched). Both are
+OS OpenData. Only each dwelling's newest certificate is used.
+
+The ground truth is **not** in the repo: `../Rotherham callibration/` holds the
+landlord's 114-dwelling survey and its QGIS coordinates. It covers only 19
+buildings, 84% of the dwellings are band C (so "always C" already scores 84%),
+and it can only test register-matched buildings, not the EHS estimates.
+
+### More Rotherham data layers (all feed `anchor_epc_uprn.py`)
+
+```
+python tools/uk/ingest_epc_bulk.py            # every domestic EPC for the council, all fields (~6 min, streams the 8 GB archive)
+python tools/uk/ingest_nondomestic_epc.py     # non-domestic EPCs + DECs (metered public buildings) by council
+python tools/uk/ingest_desnz_postcode.py      # DESNZ 2024 postcode gas/electricity (metered, OGL)
+python tools/uk/anchor_epc_uprn.py            # rebuild
+python tools/uk/validate_rotherham_consumption.py   # simulation vs metered gas (needs backend + EPSM running)
+```
+
+`epc_fabric.py` turns the certificates' wall/roof/window/floor descriptions into
+RdSAP-style U-values, which the energy model prefers over TABULA's uninsulated
+archetypes. The build also counts addresses per footprint (`dwellings_est`, since
+OSM often draws a semi pair as one polygon) and finds walls shared with a
+neighbouring footprint (`party_wall_midpoints`, modelled adiabatic). UK homes are
+heated on SAP 10.2's intermittent schedule (`tools/idf/defaults.py`).
+
 ## Files
 
 - `cities.py` — the city/district registry (single source of truth for lat/lon/radius/region/eubucco_file)
@@ -93,6 +134,8 @@ python tools/uk/uk_data_pipeline.py --city <new_id> --epc-details
 - `ingest_ehs.py` — parses the English Housing Survey 2024-25 annex tables (`.ods`) into band priors + retrofit costs
 - `ingest_tabula.py` — parses the EPISCOPE/TABULA England brochure (`.pdf`) into envelope archetypes
 - `uk_data_pipeline.py` — orchestrates all of the above per city, joins OSM+EUBUCCO+EPC+EHS+TABULA, writes the building payload
+- `anchor_epc_uprn.py` — Rotherham: re-anchors EPCs to footprints via OS Open UPRN on top of the pipeline output
+- `validate_rotherham.py` — Rotherham: band/SAP/year accuracy against the landlord ground truth, with the always-C baseline
 
 ## Known gap
 

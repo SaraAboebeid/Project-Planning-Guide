@@ -116,20 +116,20 @@
       "lon": -1.3568,
       "radius_m": 4000,
       "buildings": 14483,
-      "with_epc": 7824,
-      "estimated_from_ehs": 4414,
-      "no_band": 2365,
+      "with_epc": 10469,
+      "estimated_from_ehs": 2520,
+      "no_band": 1494,
       "band_distribution": {
-        "A": 7,
-        "B": 338,
-        "C": 5808,
-        "D": 4913,
-        "E": 756,
-        "F": 209,
-        "G": 87
+        "A": 58,
+        "B": 544,
+        "C": 4751,
+        "D": 5981,
+        "E": 1355,
+        "F": 224,
+        "G": 76
       },
       "eubucco_matched": 14381,
-      "tabula_matched": 12112,
+      "tabula_matched": 12126,
       "data_file": "uk/buildings_rotherham.json"
     }
   ]

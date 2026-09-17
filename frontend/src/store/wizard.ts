@@ -230,7 +230,8 @@ interface ProjectState {
      Default "dh_keep" = keep district heating (the as-built baseline). */
   heatingSystemId: string;
   /* Step 4 — computed heating-system comparison + the picked system, for Step 5. */
-  heatingAnalysis: (HvacOutcome & { selectedId: string; heatingDemandKwhM2Yr: number }) | null;
+  // currency: "SEK" (Gothenburg catalogue) or "GBP" (UK catalogue); absent on older saves = SEK.
+  heatingAnalysis: (HvacOutcome & { selectedId: string; heatingDemandKwhM2Yr: number; currency?: "SEK" | "GBP" }) | null;
 }
 
 /** The four facades a user uploads against. Fixed set, fixed order (N-E-S-W)
@@ -345,6 +346,22 @@ const DEFAULT_PROJECT: ProjectState = {
   selectedPackageByBuilding: {},
   heatingSystemId: "dh_keep",
   heatingAnalysis: null,
+};
+
+/** Everything tied to a place: the selection, the buildings it resolved to and
+ *  every result computed from them. Cleared when the country or city changes,
+ *  so a Gothenburg baseline can't end up in a Rotherham report. */
+export const LOCATION_SCOPED_RESET: Partial<ProjectState> = {
+  address: DEFAULT_PROJECT.address, lat: null, lon: null, locationLabel: "",
+  district: null, neighborhoodName: "",
+  buildingPoints: [], lookedUpBuilding: null, lookedUpBuildings: [],
+  bboxStats: null, currentBbox: null, selectionPolygon: null, bboxRows: [],
+  savedWWR: null, simulationMaterials: {}, renovationPackages: [], selectedPackageId: null,
+  renovationCalcPackages: [], supplementaryData: {},
+  baselineStatus: "idle", renovationBaselineResults: [], baselineBatchId: null,
+  renovationSimResults: [], facadeDefects: {},
+  prioritizedBuildingIndices: [], prioritizedBuildingCount: 0,
+  regretAnalysis: null, selectedPackageByBuilding: {}, heatingAnalysis: null,
 };
 
 /* sessionStorage wrapper that never throws — if storage is disabled or over

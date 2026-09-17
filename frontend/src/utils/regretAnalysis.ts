@@ -52,6 +52,10 @@ export interface RegretResult {
   alpha: number;
   studyPeriodYr: number;
   generatedAt: string;
+  /** Currency of every money value (priceSek/benefits are in it too). Absent on older saves = SEK. */
+  currency?: "SEK" | "GBP";
+  /** How the scenario price was formed, e.g. a gas/electricity blend for UK buildings. */
+  priceBasis?: string;
 }
 
 /** Discounted annuity factor Σ_{t=1..N} 1/(1+r)^t (→ N when r=0). */
