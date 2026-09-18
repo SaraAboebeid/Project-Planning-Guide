@@ -153,6 +153,11 @@ def _resolve_facade_ml_url(default: str | None = None) -> str:
         )
 
     chosen = ml_url or model_url or (default or "")
+    # The ML service always runs on the HOST. `host.docker.internal` only resolves
+    # from inside a container - when the backend itself runs on the host (dev), that
+    # default made every detection fail with 503, silently leaving only AI vision.
+    if not (ml_url or model_url) and "host.docker.internal" in chosen and not Path("/.dockerenv").exists():
+        chosen = chosen.replace("host.docker.internal", "localhost")
     return chosen.rstrip("/")
 
 
@@ -5246,31 +5251,42 @@ async def streetview_facade(
         # Buildings between panorama and wall are checked against the footprints;
         # a panorama lying INSIDE a footprint is in a tunnel/passage under it.
         near = _sv_near_footprints(target_lat, target_lon, country) if wall else []
-        scored, n_in_front, n_blocked, n_far = [], 0, 0, 0
-        for pid, meta in panos.items():
-            loc = meta.get("location") or {}
-            p_lat, p_lon = float(loc["lat"]), float(loc["lng"])
-            dist = _haversine_m(p_lat, p_lon, target_lat, target_lon)
-            off = _angle_diff_deg(_bearing_deg(target_lat, target_lon, p_lat, p_lon), normal)
-            max_dist = _SV_MAX_DISTANCE_M if wall else _SV_MAX_DISTANCE_M + 20.0
-            if off > _SV_MAX_OFF_NORMAL_DEG or dist < 4.0:
-                continue
-            if dist > max_dist:
-                n_far += 1
-                continue
-            n_in_front += 1
-            visible = 1.0
-            if wall:
-                if any(e[4][0] <= p_lon <= e[4][2] and e[4][1] <= p_lat <= e[4][3] and _point_in_poly(p_lon, p_lat, e[0])
-                       for e in near):
-                    n_blocked += 1
+        max_dist = _SV_MAX_DISTANCE_M if wall else _SV_MAX_DISTANCE_M + 20.0
+        counts = {"in_front": 0, "blocked": 0, "far": 0}
+
+        def _candidates(max_off: float) -> list[tuple]:
+            out = []
+            counts.update(in_front=0, blocked=0, far=0)
+            for meta in panos.values():
+                loc = meta.get("location") or {}
+                p_lat, p_lon = float(loc["lat"]), float(loc["lng"])
+                dist = _haversine_m(p_lat, p_lon, target_lat, target_lon)
+                off = _angle_diff_deg(_bearing_deg(target_lat, target_lon, p_lat, p_lon), normal)
+                if off > max_off or dist < 4.0:
                     continue
-                visible = _sv_visible_fraction(p_lat, p_lon, target_lat, target_lon, normal, width_m, ring, near)
-                if visible < 0.6:
-                    n_blocked += 1
+                if dist > max_dist:
+                    counts["far"] += 1
                     continue
-            scored.append((off + 0.8 * max(0.0, dist - 10.0) + 40.0 * (1.0 - visible),
-                           off, dist, p_lat, p_lon, meta, visible))
+                counts["in_front"] += 1
+                visible = 1.0
+                if wall:
+                    if any(e[4][0] <= p_lon <= e[4][2] and e[4][1] <= p_lat <= e[4][3] and _point_in_poly(p_lon, p_lat, e[0])
+                           for e in near):
+                        counts["blocked"] += 1
+                        continue
+                    visible = _sv_visible_fraction(p_lat, p_lon, target_lat, target_lon, normal, width_m, ring, near)
+                    if visible < 0.6:
+                        counts["blocked"] += 1
+                        continue
+                out.append((off + 0.8 * max(0.0, dist - 10.0) + 40.0 * (1.0 - visible),
+                            off, dist, p_lat, p_lon, meta, visible))
+            return out
+
+        # Sharp-angle panoramas are kept: in facade mode each one only has to cover
+        # the stretch of wall it faces, and `assign_columns` hands it just that.
+        oblique_only = False
+        scored = _candidates(_SV_MAX_OFF_NORMAL_DEG)
+        n_in_front, n_blocked, n_far = counts["in_front"], counts["blocked"], counts["far"]
         if not scored:
             side = orientation or "requested"
             if not panos:
@@ -5302,39 +5318,84 @@ async def streetview_facade(
             "off_normal_deg": round(off, 1),   # 0 = head-on; up to 65 accepted
             "unblocked_by_buildings": round(visible, 2),   # share of sight lines clear of other footprints
             "panoramas_considered": len(panos),
+            # True when only sharp-angle panoramas exist, so this is a close-up of
+            # part of the wall rather than the whole facade.
+            "oblique_only": oblique_only,
         }
 
-        # "facade": the whole wall, straight-on. One wide tilted shot keystones
-        # badly, so stitch a grid of shots from this one panorama and resample
-        # them onto the wall plane (backend/streetview_rectify.py).
+        # "facade": the whole wall, straight-on. The car drives PAST a building, so
+        # one panorama sees only the stretch it faces - the rest arrives as grazing
+        # pixels. Each segment of the wall is therefore taken from the panorama that
+        # faces it, rectified onto the wall plane and laid side by side at one scale
+        # (backend/streetview_rectify.py).
         # Without a footprint there is no wall plane to rectify onto; fall through
         # to a single "detail" shot rather than failing.
         if framing == "facade" and wall:
-            from backend.streetview_rectify import plan_tiles, rectify
+            from backend.streetview_rectify import assign_columns, plan_tiles, rectify, mosaic
             import asyncio
 
-            plan = plan_tiles(pano_lat, pano_lon, target_lat, target_lon, normal, width_m, height_m or 12.0)
+            wall_h = (height_m or 12.0) + 2.5          # matches plan_tiles' z_bot/z_top
+            cameras = [{"lat": c[3], "lon": c[4], "meta": c[5],
+                        "ok": (lambda frac, c=c: _sv_visible_fraction(
+                            c[3], c[4], *_offset_latlon(target_lat, target_lon, normal + 90.0,
+                                                        (frac - 0.5) * width_m),
+                            normal, 0.0, ring, near) >= 0.6)}
+                       for c in scored]
+            segs = await asyncio.to_thread(assign_columns, cameras, target_lat, target_lon,
+                                           normal, width_m)
+            if segs:
+                m_per_px = max(max(s["gsd"] for s in segs), width_m / 2600.0, wall_h / 1600.0)
+                total_w = max(1, round(width_m / m_per_px))
+                parts, tiles_used, dates = [], 0, []
+                for s in segs:
+                    if tiles_used >= 12:
+                        break
+                    seg_w = (s["b"] - s["a"]) * width_m
+                    c_lat, c_lon = _offset_latlon(target_lat, target_lon, normal + 90.0,
+                                                  ((s["a"] + s["b"]) / 2 - 0.5) * width_m)
+                    cam = s["camera"]
+                    # max_stretch is off here: the columns were already chosen for
+                    # being well resolved by THIS panorama.
+                    plan = plan_tiles(cam["lat"], cam["lon"], c_lat, c_lon, normal, seg_w,
+                                      height_m or 12.0, max_tiles=6, max_stretch=1e9)
+                    pid = cam["meta"]["pano_id"]
 
-            async def _tile(h: float, p: float) -> bytes | None:
-                r = await client.get(STREETVIEW_BASE, params={
-                    "size": _STREETVIEW_MAX_SIZE, "pano": meta["pano_id"], "heading": round(h, 2),
-                    "pitch": round(p, 2), "fov": plan["fov"], "return_error_code": "true", "key": key})
-                return r.content if r.status_code == 200 else None
+                    async def _tile(h: float, p: float, pid=pid, fov=plan["fov"]) -> bytes | None:
+                        r = await client.get(STREETVIEW_BASE, params={
+                            "size": _STREETVIEW_MAX_SIZE, "pano": pid, "heading": round(h, 2),
+                            "pitch": round(p, 2), "fov": fov, "return_error_code": "true", "key": key})
+                        return r.content if r.status_code == 200 else None
 
-            jpegs = await asyncio.gather(*(_tile(h, p) for h, p in plan["tiles"]))
-            out = await asyncio.to_thread(rectify, plan, list(jpegs))
-            if not out:
-                raise HTTPException(502, "Street View returned no usable image for this facade.")
-            return {
-                "images": [{"b64": base64.b64encode(out["jpeg"]).decode(), "heading": round(aim, 2),
-                            "fov": plan["fov"], "pitch": 0.0, "bytes": len(out["jpeg"]),
-                            "width": out["width"], "height": out["height"]}],
-                "orientation": orientation, "pano": pano_info,
-                "facade": {**facade_info, "height_m": round(height_m or 12.0, 1),
-                           "tiles": len(plan["tiles"]), "coverage": round(out["coverage"], 3),
-                           "rectified": True},
-                "mm_per_px": round(out["mm_per_px"], 1),
-            }
+                    jpegs = await asyncio.gather(*(_tile(h, p) for h, p in plan["tiles"]))
+                    tiles_used += sum(j is not None for j in jpegs)
+                    part = await asyncio.to_thread(rectify, plan, list(jpegs), 1600, m_per_px, True)
+                    if part:
+                        parts.append((round(s["a"] * total_w), part))
+                        dates.append(cam["meta"].get("date"))
+                height_px = max((p[1]["height"] for p in parts), default=0)
+                out = (await asyncio.to_thread(mosaic, parts, total_w, height_px, m_per_px)) if parts else None
+                # A mostly empty canvas is worse than an honest close-up: it looks
+                # like a broken image and hides how little was actually seen.
+                if out and out["coverage"] >= 0.6:
+                    return {
+                        "images": [{"b64": base64.b64encode(out["jpeg"]).decode(), "heading": round(aim, 2),
+                                    "fov": 0.0, "pitch": 0.0, "bytes": len(out["jpeg"]),
+                                    "width": out["width"], "height": out["height"]}],
+                        "orientation": orientation, "pano": pano_info,
+                        "facade": {**facade_info, "height_m": round(height_m or 12.0, 1),
+                                   "tiles": tiles_used, "coverage": round(out["coverage"], 3),
+                                   "rectified": True,
+                                   # Several panoramas, possibly of different dates, each
+                                   # covering the stretch of wall it faces.
+                                   "panoramas_used": len(parts),
+                                   "dates": sorted({d for d in dates if d}),
+                                   "wall_shown": round(out.get("width_shown", 1.0), 2),
+                                   "full_width_m": round(width_m, 1)},
+                        "mm_per_px": round(out["mm_per_px"], 1),
+                    }
+            # No segment was resolved well enough: fall through to a plain close-up.
+            framing, oblique_only = "detail", True
+            facade_info["oblique_only"] = True
 
         # "detail" keeps a narrow crop: measured on 8 Gothenburg buildings, fitting
         # the whole wall from a panorama ~10 m away clamps FOV at 90 and pitch past

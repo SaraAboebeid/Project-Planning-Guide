@@ -145,6 +145,15 @@ body.bright-mode [data-no-theme-invert="true"] {
   filter: invert(1) hue-rotate(180deg);
 }
 
+/* Content portalled into <body> never gets the #root inversion, so the rule above
+   would invert its media instead of un-inverting it - photos in the facade
+   lightbox came out colour-flipped (red brick as pale green). */
+body.bright-mode .outside-root-portal img,
+body.bright-mode .outside-root-portal video,
+body.bright-mode .outside-root-portal canvas {
+  filter: none;
+}
+
 /* The Chalmers marks are WHITE artwork. The rule above re-inverts every <img>
    back to its natural colours, which left them white-on-white in bright mode.
    Opting them out of that re-inversion lets the root inversion do its job and

@@ -200,7 +200,11 @@ function Lightbox({ entry, buildingLabel, onClose, onDownload }: {
   }, [dets]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3" onClick={onClose}>
+    // `outside-root-portal`: this renders into document.body, OUTSIDE #root, so the
+    // bright-mode inversion never reaches it - but the global `canvas` rule that
+    // normally CANCELS that inversion still applied, showing every photo with its
+    // colours inverted (red brick came out pale green). See index.css.
+    <div className="outside-root-portal fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3" onClick={onClose}>
       <div className="bg-[#0d1117] border border-white/15 rounded-xl max-w-[96vw] max-h-[94vh] overflow-hidden flex flex-col md:flex-row shadow-2xl"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-center bg-black/50 p-2 overflow-auto">
@@ -311,6 +315,9 @@ function SummaryChips({ s }: { s: FacadeDefectSummary | undefined }) {
   );
 }
 
+/** Buildings auto-captured without asking; beyond this the per-slot button applies. */
+const AUTO_CAPTURE_MAX_BUILDINGS = 12;
+
 const SENSITIVITY = [
   { label: "High (more boxes)", value: 0.3 },
   { label: "Medium", value: 0.45 },
@@ -329,6 +336,28 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
   /** Street View capture state per facade slot, keyed "<building>|<orientation>". */
   const [svSlots, setSvSlots] = useState<Record<string, { busy: boolean; error: string | null }>>({});
   const warmed = useRef(false);
+
+  /* Auto-capture: every facade of every building in scope is pulled from Street
+     View as soon as the panel opens, so the inspection starts from whatever the
+     street already shows and photos are only needed where that falls short.
+     Each capture costs a handful of Google requests, hence the off switch. */
+  const [autoCapture, setAutoCapture] = useState(true);
+  const [autoProgress, setAutoProgress] = useState<{ done: number; total: number } | null>(null);
+  /** Slots auto-capture has already claimed, so re-renders never re-request one. */
+  const autoClaimed = useRef<Set<string>>(new Set());
+  const autoStopped = useRef(false);
+  const autoQueue = useRef<{ b: FacadeBuilding; o: FacadeOrientation }[]>([]);
+  const autoRunning = useRef(false);
+  const unmounted = useRef(false);
+  // Reset on mount, not just set on unmount: StrictMode mounts, unmounts and
+  // remounts in dev, which otherwise latches this true and kills the queue.
+  useEffect(() => {
+    unmounted.current = false;
+    return () => { unmounted.current = true; };
+  }, []);
+  /** Mirror of the images map, read inside the effect without re-triggering it. */
+  const imagesRef = useRef(imagesByBuilding);
+  imagesRef.current = imagesByBuilding;
 
   // Warm on mount: the panel only mounts once its wizard section is opened, so
   // mounting is the same signal the old `open` flag carried.
@@ -472,13 +501,14 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
   };
 
   /** Pull this facade from Street View and run it through the same detection.
-   *  The backend returns the WHOLE wall: several shots from one panorama stitched
-   *  and flattened onto the wall plane, so verticals stay straight. */
-  const captureStreetView = async (b: FacadeBuilding, orientation: FacadeOrientation) => {
+   *  The backend returns the WHOLE wall: shots from the panoramas that face it,
+   *  flattened onto the wall plane, so verticals stay straight. */
+  const captureStreetView = async (b: FacadeBuilding, orientation: FacadeOrientation, auto = false) => {
     if (b.lat == null || b.lon == null) return;
     const slotKey = `${b.key}|${orientation}`;
     setSvSlots(prev => ({ ...prev, [slotKey]: { busy: true, error: null } }));
-    setExpanded(prev => new Set(prev).add(b.key));
+    // Auto-capture must not yank every building open while it runs.
+    if (!auto) setExpanded(prev => new Set(prev).add(b.key));
     try {
       const res = await api.streetviewFacade(b.lat, b.lon, orientation, b.country ?? "se");
       const shot = res.images[0]!;
@@ -486,9 +516,14 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
       const blob = new Blob([bytes], { type: "image/jpeg" });
       const entry: ImgEntry = {
         id: nextId(),
-        // The name carries what matters for trusting the result: imagery age and
-        // how much wall one pixel covers (hairline cracks need ~2 mm/px).
-        name: `Street View ${res.pano.date ?? ""} · ${Math.round(res.mm_per_px)} mm/px`,
+        // The name carries what matters for trusting the result: imagery age, how
+        // much wall one pixel covers (hairline cracks need ~2 mm/px), and whether
+        // this is the whole wall or only the part a passing camera could see.
+        name: `Street View ${res.pano.date ?? ""} · ${Math.round(res.mm_per_px)} mm/px`
+          + (res.facade.rectified
+            ? (res.facade.wall_shown && res.facade.wall_shown < 0.95
+              ? ` · ${Math.round(res.facade.wall_shown * 100)}% of wall` : " · whole wall")
+            : " · close-up (no square-on view)"),
         url: URL.createObjectURL(blob), blob, orientation, source: "streetview",
         status: "idle", result: null, error: null, ms: null, savedUrl: null,
       };
@@ -500,6 +535,54 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
       setSvSlots(prev => ({ ...prev, [slotKey]: { busy: false, error: msg } }));
     }
   };
+
+  /* Queue every uncaptured facade as soon as the panel opens (or the building set
+     changes). Runs a few at a time: each capture is several Google requests plus a
+     detection pass, and firing 40 at once would stall both. Failures stay on their
+     own slot - one wall with no clear view must not stop the rest. */
+  useEffect(() => {
+    if (!autoCapture) return;
+    const targets: { b: FacadeBuilding; o: FacadeOrientation }[] = [];
+    // A neighbourhood selection can hold dozens of buildings, and every facade is
+    // billed Google requests. Automatic means automatic for a working set, not a
+    // silent spend on a hundred buildings - the rest stay one click away.
+    for (const b of buildings.slice(0, AUTO_CAPTURE_MAX_BUILDINGS)) {
+      if (b.lat == null || b.lon == null) continue;
+      for (const o of FACADE_ORIENTATIONS) {
+        const slotKey = `${b.key}|${o}`;
+        if (autoClaimed.current.has(slotKey)) continue;
+        // Never overwrite a facade the user has already filled themselves.
+        if ((imagesRef.current[b.key] ?? []).some(e => e.orientation === o)) continue;
+        autoClaimed.current.add(slotKey);
+        targets.push({ b, o });
+      }
+    }
+    // The queue lives in a ref and the workers are NOT torn down by this effect:
+    // Step 2 re-renders whenever a detection writes its summary, which hands down a
+    // fresh `buildings` array. Cancelling on cleanup stopped the run after the
+    // first few captures and froze the counter.
+    if (targets.length) {
+      autoQueue.current.push(...targets);
+      setAutoProgress(p => ({ done: p?.done ?? 0, total: (p?.total ?? 0) + targets.length }));
+    }
+    // Nothing new, but a remount may have left the queue standing: restart it.
+    if (!autoQueue.current.length || autoRunning.current) return;
+
+    autoRunning.current = true;
+    autoStopped.current = false;
+    const worker = async () => {
+      while (!autoStopped.current && !unmounted.current) {
+        const t = autoQueue.current.shift();
+        if (!t) break;
+        await captureStreetView(t.b, t.o, true);
+        if (!unmounted.current) setAutoProgress(p => (p ? { ...p, done: p.done + 1 } : null));
+      }
+    };
+    void Promise.all([worker(), worker(), worker()]).finally(() => { autoRunning.current = false; });
+    // `buildings` is compared by its keys, not identity, and captureStreetView is
+    // re-created every render - neither belongs in the dependency list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCapture, buildings.map(b => b.key).join("|")]);
 
   const removeImage = (key: string, id: string) => {
     setImages(key, prev => {
@@ -551,8 +634,8 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
             upload target is the slot you drop onto - there is nothing to pick. */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] text-white/45">
-            Upload into a building's north / east / south / west facade below — the MBDD2025 detector flags cracks,
-            leakage, spalling, corrosion &amp; bulges.
+            Every facade is pulled from Street View automatically; upload photos where the street view is blocked or
+            too coarse. The MBDD2025 detector flags cracks, leakage, spalling, corrosion &amp; bulges.
             {totalChecked > 0 && <b className="text-violet-300"> · {totalChecked} building{totalChecked === 1 ? "" : "s"} checked</b>}
           </span>
           <label className="text-[11px] text-white/50 ml-auto flex items-center gap-1.5 cursor-pointer select-none"
@@ -568,6 +651,30 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
               {SENSITIVITY.map(s => <option key={s.value} value={s.value} style={{ background: "#161b22", color: "#e5e7eb" }}>{s.label}</option>)}
             </select>
           </label>
+        </div>
+
+        {/* Auto-capture: progress while it runs, and the switch to stop paying for it. */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="text-[11px] text-white/50 flex items-center gap-1.5 cursor-pointer select-none"
+            title="Fetch all four facades of every building from Street View as soon as this panel opens. Each facade costs a few Google Street View requests.">
+            <input type="checkbox" checked={autoCapture}
+              onChange={e => { setAutoCapture(e.target.checked); if (!e.target.checked) autoStopped.current = true; }}
+              className="w-3.5 h-3.5 accent-sky-500 cursor-pointer" />
+            <span className="flex items-center gap-1"><Camera className="w-3 h-3 text-sky-300" /> Auto-capture from Street View</span>
+          </label>
+          {autoCapture && buildings.length > AUTO_CAPTURE_MAX_BUILDINGS && (
+            <span className="text-[11px] text-white/35">
+              first {AUTO_CAPTURE_MAX_BUILDINGS} buildings — capture the rest per facade
+            </span>
+          )}
+          {autoProgress && autoProgress.done < autoProgress.total && !autoStopped.current && (
+            <span className="text-[11px] text-sky-300/80 flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Capturing facades… {autoProgress.done}/{autoProgress.total}
+              <button onClick={() => { autoStopped.current = true; setAutoCapture(false); }}
+                className="text-white/40 hover:text-white underline underline-offset-2">stop</button>
+            </span>
+          )}
         </div>
 
         {/* Legend */}

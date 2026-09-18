@@ -135,19 +135,22 @@ def main() -> None:
             "sim_gas_kwh": round(sim_gas), "desnz_median_gas_kwh": b["desnz_gas_median_kwh"],
             "metered_space_heating_kwh": round(metered_heating),
             "ratio": round(sim_gas / metered_heating, 2),
-            # EPC-area scaling: what the model predicts for the certified floor area instead of footprint x floors.
-            "ratio_epc_area": round(sim_gas * homes * (b["floor_area_m2"] / res["total_floor_area_m2"]) / metered_heating, 2)
+            # Geometry check, NOT a second accuracy ratio: modelled area per certified home
+            # against the certificates' own floor area. 1.0 means the shoebox is heating
+            # exactly the area the certificates describe; above 1 it heats more (e.g. a
+            # block with uncertified flats), below 1 less.
+            "area_ratio_modelled_over_epc": round(res["total_floor_area_m2"] / b["floor_area_m2"], 2)
                 if b.get("floor_area_m2") and res.get("total_floor_area_m2") else None,
         })
 
     ratios = [o["ratio"] for o in out]
-    ratios_epc = [o["ratio_epc_area"] for o in out if o["ratio_epc_area"]]
+    area_ratios = [o["area_ratio_modelled_over_epc"] for o in out if o["area_ratio_modelled_over_epc"]]
     summary = {
         "n": len(out),
         "median_ratio_sim_over_metered": round(statistics.median(ratios), 2) if ratios else None,
         "p25_p75": [round(sorted(ratios)[len(ratios) // 4], 2), round(sorted(ratios)[3 * len(ratios) // 4], 2)] if ratios else None,
         "within_25pct": round(sum(0.75 <= x <= 1.25 for x in ratios) / len(ratios), 2) if ratios else None,
-        "median_ratio_epc_area": round(statistics.median(ratios_epc), 2) if ratios_epc else None,
+        "median_area_ratio_modelled_over_epc": round(statistics.median(area_ratios), 2) if area_ratios else None,
         "median_sim_gas_kwh": round(statistics.median(o["sim_gas_kwh"] for o in out)) if out else None,
         "median_metered_space_heating_kwh": round(statistics.median(o["metered_space_heating_kwh"] for o in out)) if out else None,
         "boiler_eff": args.boiler_eff,

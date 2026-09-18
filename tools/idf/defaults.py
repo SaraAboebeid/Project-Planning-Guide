@@ -132,16 +132,72 @@ COOLING_SETPOINT_C = 25.0
 #   - outside those hours heating is off; a 10 °C frost setback stands in for
 #     "off" so an unheated zone can't free-fall unrealistically.
 UK_SAP_LIVING_AREA_FRACTION = 0.3
-# SAP's area-weighted demand temperature would be 18.9 °C; CALIBRATED to 19.5 °C
-# (with UK_INFILTRATION_ACH = 0.75) against DESNZ 2024 metered postcode gas for
-# Rotherham houses - tools/uk/calibrate_rotherham.py. Held-out 60 houses:
-# simulated space-heating gas / (0.75 x metered median) = 1.04 median,
-# interquartile 0.85-1.31, 53% within +/-25% (SAP defaults: 0.75, 38%).
-# Temperature and infiltration are confounded in the fit (18.9 °C / 1.0 ACH
-# scores alike); this pair was chosen as the best-centred on held-out houses.
-UK_SAP_HEATING_C = 19.5
-UK_INFILTRATION_ACH = 0.75
+# CALIBRATED (tools/uk/calibrate_rotherham.py, 2026-09-17) against DESNZ 2024
+# metered postcode gas: gas-boiler model at the heated (EPC) floor area, boiler
+# efficiency from each EPC's heating rating. SAP's area-weighted demand
+# temperature (18.9 °C) is kept; only infiltration is fitted. Held-out 60
+# houses: simulated space-heating gas / (0.75 x metered median) = 1.03 median,
+# interquartile 0.85-1.39, 53% within +/-25% (SAP defaults 0.5 ACH: 0.61, 22%).
+# 1.25 ACH is high for real airtightness, and it did NOT come down once the
+# uninsulated-wall corrections below were added: refitting the two jointly
+# (tools/uk/calibrate_wall_factor.py) still picked 1.25 over 1.0 and 0.75. So it
+# is not standing in for the wall error - it is the whole-model ventilation term,
+# and in a single-zone shoebox with no mechanical ventilation, no chimney and no
+# purpose-provided vents it absorbs every air-movement loss at once. Treat it as
+# a calibration constant for this model, not as a measurable air change rate.
+UK_SAP_HEATING_C = round(UK_SAP_LIVING_AREA_FRACTION * 21.0 + (1 - UK_SAP_LIVING_AREA_FRACTION) * 18.0, 1)
+UK_INFILTRATION_ACH = 1.25
 UK_SAP_SETBACK_C = 10.0
+# ── Poorly insulated UK homes: two separate corrections ──────────────────
+# Certificates describe an uninsulated wall with a GENERIC DEFAULT (solid brick
+# 2.0, unfilled cavity 1.5 W/m2K), not a measurement. Against DESNZ metered gas
+# those houses came out 1.5-2.2x over-predicted while insulated-wall houses sat
+# at 1.0 - so the model loses too much heat through exactly the walls a retrofit
+# tool is asked about. Two DIFFERENT things cause that, and they are kept apart
+# on purpose because they behave differently after a retrofit:
+#
+# 1. FABRIC. In-situ U-value measurements of solid walls come out well below the
+#    RdSAP default (Rye & Scott, SPAB Research Report 1, 2011: measured means
+#    ~1.3-1.6 against an assumed 2.1; BRE/Leeds Beckett in-situ surveys agree).
+#    A 0.7 factor sits inside that measured range. NOT fitted - fitting it is
+#    what the note below warns against.
+# 2. BEHAVIOUR (the "prebound effect"). Households in poor-fabric homes heat to
+#    lower temperatures and heat fewer rooms than any standard schedule assumes;
+#    measured consumption in such homes runs ~30% below calculated (Sunikka-Blank
+#    & Galvin, Building Research & Information 40(3), 2012). This is modelled as
+#    a drop in the SAP demand temperature for these homes only - CALIBRATED
+#    (tools/uk/calibrate_wall_factor.py).
+#
+# WHY NOT ONE FITTED FACTOR: fitting a single wall factor to the meters put the
+# optimum at 0.3-0.5 with accuracy FLAT across that whole range (held-out mean
+# abs log error 0.309-0.313, against 0.369 uncorrected). At 0.3 a solid brick
+# wall becomes 0.6 W/m2K - better than a filled cavity, i.e. physically absurd.
+# The meters cannot separate "this wall loses less heat" from "this house is
+# heated less", so the split above is made on published evidence instead of on
+# the fit, and only the behavioural half is calibrated.
+#
+# This matters for savings, not just for the baseline: a wall-insulation measure
+# states its own U-value, so correcting the baseline downwards shrinks the
+# predicted saving for solid-wall homes - which is the direction real evaluations
+# report (measured savings from solid-wall insulation typically fall well short
+# of calculated ones).
+#
+# RESULT on the 60 held-out houses (half of them uninsulated-wall by design),
+# against 0.75 x the DESNZ postcode median gas meter:
+#                       uncorrected   0.7 + 2 K
+#   mean abs log error      0.369        0.302
+#   within +/-25%             47%          53%
+#   median, uninsulated      1.54         1.05
+#   median, insulated        0.93         0.93   (unchanged - nothing applies here)
+# The 2 K drop is not sharply identified: 2 K and 3 K score the same within
+# noise (the calibration half narrowly prefers 3 K, the held-out half 2 K), so
+# the tie is broken on measured internal temperatures rather than on the fit -
+# 2 K puts these homes at 16.9 C while heating, 3 K at 15.9 C, below what field
+# surveys of the English stock report.
+UK_UNINSULATED_WALL_U_THRESHOLD = 1.0
+UK_UNINSULATED_WALL_FACTOR = 0.7
+UK_PREBOUND_SETPOINT_DROP_K = 2.0
+
 # Seasonal efficiency of an existing gas boiler when the certificate gives none
 # (typical in-use value; the metered-gas calibration also used 0.85).
 UK_BOILER_EFFICIENCY = 0.85

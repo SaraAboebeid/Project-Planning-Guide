@@ -308,6 +308,10 @@ export interface StreetViewFacadeResponse {
     panoramas_considered: number; unblocked_by_buildings?: number;
     /** Present for framing=facade: stitched from `tiles` shots and flattened onto the wall plane. */
     rectified?: boolean; tiles?: number; coverage?: number; height_m?: number;
+    /** Fraction of the wall's width reconstructed, and how many panoramas it took. */
+    wall_shown?: number; panoramas_used?: number; dates?: string[]; full_width_m?: number;
+    /** True when no square-on panorama exists, so this is a close-up, not the facade. */
+    oblique_only?: boolean;
   };
   mm_per_px: number;
 }

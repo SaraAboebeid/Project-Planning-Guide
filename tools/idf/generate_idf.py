@@ -265,6 +265,13 @@ def build_shoebox_idf(
     # Only the UK payload carries tabula_u_floor (TABULA GB publishes it); Sweden keeps the default.
     u_floor = u_floor_override if u_floor_override is not None else (building.get("u_floor_epc") or building.get("tabula_u_floor") or D.DEFAULT_U_FLOOR)
     uk_home = (country or "").lower() == "gb" and use_cat in ("bostad_enfamilj", "bostad_flerfamilj")
+    # An uninsulated wall's U-value is a generic certificate default, not a
+    # measurement; see defaults.UK_UNINSULATED_WALL_FACTOR. Overrides (retrofit
+    # tiers) already state a measure's own U and are left alone.
+    uninsulated_wall = bool(uk_home and u_wall_override is None and building.get("u_wall_epc")
+                            and u_wall >= D.UK_UNINSULATED_WALL_U_THRESHOLD)
+    if uninsulated_wall:
+        u_wall *= D.UK_UNINSULATED_WALL_FACTOR
     wwr = wwr_override if wwr_override is not None else D.DEFAULT_WWR_BY_USE.get(use_cat or "", D.DEFAULT_WWR_FALLBACK)
 
     name_base = _safe_name(building_name or building.get("address") or f"{city_id} building")
@@ -429,8 +436,13 @@ def build_shoebox_idf(
     objects.append(_constant_schedule("Activity Level Schedule", "Activity Level", D.ACTIVITY_LEVEL_W_PER_PERSON))
     objects.append(_constant_schedule("Always On Schedule", "Fractional", 1))
     if uk_home:
+        # Poor-fabric homes are heated cooler than the SAP pattern assumes (the
+        # prebound effect; see defaults.UK_PREBOUND_SETPOINT_DROP_K). The drop
+        # applies to the heating periods only - the frost setback stays put.
+        drop = D.UK_PREBOUND_SETPOINT_DROP_K if uninsulated_wall else 0.0
+        cooler = lambda pat: [(t, round(v - drop, 1) if v > D.UK_SAP_SETBACK_C else v) for t, v in pat]
         objects.append(_schedule_compact_week(f"{zone_name} Heating Setpoint Schedule", "Temperature",
-                                              D.UK_SAP_WEEKDAY_HEATING, D.UK_SAP_WEEKEND_HEATING))
+                                              cooler(D.UK_SAP_WEEKDAY_HEATING), cooler(D.UK_SAP_WEEKEND_HEATING)))
     else:
         objects.append(_constant_schedule(f"{zone_name} Heating Setpoint Schedule", "Temperature", D.HEATING_SETPOINT_C))
     objects.append(_constant_schedule(f"{zone_name} Cooling Setpoint Schedule", "Temperature", D.COOLING_SETPOINT_C))

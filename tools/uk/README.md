@@ -126,6 +126,24 @@ OSM often draws a semi pair as one polygon) and finds walls shared with a
 neighbouring footprint (`party_wall_midpoints`, modelled adiabatic). UK homes are
 heated on SAP 10.2's intermittent schedule (`tools/idf/defaults.py`).
 
+### Calibration against metered gas
+
+Every UK constant that is *fitted* rather than sourced lives in
+`tools/idf/defaults.py` with the script that fitted it named in its comment.
+Both scripts score the model on a calibration half and report the chosen values
+on a held-out half, so nothing is judged on the data it was tuned on:
+
+```
+python tools/uk/calibrate_rotherham.py      # demand temperature x infiltration
+python tools/uk/calibrate_wall_factor.py    # uninsulated-wall U correction x infiltration
+```
+
+Target throughout: simulated space-heating gas per home = 75% of the postcode's
+median DESNZ gas meter (ECUK 2025 Table U2 space-heating share).
+`calibrate_wall_factor.py` samples houses *stratified* by wall insulation state,
+because the correction is only identifiable when uninsulated-wall houses are
+half the sample rather than their natural quarter.
+
 ## Files
 
 - `cities.py` — the city/district registry (single source of truth for lat/lon/radius/region/eubucco_file)
@@ -136,6 +154,10 @@ heated on SAP 10.2's intermittent schedule (`tools/idf/defaults.py`).
 - `uk_data_pipeline.py` — orchestrates all of the above per city, joins OSM+EUBUCCO+EPC+EHS+TABULA, writes the building payload
 - `anchor_epc_uprn.py` — Rotherham: re-anchors EPCs to footprints via OS Open UPRN on top of the pipeline output
 - `validate_rotherham.py` — Rotherham: band/SAP/year accuracy against the landlord ground truth, with the always-C baseline
+- `validate_rotherham_consumption.py` — simulated space-heating gas vs DESNZ metered medians (`--kind houses|flats`)
+- `validate_rotherham_dec.py` — simulated heat/electricity vs DEC metered energy (public buildings)
+- `calibrate_rotherham.py` / `calibrate_wall_factor.py` — fit the UK model constants against metered gas (see above)
+- `implied_leakage_rotherham.py` — per-house air change rate implied by the meters, grouped by age/wall/type (diagnostic)
 
 ## Known gap
 
