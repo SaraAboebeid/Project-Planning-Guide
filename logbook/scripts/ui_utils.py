@@ -27,63 +27,352 @@ import streamlit as st
 LOGBOOK_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = LOGBOOK_DIR.parent
 
-STAGE_COLORS = {
-    "raw":       ("#8B5CF6", "#F3EEFF"),
-    "interim":   ("#E8880C", "#FFF4E5"),
-    "processed": ("#2FB477", "#E8F7F0"),
-    "metadata":  ("#4A90E2", "#EAF2FC"),
-    "method":    ("#6E2AAE", "#F2EAFB"),
-    "result":    ("#0F766E", "#E6F4F1"),
-    # dataset stages on Data Sources: a lookup table (TABULA, Wikells, …) is
-    # neither raw observation nor our processing, and made-up numbers must
-    # never be mistaken for data
-    "reference": ("#0E7490", "#E0F2F7"),
-    "synthetic": ("#B91C1C", "#FEE2E2"),
+# ── the palette ──────────────────────────────────────────────────────────────
+# One identity for the whole product: these are the renovation planner's own
+# tokens (frontend/src/config/colors.ts and the CSS variables in
+# frontend/src/index.css), not a second palette invented for the logbook.
+#
+# Two modes, as the planner has: dark, and the planner's "bright". The planner
+# produces bright by inverting its dark theme with a CSS filter; that trick does
+# not survive Streamlit's own chrome (dataframes are drawn by Streamlit, not by
+# us), so bright is written out as a real palette here. It targets the same
+# result: page #f6f8fc, white cards, the brand purple unchanged.
+#
+# The hues differ between modes ON PURPOSE. #4ECDC4 and #2FB477 are legible on
+# near-black and far too pale for text on white, so bright uses deepened
+# versions of the same hues.
+#
+# RULE inherited from the planner: colour is never the only signal. Every badge
+# and chip below also carries its word, so the meaning survives for a reader who
+# cannot separate the hues.
+
+BRAND      = "#721CB8"   # --brand, the primary purple — the same in both modes
+BRAND_DEEP = "#5A1790"   # --brand-deep
+BRAND_DARK = "#421869"   # --brand-dark
+
+THEMES = {
+    "dark": {
+        "page":        "#0a0d14",   # WizardLayout's shell
+        "panel":       "#0d1117",   # top bar, cards, tooltips
+        "pop":         "#11161d",   # dropdowns
+        "sidebar":     "#080b11",
+        "card_bg":     "rgba(13,17,23,0.80)",
+        "card_border": "rgba(114,28,184,0.45)",
+        "line":        "rgba(255,255,255,0.08)",
+        "txt":         "rgba(255,255,255,0.88)",
+        "dim":         "rgba(255,255,255,0.45)",
+        "heading":     "#ffffff",
+        "accent":      "#B98BE8",   # light-purple: eyebrows, links, code
+        "teal":        "#4ECDC4",   # selected / active
+        "good":        "#2FB477",
+        "bad":         "#E2483B",
+        "warn":        "#E8880C",
+        "info":        "#4A90E2",
+        "cyan":        "#22B8CF",
+        "chip_bg":     0.15,        # tint alpha behind a badge
+        "chip_border": 0.45,
+        "hover_bg":    "rgba(78,205,196,0.07)",
+        "shadow":      "none",
+        # The page-number chip sits on a 25% purple tint: white reads on it over
+        # near-black, but the purple itself would not.
+        "num_fg":      "#ffffff",
+        "btn_fg":      "#ffffff",
+    },
+    "light": {
+        "page":        "#f6f8fc",   # body.bright-mode background
+        "panel":       "#ffffff",
+        "pop":         "#ffffff",
+        "sidebar":     "#f1f2f8",
+        "card_bg":     "#ffffff",
+        "card_border": "rgba(114,28,184,0.28)",
+        "line":        "#e2e8f0",
+        "txt":         "#1e293b",
+        "dim":         "#64748b",
+        "heading":     "#0f172a",
+        "accent":      "#6D28D9",   # #B98BE8 is unreadable on white
+        "teal":        "#0F8B84",
+        "good":        "#15803D",
+        "bad":         "#B91C1C",
+        "warn":        "#B45309",
+        "info":        "#1D4ED8",
+        "cyan":        "#0E7490",
+        "chip_bg":     0.12,
+        "chip_border": 0.35,
+        "hover_bg":    "rgba(15,139,132,0.08)",
+        "shadow":      "0 1px 2px rgba(15,23,42,0.05), 0 4px 14px rgba(66,24,105,0.06)",
+        # …and over white it is the other way round: the purple reads, white does not.
+        "num_fg":      BRAND,
+        "btn_fg":      "#ffffff",
+    },
 }
+
+
+def theme_mode() -> str:
+    """"light" or "dark" — whichever Streamlit is currently rendering.
+
+    st.context.theme follows the reader's choice in ⋮ → Settings → Appearance
+    (including "System"), and changing it reruns the script, so the stylesheet
+    below is rebuilt for the new mode. Older Streamlit builds have no
+    st.context.theme; those fall back to dark, which is what config.toml's
+    `base` makes the default anyway.
+    """
+    try:
+        return "light" if st.context.theme.type == "light" else "dark"
+    except Exception:
+        return "dark"
+
+
+def theme() -> dict:
+    return THEMES[theme_mode()]
+
+
+def tint(hex_color: str, alpha: float) -> str:
+    """rgba() tint of a hex token — the planner's `tint()` helper, in Python."""
+    h = hex_color.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+def stage_colors() -> dict:
+    """One hue per stage, for the mode in use; the chip is drawn as a tint of
+    it, the way the planner draws its status chips."""
+    t = theme()
+    return {
+        "raw":       t["accent"],
+        "interim":   t["warn"],
+        "processed": t["good"],
+        "metadata":  t["info"],
+        "method":    t["accent"],
+        "result":    t["teal"],
+        # dataset stages on Data Sources: a lookup table (TABULA, Wikells, …) is
+        # neither raw observation nor our processing, and made-up numbers must
+        # never be mistaken for data
+        "reference": t["cyan"],
+        "synthetic": t["bad"],
+    }
 
 
 # ── styling ──────────────────────────────────────────────────────────────────
 
+def _css(t: dict) -> str:
+    """The stylesheet for one mode. Everything below reads the CSS variables in
+    :root, so a colour is stated once, here, and never twice in a rule."""
+    return f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+:root {{
+  --lb-page:{t["page"]}; --lb-panel:{t["panel"]}; --lb-pop:{t["pop"]};
+  --lb-sidebar:{t["sidebar"]};
+  --lb-card:{t["card_bg"]}; --lb-card-border:{t["card_border"]};
+  --lb-shadow:{t["shadow"]}; --lb-hover:{t["hover_bg"]};
+  --lb-brand:{BRAND}; --lb-brand-rgb:114,28,184;
+  --lb-brand-deep:{BRAND_DEEP}; --lb-brand-dark:{BRAND_DARK};
+  --lb-accent:{t["accent"]};
+  --lb-teal:{t["teal"]}; --lb-good:{t["good"]}; --lb-bad:{t["bad"]};
+  --lb-warn:{t["warn"]}; --lb-info:{t["info"]};
+  --lb-txt:{t["txt"]}; --lb-dim:{t["dim"]}; --lb-heading:{t["heading"]};
+  --lb-line:{t["line"]};
+  --lb-num-fg:{t["num_fg"]}; --lb-btn-fg:{t["btn_fg"]};
+}}
+
+/* ── type ──────────────────────────────────────────────────────────────── */
+/* Inter on the app, by inheritance. NOT on every emotion class: Streamlit's
+   expander arrows are Material Symbols ligatures, and forcing Inter on them
+   printed the literal text "arrow_right" over each section title. */
+html, body, .stApp {{
+  font-family:'Inter', ui-sans-serif, system-ui, sans-serif;
+}}
+/* Belt and braces — any icon keeps its own font whatever else is set. */
+[data-testid="stIconMaterial"], .material-icons, .material-symbols-rounded,
+[class*="material-symbols"], [class*="material-icons"] {{
+  font-family:'Material Symbols Rounded', 'Material Icons' !important;
+}}
+.stApp {{ background:var(--lb-page); }}
+[data-testid="stHeader"] {{ background:transparent; }}
+
+/* Headings run big and heavy, as they do on the planner's steps. */
+.stApp h1 {{ font-weight:900; letter-spacing:-0.02em; color:var(--lb-heading); }}
+.stApp h2 {{ font-weight:800; letter-spacing:-0.01em; color:var(--lb-heading);
+             margin-top:1.6rem; }}
+.stApp h3, .stApp h4 {{ font-weight:700; color:var(--lb-heading); }}
+.stApp p, .stApp li {{ color:var(--lb-txt); line-height:1.65; }}
+.stApp strong {{ color:var(--lb-heading); font-weight:700; }}
+.stApp a {{ color:var(--lb-accent); text-decoration:none; }}
+.stApp a:hover {{ color:var(--lb-teal); text-decoration:underline; }}
+[data-testid="stCaptionContainer"], .stCaption {{ color:var(--lb-dim) !important; }}
+
+/* ── page header: eyebrow + title + brand rule ─────────────────────────── */
+.lb-hero {{ margin:0 0 1.4rem 0; }}
+.lb-eyebrow {{ font-size:0.68rem; font-weight:800; letter-spacing:0.18em;
+               text-transform:uppercase; color:var(--lb-accent);
+               display:flex; align-items:center; gap:0.55rem; margin-bottom:0.45rem; }}
+.lb-eyebrow .lb-num {{ display:inline-flex; align-items:center; justify-content:center;
+               width:22px; height:22px; border-radius:50%; font-size:0.66rem;
+               background:rgba(var(--lb-brand-rgb),0.25);
+               border:1px solid rgba(var(--lb-brand-rgb),0.55); color:var(--lb-num-fg);
+               letter-spacing:0; }}
+.lb-title {{ font-size:2.1rem; font-weight:900; letter-spacing:-0.025em;
+             color:var(--lb-heading); line-height:1.15; margin:0 0 0.5rem 0; }}
+.lb-rule {{ height:3px; width:88px; border-radius:2px;
+            background:linear-gradient(90deg, var(--lb-brand) 0%, var(--lb-teal) 100%); }}
+
+/* ── chips and badges ──────────────────────────────────────────────────── */
+.lb-badge {{ display:inline-block; padding:0.16rem 0.62rem; border-radius:999px;
+             font-size:0.68rem; font-weight:800; letter-spacing:0.09em;
+             text-transform:uppercase; }}
+.lb-chip {{ display:inline-block; padding:0.1rem 0.6rem; border-radius:999px;
+            font-size:0.72rem; font-weight:700; margin-right:5px; }}
+.lb-dim {{ color:var(--lb-dim); font-size:0.82rem; }}
+.lb-missing {{ color:var(--lb-bad); font-weight:700; }}
+
+/* ── the overview card ─────────────────────────────────────────────────── */
+.lb-card {{ background:linear-gradient(135deg, rgba(var(--lb-brand-rgb),0.14) 0%,
+                                        var(--lb-card) 55%);
+            border:1px solid var(--lb-card-border); border-radius:14px;
+            box-shadow:var(--lb-shadow);
+            padding:1.3rem 1.55rem; margin-top:1.2rem; }}
+.lb-card h4 {{ margin:0 0 0.6rem 0; font-size:1.05rem; font-weight:800;
+               color:var(--lb-heading); }}
+.lb-card p  {{ margin:0 0 0.9rem 0; font-size:0.92rem; color:var(--lb-dim); }}
+.lb-card ol {{ margin:0; padding-left:1.25rem; line-height:1.6; font-size:0.93rem;
+               color:var(--lb-txt); }}
+.lb-card ol li::marker {{ color:var(--lb-accent); font-weight:800; }}
+.lb-card strong {{ color:var(--lb-heading); }}
+.lb-purpose {{ font-size:1.02rem; line-height:1.65; }}
+
+/* ── dataset card (Data Sources) ───────────────────────────────────────── */
+.lb-ds {{ width:100%; border-collapse:collapse; margin:0.4rem 0 0.9rem 0;
+          font-size:0.9rem; line-height:1.55; }}
+.lb-ds th {{ width:205px; text-align:left; vertical-align:top; font-weight:700;
+             font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase;
+             color:var(--lb-accent); padding:9px 12px 9px 0;
+             border-bottom:1px solid var(--lb-line); }}
+.lb-ds td {{ vertical-align:top; padding:9px 0; border-bottom:1px solid var(--lb-line);
+             color:var(--lb-txt); }}
+.lb-ds ul {{ margin:0; padding-left:1.1rem; }}
+.lb-ds li {{ margin:0 0 2px 0; }}
+.lb-ds code {{ font-size:0.83rem; }}
+
+/* ── code and file links ───────────────────────────────────────────────── */
+.stApp code {{ background:rgba(var(--lb-brand-rgb),0.10); color:var(--lb-accent);
+               border-radius:5px; padding:0.1em 0.38em; font-size:0.86em; }}
+a.lb-file {{ text-decoration:none; }}
+a.lb-file code {{ color:var(--lb-accent); background:rgba(var(--lb-brand-rgb),0.16);
+                  border-bottom:1px dotted var(--lb-accent); }}
+a.lb-file:hover code {{ background:var(--lb-hover); color:var(--lb-teal);
+                        border-bottom-color:var(--lb-teal); }}
+
+/* ── sections are cards, like the planner's panels ─────────────────────── */
+[data-testid="stExpander"] {{ margin-bottom:0.65rem; }}
+[data-testid="stExpander"] details {{
+  background:var(--lb-card);
+  border:1px solid var(--lb-card-border) !important;
+  border-radius:14px !important; overflow:hidden; box-shadow:var(--lb-shadow);
+}}
+[data-testid="stExpander"] summary {{ font-weight:700; font-size:0.97rem;
+  color:var(--lb-heading); padding:0.8rem 1.05rem; }}
+[data-testid="stExpander"] summary:hover {{ color:var(--lb-teal); }}
+[data-testid="stExpander"] details[open] > summary {{
+  border-bottom:1px solid var(--lb-line); }}
+
+/* ── sidebar ───────────────────────────────────────────────────────────── */
+[data-testid="stSidebar"] {{ background:var(--lb-sidebar);
+  border-right:1px solid var(--lb-line); }}
+[data-testid="stSidebarNav"] a {{ border-radius:9px; }}
+[data-testid="stSidebarNav"] a:hover {{ background:var(--lb-hover); }}
+[data-testid="stSidebarNav"] a[aria-current="page"] {{
+  background:var(--lb-hover);
+  box-shadow:inset 3px 0 0 var(--lb-teal);
+}}
+[data-testid="stSidebarNav"] a[aria-current="page"] span {{
+  color:var(--lb-teal) !important; font-weight:700; }}
+[data-testid="stSidebar"] [data-testid="stSidebarNavSeparator"],
+[data-testid="stSidebar"] hr {{ border-color:var(--lb-line); }}
+
+/* ── tabs (Sweden / United Kingdom) ────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] {{ gap:4px; border-bottom:1px solid var(--lb-line); }}
+/* The label sits in a child element, so the colour has to reach it too. */
+.stTabs [data-baseweb="tab"], .stTabs [data-baseweb="tab"] p {{
+  font-weight:700; font-size:0.88rem; color:var(--lb-dim); padding:0; }}
+.stTabs [data-baseweb="tab"] {{ padding:0.5rem 0.95rem; }}
+.stTabs [aria-selected="true"], .stTabs [aria-selected="true"] p {{
+  color:var(--lb-teal) !important; }}
+.stTabs [data-baseweb="tab-highlight"] {{ background:var(--lb-teal); }}
+.stTabs [data-baseweb="tab"]:hover p {{ color:var(--lb-heading); }}
+
+/* ── tables ────────────────────────────────────────────────────────────── */
+.stApp table:not(.lb-ds) {{ border-collapse:collapse; font-size:0.89rem; }}
+.stApp table:not(.lb-ds) th {{ background:rgba(var(--lb-brand-rgb),0.18);
+  color:var(--lb-heading); font-weight:700; font-size:0.74rem; letter-spacing:0.05em;
+  text-transform:uppercase; padding:8px 11px; border:1px solid var(--lb-line); }}
+.stApp table:not(.lb-ds) td {{ padding:7px 11px; border:1px solid var(--lb-line);
+  color:var(--lb-txt); }}
+.stApp table:not(.lb-ds) tr:hover td {{ background:var(--lb-hover); }}
+
+/* ── metrics ───────────────────────────────────────────────────────────── */
+[data-testid="stMetric"] {{ background:var(--lb-card);
+  border:1px solid var(--lb-card-border); border-radius:14px;
+  padding:0.85rem 1rem; box-shadow:var(--lb-shadow); }}
+[data-testid="stMetricLabel"] {{ font-size:0.7rem !important; font-weight:700;
+  letter-spacing:0.08em; text-transform:uppercase; color:var(--lb-dim) !important; }}
+[data-testid="stMetricValue"] {{ font-weight:800; color:var(--lb-heading); }}
+
+/* ── buttons ───────────────────────────────────────────────────────────── */
+/* The brand gradient is dark in both modes, so the label stays white. */
+[data-testid="stDownloadButton"] button, .stButton button {{
+  background:linear-gradient(135deg, var(--lb-brand-deep), var(--lb-brand-dark));
+  border:1px solid rgba(var(--lb-brand-rgb),0.6); color:var(--lb-btn-fg);
+  font-weight:700; font-size:0.85rem; border-radius:10px;
+}}
+[data-testid="stDownloadButton"] button:hover, .stButton button:hover {{
+  border-color:var(--lb-teal); color:var(--lb-btn-fg);
+  box-shadow:0 0 0 1px var(--lb-teal);
+}}
+[data-testid="stDownloadButton"] button p, .stButton button p {{
+  color:var(--lb-btn-fg) !important; }}
+
+/* ── alerts keep the planner's semantic hues ───────────────────────────── */
+[data-testid="stAlert"] {{ border-radius:12px; border-width:1px; border-style:solid; }}
+
+/* Native selects go white-on-white in dark mode unless both the control and
+   its options are told otherwise — the same trap as in the planner. */
+.stApp select, .stApp option {{ background:var(--lb-pop) !important;
+  color:var(--lb-txt) !important; }}
+
+/* Wide content scrolls in its own container; the page never scrolls sideways. */
+.lb-scroll {{ overflow-x:auto; }}
+</style>
+"""
+
+
 def inject_css() -> None:
-    st.markdown(
-        """
-        <style>
-          .lb-badge { display:inline-block; padding:0.15rem 0.6rem; border-radius:999px;
-                      font-size:0.72rem; font-weight:600; letter-spacing:0.03em;
-                      text-transform:uppercase; }
-          .lb-card  { background:#f5f6f7; border:1px solid #e1e4e8; border-radius:10px;
-                      padding:1.25rem 1.5rem; margin-top:1.2rem; }
-          .lb-card h4 { margin:0 0 0.75rem 0; }
-          .lb-card p  { margin:0 0 0.75rem 0; font-size:0.95rem; color:#555; }
-          .lb-card ol { margin:0; padding-left:1.15rem; line-height:1.55; font-size:0.95rem; }
-          .lb-purpose { font-size:1.02rem; line-height:1.6; }
-          .lb-missing { color:#E2483B; font-weight:600; }
-          /* dataset card (Data Sources) */
-          .lb-ds { width:100%; border-collapse:collapse; margin:0.4rem 0 0.9rem 0;
-                   font-size:0.92rem; line-height:1.5; }
-          .lb-ds th { width:205px; text-align:left; vertical-align:top; font-weight:600;
-                      color:#475569; padding:7px 12px 7px 0; border-bottom:1px solid #eef0f3; }
-          .lb-ds td { vertical-align:top; padding:7px 0; border-bottom:1px solid #eef0f3;
-                      color:#0f172a; }
-          .lb-ds ul { margin:0; padding-left:1.1rem; }
-          .lb-ds li { margin:0 0 2px 0; }
-          .lb-ds code { font-size:0.84rem; }
-          .lb-chip { display:inline-block; padding:0.08rem 0.55rem; border-radius:999px;
-                     font-size:0.76rem; font-weight:700; margin-right:4px; }
-          .lb-dim { color:#94a3b8; font-size:0.82rem; }
-          /* links into the file viewer */
-          a.lb-file { text-decoration:none; }
-          a.lb-file code { color:#6D28D9; border-bottom:1px dotted #a78bfa; }
-          a.lb-file:hover code { background:#F2EAFB; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(_css(theme()), unsafe_allow_html=True)
 
 
 def badge(stage: str) -> str:
-    fg, bg = STAGE_COLORS.get(stage, ("#555", "#eee"))
-    return f"<span class='lb-badge' style='color:{fg};background:{bg};'>{stage}</span>"
+    t = theme()
+    hue = stage_colors().get(stage, t["accent"])
+    return (f"<span class='lb-badge' style='color:{hue};"
+            f"background:{tint(hue, t['chip_bg'])};"
+            f"border:1px solid {tint(hue, t['chip_border'])};'>{stage}</span>")
+
+
+def page_header(number, title: str, stage: str | None = None) -> None:
+    """The planner's step header, for a logbook page: a small uppercase eyebrow
+    carrying the page number and stage, the title at full weight, and the brand
+    rule under it."""
+    hues = stage_colors()
+    num = f"<span class='lb-num'>{number}</span>" if number is not None else ""
+    stage_bit = (f"<span style='color:{hues.get(stage, theme()['accent'])}'>{stage}</span>"
+                 if stage else "")
+    sep = "<span style='opacity:0.35'>·</span>" if num and stage_bit else ""
+    st.markdown(
+        f"<div class='lb-hero'><div class='lb-eyebrow'>{num}{sep}{stage_bit}</div>"
+        f"<div class='lb-title'>{html.escape(title)}</div>"
+        f"<div class='lb-rule'></div></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def overview_card(title: str, subtitle: str, items: list[tuple[str, str]]) -> None:
@@ -341,14 +630,16 @@ def show_files(paths: list[str]) -> None:
 # it and where it is used. When present it replaces the repository file table
 # (lines / size / last commit), which says nothing about the data itself.
 
-ACCESS_COLORS = {
-    "Live API":        ("#1D4ED8", "#E0EAFF"),
-    "Downloaded once": ("#6E2AAE", "#F2EAFB"),
-    "Fetched & cached": ("#0E7490", "#E0F2F7"),
-    "Scraped":         ("#B45309", "#FFF4E5"),
-    "Derived":         ("#0F766E", "#E6F4F1"),
-    "Synthetic":       ("#B91C1C", "#FEE2E2"),
-}
+def access_colors() -> dict:
+    t = theme()
+    return {
+        "Live API":         t["info"],
+        "Downloaded once":  t["accent"],
+        "Fetched & cached": t["cyan"],
+        "Scraped":          t["warn"],
+        "Derived":          t["teal"],
+        "Synthetic":        t["bad"],
+    }
 
 
 def _inline(text: str) -> str:
@@ -398,8 +689,11 @@ def dataset_card(ds: dict) -> None:
     row("Source", src)
 
     access = ds.get("access", "—")
-    fg, bg = ACCESS_COLORS.get(access, ("#334155", "#F1F5F9"))
-    how = f"<span class='lb-chip' style='color:{fg};background:{bg}'>{html.escape(access)}</span>"
+    t = theme()
+    hue = access_colors().get(access, t["accent"])
+    how = (f"<span class='lb-chip' style='color:{hue};"
+           f"background:{tint(hue, t['chip_bg'])};"
+           f"border:1px solid {tint(hue, t['chip_border'])}'>{html.escape(access)}</span>")
     if ds.get("connection"):
         how += _inline(ds["connection"])
     row("How it is connected", how)
@@ -600,10 +894,7 @@ def render_page(page: dict, extra=None) -> None:
     st.set_page_config(page_title=page["title"], layout="wide")
     inject_css()
 
-    head = f"{page['number']}. {page['title']}"
-    st.title(head)
-    if page.get("stage"):
-        st.markdown(badge(page["stage"]), unsafe_allow_html=True)
+    page_header(page["number"], page["title"], page.get("stage"))
 
     if page.get("tabs"):
         # One page per topic, one tab per country: Sweden and the UK are built

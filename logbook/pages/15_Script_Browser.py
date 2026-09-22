@@ -20,14 +20,14 @@ from scripts.ui_utils import (  # noqa: E402
     linkify_repo_links,
     make_markdown_download,
     overview_card,
+    page_header,
 )
 
 page = PAGES["script_browser"]
 
 st.set_page_config(page_title=page["title"], layout="wide")
 inject_css()
-st.title(f"{page['number']}. {page['title']}")
-st.markdown(badge(page["stage"]), unsafe_allow_html=True)
+page_header(page["number"], page["title"], page.get("stage"))
 st.markdown(page["purpose"])
 
 if page.get("overview"):

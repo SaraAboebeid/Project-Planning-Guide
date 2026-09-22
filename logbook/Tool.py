@@ -58,4 +58,16 @@ _group = navigation.setdefault("Data & pipelines", [])
 _after = next((i for i, p in enumerate(_group) if p.url_path == "data-sources"), len(_group) - 1)
 _group[_after + 1:_after + 1] = _tools
 
-st.navigation(navigation).run()
+# expanded=True, or Streamlit collapses the longer groups behind a "View 10
+# more" link once anything else shares the sidebar — the whole contents list
+# being visible at once is the point of this sidebar.
+nav = st.navigation(navigation, expanded=True)
+
+# The planner carries a bright/dark toggle in its sidebar. Streamlit owns its
+# own theme switch (it has to: st.dataframe is drawn by Streamlit, not by our
+# CSS, so a toggle of our own could not follow), and a page cannot set it from
+# Python — so point at it rather than duplicate it. inject_css() reads the
+# chosen mode through st.context.theme and restyles to match.
+st.sidebar.caption("Bright or dark: **⋮ → Settings → Appearance**")
+
+nav.run()

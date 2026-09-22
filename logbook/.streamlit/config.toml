@@ -1,0 +1,44 @@
+# Logbook theme — the same identity as the renovation planner (frontend/).
+#
+# Two modes, as the planner has. The reader switches in ⋮ → Settings →
+# Appearance; "System" follows the operating system. Streamlit reruns the
+# script on a change, and inject_css() in scripts/ui_utils.py rebuilds its own
+# stylesheet for the new mode from the token sets in THEMES.
+#
+# These sections theme Streamlit's OWN chrome — widgets, the sidebar and, above
+# all, st.dataframe, which is drawn by Streamlit and cannot be reached with CSS.
+# Everything else — headings, cards, badges, tabs — is in inject_css().
+#
+# The values mirror the planner: dark is WizardLayout's shell (#0a0d14) and its
+# panels; bright is body.bright-mode (#f6f8fc) with white cards. The brand
+# purple #721CB8 is the same in both.
+
+[theme]
+base = "dark"
+font = "Inter, ui-sans-serif, system-ui, sans-serif"
+baseRadius = "0.75rem"
+
+[theme.dark]
+primaryColor = "#721CB8"
+backgroundColor = "#0a0d14"
+secondaryBackgroundColor = "#11161d"
+textColor = "#E6E8EE"
+linkColor = "#B98BE8"
+codeBackgroundColor = "#0d1117"
+borderColor = "#252C3A"
+
+[theme.light]
+primaryColor = "#721CB8"
+backgroundColor = "#f6f8fc"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1e293b"
+# #B98BE8 is legible on near-black and far too pale on white.
+linkColor = "#6D28D9"
+codeBackgroundColor = "#f1f0f9"
+borderColor = "#e2e8f0"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
