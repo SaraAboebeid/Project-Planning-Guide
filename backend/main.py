@@ -1096,6 +1096,101 @@ def list_districts(country: str = Query("se")):
     return _DISTRICTS_CACHE
 
 
+_BOPLATS_MAP_CACHE: tuple[float, dict] | None = None
+
+
+@app.get("/api/boplats/map")
+def boplats_map():
+    """Boplats rental listings placed on the map, with each building's energy class.
+
+    Boplats publishes an address but no coordinates, so listings are matched to
+    building footprints by normalised address - the same join /api/buildings uses,
+    widened to every entrance in ``all_addresses`` (one building often lists
+    several). Listings whose address matches no footprint are counted but not
+    returned; the frontend shows that as coverage rather than hiding it.
+
+    Cached against the scraper database's mtime, so the daily refresh invalidates
+    it without a restart.
+    """
+    global _BOPLATS_MAP_CACHE
+    import re, sqlite3
+
+    db = PROJECT_ROOT / "boplats_apartments.db"
+    if not db.exists():
+        raise HTTPException(404, "Boplats database is not available in this deployment")
+    stamp = db.stat().st_mtime
+    if _BOPLATS_MAP_CACHE and _BOPLATS_MAP_CACHE[0] == stamp:
+        return _BOPLATS_MAP_CACHE[1]
+
+    def _norm(s: str) -> str:
+        s = s.strip().lower()
+        s = re.sub(r"\s+", " ", s)
+        s = re.sub(r"\s+\d{4}$", "", s)
+        return s
+
+    listings: dict[str, list[dict]] = {}
+    try:
+        conn = sqlite3.connect(str(db))
+        rows = conn.execute(
+            "SELECT address, rooms, size_m2, rent_sek FROM apartments WHERE address IS NOT NULL"
+        ).fetchall()
+        conn.close()
+    except Exception as exc:
+        raise HTTPException(503, f"Could not read the Boplats database: {exc}")
+    for addr, rooms, size_m2, rent_sek in rows:
+        listings.setdefault(_norm(addr), []).append({
+            "rooms": rooms, "size_m2": size_m2, "rent_sek": rent_sek,
+            "rent_per_m2": round(rent_sek / size_m2, 1) if rent_sek and size_m2 else None,
+        })
+
+    def _avg(vals: list) -> float | None:
+        clean = [v for v in vals if v is not None]
+        return round(sum(clean) / len(clean), 1) if clean else None
+
+    points, used = [], set()
+    for b in _get_buildings_list():
+        keys = {_norm(b.get("address") or "")}
+        keys.update(_norm(a) for a in (b.get("all_addresses") or "").split("|") if a.strip())
+        hit = [k for k in keys if k and k in listings]
+        if not hit:
+            continue
+        c_lat, c_lon = _polygon_centroid(b.get("coordinates") or [])
+        if c_lat == 0.0 and c_lon == 0.0:
+            continue
+        used.update(hit)
+        mine = [l for k in hit for l in listings[k]]
+        rents = [l["rent_sek"] for l in mine if l["rent_sek"]]
+        points.append({
+            "address": b.get("address"),
+            "lat": round(c_lat, 6), "lon": round(c_lon, 6),
+            "listings": len(mine),
+            "avg_rent_sek": _avg(rents),
+            "min_rent_sek": min(rents) if rents else None,
+            "max_rent_sek": max(rents) if rents else None,
+            "avg_rent_per_m2_sek": _avg([l["rent_per_m2"] for l in mine]),
+            "avg_size_m2": _avg([l["size_m2"] for l in mine]),
+            "rooms": sorted({l["rooms"] for l in mine if l["rooms"] is not None}),
+            "epc_class": b.get("eclass"),
+            "energy_kwh_m2": b.get("energy"),
+            "year_built": b.get("year"),
+            "primary_area": b.get("primary_area"),
+        })
+
+    matched_listings = sum(p["listings"] for p in points)
+    total_listings = sum(len(v) for v in listings.values())
+    payload = {
+        "points": sorted(points, key=lambda p: -p["listings"]),
+        "buildings_with_listings": len(points),
+        "matched_listings": matched_listings,
+        "total_listings": total_listings,
+        "unmatched_listings": total_listings - matched_listings,
+        "with_epc_class": sum(1 for p in points if p["epc_class"]),
+        "source": "Boplats Göteborg (daily scrape), placed on building footprints by address",
+    }
+    _BOPLATS_MAP_CACHE = (stamp, payload)
+    return payload
+
+
 def _strip_boundary_slivers(geom, min_area: float = 1e-7):
     """The primärområden union + buffer(0) leaves tiny degenerate interior holes
     (and can leave sliver polygons) — near-zero-area artifacts that Leaflet draws

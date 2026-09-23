@@ -502,8 +502,8 @@ SE_COVERAGE = {
     "code_refs": "inline",
     "purpose": """
 What exactly the Swedish model knows about its buildings, how many buildings
-that is, what is missing and why, what the tool falls back on, and what could
-be improved. Every figure was counted from the payload the tool serves
+that is, what is missing and why, and what the tool falls back on. Every figure
+was counted from the payload the tool serves
 (`frontend/public/buildings.json`) on 2026-09-14. Read this before quoting a
 Swedish number outside the project.
 """,
@@ -514,7 +514,6 @@ Swedish number outside the project.
             ("Area", "A rectangle over central Gothenburg (11.85–12.10 °E, 57.62–57.80 °N) — not the whole municipality, and it takes in edges of neighbouring municipalities."),
             ("Energy data", "26,263 buildings (28%) have a real energy class and energy use — but they make up 57% of the built footprint area, because large buildings are the ones that are declared."),
             ("Use type", "85,670 buildings (92%) know their use; 28,397 of those are outbuildings such as garages and sheds."),
-            ("Malmö", "A Malmö model (49,601 buildings) exists but carries no energy data at all, and nothing in the tool loads it."),
         ],
     },
     "sections": [
@@ -642,26 +641,6 @@ geometry is EUBUCCO v0.2. Per-dataset dates are on **1. Data Sources**
   for 41,895 buildings but are only used for drawing roofs in the viewer.
 - **Multi-part buildings keep only their largest part**, and outlines are
   simplified by up to about 5 m.
-- **Malmö has no energy data** — most likely because the Lantmäteriet
-  footprints in the database cover the Gothenburg area only (source codes
-  `GOT`, `UDV`), so Malmö buildings have nothing to match against.
-- **Cannot be rebuilt today** — the Gothenburg EUBUCCO source file is no longer
-  on disk.
-""",
-        },
-        {
-            "title": "What could be improved",
-            "body": """
-| Idea | What it would fix | Effort |
-|---|---|---|
-| Ask Boverket for a fresh extract, and keep the script that builds the database in the repository | certificates after June 2025; a reproducible database | low |
-| Clip to the municipality boundary (the district polygons) instead of a rectangle | outer Göteborg missing, neighbours included | low |
-| Mark copied (property-level) certificates in the payload | shared figures mistaken for independent measurements | low |
-| Fill construction year and floors from EUBUCCO where the certificate has none (check how complete EUBUCCO's Swedish fields are first) | 72% without age, so more buildings get an archetype | medium |
-| Use the LiDAR eave and ridge heights in the energy model | modelled heights for 41,895 buildings | medium |
-| Add a non-residential and post-2005 archetype source, e.g. Boverket's BETSI building-stock survey | no U-values for offices, schools, new buildings | medium |
-| Get Lantmäteriet footprints for Malmö (the account keys already exist in `.env`, unused) | Malmö has no energy data | medium |
-| A clearly labelled statistical estimate for undeclared houses, like the UK's survey fallback | 66,710 buildings with no energy figure | high |
 """,
         },
     ],
@@ -931,8 +910,8 @@ UK_COVERAGE = {
     "code_refs": "inline",
     "purpose": """
 What exactly the UK model knows about its buildings, how many buildings that
-is, what is missing and why, what the tool falls back on, and what could be
-improved. Every figure was counted from the payloads the tool serves
+is, what is missing and why, and what the tool falls back on. Every figure was
+counted from the payloads the tool serves
 (`frontend/public/uk/buildings_<district>.json`) on 2026-09-14. UK coverage is
 not comparable with Sweden's: the join is by address, and residential
 buildings without a certificate get a survey-based estimate.
@@ -1069,22 +1048,6 @@ Housing Survey 2024-25.
   heating and floor-area detail is sparse (2.7% and 4.0%).
 - **Cost and carbon are synthetic** — any UK cost or carbon figure is a
   placeholder.
-""",
-        },
-        {
-            "title": "What could be improved",
-            "body": """
-| Idea | What it would fix | Effort |
-|---|---|---|
-| Keep only the newest certificate per dwelling (by UPRN or address) | superseded certificates skewing a building's band | low |
-| Mark estimated buildings visually, or show the band distribution instead of one drawn band | estimates mistaken for measurements | low |
-| Re-run with `--epc-details` for all certificates | heating system known for only 3–11% | low |
-| Refresh `cities.json` from the payloads | stale Rotherham statistics | low |
-| Recover the Rotherham OS Open UPRN script and apply the same method to London | London certificate coverage of 7–36%; Rotherham not reproducible | medium |
-| Fetch non-domestic certificates too (the service also publishes them — check the API) | 5,814 non-residential buildings with no band | medium |
-| Use the certificate's construction-age band more widely, and other age sources | 1.4% known year in London | medium |
-| Build Birmingham and Nottingham (already configured) | two focus cities missing | medium |
-| A real UK cost and carbon source | synthetic placeholders | high |
 """,
         },
     ],
@@ -5776,7 +5739,7 @@ COVERAGE = {
     "purpose": """
 How far each country's numbers can be trusted: what exactly is covered and for
 how many buildings, what is missing and why, what the tool falls back on, how
-old the records are, the limitations, and what could be improved. Read this
+old the records are, and the limitations. Read this
 before quoting a number outside the project — and note that Swedish and UK
 coverage figures are **not comparable**: Sweden matches certificates to
 buildings geometrically, the UK by address. Where each dataset comes from is on

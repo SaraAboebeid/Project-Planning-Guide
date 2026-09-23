@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { WIKELLS_CHAPTERS, wikellsStats } from "../config/wikellsData";
 import OptimizationAssumptions from "../components/OptimizationAssumptions";
 import MethodEquationsPanel from "../components/MethodEquationsPanel";
+import BoplatsRentalMap from "../components/panels/BoplatsRentalMap";
 
 // ── Icon helper ──────────────────────────────────────────────────────────────
 function Icon({ d, size = 16 }: { d: string; size?: number }) {
@@ -43,6 +44,8 @@ interface DataSource {
   fields: string[];
   sampleFn: () => Promise<Record<string, unknown>[]>;
   renderPreview?: () => React.ReactNode;
+  /** Extra panel shown ABOVE the sample table (renderPreview replaces it instead). */
+  renderExtra?: () => React.ReactNode;
   liveCountUrl?: string;   // address-keyed JSON to fetch a live listing count from
 }
 
@@ -148,6 +151,7 @@ const SOURCES: DataSource[] = [
     status: "live",
     liveCountUrl: "/boplats_data.json",
     fields: ["address", "rent_sek", "area_m2", "rooms", "floor", "image_url", "last_seen"],
+    renderExtra: () => <BoplatsRentalMap />,
     sampleFn: async () => {
       const r = await fetch("/boplats_data.json");
       const data = await r.json() as Record<string, unknown[]>;
@@ -597,6 +601,7 @@ function SourceCard({
               source.renderPreview()
             ) : (
               <>
+            {source.renderExtra?.()}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.40)", flex: 1 }}>
                 {loading ? "Fetching sample…" : `Showing ${(displayRows ?? []).length} record(s)`}

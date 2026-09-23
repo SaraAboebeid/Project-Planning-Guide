@@ -39,6 +39,12 @@ borderColor = "#e2e8f0"
 
 [server]
 headless = true
+# Edits to logbook_content.py were not showing up: it is an imported module, so
+# a browser refresh re-runs the page but Python keeps the cached copy. With this
+# on, Streamlit watches the local modules the app imports, drops them from
+# sys.modules and reruns on save — so editing the text is enough, no restart.
+runOnSave = true
+fileWatcherType = "auto"
 
 [browser]
 gatherUsageStats = false

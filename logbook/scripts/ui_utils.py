@@ -77,6 +77,9 @@ THEMES = {
         # near-black, but the purple itself would not.
         "num_fg":      "#ffffff",
         "btn_fg":      "#ffffff",
+        # A neutral hue for "no credential dimension" chips in the architecture
+        # diagram. t["dim"] is an rgba string and cannot be tinted further.
+        "muted":       "#8B9BB4",
     },
     "light": {
         "page":        "#f6f8fc",   # body.bright-mode background
@@ -103,6 +106,7 @@ THEMES = {
         # …and over white it is the other way round: the purple reads, white does not.
         "num_fg":      BRAND,
         "btn_fg":      "#ffffff",
+        "muted":       "#64748b",
     },
 }
 
@@ -173,7 +177,15 @@ def _css(t: dict) -> str:
   --lb-warn:{t["warn"]}; --lb-info:{t["info"]};
   --lb-txt:{t["txt"]}; --lb-dim:{t["dim"]}; --lb-heading:{t["heading"]};
   --lb-line:{t["line"]};
-  --lb-num-fg:{t["num_fg"]}; --lb-btn-fg:{t["btn_fg"]};
+  --lb-num-fg:{t["num_fg"]}; --lb-btn-fg:{t["btn_fg"]}; --lb-muted:{t["muted"]};
+  /* Chip fills for the architecture diagram — the same tint the badges use. */
+  --lb-chip-teal:{tint(t["teal"], t["chip_bg"])};
+  --lb-chip-info:{tint(t["info"], t["chip_bg"])};
+  --lb-chip-warn:{tint(t["warn"], t["chip_bg"])};
+  --lb-chip-accent:{tint(t["accent"], t["chip_bg"])};
+  --lb-chip-muted:{tint(t["muted"], t["chip_bg"])};
+  --lb-chip-brand:{tint(BRAND, t["chip_bg"])};
+  --lb-chip-good:{tint(t["good"], t["chip_bg"])};
 }}
 
 /* ── type ──────────────────────────────────────────────────────────────── */

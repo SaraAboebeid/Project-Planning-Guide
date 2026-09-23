@@ -72,7 +72,7 @@ def _chart(ch: alt.Chart) -> None:
 
 
 def _map(df: pd.DataFrame, tooltip: str, key: str, height: int = 520,
-         radius: float = 6, max_points: int = 60000) -> None:
+         radius: float = 6, max_points: int = 60000, zoom: float | None = None) -> None:
     """Scatter map of lon/lat rows with an 'rgb' colour column (Carto basemap,
     no token needed). Large sets are sampled so the page stays responsive."""
     d = df.dropna(subset=["lon", "lat"])
@@ -84,7 +84,7 @@ def _map(df: pd.DataFrame, tooltip: str, key: str, height: int = 520,
         st.caption(f"Map shows a random sample of {max_points:,} of {len(df):,} rows; "
                    "the charts and table use all of them.")
     view = pdk.ViewState(latitude=float(d["lat"].median()), longitude=float(d["lon"].median()),
-                         zoom=11 if len(d) > 2000 else 12)
+                         zoom=zoom if zoom is not None else (11 if len(d) > 2000 else 12))
     layer = pdk.Layer("ScatterplotLayer", data=d, get_position=["lon", "lat"],
                       get_fill_color="rgb", get_radius=radius, radius_min_pixels=1.4,
                       radius_max_pixels=8, pickable=True, opacity=0.85)
@@ -415,6 +415,96 @@ def _boplats() -> pd.DataFrame:
         from apartments""")
 
 
+def _norm_addr(s: str) -> str:
+    """Street address in the form both datasets agree on: lowercase, single spaces,
+    without the trailing postcode Boplats sometimes appends."""
+    s = str(s or "").strip().lower()
+    s = re.sub(r"\s+", " ", s)
+    return re.sub(r"\s+\d{4}$", "", s)
+
+
+@st.cache_data(show_spinner="Placing rentals on the map…", ttl=600)
+def _boplats_located() -> pd.DataFrame:
+    """Boplats listings with the coordinates and energy class of the building they sit in.
+
+    Boplats publishes an address but no coordinates, so each listing is matched to a
+    building in the Gothenburg model by address — including every entrance in
+    ``all_addresses``, since one building often lists several. Listings that match no
+    building keep their row but have no lat/lon, and the page says how many.
+    """
+    df = _boplats()
+    b = load_buildings("frontend/public/buildings.json")
+    have = b.dropna(subset=["lat", "lon"])
+
+    lookup: dict[str, dict] = {}
+    for rec in have.to_dict("records"):
+        keys = {_norm_addr(rec.get("address"))}
+        keys.update(_norm_addr(a) for a in str(rec.get("all_addresses") or "").split("|"))
+        for k in keys:
+            # Keep the first match, but prefer one that carries an energy class.
+            if k and (k not in lookup or (rec.get("eclass") and not lookup[k].get("eclass"))):
+                lookup[k] = rec
+
+    hit = df["address"].map(lambda a: lookup.get(_norm_addr(a)))
+    return df.assign(
+        lat=hit.map(lambda r: r.get("lat") if r else np.nan),
+        lon=hit.map(lambda r: r.get("lon") if r else np.nan),
+        eclass=hit.map(lambda r: r.get("eclass") if r else None),
+        building_year=hit.map(lambda r: r.get("year") if r else np.nan),
+        building_kwh_m2=hit.map(lambda r: r.get("energy") if r else np.nan),
+    )
+
+
+# Rent-per-m² ramp: five quantile bins, low to high (ColorBrewer RdYlBu reversed).
+RENT_COLORS = ["#2C7BB6", "#ABD9E9", "#FFFFBF", "#FDAE61", "#D7191C"]
+
+
+def _boplats_map(df: pd.DataFrame) -> None:
+    """Map of rental listings, coloured by the building's energy class or by rent per m²."""
+    placed = df.dropna(subset=["lat", "lon"])
+    st.markdown("#### Where the rentals are")
+    if placed.empty:
+        st.info("No listing address matched a building in the model, so there is nothing to map.")
+        return
+
+    mode = st.radio("Colour by", ["Energy class", "Rent per m²"], horizontal=True,
+                    key="bop_map_mode", label_visibility="collapsed")
+
+    if mode == "Energy class":
+        rgb = [_hex_rgb(EPC_COLORS[c]) if c in EPC_COLORS else GREY for c in placed["eclass"]]
+        legend = [(c, EPC_COLORS[c]) for c in CLASSES if (placed["eclass"] == c).any()]
+        if placed["eclass"].isna().any():
+            legend.append(("no certificate", "#AAAAAA"))
+    else:
+        # A few listings record size 0, which makes rent/m² infinite — drop those to
+        # NaN so they colour as "no rent" instead of dragging the top bin to infinity.
+        rent_m2 = placed["rent_m2"].replace([np.inf, -np.inf], np.nan)
+        vals = rent_m2.dropna()
+        cuts = vals.quantile([0.2, 0.4, 0.6, 0.8]).tolist() if len(vals) else []
+        idx = rent_m2.map(lambda v: -1 if pd.isna(v) else sum(v > c for c in cuts))
+        rgb = [GREY if i < 0 else _hex_rgb(RENT_COLORS[i]) for i in idx]
+        edges = ([vals.min()] + cuts + [vals.max()]) if len(vals) else []
+        legend = [(f"{edges[i]:.0f}–{edges[i + 1]:.0f}", RENT_COLORS[i]) for i in range(len(edges) - 1)]
+        if (idx < 0).any():
+            legend.append(("no rent per m²", "#AAAAAA"))
+
+    d = placed.assign(
+        rgb=rgb,
+        rent_txt=placed["rent_sek"].map(lambda v: "–" if pd.isna(v) else f"{v:,.0f}"),
+        rent_m2_txt=placed["rent_m2"].map(lambda v: "–" if pd.isna(v) else f"{v:.0f}"),
+        class_txt=placed["eclass"].fillna("no certificate"),
+    )
+    # Rentals sit right across the municipality, so start wider than the default.
+    _map(d, "{address}\n{rent_txt} SEK/month · {rent_m2_txt} SEK/m² · class {class_txt}",
+         key="boplats_map", radius=45, zoom=10.2)
+    _legend(legend)
+    st.caption(
+        f"{len(placed):,} of {len(df):,} listings are placed — the other "
+        f"{len(df) - len(placed):,} have an address that matches no building in the model. "
+        "Energy class is the **building's** certificate, not the individual apartment's."
+    )
+
+
 def market_explorer() -> None:
     which = st.radio("Dataset", ["Booli — homes for sale", "Boplats — rental apartments"],
                      horizontal=True, key="mkt_which")
@@ -442,14 +532,17 @@ def market_explorer() -> None:
         show_dataframe_safe(df.drop(columns=["rgb", "price_txt"]))
         download_csv(df.drop(columns=["rgb", "price_txt"]), "booli.csv", "booli_dl")
     else:
-        df = _boplats()
-        source_line("boplats_apartments.db", note="scraped daily; see **4. Scraped Market Data**")
+        df = _boplats_located()
+        source_line("boplats_apartments.db", "frontend/public/buildings.json",
+                    note="rentals scraped daily (see **4. Scraped Market Data**), placed on "
+                         "the building model by address")
         df["rent_m2"] = df["rent_sek"] / df["size_m2"]
         m = st.columns(4)
         m[0].metric("Apartments", f"{len(df):,}")
         m[1].metric("Median rent", f"{df['rent_sek'].median():,.0f} SEK/month")
         m[2].metric("Median rent per m²", f"{df['rent_m2'].median():.0f} SEK/month")
         m[3].metric("Last seen", str(df["last_seen"].max())[:10])
+        _boplats_map(df)
         a, b = st.columns(2)
         with a:
             _chart(alt.Chart(df.dropna(subset=["size_m2", "rent_sek"]), title="Rent and size")

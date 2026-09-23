@@ -15,9 +15,10 @@ import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
 
 from logbook_content import NAV, PAGES  # noqa: E402
+from scripts.architecture import build_svg  # noqa: E402
 from scripts.ui_utils import REPO_ROOT, badge, inject_css, show_dataframe_safe  # noqa: E402
 
-st.set_page_config(page_title="Planning Guide Logbook", layout="wide")
+st.set_page_config(page_title="Renovation Planner Logbook", layout="wide")
 inject_css()
 
 # The landing hero borrows the renovation planner's arrival screen: a small
@@ -25,19 +26,18 @@ inject_css()
 st.markdown(
     """
     <div class="lb-landing">
-      <div class="lb-eyebrow" style="letter-spacing:0.22em;">Project Planning Guide</div>
+      <div class="lb-eyebrow" style="letter-spacing:0.22em;">Renovation Planner</div>
       <h1 class="lb-landing-title">Logbook</h1>
       <p class="lb-landing-sub">
-        A stage-by-stage record of how this decision-support tool is built: the data
+        A stage-by-stage record of how The Renovation Planner tool is built: the data
         it ingests, how that data is processed, how buildings are simulated, and how
-        renovation options are ranked and chosen. Each page exports itself as
-        Markdown, so the logbook doubles as a source for reports and appendices.
+        renovation options are ranked and chosen.
       </p>
       <div class="lb-landing-note">
-        <span>🧭</span>
-        <span>A continuation of <strong>DT4PED — Digital Twin for Positive Energy
-        Districts</strong>, upscaling that approach from a single district to national
-        and European level. See <strong>17. Project Team &amp; Credits</strong>.</span>
+        <span> </span>
+        <span>A continuation of <strong> Digital Twin for Positive Energy
+        Districts (DT4PED)</strong>, upscaling that approach from a single district to national
+        and European level. </span>
       </div>
     </div>
     <style>
@@ -115,8 +115,8 @@ st.markdown(
 st.subheader("Contents")
 st.caption(
     "Sweden and the United Kingdom are built by separate chains from different "
-    "sources, so the three topics where they differ — data sources, coverage "
-    "and pipelines — have a Sweden tab and a United Kingdom tab. Everything else "
+    "sources, so the three topics where they differ - data sources, coverage "
+    "and pipelines - have a Sweden tab and a United Kingdom tab. Everything else "
     "applies to both."
 )
 
@@ -148,6 +148,30 @@ for group, keys in NAV:
                     unsafe_allow_html=True,
                 )
     st.write("")
+
+st.divider()
+
+# ── architecture ─────────────────────────────────────────────────────────────
+# Inline SVG, not a picture: it follows bright and dark mode, stays searchable
+# text, and is edited by changing LAYERS in scripts/architecture.py.
+st.subheader("How it fits together")
+st.caption(
+    "The five steps across the top, then inputs on the left flowing to outputs "
+    "on the right, with every external service the tool calls banded underneath "
+    "— each marked with whether it needs an API key, and whether that key is "
+    "free or billed. The detail behind each box is on **14. Services, Keys & "
+    "Access** and **13. Analysis Inventory**. Scroll sideways to see it all."
+)
+st.markdown(
+    # The diagram is wider than a narrow window: it scrolls in its own box so
+    # the page never scrolls sideways.
+    f"<div class='lb-scroll' style='padding-bottom:6px'>{build_svg()}</div>",
+    unsafe_allow_html=True,
+)
+st.caption(
+    "Whether a key is free or billed is this diagram's own reading of each "
+    "provider's terms — the repository records only whether a key is needed."
+)
 
 st.divider()
 
