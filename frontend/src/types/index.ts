@@ -157,6 +157,18 @@ export interface BoverketResource {
   "Waste Factor": string | number;
 }
 
+/**
+ * Why the shoebox is not a fair model of this building (backend _model_scope).
+ * null/absent means it is. "out_of_scope" = the number answers a different
+ * question from the meter (pools, hospitals, industry); "caution" = part of the
+ * picture is missing (workshops, unheated stores).
+ */
+export interface ModelScope {
+  level: "out_of_scope" | "caution";
+  reason: string;
+  matched?: string | null;
+}
+
 /** Nearest EUBUCCO building returned by /api/building */
 export interface BuildingLookup {
   address: string | null;
@@ -170,6 +182,7 @@ export interface BuildingLookup {
   roof_area_m2: number | null;     // alias of footprint_m2
   floor_area_m2: number | null;    // alias of footprint_m2
   use_cat: string | null;
+  model_scope?: ModelScope | null;
   year: number | null;
   energy: number | null;        // kWh/m²/yr
   eclass: string | null;

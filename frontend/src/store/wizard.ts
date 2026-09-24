@@ -49,6 +49,9 @@ export interface RenovationBaselineResult {
   dwellings?: number | null;
   heatedAreaM2?: number | null;
   heatingSystem?: string | null;
+  /** Set when the shoebox is not a fair model of this building (pools,
+   *  hospitals, industry) - see backend _model_scope and ModelScopeNotice. */
+  modelScope?: { level: "out_of_scope" | "caution"; reason: string; matched?: string | null } | null;
 }
 
 export interface RenovationPackageResult {
@@ -223,6 +226,14 @@ interface ProjectState {
      Only a lightweight summary is persisted (images stay in-component memory to keep
      sessionStorage small). */
   facadeDefects: Record<string, FacadeDefectSummary>;
+  /* Step 2 — glazed share of each facade, read from that facade's photo by the
+     vision model and carried into the Step 3 baseline simulation. Keyed the same
+     way as facadeDefects (see makeBuildingKeys), then by orientation. Fractions,
+     not percentages. A direction with no photo simply keeps the model's default,
+     so a partly photographed building is still better off than an unphotographed one. */
+  facadeWwr: Record<string, Partial<Record<FacadeOrientation, {
+    wwr: number; confidence: string; source?: string; at: string;
+  }>>>;
     /* Step 2 — prioritized shortlist carried to Step 3 baseline preselection.
       Indices are relative to the Step-2 active building list order. */
     prioritizedBuildingIndices: number[];
@@ -283,6 +294,14 @@ export interface FacadeDefectSummary {
   defectCount: number;
   byClass: Record<string, number>;   // e.g. { crack: 3, corrosion: 1 }
   checkedAt: string;                  // ISO timestamp
+  /** True when every analysed photo came from Street View rather than an upload.
+   *  "No defects" from a street shot is weaker evidence than from a close-up, so
+   *  the prioritisation scores it with lower confidence (retrofitPriority.ts). */
+  streetviewOnly?: boolean;
+  /** Every photo was street imagery too coarse to show a defect (see
+   *  FacadeDefectPanel.LOW_DETAIL_MM_PER_PX). A clean result from such a photo
+   *  is not evidence, so prioritisation does not count it as an inspection. */
+  lowDetail?: boolean;
   /** Per-facade breakdown; absent on summaries written before orientations existed. */
   byOrientation?: Partial<Record<FacadeOrientation, FacadeOrientationSummary>>;
   /** Analysed photos, for the Step 5 report. Boxes only - no image data. */
@@ -349,7 +368,7 @@ const DEFAULT_PROJECT: ProjectState = {
   renovationBaselineResults: [],
   baselineBatchId: null,
   renovationSimResults: [],
-  facadeDefects: {},
+  facadeDefects: {}, facadeWwr: {},
   prioritizedBuildingIndices: [],
   prioritizedBuildingCount: 0,
   regretAnalysis: null,
@@ -369,7 +388,7 @@ export const LOCATION_SCOPED_RESET: Partial<ProjectState> = {
   savedWWR: null, simulationMaterials: {}, renovationPackages: [], selectedPackageId: null,
   renovationCalcPackages: [], supplementaryData: {},
   baselineStatus: "idle", renovationBaselineResults: [], baselineBatchId: null,
-  renovationSimResults: [], facadeDefects: {},
+  renovationSimResults: [], facadeDefects: {}, facadeWwr: {},
   prioritizedBuildingIndices: [], prioritizedBuildingCount: 0,
   regretAnalysis: null, selectedPackageByBuilding: {}, heatingAnalysis: null,
 };

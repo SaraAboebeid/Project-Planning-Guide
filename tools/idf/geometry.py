@@ -71,6 +71,23 @@ def edge_length(p0: Point2D, p1: Point2D) -> float:
     return math.hypot(p1[0] - p0[0], p1[1] - p0[1])
 
 
+def wall_azimuth(p0: Point2D, p1: Point2D) -> float:
+    """Compass bearing the wall FACES, in degrees (0 = north, 90 = east).
+
+    The ring is counter-clockwise with the interior on the left (ensure_ccw), so
+    the outward normal of the edge p0 -> p1 is the edge vector turned clockwise:
+    (dy, -dx) in this east/north frame. Lets a caller give each facade its own
+    glazing ratio, shading or photo.
+    """
+    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+    return math.degrees(math.atan2(dy, -dx)) % 360.0
+
+
+def compass_octant(azimuth: float) -> str:
+    """Nearest cardinal direction ("north"/"east"/"south"/"west") for a bearing."""
+    return ("north", "east", "south", "west")[int(((azimuth + 45.0) % 360.0) // 90.0)]
+
+
 def wall_vertices(p0: Point2D, p1: Point2D, zmin: float, zmax: float) -> list[Point3D]:
     x0, y0 = p0
     x1, y1 = p1

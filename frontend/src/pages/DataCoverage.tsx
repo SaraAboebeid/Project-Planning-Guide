@@ -6,6 +6,7 @@ import { setWizardCanNext, setWizardNextError } from "../components/wizardNav";
 import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import FacadeDefectPanel, { type FacadeBuilding } from "../components/FacadeDefectPanel";
 import RetrofitPriorityPanel from "../components/RetrofitPriorityPanel";
+import ModelScopeNotice from "../components/ModelScopeNotice";
 import { makeBuildingKeys, type PriorityInput } from "../utils/retrofitPriority";
 import {
   ChevronUp, ChevronDown,
@@ -1994,6 +1995,13 @@ function BuildingDataBanner({
             </div>
             <ImportFormatGuide />
           </div>
+        </div>
+      )}
+
+      {/* Before any of this building's numbers: whether the model fits it at all */}
+      {building.model_scope && (
+        <div className="px-3 pt-3">
+          <ModelScopeNotice scope={building.model_scope} />
         </div>
       )}
 

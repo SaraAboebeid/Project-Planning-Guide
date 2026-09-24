@@ -47,7 +47,21 @@ interface ImgEntry {
   result: FacadeDetectResponse | null; error: string | null; ms: number | null;
   /** Set once the annotated render has been persisted for the Step 5 report. */
   savedUrl: string | null;
+  /** How much wall one pixel covers, for Street View captures. Decides whether
+   *  "nothing found" is worth anything - see LOW_DETAIL_MM_PER_PX. */
+  mmPerPx?: number | null;
 }
+
+/**
+ * Coarser than this and a clean result means little: the wall is there, but a
+ * crack narrower than a few pixels cannot appear in the image at all. Measured
+ * on Rotherham captures - the vision model found a crack and a damp patch on a
+ * wall imaged at 21 mm/px, and nothing on walls at 49 and 65 mm/px, which are
+ * long facades only one distant, sharply angled panorama could see. Hairline
+ * cracking needs roughly 2 mm/px, which street imagery never reaches, so this
+ * threshold marks "worth looking at", not "good enough for a survey".
+ */
+const LOW_DETAIL_MM_PER_PX = 35;
 
 let _uid = 0;
 /** Also the persisted filename, so keep it inside the backend's [A-Za-z0-9_-] rule. */
@@ -403,11 +417,46 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
     const summary: FacadeDefectSummary = {
       label: buildings.find(b => b.key === key)?.label,
       imageCount: done.length, defectCount, byClass,
+      // Where the evidence came from. A clean result from street imagery alone
+      // is weaker than one from uploaded close-ups, and the prioritisation
+      // scores it with lower confidence rather than as a clean bill of health.
+      streetviewOnly: done.length > 0 && done.every(e => e.source === "streetview"),
+      // Best detail any photo achieved. If even the best is too coarse to show a
+      // defect, "nothing found" says nothing about the wall.
+      lowDetail: done.length > 0 && done.every(
+        e => e.source === "streetview" && (e.mmPerPx ?? 0) > LOW_DETAIL_MM_PER_PX),
       checkedAt: new Date().toISOString(), byOrientation, photos,
     };
     const next = { ...(project.facadeDefects ?? {}) };
     if (done.length === 0) delete next[key]; else next[key] = summary;
     setProject({ facadeDefects: next });
+  };
+
+  /**
+   * Read the glazed share of one facade from its photo and keep it for Step 3.
+   *
+   * Once per building per direction: a second photo of the same wall would cost
+   * another vision call to re-measure something we already have. The ratio goes
+   * into the baseline simulation per facade, which matters for solar gain as
+   * much as for heat loss - the same glass area costs noticeably more heating on
+   * a north wall than on a south one.
+   */
+  const estimateWwrFor = async (b: FacadeBuilding, orientation: FacadeOrientation, blob: Blob) => {
+    if (project.facadeWwr?.[b.key]?.[orientation]) return;
+    try {
+      const res = await api.estimateWwr(blob, orientation, { address: b.label });
+      const pct = Number(res?.wwr);
+      if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) return;   // reject a nonsense reading
+      const store = useWizardStore.getState();
+      const all = { ...(store.project.facadeWwr ?? {}) };
+      all[b.key] = {
+        ...(all[b.key] ?? {}),
+        [orientation]: { wwr: pct / 100, confidence: res.confidence ?? "unknown", source: res.source, at: new Date().toISOString() },
+      };
+      store.setProject({ facadeWwr: all });
+    } catch {
+      // Glazing is a bonus on top of the defect check; never fail the photo for it.
+    }
   };
 
   const runDetection = async (key: string, id: string, blob: Blob) => {
@@ -497,6 +546,10 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
       };
       setImages(key, prev => [...prev, entry]);
       void runDetection(key, entry.id, blob);
+      // An uploaded photo is the best look at this wall we will get, so read its
+      // glazing too (the first upload per facade; see estimateWwrFor).
+      const b = buildings.find(x => x.key === key);
+      if (b) void estimateWwrFor(b, orientation, blob);
     }
   };
 
@@ -526,10 +579,14 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
             : " · close-up (no square-on view)"),
         url: URL.createObjectURL(blob), blob, orientation, source: "streetview",
         status: "idle", result: null, error: null, ms: null, savedUrl: null,
+        mmPerPx: res.mm_per_px,
       };
       setImages(b.key, prev => [...prev, entry]);
       setSvSlots(prev => ({ ...prev, [slotKey]: { busy: false, error: null } }));
       void runDetection(b.key, entry.id, blob);
+      // Only from a capture that can actually show the windows; a coarse photo
+      // would have the vision model guessing from the building type instead.
+      if ((res.mm_per_px ?? 0) <= LOW_DETAIL_MM_PER_PX) void estimateWwrFor(b, orientation, blob);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setSvSlots(prev => ({ ...prev, [slotKey]: { busy: false, error: msg } }));

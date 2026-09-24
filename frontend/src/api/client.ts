@@ -161,6 +161,8 @@ export const api = {
   simulationSubmit: (body: {
     lat: number; lon: number; address?: string | null; country: string; city_id?: string;
     building: Record<string, unknown>; wwr_override?: number;
+    /** Glazed share per facade ("north"/"east"/"south"/"west"), as fractions. */
+    wwr_by_orientation?: Record<string, number>;
     u_wall_override?: number; u_roof_override?: number; u_win_override?: number; u_floor_override?: number;
     package_id?: string; package_label?: string | null;
   }) => post<{ simulation_id: string; task_id: string; status: string }>("/simulation-submit", body),
@@ -233,7 +235,11 @@ export const api = {
    * batch_id) - see backend's /api/simulation-batch-submit. */
   simulationBatchSubmit: (body: {
     country: string; city_id?: string;
-    buildings: Array<{ lat: number; lon: number; address?: string | null; building?: Record<string, unknown> }>;
+    buildings: Array<{
+      lat: number; lon: number; address?: string | null; building?: Record<string, unknown>;
+      /** This building's own glazed share per facade, as fractions. */
+      wwr_by_orientation?: Record<string, number>;
+    }>;
     wwr_override?: number;
     u_wall_override?: number; u_roof_override?: number; u_win_override?: number; u_floor_override?: number;
     package_id?: string; package_label?: string | null;
@@ -262,6 +268,8 @@ export const api = {
           gas_kwh?: number | null; dhw_gas_kwh?: number | null; total_gas_kwh?: number | null;
           pumps_kwh?: number; dwellings?: number;
           gas_kwh_per_dwelling?: number | null; total_kwh_per_dwelling?: number;
+          /** Set when the shoebox is not a fair model of this building (backend _model_scope). */
+          model_scope?: { level: "out_of_scope" | "caution"; reason: string; matched?: string | null } | null;
         } | null;
         error: string | null;
       }>;
@@ -287,6 +295,20 @@ export const api = {
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.detail) throw new Error(d.detail || `Vision model error (${res.status})`);
     return d as FacadeDetectResponse;
+  },
+
+  /* ── Window-to-wall ratio from one facade photo (vision model) ──
+     Returns the glazed share of THAT wall, so each facade can carry its own
+     ratio into the energy model instead of one average around the building. */
+  estimateWwr: async (blob: Blob, direction: string, buildingInfo?: Record<string, unknown>)
+    : Promise<{ wwr: number; confidence: string; notes?: string; source?: string }> => {
+    const b64 = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(",")[1] ?? "");
+      r.onerror = () => reject(new Error("could not read the image"));
+      r.readAsDataURL(blob);
+    });
+    return post("/estimate-wwr", { image_base64: b64, direction, building_info: buildingInfo ?? null });
   },
 
   /* ── Street View capture of one facade — backend aims at the real wall ── */

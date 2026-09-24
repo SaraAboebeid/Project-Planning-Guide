@@ -8,6 +8,8 @@ import {
 } from "recharts";
 import { Building2, Zap, Loader2, BarChart2, Thermometer, Droplets, Download, Lightbulb, Cpu } from "lucide-react";
 import BaselineLoadProfile from "../components/BaselineLoadProfile";
+import ModelScopeNotice from "../components/ModelScopeNotice";
+import { makeBuildingKeys } from "../utils/retrofitPriority";
 
 const END_USE_COLORS = {
   heating: "#E2483B",
@@ -132,6 +134,8 @@ export default function BaselineSetup() {
     () => buildings.filter((_, i) => effectiveSelected.has(i)),
     [buildings, effectiveSelected],
   );
+  /** Same keys the Step 2 façade panel stored its photos and glazing under. */
+  const runKeys = useMemo(() => makeBuildingKeys(runList), [runList]);
 
   function applySelection(nextSet: Set<number>, mode: "step2" | "all" | "custom") {
     setSelected(nextSet);
@@ -266,7 +270,20 @@ export default function BaselineSetup() {
         // Sweden needs an explicit city_id (only "gothenburg" is mapped); UK omits
         // it and the server resolves the nearest district from lat/lon.
         ...(isUK ? {} : { city_id: "gothenburg" }),
-        buildings: runList.map((b) => ({ lat: b.lat, lon: b.lon, address: b.address })),
+        // Each building carries the glazing ratios read from its own facade
+        // photos in Step 2 (utils/retrofitPriority.makeBuildingKeys gives the
+        // same key the facade panel wrote them under). Facades with no photo are
+        // simply absent, and keep the model's default ratio.
+        buildings: runList.map((b, i) => {
+          const measured = project.facadeWwr?.[runKeys[i]!];
+          const byOrientation = Object.fromEntries(
+            Object.entries(measured ?? {}).map(([dir, v]) => [dir, v!.wwr]),
+          );
+          return {
+            lat: b.lat, lon: b.lon, address: b.address,
+            ...(Object.keys(byOrientation).length ? { wwr_by_orientation: byOrientation } : {}),
+          };
+        }),
         package_id: "baseline",
       });
 
@@ -314,6 +331,9 @@ export default function BaselineSetup() {
               dwellings: r?.dwellings ?? null,
               heatedAreaM2: r?.total_floor_area_m2 ?? null,
               heatingSystem: r?.heating_system ?? null,
+              // Carried from the backend so the caveat stays attached to the
+              // number wherever it is shown (pools, hospitals, industry).
+              modelScope: r?.model_scope ?? src?.model_scope ?? null,
             };
           });
           setProject({ baselineStatus: "done", renovationBaselineResults: mapped, baselineBatchId: batch_id });
@@ -639,6 +659,23 @@ export default function BaselineSetup() {
                     {results.map((r) => <option key={r.address} value={r.address}>{r.address}</option>)}
                   </select>
                 </div>
+              )}
+
+              {/* Above the chart: whether these numbers mean anything for this building */}
+              {resultView === "building" && activeBuildingResult?.modelScope && (
+                <ModelScopeNotice scope={activeBuildingResult.modelScope} />
+              )}
+              {resultView === "all" && results.some((r) => r.modelScope?.level === "out_of_scope") && (
+                <ModelScopeNotice
+                  scope={{
+                    level: "out_of_scope",
+                    reason:
+                      `${results.filter((r) => r.modelScope?.level === "out_of_scope").length} of ${results.length} ` +
+                      "buildings in this comparison are types the model cannot represent " +
+                      "(swimming pools, hospitals, industrial process buildings). Select them " +
+                      "individually to see which.",
+                  }}
+                />
               )}
 
               {/* Row pitch drives the panel height, so it shrinks with the bars

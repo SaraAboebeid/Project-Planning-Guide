@@ -332,6 +332,53 @@ def get_uk_building(lat: float = Query(...), lon: float = Query(...), city_id: s
     return _uk_building_response(best, footprint, perimeter_m, wall_area_m2, c_lat, c_lon, best_dist)
 
 
+# ── what the shoebox is not a fair model of ──────────────────────────────────
+# One thermal zone with generic internal gains, a heating setpoint and no
+# process equipment cannot represent a pool's evaporation and water heating, a
+# hospital's round-the-clock clinical plant, or a factory's process heat. This
+# is not a loss of accuracy to be reported with a wide error bar: the model is
+# answering a different question from the meter.
+#
+# Measured, not assumed. Against Rotherham's Display Energy Certificates
+# (tools/uk/validate_rotherham_dec.py) the pool buildings simulated at 0.16,
+# 0.28 and 0.98 of their metered heat and the hospital at 0.17, while the
+# schools the model IS built for came out at 1.03 (n=43).
+_SCOPE_BY_TYPE = [
+    (("swimming pool",), "out_of_scope",
+     "pool water heating and evaporation dominate the energy use and are not modelled"),
+    (("hospital", "clinical and research"), "out_of_scope",
+     "clinical plant, continuous operation and medical equipment dominate and are not modelled"),
+    (("laboratory", "ice rink", "data cent"), "out_of_scope",
+     "process and equipment loads dominate and are not modelled"),
+    (("workshop",), "caution",
+     "workshop process loads are not modelled, so the envelope figure is only part of the picture"),
+]
+_SCOPE_BY_USE = {
+    "industri": ("out_of_scope",
+                 "process loads rather than the envelope usually dominate an industrial building"),
+    "komplement": ("caution",
+                   "garages, stores and similar are often unheated, so a heating model may not apply"),
+}
+
+
+def _model_scope(b: dict) -> Optional[dict]:
+    """None when the shoebox is a fair model of this building, else why it is not.
+
+    Callers should show the reason instead of presenting the simulated number as
+    an estimate of what the building actually uses.
+    """
+    haystack = " ".join(str(b.get(f) or "") for f in
+                        ("dec_property_type", "nd_property_type", "property_type", "dec_name")).lower()
+    for needles, level, reason in _SCOPE_BY_TYPE:
+        hit = next((n for n in needles if n in haystack), None)
+        if hit:
+            return {"level": level, "reason": reason, "matched": hit}
+    by_use = _SCOPE_BY_USE.get(b.get("use_cat") or "")
+    if by_use:
+        return {"level": by_use[0], "reason": by_use[1], "matched": b.get("use_cat")}
+    return None
+
+
 def _uk_building_response(best: dict, footprint, perimeter_m, wall_area_m2, c_lat, c_lon, dist_m) -> dict:
     height_val = best.get("height")
     # EPC "energy_consumption_current" is the certificate's primary-energy
@@ -355,6 +402,8 @@ def _uk_building_response(best: dict, footprint, perimeter_m, wall_area_m2, c_la
         "roof_area_m2":  _clean(footprint),
         "floor_area_m2": _clean(footprint),
         "use_cat":       best.get("use_cat"),
+        # null when the shoebox is a fair model; otherwise {level, reason, matched}
+        "model_scope":   _model_scope(best),
         "year":          _clean(best.get("year")),
         "year_source":   best.get("year_source"),
         "energy":        epc_energy if epc_energy is not None else _clean(best.get("tabula_kwh_m2_yr")),
@@ -856,6 +905,8 @@ def get_building(lat: float = Query(...), lon: float = Query(...)):
         "roof_area_m2":  _clean(footprint),
         "floor_area_m2": _clean(footprint),
         "use_cat":       best.get("use_cat"),
+        # null when the shoebox is a fair model; otherwise {level, reason, matched}
+        "model_scope":   _model_scope(best),
         "year":          _clean(best.get("year")),
         "energy":        _clean(best.get("energy")),    # kWh/m²/yr
         "eclass":        best.get("eclass"),
@@ -2951,7 +3002,18 @@ def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], bu
     footprint = building_info.get("footprint_m2") or footprint_from_epsm or 1.0
     # Same area the shoebox was built with: the heated area when the record has
     # one (UK - generate_idf scales the footprint to it), else footprint x floors.
-    total_floor_area = float(building_info.get("heated_area_m2") or float(footprint) * floors)
+    # UK blocks of flats are the exception - they are simulated at gross area
+    # because the certified areas leave out the communal stairs and corridors
+    # inside the same envelope (see generate_idf). This must track that choice,
+    # or every per-m2 and per-home figure is divided by an area the simulation
+    # never used.
+    # heated_area_m2 is a UK-only field (Swedish records carry none), so its
+    # presence is what identifies the UK case here - building_info does not
+    # always carry a country.
+    heated_area = building_info.get("heated_area_m2")
+    if building_info.get("use_cat") == "bostad_flerfamilj":
+        heated_area = None
+    total_floor_area = float(heated_area or float(footprint) * floors)
 
     def _kwh(category: str) -> float:
         return float((energy_use.get(category) or {}).get("total") or 0.0)
@@ -3012,6 +3074,9 @@ def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], bu
         "equipment_kwh_m2_yr": _per_m2(equipment_kwh),
         "dhw_kwh_m2_yr": _per_m2(dhw_kwh),
         "total_kwh_m2_yr": _per_m2(total_kwh),
+        # Travels with the numbers on purpose: a result that leaves the backend
+        # without its caveat gets quoted without it (null when the model fits).
+        "model_scope": _model_scope(building_info),
         # UK: homes inside the footprint (OS Open UPRN address count, see
         # tools/uk/anchor_epc_uprn.py) - OSM often draws a semi pair or a terrace
         # row as one polygon, so per-home figures are what compare to one meter.
@@ -3085,6 +3150,8 @@ class SimulationSubmitRequest(BaseModel):
     u_roof_override: Optional[float] = None
     u_win_override: Optional[float] = None
     u_floor_override: Optional[float] = None
+    # Per-facade glazing ratio; see BatchBuildingSpec.wwr_by_orientation.
+    wwr_by_orientation: Optional[dict[str, float]] = None
     # Distinguishes multiple simulations at the SAME building location (the
     # renovation-package calculator runs baseline + N packages per building).
     # Defaults to "baseline" so existing callers (viewer/js/energy_sim.js,
@@ -3101,6 +3168,10 @@ class BatchBuildingSpec(BaseModel):
     lon: float
     address: Optional[str] = None
     building: Optional[dict[str, Any]] = None
+    # Glazing ratio measured per facade (keys "north"/"east"/"south"/"west",
+    # fractions). Per building, because it comes from that building's own facade
+    # photos. Directions not supplied keep the shared/default ratio.
+    wwr_by_orientation: Optional[dict[str, float]] = None
 
 
 class SimulationBatchSubmitRequest(BaseModel):
@@ -3158,6 +3229,7 @@ async def submit_simulation(req: SimulationSubmitRequest):
         idf_text = build_shoebox_idf(
             building, req.country, city_id, str(epw_path),
             wwr_override=req.wwr_override, building_name=req.address,
+            wwr_by_orientation=req.wwr_by_orientation,
             heating_system=_heating_system_for(building, req.country, req.heating_system),
             **_envelope_overrides(building, req.country, req),
         )
@@ -3298,7 +3370,8 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
             if not candidates:
                 raise HTTPException(404, f"No building with real geometry found near building {i} ({b.lat}, {b.lon})")
             building = min(candidates, key=_dist)
-        resolved.append({"lat": b.lat, "lon": b.lon, "address": b.address, "building": building})
+        resolved.append({"lat": b.lat, "lon": b.lon, "address": b.address, "building": building,
+                         "wwr_by_orientation": b.wwr_by_orientation})
 
     idf_payload: list[tuple[str, bytes, str]] = []
     for i, rb in enumerate(resolved):
@@ -3306,6 +3379,9 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
             idf_text = build_shoebox_idf(
                 rb["building"], req.country, city_id, str(epw_path),
                 wwr_override=req.wwr_override, building_name=rb["address"] or f"Building {i}",
+                # This building's own measured facades; the request-level
+                # wwr_override still covers any direction it does not name.
+                wwr_by_orientation=rb["wwr_by_orientation"],
                 heating_system=_heating_system_for(rb["building"], req.country, req.heating_system),
                 **_envelope_overrides(rb["building"], req.country, req),
             )
@@ -5439,6 +5515,12 @@ async def streetview_facade(
             segs = await asyncio.to_thread(assign_columns, cameras, target_lat, target_lon,
                                            normal, width_m)
             if segs:
+                # Scale of the stitched wall: the coarsest segment, so no part of
+                # the image claims detail Street View never delivered. Where that
+                # lands badly - a long wall visible only from one distant, sharply
+                # angled panorama - the honest answer is a coarse image plus the
+                # mm_per_px that says so, NOT an upsampled one that looks sharper
+                # than the data. Callers decide what is good enough to inspect.
                 m_per_px = max(max(s["gsd"] for s in segs), width_m / 2600.0, wall_h / 1600.0)
                 total_w = max(1, round(width_m / m_per_px))
                 parts, tiles_used, dates = [], 0, []
@@ -5497,13 +5579,31 @@ async def streetview_facade(
         # 40 deg - heavy keystoning and ~30% coarser mm/px, for no extra detections.
         # "fit" is for an overview shot. Explicit values always win.
         fit = framing == "fit"
+        # Both framings now AIM at the middle of the wall's height rather than a
+        # fixed 12 deg. A fixed angle is right only at one height-and-distance
+        # combination: measured on Rotherham and Gothenburg captures it put
+        # roughly half the frame into the sky for a low block seen from across a
+        # road, and filled the whole frame with blank brickwork for a two-storey
+        # house seen from close up. Either way the detector was handed very
+        # little facade, which is the likeliest reason street captures return
+        # nothing while close-up uploads score normally.
         if pitch is None:
             pitch = (max(0.0, min(30.0, degrees(atan2(height_m / 2 - _SV_CAMERA_HEIGHT_M, dist))))
-                     if fit and height_m else 12.0)
+                     if height_m else 12.0)
         if fov is None:
-            spans = [s for s in (width_m and width_m * cos(radians(off)), height_m) if s]
-            fov = (max(20.0, min(90.0, 1.15 * degrees(2 * atan(max(spans) / 2 / dist))))
-                   if fit and spans else 30.0)
+            if fit:
+                # Overview: fit the whole wall, width included.
+                spans = [s for s in (width_m and width_m * cos(radians(off)), height_m) if s]
+                fov = (max(20.0, min(90.0, 1.15 * degrees(2 * atan(max(spans) / 2 / dist))))
+                       if spans else 30.0)
+            elif height_m:
+                # Detail: fill the frame with the building's HEIGHT (plus a small
+                # margin), so the wall occupies the picture without dragging in
+                # sky and gardens. Stays narrow, so mm/px stays fine enough for
+                # the model, which keeps ~80% of its detections at this size.
+                fov = max(18.0, min(60.0, 1.25 * degrees(2 * atan(height_m / 2 / dist))))
+            else:
+                fov = 30.0
         pitch, fov = round(pitch, 1), round(fov, 1)
 
         # Sweep the tiles across the facade, centred on the aim, so N narrow crops

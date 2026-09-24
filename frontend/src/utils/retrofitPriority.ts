@@ -108,10 +108,28 @@ function scoreFacade(summary: FacadeDefectSummary | undefined): SubScore {
     for (const [k, c] of Object.entries(summary.byClass)) load += (DEFECT_SEVERITY[k] ?? 0.75) * c;
     // Saturating curve: a handful of severe defects already means "bad".
     const value = (1 - Math.exp(-load / 4)) * 100;
-    const note = summary.defectCount > 0
-      ? `${summary.defectCount} defect${summary.defectCount === 1 ? "" : "s"} in ${summary.imageCount} photo${summary.imageCount === 1 ? "" : "s"}`
-      : `inspected — no defects (${summary.imageCount} photo${summary.imageCount === 1 ? "" : "s"})`;
-    return { value, confidence: 1, note, available: true };
+    const photos = `${summary.imageCount} photo${summary.imageCount === 1 ? "" : "s"}`;
+    if (summary.defectCount > 0) {
+      return { value, confidence: 1, note: `${summary.defectCount} defect${summary.defectCount === 1 ? "" : "s"} in ${photos}`, available: true };
+    }
+    // "Nothing found" is only as strong as the photo it was found in. Street
+    // imagery is shot from the road, so fine cracking is not resolvable, and
+    // where the only panorama is distant and sharply angled the wall arrives too
+    // coarse to show anything at all. A clean result from such a photo is not
+    // evidence: drop it back to "not inspected" so the other criteria carry the
+    // score, rather than crediting the building with a sound facade.
+    if (summary.lowDetail === true) {
+      return { value: 0, confidence: 0, available: false,
+               note: "street imagery too coarse to judge — upload a photo" };
+    }
+    const streetOnly = summary.streetviewOnly === true;
+    return {
+      value, available: true,
+      confidence: streetOnly ? 0.4 : 1,
+      note: streetOnly
+        ? `no defects seen, but from street imagery only (${photos}) — upload close-ups to confirm`
+        : `inspected — no defects (${photos})`,
+    };
   }
   return { value: 0, confidence: 0, note: "not inspected — add façade photos", available: false };
 }

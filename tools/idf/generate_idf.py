@@ -222,6 +222,7 @@ def build_shoebox_idf(
     u_floor_override: Optional[float] = None,
     heating_system: str = "ideal",
     boiler_efficiency: Optional[float] = None,
+    wwr_by_orientation: Optional[dict[str, float]] = None,
 ) -> str:
     """Return a complete EnergyPlus 23.2 IDF (as text) for one building.
 
@@ -230,6 +231,14 @@ def build_shoebox_idf(
     without needing a copy of the building dict - each override takes
     priority over the building's own tabula_u_* field, same pattern as the
     existing wwr_override.
+
+    ``wwr_by_orientation`` gives each facade its own glazing ratio, keyed
+    "north"/"east"/"south"/"west" (fractions, not percentages). A wall takes the
+    value for the direction it faces, and falls back to wwr_override or the
+    use-category default for any direction not supplied. This matters for more
+    than heat loss: which side the glass is on decides how much winter sun the
+    building actually collects, and a single average ratio spreads a south
+    elevation's glazing evenly around all four sides.
     """
     ring = building["coordinates"][0]
     ring2d = G.ensure_ccw(G.project_ring(ring))
@@ -245,8 +254,22 @@ def build_shoebox_idf(
     # floors equals the heated area, so walls, roof, glazing, gains and air
     # volume all describe the same heated building. Records without one
     # (Sweden) are simulated at footprint x floors as before.
+    #
+    # EXCEPT a block of flats, which is simulated at its GROSS area (footprint x
+    # floors). The certified areas cover the flats only: in Rotherham blocks
+    # where every dwelling holds a certificate, they sum to 0.68 of gross against
+    # 0.77 for houses, and the missing tenth is the stairs, landings and
+    # corridors that belong to no flat and appear in no certificate. Scaling the
+    # block down to the certified area models a smaller building with less
+    # envelope than the one that is really standing there. Measured against DESNZ
+    # metered gas on 60 blocks (tools/uk/experiment_flats_area.py), simulating
+    # the gross envelope cut the mean absolute log error from 0.66 to 0.41 and
+    # tightened the interquartile ratio from 0.49-1.40 to 0.68-1.14.
     area_scale = 1.0
     heated = building.get("heated_area_m2")
+    if (building.get("use_cat") == "bostad_flerfamilj"
+            and (country or "").lower() == "gb" and footprint_m2 > 0):
+        heated = None
     if heated and footprint_m2 > 0:
         area_scale = max(0.1, min(2.0, (float(heated) / floors) / footprint_m2))
         lin = math.sqrt(area_scale)
@@ -385,6 +408,7 @@ def build_shoebox_idf(
     n_edges = len(ring2d)
     window_count = 0
     party_walls = 0
+    wwr_by_facing: dict[str, float] = {}   # what each facade actually got, for the trace
     for i in range(n_edges):
         p0, p1 = ring2d[i], ring2d[(i + 1) % n_edges]
         width = G.edge_length(p0, p1)
@@ -409,7 +433,16 @@ def build_shoebox_idf(
             (None, "View Factor to Ground"),
         ] + _vertex_fields(G.wall_vertices(p0, p1, 0.0, height))))
 
-        win = G.window_geometry_for_wwr(width, height, wwr)
+        # This wall's own glazing ratio when the caller measured one for the
+        # direction it faces (e.g. from a facade photo); otherwise the shared value.
+        wall_wwr = wwr
+        if wwr_by_orientation:
+            facing = G.compass_octant(G.wall_azimuth(p0, p1))
+            measured = wwr_by_orientation.get(facing)
+            if measured is not None:
+                wall_wwr = max(0.02, min(0.9, float(measured)))
+                wwr_by_facing[facing] = wall_wwr
+        win = G.window_geometry_for_wwr(width, height, wall_wwr)
         if win is not None:
             sill, head, win_width = win
             window_count += 1
@@ -439,7 +472,14 @@ def build_shoebox_idf(
         # Poor-fabric homes are heated cooler than the SAP pattern assumes (the
         # prebound effect; see defaults.UK_PREBOUND_SETPOINT_DROP_K). The drop
         # applies to the heating periods only - the frost setback stays put.
-        drop = D.UK_PREBOUND_SETPOINT_DROP_K if uninsulated_wall else 0.0
+        #
+        # HOUSES ONLY. The drop was fitted on gas-heated houses, and applying it
+        # to flats extrapolates past its calibration sample: a flat has party
+        # walls on most sides, so its wall state says much less about how much
+        # heat it needs, and against metered gas the drop over-corrected them
+        # (solid-wall flats fell to 0.56x metered). Flats keep the fabric factor,
+        # which is a measurement, and not the behavioural one, which is a fit.
+        drop = D.UK_PREBOUND_SETPOINT_DROP_K if (uninsulated_wall and use_cat == "bostad_enfamilj") else 0.0
         cooler = lambda pat: [(t, round(v - drop, 1) if v > D.UK_SAP_SETBACK_C else v) for t, v in pat]
         objects.append(_schedule_compact_week(f"{zone_name} Heating Setpoint Schedule", "Temperature",
                                               cooler(D.UK_SAP_WEEKDAY_HEATING), cooler(D.UK_SAP_WEEKEND_HEATING)))
@@ -571,6 +611,9 @@ def build_shoebox_idf(
         "building_name": name_base, "country": country, "city_id": city_id,
         "floors": floors, "footprint_m2": round(footprint_m2, 1), "total_floor_area_m2": round(total_floor_area, 1),
         "height_m": height, "use_cat": use_cat, "wwr": round(wwr, 3), "window_count": window_count,
+        # Which facades were given a measured ratio, and what each one got. Empty
+        # when every wall used the same value.
+        "wwr_by_orientation": {k: round(v, 3) for k, v in sorted(wwr_by_facing.items())},
         "u_wall": round(u_wall, 3), "u_roof": round(u_roof, 3), "u_win": round(u_win, 3),
         "dhw_kwh_m2_yr": dhw_kwh_m2,
         "party_walls": party_walls,

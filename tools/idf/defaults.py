@@ -161,7 +161,11 @@ UK_SAP_SETBACK_C = 10.0
 #    ~1.3-1.6 against an assumed 2.1; BRE/Leeds Beckett in-situ surveys agree).
 #    A 0.7 factor sits inside that measured range. NOT fitted - fitting it is
 #    what the note below warns against.
-# 2. BEHAVIOUR (the "prebound effect"). Households in poor-fabric homes heat to
+# 2. BEHAVIOUR (the "prebound effect"), HOUSES ONLY - see generate_idf, where the
+#    drop is gated on use_cat. It was fitted on gas-heated houses and does not
+#    transfer to flats: a flat is surrounded by other flats, so its own wall
+#    state says little about its heat demand, and applying the drop there pushed
+#    solid-wall flats down to 0.56x metered. Households in poor-fabric homes heat to
 #    lower temperatures and heat fewer rooms than any standard schedule assumes;
 #    measured consumption in such homes runs ~30% below calculated (Sunikka-Blank
 #    & Galvin, Building Research & Information 40(3), 2012). This is modelled as
