@@ -1,4 +1,4 @@
-"""Climate & Environmental Analysis — layout only.
+"""Climate & Environmental Analysis - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"climate_env"``. Edit it there; nothing in this file needs to change.

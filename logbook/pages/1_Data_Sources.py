@@ -1,4 +1,4 @@
-"""Data Sources (Sweden / United Kingdom tabs) — layout only.
+"""Data Sources (Sweden / United Kingdom tabs) - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"data_sources"``. Edit it there; nothing in this file needs to change.

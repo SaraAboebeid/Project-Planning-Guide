@@ -1,4 +1,4 @@
-"""Optimisation Process — layout only.
+"""Optimisation Process - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"optimisation"``. Edit it there; nothing in this file needs to change.

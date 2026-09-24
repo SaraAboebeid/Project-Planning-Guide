@@ -1,4 +1,4 @@
-"""Decision Analysis under Uncertainty — layout only.
+"""Decision Analysis under Uncertainty - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"decision"``. Edit it there; nothing in this file needs to change.

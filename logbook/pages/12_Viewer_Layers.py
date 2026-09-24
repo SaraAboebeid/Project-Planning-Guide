@@ -1,4 +1,4 @@
-"""Viewer Layers & Visualisation — layout only.
+"""Viewer Layers & Visualisation - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"viewer_layers"``. Edit it there; nothing in this file needs to change.

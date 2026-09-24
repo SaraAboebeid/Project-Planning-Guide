@@ -19,11 +19,11 @@ API = os.environ.get("PPG_API", "http://127.0.0.1:8080").rstrip("/")
 # Points the examples can run at. Each carries the country/city the backend
 # needs to pick the right buildings and weather file.
 PLACES = {
-    "Gothenburg — Vasastaden (dense blocks)": {"lat": 57.6985, "lon": 11.9690, "country": "se", "city_id": "gothenburg", "tz": 1.0},
-    "Gothenburg — Chalmers, Johanneberg": {"lat": 57.6897, "lon": 11.9767, "country": "se", "city_id": "gothenburg", "tz": 1.0},
-    "Gothenburg — Lindholmen (new waterfront)": {"lat": 57.7065, "lon": 11.9380, "country": "se", "city_id": "gothenburg", "tz": 1.0},
-    "London — Westminster": {"lat": 51.4973, "lon": -0.1339, "country": "gb", "city_id": "london_westminster", "tz": 0.0},
-    "Rotherham — town centre": {"lat": 53.4289, "lon": -1.3624, "country": "gb", "city_id": "rotherham", "tz": 0.0},
+    "Gothenburg - Vasastaden (dense blocks)": {"lat": 57.6985, "lon": 11.9690, "country": "se", "city_id": "gothenburg", "tz": 1.0},
+    "Gothenburg - Chalmers, Johanneberg": {"lat": 57.6897, "lon": 11.9767, "country": "se", "city_id": "gothenburg", "tz": 1.0},
+    "Gothenburg - Lindholmen (new waterfront)": {"lat": 57.7065, "lon": 11.9380, "country": "se", "city_id": "gothenburg", "tz": 1.0},
+    "London - Westminster": {"lat": 51.4973, "lon": -0.1339, "country": "gb", "city_id": "london_westminster", "tz": 0.0},
+    "Rotherham - town centre": {"lat": 53.4289, "lon": -1.3624, "country": "gb", "city_id": "rotherham", "tz": 0.0},
 }
 
 

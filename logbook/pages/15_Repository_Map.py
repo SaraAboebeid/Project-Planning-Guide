@@ -1,4 +1,4 @@
-"""Script Browser — renders CODEMAP.md live from the repository root.
+"""Repository map - renders CODEMAP.md live from the repository root.
 
 Deliberately not a copy: the map is version-controlled next to the code it
 describes, so rendering it here means the logbook cannot drift from it.
@@ -74,7 +74,7 @@ if query:
     st.caption(f"{len(hits)} matching line(s) in CODEMAP.md")
     st.markdown(linkify_repo_links(chr(10).join(hits)) if hits else "_No matches._")
 else:
-    # every file named in the map opens in the File viewer
+    # every file named in the map opens in the Script Explorer
     st.markdown(linkify_repo_links(text))
 
 st.divider()

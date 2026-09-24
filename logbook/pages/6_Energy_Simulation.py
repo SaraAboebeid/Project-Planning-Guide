@@ -1,4 +1,4 @@
-"""Shoebox & IDF Generation — layout only.
+"""Shoebox & IDF Generation - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"shoebox_idf"``. Edit it there; nothing in this file needs to change.

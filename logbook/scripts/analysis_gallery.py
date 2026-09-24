@@ -1,4 +1,4 @@
-"""Analysis Inventory gallery — one card per analysis the tool can run.
+"""Analysis Inventory gallery - one card per analysis the tool can run.
 
 Each card says where the analysis lives in the tool, what it computes and
 which page documents its method; most carry a recording of it running in the
@@ -147,7 +147,7 @@ def _place_picker(key: str) -> tuple[str, dict]:
 
 def _status_line(state: dict) -> None:
     if state["source"] == "live":
-        st.success(f"Live result from the backend at `{lr.API}` — {state['seconds']:.1f} s.", icon="✅")
+        st.success(f"Live result from the backend at `{lr.API}` - {state['seconds']:.1f} s.", icon="✅")
     else:
         msg = state.get("note") or "Stored example."
         st.info(msg + f" Computed by: {state.get('computed_by', 'the tool')}, {state.get('computed_at', '')}.",
@@ -163,13 +163,13 @@ def _run(state_key: str, fn, example: str) -> None:
     except lr.ApiError as e:
         ex = _example(example)
         if ex is None:
-            st.error(f"Live run failed — {e}. No stored example is available.")
+            st.error(f"Live run failed - {e}. No stored example is available.")
             return
         st.session_state[state_key] = {
             "res": ex["result"], "source": "stored", "computed_by": ex["computed_by"],
             "computed_at": ex["computed_at"], "req": ex["request"],
-            "note": f"Live run failed — {e}. Showing the stored example for "
-                    f"Gothenburg — Vasastaden instead."}
+            "note": f"Live run failed - {e}. Showing the stored example for "
+                    f"Gothenburg - Vasastaden instead."}
 
 
 def _state(state_key: str, example: str) -> dict | None:
@@ -180,7 +180,7 @@ def _state(state_key: str, example: str) -> dict | None:
         st.session_state[state_key] = {"res": ex["result"], "source": "stored",
                                        "computed_by": ex["computed_by"], "computed_at": ex["computed_at"],
                                        "req": ex["request"],
-                                       "note": "Stored example (Gothenburg — Vasastaden). Press *Run live* "
+                                       "note": "Stored example (Gothenburg - Vasastaden). Press *Run live* "
                                                "to compute your own."}
     return st.session_state[state_key]
 
@@ -340,7 +340,7 @@ def live_comfort() -> None:
                              key="tc_t")
         fr = r["frames"][times.index(t)]
         pts["rgb"] = [_hex(UTCI_PAL[c]) for c in fr["cat"]]
-        pts["tip"] = [f"UTCI {u:.1f} °C — {UTCI_LABELS[c]}" for u, c in zip(fr["utci"], fr["cat"])]
+        pts["tip"] = [f"UTCI {u:.1f} °C - {UTCI_LABELS[c]}" for u, c in zip(fr["utci"], fr["cat"])]
         m = st.columns(5)
         m[0].metric("Air", f"{fr['ta']} °C")
         m[1].metric("Humidity", f"{fr['rh']:.0f}%")
@@ -486,7 +486,7 @@ def live_space_syntax() -> None:
 # ═════════════════════════════════════════════════════════════════════════════
 
 CARDS = [
-    ("Environmental — 3D viewer", [
+    ("Environmental - 3D viewer", [
         dict(title="Direct sun hours", gif="sun_hours",
              where="3D viewer → Environmental Analysis → *Sun-hours* (both viewers)",
              runs="Backend `/api/analysis/sun-hours` · `backend/sun_hours.py`",
@@ -516,11 +516,11 @@ CARDS = [
              what="A single-zone shoebox model per building (geometry, TABULA or chosen U-values, window "
                   "ratio, hot water) simulated for a year: heating, cooling, lighting, equipment and total "
                   "kWh/m²·yr. About 12 s per building.",
-             method=("shoebox-idf", "6. Energy Simulation — EPSM & IDF"),
+             method=("shoebox-idf", "6. Energy Simulation - EPSM & IDF"),
              status="Not run from here: every run is written to the simulation store. All stored runs "
                     "can be browsed in the **Data Explorer → Simulation results**."),
         dict(title="Renovation optimiser (Pareto front)",
-             where="Wizard Step 4 — the trade-off curve under the package builder",
+             where="Wizard Step 4 - the trade-off curve under the package builder",
              runs="Backend `/api/optimize`",
              what="Every combination of wall, roof, window and floor options is scored with degree-day "
                   "physics anchored to the EnergyPlus baseline; the non-dominated set on cost, carbon and "
@@ -554,7 +554,7 @@ CARDS = [
                   "minimax regret, uncertainty range and the Hurwicz criterion.",
              method=("decision", "9. Decision Analysis under Uncertainty")),
     ]),
-    ("Urban — 3D viewer", [
+    ("Urban - 3D viewer", [
         dict(title="Space syntax (street-network centrality)",
              where="3D viewer → Urban Analysis → *Space Syntax* (Gothenburg)",
              runs="Backend `/api/urban/space-syntax` · `backend/space_syntax.py` (networkx) over OSM streets",
@@ -565,7 +565,7 @@ CARDS = [
                     "0.9 km each way: betweenness takes ~17 s, reach ~40 s, integration ~98 s."),
         dict(title="Green index, green accessibility, heat-island proxy",
              where="3D viewer → Urban Analysis", runs="In the browser (`urban_analysis.js`)",
-             what="City-wide indices from OpenStreetMap green areas and the building data — not "
+             what="City-wide indices from OpenStreetMap green areas and the building data - not "
                   "temperature models.",
              method=("climate-env", "11. Climate & Environmental Analysis")),
     ]),
@@ -618,7 +618,7 @@ def _card(c: dict, key: str) -> None:
             # even when it is collapsed, which drew every example's map on
             # every page load. Each example is also a fragment, so moving one
             # of its sliders reruns only that example.
-            if st.toggle("▶ Try it — live example", key=f"tg_{key}"):
+            if st.toggle("▶ Try it - live example", key=f"tg_{key}"):
                 c["live"]()
 
 
@@ -626,7 +626,7 @@ def render() -> None:
     up = _backend_up()
     st.markdown(
         f"<div style='margin:0.6rem 0 0.2rem 0;font-size:0.9rem'>Backend for the live examples: "
-        f"<code>{lr.API}</code> — "
+        f"<code>{lr.API}</code> - "
         + ("<b style='color:#15803d'>reachable</b>" if up else
            "<b style='color:#b91c1c'>not reachable</b>; the examples show stored results") +
         " <span class='lb-dim'>(set <code>PPG_API</code> to point elsewhere)</span></div>",

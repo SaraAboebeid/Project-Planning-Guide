@@ -1,4 +1,4 @@
-"""Digital Twin Construction — layout only.
+"""Digital Twin Construction - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"digital_twin"``. Edit it there; nothing in this file needs to change.

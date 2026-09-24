@@ -30,7 +30,7 @@ LOGBOOK_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = LOGBOOK_DIR.parent
 PAGES_DIR = LOGBOOK_DIR / "pages"
 
-# "**4. Sweden Pipeline**" — the space after the dot keeps "**1.88 million**"
+# "**4. Sweden Pipeline**" - the space after the dot keeps "**1.88 million**"
 # from matching.
 XREF = re.compile(r"\*\*(\d+)\.\s+([^*]+?)\*\*")
 

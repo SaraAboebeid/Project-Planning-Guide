@@ -1,4 +1,4 @@
-"""Analysis Inventory — layout only.
+"""Analysis Inventory - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"analysis_index"``. Edit it there; nothing in this file needs to change.

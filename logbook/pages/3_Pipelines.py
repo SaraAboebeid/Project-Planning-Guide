@@ -1,4 +1,4 @@
-"""Pipelines (Sweden / United Kingdom tabs) — layout only.
+"""Pipelines (Sweden / United Kingdom tabs) - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"pipelines"``. Edit it there; nothing in this file needs to change.

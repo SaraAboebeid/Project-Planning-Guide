@@ -1,4 +1,4 @@
-"""AI, ML & Vision Models — layout only.
+"""AI, ML & Vision Models - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"facade_ml"``. Edit it there; nothing in this file needs to change.

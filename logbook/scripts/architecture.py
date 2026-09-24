@@ -12,17 +12,17 @@ several stages.
 
 Drawn as inline SVG rather than an image so it (a) follows bright and dark mode
 through the same --lb-* variables as the rest of the logbook, (b) stays
-selectable, searchable text, and (c) is edited by changing the data below — the
+selectable, searchable text, and (c) is edited by changing the data below - the
 layout, wrapping and column heights are all computed from it.
 
 Every item is stated from what the logbook already documents:
   * services, keys and failure behaviour  → 14. Services, Keys & Access
   * the analyses and where each one runs  → 13. Analysis Inventory
-  * the EPSM round trip                   → 6. Energy Simulation — EPSM & IDF
+  * the EPSM round trip                   → 6. Energy Simulation - EPSM & IDF
   * the five wizard steps                 → frontend/src/store/wizard.ts
 
 KEY TIERS. "No key" and "needs a key" are read from the repository. Whether a
-key is free or paid is NOT recorded there — it is this diagram's own reading of
+key is free or paid is NOT recorded there - it is this diagram's own reading of
 each provider's terms, so it is labelled as such, and kept to the clear cases:
 the AI providers and Street View are metered and billed; the public-sector and
 map keys are free registrations.
@@ -52,9 +52,9 @@ LEGEND = [
     ("core",  "Backend & our services"),
     ("data",  "Data store"),
     ("out",   "Output"),
-    ("nokey", "External — no key"),
-    ("free",  "External — key, free"),
-    ("paid",  "External — key, paid"),
+    ("nokey", "External - no key"),
+    ("free",  "External - key, free"),
+    ("paid",  "External - key, paid"),
 ]
 
 # ── the five renovation steps ────────────────────────────────────────────────
@@ -98,7 +98,7 @@ COLUMNS = [
         ],
     },
     {
-        "num": "B", "title": "Ingestion & pipeline", "sub": "Offline — none of this runs while the tool is in use",
+        "num": "B", "title": "Ingestion & pipeline", "sub": "Offline - none of this runs while the tool is in use",
         "fam": "build", "w": 246,
         "cards": [
             G("Build scripts"),
@@ -114,11 +114,11 @@ COLUMNS = [
         ],
     },
     {
-        "num": "C", "title": "Analysis & AI", "sub": "Seventeen analyses — some on the backend, some in the browser",
+        "num": "C", "title": "Analysis & AI", "sub": "Seventeen analyses - some on the backend, some in the browser",
         "fam": "ai", "w": 296,
         "cards": [
             G("Building energy & cost"),
-            ("EnergyPlus simulation", "via EPSM — shoebox, full year", "ai"),
+            ("EnergyPlus simulation", "via EPSM - shoebox, full year", "ai"),
             ("Pareto optimiser", "cost · carbon · energy", "ai"),
             ("Life-cycle assessment", "embodied + operational", "ai"),
             ("Heating-system comparison", "SPF, LCC over 30 yr", "ai"),
@@ -131,8 +131,8 @@ COLUMNS = [
             ("Space-syntax centrality", "street network", "ai"),
             ("Green index · heat-island proxy", "in the browser", "ai"),
             G("Decision support"),
-            ("Retrofit prioritisation", "MCDA, AHP weights — Step 2", "ai"),
-            ("Decision under uncertainty", "minimax regret — Step 4", "ai"),
+            ("Retrofit prioritisation", "MCDA, AHP weights - Step 2", "ai"),
+            ("Decision under uncertainty", "minimax regret - Step 4", "ai"),
             G("AI & vision"),
             ("Data assistant", "tool-calling LLM", "paid"),
             ("Window-to-wall ratio", "vision model", "paid"),
@@ -166,16 +166,16 @@ COLUMNS = [
         ],
     },
     {
-        "num": "E", "title": "Data layer", "sub": "Files that behave like services — and fail like them",
+        "num": "E", "title": "Data layer", "sub": "Files that behave like services - and fail like them",
         "fam": "data", "w": 250,
         "cards": [
             G("Served payloads"),
-            ("buildings.json", "Sweden — 92,973", "data"),
-            ("uk/buildings_<district>.json", "UK — 22,203", "data"),
+            ("buildings.json", "Sweden - 92,973", "data"),
+            ("uk/buildings_<district>.json", "UK - 22,203", "data"),
             ("boplats_data.json · booli_data.json", "market data", "data"),
             G("Databases"),
-            ("epc_sweden.duckdb", "461 MB — certificates", "data"),
-            ("simulation_database.sqlite3", "1.95 GB — stored runs", "data"),
+            ("epc_sweden.duckdb", "461 MB - certificates", "data"),
+            ("simulation_database.sqlite3", "1.95 GB - stored runs", "data"),
             ("data/epw/", "weather files", "data"),
             G("Reuse"),
             ("Runs found within 25 m", "why the wizard feels instant", "data"),
@@ -212,14 +212,14 @@ EXTERNAL = [
         ("SCB map service", "viewer layers"),
         ("jsDelivr CDN", "CesiumJS 1.143"),
     ]),
-    ("free", "Key — free registration", [
+    ("free", "Key - free registration", [
         ("Västtrafik", "OAuth2 id + secret"),
         ("Trafikverket", "API key"),
         ("CARTO", "sharper basemaps"),
         ("UK EPC register", "bearer token"),
         ("Cesium ion", "3D tiles token"),
     ]),
-    ("paid", "Key — paid & metered", [
+    ("paid", "Key - paid & metered", [
         ("OpenAI", "chat · WWR · vision"),
         ("Anthropic", "tried first for vision"),
         ("Google Street View", "façade capture"),
@@ -342,7 +342,7 @@ def build_svg() -> str:
     # ── header ───────────────────────────────────────────────────────────────
     body.append(
         f'<text x="{MARGIN}" y="30" font-size="21" font-weight="900" '
-        f'fill="var(--lb-heading)">Renovation Planner — how it fits together</text>')
+        f'fill="var(--lb-heading)">Renovation Planner - how it fits together</text>')
     body.append(
         f'<text x="{MARGIN}" y="49" font-size="11.5" fill="var(--lb-dim)">'
         f'Inputs on the left, outputs on the right, every external service and its '
@@ -401,9 +401,9 @@ def build_svg() -> str:
     # the numbers 1-5: two numbered sequences on one diagram read as if stage 3
     # were step 3, and they are different axes entirely.
     body.append(f'<text x="{MARGIN}" y="{top - 16:.1f}" font-size="9" font-weight="800" '
-                f'letter-spacing="1.2" fill="var(--lb-heading)">HOW IT RUNS — STAGES A to F</text>')
+                f'letter-spacing="1.2" fill="var(--lb-heading)">HOW IT RUNS - STAGES A to F</text>')
     body.append(f'<text x="{MARGIN + 176:.1f}" y="{top - 16:.1f}" font-size="9" '
-                f'fill="var(--lb-dim)">not the five steps above — every step draws on '
+                f'fill="var(--lb-dim)">not the five steps above - every step draws on '
                 f'several of these stages</text>')
     x, heights, xs = MARGIN, [], []
     for col in COLUMNS:
@@ -454,11 +454,11 @@ def build_svg() -> str:
         f'stroke="var(--lb-warn)" stroke-width="1.2" stroke-opacity="0.55"/>')
     body.append(
         f'<text x="{bx:.1f}" y="{band_top + 22:.1f}" font-size="13" font-weight="800" '
-        f'fill="var(--lb-warn)">External services — and which need an API key</text>')
+        f'fill="var(--lb-warn)">External services - and which need an API key</text>')
     body.append(
         f'<text x="{bx:.1f}" y="{band_top + 35:.1f}" font-size="9.4" fill="var(--lb-dim)">'
         f'Called from the backend or a pipeline script, so keys never reach the browser. '
-        f'Nothing here fails hard — each degrades in its own documented way.</text>')
+        f'Nothing here fails hard - each degrades in its own documented way.</text>')
     body += parts
 
     # dashed risers from the band into the columns that call out
@@ -476,8 +476,8 @@ def build_svg() -> str:
         f'xmlns="http://www.w3.org/2000/svg" '
         f'font-family="Inter, system-ui, sans-serif" role="img" '
         f'aria-label="Architecture of the Renovation Planner: the five wizard steps, '
-        f'then six lettered stages A to F — inputs, ingestion pipeline, analysis and '
-        f'AI, backend orchestration, data layer and outputs — with every external '
+        f'then six lettered stages A to F - inputs, ingestion pipeline, analysis and '
+        f'AI, backend orchestration, data layer and outputs - with every external '
         f'service and its API key tier. The stages are not the steps; each step uses '
         f'several stages.">'
         f'<defs>'

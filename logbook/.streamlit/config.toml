@@ -1,13 +1,13 @@
-# Logbook theme — the same identity as the renovation planner (frontend/).
+# Logbook theme - the same identity as the renovation planner (frontend/).
 #
 # Two modes, as the planner has. The reader switches in ⋮ → Settings →
 # Appearance; "System" follows the operating system. Streamlit reruns the
 # script on a change, and inject_css() in scripts/ui_utils.py rebuilds its own
 # stylesheet for the new mode from the token sets in THEMES.
 #
-# These sections theme Streamlit's OWN chrome — widgets, the sidebar and, above
+# These sections theme Streamlit's OWN chrome - widgets, the sidebar and, above
 # all, st.dataframe, which is drawn by Streamlit and cannot be reached with CSS.
-# Everything else — headings, cards, badges, tabs — is in inject_css().
+# Everything else - headings, cards, badges, tabs - is in inject_css().
 #
 # The values mirror the planner: dark is WizardLayout's shell (#0a0d14) and its
 # panels; bright is body.bright-mode (#f6f8fc) with white cards. The brand
@@ -42,7 +42,7 @@ headless = true
 # Edits to logbook_content.py were not showing up: it is an imported module, so
 # a browser refresh re-runs the page but Python keeps the cached copy. With this
 # on, Streamlit watches the local modules the app imports, drops them from
-# sys.modules and reruns on save — so editing the text is enough, no restart.
+# sys.modules and reruns on save - so editing the text is enough, no restart.
 runOnSave = true
 fileWatcherType = "auto"
 

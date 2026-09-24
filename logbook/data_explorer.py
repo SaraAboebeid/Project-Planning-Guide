@@ -1,4 +1,4 @@
-"""Data Explorer — browse the tool's own datasets, read-only.
+"""Data Explorer - browse the tool's own datasets, read-only.
 
 Layout only; the loaders and charts live in ``scripts/explorer.py``.
 """
@@ -16,7 +16,7 @@ st.set_page_config(page_title="Data Explorer", layout="wide")
 inject_css()
 st.title("Data Explorer")
 st.markdown(
-    "Browse the datasets the tool actually runs on — the same files the viewer, the "
+    "Browse the datasets the tool actually runs on - the same files the viewer, the "
     "wizard and the analyses read. Filter them, see what they hold on a map and in "
     "charts, and download the rows you selected. Everything is opened **read-only**; "
     "nothing here changes the data. Where each dataset comes from is on "
@@ -24,17 +24,17 @@ st.markdown(
 )
 
 SE_DATASETS = {
-    "Buildings — Gothenburg model": "b",
-    "Energy certificates — national register": "epc",
-    "Housing market — Booli and Boplats": "mkt",
+    "Buildings - Gothenburg model": "b",
+    "Energy certificates - national register": "epc",
+    "Housing market - Booli and Boplats": "mkt",
     "Simulation results": "sim",
     "Weather files": "epw",
-    "Traffic — Trafikverket snapshot": "traf",
-    "Cost catalogue — Wikells": "ref",
+    "Traffic - Trafikverket snapshot": "traf",
+    "Cost catalogue - Wikells": "ref",
 }
 UK_DATASETS = {
-    "Buildings — district models": "b",
-    "Survey tables — EHS and TABULA": "ref",
+    "Buildings - district models": "b",
+    "Survey tables - EHS and TABULA": "ref",
     "Simulation results": "sim",
     "Weather files": "epw",
 }

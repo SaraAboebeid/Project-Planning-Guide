@@ -1,4 +1,4 @@
-"""Read-only previews of repository files for the logbook's File viewer.
+"""Read-only previews of repository files for the logbook's Script Explorer.
 
 Scripts are shown in full with syntax highlighting; data files get a preview
 that fits their format - tables and sample rows of a database, the first
@@ -109,7 +109,7 @@ def _git_info(rel: str) -> dict:
 def render_file(rel: str) -> None:
     if is_blocked(rel) or not is_allowed(rel):
         st.error("The viewer only opens files the logbook cites, and never "
-                 "secrets such as `.env` — this path is not one of them.")
+                 "secrets such as `.env` - this path is not one of them.")
         return
     p = REPO_ROOT / rel
     if not p.exists():
@@ -123,13 +123,13 @@ def render_file(rel: str) -> None:
     if p.is_file():
         facts.append(_human_size(stat.st_size))
     facts.append("modified " + datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"))
-    st.caption(" · ".join(facts) + " — the version on disk now")
+    st.caption(" · ".join(facts) + " - the version on disk now")
 
     links = [f"<a href='vscode://file/{quote(p.resolve().as_posix(), safe='/:')}'>"
              "Open in VS Code</a> <span class='lb-dim'>(on this computer)</span>"]
     gi = _git_info(rel) if p.is_file() else {}
     if gi:
-        note = " — <span class='lb-dim'>local copy has uncommitted changes</span>" if gi["dirty"] else ""
+        note = " - <span class='lb-dim'>local copy has uncommitted changes</span>" if gi["dirty"] else ""
         links.append(f"<a href='{gi['url']}' target='_blank'>Committed version on GitHub "
                      f"({gi['branch']})</a>{note}")
     elif p.is_file():
@@ -190,7 +190,7 @@ def _code(p: Path, lang: str) -> None:
     text = p.read_text(encoding="utf-8", errors="replace")
     lines = text.count("\n") + 1
     if len(text) > TEXT_LIMIT:
-        st.warning(f"Very large file — showing the first {TEXT_LIMIT:,} characters.")
+        st.warning(f"Very large file - showing the first {TEXT_LIMIT:,} characters.")
         text = text[:TEXT_LIMIT]
     st.caption(f"{lines:,} lines")
     st.code(text, language=lang, line_numbers=True)
@@ -276,14 +276,14 @@ def _json_summary(path: str, mtime: float) -> dict:
 def _json(p: Path) -> None:
     s = _json_summary(str(p), _mtime(p))
     size = f"{s['size']:,} " + ("items" if s["type"] == "list" else "keys") if s["size"] is not None else ""
-    st.markdown(f"**JSON {s['type']}** — {size}")
+    st.markdown(f"**JSON {s['type']}** - {size}")
     rec = s.get("records")
     tabs = st.tabs((["Records", "Field coverage"] if rec else []) + (["Keys"] if s.get("keys") else []) + ["Structure"])
     i = 0
     if rec:
         with tabs[0]:
             where = f" under `{rec['where']}`" if rec["where"] else ""
-            st.caption(f"{rec['n']:,} records{where} — first {min(rec['n'], SAMPLE_ROWS)} shown")
+            st.caption(f"{rec['n']:,} records{where} - first {min(rec['n'], SAMPLE_ROWS)} shown")
             show_dataframe_safe(pd.DataFrame(rec["sample"]))
         with tabs[1]:
             st.caption("How many records carry a value in each field")
@@ -302,7 +302,7 @@ def _parquet(p: Path) -> None:
     import pyarrow.parquet as pq
     pf = pq.ParquetFile(str(p))
     md = pf.metadata
-    st.markdown(f"**Parquet** — {md.num_rows:,} rows × {md.num_columns} columns, "
+    st.markdown(f"**Parquet** - {md.num_rows:,} rows × {md.num_columns} columns, "
                 f"{md.num_row_groups} row groups")
     schema = pf.schema_arrow
     rows, cols = st.tabs(["First rows", "Columns"])
@@ -350,7 +350,7 @@ def _duckdb(p: Path) -> None:
                 "environment (`.\\setup.bat` installs it).")
         return
     tables = _duckdb_tables(str(p), _mtime(p))
-    st.markdown(f"**DuckDB database** — {len(tables)} table(s), opened read-only")
+    st.markdown(f"**DuckDB database** - {len(tables)} table(s), opened read-only")
     show_dataframe_safe(pd.DataFrame([{**t, "rows": f"{t['rows']:,}"} for t in tables]))
     if tables:
         names = [x["table"] for x in tables]
@@ -386,7 +386,7 @@ def _sqlite(p: Path) -> None:
             info.append({"table": n, "rows": con.execute(f'SELECT COUNT(*) FROM "{n}"').fetchone()[0],
                          "columns": len(cols)})
         label = "GeoPackage" if p.suffix.lower() == ".gpkg" else "SQLite database"
-        st.markdown(f"**{label}** — {len(names)} table(s), opened read-only")
+        st.markdown(f"**{label}** - {len(names)} table(s), opened read-only")
         show_dataframe_safe(pd.DataFrame([{**t, "rows": f"{t['rows']:,}"} for t in info]))
         if names:
             biggest = max(info, key=lambda x: x["rows"])["table"]
@@ -406,7 +406,7 @@ def _sqlite(p: Path) -> None:
 
 def _csv(p: Path) -> None:
     df = pd.read_csv(p, nrows=SAMPLE_ROWS, sep=None, engine="python")
-    st.markdown(f"**CSV** — {len(df.columns)} columns, first {len(df)} rows")
+    st.markdown(f"**CSV** - {len(df.columns)} columns, first {len(df)} rows")
     show_dataframe_safe(df)
 
 
@@ -414,7 +414,7 @@ def _epw(p: Path) -> None:
     lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
     loc = lines[0].split(",") if lines else []
     if len(loc) >= 10:
-        st.markdown(f"**EnergyPlus weather file** — {loc[1]}, {loc[3]} "
+        st.markdown(f"**EnergyPlus weather file** - {loc[1]}, {loc[3]} "
                     f"(station {loc[5]}, lat {loc[6]}, lon {loc[7]}, elevation {loc[9]} m)")
     data = pd.read_csv(p, skiprows=8, header=None, nrows=8784)
     data = data.iloc[:, :len(EPW_COLUMNS)]
@@ -459,7 +459,7 @@ def _las(p: Path) -> None:
         {"property": "Easting range (m)", "value": f"{minx:,.1f} – {maxx:,.1f}"},
         {"property": "Northing range (m)", "value": f"{miny:,.1f} – {maxy:,.1f}"},
         {"property": "Height range (m)", "value": f"{minz:,.1f} – {maxz:,.1f}"},
-        {"property": "Written by", "value": software or "—"},
+        {"property": "Written by", "value": software or "-"},
     ]))
     st.caption("Coordinates are in the tile's own reference system (SWEREF 99 TM for the DTCC tiles). "
                "The points themselves are compressed and are not decoded here.")
@@ -469,7 +469,7 @@ def _ods(p: Path) -> None:
     with zipfile.ZipFile(p) as z:
         xml = z.read("content.xml").decode("utf-8", "replace")
     sheets = re.findall(r'<table:table [^>]*table:name="([^"]+)"', xml)
-    st.markdown(f"**OpenDocument spreadsheet** — {len(sheets)} sheet(s)")
+    st.markdown(f"**OpenDocument spreadsheet** - {len(sheets)} sheet(s)")
     show_dataframe_safe(pd.DataFrame({"sheet": sheets}))
     st.caption("Open it in LibreOffice or Excel to see the cells; the tool's parser "
                "turns the tables it needs into JSON.")
@@ -478,7 +478,7 @@ def _ods(p: Path) -> None:
 def _zip(p: Path) -> None:
     with zipfile.ZipFile(p) as z:
         infos = z.infolist()
-    st.markdown(f"**Zip archive** — {len(infos):,} member(s)")
+    st.markdown(f"**Zip archive** - {len(infos):,} member(s)")
     show_dataframe_safe(pd.DataFrame([{"name": i.filename, "size": _human_size(i.file_size),
                                        "modified": datetime(*i.date_time).strftime("%Y-%m-%d")}
                                       for i in infos[:500]]))
@@ -488,7 +488,7 @@ def _folder(p: Path, rel: str) -> None:
     entries = sorted(p.iterdir(), key=lambda e: (e.is_file(), e.name.lower()))
     entries = [e for e in entries if not is_blocked(f"{rel}/{e.name}")]
     shown = entries[:500]
-    st.markdown(f"**Folder** — {len(entries):,} item(s)"
+    st.markdown(f"**Folder** - {len(entries):,} item(s)"
                 + (f", first {len(shown)} shown" if len(entries) > len(shown) else ""))
     rows = []
     for e in shown:

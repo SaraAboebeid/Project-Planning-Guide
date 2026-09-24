@@ -1,4 +1,4 @@
-"""Logbook home page — shown first in the sidebar, as "Tool".
+"""Logbook home page - shown first in the sidebar, as "Tool".
 
 Moved out of Tool.py when the sidebar became country-grouped: Tool.py now only
 builds the navigation. The contents cards below follow the same NAV groups as
@@ -73,7 +73,7 @@ st.markdown(
       .lb-group::after { content:""; flex:1; height:1px;
         background:linear-gradient(90deg, var(--lb-card-border), transparent); }
       /* The card is a link: the whole tile navigates, as the planner's step
-         rail does. Hover lifts the border to teal — the selected-state colour
+         rail does. Hover lifts the border to teal - the selected-state colour
          used across the tool.
          Everything inside is a <span>: Streamlit wraps markdown in <p>, and a
          block-level child inside that <p> makes the browser close the <a>
@@ -93,7 +93,7 @@ st.markdown(
         color:var(--lb-dim); }
       .lb-tile-tabs { display:block; font-size:0.7rem; font-weight:700;
         color:var(--lb-teal); margin-top:0.5rem; letter-spacing:0.03em; }
-      /* Streamlit columns size to their own content, so a row came out ragged —
+      /* Streamlit columns size to their own content, so a row came out ragged -
          a card with no tab line sat shorter than its neighbours. Every level
          between the column and the <a> has to carry the height or it stops
          there; the wrapper Streamlit centres its child in also needs
@@ -130,7 +130,7 @@ for group, keys in NAV:
             page = PAGES[key]
             # Strip markdown before truncating, or a cut mid-token leaves a
             # stray backtick or asterisk visible in the card. Backticks and
-            # asterisks only — underscores are literal here (data_pipeline.py).
+            # asterisks only - underscores are literal here (data_pipeline.py).
             plain = re.sub(r"[`*]", "", " ".join(page["purpose"].split()))
             tabs = (f"<span class='lb-tile-tabs'>"
                     + " · ".join(label for label, _ in page["tabs"]) + "</span>"
@@ -158,7 +158,7 @@ st.subheader("How it fits together")
 st.caption(
     "The five steps across the top, then inputs on the left flowing to outputs "
     "on the right, with every external service the tool calls banded underneath "
-    "— each marked with whether it needs an API key, and whether that key is "
+    "- each marked with whether it needs an API key, and whether that key is "
     "free or billed. The detail behind each box is on **14. Services, Keys & "
     "Access** and **13. Analysis Inventory**. Scroll sideways to see it all."
 )
@@ -170,7 +170,7 @@ st.markdown(
 )
 st.caption(
     "Whether a key is free or billed is this diagram's own reading of each "
-    "provider's terms — the repository records only whether a key is needed."
+    "provider's terms - the repository records only whether a key is needed."
 )
 
 st.divider()
@@ -256,13 +256,13 @@ else:
     st.error(
         "Missing: "
         + ", ".join(f"`{p}`" for p in missing["Path"])
-        + " — pages citing these will flag them too."
+        + " - pages citing these will flag them too."
     )
 
 st.divider()
 st.caption(
     "Going deeper: `NOTEBOOK.md` at the repository root holds the full method "
-    "write-up — every threshold, the reasoning behind it and how it fails. "
+    "write-up - every threshold, the reasoning behind it and how it fails. "
     "`CODEMAP.md` maps the code file by file; page 15 renders it."
 )
 st.caption(

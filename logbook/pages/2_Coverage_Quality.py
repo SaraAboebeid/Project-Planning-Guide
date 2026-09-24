@@ -1,4 +1,4 @@
-"""Coverage & Quality (Sweden / United Kingdom tabs) — layout only.
+"""Coverage & Quality (Sweden / United Kingdom tabs) - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"coverage"``. Edit it there; nothing in this file needs to change.

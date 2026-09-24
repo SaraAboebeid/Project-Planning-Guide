@@ -1,4 +1,4 @@
-"""Scraped Market Data — layout only.
+"""Scraped Market Data - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"scraped_data"``. Edit it there; nothing in this file needs to change.

@@ -1,4 +1,4 @@
-"""Data Explorer — read-only views of the datasets the tool itself uses.
+"""Data Explorer - read-only views of the datasets the tool itself uses.
 
 Every loader opens its source read-only and caches the result; nothing here
 writes to the repository. Each explorer shows what a dataset holds (counts,
@@ -54,7 +54,7 @@ def _hex_rgb(h: str) -> list[int]:
 def source_line(*rels: str, note: str = "") -> None:
     links = " · ".join(file_link_html(r) for r in rels)
     st.markdown(f"<span class='lb-dim'>Source:</span> {links}"
-                + (f" <span class='lb-dim'>— {note}</span>" if note else ""),
+                + (f" <span class='lb-dim'>- {note}</span>" if note else ""),
                 unsafe_allow_html=True)
 
 
@@ -173,11 +173,11 @@ def buildings_explorer(rel: str, key: str, energy_col: str | None, energy_label:
     n = len(f)
     m = st.columns(5)
     m[0].metric("Buildings", f"{n:,}", help=f"of {len(df):,} in the file")
-    pct = (lambda s: f"{100 * s.mean():.0f}%" if n else "—")
+    pct = (lambda s: f"{100 * s.mean():.0f}%" if n else "-")
     m[1].metric("With construction year", pct(f["year"].notna()))
     m[2].metric("With energy class", pct(f["eclass"].notna()))
     m[3].metric("With a certificate", pct(f["has_epc"]))
-    m[4].metric("Median height", f"{f['height'].median():.1f} m" if n else "—")
+    m[4].metric("Median height", f"{f['height'].median():.1f} m" if n else "-")
     if not n:
         st.info("No buildings match these filters.")
         return
@@ -428,7 +428,7 @@ def _boplats_located() -> pd.DataFrame:
     """Boplats listings with the coordinates and energy class of the building they sit in.
 
     Boplats publishes an address but no coordinates, so each listing is matched to a
-    building in the Gothenburg model by address — including every entrance in
+    building in the Gothenburg model by address - including every entrance in
     ``all_addresses``, since one building often lists several. Listings that match no
     building keep their row but have no lat/lon, and the page says how many.
     """
@@ -476,7 +476,7 @@ def _boplats_map(df: pd.DataFrame) -> None:
         if placed["eclass"].isna().any():
             legend.append(("no certificate", "#AAAAAA"))
     else:
-        # A few listings record size 0, which makes rent/m² infinite — drop those to
+        # A few listings record size 0, which makes rent/m² infinite - drop those to
         # NaN so they colour as "no rent" instead of dragging the top bin to infinity.
         rent_m2 = placed["rent_m2"].replace([np.inf, -np.inf], np.nan)
         vals = rent_m2.dropna()
@@ -499,14 +499,14 @@ def _boplats_map(df: pd.DataFrame) -> None:
          key="boplats_map", radius=45, zoom=10.2)
     _legend(legend)
     st.caption(
-        f"{len(placed):,} of {len(df):,} listings are placed — the other "
+        f"{len(placed):,} of {len(df):,} listings are placed - the other "
         f"{len(df) - len(placed):,} have an address that matches no building in the model. "
         "Energy class is the **building's** certificate, not the individual apartment's."
     )
 
 
 def market_explorer() -> None:
-    which = st.radio("Dataset", ["Booli — homes for sale", "Boplats — rental apartments"],
+    which = st.radio("Dataset", ["Booli - homes for sale", "Boplats - rental apartments"],
                      horizontal=True, key="mkt_which")
     if which.startswith("Booli"):
         df = _booli()
@@ -600,7 +600,7 @@ def sims_explorer(country: str) -> None:
         st.warning(f"`{SIM_DB}` is not on this computer.")
         return
     source_line(SIM_DB, note="every EnergyPlus run the tool has sent to EPSM, with its results; "
-                             "see **6. Energy Simulation — EPSM & IDF**")
+                             "see **6. Energy Simulation - EPSM & IDF**")
     df = _sims()
     df = df[df["country"] == country]
     if df.empty:
@@ -613,7 +613,7 @@ def sims_explorer(country: str) -> None:
     m[2].metric("Queued, never run", f"{(df['status'] == 'queued').sum():,}")
     m[3].metric("Failed", f"{(df['status'] == 'failed').sum():,}")
     m[4].metric("Median total (completed)", f"{done['total_kwh_m2_yr'].median():.0f} kWh/m²"
-                if len(done) else "—")
+                if len(done) else "-")
     if len(done):
         a, b = st.columns(2)
         with a:
@@ -748,8 +748,8 @@ def traffic_explorer() -> None:
     m = st.columns(4)
     m[0].metric("Road cameras", f"{len(cams):,}")
     m[1].metric("Flow measurements", f"{len(flow):,}")
-    m[2].metric("Median speed", f"{flow['avg_speed'].median():.0f} km/h" if len(flow) else "—")
-    m[3].metric("Measured at", str(flow["measurement_time"].max())[:16] if len(flow) else "—")
+    m[2].metric("Median speed", f"{flow['avg_speed'].median():.0f} km/h" if len(flow) else "-")
+    m[3].metric("Measured at", str(flow["measurement_time"].max())[:16] if len(flow) else "-")
     v = flow["avg_speed"].clip(0, 110) / 110
     flow = flow.assign(rgb=[[int(230 - 200 * t), int(40 + 170 * t), 60] for t in v.fillna(0.5)])
     cams = cams.assign(rgb=[[80, 80, 90]] * len(cams))

@@ -1,6 +1,9 @@
-"""File viewer — opens a script or data file that the logbook cites.
+"""Script Explorer - opens a script or data file that the logbook cites.
 
-Every file path on the other pages links here as ``file?path=<repo path>``.
+Every file path on the other pages links here as ``file?path=<repo path>``; the
+url_path stays "file" (``ui_utils.VIEWER_URL``) even though the page is now
+labelled Script Explorer, so those citations keep working.
+
 Scripts are shown in full with syntax highlighting; data files get a preview
 suited to their format (see scripts/file_preview.py). Read-only, and limited to
 files the logbook cites - see ``ui_utils.is_allowed``.
@@ -15,14 +18,14 @@ import streamlit as st  # noqa: E402
 from scripts.file_preview import render_file  # noqa: E402
 from scripts.ui_utils import cited_paths, inject_css, is_allowed  # noqa: E402
 
-st.set_page_config(page_title="File viewer", layout="wide")
+st.set_page_config(page_title="Script Explorer", layout="wide")
 inject_css()
-st.title("File viewer")
+st.title("Script Explorer")
 st.markdown(
-    "Opens any script or data file the logbook cites — the version on disk now, "
-    "read-only. Scripts are shown in full; data files get a preview of their "
-    "contents: tables and sample rows, records, weather-file summaries. Every file "
-    "path on the other pages links here."
+    "Opens any script the logbook cites - the version on disk now, read-only - and "
+    "the data files those scripts read and write, previewed by format: tables and "
+    "sample rows, records, weather-file summaries. Every file path on the other "
+    "pages links here."
 )
 
 options = list(cited_paths())

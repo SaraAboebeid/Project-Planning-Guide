@@ -7,7 +7,7 @@ without touching Streamlit code, mirroring the DT4PED logbook's split.
 The one addition over DT4PED: pages resolve file references against the real
 repository at run time (``file_status_table``). A page that cites a script it
 can no longer find says so in red rather than quietly describing code that was
-deleted — which is exactly how the old Streamlit docs in this repo went stale.
+deleted - which is exactly how the old Streamlit docs in this repo went stale.
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ REPO_ROOT = LOGBOOK_DIR.parent
 # and chip below also carries its word, so the meaning survives for a reader who
 # cannot separate the hues.
 
-BRAND      = "#721CB8"   # --brand, the primary purple — the same in both modes
+BRAND      = "#721CB8"   # --brand, the primary purple - the same in both modes
 BRAND_DEEP = "#5A1790"   # --brand-deep
 BRAND_DARK = "#421869"   # --brand-dark
 
@@ -112,7 +112,7 @@ THEMES = {
 
 
 def theme_mode() -> str:
-    """"light" or "dark" — whichever Streamlit is currently rendering.
+    """"light" or "dark" - whichever Streamlit is currently rendering.
 
     st.context.theme follows the reader's choice in ⋮ → Settings → Appearance
     (including "System"), and changing it reruns the script, so the stylesheet
@@ -131,7 +131,7 @@ def theme() -> dict:
 
 
 def tint(hex_color: str, alpha: float) -> str:
-    """rgba() tint of a hex token — the planner's `tint()` helper, in Python."""
+    """rgba() tint of a hex token - the planner's `tint()` helper, in Python."""
     h = hex_color.lstrip("#")
     r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
     return f"rgba({r},{g},{b},{alpha})"
@@ -178,7 +178,7 @@ def _css(t: dict) -> str:
   --lb-txt:{t["txt"]}; --lb-dim:{t["dim"]}; --lb-heading:{t["heading"]};
   --lb-line:{t["line"]};
   --lb-num-fg:{t["num_fg"]}; --lb-btn-fg:{t["btn_fg"]}; --lb-muted:{t["muted"]};
-  /* Chip fills for the architecture diagram — the same tint the badges use. */
+  /* Chip fills for the architecture diagram - the same tint the badges use. */
   --lb-chip-teal:{tint(t["teal"], t["chip_bg"])};
   --lb-chip-info:{tint(t["info"], t["chip_bg"])};
   --lb-chip-warn:{tint(t["warn"], t["chip_bg"])};
@@ -195,7 +195,7 @@ def _css(t: dict) -> str:
 html, body, .stApp {{
   font-family:'Inter', ui-sans-serif, system-ui, sans-serif;
 }}
-/* Belt and braces — any icon keeps its own font whatever else is set. */
+/* Belt and braces - any icon keeps its own font whatever else is set. */
 [data-testid="stIconMaterial"], .material-icons, .material-symbols-rounded,
 [class*="material-symbols"], [class*="material-icons"] {{
   font-family:'Material Symbols Rounded', 'Material Icons' !important;
@@ -348,7 +348,7 @@ a.lb-file:hover code {{ background:var(--lb-hover); color:var(--lb-teal);
 [data-testid="stAlert"] {{ border-radius:12px; border-width:1px; border-style:solid; }}
 
 /* Native selects go white-on-white in dark mode unless both the control and
-   its options are told otherwise — the same trap as in the planner. */
+   its options are told otherwise - the same trap as in the planner. */
 .stApp select, .stApp option {{ background:var(--lb-pop) !important;
   color:var(--lb-txt) !important; }}
 
@@ -388,7 +388,7 @@ def page_header(number, title: str, stage: str | None = None) -> None:
 
 
 def overview_card(title: str, subtitle: str, items: list[tuple[str, str]]) -> None:
-    lis = "".join(f"<li><strong>{lab}</strong> — {txt}</li>" for lab, txt in items)
+    lis = "".join(f"<li><strong>{lab}</strong> - {txt}</li>" for lab, txt in items)
     st.markdown(
         f"<div class='lb-card'><h4>{title}</h4><p>{subtitle}</p><ol>{lis}</ol></div>",
         unsafe_allow_html=True,
@@ -423,29 +423,30 @@ def file_facts(rel_path: str) -> dict:
     """Live facts about one repo-relative path."""
     p = REPO_ROOT / rel_path
     if not p.exists():
-        return {"Path": rel_path, "Status": "MISSING", "Lines": "—",
-                "Size": "—", "Last commit": _git_last_commit(rel_path) or "—"}
+        return {"Path": rel_path, "Status": "MISSING", "Lines": "-",
+                "Size": "-", "Last commit": _git_last_commit(rel_path) or "-"}
     if p.is_dir():
         files = [f for f in p.rglob("*") if f.is_file()]
         return {"Path": rel_path + "/", "Status": "ok", "Lines": f"{len(files)} files",
                 "Size": _human_size(sum(f.stat().st_size for f in files)),
-                "Last commit": _git_last_commit(rel_path) or "—"}
+                "Last commit": _git_last_commit(rel_path) or "-"}
     try:
         lines = sum(1 for _ in p.open("r", encoding="utf-8", errors="replace"))
     except Exception:
         lines = 0
     return {"Path": rel_path, "Status": "ok", "Lines": f"{lines:,}",
             "Size": _human_size(p.stat().st_size),
-            "Last commit": _git_last_commit(rel_path) or "—"}
+            "Last commit": _git_last_commit(rel_path) or "-"}
 
 
 def file_status_table(paths: list[str]) -> pd.DataFrame:
     return pd.DataFrame([file_facts(p) for p in paths])
 
 
-# ── file viewer links ────────────────────────────────────────────────────────
-# Every script or data path the logbook cites links to the File viewer page
-# (file_viewer.py, url "file"), which shows the file as it is on disk now.
+# ── script explorer links ────────────────────────────────────────────────────
+# Every script or data path the logbook cites links to the Script Explorer
+# page (file_viewer.py, url "file"), which shows the file as it is on disk
+# now. The url stays "file" although the page is labelled Script Explorer.
 #
 # The logbook also listens on the network address, so the viewer only opens
 # files the logbook itself cites (plus anything inside a cited folder) and
@@ -580,7 +581,7 @@ def file_link_html(rel: str, label: str | None = None) -> str:
     target = link_target(rel)
     if target:
         return (f"<a class='lb-file' href='{viewer_href(target)}' target='_blank' "
-                f"title='Open in the file viewer'><code>{lab}</code></a>")
+                f"title='Open in the Script Explorer'><code>{lab}</code></a>")
     ok = (REPO_ROOT / rel).exists()
     return f"<code>{lab}</code>" + ("" if ok else " <span class='lb-missing'>missing</span>")
 
@@ -631,7 +632,7 @@ def show_files(paths: list[str]) -> None:
         st.markdown(
             "<span class='lb-missing'>Not found in the repository: "
             + ", ".join(f"<code>{m}</code>" for m in missing)
-            + "</span> — this page references code that no longer exists.",
+            + "</span> - this page references code that no longer exists.",
             unsafe_allow_html=True,
         )
 
@@ -655,7 +656,7 @@ def access_colors() -> dict:
 
 
 def _inline(text: str) -> str:
-    """Escape, then honour `code`, **bold** and *italic* — HTML blocks get no
+    """Escape, then honour `code`, **bold** and *italic* - HTML blocks get no
     markdown."""
     s = html.escape(str(text).strip())
 
@@ -694,13 +695,13 @@ def dataset_card(ds: dict) -> None:
     def row(label: str, value: str) -> None:
         rows.append(f"<tr><th>{label}</th><td>{value}</td></tr>")
 
-    src = _inline(ds.get("publisher", "—"))
+    src = _inline(ds.get("publisher", "-"))
     if ds.get("link"):
         url = html.escape(ds["link"])
         src += f"<br><a href='{url}' target='_blank'>{url}</a>"
     row("Source", src)
 
-    access = ds.get("access", "—")
+    access = ds.get("access", "-")
     t = theme()
     hue = access_colors().get(access, t["accent"])
     how = (f"<span class='lb-chip' style='color:{hue};"
@@ -747,11 +748,11 @@ def dataset_summary(sections: list[dict]) -> None:
             continue
         rows.append({
             "Dataset": sec["title"],
-            "Connection": ds.get("access", "—"),
-            "Source version / updated": ds.get("source_short", ds.get("source_version", "—")),
+            "Connection": ds.get("access", "-"),
+            "Source version / updated": ds.get("source_short", ds.get("source_version", "-")),
             "Our copy": (local_updated(tuple(ds["local"])) if ds.get("local")
                          else ds.get("copy_short", "live")),
-            "Stage": ds.get("stage", "—"),
+            "Stage": ds.get("stage", "-"),
         })
     if rows:
         st.markdown("**At a glance**")
@@ -808,7 +809,7 @@ def _body_markdown(part: dict, level: int) -> list[str]:
     ov = part.get("overview")
     if ov:
         md += [f"{h} {ov['title']}", "", ov.get("subtitle", ""), ""]
-        md += [f"{i}. **{lab}** — {txt}" for i, (lab, txt) in enumerate(ov["items"], 1)]
+        md += [f"{i}. **{lab}** - {txt}" for i, (lab, txt) in enumerate(ov["items"], 1)]
         md += [""]
     for sec in part.get("sections", []):
         md += [f"{h} {sec['title']}", ""]
@@ -816,13 +817,13 @@ def _body_markdown(part: dict, level: int) -> list[str]:
             md += [f"*{sec['badge']}*", ""]
         ds = sec.get("dataset")
         if ds:
-            cells = [("Source", ds.get("publisher", "—") + (f" — {ds['link']}" if ds.get("link") else "")),
-                     ("How it is connected", ds.get("access", "—") + (f" — {ds['connection']}" if ds.get("connection") else "")),
+            cells = [("Source", ds.get("publisher", "-") + (f" - {ds['link']}" if ds.get("link") else "")),
+                     ("How it is connected", ds.get("access", "-") + (f" - {ds['connection']}" if ds.get("connection") else "")),
                      ("Format", ds.get("format", "")),
                      ("Source version / last updated", ds.get("source_version", "not stated by the publisher")),
                      ("Our copy last updated", local_updated(tuple(ds["local"])) if ds.get("local") else ds.get("refresh", "")),
                      ("Stored in the tool as", ds.get("stored_as", "")),
-                     ("Data stage", ds.get("stage", "") + (f" — {ds['stage_note']}" if ds.get("stage_note") else "")),
+                     ("Data stage", ds.get("stage", "") + (f" - {ds['stage_note']}" if ds.get("stage_note") else "")),
                      ("Where it is used", "; ".join(ds.get("used_in", []))),
                      ("Processed by", ", ".join(f"`{p}`" for p in ds.get("processed_by", [])))]
             md += ["| | |", "|---|---|"]
@@ -858,7 +859,7 @@ def page_markdown(page: dict) -> str:
             md += _body_markdown(part, level=3)
     else:
         md += _body_markdown(page, level=2)
-    md += ["---", "", f"*Exported from the Project Planning Guide logbook — page "
+    md += ["---", "", f"*Exported from the Project Planning Guide logbook - page "
                       f"{page['number']}, {page['title']}.*"]
     return "\n".join(md)
 
@@ -929,7 +930,7 @@ def render_page(page: dict, extra=None) -> None:
 
 
 def _render_body(page: dict, key: str, extra=None) -> None:
-    """Purpose, overview, sections and todo of one content dict — a whole plain
+    """Purpose, overview, sections and todo of one content dict - a whole plain
     page, or one tab of a tabbed page. `key` keeps widget ids unique per tab."""
     if page.get("purpose"):
         # Plain st.markdown, NOT an HTML wrapper: Streamlit does not parse
@@ -964,7 +965,7 @@ def _render_body(page: dict, key: str, extra=None) -> None:
                 if sec.get("table"):
                     rows = sec["table"]
                     show_dataframe_safe(pd.DataFrame(rows[1:], columns=rows[0]))
-                # Scripts and data are named as links into the File viewer. The
+                # Scripts and data are named as links into the Script Explorer. The
                 # repository statistics table (lines / size / last commit) says
                 # nothing about the data or the method, so it is off by default;
                 # a page can still ask for it with "code_refs": "table".

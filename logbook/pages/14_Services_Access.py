@@ -1,4 +1,4 @@
-"""Services, Keys & Access — layout only.
+"""Services, Keys & Access - layout only.
 
 The text for this page lives in ``logbook_content.py`` under the key
 ``"access"``. Edit it there; nothing in this file needs to change.
