@@ -8,6 +8,7 @@ import HeatingSystemPanel from "../components/HeatingSystemPanel";
 import { ukHvacCatalogue, type UkRetailTariffs } from "../config/hvacSystemsUK";
 import { computeRegret, annuityFactor, type RegretOptionInput } from "../utils/regretAnalysis";
 import { api } from "../api/client";
+import { seCityId } from "../config/countryNav";
 import { lineItemsFor, type AreaLineItem } from "../config/componentAreaLineItems";
 import { resolveBuildingGeometry, computeAreaForLineItem, quantityUnitLabel, effectiveWwr, type ResolvedBuildingGeometry } from "../utils/componentAreas";
 import { filterToBaselineShortlist } from "../utils/baselineShortlist";
@@ -15,7 +16,7 @@ import type { BuildingLookup, BuildingRecord } from "../types";
 import { itemsForLineItem, estimateCarbon, recommendationsForLineItem, type RecTag } from "../utils/materialRecommendation";
 import { computePriorities, makeBuildingKeys, DEFAULT_WEIGHTS } from "../utils/retrofitPriority";
 import {
-  loadUkArchetypes, findUkArchetype, REFURB_TIERS,
+  loadUkArchetypes, loadBeArchetypes, findUkArchetype, REFURB_TIERS,
   type TabulaArchetypeGB, type RefurbTierKey,
 } from "../utils/ukArchetype";
 import { fmtGBP, ukTierCostCarbon, ukMeasureOptions, UK_COST_CARBON_SOURCE_NOTE, UK_COST_PRICE_BASIS, type UkQuantities, type UkMeasureOption } from "../config/ukCostCarbon";
@@ -43,7 +44,6 @@ import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRi
  * just the first one - so a package's cost/carbon/energy are per-building
  * (footprint/wall area differ per building) and the comparison table shows
  * portfolio aggregates with a per-building breakdown on expand. */
-const CITY_ID = "gothenburg"; // Sweden only - UK omits city_id, server auto-resolves the nearest district from lat/lon
 const UK_TIER_SELECTIONS_KEY = "UK::RefurbTier";
 
 const COMPONENT_COLORS: Record<string, string> = {
@@ -548,7 +548,7 @@ function ukOptionsFor(g: ResolvedBuildingGeometry, wwr: WWRRecord | null): Recor
 
 /* ─── UK refurbishment-tier picker (whole-building, not per-component) ────── */
 function UkTierPicker({
-  archetype, selectedTier, onSelect, quantities, buildingCount, uSource,
+  archetype, selectedTier, onSelect, quantities, buildingCount, uSource, country = "gb",
 }: {
   archetype: TabulaArchetypeGB | null;
   selectedTier: RefurbTierKey | null;
@@ -556,7 +556,20 @@ function UkTierPicker({
   quantities: UkQuantities | null;
   buildingCount: number;
   uSource: string | null;
+  /** "be": TABULA Belgium tiers - no open Belgian cost data, so no £/€ estimate. */
+  country?: "gb" | "be";
 }) {
+  const isBE = country === "be";
+  if (!archetype && isBE) {
+    return (
+      <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(232,136,12,0.1)", border: "1px solid rgba(232,136,12,0.25)" }}>
+        <p style={{ fontSize: 12, color: "#E8880C", margin: 0 }}>
+          No TABULA Belgium archetype matched this building (TABULA BE covers dwellings only) - envelope U-value
+          overrides aren't available, but a baseline EnergyPlus simulation can still run on the as-built defaults.
+        </p>
+      </div>
+    );
+  }
   if (!archetype) {
     return (
       <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(232,136,12,0.1)", border: "1px solid rgba(232,136,12,0.25)" }}>
@@ -567,7 +580,8 @@ function UkTierPicker({
       </div>
     );
   }
-  const eraLabel = uSource === "known_year" ? "known construction year" : uSource === "ehs_sampled_period" ? "estimated era" : "era unknown";
+  const eraLabel = uSource === "known_year" ? "known construction year" : uSource === "ehs_sampled_period" ? "estimated era"
+    : uSource === "statbel_sampled_period" ? "estimated era (Statbel)" : "era unknown";
   const eraColor = uSource === "known_year" ? "#2FB477" : "#E8880C";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -594,9 +608,10 @@ function UkTierPicker({
 
       {REFURB_TIERS.map(({ key, label }) => {
         const tier = archetype[key];
+        if (!tier) return null;  // TABULA BE omits some tiers for recent periods
         const checked = selectedTier === key;
         const color = "var(--brand)";
-        const est = quantities ? ukTierCostCarbon(archetype.as_built, tier, quantities) : null;
+        const est = quantities && !isBE ? ukTierCostCarbon(archetype.as_built, tier, quantities) : null;
         const estCost = est?.costGbp ?? null;
         const estCarbon = est?.carbonKgCo2e ?? null;
         return (
@@ -650,10 +665,18 @@ function UkTierPicker({
           </button>
         );
       })}
+      {isBE ? (
+      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: 0 }}>
+        TABULA Belgium (VITO): standard = upgrade towards EPBD new-build requirements, ambitious = towards a low-energy
+        standard. No open Belgian retrofit cost dataset is wired in yet, so packages show no cost.
+        The energy columns below come from an EnergyPlus simulation using this tier's U-values, applied to every selected building.
+      </p>
+      ) : (
       <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: 0 }}>
         {UK_COST_CARBON_SOURCE_NOTE} Quantities come from the building's footprint, wall area and window-to-wall ratio.
         The energy columns below come from an EnergyPlus simulation using this tier's U-values, applied to every selected building.
       </p>
+      )}
     </div>
   );
 }
@@ -664,7 +687,10 @@ export default function RenovationSimulator() {
   const { project, setProject } = useWizardStore();
 
   const isUK = project.country === "United Kingdom";
-  const COUNTRY = isUK ? "gb" : "se";
+  // Belgium reuses the UK's TABULA-tier flow; UK-only parts (DESNZ £, tariffs,
+  // HVAC catalogue, optimiser) stay behind isUK.
+  const isBE = project.country === "Belgium";
+  const COUNTRY = isUK ? "gb" : isBE ? "be" : "se";
 
   const components = project.renovationEnvelopeComponents.length > 0
     ? project.renovationEnvelopeComponents
@@ -871,7 +897,7 @@ export default function RenovationSimulator() {
     try {
       const { batch_id } = await api.simulationBatchSubmit({
         country: COUNTRY,
-        ...(isUK ? {} : { city_id: CITY_ID }),
+        ...(isUK || isBE ? {} : { city_id: seCityId(project.city) }),
         buildings: entries.map(({ g }) => ({ lat: g.lat, lon: g.lon, address: g.address })),
         package_id: packageId, package_label: packageLabel ?? null,
         ...overrides,
@@ -899,7 +925,7 @@ export default function RenovationSimulator() {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geometries, isUK, pollBatch]);
+  }, [geometries, isUK, isBE, pollBatch]);
 
   function makeBuildingRows(
     entries: GeoEntry[],
@@ -970,8 +996,8 @@ export default function RenovationSimulator() {
       geometries.map((g) => api.lookupWWR(g.lat, g.lon).then((r) => (r.found ? r.record : null)).catch(() => null))
     ).then((records) => setWwrByIndex(Object.fromEntries(records.map((r, i) => [i, r] as const))));
 
-    if (isUK) {
-      loadUkArchetypes().then((archetypes) => {
+    if (isUK || isBE) {
+      (isBE ? loadBeArchetypes() : loadUkArchetypes()).then((archetypes) => {
         // tabulaPeriodUsed (not tabulaPeriod) always carries whichever period actually
         // drove the backend's own TABULA lookup - real known year OR an EHS-sampled
         // era - so this matches the SAME archetype the building's as-built u-values
@@ -1030,13 +1056,13 @@ export default function RenovationSimulator() {
           zone: r.zone ?? null,
         });
       }).catch(() => {});
-    } else {
+    } else if (!isBE) {
       api.energyPrice("se").then((r) => {
         if (active && r.live && r.average_price != null) setLivePriceSek(r.average_price);
       }).catch(() => {});
     }
     return () => { active = false; };
-  }, [isUK, project.city]);
+  }, [isUK, isBE, project.city]);
   const ukHvac = useMemo(() => (isUK ? ukHvacCatalogue(ukTariffs) : undefined), [isUK, ukTariffs]);
 
   /* ── derived: items/areas/recommendations for the active line item (Sweden only) ── */
@@ -1239,7 +1265,7 @@ export default function RenovationSimulator() {
   // auto-named from the chosen materials.
   function addPackage() {
     if (geometries.length === 0) return;
-    if (isUK) {
+    if (isUK || isBE) {
       addUkPackage();
       return;
     }
@@ -1408,6 +1434,8 @@ export default function RenovationSimulator() {
     // UK money is GBP; the package row's field is still named costSEK (shared
     // with Sweden) and every UK display formats it as £.
     const buildingRows = makeBuildingRows(targetEntries, (g, idx) => {
+      // Belgium: no open retrofit cost/carbon source wired in yet - show "—", not a UK figure.
+      if (isBE) return { costSEK: null, carbonKgCO2e: null };
       const est = ukTierCostCarbon(ukArchetype.as_built, tier, ukQuantitiesFor(g, wwrByIndex[idx] ?? null));
       return { costSEK: est.costGbp, carbonKgCO2e: est.carbonKgCo2e };
     });
@@ -1430,7 +1458,7 @@ export default function RenovationSimulator() {
   function retryPackage(pkg: RenovationCalcPackage) {
     if (geometries.length === 0) return;
     let overrides: Record<string, number> = {};
-    if (isUK) {
+    if (isUK || isBE) {
       const sel = pkg.selections[UK_TIER_SELECTIONS_KEY];
       const tierKey = sel?.wikellsCode as RefurbTierKey | undefined;
       const tier = tierKey && ukArchetype ? ukArchetype[tierKey] : null;
@@ -1517,6 +1545,7 @@ export default function RenovationSimulator() {
   const regretResult = useMemo(() => {
     if (regretOptions.length < 2 || baselineAgg?.avgTotalKwhM2Yr == null || totalFloorAreaM2 <= 0) return null;
     if (isUK && !ukBlend) return null;
+    if (isBE) return null;
     const scenarios = [
       { key: "low", label: "Low", priceSek: regretPrices[0]! },
       { key: "med", label: "Medium", priceSek: regretPrices[1]! },
@@ -1531,7 +1560,7 @@ export default function RenovationSimulator() {
       priceBasis: `Blended £/kWh: ${Math.round(ukBlend.share * 100)}% of baseline energy is heating at the gas price (£${ukBlend.gas}/kWh), `
         + `the rest at electricity (£${ukBlend.elec}/kWh) — Ofgem price cap, ${ukTariffs?.zone ?? "Yorkshire"}. Package costs are 2020 prices, ex VAT.`,
     };
-  }, [isUK, ukBlend, ukTariffs?.zone, regretOptions, baselineAgg?.avgTotalKwhM2Yr, totalFloorAreaM2, regretPrices, regretAlpha]);
+  }, [isUK, isBE, ukBlend, ukTariffs?.zone, regretOptions, baselineAgg?.avgTotalKwhM2Yr, totalFloorAreaM2, regretPrices, regretAlpha]);
   // Persist to the store for the Step-5 report — only when the content changes.
   const regretSigRef = useRef<string>("");
   useEffect(() => {
@@ -1752,6 +1781,16 @@ export default function RenovationSimulator() {
           name: p.name,
           buildingLabel: p.buildings.length === 1 ? (p.buildings[0]?.address ?? null) : null,
           components: Object.fromEntries(Object.entries(p.selections).map(([k, s]) => {
+            if (isBE && k === UK_TIER_SELECTIONS_KEY) {
+              const tier = REFURB_TIERS.find((t) => t.key === s.wikellsCode);
+              const u = ukArchetype?.[s.wikellsCode as RefurbTierKey];
+              return ["Envelope", {
+                code: s.wikellsCode,
+                description: `${tier?.label ?? s.wikellsCode} (TABULA Belgium${ukArchetype ? `, ${ukArchetype.type_label}` : ""})`,
+                costSEK: 0,
+                uValue: u?.u_wall,
+              }];
+            }
             const it = itemByCode[s.wikellsCode];
             const layers = s.layers?.length
               ? s.layers.map((l) => ({
@@ -1778,7 +1817,7 @@ export default function RenovationSimulator() {
     navigate("/step/5");
   }
 
-  const canAddPackage = isUK ? ukTier != null : packageCombos > 0;
+  const canAddPackage = isUK || isBE ? ukTier != null : packageCombos > 0;
 
   // The wizard footer's Continue saves this step's results before advancing.
   useWizardStepNav({ onNext: handleSaveAndContinue });
@@ -1793,7 +1832,7 @@ export default function RenovationSimulator() {
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>Renovation Calculator</h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          {isUK
+          {isUK || isBE
             ? "Pick a refurbishment tier and compare its simulated performance against the baseline."
             : <>Design build-ups, combine them into packages, and simulate each against the baseline to compare energy, cost and carbon
                {geometries.length > 1 ? ` — across the ${geometries.length} buildings from Step 3.` : "."}</>}
@@ -1809,8 +1848,8 @@ export default function RenovationSimulator() {
       {geometries.length > 0 && (
         <>
           <div ref={(el) => { stageRefs.current[1] = el; }} style={{ scrollMarginTop: 80 }} />
-          <StageHeader n={1} title={isUK ? "Choose refurbishment tier & run" : "Design assemblies"}
-            hint={isUK
+          <StageHeader n={1} title={isUK || isBE ? "Choose refurbishment tier & run" : "Design assemblies"}
+            hint={isUK || isBE
               ? (baselineAgg?.avgTotalKwhM2Yr != null
                 ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr · TABULA standard or ambitious refurbishment`
                 : "TABULA standard or ambitious refurbishment, simulated in EnergyPlus")
@@ -1846,7 +1885,7 @@ export default function RenovationSimulator() {
         </div>
       )}
 
-      {geometries.length > 0 && !isUK && hasEnvelope && (
+      {geometries.length > 0 && !isUK && !isBE && hasEnvelope && (
         <>
 
           {/* Supplier discount — the % the property owner gets off catalogue material
@@ -1880,7 +1919,7 @@ export default function RenovationSimulator() {
               of the stage: it only applies to owners with negotiated Swedish supplier
               rates, and it was the first thing in the way of the material-picking
               flow. It now sits with the prices it modifies. */}
-          {!isUK && (
+          {!isUK && !isBE && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 8, position: "relative" }}>
               {(project.supplierDiscountPct || 0) > 0 && (
                 <span style={{ fontSize: 10.5, color: "#2FB477", fontWeight: 700 }}>
@@ -2134,7 +2173,7 @@ export default function RenovationSimulator() {
       {geometries.length > 0 && (
         <>
           {/* ══ PACKAGES — folded into stage 2 (Design & Packages) ══════ */}
-          {!isUK && hasEnvelope && openStage === 2 && (
+          {!isUK && !isBE && hasEnvelope && openStage === 2 && (
             <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Packages</span>
@@ -2275,16 +2314,17 @@ export default function RenovationSimulator() {
 
           {/* UK keeps the tier-based flow. It lives in stage 1 because the
               stage 2 header only exists for the Swedish assembly designer. */}
-          {isUK && openStage === 1 && (
+          {(isUK || isBE) && openStage === 1 && (
             <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(114,28,184,0.2)" }}>
               <UkTierPicker
+                country={isBE ? "be" : "gb"}
                 archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier}
                 quantities={geometries[0] ? ukQuantitiesFor(geometries[0], wwrByIndex[0] ?? null) : null} buildingCount={geometries.length}
                 uSource={geometries[0]?.tabulaUSource ?? null}
               />
             </div>
           )}
-          {isUK && openStage === 1 && (
+          {(isUK || isBE) && openStage === 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <input value={packageName} onChange={(e) => setPackageName(e.target.value)}
                 placeholder="Package name (optional)"
@@ -2328,7 +2368,7 @@ export default function RenovationSimulator() {
 
           {/* The trade-off curve now updates live from the same picks, so it's a
               companion view (not a separate "run this instead" tool). */}
-          {!isUK && hasEnvelope && openStage === 2 && (
+          {!isUK && !isBE && hasEnvelope && openStage === 2 && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 -4px" }}>
               <span style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
               <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>
@@ -2341,7 +2381,7 @@ export default function RenovationSimulator() {
           {/* Multi-objective optimizer (Sweden) — Pareto front over the fast
               degree-day physics; each validated winner runs in EPSM and drops
               into the comparison table below. */}
-          {!isUK && hasEnvelope && openStage === 2 && (
+          {!isUK && !isBE && hasEnvelope && openStage === 2 && (
             <div>
               <button
                 onClick={() => setOptimizerOpen((o) => !o)}
@@ -2366,7 +2406,7 @@ export default function RenovationSimulator() {
             </div>
           )}
 
-          {(isUK || hasEnvelope) && (<>
+          {(isUK || isBE || hasEnvelope) && (<>
           <div ref={(el) => { stageRefs.current[3] = el; }} style={{ scrollMarginTop: 80 }} />
           <StageHeader n={3} title="Results"
             hint={packages.filter((p) => !p.isBaseline).length
@@ -2445,8 +2485,9 @@ export default function RenovationSimulator() {
                 { k: "pkg", l: "Package" },
                 { k: "cost", l: "Cost", sub: isUK
                   ? `installed capex — DESNZ install costs, ${UK_COST_PRICE_BASIS}, one-off`
+                  : isBE ? "no open Belgian cost data yet"
                   : "installed capex — materials + labour (Wikells), one-off" },
-                { k: "carbon", l: "Carbon", sub: isUK ? "embodied A1-A3, Boverket" : undefined },
+                { k: "carbon", l: "Carbon", sub: isUK ? "embodied A1-A3, Boverket" : isBE ? "not yet available" : undefined },
                 { k: "heat", l: "Heating", sub: "kWh/m²·yr" },
                 { k: "total", l: "Total energy", sub: "heating + hot water + cooling + lighting + equipment, kWh/m²·yr" },
                 { k: "status", l: "Status" },
@@ -2492,7 +2533,7 @@ export default function RenovationSimulator() {
                       {pkg.name}{agg.n > 1 ? ` (${agg.n} buildings)` : ""}
                       {/* Applied envelope U-values — makes an uninsulated pick (which
                           replaces, never adds to, the baseline U) explain its own result. */}
-                      {!pkg.isBaseline && !isUK && (() => {
+                      {!pkg.isBaseline && !isUK && !isBE && (() => {
                         const us = appliedUValues(pkg, itemByCode);
                         if (!us.length) return null;
                         return (
@@ -2677,7 +2718,7 @@ export default function RenovationSimulator() {
           </>)}
 
           {/* Heating system — only when HVAC is a selected renovation component */}
-          {openStage === 3 && hasHeating && baselineAgg?.avgHeatingKwhM2Yr != null && totalFloorAreaM2 > 0 && (
+          {openStage === 3 && hasHeating && !isBE && baselineAgg?.avgHeatingKwhM2Yr != null && totalFloorAreaM2 > 0 && (
             <HeatingSystemPanel
               heatingDemandKwhM2Yr={baselineAgg.avgHeatingKwhM2Yr}
               floorAreaM2={totalFloorAreaM2}

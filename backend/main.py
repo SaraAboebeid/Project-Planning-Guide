@@ -92,6 +92,144 @@ def _get_buildings_list() -> list:
         _BUILDINGS_LIST = _sanitize(raw)
     return _BUILDINGS_LIST
 
+# ── Other Swedish cities (tools/se/se_cities.py) ─────────────────────────────
+# Gothenburg stays the single buildings.json above. A city built with
+# tools/se/build_city.py writes buildings_<slug>.json; requests whose point lies
+# in that city's bbox are served from it. Points anywhere else resolve to the
+# Gothenburg list, so Gothenburg behaves exactly as before.
+_SE_CITY_BUILDINGS: dict[str, list] = {}
+
+
+def _se_cities() -> dict:
+    """Hand-configured Swedish cities plus municipalities built on demand
+    (data/se/dynamic_cities.json, re-read so a finished build shows up at once).
+    Each built municipality's weather file joins CITY_TO_EPW."""
+    try:
+        from tools.se.se_cities import load_cities
+        cities = load_cities()
+    except Exception:
+        return {}
+    for key, c in cities.items():
+        if c.get("epw"):
+            CITY_TO_EPW.setdefault(key, c["epw"])
+    return cities
+
+
+def _se_city_file(city_id: str) -> Path:
+    slug = (_se_cities().get(city_id) or {}).get("slug", city_id)
+    return PROJECT_ROOT / "frontend" / "public" / f"buildings_{slug}.json"
+
+
+def _se_city_at(lat: float, lon: float) -> str:
+    """Swedish city id whose built payload covers the point; 'gothenburg' otherwise."""
+    for key, c in _se_cities().items():
+        if key == "gothenburg" or (c.get("on_demand") and not c.get("built")):
+            continue
+        lo, la, LO, LA = c["bbox4326"]
+        if lo <= lon <= LO and la <= lat <= LA and _se_city_file(key).exists():
+            return key
+    return "gothenburg"
+
+
+def _se_buildings(city_id: str | None) -> list:
+    if not city_id or city_id == "gothenburg" or not _se_city_file(city_id).exists():
+        return _get_buildings_list()
+    if city_id not in _SE_CITY_BUILDINGS:
+        raw = json.loads(_se_city_file(city_id).read_text(encoding="utf-8-sig"))
+        _SE_CITY_BUILDINGS[city_id] = _sanitize(raw)
+    return _SE_CITY_BUILDINGS[city_id]
+
+
+def _se_buildings_at(lat: float, lon: float) -> list:
+    return _se_buildings(_se_city_at(lat, lon))
+
+
+@app.get("/api/se/cities")
+def se_cities_built():
+    """Swedish cities with a built building payload (Gothenburg always)."""
+    out = []
+    for key, c in _se_cities().items():
+        built = key == "gothenburg" or (_se_city_file(key).exists() and c.get("built", True))
+        out.append({"id": key, "name": c["name"], "kommun": c.get("kommun"),
+                    "kommun_code": c.get("kommun_code"), "bbox4326": c["bbox4326"],
+                    "center": c.get("center"), "on_demand": bool(c.get("on_demand")),
+                    "stats": c.get("stats"), "built": built})
+    return {"cities": out}
+
+
+# ── Build any Swedish municipality on demand (tools/se/build_any_city.py) ─────
+_SE_BUILD_DIR = PROJECT_ROOT / "data" / "se" / "builds"
+_SE_BUILD_PROCS: dict[str, "subprocess.Popen"] = {}
+
+
+@app.get("/api/se/kommuner")
+def se_kommuner():
+    """All 290 municipalities (tools/se/kommuner.py), marked built / building."""
+    path = PROJECT_ROOT / "data" / "se" / "kommuner.json"
+    if not path.exists():
+        raise HTTPException(404, "Municipality list not built - run: python tools/se/kommuner.py")
+    built = {c.get("kommun_code") for c in _se_cities().values()
+             if c.get("kommun_code") and c.get("built")}
+    built.add("1480")                                        # Gothenburg
+    if _se_city_file("malmo").exists():
+        built.add("1280")
+    out = []
+    for k in json.loads(path.read_text(encoding="utf-8")):
+        proc = _SE_BUILD_PROCS.get(k["code"])
+        out.append({"code": k["code"], "name": k["name"], "slug": k["slug"], "lan": k["lan"],
+                    "epc_with_energy": k["epc_with_energy"], "built": k["code"] in built,
+                    "building": bool(proc and proc.poll() is None)})
+    return {"kommuner": out}
+
+
+from pydantic import BaseModel  # noqa: E402 (defined here, before the module's later import)
+
+
+class SeBuildRequest(BaseModel):
+    code: str
+
+
+@app.post("/api/se/cities/build")
+def se_build_city(req: SeBuildRequest):
+    """Start building a municipality in the background; poll /api/se/cities/build/{code}."""
+    import subprocess
+    code = (req.code or "").strip()
+    if not code.isdigit() or len(code) != 4:
+        raise HTTPException(422, "code must be a 4-digit municipality code")
+    running = _SE_BUILD_PROCS.get(code)
+    if running and running.poll() is None:
+        return se_build_status(code)
+    log = _SE_BUILD_DIR / f"{code}.stdout.log"
+    _SE_BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    _SE_BUILD_PROCS[code] = subprocess.Popen(
+        [sys.executable, "tools/se/build_any_city.py", code], cwd=PROJECT_ROOT,
+        stdout=open(log, "w", encoding="utf-8"), stderr=subprocess.STDOUT,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+    return {"code": code, "state": "starting"}
+
+
+@app.get("/api/se/cities/build/{code}")
+def se_build_status(code: str):
+    path = _SE_BUILD_DIR / f"{code}.json"
+    proc = _SE_BUILD_PROCS.get(code)
+    if not path.exists():
+        if proc and proc.poll() is None:
+            return {"code": code, "state": "starting"}
+        raise HTTPException(404, f"No build for {code}")
+    for attempt in range(10):   # the build script may be swapping the file in right now
+        try:
+            d = json.loads(path.read_text(encoding="utf-8"))
+            break
+        except (PermissionError, ValueError):
+            __import__("time").sleep(0.05 * (attempt + 1))
+    else:
+        return {"code": code, "state": "running"}
+    # The script died without writing its final state (killed, crashed on import).
+    if d.get("state") == "running" and proc and proc.poll() not in (None, 0):
+        d.update(state="failed", error=f"build process exited with code {proc.returncode}")
+    return d
+
+
 def _load_buildings() -> bytes:
     global _BUILDINGS_GZ
     if _BUILDINGS_GZ is None:
@@ -192,16 +330,29 @@ async def status():
 
 # ── UK data (English Housing Survey 2024-25 + OSM/EPC city buildings) ───────
 _UK_DIR = PROJECT_ROOT / "frontend" / "public" / "uk"
+_BE_DIR = PROJECT_ROOT / "frontend" / "public" / "be"
+
+# Countries whose buildings come as district payloads (tools/<cc>/ pipelines)
+# rather than Sweden's single city-wide buildings.json. Same record schema.
+_DISTRICT_COUNTRIES = {
+    "gb": (_UK_DIR, "python tools/uk/ingest_ehs.py && python tools/uk/uk_data_pipeline.py"),
+    "be": (_BE_DIR, "python tools/be/ingest_tabula.py && python tools/be/ingest_statbel.py "
+                    "&& python tools/be/ingest_urbis3d.py && python tools/be/be_data_pipeline.py"),
+}
 
 
-def _read_uk_json(name: str):
-    path = _UK_DIR / name
+def _district_cc(country: str | None) -> str | None:
+    """'gb'/'be' for a district-payload country ('uk' is an alias), else None (Sweden)."""
+    cc = (country or "").lower()
+    cc = "gb" if cc == "uk" else cc
+    return cc if cc in _DISTRICT_COUNTRIES else None
+
+
+def _read_uk_json(name: str, cc: str = "gb"):
+    base, how = _DISTRICT_COUNTRIES[cc]
+    path = base / name
     if not path.exists():
-        raise HTTPException(
-            404,
-            f"{name} not built yet - run: python tools/uk/ingest_ehs.py "
-            "&& python tools/uk/uk_data_pipeline.py",
-        )
+        raise HTTPException(404, f"{name} not built yet - run: {how}")
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -255,29 +406,30 @@ def uk_buildings(city_id: str):
 # keyed by which UK district's JSON to load.
 _UK_BUILDINGS_CACHE: dict[str, list] = {}
 
-def _get_uk_buildings_list(city_id: str) -> list:
-    if city_id not in _UK_BUILDINGS_CACHE:
-        registry = _read_uk_json("cities.json")
+def _get_uk_buildings_list(city_id: str, cc: str = "gb") -> list:
+    key = f"{cc}:{city_id}"
+    if key not in _UK_BUILDINGS_CACHE:
+        registry = _read_uk_json("cities.json", cc)
         city = next((c for c in registry["cities"] if c["id"] == city_id), None)
         if city is None:
             known = ", ".join(c["id"] for c in registry["cities"]) or "none built yet"
             raise HTTPException(404, f"Unknown city '{city_id}'. Built cities: {known}")
-        raw = _read_uk_json(Path(city["data_file"]).name)
-        _UK_BUILDINGS_CACHE[city_id] = _sanitize(raw)
-    return _UK_BUILDINGS_CACHE[city_id]
+        raw = _read_uk_json(Path(city["data_file"]).name, cc)
+        _UK_BUILDINGS_CACHE[key] = _sanitize(raw)
+    return _UK_BUILDINGS_CACHE[key]
 
 
-def _resolve_uk_city_id(lat: float, lon: float) -> str:
-    """Nearest built UK district to a point, so callers don't need their own
-    copy of the district registry - mirrors how Sweden's /api/building never
-    asks the caller which "area" a point is in either."""
-    registry = _read_uk_json("cities.json")
+def _resolve_uk_city_id(lat: float, lon: float, cc: str = "gb") -> str:
+    """Nearest built district (UK or Belgium) to a point, so callers don't need
+    their own copy of the district registry - mirrors how Sweden's /api/building
+    never asks the caller which "area" a point is in either."""
+    registry = _read_uk_json("cities.json", cc)
     cities = registry["cities"]
     if not cities:
-        raise HTTPException(404, "No UK cities built yet")
+        raise HTTPException(404, f"No {cc.upper()} cities built yet")
     nearest = min(cities, key=lambda c: _haversine_m(lat, lon, c["lat"], c["lon"]))
     if _haversine_m(lat, lon, nearest["lat"], nearest["lon"]) > nearest.get("radius_m", 1200) * 2:
-        raise HTTPException(404, "No built UK district near this point")
+        raise HTTPException(404, f"No built {cc.upper()} district near this point")
     return nearest["id"]
 
 
@@ -292,9 +444,13 @@ def get_uk_building(lat: float = Query(...), lon: float = Query(...), city_id: s
     city_id is optional - when omitted, the nearest built UK district is
     resolved automatically (see _resolve_uk_city_id).
     """
+    return _district_building(lat, lon, city_id, "gb")
+
+
+def _district_building(lat: float, lon: float, city_id: str | None, cc: str) -> dict:
     if not city_id:
-        city_id = _resolve_uk_city_id(lat, lon)
-    buildings = _get_uk_buildings_list(city_id)
+        city_id = _resolve_uk_city_id(lat, lon, cc)
+    buildings = _get_uk_buildings_list(city_id, cc)
 
     candidates: list[tuple[float, dict]] = []
     for b in buildings:
@@ -329,7 +485,40 @@ def get_uk_building(lat: float = Query(...), lon: float = Query(...), city_id: s
         else None
     )
 
-    return _uk_building_response(best, footprint, perimeter_m, wall_area_m2, c_lat, c_lon, best_dist)
+    return _uk_building_response(best, footprint, perimeter_m, wall_area_m2, c_lat, c_lon, best_dist, cc)
+
+
+# ── Belgium (Brussels UrbIS / Flemish GRB districts, TABULA BE, Statbel) ──────
+@app.get("/api/be/cities")
+def be_cities():
+    """Registry of built Belgian districts (Brussels, Gent, ...)."""
+    return _read_uk_json("cities.json", "be")
+
+
+@app.get("/api/be/tabula")
+def be_tabula():
+    """TABULA Belgium (VITO): as-built U-values and heating need by type and
+    period, with standard and advanced refurbishment variants."""
+    return _read_uk_json("tabula_be.json", "be")
+
+
+@app.get("/api/be/statbel")
+def be_statbel():
+    """Statbel building stock: construction-period counts per municipality x type."""
+    return _read_uk_json("statbel_building_stock.json", "be")
+
+
+@app.get("/api/be/buildings/{city_id}")
+def be_buildings(city_id: str):
+    """Extruded building payload for one Belgian district, same schema as /api/uk/buildings."""
+    return _get_uk_buildings_list(city_id, "be")
+
+
+@app.get("/api/be/building")
+def get_be_building(lat: float = Query(...), lon: float = Query(...), city_id: str | None = Query(None)):
+    """Belgian equivalent of /api/uk/building. No EPC: energy is the TABULA
+    archetype's heating need; year is Statbel-sampled unless OSM tags one."""
+    return _district_building(lat, lon, city_id, "be")
 
 
 # ── what the shoebox is not a fair model of ──────────────────────────────────
@@ -379,14 +568,14 @@ def _model_scope(b: dict) -> Optional[dict]:
     return None
 
 
-def _uk_building_response(best: dict, footprint, perimeter_m, wall_area_m2, c_lat, c_lon, dist_m) -> dict:
+def _uk_building_response(best: dict, footprint, perimeter_m, wall_area_m2, c_lat, c_lon, dist_m, cc: str = "gb") -> dict:
     height_val = best.get("height")
     # EPC "energy_consumption_current" is the certificate's primary-energy
     # intensity - the same kind of figure as Boverket's energiprestanda. Only
     # fall back to the TABULA archetype estimate when no certificate has one.
     epc_energy = _clean(best.get("energy_consumption_kwh_m2_yr"))
     return {
-        "country":       "gb",
+        "country":       cc,
         "address":       best.get("address"),
         "postcode":      best.get("postcode"),
         "height":        _clean(height_val),
@@ -467,6 +656,15 @@ def _uk_building_response(best: dict, footprint, perimeter_m, wall_area_m2, c_la
         "epc_median_year": best.get("epc_median_year"),
         "epc_stale": best.get("epc_stale"),
         "has_epc":       bool(best.get("has_epc")),
+        # Belgium: register ids and how each estimate was made (tools/be/be_data_pipeline.py).
+        "register_id":   best.get("register_id"),
+        "capakey":       best.get("capakey"),
+        "stat_sector":   best.get("stat_sector"),
+        "nis":           best.get("nis"),
+        "attached_neighbours": best.get("attached_neighbours"),
+        "height_source": best.get("height_source"),
+        "height_ridge":  _clean(best.get("height_ridge")),
+        "tabula_code":   best.get("tabula_code"),
         "lat":           round(c_lat, 6),
         "lon":           round(c_lon, 6),
         "dist_m":        round(dist_m, 1),
@@ -545,6 +743,28 @@ def country_profile(country: str = Query(...)):
             },
         }
 
+    if country == "be":
+        try:
+            cities = _read_uk_json("cities.json", "be")["cities"]
+        except HTTPException:
+            cities = []
+        if cities:
+            return {
+                "country": "be",
+                "name": "Belgium",
+                "viewer": {
+                    "summary": f"{len(cities)} district(s): {', '.join(c['district'] for c in cities)}. "
+                               "No open per-building EPCs: envelopes from TABULA BE, construction "
+                               "period sampled from Statbel unless OpenStreetMap tags a year.",
+                    "kpis": [
+                        {"key": "buildings", "label": "3D Buildings", "value": sum(c["buildings"] for c in cities), "unit": "count"},
+                        {"key": "residential", "label": "Residential", "value": sum(c.get("residential", 0) for c in cities), "unit": "count"},
+                        {"key": "tabula", "label": "TABULA matched", "value": sum(c.get("tabula_matched", 0) for c in cities), "unit": "count"},
+                    ],
+                    "energy_class_share": {},
+                },
+            }
+
     return {
         "country": country,
         "name": {"be": "Belgium", "ie": "Ireland"}.get(country, country.upper()),
@@ -616,6 +836,8 @@ async def geocode(address: str = Query(...), country: str | None = Query(None)):
     # Without a country filter "10 High Street" resolves anywhere in the world.
     if country and country.lower() in ("gb", "uk", "se"):
         params["countrycodes"] = "gb" if country.lower() in ("gb", "uk") else "se"
+    elif country and country.lower() == "be":
+        params["countrycodes"] = "be"
     async with httpx.AsyncClient() as client:
         r = await client.get(
             "https://nominatim.openstreetmap.org/search",
@@ -803,13 +1025,13 @@ def _ring_perimeter_m(coords: list) -> float | None:
 _SECONDARY_USE = {"komplement", "industri"}
 
 @app.get("/api/building")
-def get_building(lat: float = Query(...), lon: float = Query(...)):
+def get_building(lat: float = Query(...), lon: float = Query(...), city_id: str | None = Query(None)):
     """Return the nearest meaningful EUBUCCO building within 150 m, enriched with derived fields.
 
     Prefers primary use types (residential, civic, etc.) over secondary ones (komplement, industri)
     so that a residential tower 60 m away beats a garage/annex 10 m away.
     """
-    buildings = _get_buildings_list()
+    buildings = _se_buildings(city_id) if city_id else _se_buildings_at(lat, lon)
 
     # Collect all candidates within 150 m with their distances
     candidates: list[tuple[float, dict]] = []
@@ -957,12 +1179,12 @@ def _is_uk(country: str | None) -> bool:
     return (country or "").lower() in ("gb", "uk")
 
 
-def _uk_bbox_match(north: float, south: float, east: float, west: float, poly) -> list[tuple[dict, float, float]]:
-    """UK buildings whose centroid is in the bbox (and polygon), from the
-    district nearest the bbox centre."""
-    city_id = _resolve_uk_city_id((north + south) / 2, (east + west) / 2)
+def _uk_bbox_match(north: float, south: float, east: float, west: float, poly, cc: str = "gb") -> list[tuple[dict, float, float]]:
+    """District buildings (UK or Belgium) whose centroid is in the bbox (and
+    polygon), from the district nearest the bbox centre."""
+    city_id = _resolve_uk_city_id((north + south) / 2, (east + west) / 2, cc)
     out = []
-    for b in _get_uk_buildings_list(city_id):
+    for b in _get_uk_buildings_list(city_id, cc):
         c_lat, c_lon = _polygon_centroid(b.get("coordinates") or [])
         if c_lat == 0.0 and c_lon == 0.0:
             continue
@@ -1037,6 +1259,7 @@ def buildings_bbox_stats(
     west:  float = Query(...),
     polygon: str | None = Query(None),
     country: str | None = Query(None),
+    city_id: str | None = Query(None),
 ):
     """Return aggregate EUBUCCO stats for every building whose centroid is inside
     the bbox. If a ``polygon`` (lon,lat;… vertices) is given, the bbox is used as
@@ -1044,12 +1267,12 @@ def buildings_bbox_stats(
     so an arbitrary drawn shape selects exactly its buildings."""
     from collections import Counter
     poly = _parse_polygon(polygon)
-    if _is_uk(country):
-        # Normalise UK records to the Swedish keys the aggregation below reads.
-        matched = [{**b, "energy": _uk_energy(b)} for b, _, _ in _uk_bbox_match(north, south, east, west, poly)]
+    if _district_cc(country):
+        # Normalise UK/BE records to the Swedish keys the aggregation below reads.
+        matched = [{**b, "energy": _uk_energy(b)} for b, _, _ in _uk_bbox_match(north, south, east, west, poly, _district_cc(country))]
         all_buildings = []
     else:
-        all_buildings = _get_buildings_list()
+        all_buildings = _se_buildings(city_id) if city_id else _se_buildings_at((north + south) / 2, (east + west) / 2)
         matched = []
     for b in all_buildings:
         coords = b.get("coordinates") or []
@@ -1347,6 +1570,7 @@ def buildings_bbox_list(
     district: str | None = Query(None),
     polygon: str | None = Query(None),
     country: str | None = Query(None),
+    city_id: str | None = Query(None),
 ):
     """Return individual building records, joined with Boplats rental data where available.
 
@@ -1359,19 +1583,22 @@ def buildings_bbox_list(
     import re, sqlite3, httpx
     from concurrent.futures import ThreadPoolExecutor, wait as fut_wait
 
-    if _is_uk(country):
+    if _district_cc(country):
         if None in (north, south, east, west):
-            raise HTTPException(422, "UK area selection needs a bounding box")
+            raise HTTPException(422, "Area selection outside Sweden needs a bounding box")
         rows = [_uk_bbox_row(b, la, lo) for b, la, lo in
-                _uk_bbox_match(north, south, east, west, _parse_polygon(polygon))]
+                _uk_bbox_match(north, south, east, west, _parse_polygon(polygon), _district_cc(country))]
         if not rows:
             raise HTTPException(404, "No buildings found in the drawn area" if polygon else "No buildings found in bounding box")
         return rows
 
     # ── Match buildings by district name or bbox (optionally polygon-refined) ─
-    all_buildings = _get_buildings_list()
-    matched: list[tuple] = []
     have_bbox = None not in (north, south, east, west)
+    # A named district is a Gothenburg primärområde; a box/shape may be in another built city.
+    all_buildings = (_se_buildings(city_id) if city_id and not district
+                     else _se_buildings_at((north + south) / 2, (east + west) / 2) if have_bbox and not district
+                     else _get_buildings_list())
+    matched: list[tuple] = []
     poly = _parse_polygon(polygon)
     if district:
         want = district.strip().casefold()
@@ -2902,11 +3129,21 @@ EPW_DIR = PROJECT_ROOT / "data" / "epw"
 # data/epw/. All 4 London districts share one weather station (Heathrow).
 CITY_TO_EPW = {
     "gothenburg": "SWE_VG_Gothenburg-Landvetter.AP.025260_TMYx.2011-2025.epw",
+    # Other Swedish cities (tools/se/se_cities.py): nearest TMYx station, climate.onebuilding.org.
+    "malmo": "SWE_SN_Malmo.026350_TMYx.2011-2025.epw",
     "london_kings_cross": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
     "london_westminster": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
     "london_canary_wharf": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
     "london_southwark": "GBR_ENG_London.City.AP.037683_TMYx.2011-2025.epw",
     "rotherham": "GBR_ENG_Doncaster.Sheffield-Hood.AP.034054_TMYx.2011-2025.epw",
+    # Belgium (tools/be/cities.py): Uccle (RMI station, inside the Brussels region)
+    # for Brussels; also for Gent until a Flemish station file is added.
+    "brussels_saint_gilles": "BEL_VLG_Uccle.064470_TMYx.2011-2025.epw",
+    "brussels_schaerbeek": "BEL_VLG_Uccle.064470_TMYx.2011-2025.epw",
+    "gent_centrum": "BEL_VLG_Uccle.064470_TMYx.2011-2025.epw",
+    # Liege: Bierset airport, ~8 km west of the centre.
+    "liege_centre": "BEL_WAL_Liege.AP.064780_TMYx.2011-2025.epw",
+    "liege_saint_leonard": "BEL_WAL_Liege.AP.064780_TMYx.2011-2025.epw",
 }
 
 
@@ -3106,7 +3343,7 @@ def _envelope_overrides(building: dict, country: str, req) -> dict:
         "u_wall_override": req.u_wall_override, "u_roof_override": req.u_roof_override,
         "u_win_override": req.u_win_override, "u_floor_override": req.u_floor_override,
     }
-    if (country or "").lower() != "gb":
+    if (country or "").lower() not in ("gb", "be"):
         return out
     for key, fields in (("u_wall_override", ("u_wall_epc", "tabula_u_wall")), ("u_roof_override", ("u_roof_epc", "tabula_u_roof")),
                         ("u_win_override", ("u_win_epc", "tabula_u_win")), ("u_floor_override", ("u_floor_epc", "tabula_u_floor"))):
@@ -3197,10 +3434,10 @@ async def submit_simulation(req: SimulationSubmitRequest):
     import httpx
 
     city_id = req.city_id
-    if req.country == "gb" and not city_id:
-        city_id = _resolve_uk_city_id(req.lat, req.lon)
+    if _district_cc(req.country) and not city_id:
+        city_id = _resolve_uk_city_id(req.lat, req.lon, _district_cc(req.country))
     elif req.country == "se" and not city_id:
-        city_id = "gothenburg"  # only Swedish city currently mapped — safe default
+        city_id = _se_city_at(req.lat, req.lon)  # 'gothenburg' unless another built city covers it
 
     epw_name = CITY_TO_EPW.get(city_id or "")
     if not epw_name:
@@ -3219,7 +3456,7 @@ async def submit_simulation(req: SimulationSubmitRequest):
             c_lat, c_lon = _polygon_centroid(b.get("coordinates") or [])
             return _haversine_m(req.lat, req.lon, c_lat, c_lon)
 
-        source = _get_uk_buildings_list(city_id) if req.country == "gb" else _get_buildings_list()
+        source = _get_uk_buildings_list(city_id, _district_cc(req.country)) if _district_cc(req.country) else _se_buildings(city_id)
         candidates = [b for b in source if _dist(b) <= 150]
         if not candidates:
             raise HTTPException(404, "No building with real geometry found near this location")
@@ -3342,12 +3579,13 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
         raise HTTPException(400, "No buildings given")
 
     city_id = req.city_id
-    if req.country == "gb" and not city_id:
+    if _district_cc(req.country) and not city_id:
         # A batch is always scoped to one district/city - resolve from the first building.
         first = req.buildings[0]
-        city_id = _resolve_uk_city_id(first.lat, first.lon)
+        city_id = _resolve_uk_city_id(first.lat, first.lon, _district_cc(req.country))
     elif req.country == "se" and not city_id:
-        city_id = "gothenburg"  # only Swedish city currently mapped — safe default
+        first = req.buildings[0]
+        city_id = _se_city_at(first.lat, first.lon)  # 'gothenburg' unless another built city covers it
 
     epw_name = CITY_TO_EPW.get(city_id or "")
     if not epw_name:
@@ -3356,7 +3594,7 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
     if not epw_path.exists():
         raise HTTPException(500, f"Weather file missing on server: {epw_path.name}")
 
-    source = _get_uk_buildings_list(city_id) if req.country == "gb" else _get_buildings_list()
+    source = _get_uk_buildings_list(city_id, _district_cc(req.country)) if _district_cc(req.country) else _se_buildings(city_id)
 
     resolved: list[dict] = []
     for i, b in enumerate(req.buildings):
@@ -4282,6 +4520,7 @@ _HEATING_GROUPS: dict[str, list[str]] = {
 
 class EpcHeatingRequest(BaseModel):
     addresses: list[str]
+    city_id: str | None = None   # Swedish city (tools/se/se_cities.py); default Gothenburg
 
 
 @app.post("/api/epc/heating")
@@ -4310,11 +4549,12 @@ def epc_heating(req: EpcHeatingRequest):
     placeholders = ", ".join(["?"] * len(keys))
     sql = (
         f"SELECT lower(regexp_replace(IdAdr, '\\s+', '', 'g')) AS k, {col_sql} "
-        f"FROM epc WHERE _kommunkod_4digit = '1480' "
+        f"FROM epc WHERE IdKommun = ? "
         f"AND lower(regexp_replace(IdAdr, '\\s+', '', 'g')) IN ({placeholders})"
     )
+    kommun = (_se_cities().get(req.city_id or "gothenburg") or {}).get("kommun") or "Göteborg"
     try:
-        rows = con.execute(sql, keys).fetchall()
+        rows = con.execute(sql, [kommun, *keys]).fetchall()
     finally:
         con.close()
 
@@ -4934,8 +5174,8 @@ async def energy_price(country: str = Query("se"), zone: str = Query("SE3"),
 def _analysis_buildings(country: str, city_id: str) -> list:
     """Building set to shade an analysis: UK city buildings for 'gb', else the
     Swedish (Gothenburg) set. Keeps every site analysis correct per country."""
-    if (country or "").lower() == "gb":
-        return _get_uk_buildings_list(city_id or "")
+    if _district_cc(country):
+        return _get_uk_buildings_list(city_id or "", _district_cc(country))
     return _get_buildings_list()
 
 
@@ -5225,9 +5465,10 @@ def _sv_near_footprints(lat: float, lon: float, country: str) -> list[tuple]:
     """Footprints around a point as (ring, c_lat, c_lon, height, bbox) - the
     containing grid cell and its 8 neighbours, i.e. everything within ~500 m."""
     try:
-        if _is_uk(country):
-            set_id = "gb:" + _resolve_uk_city_id(lat, lon)
-            rows = _get_uk_buildings_list(set_id[3:])
+        if _district_cc(country):
+            cc = _district_cc(country)
+            set_id = f"{cc}:" + _resolve_uk_city_id(lat, lon, cc)
+            rows = _get_uk_buildings_list(set_id[3:], cc)
         else:
             set_id, rows = "se", _get_buildings_list()
     except HTTPException:
@@ -5830,6 +6071,14 @@ def _serve_uk_map():
     if not _UK_MAP_FILE.exists():
         raise HTTPException(404, "UK map not built - run tools/uk/uk_data_pipeline.py then build.py")
     return FileResponse(_UK_MAP_FILE, media_type="text/html")
+
+_BE_MAP_FILE = PROJECT_ROOT / "assets" / "be_3d.html"
+
+@app.get("/be_3d.html", include_in_schema=False)
+def _serve_be_map():
+    if not _BE_MAP_FILE.exists():
+        raise HTTPException(404, "Brussels map not built - run tools/be/be_data_pipeline.py then tools/be/build_be_viewer.py")
+    return FileResponse(_BE_MAP_FILE, media_type="text/html")
 
 if _FRONTEND_DIST.exists():
     from starlette.exceptions import HTTPException as StarletteHTTPException

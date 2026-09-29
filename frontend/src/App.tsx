@@ -21,6 +21,7 @@ import SampleReports from "./pages/SampleReports";
 import ProjectTeam from "./pages/ProjectTeam";
 import MapViewer from "./pages/MapViewer";
 import UKMapViewer from "./pages/UKMapViewer";
+import BEMapViewer from "./pages/BEMapViewer";
 import UKDataExplorer from "./pages/UKDataExplorer";
 import { useWizardStore } from "./store/wizard";
 
@@ -75,6 +76,7 @@ export default function App() {
       <Route path="/analysis"  element={<DataLayout title="Analysis" accentColor="#4ECDC4" accentBadge="Tools"><AnalysisTools /></DataLayout>} />
       <Route path="/viewer"    element={<DataLayout title="" accentColor="#5FA5FF" accentBadge=""><MapViewer /></DataLayout>} />
       <Route path="/viewer/uk" element={<DataLayout title="" accentColor="#5FA5FF" accentBadge=""><UKMapViewer /></DataLayout>} />
+      <Route path="/viewer/be" element={<DataLayout title="" accentColor="#5FA5FF" accentBadge=""><BEMapViewer /></DataLayout>} />
       <Route path="/map"       element={<Navigate to="/viewer" replace />} />
       <Route path="/budget"    element={<DataLayout title="Planning & Cost" accentColor="#E8880C" accentBadge="Cost Estimate"><Budget /></DataLayout>} />
       <Route path="/reports" element={<DataLayout title="Reports" accentColor="#2FB477" accentBadge="Examples"><SampleReports /></DataLayout>} />

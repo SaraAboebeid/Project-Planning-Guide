@@ -17,9 +17,9 @@ export const COUNTRIES: {
   enabledCities?: string[];
 }[] = [
   { id: "se", name: "Sweden", cities: ["Stockholm", "Gothenburg", "Malmö"],
-    defaultCity: "Gothenburg", enabledCities: ["Gothenburg"] },
+    defaultCity: "Gothenburg", enabledCities: ["Gothenburg", "Malmö"] },
   { id: "gb", name: "United Kingdom", cities: ["London", "Rotherham"], defaultCity: "London" },
-  { id: "be", name: "Belgium", cities: [] },
+  { id: "be", name: "Belgium", cities: ["Brussels", "Liège"], defaultCity: "Brussels" },
   { id: "ie", name: "Ireland", cities: [] },
 ];
 
@@ -58,6 +58,8 @@ export const CITY_COORDS: Record<string, { lat: number; lon: number; zoom: numbe
   "Malmö": { lat: 55.6050, lon: 13.0038, zoom: 12 },
   London: { lat: 51.5072, lon: -0.1276, zoom: 11 },
   Rotherham: { lat: 53.4302, lon: -1.3568, zoom: 13 },
+  Brussels: { lat: 50.8480, lon: 4.3600, zoom: 13 },
+  "Liège": { lat: 50.6460, lon: 5.5830, zoom: 14 },
 };
 
 // The UK 3D viewer resolves its location from `?city=<id>` (see viewer/js/bootstrap.js),
@@ -72,6 +74,55 @@ const UK_VIEWER_CITY_ID: Record<string, string> = {
 
 export function ukViewerCityId(city: string | null | undefined): string {
   return (city && UK_VIEWER_CITY_ID[city]) || "london_kings_cross";
+}
+
+// Swedish city name (COUNTRIES[].cities) -> backend city id (tools/se/se_cities.py).
+// Gothenburg is the original single-city path; anything unknown falls back to it.
+const SE_CITY_ID: Record<string, string> = {
+  Gothenburg: "gothenburg",
+  "Malmö": "malmo",
+};
+
+export function seCityId(city: string | null | undefined): string {
+  return (city && SE_CITY_ID[city]) || "gothenburg";
+}
+
+/** Swedish municipalities built on demand (tools/se/build_any_city.py). */
+const SE_ON_DEMAND = new Set<string>();
+
+export function isSeOnDemandCity(city: string | null | undefined): boolean {
+  return !!city && SE_ON_DEMAND.has(city);
+}
+
+/** Make a built municipality selectable everywhere the static cities are:
+ *  the Sweden city list, map centring and the backend city id. */
+export function registerSeCity(name: string, id: string, center?: [number, number] | null) {
+  const se = COUNTRIES.find((c) => c.id === "se")!;
+  if (!se.cities.includes(name)) se.cities.push(name);
+  if (se.enabledCities && !se.enabledCities.includes(name)) se.enabledCities.push(name);
+  SE_CITY_ID[name] = id;
+  if (center && !CITY_COORDS[name]) CITY_COORDS[name] = { lat: center[0], lon: center[1], zoom: 13 };
+  SE_ON_DEMAND.add(name);
+}
+
+/** Load every built on-demand municipality from the backend (called at startup). */
+export async function loadSeCities(timeoutMs = 2500): Promise<void> {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), timeoutMs);
+    const r = await fetch("/api/se/cities", { signal: ctl.signal });
+    clearTimeout(t);
+    if (!r.ok) return;
+    const d = (await r.json()) as { cities: { id: string; name: string; on_demand: boolean; built: boolean; center?: [number, number] | null }[] };
+    for (const c of d.cities) if (c.on_demand && c.built) registerSeCity(c.name, c.id, c.center);
+  } catch { /* backend down: the static cities still work */ }
+}
+
+// Belgian 3D viewer (/be_3d.html?city=<id>): Brussels opens on Saint-Gilles,
+// Liège on Centre; the city's other districts are switchable inside the
+// viewer (tools/be/cities.py).
+export function beViewerCityId(city?: string | null): string {
+  return city === "Liège" ? "liege_centre" : "brussels_saint_gilles";
 }
 
 // Country-level fallback center (no city selected, or a country with no
@@ -101,7 +152,7 @@ export const LIBRARY_TABS: {
   { label: "Pathways", path: "/pathways" },
   { label: "Analysis Tools", path: "/analysis" },
   { label: "Data Explorer", path: "/data", pathByCountry: { gb: "/data/uk" } },
-  { label: "3D Viewer", path: "/viewer", pathByCountry: { gb: "/viewer/uk" } },
+  { label: "3D Viewer", path: "/viewer", pathByCountry: { gb: "/viewer/uk", be: "/viewer/be" } },
   { label: "Sample Reports", path: "/reports" },
   { label: "Project Team", path: "/team" },
 ];

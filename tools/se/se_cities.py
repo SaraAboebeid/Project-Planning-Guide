@@ -42,11 +42,30 @@ CITIES = {
 }
 
 
+# Municipalities built on demand (tools/se/build_any_city.py) are recorded here and
+# merged in; the hand-written entries above always win.
+DYNAMIC_FILE = __import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "se" / "dynamic_cities.json"
+
+
+def load_cities() -> dict:
+    """Static cities plus every municipality built on demand (re-read on each call)."""
+    import json
+    out = dict(CITIES)
+    if DYNAMIC_FILE.exists():
+        try:
+            for k, v in json.loads(DYNAMIC_FILE.read_text(encoding="utf-8")).items():
+                out.setdefault(k, v)
+        except ValueError:
+            pass
+    return out
+
+
 def get_city(key: str) -> dict:
     k = key.lower()
-    if k not in CITIES:
-        raise SystemExit(f"unknown city '{key}'. Known: {', '.join(CITIES)}")
-    return CITIES[k]
+    cities = load_cities()
+    if k not in cities:
+        raise SystemExit(f"unknown city '{key}'. Known: {', '.join(cities)}")
+    return cities[k]
 
 
 def bbox3006(bbox4326):

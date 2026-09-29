@@ -48,6 +48,21 @@ export function loadUkArchetypes(): Promise<TabulaArchetypeGB[]> {
   return cached;
 }
 
+let cachedBe: Promise<TabulaArchetypeGB[]> | null = null;
+
+/** TABULA Belgium (VITO) from frontend/public/be/tabula_be.json
+ * (tools/be/ingest_tabula.py). Same shape as the GB set, so the same tier
+ * picker and matcher work on it; a few recent-period types have no
+ * standard_refurbishment tier in the source, so callers must allow a missing tier. */
+export function loadBeArchetypes(): Promise<TabulaArchetypeGB[]> {
+  if (!cachedBe) {
+    cachedBe = fetch("/be/tabula_be.json")
+      .then((r) => r.json())
+      .then((d) => (d.archetypes as TabulaArchetypeGB[]) ?? []);
+  }
+  return cachedBe;
+}
+
 /**
  * Matches a building's use_cat + tabula_period against the archetype list.
  * Multiple type_labels (e.g. "Single Family House" vs "Terraced house") can

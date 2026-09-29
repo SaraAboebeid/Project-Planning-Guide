@@ -102,6 +102,13 @@ data/os/codepo_gb.zip
 
 # Raw UK bulk downloads (EPC / DESNZ extracts) - hundreds of MB, re-downloadable
 data/uk_raw/
+# Raw Belgian downloads (TABULA workbook, Statbel stock, UrbIS 3D tiles, WFS caches) - re-downloadable
+data/be_raw/
+# Lantmäteriet per-municipality downloads + linked footprints (tools/se/lm_link_city.py), DTCC tiles,
+# and on-demand build logs/status (tools/se/build_any_city.py) - large or machine-local, re-creatable
+data/lm/
+data/dtcc/footprints/
+data/se/builds/
 
 # Generated apartment image downloads
 assets/boplats_images/
@@ -111,3 +118,6 @@ frontend/public/boplats_images/
 
 # User-uploaded facade photos (annotated) — private site data, never committed
 data/facade_images/
+
+# TOTEM-derived material data: licensed (OVAM/SPW/Brussels Environment + ecoinvent), never commit or ship
+**/totem_private/

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationBaselineResult } from "../store/wizard";
 import { api } from "../api/client";
+import { seCityId } from "../config/countryNav";
 import type { BuildingLookup, BuildingRecord } from "../types";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
@@ -263,13 +264,14 @@ export default function BaselineSetup() {
     setSimProgress(0);
     setSimError(null);
     const isUK = project.country === "United Kingdom";
+    const isBE = project.country === "Belgium";
 
     try {
       const { batch_id } = await api.simulationBatchSubmit({
-        country: isUK ? "gb" : "se",
-        // Sweden needs an explicit city_id (only "gothenburg" is mapped); UK omits
-        // it and the server resolves the nearest district from lat/lon.
-        ...(isUK ? {} : { city_id: "gothenburg" }),
+        country: isUK ? "gb" : isBE ? "be" : "se",
+        // Sweden needs an explicit city_id (only "gothenburg" is mapped); UK and
+        // Belgium omit it and the server resolves the nearest district from lat/lon.
+        ...(isUK || isBE ? {} : { city_id: seCityId(project.city) }),
         // Each building carries the glazing ratios read from its own facade
         // photos in Step 2 (utils/retrofitPriority.makeBuildingKeys gives the
         // same key the facade panel wrote them under). Facades with no photo are
@@ -799,7 +801,16 @@ export default function BaselineSetup() {
                 addresses={results.map((r, i) => r.address || `Building ${i + 1}`)}
               />
             )}
-            {project.country === "United Kingdom" ? (
+            {project.country === "Belgium" ? (
+            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
+              * Real EnergyPlus (EPSM) output with Uccle weather. Belgium has no open per-building EPCs, so the
+              envelope is the TABULA Belgium archetype for the building's type and construction period, and the
+              period is sampled from Statbel's municipal building stock unless OpenStreetMap records a year.
+              Shared walls with neighbours are modelled as adiabatic. Heating is ideal loads (heat delivered, not
+              fuel) and the model is not yet calibrated against Brussels EPC statistics, so treat absolute values
+              as indicative and compare packages relative to this baseline in Step 4.
+            </p>
+            ) : project.country === "United Kingdom" ? (
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
               * Real EnergyPlus (EPSM) output for UK homes: a gas boiler with radiators (efficiency from the EPC heating
               rating), SAP intermittent heating calibrated to DESNZ metered postcode gas, hot water from SAP 2012

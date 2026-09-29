@@ -1,0 +1,147 @@
+{
+ "country": "be",
+ "country_name": "Belgium",
+ "sources": {
+  "footprints": {
+   "urbis": "UrbIS Buildings + Addresses, paradigm.brussels (CC0)",
+   "grb": "GRB Gebouw aan de grond + Adres, Digitaal Vlaanderen (Modellicentie Gratis Hergebruik)",
+   "picc": "PICC building footprints + Batiments 3D LoD1 2013-2014, SPW (CC BY 4.0); BeST Address, BOSA (Walloon data CC BY 4.0)"
+  },
+  "certificates": null,
+  "priors": "Statbel building stock (CC BY 4.0); TABULA BE, VITO",
+  "tags": "OpenStreetMap (ODbL)"
+ },
+ "cities": [
+  {
+   "id": "brussels_saint_gilles",
+   "name": "Brussels",
+   "district": "Saint-Gilles / Ixelles",
+   "region": "Brussels-Capital",
+   "lat": 50.829,
+   "lon": 4.348,
+   "radius_m": 700,
+   "buildings": 5839,
+   "with_epc": 0,
+   "estimated_from_ehs": 0,
+   "no_band": 5839,
+   "band_distribution": {
+    "A": 0,
+    "B": 0,
+    "C": 0,
+    "D": 0,
+    "E": 0,
+    "F": 0,
+    "G": 0
+   },
+   "residential": 5170,
+   "tabula_matched": 5170,
+   "with_party_walls": 5717,
+   "year_from_osm": 29,
+   "height_sources": {
+    "register_3d": 5540,
+    "default_by_use": 295,
+    "osm_levels": 4
+   },
+   "footprint_source": "urbis",
+   "data_file": "be/buildings_brussels_saint_gilles.json"
+  },
+  {
+   "id": "brussels_schaerbeek",
+   "name": "Brussels",
+   "district": "Schaerbeek",
+   "region": "Brussels-Capital",
+   "lat": 50.8668,
+   "lon": 4.3736,
+   "radius_m": 700,
+   "buildings": 5723,
+   "with_epc": 0,
+   "estimated_from_ehs": 0,
+   "no_band": 5723,
+   "band_distribution": {
+    "A": 0,
+    "B": 0,
+    "C": 0,
+    "D": 0,
+    "E": 0,
+    "F": 0,
+    "G": 0
+   },
+   "residential": 4913,
+   "tabula_matched": 4913,
+   "with_party_walls": 5552,
+   "year_from_osm": 7,
+   "height_sources": {
+    "register_3d": 5554,
+    "default_by_use": 169
+   },
+   "footprint_source": "urbis",
+   "data_file": "be/buildings_brussels_schaerbeek.json"
+  },
+  {
+   "id": "gent_centrum",
+   "name": "Gent",
+   "district": "Gent centrum",
+   "region": "Flanders",
+   "lat": 51.0543,
+   "lon": 3.725,
+   "radius_m": 700,
+   "buildings": 4095,
+   "with_epc": 0,
+   "estimated_from_ehs": 0,
+   "no_band": 4095,
+   "band_distribution": {
+    "A": 0,
+    "B": 0,
+    "C": 0,
+    "D": 0,
+    "E": 0,
+    "F": 0,
+    "G": 0
+   },
+   "residential": 3575,
+   "tabula_matched": 3575,
+   "with_party_walls": 3974,
+   "year_from_osm": 55,
+   "height_sources": {
+    "default_by_use": 3858,
+    "osm_height": 28,
+    "osm_levels": 209
+   },
+   "footprint_source": "grb",
+   "data_file": "be/buildings_gent_centrum.json"
+  },
+  {
+   "id": "liege_centre",
+   "name": "Liège",
+   "district": "Centre / Outremeuse",
+   "region": "Wallonia",
+   "lat": 50.641,
+   "lon": 5.578,
+   "radius_m": 700,
+   "buildings": 6666,
+   "with_epc": 0,
+   "estimated_from_ehs": 0,
+   "no_band": 6666,
+   "band_distribution": {
+    "A": 0,
+    "B": 0,
+    "C": 0,
+    "D": 0,
+    "E": 0,
+    "F": 0,
+    "G": 0
+   },
+   "residential": 3976,
+   "tabula_matched": 3976,
+   "with_party_walls": 6581,
+   "year_from_osm": 25,
+   "height_sources": {
+    "register_3d": 6258,
+    "default_by_use": 388,
+    "osm_levels": 20
+   },
+   "footprint_source": "picc",
+   "data_file": "be/buildings_liege_centre.json"
+  }
+ ]
+}

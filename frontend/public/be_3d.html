@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Brussels 3D – Facade Inspector</title>
+  <meta charset="utf-8"/>
+  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
+  <link rel="stylesheet" href="be_3d.css?v=20260928-221740-be">
+  <link rel="stylesheet" href="sidebar-theme.css?v=20260812-cvd">
+  <style>
+    /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
+       is stamped on <body> by bootstrap.js. */
+    body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
+  </style>
+  <script src="be_3d.meta.js?v=20260928-221740-be" defer></script>
+  <script src="viewer/js/bootstrap.js?v=20260803-scb2" defer></script>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="spinner"></div>
+  <h1>Brussels 3D</h1>
+  <p id="loading-status">Initialising Cesium...</p>
+</div>
+
+<!-- Cesium main viewer -->
+<div id="cesium-container"></div>
+
+<!-- Left sidebar: fixed header (title + search) · scrollable accordion sections · fixed footer -->
+<aside id="left-panel" role="complementary" aria-label="Map controls and analysis layers">
+  <div id="lp-header">
+    <span class="lp-title">Brussels 3D</span>
+    <span class="lp-sub" id="city-subtitle">London &mdash; King's Cross / Bloomsbury</span>
+  </div>
+
+  <!-- Fixed: search is always reachable, never scrolls away -->
+  <div id="lp-fixed-top">
+    <div id="search-wrap">
+      <div id="search-row">
+        <input id="search-input" type="text" placeholder="Search address&hellip;" autocomplete="off" aria-label="Search building address">
+        <button class="btn" id="search-btn">Search</button>
+      </div>
+      <div id="search-results" role="listbox" aria-label="Search results"></div>
+    </div>
+  </div>
+
+  <div id="lp-scroll" role="region" aria-label="Viewer controls">
+  <!-- City switcher — populated by city_switcher.js, hidden for single-city countries -->
+  <div id="city-switcher" style="display:flex;gap:4px;flex-wrap:wrap;padding:8px 10px 2px;"></div>
+
+  <div id="lp-stats">
+    <div class="stat-box">
+      <div class="stat-num" data-stat="epc">&ndash;</div>
+      <div class="stat-lbl">EPC matched</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num stat-num-2" data-stat="total">&ndash;</div>
+      <div class="stat-lbl">buildings</div>
+    </div>
+  </div>
+
+  <!-- hidden legacy buttons — IDs wired by cesium.js / vasttrafik.js -->
+  <button id="btn-tiles"       style="display:none">tiles</button>
+  <button id="btn-eubucco"     style="display:none">eubucco</button>
+  <button id="btn-transit"     style="display:none">transit</button>
+  <button id="btn-disruptions" style="display:none">disruptions</button>
+  <button id="btn-parking"     style="display:none">parking</button>
+
+  <!-- ══ SELECTED BUILDING ══════════════════════════════════════════════
+       Contextual: the building's data AND the tools that act on it live
+       together, so selecting → inspecting → running a tool needs no scrolling. -->
+  <div class="lp-divider"></div>
+  <div class="collapse-head">
+    <button class="collapse-toggle" id="building-toggle" type="button" aria-expanded="false" aria-controls="building-content">
+      <span class="collapse-chevron">&#9662;</span>
+      <span class="collapse-label">Building Analysis</span>
+      <span class="sec-badge" id="building-badge" hidden></span>
+    </button>
+    <button class="info-btn" data-layer="selected-building"></button>
+  </div>
+  <div id="building-content" class="collapse-content collapsed">
+    <div id="lp-no-selection">Click a building on the map to see its data and enable the analysis tools.</div>
+    <div class="panel" id="info-panel">
+      <button class="close-btn" id="info-close" aria-label="Clear selection">&#x2715;</button>
+      <h2>Building</h2>
+      <div id="info-content"></div>
+    </div>
+    <div class="analysis-tools-group">
+      <button class="tool-btn" id="btn-inspect" disabled>Facade Inspection</button>
+      <div class="analysis-note" id="inspect-saved-badge" style="display:none"></div>
+      <button class="tool-btn" id="btn-pvgis" disabled>Rooftop PV Estimate</button>
+      <div class="analysis-note" id="pvgis-saved-badge" style="display:none"></div>
+      <div id="pvgis-result" class="analysis-result"></div>
+      <button class="tool-btn" id="btn-sim" disabled>Run Energy Simulation</button>
+      <div class="analysis-note" id="sim-saved-badge" style="display:none"></div>
+      <div id="sim-result" class="analysis-result"></div>
+    </div>
+  </div>
+
+  <!-- ══ BASE MAP ═══════════════════════════════════════════════════════ -->
+  <div class="lp-divider"></div>
+  <div class="collapse-head">
+    <button class="collapse-toggle" id="basemap-toggle" type="button" aria-expanded="false" aria-controls="basemap-content">
+      <span class="collapse-chevron">&#9662;</span>
+      <span class="collapse-label">Base Map</span>
+      <span class="sec-badge" id="basemap-badge" hidden></span>
+    </button>
+    <button class="info-btn" data-layer="base-map"></button>
+  </div>
+  <div id="basemap-content" class="collapse-content collapsed">
+    <div class="basemap-group" role="radiogroup" aria-label="Base map" style="padding:0 0 4px">
+      <div class="base-row">
+        <button class="base-btn active" id="btn-base-light" role="radio" aria-checked="true">
+          <span class="base-indicator"></span>
+          <span class="base-name">Light</span>
+          <span class="layer-pill">CartoDB</span>
+        </button>
+        <button class="info-btn" data-layer="light-basemap"></button>
+      </div>
+      <div class="base-row">
+        <button class="base-btn" id="btn-base-dark" role="radio" aria-checked="false">
+          <span class="base-indicator"></span>
+          <span class="base-name">Dark</span>
+          <span class="layer-pill">CartoDB</span>
+        </button>
+        <button class="info-btn" data-layer="dark-basemap"></button>
+      </div>
+      <div class="base-row">
+        <button class="base-btn" id="btn-base-satellite" role="radio" aria-checked="false">
+          <span class="base-indicator"></span>
+          <span class="base-name">Satellite</span>
+          <span class="layer-pill">Esri</span>
+        </button>
+        <button class="info-btn" data-layer="satellite-imagery"></button>
+      </div>
+      <div class="base-row">
+        <button class="base-btn" id="btn-base-photo" role="radio" aria-checked="false">
+          <span class="base-indicator"></span>
+          <span class="base-name">Photorealistic 3D</span>
+          <span class="layer-pill">Google</span>
+        </button>
+        <button class="info-btn" data-layer="photorealistic-3d-tiles"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ DATA LAYERS ════════════════════════════════════════════════════ -->
+  <div id="lp-layers">
+
+    <!-- ─ Buildings ───────────────────────────────────────────────────── -->
+    <div class="lp-divider"></div>
+    <div class="collapse-head">
+      <button class="collapse-toggle" id="buildings-toggle" type="button" aria-expanded="false" aria-controls="buildings-content">
+        <span class="collapse-chevron">&#9662;</span>
+        <span class="collapse-label">Additional Layers</span>
+        <span class="sec-badge" id="buildings-badge" hidden></span>
+      </button>
+      <button class="info-btn" data-layer="building-layers" data-source="OpenStreetMap · EPB Register (MHCLG) · English Housing Survey 2024-25"></button>
+    </div>
+    <div id="buildings-content" class="collapse-content collapsed">
+      <div class="overlay-group">
+        <div class="overlay-row">
+          <button class="overlay-btn active" id="btn-overlay-buildings" aria-pressed="true">
+            <span class="overlay-check"></span>
+            <span class="base-name">Buildings</span>
+            <span class="layer-pill">UrbIS 3D + TABULA</span>
+          </button>
+          <button class="info-btn" data-title="Buildings" data-desc="10,235 building footprints across 5 UK focus area(s). Coloured by use type, EPC band, or construction era. Bands come from the Energy Performance of Buildings Register where a certificate matches, otherwise they are estimated from English Housing Survey 2024-25 distributions and marked as estimates." data-source="OpenStreetMap · EPB Register (MHCLG) · English Housing Survey 2024-25"></button>
+        </div>
+        <div id="photo-pick-hint" style="display:none;font-size:10px;color:var(--muted);padding:2px 12px 6px;line-height:1.5">Photorealistic view: data boxes are hidden — hover or click the 3D model itself to select a building.</div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-osm-buildings" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">OSM Buildings</span>
+            <span class="layer-pill">OSM</span>
+          </button>
+          <button class="info-btn" data-layer="cesium-osm-buildings"></button>
+        </div>
+      </div>
+      <div id="colour-by-group">
+      <div class="lp-subhead">Colour buildings by</div>
+      <div id="lp-tabs" role="tablist" aria-label="Colour buildings by">
+        <button class="lp-tab active" id="btn-use" role="tab" aria-selected="true">Use type</button>
+        <button class="lp-tab" id="btn-eclass" role="tab" aria-selected="false">Energy</button>
+        <button class="lp-tab" id="btn-year" role="tab" aria-selected="false">Year era</button>
+      </div>
+      <div id="legend-container"></div>
+      <div class="lp-hint">Click a legend row to see best &amp; worst performers</div>
+      </div>
+      <!-- /#colour-by-group -->
+    </div>
+
+    <!-- ─ Traffic (Västtrafik — Sweden only) ──────────────────────────── -->
+    <div class="lp-divider se-only"></div>
+    <div class="collapse-head se-only">
+      <button class="collapse-toggle" id="traffic-toggle" type="button" aria-expanded="false" aria-controls="traffic-content">
+        <span class="collapse-chevron">&#9662;</span>
+        <span class="collapse-label">Traffic</span>
+        <span class="sec-badge" id="traffic-badge" hidden></span>
+      </button>
+      <button class="info-btn" data-layer="traffic-layers"></button>
+    </div>
+    <div id="traffic-content" class="collapse-content collapsed se-only">
+      <div class="overlay-group-label" style="font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:2px 10px 2px">Public transport</div>
+      <div class="overlay-group">
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-overlay-transit" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Live Transit &amp; Stops</span>
+            <span class="layer-pill">V&#228;sttrafik</span>
+          </button>
+          <button class="info-btn" data-layer="live-transit-amp-stops"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-overlay-disruptions" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Disruptions</span>
+            <span class="layer-pill">Live</span>
+          </button>
+          <button class="info-btn" data-layer="traffic-disruptions"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-overlay-parking" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Commuter Parking</span>
+            <span class="layer-pill">VT</span>
+          </button>
+          <button class="info-btn" data-layer="commuter-parking"></button>
+        </div>
+      </div>
+      <div class="overlay-group-label" style="font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px 2px">Roads &amp; highways</div>
+      <div class="overlay-group">
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-tv-cameras" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Traffic Cameras</span>
+            <span class="layer-pill">Live</span>
+          </button>
+          <button class="info-btn" data-layer="traffic-cameras"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-tv-flow" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Traffic Flow</span>
+            <span class="layer-pill">veh/h</span>
+          </button>
+          <button class="info-btn" data-layer="traffic-flow"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-tv-conditions" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Road Conditions</span>
+            <span class="layer-pill">TRV</span>
+          </button>
+          <button class="info-btn" data-layer="road-conditions"></button>
+        </div>
+        <div class="overlay-row">
+          <button class="overlay-btn" id="btn-tv-parking" aria-pressed="false">
+            <span class="overlay-check"></span>
+            <span class="base-name">Rest Stops &amp; Parking</span>
+            <span class="layer-pill">TRV</span>
+          </button>
+          <button class="info-btn" data-layer="road-parking"></button>
+        </div>
+      </div>
+      <div id="tv-status" style="display:none;font-size:10px;color:var(--muted);padding:4px 8px 0;line-height:1.5"></div>
+      <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:2px 8px 0"></div>
+    </div>
+
+    <!-- ─ Statistics (SCB — Sweden only) ──────────────────────────────── -->
+    <div class="lp-divider se-only"></div>
+    <div class="collapse-head se-only">
+      <button class="collapse-toggle" id="stats-toggle" type="button" aria-expanded="false" aria-controls="stats-content">
+        <span class="collapse-chevron">&#9662;</span>
+        <span class="collapse-label">Statistics</span>
+        <span class="sec-badge" id="stats-badge" hidden></span>
+      </button>
+      <button class="info-btn" data-layer="statistics-sweden-scb-layers"></button>
+    </div>
+    <div id="stats-content" class="collapse-content collapsed se-only">
+      <div class="filter-wrap">
+        <input id="scb-filter" type="search" placeholder="Filter layers&hellip;" aria-label="Filter statistics layers" autocomplete="off">
+        <span class="filter-count" id="scb-filter-count"></span>
+      </div>
+      <div id="scb-layers-container" style="display:flex;flex-direction:column;gap:2px;padding:4px 0 4px"></div>
+    </div>
+
+    <!-- ══ URBAN ANALYSIS ════════════════════════════════════════════════ -->
+    <div class="lp-divider"></div>
+    <div class="collapse-head">
+      <button class="collapse-toggle" id="urban-toggle" type="button" aria-expanded="false" aria-controls="urban-content">
+        <span class="collapse-chevron">&#9662;</span>
+        <span class="collapse-label">Urban Analysis</span>
+        <span class="sec-badge" id="urban-badge" hidden></span>
+      </button>
+      <button class="info-btn" data-layer="urban-analysis-layers"></button>
+    </div>
+    <div id="urban-content" class="collapse-content collapsed">
+      <div id="urban-analysis-section">
+        <div class="overlay-group">
+          <div class="overlay-row">
+            <button class="overlay-btn" id="btn-urban-green" aria-pressed="false">
+              <span class="overlay-check"></span>
+              <span class="base-name">Green Index</span>
+              <span class="layer-pill">OSM</span>
+            </button>
+            <button class="info-btn" data-layer="street-green-index"></button>
+          </div>
+          <div class="overlay-row se-only">
+            <button class="overlay-btn" id="btn-urban-uhi" aria-pressed="false">
+              <span class="overlay-check"></span>
+              <span class="base-name">Heat Island Proxy</span>
+              <span class="layer-pill">EUBUCCO</span>
+            </button>
+            <button class="info-btn" data-layer="urban-heat-island-proxy"></button>
+          </div>
+          <div class="overlay-row">
+            <button class="overlay-btn" id="btn-urban-access" aria-pressed="false">
+              <span class="overlay-check"></span>
+              <span class="base-name">Green Accessibility</span>
+              <span class="layer-pill">OSM</span>
+            </button>
+            <button class="info-btn" data-layer="green-space-accessibility"></button>
+          </div>
+        </div>
+        <div id="urban-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
+        <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:11px;color:var(--text)"></div>
+      </div>
+    </div>
+
+  </div><!-- /lp-layers -->
+
+  </div><!-- /lp-scroll -->
+
+  <!-- Fixed: escape hatch always reachable -->
+  <div id="lp-footer">
+    <button class="btn opt-btn" id="btn-reset" style="width:100%">Reset View</button>
+  </div>
+</aside>
+
+<!-- Info tooltip -->
+<div id="info-tooltip"><div class="it-title"></div><div class="it-desc"></div><div class="it-source"></div></div>
+
+<!-- Hover tooltip card -->
+<div id="hover-card" style="
+  display:none; position:fixed; pointer-events:none; z-index:9999;
+  background:#ffffff; border:1px solid rgba(114,28,184,0.25);
+  border-radius:10px; padding:10px 13px; min-width:200px; max-width:280px;
+  font-family:Inter,sans-serif; font-size:12px; color:#1e293b;
+  box-shadow:0 4px 20px rgba(0,0,0,0.15); backdrop-filter:blur(6px);
+"></div>
+
+<!-- Facade inspector -->
+<div class="panel" id="facade-panel">
+  <!-- Drag handle: the whole header strip. Keeps every child id unchanged so
+       facade_inspector.js is untouched by the re-layout. -->
+  <div class="fi-head" id="facade-drag-handle">
+    <h2>Facade Inspector</h2>
+    <div class="sub" id="facade-sub">Orbit to the angle you want, then <b>Draw &amp; Capture</b></div>
+    <span class="fi-grip" title="Drag to move">⠿</span>
+    <button class="btn fi-close" id="btn-exit-inspect" title="Close">&#x2715;</button>
+  </div>
+
+  <div class="fi-body">
+    <!-- Manual capture slot -->
+    <div class="fi-manual" id="manual-canvas-wrap">
+      <canvas id="canvas-manual" width="520" height="300"></canvas>
+      <div id="manual-label">Manual</div>
+    </div>
+
+    <!-- Cardinal views -->
+    <div class="fi-cardinals">
+      <div class="fi-cardinals-label">Cardinal views</div>
+      <div id="facade-views">
+        <div class="facade-thumb" id="thumb-N"><canvas id="canvas-N" width="200" height="150"></canvas><div class="dir-label">N</div></div>
+        <div class="facade-thumb" id="thumb-E"><canvas id="canvas-E" width="200" height="150"></canvas><div class="dir-label">E</div></div>
+        <div class="facade-thumb" id="thumb-S"><canvas id="canvas-S" width="200" height="150"></canvas><div class="dir-label">S</div></div>
+        <div class="facade-thumb" id="thumb-W"><canvas id="canvas-W" width="200" height="150"></canvas><div class="dir-label">W</div></div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="fi-actions">
+      <button class="btn fi-primary" id="btn-manual-capture">Draw &amp; Capture</button>
+      <button class="btn" id="btn-capture-all">&#9654; Capture All</button>
+      <button class="btn" id="btn-ai-wwr">&#129302; AI Estimate</button>
+      <button class="btn fi-defects" id="btn-detect-defects">&#128269; Defects</button>
+      <div class="fi-zoom">
+        <button class="btn" id="btn-zoom-out" title="Zoom out">&#x2212;</button>
+        <span id="zoom-label">1.0×</span>
+        <button class="btn" id="btn-zoom-in" title="Zoom in">+</button>
+      </div>
+    </div>
+  </div>
+  <div id="facade-defects-result"></div>
+</div>
+
+<!-- WWR result panel -->
+<div class="panel" id="wwr-panel">
+  <h2>WWR per Facade</h2>
+  <div class="sub" id="wwr-sub">Window-to-Wall Ratio per facade</div>
+
+  <!-- AI per-facade bars (primary — shown when AI estimate exists) -->
+  <div id="wwr-ai-section" style="margin-top:10px;display:none">
+    <div id="wwr-ai-label" style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">AI Vision estimate · per facade</div>
+    <div id="wwr-facades-rows"></div>
+    <div style="margin-top:8px;display:flex;align-items:baseline;gap:5px">
+      <span style="font-size:10px;color:var(--muted)">Average:</span>
+      <span id="wwr-value-ai" style="font-size:18px;font-weight:700;color:#7c3aed">&#x2013;</span>
+      <span style="font-size:11px;color:var(--muted)">%</span>
+    </div>
+  </div>
+
+  <!-- Archetype fallback (shown only when no AI estimate yet) -->
+  <div id="wwr-heuristic-section" style="margin-top:10px">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Archetype fallback &nbsp;<span style="font-weight:400;text-transform:none;letter-spacing:0">era · use · orientation</span></div>
+    <div id="wwr-heuristic-rows"></div>
+    <div style="margin-top:8px;display:flex;align-items:baseline;gap:5px">
+      <span style="font-size:10px;color:var(--muted)">Average:</span>
+      <span id="wwr-value-heuristic" style="font-size:18px;font-weight:700;color:#7c3aed">&#x2013;</span>
+      <span style="font-size:11px;color:var(--muted)">%</span>
+    </div>
+  </div>
+
+  <div id="wwr-breakdown" style="margin-top:8px;font-size:11px;color:var(--muted)"></div>
+
+  <!-- Save to database -->
+  <div id="wwr-save-row" style="margin-top:10px;display:none">
+    <button id="btn-wwr-save" class="btn" style="width:100%;font-size:11px;background:rgba(124,58,237,0.18);border-color:#a78bfa;color:#c4b5fd;font-weight:600">
+      Save to WWR Database
+    </button>
+    <div id="wwr-save-status" style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px;min-height:14px"></div>
+  </div>
+</div>
+
+<!-- Västtrafik departures panel -->
+<div class="panel" id="vt-panel" style="display:none;top:16px;left:260px;width:280px;max-height:360px;overflow-y:auto">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <h2 style="margin:0">Departures</h2>
+    <button class="btn" id="btn-vt-close" style="padding:2px 8px">&#x2715;</button>
+  </div>
+  <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px" id="vt-panel-title"></div>
+  <div id="vt-departures"></div>
+</div>
+
+<!-- Västtrafik disruptions panel -->
+<div class="panel" id="vt-disr-panel" style="display:none;top:16px;left:260px;width:320px;max-height:480px;overflow-y:auto">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <h2 style="margin:0">Disruptions</h2>
+    <button class="btn" id="btn-disr-close" style="padding:2px 8px">&#x2715;</button>
+  </div>
+  <div id="vt-disr-count" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+  <div id="vt-disr-list"></div>
+</div>
+
+<!-- Västtrafik parking detail panel -->
+<div class="panel" id="vt-park-panel" style="display:none;top:16px;left:260px;width:260px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <h2 style="margin:0">Parkering</h2>
+    <button class="btn" id="btn-park-close" style="padding:2px 8px">&#x2715;</button>
+  </div>
+  <div id="vt-park-title" style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px"></div>
+  <div id="vt-park-detail"></div>
+</div>
+
+<!-- Trafikverket camera popup.
+     Deliberately avoids the .btn and .tt-* classes: the MAP SIDEBAR THEME
+     OVERRIDES block styles those near-white with !important and is NOT scoped to
+     #left-panel, so a popup over the map inherited white-on-white text and an
+     invisible close button. Colours are set here explicitly instead. -->
+<div class="panel" id="tv-popup" style="display:none;position:fixed;z-index:40;width:268px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+    <span id="tv-popup-title" style="flex:1;font-size:12px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <button id="btn-tv-popup-close" type="button" aria-label="Close"
+      style="flex:0 0 auto;width:24px;height:24px;display:flex;align-items:center;justify-content:center;
+             padding:0;border-radius:7px;border:1px solid #e2e8f0;background:#f8fafc;color:#334155;
+             font-size:13px;line-height:1;cursor:pointer">&#x2715;</button>
+  </div>
+  <div id="tv-popup-body" style="font-size:12px;color:#0f172a"></div>
+</div>
+
+<!-- Cesium Ion Token panel -->
+<div class="panel" id="token-panel" style="top:16px;right:16px;width:320px;display:none">
+  <h2>&#128273; Cesium Ion Token Required</h2>
+  <div class="sub">Google Photorealistic 3D Tiles stream real building facade &amp; roof textures directly from Google Maps.</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+    1. Sign up free at <a href="https://ion.cesium.com" target="_blank" style="color:#a78bfa">ion.cesium.com</a><br>
+    2. Go to <b>Access Tokens</b> &rarr; create a token<br>
+    3. Enable <b>Google Photorealistic 3D Tiles</b> asset (2275207)<br>
+    4. Paste your token below and click Apply
+  </div>
+  <input id="token-input" type="text" placeholder="Paste your Cesium ion token&hellip;"
+    style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);
+           background:rgba(0,0,0,0.04);color:var(--text);font-size:12px;margin-bottom:8px;outline:none">
+  <button class="btn" id="token-apply" style="width:100%;margin-bottom:6px">&#128640; Apply &amp; Load 3D Tiles</button>
+  <div id="token-error" style="font-size:11px;color:#E2483B;min-height:14px"></div>
+</div>
+
+<!-- Performance card panel -->
+<div class="panel" id="perf-panel" style="display:none;top:16px;right:16px;width:320px;max-height:82vh;flex-direction:column;overflow:hidden">
+  <button class="close-btn" id="perf-close">&#x2715;</button>
+  <h2 id="perf-title">Performance</h2>
+  <div class="sub" id="perf-sub"></div>
+  <div id="perf-content" style="margin-top:10px;overflow-y:auto;flex:1"></div>
+</div>
+
+<div id="ppg-brand">PPG &middot; Chalmers / Boverket</div>
+<div id="controls-hint">&#128205; Scroll to zoom &nbsp;&middot;&nbsp; Drag to pan &nbsp;&middot;&nbsp; Right-drag or Ctrl+drag to tilt/rotate &nbsp;&middot;&nbsp; Hover buildings for details</div>
+
+<!-- INJECT:DATA -->
+<!-- INJECT:JS -->
+
+</body>
+</html>

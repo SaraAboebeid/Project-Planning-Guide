@@ -182,8 +182,12 @@ export default function RenovationReport() {
   const { project } = useWizardStore();
   // UK projects are costed in GBP from UK sources; everything else is Swedish.
   const isUK = project.country === "United Kingdom";
-  const numLocale = isUK ? "en-GB" : "sv-SE";
-  const money = (n: number) => (isUK ? fmtGBP(n) : sek(n));
+  // Belgium: no cost data yet (packages carry no cost), numbers in en-GB style.
+  const isBE = project.country === "Belgium";
+  const numLocale = isUK || isBE ? "en-GB" : "sv-SE";
+  const money = (n: number) => (isBE ? "—" : isUK ? fmtGBP(n) : sek(n));
+  // Belgium: packages carry no carbon figure, so there is no saving to report.
+  const co2Saved = (n: number) => (isBE ? "—" : `−${kg(n)}`);
 
   const simResults   = project.renovationSimResults ?? [];
   const baselines    = project.renovationBaselineResults ?? [];
@@ -533,7 +537,7 @@ export default function RenovationReport() {
           <span><b>${r.energyUse.toFixed(1)}</b> kWh/m²·yr</span>
           <span>saves <b>${r.saving.toFixed(1)}</b> kWh/m²·yr</span>
           <span><b>${money(r.cost)}</b></span>
-          <span><b>${Math.round(r.carbonSaving).toLocaleString(numLocale)}</b> kg CO₂e saved</span>
+          ${isBE ? "" : `<span><b>${Math.round(r.carbonSaving).toLocaleString(numLocale)}</b> kg CO₂e saved</span>`}
         </div>
       </div>`;
     };
@@ -639,7 +643,7 @@ export default function RenovationReport() {
       <td>${esc(r.buildingLabel ?? "all buildings")}</td>
       <td>${esc(materialsOf(r).map((m) => `${m.component}: ${m.buildup || m.desc}`).join("; ") || "—")}</td>
       <td>${r.energyUse.toFixed(1)}</td><td>${r.saving.toFixed(1)}</td>
-      <td>${money(r.cost)}</td><td>${Math.round(r.carbonSaving).toLocaleString(numLocale)}</td></tr>`).join("")
+      <td>${money(r.cost)}</td><td>${isBE ? "—" : Math.round(r.carbonSaving).toLocaleString(numLocale)}</td></tr>`).join("")
     : `<tr><td colspan="7" class="muted">No packages simulated.</td></tr>`}
   </tbody></table>
 
@@ -680,7 +684,13 @@ export default function RenovationReport() {
   <p class="sub" style="margin-top:4px">Values in kWh/m²·yr · pp = percentage points short of the −${buildingGoal.goal.reductionPct}% target.</p>` : ""}` : ""}
 
   <div class="foot">
-    Energy from EnergyPlus (EPSM) single-zone shoebox simulation · ${isUK
+    Energy from EnergyPlus (EPSM) single-zone shoebox simulation · ${isBE
+      ? `as-built and refurbished U-values from TABULA Belgium (VITO, EPISCOPE) · weather: Uccle TMYx ·
+    footprints and addresses from UrbIS (paradigm.brussels, CC0), heights from UrbIS 3D; construction period sampled from
+    Statbel's building stock unless OpenStreetMap records a year. Belgium publishes no open per-building EPCs, so there is
+    no baseline energy class. No open Belgian retrofit cost or carbon data is wired in yet, so packages are not costed.
+    Heating is ideal loads (heat delivered, not fuel); the model is not yet calibrated against Brussels EPC statistics.`
+      : isUK
       ? `as-built and refurbished U-values from TABULA GB (BRE, EPISCOPE) · weather: Doncaster/Sheffield TMYx ·
     ${esc(UK_COST_CARBON_SOURCE_NOTE)}
     Baseline energy class, SAP, floor area and heating from the MHCLG EPC register (OGL v3.0), matched to buildings via OS Open UPRN;
@@ -788,7 +798,7 @@ export default function RenovationReport() {
           </div>
           <div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>CO₂e saved</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#4A90E2" }}>−{kg(result.carbonSaving)}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#4A90E2" }}>{co2Saved(result.carbonSaving)}</div>
           </div>
           <div>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>Material cost</div>
@@ -1131,13 +1141,13 @@ export default function RenovationReport() {
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.65)", textAlign: "right" }}>{kwh(r.energyUse)}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#2FB477", textAlign: "right" }}>−{kwh(r.saving)}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#4A90E2", textAlign: "right" }}>−{kg(r.carbonSaving)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#4A90E2", textAlign: "right" }}>{co2Saved(r.carbonSaving)}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>{money(r.cost)}</span>
               </div>
             ))}
           </div>
           <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: "10px 0 0" }}>
-            * Illustrative EPSM outputs. CO₂e savings at 0.2 kg CO₂e/kWh.
+            * Illustrative EPSM outputs. {isBE ? "Cost and CO₂e are not reported for Belgium: no open Belgian retrofit cost or carbon data is wired in yet." : "CO₂e savings at 0.2 kg CO₂e/kWh."}
           </p>
         </Card>
       )}
@@ -1164,18 +1174,22 @@ export default function RenovationReport() {
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.6 }}>
               This package achieves a <strong style={{ color: "#2FB477" }}>{kwh(bestBalanced.saving)} reduction</strong> in annual energy use
               (from {kwh(baselineEU)} to <strong style={{ color: "#E8880C" }}>{kwh(bestBalanced.energyUse)}</strong>),
+              {isBE ? (
+                <>. Cost and carbon are not assessed for Belgium yet, so this ranking is by energy alone.</>
+              ) : (<>
               saving an estimated <strong style={{ color: "#4A90E2" }}>{kg(bestBalanced.carbonSaving)}</strong> of embodied carbon per year,
               at a material cost of <strong style={{ color: "rgba(255,255,255,0.8)" }}>{money(bestBalanced.cost)}</strong>.
+              </>)}
             </p>
           </div>
-          {bestCost && bestCost.packageIndex !== bestBalanced.packageIndex && (
+          {!isBE && bestCost && bestCost.packageIndex !== bestBalanced.packageIndex && (
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6, margin: "0 0 6px" }}>
               If cost is the primary constraint, <strong style={{ color: "#E8880C" }}>Package #{bestCost.packageIndex}</strong> offers the
               lowest material cost at <strong style={{ color: "#E8880C" }}>{money(bestCost.cost)}</strong> while still saving{" "}
               <strong style={{ color: "#2FB477" }}>{kwh(bestCost.saving)}</strong>.
             </p>
           )}
-          {bestCarbon && bestCarbon.packageIndex !== bestBalanced.packageIndex && (
+          {!isBE && bestCarbon && bestCarbon.packageIndex !== bestBalanced.packageIndex && (
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6, margin: 0 }}>
               For maximum carbon impact, <strong style={{ color: "#4A90E2" }}>Package #{bestCarbon.packageIndex}</strong> saves{" "}
               <strong style={{ color: "#4A90E2" }}>{kg(bestCarbon.carbonSaving)}</strong> of CO₂e per year.

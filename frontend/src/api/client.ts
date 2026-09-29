@@ -4,6 +4,14 @@
 
 const BASE = "/api";
 
+import { seCityId } from "../config/countryNav";
+import { useWizardStore } from "../store/wizard";
+
+/** city_id for a Swedish request: the project's city (Gothenburg -> "gothenburg"). */
+function seCityParam(country?: string | null): Record<string, string> {
+  return country === "Sweden" ? { city_id: seCityId(useWizardStore.getState().project.city) } : {};
+}
+
 async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
@@ -64,7 +72,7 @@ export const api = {
   geocode: (address: string, country?: string | null) =>
     get<{ lat: number; lon: number; display_name: string }>("/geocode", {
       address,
-      ...(country === "United Kingdom" ? { country: "gb" } : country === "Sweden" ? { country: "se" } : {}),
+      ...(country === "United Kingdom" ? { country: "gb" } : country === "Sweden" ? { country: "se" } : country === "Belgium" ? { country: "be" } : {}),
     }),
 
   /** Fetch nearby EPC snapshot */
@@ -100,7 +108,9 @@ export const api = {
   lookupBuilding: (lat: number, lon: number, country?: string | null) =>
     country === "United Kingdom"
       ? get<BuildingLookup>("/uk/building", { lat: String(lat), lon: String(lon) })
-      : get<BuildingLookup>("/building", { lat: String(lat), lon: String(lon) }),
+      : country === "Belgium"
+      ? get<BuildingLookup>("/be/building", { lat: String(lat), lon: String(lon) })
+      : get<BuildingLookup>("/building", { lat: String(lat), lon: String(lon), ...seCityParam(country) }),
 
   /** Aggregate EUBUCCO stats for all buildings in a bounding box */
   lookupBuildingsBbox: (north: number, south: number, east: number, west: number, polygon?: string, country?: string | null) =>
@@ -108,7 +118,8 @@ export const api = {
       north: String(north), south: String(south),
       east:  String(east),  west:  String(west),
       ...(polygon ? { polygon } : {}),
-      ...(country === "United Kingdom" ? { country: "gb" } : {}),
+      ...(country === "United Kingdom" ? { country: "gb" } : country === "Belgium" ? { country: "be" } : {}),
+      ...seCityParam(country),
     }),
 
   /** Individual building records in a bounding box (optionally refined to a drawn
@@ -118,7 +129,8 @@ export const api = {
       north: String(north), south: String(south),
       east:  String(east),  west:  String(west),
       ...(polygon ? { polygon } : {}),
-      ...(country === "United Kingdom" ? { country: "gb" } : {}),
+      ...(country === "United Kingdom" ? { country: "gb" } : country === "Belgium" ? { country: "be" } : {}),
+      ...seCityParam(country),
     }),
 
   /** Named neighborhoods (Gothenburg primärområden) with building counts */
@@ -276,8 +288,8 @@ export const api = {
     }>(`/simulation-batch-status/${batchId}`),
 
   /* ── Current heating system per building, inferred from the Boverket EPC ── */
-  epcHeating: (addresses: string[]) =>
-    post<{ results: Record<string, { system: string } | null>; available: boolean }>("/epc/heating", { addresses }),
+  epcHeating: (addresses: string[], cityId?: string) =>
+    post<{ results: Record<string, { system: string } | null>; available: boolean }>("/epc/heating", { addresses, ...(cityId ? { city_id: cityId } : {}) }),
 
   /* ── Facade defect detection (ML) — POST raw image bytes to the on-host model ── */
   facadeDetect: async (blob: Blob, threshold = 0.5): Promise<FacadeDetectResponse> => {

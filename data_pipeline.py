@@ -42,6 +42,16 @@ _REGION_KOMMUNS = ["Göteborg", "Mölndal", "Partille", "Härryda", "Kungälv", 
                    "Lilla Edet", "Alingsås", "Bollebygd"]
 
 
+# Where the EPC-linked Lantmäteriet footprints come from. Gothenburg: the pre-built
+# `footprints` table in epc_sweden.duckdb. Other cities: the file written by
+# tools/se/lm_link_city.py (same columns), selected in _apply_city.
+_FOOTPRINTS_SRC = "footprints"
+# On-demand municipalities (tools/se/build_any_city.py) cover a whole kommun's bbox,
+# which also takes in neighbouring municipalities' buildings - buildings with no
+# linked EPC. With this set, only buildings on the kommun's own footprints are kept.
+_CLIP_TO_FOOTPRINTS = False
+
+
 def _region_in() -> str:
     """SQL IN-list fragment of region municipalities (trusted config, not user input)."""
     return "'" + "','".join(_REGION_KOMMUNS) + "'"
@@ -49,7 +59,7 @@ def _region_in() -> str:
 
 def _apply_city(city_key: str):
     """Repoint the module config (paths, bbox, municipalities) at a registered city."""
-    global PARQUET_PATH, GPKG_PATH, LON_MIN, LON_MAX, LAT_MIN, LAT_MAX, _KOMMUN, _REGION_KOMMUNS
+    global PARQUET_PATH, GPKG_PATH, LON_MIN, LON_MAX, LAT_MIN, LAT_MAX, _KOMMUN, _REGION_KOMMUNS, _FOOTPRINTS_SRC, _CLIP_TO_FOOTPRINTS
     import sys as _sys
     from pathlib import Path as _P
     _sys.path.insert(0, str(_P(__file__).resolve().parent / "tools" / "se"))
@@ -63,6 +73,10 @@ def _apply_city(city_key: str):
     LON_MIN, LAT_MIN, LON_MAX, LAT_MAX = c["bbox4326"]
     _KOMMUN = c["kommun"]
     _REGION_KOMMUNS = c["region_kommuns"]
+    linked = root / "data" / "lm" / f"footprints_{c['slug']}.parquet"
+    _FOOTPRINTS_SRC = f"read_parquet('{linked.as_posix()}')" if city_key != "gothenburg" and linked.exists() else "footprints"
+    _CLIP_TO_FOOTPRINTS = bool(c.get("clip_to_footprints")) and _FOOTPRINTS_SRC != "footprints"
+    print(f"[city] EPC footprints from {_FOOTPRINTS_SRC}  clip={_CLIP_TO_FOOTPRINTS}", flush=True)
     print(f"[city] {c['name']}  bbox={c['bbox4326']}  eubucco_parquet={PARQUET_PATH}  eubucco_gpkg={GPKG_PATH}", flush=True)
     return c
 
@@ -156,12 +170,12 @@ def _epc_fallback_points(gdf_3006, blank_idx):
     # centroid where the cadastral has any footprint (else lon/lat NULL → geocode).
     df = con2.execute(
         """
-        WITH linked AS (SELECT DISTINCT FormularId FROM footprints WHERE FormularId IS NOT NULL),
+        WITH linked AS (SELECT DISTINCT FormularId FROM """ + _FOOTPRINTS_SRC + """ WHERE FormularId IS NOT NULL),
         cad_cent AS (
             SELECT upper(fastighetsbeteckning) cad,
                    AVG(ST_X(ST_Centroid(ST_GeomFromWKB(geom)))) lon,
                    AVG(ST_Y(ST_Centroid(ST_GeomFromWKB(geom)))) lat
-            FROM footprints WHERE fastighetsbeteckning IS NOT NULL AND TRIM(fastighetsbeteckning)<>''
+            FROM """ + _FOOTPRINTS_SRC + """ WHERE fastighetsbeteckning IS NOT NULL AND TRIM(fastighetsbeteckning)<>''
             GROUP BY 1)
         SELECT TRIM(e."IdAdr")                       AS address,
                MIN(e."EgiSpecifikEnergianvandning")  AS energy_kwh_m2,
@@ -400,7 +414,7 @@ def process_data(city_key: str = "gothenburg") -> dict:
                 e_agg.all_addresses,
                 CASE WHEN f.FormularId IS NULL AND f.andamal1 NOT ILIKE 'Komplement%' THEN MAX(c.all_addr) END
             ) AS all_addresses
-        FROM footprints f
+        FROM """ + _FOOTPRINTS_SRC + """ f
         LEFT JOIN epc e ON f.FormularId = e.FormularId
                         AND e.IdAdr IS NOT NULL
                         AND TRIM(e.IdAdr) != ''
@@ -443,6 +457,11 @@ def process_data(city_key: str = "gothenburg") -> dict:
     ).to_crs("EPSG:3006").geometry.iloc[0]
     epc_polys = epc_3006[epc_3006.geometry.intersects(bbox_poly.buffer(200))].copy()
     print(f"  EPC footprints in bbox: {len(epc_polys):,}")
+    if _CLIP_TO_FOOTPRINTS:
+        on_fp = gpd.sjoin(gdf_3006[["geometry"]], gpd.GeoDataFrame(geometry=epc_polys.geometry.buffer(3), crs=epc_polys.crs),
+                          how="inner", predicate="intersects").index.unique()
+        gdf, gdf_3006 = gdf.loc[on_fp].copy(), gdf_3006.loc[on_fp].copy()
+        print(f"  kept {len(gdf):,} buildings on the municipality's own footprints")
 
     # ── EUBUCCO ↔ Lantmäteriet footprint matching ───────────────────────────
     # EUBUCCO (OSM geometry) carries no cadastral id or address, so the only link

@@ -202,7 +202,7 @@ export interface BuildingLookup {
   lon: number;
   dist_m: number;
   // ── UK only (/api/uk/building) ──
-  country?: "gb";
+  country?: "gb" | "be";
   postcode?: string | null;
   floors_source?: "epc_property_type" | "height_estimate" | "eubucco" | null;
   area_source?: "epc_sum" | "epc_mean_x_dwellings" | null;

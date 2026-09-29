@@ -6,13 +6,15 @@ import {
   defaultCityFor,
   mapCenterFor,
   countryCodeFromName,
+  isSeOnDemandCity,
+  registerSeCity,
   type CountryCode,
 } from "../config/countryNav";
 import { PROJECT_TYPES, type ProjectType } from "../config/projectConfig";
 import {
   Globe, MapPin, Target, Users, User, Lock, Building2, HelpCircle,
   ArrowRight, ExternalLink, Boxes, Zap, CloudSun, Layers, Coins, Compass,
-  Database, ShieldCheck, Leaf, ChevronRight,
+  Database, ShieldCheck, Leaf, ChevronRight, Plus, Loader2, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 
 /* ── Workspace entry page ─────────────────────────────────────────────────────
@@ -26,7 +28,7 @@ const FLAG: Record<CountryCode, string> = { se: "🇸🇪", gb: "🇬🇧", be: 
 
 // Cities with a genuinely ingested building dataset. Everything else is a demo
 // placeholder — no fabricated readiness figures.
-const LIVE_CITIES = new Set(["Gothenburg", "London", "Rotherham"]);
+const LIVE_CITIES = new Set(["Gothenburg", "Malmö", "London", "Rotherham"]);
 
 const ACCENT = "#8B5CF6";
 
@@ -64,7 +66,7 @@ export default function WorkspaceSelect() {
   const [leaving, setLeaving] = useState(false);
 
   const country = COUNTRIES.find((c) => c.id === countryCode)!;
-  const cityIsLive = LIVE_CITIES.has(city);
+  const cityIsLive = LIVE_CITIES.has(city) || isSeOnDemandCity(city);
 
   // Keep the city valid when the country changes.
   useEffect(() => {
@@ -77,6 +79,20 @@ export default function WorkspaceSelect() {
   useEffect(() => {
     let active = true;
     if (!cityIsLive) { setReadiness(null); return; }
+    if (isSeOnDemandCity(city)) {
+      fetch("/api/se/cities")
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((d: { cities: { name: string; stats?: { buildings: number; with_energy: number } | null }[] }) => {
+          if (!active) return;
+          const st = d.cities.find((c) => c.name === city)?.stats;
+          setReadiness({
+            dataReadiness: st?.buildings ? Math.round((st.with_energy / st.buildings) * 100) : null,
+            modelConfidence: null,
+          });
+        })
+        .catch(() => { if (active) setReadiness(null); });
+      return () => { active = false; };
+    }
     fetch(`/api/country-profile?country=${countryCode}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d: { viewer?: { kpis?: { key: string; value: number }[] } }) => {
@@ -195,6 +211,10 @@ export default function WorkspaceSelect() {
                 <div className="text-sm text-white/40 px-1 py-2">No study areas available for {country.name} yet.</div>
               )}
             </SelectRow>
+
+            {countryCode === "se" && (
+              <SeMunicipalityBuilder onBuilt={(name) => setCity(name)} />
+            )}
 
             <SelectRow icon={Target} label="Focus">
               <Select value={focus} onChange={(v) => setFocus(v as ProjectType)}
@@ -350,6 +370,134 @@ export default function WorkspaceSelect() {
         </div>
       </main>
       </div>{/* end fade layer */}
+    </div>
+  );
+}
+
+/* ── Build any Swedish municipality ──────────────────────────────────────────
+   Search the 290 municipalities, start tools/se/build_any_city.py through the
+   backend, follow its stages, then register the city so it is selectable. */
+
+interface Kommun { code: string; name: string; slug: string; epc_with_energy: number; built: boolean; building: boolean }
+
+// Hand-configured cities go by their app name, not the municipality name.
+const STATIC_SE_CITY: Record<string, string> = { "1480": "Gothenburg", "1280": "Malmö" };
+interface BuildStatus {
+  state: "starting" | "running" | "done" | "failed";
+  stage?: string | null; stage_index?: number; stages?: string[];
+  stage_labels?: Record<string, string>; log?: string[]; error?: string | null;
+  city_id?: string; name?: string; result?: { buildings: number; with_energy: number } | null;
+}
+
+function SeMunicipalityBuilder({ onBuilt }: { onBuilt: (name: string) => void }) {
+  const [kommuner, setKommuner] = useState<Kommun[]>([]);
+  const [query, setQuery] = useState("");
+  const [job, setJob] = useState<{ code: string; status: BuildStatus } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/se/kommuner").then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { kommuner: Kommun[] }) => setKommuner(d.kommuner))
+      .catch(() => setErr("Municipality list unavailable (backend down?)"));
+  }, []);
+
+  const picked = kommuner.find((k) => k.name.toLowerCase() === query.trim().toLowerCase()) ?? null;
+
+  // Poll the running build every 2 s until it finishes.
+  useEffect(() => {
+    if (!job || job.status.state === "done" || job.status.state === "failed") return;
+    const t = window.setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/se/cities/build/${job.code}`);
+        const status = (await r.json()) as BuildStatus;
+        setJob({ code: job.code, status });
+        if (status.state === "done" && status.city_id && status.name) {
+          const cities = await fetch("/api/se/cities").then((x) => x.json()) as
+            { cities: { id: string; center?: [number, number] | null }[] };
+          registerSeCity(status.name, status.city_id, cities.cities.find((c) => c.id === status.city_id)?.center);
+          setKommuner((ks) => ks.map((k) => (k.code === job.code ? { ...k, built: true, building: false } : k)));
+          onBuilt(status.name);
+        }
+      } catch { /* transient: try again next tick */ }
+    }, 2000);
+    return () => window.clearTimeout(t);
+  }, [job, onBuilt]);
+
+  async function build() {
+    if (!picked) return;
+    setErr(null);
+    const r = await fetch("/api/se/cities/build", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: picked.code }),
+    });
+    if (!r.ok) { setErr(`Could not start the build (${r.status})`); return; }
+    setJob({ code: picked.code, status: (await r.json()) as BuildStatus });
+  }
+
+  const st = job?.status;
+  const running = st && (st.state === "starting" || st.state === "running");
+  const nStages = st?.stages?.length ?? 5;
+  const pct = st?.state === "done" ? 100 : Math.round((((st?.stage_index ?? 0) + 0.5) / nStages) * 100);
+
+  return (
+    <div className="flex items-start gap-3 mb-3.5">
+      <span className="w-9 flex justify-center pt-2.5"><Plus size={18} className="text-white/45" /></span>
+      <span className="w-28 text-[13px] text-white/55 flex-shrink-0 pt-2.5">Add municipality</span>
+      <div className="flex-1">
+        <div className="flex gap-2">
+          <input list="se-kommuner" value={query} onChange={(e) => setQuery(e.target.value)} disabled={!!running}
+            placeholder="Any Swedish municipality, e.g. Ystad"
+            className="flex-1 rounded-lg px-4 py-2.5 text-[14px] text-white focus:outline-none"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)" }} />
+          <datalist id="se-kommuner">
+            {kommuner.map((k) => <option key={k.code} value={k.name}>{k.built ? "built" : `${k.epc_with_energy.toLocaleString("en-US")} EPCs`}</option>)}
+          </datalist>
+          {picked?.built && !running ? (
+            <button onClick={() => {
+                const staticName = STATIC_SE_CITY[picked.code];
+                if (!staticName) registerSeCity(picked.name, picked.slug, null);
+                onBuilt(staticName ?? picked.name);
+              }}
+              className="px-4 rounded-lg text-[13px] font-semibold text-white/85"
+              style={{ border: "1px solid rgba(78,205,196,0.5)", background: "rgba(78,205,196,0.10)" }}>
+              Select
+            </button>
+          ) : (
+            <button onClick={build} disabled={!picked || !!running}
+              className="px-4 rounded-lg text-[13px] font-bold text-white transition"
+              style={{ background: picked && !running ? "linear-gradient(135deg, #6D28D9 0%, #8B5CF6 100%)" : "rgba(255,255,255,0.06)",
+                       opacity: picked && !running ? 1 : 0.5, cursor: picked && !running ? "pointer" : "not-allowed" }}>
+              Build
+            </button>
+          )}
+        </div>
+        <div className="text-[11.5px] text-white/40 mt-1.5">
+          {picked
+            ? picked.built
+              ? `${picked.name} is already built.`
+              : `${picked.epc_with_energy.toLocaleString("en-US")} energy declarations. Downloads Lantmäteriet buildings, links EPCs, builds the data set and weather - about 2-5 minutes.`
+            : "Builds the buildings, energy declarations and weather for one municipality so Steps 1-5 work there."}
+        </div>
+        {err && <div className="text-[12px] mt-2" style={{ color: "#E2483B" }}>{err}</div>}
+        {st && (
+          <div className="mt-3 rounded-lg p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="flex items-center gap-2 text-[12.5px] font-semibold text-white/80">
+              {st.state === "done" ? <CheckCircle2 size={15} color="#2FB477" />
+                : st.state === "failed" ? <AlertTriangle size={15} color="#E2483B" />
+                : <Loader2 size={15} className="animate-spin" color={ACCENT} />}
+              {st.state === "done"
+                ? `${st.name} built: ${st.result?.buildings.toLocaleString("en-US")} buildings, ${st.result?.with_energy.toLocaleString("en-US")} with EPC energy`
+                : st.state === "failed" ? `Build failed: ${st.error}`
+                : (st.stage && st.stage_labels?.[st.stage]) || "Starting..."}
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden mt-2" style={{ background: "rgba(255,255,255,0.07)" }}>
+              <div style={{ width: `${pct}%`, height: "100%", background: st.state === "failed" ? "#E2483B" : "#4ECDC4", transition: "width .5s" }} />
+            </div>
+            {st.log && st.log.length > 0 && st.state !== "done" && (
+              <div className="text-[10.5px] text-white/35 mt-1.5 font-mono truncate">{st.log[st.log.length - 1]}</div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

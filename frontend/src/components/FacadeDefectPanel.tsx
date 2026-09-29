@@ -35,7 +35,7 @@ const MAX_UPLOAD_DIM = 1280;
 export interface FacadeBuilding {
   key: string; label: string;
   /** Address point - enables Street View capture (the backend finds the footprint). */
-  lat?: number | null; lon?: number | null; country?: "se" | "gb";
+  lat?: number | null; lon?: number | null; country?: "se" | "gb" | "be";
 }
 
 interface ImgEntry {

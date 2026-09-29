@@ -1,0 +1,6382 @@
+[
+ {
+  "code": "1440",
+  "name": "Ale",
+  "title": "Ale kommun",
+  "slug": "ale",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.01152,
+   57.81114,
+   12.41718,
+   58.10959
+  ],
+  "bbox3006": [
+   322459.058,
+   6411604.363,
+   347821.033,
+   6443824.142
+  ],
+  "buildings_file_mb": 3.8,
+  "epc_with_energy": 6382
+ },
+ {
+  "code": "1489",
+  "name": "Alingsås",
+  "title": "Alingsås kommun",
+  "slug": "alingsas",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.37855,
+   57.76094,
+   12.70193,
+   58.19937
+  ],
+  "bbox3006": [
+   344040.487,
+   6405114.051,
+   364935.122,
+   6453209.849
+  ],
+  "buildings_file_mb": 4.9,
+  "epc_with_energy": 7899
+ },
+ {
+  "code": "0764",
+  "name": "Alvesta",
+  "title": "Alvesta kommun",
+  "slug": "alvesta",
+  "lan": "07",
+  "nuts2": "SE21",
+  "bbox4326": [
+   14.29567,
+   56.53291,
+   14.67319,
+   57.16272
+  ],
+  "bbox3006": [
+   456679.509,
+   6265615.278,
+   480233.487,
+   6335547.081
+  ],
+  "buildings_file_mb": 3.5,
+  "epc_with_energy": 2560
+ },
+ {
+  "code": "0604",
+  "name": "Aneby",
+  "title": "Aneby kommun",
+  "slug": "aneby",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   14.48621,
+   57.71886,
+   15.1211,
+   57.99936
+  ],
+  "bbox3006": [
+   469392.948,
+   6397527.138,
+   507158.357,
+   6428645.236
+  ],
+  "buildings_file_mb": 1.4,
+  "epc_with_energy": 1437
+ },
+ {
+  "code": "1984",
+  "name": "Arboga",
+  "title": "Arboga kommun",
+  "slug": "arboga",
+  "lan": "19",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.60641,
+   59.24738,
+   15.99837,
+   59.53581
+  ],
+  "bbox3006": [
+   534589.333,
+   6567756.244,
+   556463.622,
+   6600141.489
+  ],
+  "buildings_file_mb": 2.2,
+  "epc_with_energy": 4269
+ },
+ {
+  "code": "2506",
+  "name": "Arjeplog",
+  "title": "Arjeplogs kommun",
+  "slug": "arjeplog",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   15.38772,
+   65.60739,
+   19.11414,
+   66.98768
+  ],
+  "bbox3006": [
+   517867.293,
+   7276205.171,
+   679370.295,
+   7435937.982
+  ],
+  "buildings_file_mb": 1.5,
+  "epc_with_energy": 881
+ },
+ {
+  "code": "2505",
+  "name": "Arvidsjaur",
+  "title": "Arvidsjaurs kommun",
+  "slug": "arvidsjaur",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   18.13302,
+   65.18426,
+   20.25731,
+   66.07621
+  ],
+  "bbox3006": [
+   646676.849,
+   7232631.85,
+   737674.681,
+   7338381.056
+  ],
+  "buildings_file_mb": 2.4,
+  "epc_with_energy": 1527
+ },
+ {
+  "code": "1784",
+  "name": "Arvika",
+  "title": "Arvika kommun",
+  "slug": "arvika",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   12.3019,
+   59.38952,
+   13.02347,
+   60.12264
+  ],
+  "bbox3006": [
+   346769.467,
+   6586532.838,
+   390173.043,
+   6666711.929
+  ],
+  "buildings_file_mb": 5.7,
+  "epc_with_energy": 3576
+ },
+ {
+  "code": "1882",
+  "name": "Askersund",
+  "title": "Askersunds kommun",
+  "slug": "askersund",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.64405,
+   58.68377,
+   15.33504,
+   59.02072
+  ],
+  "bbox3006": [
+   479362.838,
+   6504895.261,
+   519237.48,
+   6542407.967
+  ],
+  "buildings_file_mb": 2.9,
+  "epc_with_energy": 1933
+ },
+ {
+  "code": "2084",
+  "name": "Avesta",
+  "title": "Avesta kommun",
+  "slug": "avesta",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   16.03131,
+   60.0742,
+   16.70695,
+   60.36283
+  ],
+  "bbox3006": [
+   557393.52,
+   6660122.917,
+   594158.102,
+   6693038.609
+  ],
+  "buildings_file_mb": 4.2,
+  "epc_with_energy": 4423
+ },
+ {
+  "code": "1460",
+  "name": "Bengtsfors",
+  "title": "Bengtsfors kommun",
+  "slug": "bengtsfors",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.89284,
+   58.74787,
+   12.45152,
+   59.26394
+  ],
+  "bbox3006": [
+   320223.93,
+   6516146.988,
+   354728.816,
+   6572219.744
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 1870
+ },
+ {
+  "code": "2326",
+  "name": "Berg",
+  "title": "Bergs kommun",
+  "slug": "berg",
+  "lan": "23",
+  "nuts2": "SE32",
+  "bbox4326": [
+   12.17914,
+   62.27412,
+   14.91,
+   63.09207
+  ],
+  "bbox3006": [
+   353613.733,
+   6907908.587,
+   495455.423,
+   6995850.981
+  ],
+  "buildings_file_mb": 3.7,
+  "epc_with_energy": 1061
+ },
+ {
+  "code": "2403",
+  "name": "Bjurholm",
+  "title": "Bjurholms kommun",
+  "slug": "bjurholm",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   18.40537,
+   63.81477,
+   19.54621,
+   64.10952
+  ],
+  "bbox3006": [
+   667605.661,
+   7080844.888,
+   721350.549,
+   7117124.387
+  ],
+  "buildings_file_mb": 0.8,
+  "epc_with_energy": 344
+ },
+ {
+  "code": "1260",
+  "name": "Bjuv",
+  "title": "Bjuvs kommun",
+  "slug": "bjuv",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.88183,
+   55.97443,
+   13.04414,
+   56.12129
+  ],
+  "bbox3006": [
+   367818.513,
+   6205258.738,
+   378408.587,
+   6221302.718
+  ],
+  "buildings_file_mb": 1.7,
+  "epc_with_energy": 2625
+ },
+ {
+  "code": "2582",
+  "name": "Boden",
+  "title": "Bodens kommun",
+  "slug": "boden",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   20.34074,
+   65.71902,
+   22.24752,
+   66.39002
+  ],
+  "bbox3006": [
+   744826.813,
+   7299003.484,
+   823321.351,
+   7382153.754
+  ],
+  "buildings_file_mb": 5.2,
+  "epc_with_energy": 4648
+ },
+ {
+  "code": "1443",
+  "name": "Bollebygd",
+  "title": "Bollebygds kommun",
+  "slug": "bollebygd",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.44908,
+   57.61675,
+   12.76017,
+   57.8616
+  ],
+  "bbox3006": [
+   347630.709,
+   6388908.502,
+   367109.649,
+   6415501.66
+  ],
+  "buildings_file_mb": 1.1,
+  "epc_with_energy": 1803
+ },
+ {
+  "code": "2183",
+  "name": "Bollnäs",
+  "title": "Bollnäs kommun",
+  "slug": "bollnas",
+  "lan": "21",
+  "nuts2": "SE31",
+  "bbox4326": [
+   15.9514,
+   61.00838,
+   16.76355,
+   61.63612
+  ],
+  "bbox3006": [
+   551442.57,
+   6764094.82,
+   593461.603,
+   6834910.968
+  ],
+  "buildings_file_mb": 6.2,
+  "epc_with_energy": 5057
+ },
+ {
+  "code": "0885",
+  "name": "Borgholm",
+  "title": "Borgholms kommun",
+  "slug": "borgholm",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   16.5229,
+   56.67146,
+   17.14297,
+   57.36648
+  ],
+  "bbox3006": [
+   593322.304,
+   6281851.165,
+   628885.8076790823,
+   6360211.957
+  ],
+  "buildings_file_mb": 6.6,
+  "epc_with_energy": 1818
+ },
+ {
+  "code": "2081",
+  "name": "Borlänge",
+  "title": "Borlänge kommun",
+  "slug": "borlange",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   15.10356,
+   60.30128,
+   15.68417,
+   60.63391
+  ],
+  "bbox3006": [
+   505723.7679999866,
+   6684969.794,
+   537428.73,
+   6722205.959
+  ],
+  "buildings_file_mb": 7.1,
+  "epc_with_energy": 13467
+ },
+ {
+  "code": "1490",
+  "name": "Borås",
+  "title": "Borås kommun",
+  "slug": "boras",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.63987,
+   57.55189,
+   13.27166,
+   57.93609
+  ],
+  "bbox3006": [
+   358773.047,
+   6381277.16,
+   397664.12,
+   6422902.726
+  ],
+  "buildings_file_mb": 8.8,
+  "epc_with_energy": 16636
+ },
+ {
+  "code": "0127",
+  "name": "Botkyrka",
+  "title": "Botkyrka kommun",
+  "slug": "botkyrka",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.66909,
+   59.05261,
+   17.97351,
+   59.26043
+  ],
+  "bbox3006": [
+   653085.121,
+   6548968.925,
+   669506.806,
+   6572833.483
+  ],
+  "buildings_file_mb": 4.9,
+  "epc_with_energy": 11930
+ },
+ {
+  "code": "0560",
+  "name": "Boxholm",
+  "title": "Boxholms kommun",
+  "slug": "boxholm",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.86877,
+   57.96416,
+   15.37746,
+   58.30415
+  ],
+  "bbox3006": [
+   492235.211,
+   6424727.462,
+   522121.677,
+   6462635.271
+  ],
+  "buildings_file_mb": 1.4,
+  "epc_with_energy": 1076
+ },
+ {
+  "code": "1272",
+  "name": "Bromölla",
+  "title": "Bromölla kommun",
+  "slug": "bromolla",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   14.38441,
+   56.00021,
+   14.58243,
+   56.22327
+  ],
+  "bbox3006": [
+   461607.399,
+   6206273.661,
+   474107.583,
+   6231007.898
+  ],
+  "buildings_file_mb": 1.8,
+  "epc_with_energy": 2075
+ },
+ {
+  "code": "2305",
+  "name": "Bräcke",
+  "title": "Bräcke kommun",
+  "slug": "bracke",
+  "lan": "23",
+  "nuts2": "SE32",
+  "bbox4326": [
+   14.78267,
+   62.59009,
+   16.4938,
+   63.13647
+  ],
+  "bbox3006": [
+   488837.604,
+   6939938.567,
+   575306.101,
+   7001669.78
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 1059
+ },
+ {
+  "code": "1231",
+  "name": "Burlöv",
+  "title": "Burlövs kommun",
+  "slug": "burlov",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.03207,
+   55.60329,
+   13.13173,
+   55.66612
+  ],
+  "bbox3006": [
+   376019.151,
+   6163685.563,
+   382485.082,
+   6170502.678
+  ],
+  "buildings_file_mb": 1.2,
+  "epc_with_energy": 2692
+ },
+ {
+  "code": "1278",
+  "name": "Båstad",
+  "title": "Båstads kommun",
+  "slug": "bastad",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.55114,
+   56.31545,
+   12.96103,
+   56.47513
+  ],
+  "bbox3006": [
+   348533.966,
+   6243883.179961417,
+   374408.798,
+   6260826.042
+  ],
+  "buildings_file_mb": 4.9,
+  "epc_with_energy": 3699
+ },
+ {
+  "code": "1438",
+  "name": "Dals-Ed",
+  "title": "Dals-Eds kommun",
+  "slug": "dals_ed",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.67659,
+   58.74976,
+   12.11263,
+   59.24159
+  ],
+  "bbox3006": [
+   307728.615,
+   6516957.5,
+   335310.873,
+   6570521.351
+  ],
+  "buildings_file_mb": 1.3,
+  "epc_with_energy": 848
+ },
+ {
+  "code": "0162",
+  "name": "Danderyd",
+  "title": "Danderyds kommun",
+  "slug": "danderyd",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.99499,
+   59.37549,
+   18.1143,
+   59.43725
+  ],
+  "bbox3006": [
+   670154.5380183068,
+   6585692.408,
+   676607.9241908772,
+   6592876.226
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 5191
+ },
+ {
+  "code": "1862",
+  "name": "Degerfors",
+  "title": "Degerfors kommun",
+  "slug": "degerfors",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.30062,
+   58.9939,
+   14.58109,
+   59.31133
+  ],
+  "bbox3006": [
+   459812.2005524262,
+   6539582.826,
+   476150.334,
+   6574795.127
+  ],
+  "buildings_file_mb": 1.9,
+  "epc_with_energy": 2613
+ },
+ {
+  "code": "2425",
+  "name": "Dorotea",
+  "title": "Dorotea kommun",
+  "slug": "dorotea",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   14.84609,
+   63.99259,
+   16.9423,
+   64.91391
+  ],
+  "bbox3006": [
+   492469.951,
+   7096197.423,
+   591875.832,
+   7200270.428
+  ],
+  "buildings_file_mb": 1.0,
+  "epc_with_energy": 355
+ },
+ {
+  "code": "1730",
+  "name": "Eda",
+  "title": "Eda kommun",
+  "slug": "eda",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   11.89518,
+   59.58836,
+   12.4688,
+   60.03374
+  ],
+  "bbox3006": [
+   324715.586,
+   6609666.956,
+   358982.288,
+   6657868.311
+  ],
+  "buildings_file_mb": 2.4,
+  "epc_with_energy": 744
+ },
+ {
+  "code": "0125",
+  "name": "Ekerö",
+  "title": "Ekerö kommun",
+  "slug": "ekero",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.4273,
+   59.26982,
+   17.95483,
+   59.43554
+  ],
+  "bbox3006": [
+   638341.554,
+   6572616.973,
+   667576.896,
+   6592273.232
+  ],
+  "buildings_file_mb": 5.3,
+  "epc_with_energy": 4790
+ },
+ {
+  "code": "0686",
+  "name": "Eksjö",
+  "title": "Eksjö kommun",
+  "slug": "eksjo",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   14.79008,
+   57.5084,
+   15.64659,
+   57.74735
+  ],
+  "bbox3006": [
+   487422.133,
+   6374000.732,
+   538488.0459999617,
+   6400766.193
+  ],
+  "buildings_file_mb": 3.7,
+  "epc_with_energy": 4699
+ },
+ {
+  "code": "0862",
+  "name": "Emmaboda",
+  "title": "Emmaboda kommun",
+  "slug": "emmaboda",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   15.34118,
+   56.45234,
+   15.77969,
+   56.83675
+  ],
+  "bbox3006": [
+   521029.436,
+   6256477.816,
+   547571.184,
+   6299485.033
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 1465
+ },
+ {
+  "code": "0381",
+  "name": "Enköping",
+  "title": "Enköpings kommun",
+  "slug": "enkoping",
+  "lan": "03",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.71787,
+   59.43884,
+   17.53954,
+   59.8712
+  ],
+  "bbox3006": [
+   597429.827,
+   6590176.299,
+   642176.626,
+   6639792.714
+  ],
+  "buildings_file_mb": 6.3,
+  "epc_with_energy": 7601
+ },
+ {
+  "code": "0484",
+  "name": "Eskilstuna",
+  "title": "Eskilstuna kommun",
+  "slug": "eskilstuna",
+  "lan": "04",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.87398,
+   59.16058,
+   16.85268,
+   59.47828
+  ],
+  "bbox3006": [
+   549977.2835244589,
+   6558260.101,
+   604952.092,
+   6594773.101
+  ],
+  "buildings_file_mb": 13.1,
+  "epc_with_energy": 21386
+ },
+ {
+  "code": "1285",
+  "name": "Eslöv",
+  "title": "Eslövs kommun",
+  "slug": "eslov",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.1363,
+   55.69268,
+   13.6314,
+   56.00506
+  ],
+  "bbox3006": [
+   382851.933,
+   6173450.689004361,
+   414657.538,
+   6207487.601
+  ],
+  "buildings_file_mb": 3.8,
+  "epc_with_energy": 5716
+ },
+ {
+  "code": "1445",
+  "name": "Essunga",
+  "title": "Essunga kommun",
+  "slug": "essunga",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.53302,
+   58.09215,
+   12.91138,
+   58.28711
+  ],
+  "bbox3006": [
+   354573.459,
+   6441628.229,
+   377545.109,
+   6462574.222
+  ],
+  "buildings_file_mb": 1.2,
+  "epc_with_energy": 901
+ },
+ {
+  "code": "1982",
+  "name": "Fagersta",
+  "title": "Fagersta kommun",
+  "slug": "fagersta",
+  "lan": "19",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.69161,
+   59.87114,
+   16.07381,
+   60.03713
+  ],
+  "bbox3006": [
+   538725.815,
+   6637262.447,
+   559825.999,
+   6656032.203
+  ],
+  "buildings_file_mb": 2.2,
+  "epc_with_energy": 3559
+ },
+ {
+  "code": "1382",
+  "name": "Falkenberg",
+  "title": "Falkenbergs kommun",
+  "slug": "falkenberg",
+  "lan": "13",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.35913,
+   56.77648,
+   13.08765,
+   57.2934
+  ],
+  "bbox3006": [
+   338635.15,
+   6295616.931,
+   384753.396,
+   6351665.384
+  ],
+  "buildings_file_mb": 9.2,
+  "epc_with_energy": 9240
+ },
+ {
+  "code": "1499",
+  "name": "Falköping",
+  "title": "Falköpings kommun",
+  "slug": "falkoping",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.21735,
+   57.9162,
+   13.88447,
+   58.40104
+  ],
+  "bbox3006": [
+   394390.169,
+   6420772.646,
+   434802.667,
+   6473901.552
+  ],
+  "buildings_file_mb": 5.9,
+  "epc_with_energy": 5758
+ },
+ {
+  "code": "2080",
+  "name": "Falun",
+  "title": "Falu kommun",
+  "slug": "falun",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   15.26587,
+   60.46209,
+   16.37995,
+   61.04795
+  ],
+  "bbox3006": [
+   514622.5013429452,
+   6702903.994738234,
+   574519.399,
+   6768913.611
+  ],
+  "buildings_file_mb": 10.4,
+  "epc_with_energy": 15392
+ },
+ {
+  "code": "1782",
+  "name": "Filipstad",
+  "title": "Filipstads kommun",
+  "slug": "filipstad",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   13.80591,
+   59.57399,
+   14.43982,
+   60.23168
+  ],
+  "bbox3006": [
+   432544.472,
+   6604575.601,
+   468973.233,
+   6677344.905
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 2217
+ },
+ {
+  "code": "0562",
+  "name": "Finspång",
+  "title": "Finspångs kommun",
+  "slug": "finspang",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.41881,
+   58.61836,
+   16.18439,
+   59.01176
+  ],
+  "bbox3006": [
+   524327.46,
+   6497632.983,
+   568020.742,
+   6541964.605
+  ],
+  "buildings_file_mb": 3.6,
+  "epc_with_energy": 3416
+ },
+ {
+  "code": "0482",
+  "name": "Flen",
+  "title": "Flens kommun",
+  "slug": "flen",
+  "lan": "04",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.42273,
+   58.88882,
+   17.02368,
+   59.23383
+  ],
+  "bbox3006": [
+   581998.759,
+   6528543.833,
+   615464.371,
+   6567842.046
+  ],
+  "buildings_file_mb": 3.2,
+  "epc_with_energy": 3444
+ },
+ {
+  "code": "1763",
+  "name": "Forshaga",
+  "title": "Forshaga kommun",
+  "slug": "forshaga",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   13.37651,
+   59.48613,
+   13.67146,
+   59.80775
+  ],
+  "bbox3006": [
+   408050.587,
+   6595307.805,
+   425470.68,
+   6630748.357
+  ],
+  "buildings_file_mb": 1.7,
+  "epc_with_energy": 2666
+ },
+ {
+  "code": "1439",
+  "name": "Färgelanda",
+  "title": "Färgelanda kommun",
+  "slug": "fargelanda",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.86311,
+   58.43917,
+   12.20514,
+   58.80203
+  ],
+  "bbox3006": [
+   316898.01,
+   6481878.36,
+   338537.709,
+   6521377.278
+  ],
+  "buildings_file_mb": 1.4,
+  "epc_with_energy": 1017
+ },
+ {
+  "code": "2026",
+  "name": "Gagnef",
+  "title": "Gagnefs kommun",
+  "slug": "gagnef",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   14.58704,
+   60.28645,
+   15.27461,
+   60.63363
+  ],
+  "bbox3006": [
+   477165.579,
+   6683384.179,
+   515023.2438977486,
+   6722011.779
+  ],
+  "buildings_file_mb": 3.5,
+  "epc_with_energy": 1747
+ },
+ {
+  "code": "0662",
+  "name": "Gislaved",
+  "title": "Gislaveds kommun",
+  "slug": "gislaved",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   13.0925,
+   56.9774,
+   13.90027,
+   57.60519
+  ],
+  "bbox3006": [
+   384062.094,
+   6316488.109,
+   434283.606,
+   6385288.713
+  ],
+  "buildings_file_mb": 4.8,
+  "epc_with_energy": 3802
+ },
+ {
+  "code": "0461",
+  "name": "Gnesta",
+  "title": "Gnesta kommun",
+  "slug": "gnesta",
+  "lan": "04",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.87561,
+   58.92588,
+   17.41652,
+   59.19381
+  ],
+  "bbox3006": [
+   607980.558,
+   6533312.8,
+   638034.158,
+   6564133.411
+  ],
+  "buildings_file_mb": 2.1,
+  "epc_with_energy": 2230
+ },
+ {
+  "code": "0617",
+  "name": "Gnosjö",
+  "title": "Gnosjö kommun",
+  "slug": "gnosjo",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   13.57901,
+   57.23262,
+   14.04992,
+   57.4769
+  ],
+  "bbox3006": [
+   414220.946,
+   6344174.719,
+   443025.803,
+   6370873.087
+  ],
+  "buildings_file_mb": 1.8,
+  "epc_with_energy": 1699
+ },
+ {
+  "code": "0980",
+  "name": "Gotland",
+  "title": "Gotlands kommun",
+  "slug": "gotland",
+  "lan": "09",
+  "nuts2": "SE21",
+  "bbox4326": [
+   17.92847,
+   56.91343,
+   19.4023,
+   58.38873
+  ],
+  "bbox3006": [
+   678279.726,
+   6311568.071,
+   757276.3,
+   6480413.432
+  ],
+  "buildings_file_mb": 13.2,
+  "epc_with_energy": 18371
+ },
+ {
+  "code": "1764",
+  "name": "Grums",
+  "title": "Grums kommun",
+  "slug": "grums",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   12.84313,
+   59.23445,
+   13.15133,
+   59.56022
+  ],
+  "bbox3006": [
+   376940.08,
+   6568149.014,
+   395529.067,
+   6603888.904
+  ],
+  "buildings_file_mb": 1.8,
+  "epc_with_energy": 1961
+ },
+ {
+  "code": "1444",
+  "name": "Grästorp",
+  "title": "Grästorps kommun",
+  "slug": "grastorp",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.47083,
+   58.21844,
+   12.84865,
+   58.43183
+  ],
+  "bbox3006": [
+   351435.449,
+   6455818.102,
+   374383.041,
+   6478798.273
+  ],
+  "buildings_file_mb": 1.1,
+  "epc_with_energy": 1124
+ },
+ {
+  "code": "1447",
+  "name": "Gullspång",
+  "title": "Gullspångs kommun",
+  "slug": "gullspang",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.95427,
+   58.78761,
+   14.3906,
+   59.05352
+  ],
+  "bbox3006": [
+   439552.51,
+   6516874.66,
+   465043.472,
+   6546171.048
+  ],
+  "buildings_file_mb": 1.5,
+  "epc_with_energy": 855
+ },
+ {
+  "code": "2523",
+  "name": "Gällivare",
+  "title": "Gällivare kommun",
+  "slug": "gallivare",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   16.79678,
+   66.41606,
+   22.53129,
+   67.94697
+  ],
+  "bbox3006": [
+   580209.889,
+   7367438.735,
+   814911.122,
+   7556170.248
+  ],
+  "buildings_file_mb": 3.8,
+  "epc_with_energy": 3706
+ },
+ {
+  "code": "2180",
+  "name": "Gävle",
+  "title": "Gävle kommun",
+  "slug": "gavle",
+  "lan": "21",
+  "nuts2": "SE31",
+  "bbox4326": [
+   16.77618,
+   60.27496,
+   17.58437,
+   61.05525
+  ],
+  "bbox3006": [
+   598239.6819998547,
+   6683356.369,
+   639509.873,
+   6771695.684
+  ],
+  "buildings_file_mb": 13.7,
+  "epc_with_energy": 23451
+ },
+ {
+  "code": "1480",
+  "name": "Göteborg",
+  "title": "Göteborgs kommun",
+  "slug": "goteborg",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.61266,
+   57.50476,
+   12.219,
+   57.86681
+  ],
+  "bbox3006": [
+   297069.984,
+   6378637.773,
+   335035.6310375641,
+   6417272.777
+  ],
+  "buildings_file_mb": 25.4,
+  "epc_with_energy": 90955
+ },
+ {
+  "code": "1471",
+  "name": "Götene",
+  "title": "Götene kommun",
+  "slug": "gotene",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.26967,
+   58.4318,
+   13.6637,
+   58.69228
+  ],
+  "bbox3006": [
+   398962.624,
+   6478085.145,
+   422545.881,
+   6506559.733
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 2424
+ },
+ {
+  "code": "0643",
+  "name": "Habo",
+  "title": "Habo kommun",
+  "slug": "habo",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   13.86119,
+   57.80928,
+   14.22675,
+   58.13728
+  ],
+  "bbox3006": [
+   432330.298,
+   6408046.34,
+   454469.667,
+   6444255.248
+  ],
+  "buildings_file_mb": 2.2,
+  "epc_with_energy": 2427
+ },
+ {
+  "code": "1783",
+  "name": "Hagfors",
+  "title": "Hagfors kommun",
+  "slug": "hagfors",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   13.19868,
+   59.77196,
+   13.99399,
+   60.40076
+  ],
+  "bbox3006": [
+   398843.959,
+   6627389.693,
+   444568.473,
+   6696467.296
+  ],
+  "buildings_file_mb": 2.6,
+  "epc_with_energy": 2422
+ },
+ {
+  "code": "1861",
+  "name": "Hallsberg",
+  "title": "Hallsbergs kommun",
+  "slug": "hallsberg",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.71767,
+   58.80807,
+   15.59388,
+   59.15574
+  ],
+  "bbox3006": [
+   483689.477,
+   6518714.849009355,
+   533965.284,
+   6557545.057
+  ],
+  "buildings_file_mb": 3.0,
+  "epc_with_energy": 3017
+ },
+ {
+  "code": "1961",
+  "name": "Hallstahammar",
+  "title": "Hallstahammars kommun",
+  "slug": "hallstahammar",
+  "lan": "19",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.07181,
+   59.47216,
+   16.33297,
+   59.66545
+  ],
+  "bbox3006": [
+   560730.888,
+   6593118.875,
+   575095.982,
+   6614908.011
+  ],
+  "buildings_file_mb": 1.8,
+  "epc_with_energy": 3328
+ },
+ {
+  "code": "1380",
+  "name": "Halmstad",
+  "title": "Halmstads kommun",
+  "slug": "halmstad",
+  "lan": "13",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.63242,
+   56.54652,
+   13.30978,
+   56.93963
+  ],
+  "bbox3006": [
+   354446.091,
+   6269417.642,
+   397162.748,
+   6311937.528
+  ],
+  "buildings_file_mb": 14.3,
+  "epc_with_energy": 19628
+ },
+ {
+  "code": "1761",
+  "name": "Hammarö",
+  "title": "Hammarö kommun",
+  "slug": "hammaro",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   13.41886,
+   59.25333,
+   13.71113,
+   59.36562
+  ],
+  "bbox3006": [
+   409833.358,
+   6569330.741,
+   426740.734,
+   6581474.704
+  ],
+  "buildings_file_mb": 2.5,
+  "epc_with_energy": 3851
+ },
+ {
+  "code": "0136",
+  "name": "Haninge",
+  "title": "Haninge kommun",
+  "slug": "haninge",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.89551,
+   58.85347,
+   18.62173,
+   59.20789
+  ],
+  "bbox3006": [
+   667027.029,
+   6527349.736,
+   706755.418,
+   6568817.008204101
+  ],
+  "buildings_file_mb": 9.3,
+  "epc_with_energy": 13602
+ },
+ {
+  "code": "2583",
+  "name": "Haparanda",
+  "title": "Haparanda kommun",
+  "slug": "haparanda",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   23.21799,
+   65.59294,
+   24.31506,
+   66.14105
+  ],
+  "bbox3006": [
+   878064.207,
+   7299286.666,
+   919192.56,
+   7366887.419
+  ],
+  "buildings_file_mb": 2.2,
+  "epc_with_energy": 1709
+ },
+ {
+  "code": "0331",
+  "name": "Heby",
+  "title": "Heby kommun",
+  "slug": "heby",
+  "lan": "03",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.70628,
+   59.83647,
+   17.37525,
+   60.28356
+  ],
+  "bbox3006": [
+   595634.913,
+   6634431.04,
+   631331.415,
+   6685355.791
+  ],
+  "buildings_file_mb": 3.0,
+  "epc_with_energy": 2397
+ },
+ {
+  "code": "2083",
+  "name": "Hedemora",
+  "title": "Hedemora kommun",
+  "slug": "hedemora",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   15.66177,
+   60.18498,
+   16.38833,
+   60.59171
+  ],
+  "bbox3006": [
+   536705.539,
+   6672195.692,
+   576046.87,
+   6718113.947
+  ],
+  "buildings_file_mb": 3.1,
+  "epc_with_energy": 3278
+ },
+ {
+  "code": "1283",
+  "name": "Helsingborg",
+  "title": "Helsingborgs kommun",
+  "slug": "helsingborg",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.60197,
+   55.91622,
+   12.96949,
+   56.22227
+  ],
+  "bbox3006": [
+   350132.688,
+   6199352.847,
+   374099.2087229852,
+   6232673.238
+  ],
+  "buildings_file_mb": 12.5,
+  "epc_with_energy": 23329
+ },
+ {
+  "code": "1466",
+  "name": "Herrljunga",
+  "title": "Herrljunga kommun",
+  "slug": "herrljunga",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.85417,
+   57.88972,
+   13.36338,
+   58.12958
+  ],
+  "bbox3006": [
+   372784.674,
+   6418450.644,
+   403615.999,
+   6444305.832
+  ],
+  "buildings_file_mb": 1.8,
+  "epc_with_energy": 1621
+ },
+ {
+  "code": "1497",
+  "name": "Hjo",
+  "title": "Hjo kommun",
+  "slug": "hjo",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.99906,
+   58.12909,
+   14.38713,
+   58.40046
+  ],
+  "bbox3006": [
+   441049.637,
+   6443519.929,
+   464179.588,
+   6473458.841
+  ],
+  "buildings_file_mb": 1.6,
+  "epc_with_energy": 1764
+ },
+ {
+  "code": "2104",
+  "name": "Hofors",
+  "title": "Hofors kommun",
+  "slug": "hofors",
+  "lan": "21",
+  "nuts2": "SE31",
+  "bbox4326": [
+   16.13966,
+   60.3768,
+   16.66981,
+   60.60751
+  ],
+  "bbox3006": [
+   562841.232,
+   6693919.185,
+   591418.387,
+   6720232.228
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 2083
+ },
+ {
+  "code": "0126",
+  "name": "Huddinge",
+  "title": "Huddinge kommun",
+  "slug": "huddinge",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.85712,
+   59.15115,
+   18.18134,
+   59.28033
+  ],
+  "bbox3006": [
+   663396.267,
+   6560381.070128118,
+   681242.8964226586,
+   6575595.153259204
+  ],
+  "buildings_file_mb": 9.2,
+  "epc_with_energy": 15405
+ },
+ {
+  "code": "2184",
+  "name": "Hudiksvall",
+  "title": "Hudiksvalls kommun",
+  "slug": "hudiksvall",
+  "lan": "21",
+  "nuts2": "SE31",
+  "bbox4326": [
+   16.05499,
+   61.42132,
+   17.59498,
+   62.18407
+  ],
+  "bbox3006": [
+   556301.166,
+   6810172.318,
+   635071.031,
+   6897392.366
+  ],
+  "buildings_file_mb": 9.3,
+  "epc_with_energy": 6901
+ },
+ {
+  "code": "0860",
+  "name": "Hultsfred",
+  "title": "Hultsfreds kommun",
+  "slug": "hultsfred",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   15.48331,
+   57.20548,
+   16.2013,
+   57.58406
+  ],
+  "bbox3006": [
+   529198.132,
+   6340362.496,
+   571827.099,
+   6383039.77
+  ],
+  "buildings_file_mb": 3.1,
+  "epc_with_energy": 2666
+ },
+ {
+  "code": "1315",
+  "name": "Hylte",
+  "title": "Hylte kommun",
+  "slug": "hylte",
+  "lan": "13",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.84268,
+   56.82899,
+   13.65562,
+   57.11642
+  ],
+  "bbox3006": [
+   368359.314,
+   6300425.383,
+   418590.265,
+   6331147.575
+  ],
+  "buildings_file_mb": 2.4,
+  "epc_with_energy": 2034
+ },
+ {
+  "code": "1863",
+  "name": "Hällefors",
+  "title": "Hällefors kommun",
+  "slug": "hallefors",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.366,
+   59.47413,
+   14.9339,
+   59.99872
+  ],
+  "bbox3006": [
+   464077.407,
+   6593019.695,
+   496312.777,
+   6651270.466
+  ],
+  "buildings_file_mb": 1.6,
+  "epc_with_energy": 1503
+ },
+ {
+  "code": "2361",
+  "name": "Härjedalen",
+  "title": "Härjedalens kommun",
+  "slug": "harjedalen",
+  "lan": "23",
+  "nuts2": "SE32",
+  "bbox4326": [
+   12.20539,
+   61.56525,
+   15.42678,
+   62.78107
+  ],
+  "bbox3006": [
+   351576.401,
+   6828934.149,
+   521778.971,
+   6961269.181
+  ],
+  "buildings_file_mb": 5.9,
+  "epc_with_energy": 2821
+ },
+ {
+  "code": "2280",
+  "name": "Härnösand",
+  "title": "Härnösands kommun",
+  "slug": "harnosand",
+  "lan": "22",
+  "nuts2": "SE32",
+  "bbox4326": [
+   17.15822,
+   62.49216,
+   18.17339,
+   62.88198
+  ],
+  "bbox3006": [
+   611199.115,
+   6930867.565,
+   661340.422,
+   6976417.719
+  ],
+  "buildings_file_mb": 3.6,
+  "epc_with_energy": 4807
+ },
+ {
+  "code": "1401",
+  "name": "Härryda",
+  "title": "Härryda kommun",
+  "slug": "harryda",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.07484,
+   57.59392,
+   12.55197,
+   57.73513
+  ],
+  "bbox3006": [
+   325175.591,
+   6387270.992,
+   354251.276,
+   6401855.077
+  ],
+  "buildings_file_mb": 4.3,
+  "epc_with_energy": 7174
+ },
+ {
+  "code": "1293",
+  "name": "Hässleholm",
+  "title": "Hässleholms kommun",
+  "slug": "hassleholm",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.43209,
+   55.94362,
+   14.00865,
+   56.41981
+  ],
+  "bbox3006": [
+   402075.1177172805,
+   6200914.80900029,
+   438844.8202040667,
+   6253246.077
+  ],
+  "buildings_file_mb": 9.2,
+  "epc_with_energy": 9778
+ },
+ {
+  "code": "0305",
+  "name": "Håbo",
+  "title": "Håbo kommun",
+  "slug": "habo",
+  "lan": "03",
+  "nuts2": "SE12",
+  "bbox4326": [
+   17.38009,
+   59.52545,
+   17.64893,
+   59.73153
+  ],
+  "bbox3006": [
+   634633.515,
+   6600974.267,
+   648920.715,
+   6624487.223
+  ],
+  "buildings_file_mb": 3.9,
+  "epc_with_energy": 4499
+ },
+ {
+  "code": "1284",
+  "name": "Höganäs",
+  "title": "Höganäs kommun",
+  "slug": "hoganas",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.45782,
+   56.13522,
+   12.75916,
+   56.30852
+  ],
+  "bbox3006": [
+   342023.622716482,
+   6224039.969,
+   361372.819,
+   6242673.97426046
+  ],
+  "buildings_file_mb": 4.7,
+  "epc_with_energy": 6183
+ },
+ {
+  "code": "0821",
+  "name": "Högsby",
+  "title": "Högsby kommun",
+  "slug": "hogsby",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   15.55356,
+   56.97235,
+   16.26614,
+   57.26022
+  ],
+  "bbox3006": [
+   533652.142,
+   6314444.685,
+   576374.956,
+   6347063.054
+  ],
+  "buildings_file_mb": 1.5,
+  "epc_with_energy": 633
+ },
+ {
+  "code": "1266",
+  "name": "Hörby",
+  "title": "Hörby kommun",
+  "slug": "horby",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.56143,
+   55.72367,
+   13.9512,
+   55.9623
+  ],
+  "bbox3006": [
+   409643.838,
+   6176263.037,
+   434526.477,
+   6202380.268
+  ],
+  "buildings_file_mb": 3.1,
+  "epc_with_energy": 2888
+ },
+ {
+  "code": "1267",
+  "name": "Höör",
+  "title": "Höörs kommun",
+  "slug": "hoor",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.38719,
+   55.77625,
+   13.66439,
+   56.08737
+  ],
+  "bbox3006": [
+   398837.373,
+   6182354.609,
+   416891.856,
+   6216607.65
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 2740
+ },
+ {
+  "code": "2510",
+  "name": "Jokkmokk",
+  "title": "Jokkmokks kommun",
+  "slug": "jokkmokk",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   16.1228,
+   66.01093,
+   21.63125,
+   67.75886
+  ],
+  "bbox3006": [
+   550936.225,
+   7321584.059,
+   779653.879,
+   7530980.212
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 1057
+ },
+ {
+  "code": "0123",
+  "name": "Järfälla",
+  "title": "Järfälla kommun",
+  "slug": "jarfalla",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.74739,
+   59.383,
+   17.90342,
+   59.50624
+  ],
+  "bbox3006": [
+   656058.648999794,
+   6585921.663,
+   664319.176,
+   6600013.216
+  ],
+  "buildings_file_mb": 3.7,
+  "epc_with_energy": 20871
+ },
+ {
+  "code": "0680",
+  "name": "Jönköping",
+  "title": "Jönköpings kommun",
+  "slug": "jonkoping",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   13.66881,
+   57.53916,
+   14.6467,
+   58.10829
+  ],
+  "bbox3006": [
+   420308.879,
+   6378186.685,
+   479180.1356899037,
+   6440821.455817169
+  ],
+  "buildings_file_mb": 13.8,
+  "epc_with_energy": 24666
+ },
+ {
+  "code": "2514",
+  "name": "Kalix",
+  "title": "Kalix kommun",
+  "slug": "kalix",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   22.22099,
+   65.59486,
+   23.76698,
+   66.14262
+  ],
+  "bbox3006": [
+   832345.534,
+   7293858.173,
+   894638.45,
+   7363490.879
+  ],
+  "buildings_file_mb": 4.4,
+  "epc_with_energy": 4599
+ },
+ {
+  "code": "0880",
+  "name": "Kalmar",
+  "title": "Kalmars kommun",
+  "slug": "kalmar",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   15.74638,
+   56.46699,
+   16.50266,
+   56.9235
+  ],
+  "bbox3006": [
+   545986.819,
+   6258306.157,
+   591466.521,
+   6309876.024
+  ],
+  "buildings_file_mb": 9.7,
+  "epc_with_energy": 13691
+ },
+ {
+  "code": "1446",
+  "name": "Karlsborg",
+  "title": "Karlsborgs kommun",
+  "slug": "karlsborg",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   14.2771,
+   58.40566,
+   14.69722,
+   58.75863
+  ],
+  "bbox3006": [
+   457754.702,
+   6474102.04,
+   482482.856,
+   6513215.09
+  ],
+  "buildings_file_mb": 1.8,
+  "epc_with_energy": 1537
+ },
+ {
+  "code": "1082",
+  "name": "Karlshamn",
+  "title": "Karlshamns kommun",
+  "slug": "karlshamn",
+  "lan": "10",
+  "nuts2": "SE22",
+  "bbox4326": [
+   14.6552,
+   56.11248,
+   15.06821,
+   56.38394
+  ],
+  "bbox3006": [
+   478558.35,
+   6218651.738,
+   504212.025515599,
+   6248814.779
+  ],
+  "buildings_file_mb": 6.6,
+  "epc_with_energy": 6073
+ },
+ {
+  "code": "1883",
+  "name": "Karlskoga",
+  "title": "Karlskoga kommun",
+  "slug": "karlskoga",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.32994,
+   59.24973,
+   14.77141,
+   59.51096
+  ],
+  "bbox3006": [
+   461783.12,
+   6568052.716,
+   487061.979,
+   6596971.855
+  ],
+  "buildings_file_mb": 3.3,
+  "epc_with_energy": 9037
+ },
+ {
+  "code": "1080",
+  "name": "Karlskrona",
+  "title": "Karlskrona kommun",
+  "slug": "karlskrona",
+  "lan": "10",
+  "nuts2": "SE22",
+  "bbox4326": [
+   15.29973,
+   55.95428,
+   16.06435,
+   56.49721
+  ],
+  "bbox3006": [
+   518715.748,
+   6201031.666,
+   565524.964,
+   6261927.424
+  ],
+  "buildings_file_mb": 9.7,
+  "epc_with_energy": 10432
+ },
+ {
+  "code": "1780",
+  "name": "Karlstad",
+  "title": "Karlstads kommun",
+  "slug": "karlstad",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   13.15961,
+   59.26164,
+   14.01026,
+   59.768
+  ],
+  "bbox3006": [
+   395077.063,
+   6570634.923,
+   444409.848,
+   6625988.995
+  ],
+  "buildings_file_mb": 8.7,
+  "epc_with_energy": 19922
+ },
+ {
+  "code": "0483",
+  "name": "Katrineholm",
+  "title": "Katrineholms kommun",
+  "slug": "katrineholm",
+  "lan": "04",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.80836,
+   58.77574,
+   16.62304,
+   59.22914
+  ],
+  "bbox3006": [
+   546742.801,
+   6515363.149,
+   592620.988,
+   6566694.789
+  ],
+  "buildings_file_mb": 4.4,
+  "epc_with_energy": 5057
+ },
+ {
+  "code": "1715",
+  "name": "Kil",
+  "title": "Kils kommun",
+  "slug": "kil",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   12.94462,
+   59.47507,
+   13.42204,
+   59.66462
+  ],
+  "bbox3006": [
+   383556.639,
+   6594752.298,
+   411101.5,
+   6615118.091
+  ],
+  "buildings_file_mb": 1.8,
+  "epc_with_energy": 2236
+ },
+ {
+  "code": "0513",
+  "name": "Kinda",
+  "title": "Kinda kommun",
+  "slug": "kinda",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.37052,
+   57.79095,
+   16.07911,
+   58.20094
+  ],
+  "bbox3006": [
+   522028.497,
+   6405496.121,
+   563425.887,
+   6451589.151
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 1419
+ },
+ {
+  "code": "2584",
+  "name": "Kiruna",
+  "title": "Kiruna kommun",
+  "slug": "kiruna",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   17.9186,
+   67.50271,
+   23.56349,
+   68.92462
+  ],
+  "bbox3006": [
+   624587.171,
+   7490355.211,
+   842712.419,
+   7669910.507
+  ],
+  "buildings_file_mb": 5.0,
+  "epc_with_energy": 4576
+ },
+ {
+  "code": "1276",
+  "name": "Klippan",
+  "title": "Klippans kommun",
+  "slug": "klippan",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.99998,
+   55.99961,
+   13.50186,
+   56.23442
+  ],
+  "bbox3006": [
+   375271.345,
+   6207841.785,
+   407134.371,
+   6233179.773
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 3175
+ },
+ {
+  "code": "0330",
+  "name": "Knivsta",
+  "title": "Knivsta kommun",
+  "slug": "knivsta",
+  "lan": "03",
+  "nuts2": "SE12",
+  "bbox4326": [
+   17.62766,
+   59.66829,
+   18.12019,
+   59.81718
+  ],
+  "bbox3006": [
+   648004.078,
+   6617399.994,
+   674953.764,
+   6635170.8
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 3916
+ },
+ {
+  "code": "2282",
+  "name": "Kramfors",
+  "title": "Kramfors kommun",
+  "slug": "kramfors",
+  "lan": "22",
+  "nuts2": "SE32",
+  "bbox4326": [
+   17.24367,
+   62.77293,
+   18.64675,
+   63.16731
+  ],
+  "bbox3006": [
+   614512.46,
+   6962284.411,
+   683585.611,
+   7009445.927
+  ],
+  "buildings_file_mb": 5.0,
+  "epc_with_energy": 5037
+ },
+ {
+  "code": "1290",
+  "name": "Kristianstad",
+  "title": "Kristianstads kommun",
+  "slug": "kristianstad",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.76689,
+   55.75456,
+   14.46601,
+   56.30071
+  ],
+  "bbox3006": [
+   422609.327,
+   6179451.856325523,
+   466955.378,
+   6239676.794969617
+  ],
+  "buildings_file_mb": 16.7,
+  "epc_with_energy": 12696
+ },
+ {
+  "code": "1781",
+  "name": "Kristinehamn",
+  "title": "Kristinehamns kommun",
+  "slug": "kristinehamn",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   13.7698,
+   59.02685,
+   14.32901,
+   59.48312
+  ],
+  "bbox3006": [
+   429379.771,
+   6543692.23,
+   461992.074,
+   6594041.523
+  ],
+  "buildings_file_mb": 3.4,
+  "epc_with_energy": 4799
+ },
+ {
+  "code": "2309",
+  "name": "Krokom",
+  "title": "Krokoms kommun",
+  "slug": "krokom",
+  "lan": "23",
+  "nuts2": "SE32",
+  "bbox4326": [
+   13.32909,
+   63.20594,
+   15.10379,
+   64.39179
+  ],
+  "bbox3006": [
+   415967.809,
+   7009628.329,
+   505005.181,
+   7140677.986
+  ],
+  "buildings_file_mb": 4.2,
+  "epc_with_energy": 3799
+ },
+ {
+  "code": "1881",
+  "name": "Kumla",
+  "title": "Kumla kommun",
+  "slug": "kumla",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.93357,
+   59.04736,
+   15.33566,
+   59.18345
+  ],
+  "bbox3006": [
+   496188.719,
+   6545327.475,
+   519181.813,
+   6560527.468
+  ],
+  "buildings_file_mb": 3.2,
+  "epc_with_energy": 5786
+ },
+ {
+  "code": "1384",
+  "name": "Kungsbacka",
+  "title": "Kungsbacka kommun",
+  "slug": "kungsbacka",
+  "lan": "13",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.84496,
+   57.29138,
+   12.40537,
+   57.59706
+  ],
+  "bbox3006": [
+   309878.202,
+   6354227.611,
+   344936.9298282686,
+   6386815.665
+  ],
+  "buildings_file_mb": 13.3,
+  "epc_with_energy": 15347
+ },
+ {
+  "code": "1960",
+  "name": "Kungsör",
+  "title": "Kungsörs kommun",
+  "slug": "kungsor",
+  "lan": "19",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.87274,
+   59.35266,
+   16.30825,
+   59.47456
+  ],
+  "bbox3006": [
+   549626.506,
+   6579646.672,
+   574121.821,
+   6593625.358
+  ],
+  "buildings_file_mb": 1.3,
+  "epc_with_energy": 2045
+ },
+ {
+  "code": "1482",
+  "name": "Kungälv",
+  "title": "Kungälvs kommun",
+  "slug": "kungalv",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.55698,
+   57.78386,
+   12.12733,
+   58.02278
+  ],
+  "bbox3006": [
+   295314.359,
+   6409852.415004235,
+   330337.6,
+   6434855.792
+  ],
+  "buildings_file_mb": 5.5,
+  "epc_with_energy": 9852
+ },
+ {
+  "code": "1261",
+  "name": "Kävlinge",
+  "title": "Kävlinge kommun",
+  "slug": "kavlinge",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.90312,
+   55.72467,
+   13.21323,
+   55.84779
+  ],
+  "bbox3006": [
+   368304.638,
+   6177428.559,
+   388132.288,
+   6190582.937
+  ],
+  "buildings_file_mb": 4.2,
+  "epc_with_energy": 5660
+ },
+ {
+  "code": "1983",
+  "name": "Köping",
+  "title": "Köpings kommun",
+  "slug": "koping",
+  "lan": "19",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.51899,
+   59.45352,
+   16.23121,
+   59.71096
+  ],
+  "bbox3006": [
+   529424.029,
+   6590668.563,
+   569269.317,
+   6619865.118
+  ],
+  "buildings_file_mb": 3.3,
+  "epc_with_energy": 5106
+ },
+ {
+  "code": "1381",
+  "name": "Laholm",
+  "title": "Laholms kommun",
+  "slug": "laholm",
+  "lan": "13",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.91251,
+   56.32232,
+   13.45675,
+   56.67877
+  ],
+  "bbox3006": [
+   370904.357,
+   6243911.08,
+   405449.266,
+   6282693.448
+  ],
+  "buildings_file_mb": 7.1,
+  "epc_with_energy": 4647
+ },
+ {
+  "code": "1282",
+  "name": "Landskrona",
+  "title": "Landskrona kommun",
+  "slug": "landskrona",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.67233,
+   55.81873,
+   13.04891,
+   55.96604
+  ],
+  "bbox3006": [
+   354164.1511913109,
+   6188356.300217408,
+   378217.1572573574,
+   6204019.11273393
+  ],
+  "buildings_file_mb": 5.2,
+  "epc_with_energy": 7293
+ },
+ {
+  "code": "1860",
+  "name": "Laxå",
+  "title": "Laxå kommun",
+  "slug": "laxa",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.32709,
+   58.71254,
+   14.74464,
+   59.11165
+  ],
+  "bbox3006": [
+   461018.68,
+   6508240.052,
+   485376.55,
+   6552512.46
+  ],
+  "buildings_file_mb": 1.4,
+  "epc_with_energy": 1323
+ },
+ {
+  "code": "1814",
+  "name": "Lekeberg",
+  "title": "Lekebergs kommun",
+  "slug": "lekeberg",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.5617,
+   59.03438,
+   15.05355,
+   59.2972
+  ],
+  "bbox3006": [
+   474843.836,
+   6543962.706,
+   503049.835,
+   6573147.81
+  ],
+  "buildings_file_mb": 2.1,
+  "epc_with_energy": 1756
+ },
+ {
+  "code": "2029",
+  "name": "Leksand",
+  "title": "Leksands kommun",
+  "slug": "leksand",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   14.37444,
+   60.54595,
+   15.62103,
+   60.89504
+  ],
+  "bbox3006": [
+   465684.372,
+   6712377.811,
+   533699.567,
+   6751256.264
+  ],
+  "buildings_file_mb": 5.7,
+  "epc_with_energy": 3231
+ },
+ {
+  "code": "1441",
+  "name": "Lerum",
+  "title": "Lerums kommun",
+  "slug": "lerum",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.17818,
+   57.72231,
+   12.46233,
+   57.97413
+  ],
+  "bbox3006": [
+   331944.488,
+   6401295.08101141,
+   349913.71,
+   6428648.246
+  ],
+  "buildings_file_mb": 4.7,
+  "epc_with_energy": 8714
+ },
+ {
+  "code": "0761",
+  "name": "Lessebo",
+  "title": "Lessebo kommun",
+  "slug": "lessebo",
+  "lan": "07",
+  "nuts2": "SE21",
+  "bbox4326": [
+   15.08492,
+   56.60781,
+   15.55208,
+   56.88487
+  ],
+  "bbox3006": [
+   505212.642,
+   6273733.389,
+   533640.815,
+   6304706.431
+  ],
+  "buildings_file_mb": 1.4,
+  "epc_with_energy": 1625
+ },
+ {
+  "code": "0186",
+  "name": "Lidingö",
+  "title": "Lidingö kommun",
+  "slug": "lidingo",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   18.08986,
+   59.32924,
+   18.29543,
+   59.39706
+  ],
+  "bbox3006": [
+   675781.1829248056,
+   6580791.836,
+   687095.768,
+   6588899.288727698
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 7970
+ },
+ {
+  "code": "1494",
+  "name": "Lidköping",
+  "title": "Lidköpings kommun",
+  "slug": "lidkoping",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.68563,
+   58.31498,
+   13.33319,
+   58.75763
+  ],
+  "bbox3006": [
+   364419.161,
+   6466109.703,
+   403572.327,
+   6514264.352
+  ],
+  "buildings_file_mb": 5.5,
+  "epc_with_energy": 9051
+ },
+ {
+  "code": "1462",
+  "name": "Lilla Edet",
+  "title": "Lilla Edets kommun",
+  "slug": "lilla_edet",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.996,
+   58.00446,
+   12.34727,
+   58.31189
+  ],
+  "bbox3006": [
+   322493.404,
+   6433154.19,
+   344589.639,
+   6466496.465
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 2767
+ },
+ {
+  "code": "1885",
+  "name": "Lindesberg",
+  "title": "Lindesbergs kommun",
+  "slug": "lindesberg",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.96352,
+   59.37038,
+   15.74323,
+   59.95599
+  ],
+  "bbox3006": [
+   497926.532,
+   6581296.191,
+   541510.12,
+   6646743.104
+  ],
+  "buildings_file_mb": 4.2,
+  "epc_with_energy": 5912
+ },
+ {
+  "code": "0580",
+  "name": "Linköping",
+  "title": "Linköpings kommun",
+  "slug": "linkoping",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.27232,
+   58.07015,
+   16.0581,
+   58.63537
+  ],
+  "bbox3006": [
+   516065.38,
+   6436552.558,
+   561430.368,
+   6499935.283
+  ],
+  "buildings_file_mb": 13.5,
+  "epc_with_energy": 34426
+ },
+ {
+  "code": "0781",
+  "name": "Ljungby",
+  "title": "Ljungby kommun",
+  "slug": "ljungby",
+  "lan": "07",
+  "nuts2": "SE21",
+  "bbox4326": [
+   13.31587,
+   56.5959,
+   14.29702,
+   57.05201
+  ],
+  "bbox3006": [
+   396592.484,
+   6273673.715,
+   457355.606,
+   6323394.767
+  ],
+  "buildings_file_mb": 6.6,
+  "epc_with_energy": 5649
+ },
+ {
+  "code": "2161",
+  "name": "Ljusdal",
+  "title": "Ljusdals kommun",
+  "slug": "ljusdal",
+  "lan": "21",
+  "nuts2": "SE31",
+  "bbox4326": [
+   14.50223,
+   61.49156,
+   16.58365,
+   62.329
+  ],
+  "bbox3006": [
+   473494.935,
+   6817642.273,
+   582045.446,
+   6911835.705
+  ],
+  "buildings_file_mb": 5.8,
+  "epc_with_energy": 3409
+ },
+ {
+  "code": "1864",
+  "name": "Ljusnarsberg",
+  "title": "Ljusnarsbergs kommun",
+  "slug": "ljusnarsberg",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.7398,
+   59.77095,
+   15.21403,
+   60.1031
+  ],
+  "bbox3006": [
+   485386.256,
+   6625931.455,
+   511900.793,
+   6662912.127
+  ],
+  "buildings_file_mb": 1.1,
+  "epc_with_energy": 1064
+ },
+ {
+  "code": "1262",
+  "name": "Lomma",
+  "title": "Lomma kommun",
+  "slug": "lomma",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.00271,
+   55.64063,
+   13.13407,
+   55.75613
+  ],
+  "bbox3006": [
+   374289.045,
+   6167892.961,
+   382901.95,
+   6180513.961
+  ],
+  "buildings_file_mb": 3.4,
+  "epc_with_energy": 4547
+ },
+ {
+  "code": "2085",
+  "name": "Ludvika",
+  "title": "Ludvika kommun",
+  "slug": "ludvika",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   14.18899,
+   60.00012,
+   15.24651,
+   60.39079
+  ],
+  "bbox3006": [
+   454764.401,
+   6651702.237,
+   513587.186,
+   6694959.175
+  ],
+  "buildings_file_mb": 4.6,
+  "epc_with_energy": 5271
+ },
+ {
+  "code": "2580",
+  "name": "Luleå",
+  "title": "Luleå kommun",
+  "slug": "lulea",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   21.30492,
+   65.36076,
+   23.0181,
+   66.22209
+  ],
+  "bbox3006": [
+   792916.641,
+   7263330.143,
+   859950.135,
+   7367762.87
+  ],
+  "buildings_file_mb": 10.7,
+  "epc_with_energy": 15492
+ },
+ {
+  "code": "1281",
+  "name": "Lund",
+  "title": "Lunds kommun",
+  "slug": "lund",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.1262,
+   55.52228,
+   13.60986,
+   55.79866
+  ],
+  "bbox3006": [
+   381705.517,
+   6154507.373,
+   412852.797,
+   6184546.3
+  ],
+  "buildings_file_mb": 10.9,
+  "epc_with_energy": 22295
+ },
+ {
+  "code": "2481",
+  "name": "Lycksele",
+  "title": "Lycksele kommun",
+  "slug": "lycksele",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   17.49975,
+   64.11044,
+   19.34919,
+   65.19573
+  ],
+  "bbox3006": [
+   621761.283,
+   7111711.039,
+   703464.47,
+   7237283.075
+  ],
+  "buildings_file_mb": 2.9,
+  "epc_with_energy": 2139
+ },
+ {
+  "code": "1484",
+  "name": "Lysekil",
+  "title": "Lysekils kommun",
+  "slug": "lysekil",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.32225,
+   58.18364,
+   11.5763,
+   58.48976
+  ],
+  "bbox3006": [
+   283791.328,
+   6455055.288,
+   300452.482,
+   6488324.13
+  ],
+  "buildings_file_mb": 3.3,
+  "epc_with_energy": 2492
+ },
+ {
+  "code": "1280",
+  "name": "Malmö",
+  "title": "Malmö kommun",
+  "slug": "malmo",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.84913,
+   55.50413,
+   13.14721,
+   55.64075
+  ],
+  "bbox3006": [
+   364154.152,
+   6152995.08,
+   383383.044,
+   6167653.631
+  ],
+  "buildings_file_mb": 8.9,
+  "epc_with_energy": 49717
+ },
+ {
+  "code": "2023",
+  "name": "Malung",
+  "title": "Malung-Sälens kommun",
+  "slug": "malung",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   12.74866,
+   60.19432,
+   13.96734,
+   61.52275
+  ],
+  "bbox3006": [
+   375178.659,
+   6675181.131,
+   445069.337,
+   6821450.997
+  ],
+  "buildings_file_mb": 5.1,
+  "epc_with_energy": 4650
+ },
+ {
+  "code": "2418",
+  "name": "Malå",
+  "title": "Malå kommun",
+  "slug": "mala",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   18.18068,
+   65.01914,
+   19.41396,
+   65.48835
+  ],
+  "bbox3006": [
+   649833.526,
+   7214358.524,
+   704207.382,
+   7270043.624
+  ],
+  "buildings_file_mb": 0.8,
+  "epc_with_energy": 956
+ },
+ {
+  "code": "1493",
+  "name": "Mariestad",
+  "title": "Mariestads kommun",
+  "slug": "mariestad",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.4654,
+   58.52105,
+   14.13125,
+   58.91677
+  ],
+  "bbox3006": [
+   410617.17,
+   6487743.149,
+   449969.023,
+   6531109.282
+  ],
+  "buildings_file_mb": 4.0,
+  "epc_with_energy": 6004
+ },
+ {
+  "code": "1463",
+  "name": "Mark",
+  "title": "Marks kommun",
+  "slug": "mark",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.29875,
+   57.26689,
+   12.93457,
+   57.64513
+  ],
+  "bbox3006": [
+   337106.137,
+   6350326.601,
+   376720.128,
+   6391079.441
+  ],
+  "buildings_file_mb": 4.9,
+  "epc_with_energy": 7494
+ },
+ {
+  "code": "0767",
+  "name": "Markaryd",
+  "title": "Markaryds kommun",
+  "slug": "markaryd",
+  "lan": "07",
+  "nuts2": "SE21",
+  "bbox4326": [
+   13.42316,
+   56.40702,
+   13.81259,
+   56.66844
+  ],
+  "bbox3006": [
+   402696.928,
+   6252497.256,
+   427229.208,
+   6281108.97
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 1316
+ },
+ {
+  "code": "1461",
+  "name": "Mellerud",
+  "title": "Melleruds kommun",
+  "slug": "mellerud",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.21293,
+   58.52483,
+   12.68193,
+   58.85929
+  ],
+  "bbox3006": [
+   337705.1170001969,
+   6490511.441,
+   366295.303,
+   6526699.325871736
+  ],
+  "buildings_file_mb": 2.5,
+  "epc_with_energy": 1748
+ },
+ {
+  "code": "0586",
+  "name": "Mjölby",
+  "title": "Mjölby kommun",
+  "slug": "mjolby",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.8562,
+   58.14387,
+   15.37438,
+   58.46588
+  ],
+  "bbox3006": [
+   491534.37,
+   6444736.492,
+   521840.853,
+   6480640.513
+  ],
+  "buildings_file_mb": 3.7,
+  "epc_with_energy": 4516
+ },
+ {
+  "code": "2062",
+  "name": "Mora",
+  "title": "Mora kommun",
+  "slug": "mora",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   13.57737,
+   60.67616,
+   15.00279,
+   61.62203
+  ],
+  "bbox3006": [
+   422277.832,
+   6727558.881,
+   500147.799,
+   6832075.004
+  ],
+  "buildings_file_mb": 7.2,
+  "epc_with_energy": 3925
+ },
+ {
+  "code": "0583",
+  "name": "Motala",
+  "title": "Motala kommun",
+  "slug": "motala",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.79127,
+   58.42091,
+   15.4896,
+   58.8564
+  ],
+  "bbox3006": [
+   487807.398,
+   6475591.433,
+   528245.623,
+   6524165.431
+  ],
+  "buildings_file_mb": 6.8,
+  "epc_with_energy": 7679
+ },
+ {
+  "code": "0642",
+  "name": "Mullsjö",
+  "title": "Mullsjö kommun",
+  "slug": "mullsjo",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   13.72545,
+   57.82811,
+   13.94842,
+   58.05602
+  ],
+  "bbox3006": [
+   424304.389,
+   6410286.487411747,
+   437940.684,
+   6435430.027
+  ],
+  "buildings_file_mb": 1.2,
+  "epc_with_energy": 1547
+ },
+ {
+  "code": "1430",
+  "name": "Munkedal",
+  "title": "Munkedals kommun",
+  "slug": "munkedal",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.45509,
+   58.39829,
+   11.90402,
+   58.81833
+  ],
+  "bbox3006": [
+   292854.42,
+   6478514.945,
+   321233.044,
+   6523956.436
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 1800
+ },
+ {
+  "code": "1762",
+  "name": "Munkfors",
+  "title": "Munkfors kommun",
+  "slug": "munkfors",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   13.37322,
+   59.74744,
+   13.61175,
+   59.87637
+  ],
+  "bbox3006": [
+   408577.076,
+   6624406.257,
+   422281.488,
+   6638457.851
+  ],
+  "buildings_file_mb": 0.6,
+  "epc_with_energy": 767
+ },
+ {
+  "code": "1481",
+  "name": "Mölndal",
+  "title": "Mölndals kommun",
+  "slug": "molndal",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.96293,
+   57.54644,
+   12.26764,
+   57.68454
+  ],
+  "bbox3006": [
+   318253.194,
+   6382281.996,
+   337101.166,
+   6396873.656
+  ],
+  "buildings_file_mb": 3.6,
+  "epc_with_energy": 12801
+ },
+ {
+  "code": "0861",
+  "name": "Mönsterås",
+  "title": "Mönsterås kommun",
+  "slug": "monsteras",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   16.12383,
+   56.89064,
+   16.6839,
+   57.2337
+  ],
+  "bbox3006": [
+   568468.835,
+   6305775.556,
+   601645.1479775985,
+   6344656.625
+  ],
+  "buildings_file_mb": 2.9,
+  "epc_with_energy": 2130
+ },
+ {
+  "code": "0840",
+  "name": "Mörbylånga",
+  "title": "Mörbylånga kommun",
+  "slug": "morbylanga",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   16.35947,
+   56.19559,
+   16.71915,
+   56.75212
+  ],
+  "bbox3006": [
+   584355.315,
+   6228680.552,
+   605121.732,
+   6291112.563
+  ],
+  "buildings_file_mb": 4.3,
+  "epc_with_energy": 2819
+ },
+ {
+  "code": "0182",
+  "name": "Nacka",
+  "title": "Nacka kommun",
+  "slug": "nacka",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   18.10009,
+   59.24687,
+   18.39704,
+   59.36426
+  ],
+  "bbox3006": [
+   676789.755,
+   6571653.119,
+   693048.279,
+   6585540.215
+  ],
+  "buildings_file_mb": 7.3,
+  "epc_with_energy": 14773
+ },
+ {
+  "code": "1884",
+  "name": "Nora",
+  "title": "Nora kommun",
+  "slug": "nora",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.63513,
+   59.37773,
+   15.17307,
+   59.71746
+  ],
+  "bbox3006": [
+   479267.515,
+   6582170.194,
+   509735.759,
+   6619958.194
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 2349
+ },
+ {
+  "code": "1962",
+  "name": "Norberg",
+  "title": "Norbergs kommun",
+  "slug": "norberg",
+  "lan": "19",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.71755,
+   59.95012,
+   16.19962,
+   60.18096
+  ],
+  "bbox3006": [
+   540082.767,
+   6646073.847,
+   566544.069,
+   6672169.183
+  ],
+  "buildings_file_mb": 1.2,
+  "epc_with_energy": 1031
+ },
+ {
+  "code": "2132",
+  "name": "Nordanstig",
+  "title": "Nordanstigs kommun",
+  "slug": "nordanstig",
+  "lan": "21",
+  "nuts2": "SE31",
+  "bbox4326": [
+   16.07883,
+   61.84492,
+   17.65465,
+   62.21794
+  ],
+  "bbox3006": [
+   556791.449,
+   6857376.055,
+   638021.329,
+   6901289.346
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 1785
+ },
+ {
+  "code": "2401",
+  "name": "Nordmaling",
+  "title": "Nordmalings kommun",
+  "slug": "nordmaling",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   18.76423,
+   63.4299,
+   19.8465,
+   63.84899
+  ],
+  "bbox3006": [
+   687777.602,
+   7039008.403,
+   738157.369,
+   7089236.312
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 905
+ },
+ {
+  "code": "0581",
+  "name": "Norrköping",
+  "title": "Norrköpings kommun",
+  "slug": "norrkoping",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.61934,
+   58.42419,
+   17.07532,
+   58.82713
+  ],
+  "bbox3006": [
+   536174.241,
+   6476104.684,
+   619816.984,
+   6522660.206
+  ],
+  "buildings_file_mb": 14.2,
+  "epc_with_energy": 19984
+ },
+ {
+  "code": "0188",
+  "name": "Norrtälje",
+  "title": "Norrtälje kommun",
+  "slug": "norrtalje",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   18.06415,
+   59.44626,
+   19.61932,
+   60.25263
+  ],
+  "bbox3006": [
+   673719.112,
+   6593747.153,
+   755547.47,
+   6688497.304
+  ],
+  "buildings_file_mb": 16.8,
+  "epc_with_energy": 11717
+ },
+ {
+  "code": "2417",
+  "name": "Norsjö",
+  "title": "Norsjö kommun",
+  "slug": "norsjo",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   18.73326,
+   64.71314,
+   20.26224,
+   65.16102
+  ],
+  "bbox3006": [
+   677853.56,
+   7181727.053,
+   746430.528,
+   7236680.084
+  ],
+  "buildings_file_mb": 1.3,
+  "epc_with_energy": 1390
+ },
+ {
+  "code": "0881",
+  "name": "Nybro",
+  "title": "Nybro kommun",
+  "slug": "nybro",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   15.52022,
+   56.59277,
+   16.22863,
+   57.07887
+  ],
+  "bbox3006": [
+   531946.717,
+   6272177.212,
+   574476.219,
+   6326835.361
+  ],
+  "buildings_file_mb": 3.3,
+  "epc_with_energy": 3498
+ },
+ {
+  "code": "0140",
+  "name": "Nykvarn",
+  "title": "Nykvarns kommun",
+  "slug": "nykvarn",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.24563,
+   59.12598,
+   17.56517,
+   59.24884
+  ],
+  "bbox3006": [
+   628529.294,
+   6556242.313,
+   646287.178,
+   6570575.596
+  ],
+  "buildings_file_mb": 1.5,
+  "epc_with_energy": 1932
+ },
+ {
+  "code": "0480",
+  "name": "Nyköping",
+  "title": "Nyköpings kommun",
+  "slug": "nykoping",
+  "lan": "04",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.29475,
+   58.61371,
+   17.53403,
+   59.01088
+  ],
+  "bbox3006": [
+   575215.11,
+   6497765.500565075,
+   645517.673,
+   6544022.994
+  ],
+  "buildings_file_mb": 8.0,
+  "epc_with_energy": 13252
+ },
+ {
+  "code": "0192",
+  "name": "Nynäshamn",
+  "title": "Nynäshamns kommun",
+  "slug": "nynashamn",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.703,
+   58.71914,
+   18.08209,
+   59.11311
+  ],
+  "bbox3006": [
+   656529.828,
+   6511935.155,
+   676451.902,
+   6556721.819
+  ],
+  "buildings_file_mb": 4.9,
+  "epc_with_energy": 6312
+ },
+ {
+  "code": "0682",
+  "name": "Nässjö",
+  "title": "Nässjö kommun",
+  "slug": "nassjo",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   14.33406,
+   57.40678,
+   14.96555,
+   57.80867
+  ],
+  "bbox3006": [
+   459988.54,
+   6362864.278,
+   497952.746,
+   6407409.628
+  ],
+  "buildings_file_mb": 5.5,
+  "epc_with_energy": 6548
+ },
+ {
+  "code": "2101",
+  "name": "Ockelbo",
+  "title": "Ockelbo kommun",
+  "slug": "ockelbo",
+  "lan": "21",
+  "nuts2": "SE31",
+  "bbox4326": [
+   16.14512,
+   60.76575,
+   16.95796,
+   61.08247
+  ],
+  "bbox3006": [
+   562388.08,
+   6737239.657,
+   605612.561,
+   6773553.086
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 1343
+ },
+ {
+  "code": "1060",
+  "name": "Olofström",
+  "title": "Olofströms kommun",
+  "slug": "olofstrom",
+  "lan": "10",
+  "nuts2": "SE22",
+  "bbox4326": [
+   14.39883,
+   56.19985,
+   14.7431,
+   56.45054
+  ],
+  "bbox3006": [
+   462700.438,
+   6228484.896,
+   484164.894,
+   6256254.968
+  ],
+  "buildings_file_mb": 2.6,
+  "epc_with_energy": 2090
+ },
+ {
+  "code": "2034",
+  "name": "Orsa",
+  "title": "Orsa kommun",
+  "slug": "orsa",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   14.36255,
+   61.05231,
+   15.05972,
+   61.5944
+  ],
+  "bbox3006": [
+   465580.04,
+   6768781.848,
+   503169.45,
+   6828998.334
+  ],
+  "buildings_file_mb": 2.4,
+  "epc_with_energy": 1184
+ },
+ {
+  "code": "1421",
+  "name": "Orust",
+  "title": "Orusts kommun",
+  "slug": "orust",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.33317,
+   58.05756,
+   11.83716,
+   58.30824
+  ],
+  "bbox3006": [
+   283669.694,
+   6440995.306,
+   314698.53,
+   6467381.351
+  ],
+  "buildings_file_mb": 4.5,
+  "epc_with_energy": 2446
+ },
+ {
+  "code": "1273",
+  "name": "Osby",
+  "title": "Osby kommun",
+  "slug": "osby",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.71542,
+   56.28811,
+   14.50435,
+   56.53365
+  ],
+  "bbox3006": [
+   420483.142,
+   6238887.213,
+   469515.07,
+   6265585.981
+  ],
+  "buildings_file_mb": 2.5,
+  "epc_with_energy": 2030
+ },
+ {
+  "code": "0882",
+  "name": "Oskarshamn",
+  "title": "Oskarshamns kommun",
+  "slug": "oskarshamn",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   16.01448,
+   57.13053,
+   16.81769,
+   57.5976
+  ],
+  "bbox3006": [
+   561410.458,
+   6332372.449,
+   608637.091,
+   6385366.472
+  ],
+  "buildings_file_mb": 5.2,
+  "epc_with_energy": 4656
+ },
+ {
+  "code": "2121",
+  "name": "Ovanåker",
+  "title": "Ovanåkers kommun",
+  "slug": "ovanaker",
+  "lan": "21",
+  "nuts2": "SE31",
+  "bbox4326": [
+   15.28255,
+   61.03657,
+   16.25619,
+   61.61209
+  ],
+  "bbox3006": [
+   515264.56,
+   6766893.577,
+   566627.716,
+   6831610.176
+  ],
+  "buildings_file_mb": 3.4,
+  "epc_with_energy": 3369
+ },
+ {
+  "code": "0481",
+  "name": "Oxelösund",
+  "title": "Oxelösunds kommun",
+  "slug": "oxelosund",
+  "lan": "04",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.98396,
+   58.56749,
+   17.39181,
+   58.69796
+  ],
+  "bbox3006": [
+   615398.566,
+   6493598.134,
+   638598.16,
+   6508893.23
+  ],
+  "buildings_file_mb": 1.4,
+  "epc_with_energy": 3043
+ },
+ {
+  "code": "2521",
+  "name": "Pajala",
+  "title": "Pajala kommun",
+  "slug": "pajala",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   21.75621,
+   66.73934,
+   24.32772,
+   68.07726
+  ],
+  "bbox3006": [
+   797262.541,
+   7418449.237,
+   887402.159,
+   7580815.118
+  ],
+  "buildings_file_mb": 2.8,
+  "epc_with_energy": 552
+ },
+ {
+  "code": "1402",
+  "name": "Partille",
+  "title": "Partille kommun",
+  "slug": "partille",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.05871,
+   57.68162,
+   12.19117,
+   57.77465
+  ],
+  "bbox3006": [
+   324635.042,
+   6397070.244,
+   332959.456,
+   6407086.286
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 7523
+ },
+ {
+  "code": "1275",
+  "name": "Perstorp",
+  "title": "Perstorps kommun",
+  "slug": "perstorp",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.28342,
+   56.10231,
+   13.459,
+   56.2687
+  ],
+  "bbox3006": [
+   393229.763,
+   6218794.56,
+   404563.568,
+   6237053.123
+  ],
+  "buildings_file_mb": 1.0,
+  "epc_with_energy": 1014
+ },
+ {
+  "code": "2581",
+  "name": "Piteå",
+  "title": "Piteå kommun",
+  "slug": "pitea",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   19.61473,
+   65.14156,
+   22.05314,
+   65.62069
+  ],
+  "bbox3006": [
+   716311.349,
+   7232141.402953663,
+   824323.309,
+   7295845.333
+  ],
+  "buildings_file_mb": 9.9,
+  "epc_with_energy": 11228
+ },
+ {
+  "code": "2303",
+  "name": "Ragunda",
+  "title": "Ragunda kommun",
+  "slug": "ragunda",
+  "lan": "23",
+  "nuts2": "SE32",
+  "bbox4326": [
+   15.22932,
+   62.8172,
+   17.0276,
+   63.50232
+  ],
+  "bbox3006": [
+   511688.354,
+   6965243.358,
+   600921.714,
+   7043156.708
+  ],
+  "buildings_file_mb": 1.9,
+  "epc_with_energy": 954
+ },
+ {
+  "code": "2409",
+  "name": "Robertsfors",
+  "title": "Robertsfors kommun",
+  "slug": "robertsfors",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   20.27082,
+   63.88028,
+   21.24334,
+   64.41112
+  ],
+  "bbox3006": [
+   758686.057,
+   7094368.043,
+   800506.563,
+   7157614.971
+  ],
+  "buildings_file_mb": 2.1,
+  "epc_with_energy": 1151
+ },
+ {
+  "code": "1081",
+  "name": "Ronneby",
+  "title": "Ronneby kommun",
+  "slug": "ronneby",
+  "lan": "10",
+  "nuts2": "SE22",
+  "bbox4326": [
+   14.9464,
+   56.11983,
+   15.51314,
+   56.49281
+  ],
+  "bbox3006": [
+   496667.262,
+   6219417.695,
+   531595.101,
+   6261048.592
+  ],
+  "buildings_file_mb": 6.1,
+  "epc_with_energy": 4463
+ },
+ {
+  "code": "2031",
+  "name": "Rättvik",
+  "title": "Rättviks kommun",
+  "slug": "rattvik",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   14.88689,
+   60.81426,
+   15.76635,
+   61.56644
+  ],
+  "bbox3006": [
+   493846.921,
+   6742104.758,
+   540707.964,
+   6826121.546
+  ],
+  "buildings_file_mb": 4.1,
+  "epc_with_energy": 2307
+ },
+ {
+  "code": "1981",
+  "name": "Sala",
+  "title": "Sala kommun",
+  "slug": "sala",
+  "lan": "19",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.12177,
+   59.76454,
+   16.84469,
+   60.19153
+  ],
+  "bbox3006": [
+   563012.104,
+   6625721.461,
+   602288.398,
+   6674170.91
+  ],
+  "buildings_file_mb": 4.7,
+  "epc_with_energy": 3939
+ },
+ {
+  "code": "0128",
+  "name": "Salem",
+  "title": "Salems kommun",
+  "slug": "salem",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.57297,
+   59.18377,
+   17.80101,
+   59.28009
+  ],
+  "bbox3006": [
+   647010.967,
+   6563350.615022261,
+   659585.164,
+   6574594.793
+  ],
+  "buildings_file_mb": 1.4,
+  "epc_with_energy": 2705
+ },
+ {
+  "code": "2181",
+  "name": "Sandviken",
+  "title": "Sandvikens kommun",
+  "slug": "sandviken",
+  "lan": "21",
+  "nuts2": "SE31",
+  "bbox4326": [
+   16.25782,
+   60.20299,
+   16.93992,
+   60.78612
+  ],
+  "bbox3006": [
+   569725.289,
+   6674682.562,
+   605616.301,
+   6740525.359
+  ],
+  "buildings_file_mb": 7.8,
+  "epc_with_energy": 8409
+ },
+ {
+  "code": "0191",
+  "name": "Sigtuna",
+  "title": "Sigtuna kommun",
+  "slug": "sigtuna",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.57303,
+   59.55928,
+   18.14373,
+   59.73879
+  ],
+  "bbox3006": [
+   645398.22,
+   6605146.009,
+   676686.753,
+   6626509.241
+  ],
+  "buildings_file_mb": 3.6,
+  "epc_with_energy": 9416
+ },
+ {
+  "code": "1291",
+  "name": "Simrishamn",
+  "title": "Simrishamns kommun",
+  "slug": "simrishamn",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   14.0755,
+   55.40456,
+   14.35681,
+   55.76673
+  ],
+  "bbox3006": [
+   441458.562,
+   6140201.104,
+   459644.747,
+   6180305.03
+  ],
+  "buildings_file_mb": 5.2,
+  "epc_with_energy": 3476
+ },
+ {
+  "code": "1265",
+  "name": "Sjöbo",
+  "title": "Sjöbo kommun",
+  "slug": "sjobo",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.52358,
+   55.51068,
+   13.97979,
+   55.77696
+  ],
+  "bbox3006": [
+   406762.349,
+   6152611.739,
+   436006.753,
+   6181727.43
+  ],
+  "buildings_file_mb": 3.1,
+  "epc_with_energy": 2988
+ },
+ {
+  "code": "1495",
+  "name": "Skara",
+  "title": "Skara kommun",
+  "slug": "skara",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.18843,
+   58.2724,
+   13.74428,
+   58.47921
+  ],
+  "bbox3006": [
+   393741.79,
+   6460466.992,
+   426772.267,
+   6482748.009
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 3530
+ },
+ {
+  "code": "2482",
+  "name": "Skellefteå",
+  "title": "Skellefteå kommun",
+  "slug": "skelleftea",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   19.31739,
+   64.34446,
+   21.82338,
+   65.29051
+  ],
+  "bbox3006": [
+   708446.026,
+   7142482.814,
+   817779.129,
+   7258048.888
+  ],
+  "buildings_file_mb": 15.4,
+  "epc_with_energy": 22977
+ },
+ {
+  "code": "1904",
+  "name": "Skinnskatteberg",
+  "title": "Skinnskattebergs kommun",
+  "slug": "skinnskatteberg",
+  "lan": "19",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.44346,
+   59.63396,
+   16.00274,
+   59.93539
+  ],
+  "bbox3006": [
+   525007.674,
+   6610731.052,
+   556037.966,
+   6644639.636
+  ],
+  "buildings_file_mb": 1.1,
+  "epc_with_energy": 863
+ },
+ {
+  "code": "1264",
+  "name": "Skurup",
+  "title": "Skurups kommun",
+  "slug": "skurup",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.44794,
+   55.38046,
+   13.65836,
+   55.58329
+  ],
+  "bbox3006": [
+   401663.193,
+   6138225.932,
+   415429.584,
+   6160519.07809771
+  ],
+  "buildings_file_mb": 2.5,
+  "epc_with_energy": 2956
+ },
+ {
+  "code": "1496",
+  "name": "Skövde",
+  "title": "Skövde kommun",
+  "slug": "skovde",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.64906,
+   58.24706,
+   14.13407,
+   58.59376
+  ],
+  "bbox3006": [
+   420700.75,
+   6457011.927,
+   449666.39,
+   6495142.518
+  ],
+  "buildings_file_mb": 5.6,
+  "epc_with_energy": 11813
+ },
+ {
+  "code": "2061",
+  "name": "Smedjebacken",
+  "title": "Smedjebackens kommun",
+  "slug": "smedjebacken",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   15.13783,
+   59.8712,
+   15.78526,
+   60.27571
+  ],
+  "bbox3006": [
+   507717.903,
+   6637075.345,
+   543434.539,
+   6682375.546
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 2163
+ },
+ {
+  "code": "2283",
+  "name": "Sollefteå",
+  "title": "Sollefteå kommun",
+  "slug": "solleftea",
+  "lan": "22",
+  "nuts2": "SE32",
+  "bbox4326": [
+   15.77522,
+   62.91374,
+   18.11705,
+   63.97923
+  ],
+  "bbox3006": [
+   539382.072,
+   6976215.647,
+   652528.566,
+   7098429.011
+  ],
+  "buildings_file_mb": 5.3,
+  "epc_with_energy": 3445
+ },
+ {
+  "code": "0163",
+  "name": "Sollentuna",
+  "title": "Sollentuna kommun",
+  "slug": "sollentuna",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.82238,
+   59.39955,
+   18.01581,
+   59.49491
+  ],
+  "bbox3006": [
+   660238.281,
+   6587941.255,
+   670734.271,
+   6599035.613
+  ],
+  "buildings_file_mb": 3.5,
+  "epc_with_energy": 14896
+ },
+ {
+  "code": "0184",
+  "name": "Solna",
+  "title": "Solna kommun",
+  "slug": "solna",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.96268,
+   59.34133,
+   18.05638,
+   59.39645
+  ],
+  "bbox3006": [
+   668489.321,
+   6581809.285,
+   673533.838876537,
+   6588184.015
+  ],
+  "buildings_file_mb": 0.9,
+  "epc_with_energy": 12563
+ },
+ {
+  "code": "2422",
+  "name": "Sorsele",
+  "title": "Sorsele kommun",
+  "slug": "sorsele",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   14.97581,
+   65.07418,
+   18.38966,
+   66.23846
+  ],
+  "bbox3006": [
+   498862.4,
+   7216721.8,
+   652346.884,
+   7350616.259
+  ],
+  "buildings_file_mb": 1.3,
+  "epc_with_energy": 276
+ },
+ {
+  "code": "1427",
+  "name": "Sotenäs",
+  "title": "Sotenäs kommun",
+  "slug": "sotenas",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.20302,
+   58.29349,
+   11.46102,
+   58.49922
+  ],
+  "bbox3006": [
+   277475.758,
+   6467662.255,
+   293792.808,
+   6489725.067
+  ],
+  "buildings_file_mb": 2.5,
+  "epc_with_energy": 2556
+ },
+ {
+  "code": "1230",
+  "name": "Staffanstorp",
+  "title": "Staffanstorps kommun",
+  "slug": "staffanstorp",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.11105,
+   55.59662,
+   13.34617,
+   55.70443
+  ],
+  "bbox3006": [
+   380973.9762432341,
+   6162804.722,
+   396073.467,
+   6174423.106
+  ],
+  "buildings_file_mb": 2.8,
+  "epc_with_energy": 4155
+ },
+ {
+  "code": "1415",
+  "name": "Stenungsund",
+  "title": "Stenungsunds kommun",
+  "slug": "stenungsund",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.7656,
+   57.95198,
+   12.03394,
+   58.16281
+  ],
+  "bbox3006": [
+   308605.672,
+   6427944.929,
+   325509.584,
+   6450674.723
+  ],
+  "buildings_file_mb": 2.9,
+  "epc_with_energy": 5123
+ },
+ {
+  "code": "0180",
+  "name": "Stockholm",
+  "title": "Stockholms kommun",
+  "slug": "stockholm",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.75795,
+   59.23817,
+   18.21513,
+   59.41763
+  ],
+  "bbox3006": [
+   657325.988,
+   6569827.569,
+   682428.683,
+   6590964.789
+  ],
+  "buildings_file_mb": 13.4,
+  "epc_with_energy": 128334
+ },
+ {
+  "code": "1760",
+  "name": "Storfors",
+  "title": "Storfors kommun",
+  "slug": "storfors",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   14.0293,
+   59.31651,
+   14.46348,
+   59.60785
+  ],
+  "bbox3006": [
+   444744.755,
+   6575699.322,
+   469720.911,
+   6607862.238
+  ],
+  "buildings_file_mb": 0.9,
+  "epc_with_energy": 897
+ },
+ {
+  "code": "2421",
+  "name": "Storuman",
+  "title": "Storumans kommun",
+  "slug": "storuman",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   14.51853,
+   64.78189,
+   18.03517,
+   66.10574
+  ],
+  "bbox3006": [
+   477110.641,
+   7184233.612,
+   637142.303,
+   7335017.894
+  ],
+  "buildings_file_mb": 3.1,
+  "epc_with_energy": 951
+ },
+ {
+  "code": "0486",
+  "name": "Strängnäs",
+  "title": "Strängnäs kommun",
+  "slug": "strangnas",
+  "lan": "04",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.68529,
+   59.18429,
+   17.35622,
+   59.51881
+  ],
+  "bbox3006": [
+   596299.102,
+   6561789.068,
+   633309.868,
+   6600187.232
+  ],
+  "buildings_file_mb": 4.8,
+  "epc_with_energy": 8432
+ },
+ {
+  "code": "1486",
+  "name": "Strömstad",
+  "title": "Strömstads kommun",
+  "slug": "stromstad",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   10.99123,
+   58.82116,
+   11.44049,
+   59.11541
+  ],
+  "bbox3006": [
+   268581.513,
+   6527068.61,
+   296244.568,
+   6558337.342
+  ],
+  "buildings_file_mb": 3.6,
+  "epc_with_energy": 2545
+ },
+ {
+  "code": "2313",
+  "name": "Strömsund",
+  "title": "Strömsunds kommun",
+  "slug": "stromsund",
+  "lan": "23",
+  "nuts2": "SE32",
+  "bbox4326": [
+   13.72732,
+   63.35699,
+   16.75668,
+   65.03738
+  ],
+  "bbox3006": [
+   436326.934,
+   7025996.592,
+   582714.997,
+   7213770.622
+  ],
+  "buildings_file_mb": 4.6,
+  "epc_with_energy": 2376
+ },
+ {
+  "code": "0183",
+  "name": "Sundbyberg",
+  "title": "Sundbybergs kommun",
+  "slug": "sundbyberg",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.92622,
+   59.35693,
+   17.98632,
+   59.39805
+  ],
+  "bbox3006": [
+   666340.231,
+   6583453.664,
+   669549.53,
+   6588181.401
+  ],
+  "buildings_file_mb": 0.8,
+  "epc_with_energy": 5278
+ },
+ {
+  "code": "2281",
+  "name": "Sundsvall",
+  "title": "Sundsvalls kommun",
+  "slug": "sundsvall",
+  "lan": "22",
+  "nuts2": "SE32",
+  "bbox4326": [
+   16.31099,
+   62.1626,
+   17.80553,
+   62.91887
+  ],
+  "bbox3006": [
+   568296.478,
+   6892985.089385668,
+   642468.227,
+   6979656.289
+  ],
+  "buildings_file_mb": 11.6,
+  "epc_with_energy": 18727
+ },
+ {
+  "code": "1766",
+  "name": "Sunne",
+  "title": "Sunne kommun",
+  "slug": "sunne",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   12.62432,
+   59.64421,
+   13.36296,
+   60.11376
+  ],
+  "bbox3006": [
+   366088.847,
+   6614184.607,
+   409009.604,
+   6665207.39
+  ],
+  "buildings_file_mb": 3.0,
+  "epc_with_energy": 2080
+ },
+ {
+  "code": "1907",
+  "name": "Surahammar",
+  "title": "Surahammars kommun",
+  "slug": "surahammar",
+  "lan": "19",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.9503,
+   59.66114,
+   16.29561,
+   59.89422
+  ],
+  "bbox3006": [
+   553545.487,
+   6614057.141,
+   572493.414,
+   6640339.79
+  ],
+  "buildings_file_mb": 1.4,
+  "epc_with_energy": 1905
+ },
+ {
+  "code": "1214",
+  "name": "Svalöv",
+  "title": "Svalövs kommun",
+  "slug": "svalov",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.9519,
+   55.82876,
+   13.33655,
+   56.07989
+  ],
+  "bbox3006": [
+   371710.308,
+   6188918.864,
+   396474.01,
+   6216218.255
+  ],
+  "buildings_file_mb": 2.1,
+  "epc_with_energy": 2618
+ },
+ {
+  "code": "1263",
+  "name": "Svedala",
+  "title": "Svedala kommun",
+  "slug": "svedala",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.10989,
+   55.46361,
+   13.47418,
+   55.62288
+  ],
+  "bbox3006": [
+   380498.165,
+   6148007.762,
+   403917.567,
+   6165164.112
+  ],
+  "buildings_file_mb": 2.5,
+  "epc_with_energy": 5604
+ },
+ {
+  "code": "1465",
+  "name": "Svenljunga",
+  "title": "Svenljunga kommun",
+  "slug": "svenljunga",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.82182,
+   57.14378,
+   13.26354,
+   57.6724
+  ],
+  "bbox3006": [
+   368203.677,
+   6335495.679,
+   396430.538,
+   6393565.122
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 1704
+ },
+ {
+  "code": "1785",
+  "name": "Säffle",
+  "title": "Säffle kommun",
+  "slug": "saffle",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   12.46056,
+   58.72256,
+   13.27384,
+   59.43625
+  ],
+  "bbox3006": [
+   352953.524,
+   6511945.62,
+   402092.438,
+   6589899.951
+  ],
+  "buildings_file_mb": 3.0,
+  "epc_with_energy": 2583
+ },
+ {
+  "code": "2082",
+  "name": "Säter",
+  "title": "Säters kommun",
+  "slug": "sater",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   15.21818,
+   60.22528,
+   16.12141,
+   60.60588
+  ],
+  "bbox3006": [
+   512086.847,
+   6676520.859,
+   561400.419,
+   6719412.867
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 1826
+ },
+ {
+  "code": "0684",
+  "name": "Sävsjö",
+  "title": "Sävsjö kommun",
+  "slug": "savsjo",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   14.37482,
+   57.15348,
+   14.82306,
+   57.48798
+  ],
+  "bbox3006": [
+   462178.298,
+   6334644.173,
+   489392.314,
+   6371721.474
+  ],
+  "buildings_file_mb": 2.1,
+  "epc_with_energy": 1778
+ },
+ {
+  "code": "2182",
+  "name": "Söderhamn",
+  "title": "Söderhamns kommun",
+  "slug": "soderhamn",
+  "lan": "21",
+  "nuts2": "SE31",
+  "bbox4326": [
+   16.56961,
+   61.05618,
+   17.36059,
+   61.49912
+  ],
+  "bbox3006": [
+   584738.265,
+   6770060.219,
+   625646.818,
+   6820659.281
+  ],
+  "buildings_file_mb": 5.0,
+  "epc_with_energy": 10618
+ },
+ {
+  "code": "0582",
+  "name": "Söderköping",
+  "title": "Söderköpings kommun",
+  "slug": "soderkoping",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.01651,
+   58.26998,
+   17.05968,
+   58.51477
+  ],
+  "bbox3006": [
+   559630.828,
+   6459218.614,
+   619982.481,
+   6487862.555
+  ],
+  "buildings_file_mb": 3.1,
+  "epc_with_energy": 2678
+ },
+ {
+  "code": "0181",
+  "name": "Södertälje",
+  "title": "Södertälje kommun",
+  "slug": "sodertalje",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.29743,
+   58.84827,
+   17.76187,
+   59.3228
+  ],
+  "bbox3006": [
+   632556.293,
+   6525432.35,
+   657159.001,
+   6579255.53
+  ],
+  "buildings_file_mb": 7.2,
+  "epc_with_energy": 13491
+ },
+ {
+  "code": "1083",
+  "name": "Sölvesborg",
+  "title": "Sölvesborgs kommun",
+  "slug": "solvesborg",
+  "lan": "10",
+  "nuts2": "SE22",
+  "bbox4326": [
+   14.54793,
+   55.99196,
+   14.84594,
+   56.20328
+  ],
+  "bbox3006": [
+   471799.6,
+   6205276.538,
+   490442.371,
+   6228714.68
+  ],
+  "buildings_file_mb": 3.3,
+  "epc_with_energy": 2402
+ },
+ {
+  "code": "1435",
+  "name": "Tanum",
+  "title": "Tanums kommun",
+  "slug": "tanum",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.02525,
+   58.47127,
+   11.71115,
+   58.90191
+  ],
+  "bbox3006": [
+   268234.462,
+   6488036.885,
+   310559.405,
+   6533787.179
+  ],
+  "buildings_file_mb": 3.9,
+  "epc_with_energy": 1868
+ },
+ {
+  "code": "1472",
+  "name": "Tibro",
+  "title": "Tibro kommun",
+  "slug": "tibro",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   14.0664,
+   58.35269,
+   14.3837,
+   58.55101
+  ],
+  "bbox3006": [
+   445360.178,
+   6468356.016,
+   464132.466,
+   6490223.321
+  ],
+  "buildings_file_mb": 1.8,
+  "epc_with_energy": 3081
+ },
+ {
+  "code": "1498",
+  "name": "Tidaholm",
+  "title": "Tidaholms kommun",
+  "slug": "tidaholm",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.73374,
+   58.01375,
+   14.13662,
+   58.27981
+  ],
+  "bbox3006": [
+   425183.729,
+   6430942.12,
+   449365.925,
+   6460187.84
+  ],
+  "buildings_file_mb": 1.9,
+  "epc_with_energy": 3119
+ },
+ {
+  "code": "0360",
+  "name": "Tierp",
+  "title": "Tierps kommun",
+  "slug": "tierp",
+  "lan": "03",
+  "nuts2": "SE12",
+  "bbox4326": [
+   17.17559,
+   60.09939,
+   18.13567,
+   60.63558
+  ],
+  "bbox3006": [
+   620970.692,
+   6664471.205,
+   671490.03,
+   6726289.107
+  ],
+  "buildings_file_mb": 3.9,
+  "epc_with_energy": 4425
+ },
+ {
+  "code": "2262",
+  "name": "Timrå",
+  "title": "Timrå kommun",
+  "slug": "timra",
+  "lan": "22",
+  "nuts2": "SE32",
+  "bbox4326": [
+   16.94968,
+   62.4012,
+   17.77589,
+   62.83639
+  ],
+  "bbox3006": [
+   600762.603,
+   6920395.074,
+   641360.027,
+   6970408.535
+  ],
+  "buildings_file_mb": 2.9,
+  "epc_with_energy": 2973
+ },
+ {
+  "code": "0763",
+  "name": "Tingsryd",
+  "title": "Tingsryds kommun",
+  "slug": "tingsryd",
+  "lan": "07",
+  "nuts2": "SE21",
+  "bbox4326": [
+   14.58204,
+   56.35919,
+   15.38622,
+   56.71662
+  ],
+  "bbox3006": [
+   474175.332,
+   6246135.716,
+   523640.243,
+   6285909.063
+  ],
+  "buildings_file_mb": 3.1,
+  "epc_with_energy": 2233
+ },
+ {
+  "code": "1419",
+  "name": "Tjörn",
+  "title": "Tjörns kommun",
+  "slug": "tjorn",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.4624,
+   57.89527,
+   11.77876,
+   58.10204
+  ],
+  "bbox3006": [
+   290342.807,
+   6422535.247,
+   310181.214,
+   6444602.554
+  ],
+  "buildings_file_mb": 3.4,
+  "epc_with_energy": 2896
+ },
+ {
+  "code": "1270",
+  "name": "Tomelilla",
+  "title": "Tomelilla kommun",
+  "slug": "tomelilla",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.86074,
+   55.46837,
+   14.15978,
+   55.7842
+  ],
+  "bbox3006": [
+   427976.544,
+   6147502.729,
+   447306.454,
+   6182381.97072064
+  ],
+  "buildings_file_mb": 3.3,
+  "epc_with_energy": 2358
+ },
+ {
+  "code": "1737",
+  "name": "Torsby",
+  "title": "Torsby kommun",
+  "slug": "torsby",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   12.31584,
+   60.03641,
+   13.54212,
+   61.06453
+  ],
+  "bbox3006": [
+   350475.893,
+   6658501.742,
+   421313.692,
+   6770851.065
+  ],
+  "buildings_file_mb": 3.7,
+  "epc_with_energy": 3558
+ },
+ {
+  "code": "0834",
+  "name": "Torsås",
+  "title": "Torsås kommun",
+  "slug": "torsas",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   15.6857,
+   56.3016,
+   16.13895,
+   56.52349
+  ],
+  "bbox3006": [
+   542431.531,
+   6239859.018,
+   570068.699,
+   6264926.39
+  ],
+  "buildings_file_mb": 2.1,
+  "epc_with_energy": 1349
+ },
+ {
+  "code": "1452",
+  "name": "Tranemo",
+  "title": "Tranemo kommun",
+  "slug": "tranemo",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.15889,
+   57.29467,
+   13.71783,
+   57.67083
+  ],
+  "bbox3006": [
+   389050.123,
+   6351688.134,
+   423520.661,
+   6392786.818
+  ],
+  "buildings_file_mb": 1.9,
+  "epc_with_energy": 1895
+ },
+ {
+  "code": "0687",
+  "name": "Tranås",
+  "title": "Tranås kommun",
+  "slug": "tranas",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   14.59786,
+   57.93065,
+   15.07518,
+   58.14992
+  ],
+  "bbox3006": [
+   476183.855,
+   6421059.905,
+   504425.071,
+   6445403.86
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 3220
+ },
+ {
+  "code": "1287",
+  "name": "Trelleborg",
+  "title": "Trelleborgs kommun",
+  "slug": "trelleborg",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.01985,
+   55.33241,
+   13.48262,
+   55.50971
+  ],
+  "bbox3006": [
+   374390.9795693607,
+   6133567.9154937705,
+   404173.786,
+   6152559.455
+  ],
+  "buildings_file_mb": 6.7,
+  "epc_with_energy": 7105
+ },
+ {
+  "code": "1488",
+  "name": "Trollhättan",
+  "title": "Trollhättans kommun",
+  "slug": "trollhattan",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.15441,
+   58.09011,
+   12.55991,
+   58.3456
+  ],
+  "bbox3006": [
+   332252.764,
+   6442279.726,
+   357179.813,
+   6469777.398
+  ],
+  "buildings_file_mb": 6.1,
+  "epc_with_energy": 11682
+ },
+ {
+  "code": "0488",
+  "name": "Trosa",
+  "title": "Trosa kommun",
+  "slug": "trosa",
+  "lan": "04",
+  "nuts2": "SE12",
+  "bbox4326": [
+   17.35524,
+   58.75416,
+   17.72439,
+   58.98316
+  ],
+  "bbox3006": [
+   636259.81,
+   6515073.367,
+   656571.482,
+   6541368.102
+  ],
+  "buildings_file_mb": 2.5,
+  "epc_with_energy": 3836
+ },
+ {
+  "code": "0138",
+  "name": "Tyresö",
+  "title": "Tyresö kommun",
+  "slug": "tyreso",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   18.17084,
+   59.16643,
+   18.42894,
+   59.25444
+  ],
+  "bbox3006": [
+   681248.5321634063,
+   6562892.164,
+   695489.285,
+   6573414.254097127
+  ],
+  "buildings_file_mb": 4.6,
+  "epc_with_energy": 8901
+ },
+ {
+  "code": "0160",
+  "name": "Täby",
+  "title": "Täby kommun",
+  "slug": "taby",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.98351,
+   59.41982,
+   18.15252,
+   59.50474
+  ],
+  "bbox3006": [
+   669281.5934317517,
+   6590596.456708365,
+   678418.28,
+   6600488.00300027
+  ],
+  "buildings_file_mb": 5.4,
+  "epc_with_energy": 10946
+ },
+ {
+  "code": "1473",
+  "name": "Töreboda",
+  "title": "Töreboda kommun",
+  "slug": "toreboda",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.91893,
+   58.51874,
+   14.38351,
+   58.82935
+  ],
+  "bbox3006": [
+   437027.211,
+   6486972.353,
+   464406.622,
+   6521213.792
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 1327
+ },
+ {
+  "code": "1485",
+  "name": "Uddevalla",
+  "title": "Uddevalla kommun",
+  "slug": "uddevalla",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.50727,
+   58.1421,
+   12.1499,
+   58.44905
+  ],
+  "bbox3006": [
+   294422.252,
+   6449855.633,
+   333678.207707496,
+   6482232.355
+  ],
+  "buildings_file_mb": 7.0,
+  "epc_with_energy": 9788
+ },
+ {
+  "code": "1491",
+  "name": "Ulricehamn",
+  "title": "Ulricehamns kommun",
+  "slug": "ulricehamn",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   13.136,
+   57.60964,
+   13.78206,
+   58.01313
+  ],
+  "bbox3006": [
+   388632.23,
+   6386781.121,
+   428036.957,
+   6430820.213
+  ],
+  "buildings_file_mb": 4.4,
+  "epc_with_energy": 3730
+ },
+ {
+  "code": "2480",
+  "name": "Umeå",
+  "title": "Umeå kommun",
+  "slug": "umea",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   19.65237,
+   63.44713,
+   21.11722,
+   64.33964
+  ],
+  "bbox3006": [
+   731889.615,
+   7043836.902,
+   795217.866556314,
+   7149086.333
+  ],
+  "buildings_file_mb": 14.7,
+  "epc_with_energy": 32705
+ },
+ {
+  "code": "0114",
+  "name": "Upplands Väsby",
+  "title": "Upplands Väsby kommun",
+  "slug": "upplands_vasby",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.80832,
+   59.46985,
+   18.01699,
+   59.5622
+  ],
+  "bbox3006": [
+   659110.0969997856,
+   6595732.209117888,
+   670460.8609848558,
+   6606526.542
+  ],
+  "buildings_file_mb": 3.4,
+  "epc_with_energy": 7871
+ },
+ {
+  "code": "0139",
+  "name": "Upplands-Bro",
+  "title": "Upplands-Bro kommun",
+  "slug": "upplands_bro",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.49612,
+   59.42827,
+   17.8129,
+   59.64211
+  ],
+  "bbox3006": [
+   641601.553,
+   6590398.359,
+   658557.288,
+   6614914.832
+  ],
+  "buildings_file_mb": 2.2,
+  "epc_with_energy": 4307
+ },
+ {
+  "code": "0380",
+  "name": "Uppsala",
+  "title": "Uppsala kommun",
+  "slug": "uppsala",
+  "lan": "03",
+  "nuts2": "SE12",
+  "bbox4326": [
+   17.07099,
+   59.74073,
+   18.46319,
+   60.15375
+  ],
+  "bbox3006": [
+   616405.396,
+   6624355.047059833,
+   692212.833,
+   6673574.642
+  ],
+  "buildings_file_mb": 18.3,
+  "epc_with_energy": 47078
+ },
+ {
+  "code": "0760",
+  "name": "Uppvidinge",
+  "title": "Uppvidinge kommun",
+  "slug": "uppvidinge",
+  "lan": "07",
+  "nuts2": "SE21",
+  "bbox4326": [
+   15.07963,
+   56.83486,
+   15.83954,
+   57.22684
+  ],
+  "bbox3006": [
+   504858.818,
+   6299006.9,
+   550688.891,
+   6342949.507
+  ],
+  "buildings_file_mb": 1.8,
+  "epc_with_energy": 1833
+ },
+ {
+  "code": "0584",
+  "name": "Vadstena",
+  "title": "Vadstena kommun",
+  "slug": "vadstena",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.66713,
+   58.32922,
+   15.01387,
+   58.50046
+  ],
+  "bbox3006": [
+   480505.031,
+   6465412.525,
+   500808.22,
+   6484429.837
+  ],
+  "buildings_file_mb": 1.5,
+  "epc_with_energy": 1589
+ },
+ {
+  "code": "0665",
+  "name": "Vaggeryd",
+  "title": "Vaggeryds kommun",
+  "slug": "vaggeryd",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   13.87454,
+   57.2975,
+   14.44388,
+   57.6554
+  ],
+  "bbox3006": [
+   432179.167,
+   6351063.592,
+   466812.971,
+   6390482.004
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 2804
+ },
+ {
+  "code": "0563",
+  "name": "Valdemarsvik",
+  "title": "Valdemarsviks kommun",
+  "slug": "valdemarsvik",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.26014,
+   57.99816,
+   17.16789,
+   58.38096
+  ],
+  "bbox3006": [
+   574486.912,
+   6429199.59,
+   626764.925,
+   6473167.348
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 1420
+ },
+ {
+  "code": "0115",
+  "name": "Vallentuna",
+  "title": "Vallentuna kommun",
+  "slug": "vallentuna",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.97229,
+   59.49413,
+   18.43867,
+   59.6795
+  ],
+  "bbox3006": [
+   668275.215,
+   6598837.9220793545,
+   693596.329,
+   6620735.562
+  ],
+  "buildings_file_mb": 4.7,
+  "epc_with_energy": 7577
+ },
+ {
+  "code": "2021",
+  "name": "Vansbro",
+  "title": "Vansbro kommun",
+  "slug": "vansbro",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   13.91432,
+   60.23169,
+   14.61907,
+   60.68887
+  ],
+  "bbox3006": [
+   439868.895,
+   6677709.023,
+   479195.844,
+   6728193.075
+  ],
+  "buildings_file_mb": 2.6,
+  "epc_with_energy": 579
+ },
+ {
+  "code": "1470",
+  "name": "Vara",
+  "title": "Vara kommun",
+  "slug": "vara",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.80043,
+   58.10996,
+   13.37254,
+   58.39546
+  ],
+  "bbox3006": [
+   370398.264,
+   6443064.68,
+   404870.711,
+   6473890.123
+  ],
+  "buildings_file_mb": 3.1,
+  "epc_with_energy": 2773
+ },
+ {
+  "code": "1383",
+  "name": "Varberg",
+  "title": "Varbergs kommun",
+  "slug": "varberg",
+  "lan": "13",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.115,
+   56.98582,
+   12.74575,
+   57.35051
+  ],
+  "bbox3006": [
+   324705.666,
+   6319508.928968417,
+   364363.787999839,
+   6358651.139
+  ],
+  "buildings_file_mb": 14.0,
+  "epc_with_energy": 14046
+ },
+ {
+  "code": "0187",
+  "name": "Vaxholm",
+  "title": "Vaxholms kommun",
+  "slug": "vaxholm",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   18.15096,
+   59.36819,
+   18.45137,
+   59.44121
+  ],
+  "bbox3006": [
+   679049.928,
+   6585289.0510261,
+   695689.347,
+   6594260.768
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 1876
+ },
+ {
+  "code": "1233",
+  "name": "Vellinge",
+  "title": "Vellinge kommun",
+  "slug": "vellinge",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.8103,
+   55.37797,
+   13.17106,
+   55.52492
+  ],
+  "bbox3006": [
+   361259.901,
+   6139035.479,
+   384544.616,
+   6154725.759
+  ],
+  "buildings_file_mb": 7.0,
+  "epc_with_energy": 5721
+ },
+ {
+  "code": "0685",
+  "name": "Vetlanda",
+  "title": "Vetlanda kommun",
+  "slug": "vetlanda",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   14.78192,
+   57.1362,
+   15.63979,
+   57.58675
+  ],
+  "bbox3006": [
+   486800.336,
+   6332567.922,
+   538251.677999962,
+   6382883.144
+  ],
+  "buildings_file_mb": 5.0,
+  "epc_with_energy": 3860
+ },
+ {
+  "code": "2462",
+  "name": "Vilhelmina",
+  "title": "Vilhelmina kommun",
+  "slug": "vilhelmina",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   14.40252,
+   64.3873,
+   17.75303,
+   65.39377
+  ],
+  "bbox3006": [
+   471181.589,
+   7140309.238,
+   627877.488,
+   7255134.756
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 857
+ },
+ {
+  "code": "0884",
+  "name": "Vimmerby",
+  "title": "Vimmerby kommun",
+  "slug": "vimmerby",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   15.44821,
+   57.49169,
+   16.32486,
+   57.87059
+  ],
+  "bbox3006": [
+   526867.586,
+   6372209.352,
+   578590.949,
+   6415071.941
+  ],
+  "buildings_file_mb": 3.5,
+  "epc_with_energy": 2755
+ },
+ {
+  "code": "2404",
+  "name": "Vindeln",
+  "title": "Vindelns kommun",
+  "slug": "vindeln",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   18.96903,
+   64.03722,
+   20.19176,
+   64.73094
+  ],
+  "bbox3006": [
+   693780.117,
+   7107199.19,
+   747070.701,
+   7188601.592
+  ],
+  "buildings_file_mb": 1.8,
+  "epc_with_energy": 1129
+ },
+ {
+  "code": "0428",
+  "name": "Vingåker",
+  "title": "Vingåkers kommun",
+  "slug": "vingaker",
+  "lan": "04",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.6195,
+   58.9564,
+   16.14385,
+   59.16108
+  ],
+  "bbox3006": [
+   535636.157,
+   6535362.41,
+   565407.803,
+   6558548.931
+  ],
+  "buildings_file_mb": 1.9,
+  "epc_with_energy": 1512
+ },
+ {
+  "code": "1487",
+  "name": "Vänersborg",
+  "title": "Vänersborgs kommun",
+  "slug": "vanersborg",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.1027,
+   58.25364,
+   12.68263,
+   58.63045
+  ],
+  "bbox3006": [
+   329988.101,
+   6460606.381,
+   365455.002,
+   6501227.456
+  ],
+  "buildings_file_mb": 4.8,
+  "epc_with_energy": 8466
+ },
+ {
+  "code": "2460",
+  "name": "Vännäs",
+  "title": "Vännäs kommun",
+  "slug": "vannas",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   19.39541,
+   63.80141,
+   19.99732,
+   64.08038
+  ],
+  "bbox3006": [
+   716383.822,
+   7082337.364,
+   743536.014,
+   7115532.01
+  ],
+  "buildings_file_mb": 1.7,
+  "epc_with_energy": 1696
+ },
+ {
+  "code": "0120",
+  "name": "Värmdö",
+  "title": "Värmdö kommun",
+  "slug": "varmdo",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   18.29989,
+   59.04811,
+   19.28852,
+   59.49657
+  ],
+  "bbox3006": [
+   689272.372,
+   6550085.816,
+   742718.776,
+   6603179.898
+  ],
+  "buildings_file_mb": 15.3,
+  "epc_with_energy": 7032
+ },
+ {
+  "code": "0683",
+  "name": "Värnamo",
+  "title": "Värnamo kommun",
+  "slug": "varnamo",
+  "lan": "06",
+  "nuts2": "SE21",
+  "bbox4326": [
+   13.65418,
+   56.88371,
+   14.43234,
+   57.37868
+  ],
+  "bbox3006": [
+   417992.575,
+   6305248.005,
+   465866.868,
+   6359682.968
+  ],
+  "buildings_file_mb": 6.1,
+  "epc_with_energy": 6303
+ },
+ {
+  "code": "0883",
+  "name": "Västervik",
+  "title": "Västerviks kommun",
+  "slug": "vastervik",
+  "lan": "08",
+  "nuts2": "SE21",
+  "bbox4326": [
+   15.97619,
+   57.52009,
+   16.86183,
+   58.12972
+  ],
+  "bbox3006": [
+   558470.839,
+   6375703.079,
+   609644.338,
+   6444665.28
+  ],
+  "buildings_file_mb": 7.0,
+  "epc_with_energy": 8461
+ },
+ {
+  "code": "1980",
+  "name": "Västerås",
+  "title": "Västerås kommun",
+  "slug": "vasteras",
+  "lan": "19",
+  "nuts2": "SE12",
+  "bbox4326": [
+   16.24177,
+   59.45398,
+   16.96928,
+   59.83638
+  ],
+  "bbox3006": [
+   570398.342,
+   6591261.224,
+   610373.322,
+   6634829.907
+  ],
+  "buildings_file_mb": 11.7,
+  "epc_with_energy": 30013
+ },
+ {
+  "code": "0780",
+  "name": "Växjö",
+  "title": "Växjö kommun",
+  "slug": "vaxjo",
+  "lan": "07",
+  "nuts2": "SE21",
+  "bbox4326": [
+   14.49701,
+   56.61016,
+   15.23058,
+   57.22713
+  ],
+  "bbox3006": [
+   469125.762,
+   6274105.34,
+   513922.078,
+   6342692.511
+  ],
+  "buildings_file_mb": 12.1,
+  "epc_with_energy": 18043
+ },
+ {
+  "code": "1442",
+  "name": "Vårgårda",
+  "title": "Vårgårda kommun",
+  "slug": "vargarda",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.55977,
+   57.86277,
+   12.97645,
+   58.11004
+  ],
+  "bbox3006": [
+   355227.456,
+   6416042.841,
+   380767.495,
+   6442749.725
+  ],
+  "buildings_file_mb": 1.9,
+  "epc_with_energy": 2722
+ },
+ {
+  "code": "0512",
+  "name": "Ydre",
+  "title": "Ydre kommun",
+  "slug": "ydre",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.99997,
+   57.70476,
+   15.54558,
+   58.02904
+  ],
+  "bbox3006": [
+   499998.06,
+   6395840.572,
+   532222.718,
+   6432073.456
+  ],
+  "buildings_file_mb": 1.3,
+  "epc_with_energy": 415
+ },
+ {
+  "code": "1286",
+  "name": "Ystad",
+  "title": "Ystads kommun",
+  "slug": "ystad",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.62439,
+   55.37315,
+   14.20718,
+   55.56831
+  ],
+  "bbox3006": [
+   412825.9550001075,
+   6137177.267,
+   450004.305,
+   6158320.112
+  ],
+  "buildings_file_mb": 3.9,
+  "epc_with_energy": 5961
+ },
+ {
+  "code": "0765",
+  "name": "Älmhult",
+  "title": "Älmhults kommun",
+  "slug": "almhult",
+  "lan": "07",
+  "nuts2": "SE21",
+  "bbox4326": [
+   13.71492,
+   56.43593,
+   14.59574,
+   56.76177
+  ],
+  "bbox3006": [
+   420759.266,
+   6255340.018,
+   475285.547,
+   6290940.952
+  ],
+  "buildings_file_mb": 2.9,
+  "epc_with_energy": 3389
+ },
+ {
+  "code": "2039",
+  "name": "Älvdalen",
+  "title": "Älvdalens kommun",
+  "slug": "alvdalen",
+  "lan": "20",
+  "nuts2": "SE31",
+  "bbox4326": [
+   12.22785,
+   61.03319,
+   14.25864,
+   62.27629
+  ],
+  "bbox3006": [
+   350253.196,
+   6769654.672,
+   461522.471,
+   6905179.796
+  ],
+  "buildings_file_mb": 3.7,
+  "epc_with_energy": 1864
+ },
+ {
+  "code": "0319",
+  "name": "Älvkarleby",
+  "title": "Älvkarleby kommun",
+  "slug": "alvkarleby",
+  "lan": "03",
+  "nuts2": "SE12",
+  "bbox4326": [
+   17.29787,
+   60.46442,
+   17.70038,
+   60.65102
+  ],
+  "bbox3006": [
+   626351.8708476915,
+   6705339.661,
+   647623.5146089798,
+   6726950.386
+  ],
+  "buildings_file_mb": 2.1,
+  "epc_with_energy": 2107
+ },
+ {
+  "code": "2560",
+  "name": "Älvsbyn",
+  "title": "Älvsbyns kommun",
+  "slug": "alvsbyn",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   20.07838,
+   65.5532,
+   21.39619,
+   65.94184
+  ],
+  "bbox3006": [
+   734313.345,
+   7279571.609,
+   790558.165,
+   7328257.521
+  ],
+  "buildings_file_mb": 1.9,
+  "epc_with_energy": 1961
+ },
+ {
+  "code": "1292",
+  "name": "Ängelholm",
+  "title": "Ängelholms kommun",
+  "slug": "angelholm",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.77279,
+   56.12773,
+   13.19624,
+   56.37609
+  ],
+  "bbox3006": [
+   361565.706,
+   6222529.673,
+   388605.203,
+   6249399.127
+  ],
+  "buildings_file_mb": 7.6,
+  "epc_with_energy": 8335
+ },
+ {
+  "code": "1492",
+  "name": "Åmål",
+  "title": "Åmåls kommun",
+  "slug": "amal",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.42482,
+   58.81172,
+   12.76328,
+   59.18019
+  ],
+  "bbox3006": [
+   351266.258,
+   6521946.908,
+   372182.863,
+   6562259.45
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 1697
+ },
+ {
+  "code": "2260",
+  "name": "Ånge",
+  "title": "Ånge kommun",
+  "slug": "ange",
+  "lan": "22",
+  "nuts2": "SE32",
+  "bbox4326": [
+   14.78858,
+   62.23967,
+   16.51774,
+   62.70707
+  ],
+  "bbox3006": [
+   489013.289,
+   6900898.377,
+   577641.435,
+   6953866.743
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 1343
+ },
+ {
+  "code": "2321",
+  "name": "Åre",
+  "title": "Åre kommun",
+  "slug": "are",
+  "lan": "23",
+  "nuts2": "SE32",
+  "bbox4326": [
+   12.02903,
+   62.91242,
+   14.36224,
+   64.09624
+  ],
+  "bbox3006": [
+   349101.743,
+   6979315.58,
+   468913.568,
+   7107894.454
+  ],
+  "buildings_file_mb": 4.1,
+  "epc_with_energy": 3440
+ },
+ {
+  "code": "1765",
+  "name": "Årjäng",
+  "title": "Årjängs kommun",
+  "slug": "arjang",
+  "lan": "17",
+  "nuts2": "SE31",
+  "bbox4326": [
+   11.74167,
+   59.16117,
+   12.46243,
+   59.72895
+  ],
+  "bbox3006": [
+   313724.571,
+   6562548.283,
+   357327.174,
+   6623954.915
+  ],
+  "buildings_file_mb": 2.7,
+  "epc_with_energy": 1457
+ },
+ {
+  "code": "2463",
+  "name": "Åsele",
+  "title": "Åsele kommun",
+  "slug": "asele",
+  "lan": "24",
+  "nuts2": "SE33",
+  "bbox4326": [
+   16.68153,
+   63.90238,
+   18.78461,
+   64.48259
+  ],
+  "bbox3006": [
+   582526.636,
+   7087224.343,
+   681830.994,
+   7156214.684
+  ],
+  "buildings_file_mb": 1.3,
+  "epc_with_energy": 323
+ },
+ {
+  "code": "1277",
+  "name": "Åstorp",
+  "title": "Åstorps kommun",
+  "slug": "astorp",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.8441,
+   56.0724,
+   13.09903,
+   56.18306
+  ],
+  "bbox3006": [
+   365804.324,
+   6216232.791,
+   382010.154,
+   6228080.903
+  ],
+  "buildings_file_mb": 1.9,
+  "epc_with_energy": 2915
+ },
+ {
+  "code": "0561",
+  "name": "Åtvidaberg",
+  "title": "Åtvidabergs kommun",
+  "slug": "atvidaberg",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   15.79877,
+   58.07161,
+   16.45441,
+   58.36782
+  ],
+  "bbox3006": [
+   547119.883,
+   6436962.07,
+   585081.35,
+   6470581.585
+  ],
+  "buildings_file_mb": 2.0,
+  "epc_with_energy": 1730
+ },
+ {
+  "code": "1407",
+  "name": "Öckerö",
+  "title": "Öckerö kommun",
+  "slug": "ockero",
+  "lan": "14",
+  "nuts2": "SE23",
+  "bbox4326": [
+   11.53439,
+   57.6553,
+   11.69627,
+   57.7859
+  ],
+  "bbox3006": [
+   293239.822,
+   6395620.277,
+   303601.842,
+   6409666.962
+  ],
+  "buildings_file_mb": 1.4,
+  "epc_with_energy": 1824
+ },
+ {
+  "code": "0509",
+  "name": "Ödeshög",
+  "title": "Ödeshögs kommun",
+  "slug": "odeshog",
+  "lan": "05",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.54912,
+   58.08372,
+   14.92685,
+   58.335
+  ],
+  "bbox3006": [
+   473411.156,
+   6438119.68,
+   495716.689,
+   6466010.462
+  ],
+  "buildings_file_mb": 1.5,
+  "epc_with_energy": 955
+ },
+ {
+  "code": "1880",
+  "name": "Örebro",
+  "title": "Örebro kommun",
+  "slug": "orebro",
+  "lan": "18",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.79548,
+   58.96217,
+   15.79641,
+   59.5055
+  ],
+  "bbox3006": [
+   488237.096,
+   6535857.582,
+   545082.616,
+   6596612.252
+  ],
+  "buildings_file_mb": 12.5,
+  "epc_with_energy": 36918
+ },
+ {
+  "code": "1257",
+  "name": "Örkelljunga",
+  "title": "Örkelljunga kommun",
+  "slug": "orkelljunga",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.12297,
+   56.19183,
+   13.57491,
+   56.42404
+  ],
+  "bbox3006": [
+   383522.089,
+   6229015.135,
+   412099.141,
+   6254186.073
+  ],
+  "buildings_file_mb": 1.9,
+  "epc_with_energy": 1829
+ },
+ {
+  "code": "2284",
+  "name": "Örnsköldsvik",
+  "title": "Örnsköldsviks kommun",
+  "slug": "ornskoldsvik",
+  "lan": "22",
+  "nuts2": "SE32",
+  "bbox4326": [
+   17.1175,
+   63.0092,
+   19.36199,
+   63.96476
+  ],
+  "bbox3006": [
+   607208.586,
+   6988380.265,
+   713496.1259996075,
+   7100394.022
+  ],
+  "buildings_file_mb": 13.6,
+  "epc_with_energy": 7633
+ },
+ {
+  "code": "2380",
+  "name": "Östersund",
+  "title": "Östersunds kommun",
+  "slug": "ostersund",
+  "lan": "23",
+  "nuts2": "SE32",
+  "bbox4326": [
+   14.30195,
+   62.89594,
+   15.52545,
+   63.58444
+  ],
+  "bbox3006": [
+   464516.687,
+   6974187.678,
+   526081.727,
+   7050815.751
+  ],
+  "buildings_file_mb": 7.4,
+  "epc_with_energy": 14966
+ },
+ {
+  "code": "0117",
+  "name": "Österåker",
+  "title": "Österåkers kommun",
+  "slug": "osteraker",
+  "lan": "01",
+  "nuts2": "SE11",
+  "bbox4326": [
+   18.14342,
+   59.4167,
+   18.94933,
+   59.58261
+  ],
+  "bbox3006": [
+   678366.7985092691,
+   6590667.585,
+   722967.024,
+   6611559.827
+  ],
+  "buildings_file_mb": 7.4,
+  "epc_with_energy": 8156
+ },
+ {
+  "code": "0382",
+  "name": "Östhammar",
+  "title": "Östhammars kommun",
+  "slug": "osthammar",
+  "lan": "03",
+  "nuts2": "SE12",
+  "bbox4326": [
+   17.72077,
+   60.03301,
+   18.88182,
+   60.51276
+  ],
+  "bbox3006": [
+   651578.744,
+   6658206.149,
+   713075.491,
+   6714805.381
+  ],
+  "buildings_file_mb": 7.0,
+  "epc_with_energy": 4040
+ },
+ {
+  "code": "1256",
+  "name": "Östra Göinge",
+  "title": "Östra Göinge kommun",
+  "slug": "ostra_goinge",
+  "lan": "12",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.97736,
+   56.12565,
+   14.32689,
+   56.45212
+  ],
+  "bbox3006": [
+   436428.488,
+   6220535.658,
+   458511.204,
+   6256604.451
+  ],
+  "buildings_file_mb": 2.3,
+  "epc_with_energy": 4004
+ },
+ {
+  "code": "2513",
+  "name": "Överkalix",
+  "title": "Överkalix kommun",
+  "slug": "overkalix",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   21.87934,
+   66.16506,
+   23.41917,
+   66.74395
+  ],
+  "bbox3006": [
+   809707.447,
+   7355342.808,
+   870032.872,
+   7427873.46
+  ],
+  "buildings_file_mb": 1.3,
+  "epc_with_energy": 661
+ },
+ {
+  "code": "2518",
+  "name": "Övertorneå",
+  "title": "Övertorneå kommun",
+  "slug": "overtornea",
+  "lan": "25",
+  "nuts2": "SE33",
+  "bbox4326": [
+   22.8707,
+   66.08683,
+   24.13565,
+   66.90519
+  ],
+  "bbox3006": [
+   855255.625,
+   7351941.098,
+   898711.47,
+   7450131.655
+  ],
+  "buildings_file_mb": 1.7,
+  "epc_with_energy": 711
+ }
+]

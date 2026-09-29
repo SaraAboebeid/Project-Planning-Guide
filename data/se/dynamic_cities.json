@@ -1,0 +1,68 @@
+{
+ "ystad": {
+  "name": "Ystad",
+  "nuts2": "SE22",
+  "bbox4326": [
+   13.62439,
+   55.37315,
+   14.20718,
+   55.56831
+  ],
+  "slug": "ystad",
+  "eubucco": "data/eubucco/ystad.gpkg",
+  "kommun": "Ystad",
+  "region_kommuns": [
+   "Ystad"
+  ],
+  "kommun_codes": {
+   "Ystad": "1286"
+  },
+  "kommun_code": "1286",
+  "clip_to_footprints": true,
+  "on_demand": true,
+  "built": true,
+  "epw": "SWE_SN_Ystad.020990_TMYx.2011-2025.epw",
+  "stats": {
+   "buildings": 16348,
+   "with_energy": 4576,
+   "epw": "SWE_SN_Ystad.020990_TMYx.2011-2025.epw"
+  },
+  "center": [
+   55.47073,
+   13.91578
+  ]
+ },
+ "alingsas": {
+  "name": "Alingsås",
+  "nuts2": "SE23",
+  "bbox4326": [
+   12.37855,
+   57.76094,
+   12.70193,
+   58.19937
+  ],
+  "slug": "alingsas",
+  "eubucco": "data/eubucco/alingsas.gpkg",
+  "kommun": "Alingsås",
+  "region_kommuns": [
+   "Alingsås"
+  ],
+  "kommun_codes": {
+   "Alingsås": "1489"
+  },
+  "kommun_code": "1489",
+  "clip_to_footprints": true,
+  "on_demand": true,
+  "built": true,
+  "epw": "SWE_VG_Molla.025240_TMYx.2011-2025.epw",
+  "stats": {
+   "buildings": 23544,
+   "with_energy": 4914,
+   "epw": "SWE_VG_Molla.025240_TMYx.2011-2025.epw"
+  },
+  "center": [
+   57.98015,
+   12.54024
+  ]
+ }
+}

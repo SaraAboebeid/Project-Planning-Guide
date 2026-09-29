@@ -109,7 +109,11 @@ export default function DefineProject() {
   const [districtExactCounts, setDistrictExactCounts] = useState<Record<string, number>>({});
   const [addressUploadMessage, setAddressUploadMessage] = useState<string | null>(null);
   const districtCountSeq = useRef(0);
-  const isSweden = project.country !== "United Kingdom";
+  const isBE = project.country === "Belgium";
+  // Gothenburg's primärområden are the only named-district list; other Swedish cities
+  // (Malmö, ...) select by address or by drawing, like the UK and Belgium.
+  const isSweden = project.country !== "United Kingdom" && !isBE
+    && (!project.city || project.city === "Gothenburg");
 
   useEffect(() => {
     if (project.scale === "Neighborhood" && isSweden && districts.length === 0) {
@@ -1262,7 +1266,7 @@ export default function DefineProject() {
                   type="text"
                   value={project.neighborhoodName}
                   onChange={(e) => setProject({ neighborhoodName: e.target.value })}
-                  placeholder={isSweden ? "e.g. Askim, Backa, Eriksberg" : "e.g. Eastwood, Kimberworth, Rawmarsh"}
+                  placeholder={isSweden ? "e.g. Askim, Backa, Eriksberg" : isBE ? "e.g. Saint-Gilles, Schaerbeek" : "e.g. Eastwood, Kimberworth, Rawmarsh"}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
                 />
                 <p className="text-xs text-gray-500 mt-1">Name the district or neighborhood this project covers.</p>

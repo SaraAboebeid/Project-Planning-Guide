@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import TopBar from "../components/TopBar";
-import { COUNTRIES, countryCodeFromName, defaultCityFor, cityEnabled, type CountryCode } from "../config/countryNav";
+import { COUNTRIES, CITY_COORDS, countryCodeFromName, defaultCityFor, cityEnabled, type CountryCode } from "../config/countryNav";
 import ChatWidget from "../components/ChatWidget";
 
 // ── Inline SVG icon set ────────────────────────────────────────────────────
@@ -121,7 +121,9 @@ const COUNTRY_BG: Record<CountryCode, BgView> = {
   ie: { lat: 53.3498, lon: -6.2603, height: 700, heading: 20 }, // Dublin
 };
 function bgUrlFor(country: CountryCode, city: string): string {
-  const v = CITY_BG[city] || COUNTRY_BG[country];
+  // Municipalities built on demand have map coordinates but no hand-picked camera.
+  const c = CITY_COORDS[city];
+  const v = CITY_BG[city] || (c ? { lat: c.lat, lon: c.lon, height: 700, heading: 20 } : COUNTRY_BG[country]);
   const p = new URLSearchParams({
     lat: String(v.lat), lon: String(v.lon), height: String(v.height), heading: String(v.heading),
   });
@@ -147,6 +149,7 @@ export default function LandingPage() {
   });
   const [boplatsListings, setBoplatsListings] = useState<string>("-");
   const [ukStats, setUkStats] = useState<{ buildings: number; withEpc: number; estimated: number; districts: number } | null>(null);
+  const [beStats, setBeStats] = useState<{ buildings: number; residential: number; tabula: number; districts: number } | null>(null);
   // Live Sweden KPI counts from /api/country-profile (buildings / epc_match /
   // tabula_match), so the hero pills track the current buildings.json instead of
   // going stale after every pipeline rebuild. Falls back to the last-known values.
@@ -162,7 +165,14 @@ export default function LandingPage() {
   const seVal = (key: string, fallback: string) =>
     seKpis && seKpis[key] != null ? seKpis[key]!.toLocaleString("en-US") : fallback;
 
-  const statCards = selectedCountry === "gb"
+  const statCards = selectedCountry === "be"
+    ? [
+        { label: "3D buildings",   value: beStats ? beStats.buildings.toLocaleString("en-US") : "—",   color: "#4A90E2" },
+        { label: "residential",    value: beStats ? beStats.residential.toLocaleString("en-US") : "—", color: "#2FB477" },
+        { label: "TABULA matched", value: beStats ? beStats.tabula.toLocaleString("en-US") : "—",      color: "#4ECDC4" },
+        { label: "districts",      value: beStats ? String(beStats.districts) : "—",                  color: "var(--brand)" },
+      ]
+    : selectedCountry === "gb"
     ? [
         { label: "buildings",      value: ukStats ? ukStats.buildings.toLocaleString("en-US") : "—", color: "#4A90E2" },
         { label: "EPC matched",    value: ukStats ? ukStats.withEpc.toLocaleString("en-US") : "—",   color: "#2FB477" },
@@ -222,6 +232,18 @@ export default function LandingPage() {
         setUkStats({ buildings: sum("buildings"), withEpc: sum("with_epc"), estimated: sum("estimated_from_ehs"), districts: use.length });
       })
       .catch(() => { /* stat pills fall back to "—" for the UK */ });
+
+    // Belgium: Brussels districts only (Gent's payload exists but is not offered yet).
+    fetch("/api/be/cities")
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((d: { cities?: { region: string; buildings: number; residential?: number; tabula_matched?: number }[] }) => {
+        if (!active) return;
+        const use = (d.cities ?? []).filter((c) => c.region === "Brussels-Capital");
+        const sum = (f: (c: (typeof use)[number]) => number | undefined) => use.reduce((a, c) => a + (f(c) || 0), 0);
+        setBeStats({ buildings: sum((c) => c.buildings), residential: sum((c) => c.residential),
+          tabula: sum((c) => c.tabula_matched), districts: use.length });
+      })
+      .catch(() => { /* stat pills fall back to "—" for Belgium */ });
 
     fetch("/api/country-profile?country=se")
       .then(r => r.ok ? r.json() : Promise.reject())
