@@ -12,6 +12,12 @@ import {
   type CountryCode,
 } from "../config/countryNav";
 import { useWizardStore } from "../store/wizard";
+import { Building2 } from "lucide-react";
+
+/** Distance from the window's right edge to the right edge of the home-page
+ *  tabs: bar padding (20) + gap (12) + avatar block (4 margin + 28 + 6 + 12).
+ *  LandingPage places its workspace card at the same offset so they line up. */
+export const HOME_TABS_RIGHT_OFFSET = 20 + 12 + (4 + 28 + 6 + 12);
 
 /* The application top bar — logos, library tabs, country/city selector, account.
  *
@@ -32,11 +38,17 @@ export default function TopBar({
   city: cityProp,
   onCountryChange,
   onCityChange,
+  hideLocationPicker = false,
+  tabsRightWidth,
 }: {
   country?: CountryCode;
   city?: string;
   onCountryChange?: (c: CountryCode) => void;
   onCityChange?: (city: string) => void;
+  /** The home page selects country/city in its workspace card instead. */
+  hideLocationPicker?: boolean;
+  /** Home page: put the tabs at the right edge at this width, lined up with the card below. */
+  tabsRightWidth?: number;
 } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -82,6 +94,62 @@ export default function TopBar({
     border: "1px solid rgba(255,255,255,0.08)",
   } as const;
 
+  // Library tabs. On the home page they sit at the right, just left of the
+  // avatar, at the card's width so the tabs and the card below line up.
+  const tabs = (
+    <div style={{ ...pill, marginLeft: tabsRightWidth ? 8 : 16, padding: 4,
+      ...(tabsRightWidth ? { width: tabsRightWidth, justifyContent: "space-between", flexShrink: 0 } : {}) }}>
+      {LIBRARY_TABS.map((tab) => {
+        const targetPath = tabPathFor(tab, country);
+        const isActive = location.pathname === tab.path || location.pathname === targetPath;
+        return (
+          <button
+            key={tab.label}
+            onClick={() => navigate(targetPath)}
+            style={{
+              border: 0,
+              borderRadius: 8,
+              padding: "6px 10px",
+              cursor: "pointer",
+              fontSize: 10,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
+              background: isActive ? "var(--brand-deep)" : "transparent",
+              transition: "all 0.15s",
+            }}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const avatar = (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 4, flexShrink: 0 }}>
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          background: "linear-gradient(135deg,var(--brand-deep),var(--brand-dark))",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          fontSize: 11,
+          fontWeight: 700,
+        }}
+      >
+        SA
+      </div>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)">
+        <path d="M7 10l5 5 5-5z" />
+      </svg>
+    </div>
+  );
+
   return (
     <header
       style={{
@@ -100,42 +168,30 @@ export default function TopBar({
         <img src="/CTH_new_logo_white.png" alt="Chalmers" className="brand-logo" style={{ height: 28, opacity: 0.8 }} />
         <span style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)" }} />
         <img src="/CNL_new_logo_white.png" alt="Chalmers Next Labs" className="brand-logo" style={{ height: 28, opacity: 0.8 }} />
+        <span style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)" }} />
+        {/* Product name + mark. The text folds away on narrower screens so the
+            tabs and the country/city pills keep their room. */}
+        <button onClick={() => navigate("/")} title="Renovation Planning Toolbox — home"
+          style={{ display: "flex", alignItems: "center", gap: 9, border: 0, background: "transparent", padding: 0, cursor: "pointer" }}>
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8,
+            background: "rgba(139,92,246,0.16)", border: "1px solid rgba(139,92,246,0.4)", flexShrink: 0 }}>
+            <Building2 size={16} color="#8B5CF6" />
+          </span>
+          <span className="hidden 2xl:block" style={{ textAlign: "left", lineHeight: 1.15 }}>
+            <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: "#fff", whiteSpace: "nowrap" }}>Renovation Planning Toolbox</span>
+            <span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap" }}>Digital Twin Decision Support</span>
+          </span>
+        </button>
       </div>
 
-      {/* Library tabs */}
-      <div style={{ ...pill, marginLeft: 16, padding: 4 }}>
-        {LIBRARY_TABS.map((tab) => {
-          const targetPath = tabPathFor(tab, country);
-          const isActive = location.pathname === tab.path || location.pathname === targetPath;
-          return (
-            <button
-              key={tab.label}
-              onClick={() => navigate(targetPath)}
-              style={{
-                border: 0,
-                borderRadius: 8,
-                padding: "6px 10px",
-                cursor: "pointer",
-                fontSize: 10,
-                fontWeight: 700,
-                whiteSpace: "nowrap",
-                color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
-                background: isActive ? "var(--brand-deep)" : "transparent",
-                transition: "all 0.15s",
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      {!tabsRightWidth && tabs}
 
       <div style={{ flex: 1 }} />
 
       {/* Country → city selector. Switching to a country or city that has no
           build yet is a no-op for the page content; the pill still moves so the
           selection is never silently ignored. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      {!hideLocationPicker && <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         <div style={pill}>
           {COUNTRIES.map((c) => {
             const enabled = countryEnabled(c.id);
@@ -200,29 +256,9 @@ export default function TopBar({
             </div>
           </>
         )}
-      </div>
+      </div>}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 4, flexShrink: 0 }}>
-        <div
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            background: "linear-gradient(135deg,var(--brand-deep),var(--brand-dark))",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            fontSize: 11,
-            fontWeight: 700,
-          }}
-        >
-          SA
-        </div>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)">
-          <path d="M7 10l5 5 5-5z" />
-        </svg>
-      </div>
+      {tabsRightWidth ? <>{tabs}{avatar}</> : avatar}
     </header>
   );
 }

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
-import TopBar from "../components/TopBar";
-import { COUNTRIES, CITY_COORDS, countryCodeFromName, defaultCityFor, cityEnabled, type CountryCode } from "../config/countryNav";
+import TopBar, { HOME_TABS_RIGHT_OFFSET } from "../components/TopBar";
+import { COUNTRIES, CITY_COORDS, countryCodeFromName, defaultCityFor, cityEnabled, seCityId, type CountryCode } from "../config/countryNav";
 import ChatWidget from "../components/ChatWidget";
+import { WorkspaceCard } from "../components/WorkspacePanel";
 
 // ── Inline SVG icon set ────────────────────────────────────────────────────
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
@@ -29,25 +30,6 @@ const IC = {
   generate:    "M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z",
   wind:        "M3.76 16.88C4.41 16.95 5 16.45 5 15.79v-.38C5 14.63 4.37 14 3.59 14c-1.19 0-1.78 1.42-.94 2.27.19.2.6.57 1.11.61zm9.71-15C12.22 1.31 11 2.44 11 3.78c0 .89.49 1.71 1.28 2.15l.72.41c.39.22.63.64.63 1.09C13.63 8.28 13 8.93 12.21 8.98c-.44.03-.82-.2-1.07-.52l-.82.82C10.79 9.82 11.36 10.12 12 10.12c1.33 0 2.41-1.08 2.41-2.42 0-.89-.49-1.71-1.28-2.15l-.72-.41A1.23 1.23 0 0 1 11.78 4c0-.41.2-.78.52-1.01l-.83-.11zm-5 3C7.22 4.31 6 5.44 6 6.78c0 .89.49 1.71 1.28 2.15l.72.41c.39.22.63.64.63 1.09C8.63 11.28 8 11.93 7.21 11.98c-.44.03-.82-.2-1.07-.52l-.82.82C5.79 12.82 6.36 13.12 7 13.12c1.33 0 2.41-1.08 2.41-2.42 0-.89-.49-1.71-1.28-2.15l-.72-.41A1.23 1.23 0 0 1 6.78 7c0-.41.2-.78.52-1.01l-.83-.11z",
 };
-
-// ── Stat pill (top-right overlay) ────────────────────────────────────────────
-function StatCard({ label, value, unit, barColor }: {
-  label: string; value: string; unit?: string; bar?: number; barColor?: string;
-}) {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 6,
-      background: "rgba(13,17,23,0.55)",
-      backdropFilter: "blur(8px)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      borderRadius: 8, padding: "5px 10px",
-    }}>
-      <div style={{ width: 5, height: 5, borderRadius: "50%", background: barColor ?? "#2FB477", flexShrink: 0 }} />
-      <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{value}</span>
-      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{label}{unit ? ` ${unit}` : ""}</span>
-    </div>
-  );
-}
 
 type StepStatus = "not-started" | "in-progress" | "review";
 
@@ -113,6 +95,7 @@ const CITY_BG: Record<string, BgView> = {
   "Malmö":    { lat: 55.605000, lon: 13.003800, height: 650, heading: 20 },
   London:     { lat: 51.503300, lon: -0.078500, height: 700, heading: 345 },
   Rotherham:  { lat: 53.430200, lon: -1.356800, height: 520, heading: 20 },
+  "Liège":    { lat: 50.640500, lon: 5.576000, height: 600, heading: 60 },
 };
 const COUNTRY_BG: Record<CountryCode, BgView> = {
   se: CITY_BG.Gothenburg!,
@@ -147,13 +130,14 @@ export default function LandingPage() {
     const c = storedProject.city ?? defaultCityFor(initialCountry);
     return cityEnabled(initialCountry, c) ? c : defaultCityFor(initialCountry);
   });
-  const [boplatsListings, setBoplatsListings] = useState<string>("-");
   const [ukStats, setUkStats] = useState<{ buildings: number; withEpc: number; estimated: number; districts: number } | null>(null);
   const [beStats, setBeStats] = useState<{ buildings: number; residential: number; tabula: number; districts: number } | null>(null);
   // Live Sweden KPI counts from /api/country-profile (buildings / epc_match /
   // tabula_match), so the hero pills track the current buildings.json instead of
   // going stale after every pipeline rebuild. Falls back to the last-known values.
   const [seKpis, setSeKpis] = useState<Record<string, number> | null>(null);
+  // Per-city Swedish counts (Malmö, municipalities built on demand, ...).
+  const [seCity, setSeCity] = useState<{ city: string; buildings: number; epc_match: number; tabula_match: number } | null>(null);
 
   const country = COUNTRIES.find(c => c.id === selectedCountry)!;
 
@@ -179,39 +163,17 @@ export default function LandingPage() {
         { label: "EHS estimated",  value: ukStats ? ukStats.estimated.toLocaleString("en-US") : "—", color: "#4ECDC4" },
         { label: "districts",      value: ukStats ? String(ukStats.districts) : "—",                 color: "var(--brand)" },
       ]
+    : selectedCity !== "Gothenburg"
+    ? [
+        { label: "3D buildings",     value: seCity?.city === selectedCity ? seCity.buildings.toLocaleString("en-US") : "—",    color: "#4A90E2" },
+        { label: "EPC matched",      value: seCity?.city === selectedCity ? seCity.epc_match.toLocaleString("en-US") : "—",    color: "#2FB477" },
+        { label: "TABULA matched",   value: seCity?.city === selectedCity ? seCity.tabula_match.toLocaleString("en-US") : "—", color: "#4ECDC4" },
+      ]
     : [
         { label: "3D buildings",     value: seVal("buildings", "92,973"),     color: "#4A90E2" },
         { label: "EPC matched",      value: seVal("epc_match", "85,670"),     color: "#2FB477" },
         { label: "TABULA matched",   value: seVal("tabula_match", "26,257"),  color: "#4ECDC4" },
-        { label: "Boplats listings", value: boplatsListings,                  color: "var(--brand)" },
       ];
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadBoplatsCount() {
-      try {
-        const res = await fetch(`/boplats_data.json?t=${Date.now()}`, { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const data = await res.json() as Record<string, unknown[]>;
-        const total = Object.values(data).reduce((sum, listings) => {
-          return sum + (Array.isArray(listings) ? listings.length : 0);
-        }, 0);
-
-        if (active) {
-          setBoplatsListings(total.toLocaleString("en-US"));
-        }
-      } catch {
-        if (active) {
-          setBoplatsListings("-");
-        }
-      }
-    }
-
-    loadBoplatsCount();
-    return () => { active = false; };
-  }, []);
 
   // UK district totals for the country-aware stat pills + per-band data for
   // the retrofit card; plus Sweden's coarse class share.
@@ -233,17 +195,26 @@ export default function LandingPage() {
       })
       .catch(() => { /* stat pills fall back to "—" for the UK */ });
 
-    // Belgium: Brussels districts only (Gent's payload exists but is not offered yet).
+    // Belgium: the selected city's districts (Brussels or Liège; Gent's payload
+    // exists but is not offered yet).
     fetch("/api/be/cities")
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then((d: { cities?: { region: string; buildings: number; residential?: number; tabula_matched?: number }[] }) => {
+      .then((d: { cities?: { name: string; buildings: number; residential?: number; tabula_matched?: number }[] }) => {
         if (!active) return;
-        const use = (d.cities ?? []).filter((c) => c.region === "Brussels-Capital");
+        const use = (d.cities ?? []).filter((c) => c.name === (selectedCity || "Brussels"));
         const sum = (f: (c: (typeof use)[number]) => number | undefined) => use.reduce((a, c) => a + (f(c) || 0), 0);
         setBeStats({ buildings: sum((c) => c.buildings), residential: sum((c) => c.residential),
           tabula: sum((c) => c.tabula_matched), districts: use.length });
       })
       .catch(() => { /* stat pills fall back to "—" for Belgium */ });
+
+    if (selectedCountry === "se" && selectedCity && selectedCity !== "Gothenburg") {
+      const city = selectedCity;
+      fetch(`/api/se/city-stats?city_id=${encodeURIComponent(seCityId(city))}`)
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then((d: { buildings: number; epc_match: number; tabula_match: number }) => { if (active) setSeCity({ city, ...d }); })
+        .catch(() => { if (active) setSeCity(null); });
+    }
 
     fetch("/api/country-profile?country=se")
       .then(r => r.ok ? r.json() : Promise.reject())
@@ -253,7 +224,7 @@ export default function LandingPage() {
       })
       .catch(() => { /* SE stat pills fall back to last-known values if absent */ });
     return () => { active = false; };
-  }, [selectedCity]);
+  }, [selectedCountry, selectedCity]);
 
   // Country/city are chosen once here on the landing page (the top-bar
   // pickers below), not asked again in the wizard - Step 1 used to have its
@@ -263,10 +234,20 @@ export default function LandingPage() {
   // *after* reset(), not before.
   const startAt = (path: string) => {
     reset();
-    setProject({ country: country.name, city: selectedCity || null });
+    // The toolbox now covers renovation planning only.
+    setProject({ country: country.name, city: selectedCity || null, projectType: "Renovation Planning" });
     navigate(path);
   };
   const handleStart = () => startAt("/step/1");
+
+  // One selection drives the top bar, the workspace card and the 3D camera.
+  const chooseCountry = (id: CountryCode) => {
+    const city = defaultCityFor(id);
+    setSelectedCountry(id);
+    setSelectedCity(city);
+    setProject({ country: COUNTRIES.find((c) => c.id === id)?.name ?? null, city: city || null });
+  };
+  const chooseCity = (city: string) => { setSelectedCity(city); setProject({ city }); };
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#0a0d14", fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -284,13 +265,10 @@ export default function LandingPage() {
         <TopBar
           country={selectedCountry}
           city={selectedCity}
-          onCountryChange={(id) => {
-            const city = defaultCityFor(id);
-            setSelectedCountry(id);
-            setSelectedCity(city);
-            setProject({ country: COUNTRIES.find((c) => c.id === id)?.name ?? null, city: city || null });
-          }}
-          onCityChange={(city) => { setSelectedCity(city); setProject({ city }); }}
+          onCountryChange={chooseCountry}
+          onCityChange={chooseCity}
+          hideLocationPicker
+          tabsRightWidth={540}
         />
 
         {/* ── Hero (3D background) ────────────────────────────────────── */}
@@ -312,18 +290,24 @@ export default function LandingPage() {
           <div className="absolute bottom-0 left-0 right-0 h-44 pointer-events-none"
                style={{ background: "linear-gradient(to top, rgba(10,13,20,0.75) 0%, transparent 100%)" }} />
 
-          {/* ── Stats overlay (top right) — country-aware ────────────── */}
-          <div className="absolute top-4 right-4 flex gap-1.5 pointer-events-none z-10">
-            {statCards.map(s => (
-              <StatCard key={s.label} label={s.label} value={s.value} barColor={s.color} />
-            ))}
+          {/* ── Workspace selection (right) — stops above the step strip,
+              scrolling inside itself if the window is short. ───────────── */}
+          {/* Right edge at the same offset as the top-bar tabs above it, so the two line up. */}
+          <div className="absolute top-4 bottom-4 xl:bottom-[196px] w-[540px] z-20 overflow-y-auto"
+               style={{ right: HOME_TABS_RIGHT_OFFSET, maxWidth: `calc(100% - ${HOME_TABS_RIGHT_OFFSET + 16}px)` }}>
+            <WorkspaceCard
+              country={selectedCountry}
+              city={selectedCity}
+              metrics={statCards}
+              onCountry={chooseCountry}
+              onCity={chooseCity}
+              onStart={handleStart}
+            />
           </div>
-
-
 
           {/* ── Hero content (left side) ─────────────────────────────── */}
           <div className="absolute inset-0 flex flex-col justify-center px-10 z-10 pointer-events-none">
-            <div className="max-w-[520px]" style={{ pointerEvents: "auto" }}>
+            <div className="max-w-[460px]" style={{ pointerEvents: "auto" }}>
 
               {/* Badges row */}
               <div className="flex items-center gap-3 mb-5">
@@ -339,28 +323,18 @@ export default function LandingPage() {
               </div>
 
               {/* Main heading */}
-              <h1 className="text-[2.6rem] font-black text-white leading-[1.08] tracking-tight mb-3">
-                Renovation Planner
+              <h1 className="text-[2.6rem] font-black text-white leading-[1.08] tracking-tight mb-2">
+                Renovation Planning Toolbox
               </h1>
-              <p className="text-[13px] text-white/50 leading-relaxed mb-7 max-w-[380px]">
+              <div className="text-[15px] font-semibold mb-3" style={{ color: "#B98BE8" }}>
+                Digital Twin Decision Support
+              </div>
+              <p className="text-[13px] text-white/50 leading-relaxed mb-6 max-w-[400px]">
                 A decision-support tool for building renovation planning — explore
                 real building and energy data and compare renovation packages by
                 energy, cost, and carbon.
               </p>
 
-              {/* CTA buttons */}
-              <div className="flex items-center gap-3 mb-8">
-                <button
-                  onClick={handleStart}
-                  className="ppg-start-cta flex items-center gap-2 px-6 py-3 rounded-xl text-[13px] font-bold
-                             text-white cursor-pointer border-0 transition-all duration-150
-                             hover:-translate-y-0.5 hover:brightness-115 active:translate-y-0 active:brightness-95"
-                  style={{ background: "linear-gradient(135deg, var(--brand-dark) 0%, var(--brand) 100%)", boxShadow: "0 4px 20px rgba(var(--brand-rgb),0.45)" }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                  Start Planning
-                </button>
-              </div>
 
             </div>
           </div>

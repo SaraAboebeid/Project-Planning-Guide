@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Brussels 3D – Facade Inspector</title>
+  <title>Belgium 3D – Facade Inspector</title>
   <meta charset="utf-8"/>
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="be_3d.css?v=20260928-221740-be">
+  <link rel="stylesheet" href="be_3d.css?v=20260929-141513-be">
   <link rel="stylesheet" href="sidebar-theme.css?v=20260812-cvd">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
        is stamped on <body> by bootstrap.js. */
     body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
   </style>
-  <script src="be_3d.meta.js?v=20260928-221740-be" defer></script>
+  <script src="be_3d.meta.js?v=20260929-141513-be" defer></script>
   <script src="viewer/js/bootstrap.js?v=20260803-scb2" defer></script>
 </head>
 <body>
@@ -21,7 +21,7 @@
 <!-- Loading overlay -->
 <div id="loading">
   <div class="spinner"></div>
-  <h1>Brussels 3D</h1>
+  <h1>Belgium 3D</h1>
   <p id="loading-status">Initialising Cesium...</p>
 </div>
 
@@ -31,7 +31,7 @@
 <!-- Left sidebar: fixed header (title + search) · scrollable accordion sections · fixed footer -->
 <aside id="left-panel" role="complementary" aria-label="Map controls and analysis layers">
   <div id="lp-header">
-    <span class="lp-title">Brussels 3D</span>
+    <span class="lp-title">Belgium 3D</span>
     <span class="lp-sub" id="city-subtitle">London &mdash; King's Cross / Bloomsbury</span>
   </div>
 
@@ -165,7 +165,7 @@
           <button class="overlay-btn active" id="btn-overlay-buildings" aria-pressed="true">
             <span class="overlay-check"></span>
             <span class="base-name">Buildings</span>
-            <span class="layer-pill">UrbIS 3D + TABULA</span>
+            <span class="layer-pill">UrbIS / PICC 3D + TABULA</span>
           </button>
           <button class="info-btn" data-title="Buildings" data-desc="10,235 building footprints across 5 UK focus area(s). Coloured by use type, EPC band, or construction era. Bands come from the Energy Performance of Buildings Register where a certificate matches, otherwise they are estimated from English Housing Survey 2024-25 distributions and marked as estimates." data-source="OpenStreetMap · EPB Register (MHCLG) · English Housing Survey 2024-25"></button>
         </div>

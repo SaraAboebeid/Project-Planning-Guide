@@ -157,6 +157,21 @@ def se_cities_built():
     return {"cities": out}
 
 
+@app.get("/api/se/city-stats")
+def se_city_stats(city_id: str = Query("gothenburg")):
+    """Home-page counts for one Swedish city, defined exactly as the Gothenburg
+    country profile defines them (has_epc / tabula_period), plus how many carry
+    real EPC energy. Gothenburg reads the same list, so its numbers are unchanged."""
+    records = _se_buildings(city_id)
+    return {
+        "city_id": city_id,
+        "buildings": len(records),
+        "epc_match": sum(1 for r in records if r.get("has_epc")),
+        "tabula_match": sum(1 for r in records if r.get("tabula_period")),
+        "with_energy": sum(1 for r in records if r.get("energy") is not None),
+    }
+
+
 # ── Build any Swedish municipality on demand (tools/se/build_any_city.py) ─────
 _SE_BUILD_DIR = PROJECT_ROOT / "data" / "se" / "builds"
 _SE_BUILD_PROCS: dict[str, "subprocess.Popen"] = {}

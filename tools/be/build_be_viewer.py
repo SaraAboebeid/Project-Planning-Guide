@@ -1,5 +1,5 @@
 """
-build_be_viewer.py - the Brussels 3D viewer (assets/be_3d.html + .css + .meta.js)
+build_be_viewer.py - the Belgian 3D viewer (Brussels, Liège) (assets/be_3d.html + .css + .meta.js)
 
 Why not `build.py --be`: build.py copies viewer/js/*.js over assets/viewer/js/,
 and the built assets currently hold work that is not in viewer/ (see the note
@@ -9,7 +9,7 @@ non-"se" country the same way - and writes only NEW files:
 
   assets/be_3d.html       uk_3d.html with Belgian title/labels/sources
   assets/be_3d.css        copy of uk_3d.css
-  assets/be_3d.meta.js    VIEWER_PROFILE for country "be" (Brussels districts only)
+  assets/be_3d.meta.js    VIEWER_PROFILE for country "be" (Brussels + Liège districts)
 
 and mirrors the payloads into frontend/public/ so Vite serves the page too.
 Nothing UK or Swedish is written.
@@ -42,10 +42,10 @@ PERIOD_COLORS = {
 
 def main() -> None:
     registry = json.loads((PUBLIC / "be" / "cities.json").read_text(encoding="utf-8"))
-    # The app offers Brussels; Gent's payload exists but is not exposed yet.
-    cities = [c for c in registry["cities"] if c["region"] == "Brussels-Capital"]
+    # The app offers Brussels and Liège; Gent's payload exists but is not exposed yet.
+    cities = [c for c in registry["cities"] if c["region"] in ("Brussels-Capital", "Wallonia")]
     if not cities:
-        raise SystemExit("no Brussels districts built - run tools/be/be_data_pipeline.py first")
+        raise SystemExit("no Brussels/Liège districts built - run tools/be/be_data_pipeline.py first")
     version = datetime.now().strftime("%Y%m%d-%H%M%S") + "-be"
     first = cities[0]
     total = sum(c["buildings"] for c in cities)
@@ -78,10 +78,10 @@ def main() -> None:
     html = (ASSETS / "uk_3d.html").read_text(encoding="utf-8")
     html = re.sub(r"uk_3d\.css\?v=[^\"']+", f"be_3d.css?v={version}", html)
     html = re.sub(r"uk_3d\.meta\.js\?v=[^\"']+", f"be_3d.meta.js?v={version}", html)
-    html = html.replace("United Kingdom 3D", "Brussels 3D")
+    html = html.replace("United Kingdom 3D", "Belgium 3D")
     # The first stat box is filled by the viewer with the EPC-matched count - 0 in
     # Belgium, which has no open EPCs - so its "EPC matched" label stays as is.
-    html = html.replace(">OSM + EPC<", ">UrbIS 3D + TABULA<")
+    html = html.replace(">OSM + EPC<", ">UrbIS / PICC 3D + TABULA<")
     (ASSETS / "be_3d.html").write_text(html, encoding="utf-8")
 
     for base in (ASSETS, PUBLIC):

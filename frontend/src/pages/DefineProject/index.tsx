@@ -1266,7 +1266,7 @@ export default function DefineProject() {
                   type="text"
                   value={project.neighborhoodName}
                   onChange={(e) => setProject({ neighborhoodName: e.target.value })}
-                  placeholder={isSweden ? "e.g. Askim, Backa, Eriksberg" : isBE ? "e.g. Saint-Gilles, Schaerbeek" : "e.g. Eastwood, Kimberworth, Rawmarsh"}
+                  placeholder={isSweden ? "e.g. Askim, Backa, Eriksberg" : isBE ? (project.city === "Liège" ? "e.g. Outremeuse, Saint-Léonard" : "e.g. Saint-Gilles, Schaerbeek") : "e.g. Eastwood, Kimberworth, Rawmarsh"}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
                 />
                 <p className="text-xs text-gray-500 mt-1">Name the district or neighborhood this project covers.</p>

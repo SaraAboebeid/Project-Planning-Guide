@@ -689,7 +689,7 @@ export default function RenovationReport() {
     footprints and addresses from UrbIS (paradigm.brussels, CC0), heights from UrbIS 3D; construction period sampled from
     Statbel's building stock unless OpenStreetMap records a year. Belgium publishes no open per-building EPCs, so there is
     no baseline energy class. No open Belgian retrofit cost or carbon data is wired in yet, so packages are not costed.
-    Heating is ideal loads (heat delivered, not fuel); the model is not yet calibrated against Brussels EPC statistics.`
+    Heating is ideal loads (heat delivered, not fuel); the model is not yet calibrated against Belgian EPB certificate statistics.`
       : isUK
       ? `as-built and refurbished U-values from TABULA GB (BRE, EPISCOPE) · weather: Doncaster/Sheffield TMYx ·
     ${esc(UK_COST_CARBON_SOURCE_NOTE)}

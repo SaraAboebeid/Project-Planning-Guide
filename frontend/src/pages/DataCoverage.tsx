@@ -2117,7 +2117,7 @@ function BuildingDataBanner({
       <div className="px-3 pb-3">
         <a href={viewerUrl} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-400 hover:text-purple-300 underline underline-offset-2">
-          📷 {isUK ? "Open UK 3D viewer" : isBE ? "Open Brussels 3D viewer" : "Open Gothenburg 3D"} →
+          📷 {isUK ? "Open UK 3D viewer" : isBE ? `Open ${projectCity === "Liège" ? "Liège" : "Brussels"} 3D viewer` : "Open Gothenburg 3D"} →
         </a>
       </div>
     </div>

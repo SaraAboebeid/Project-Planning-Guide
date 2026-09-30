@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import WizardLayout from "./components/WizardLayout";
 import DataLayout from "./components/DataLayout";
 import LandingPage from "./pages/LandingPage";
-import WorkspaceSelect from "./pages/WorkspaceSelect";
 import { type ProjectType } from "./config/projectConfig";
 import DefineProject from "./pages/DefineProject";
 import DataCoverage from "./pages/DataCoverage";
@@ -67,9 +66,8 @@ export default function App() {
       <ScrollToTop />
       <Routes>
       <Route path="/" element={<LandingPage />} />
-      {/* New workspace/toolbox-select entry — parked here (NOT the entry) while its
-          design is reviewed; visit /workspace to preview it. */}
-      <Route path="/workspace" element={<WorkspaceSelect />} />
+      {/* The workspace/toolbox selection now lives on the home page itself. */}
+      <Route path="/workspace" element={<Navigate to="/" replace />} />
       <Route path="/data"      element={<DataLayout><DataExplorer /></DataLayout>} />
       <Route path="/data/uk"   element={<DataLayout title="Data Explorer" accentColor="#4A90E2" accentBadge="United Kingdom Data"><UKDataExplorer /></DataLayout>} />
       <Route path="/pathways"  element={<DataLayout title="Pathways"       accentColor="var(--brand)" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />

@@ -807,7 +807,7 @@ export default function BaselineSetup() {
               envelope is the TABULA Belgium archetype for the building's type and construction period, and the
               period is sampled from Statbel's municipal building stock unless OpenStreetMap records a year.
               Shared walls with neighbours are modelled as adiabatic. Heating is ideal loads (heat delivered, not
-              fuel) and the model is not yet calibrated against Brussels EPC statistics, so treat absolute values
+              fuel) and the model is not yet calibrated against Belgian EPB certificate statistics, so treat absolute values
               as indicative and compare packages relative to this baseline in Step 4.
             </p>
             ) : project.country === "United Kingdom" ? (

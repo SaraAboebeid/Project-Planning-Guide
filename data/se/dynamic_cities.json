@@ -64,5 +64,38 @@
    57.98015,
    12.54024
   ]
+ },
+ "askersund": {
+  "name": "Askersund",
+  "nuts2": "SE12",
+  "bbox4326": [
+   14.64405,
+   58.68377,
+   15.33504,
+   59.02072
+  ],
+  "slug": "askersund",
+  "eubucco": "data/eubucco/askersund.gpkg",
+  "kommun": "Askersund",
+  "region_kommuns": [
+   "Askersund"
+  ],
+  "kommun_codes": {
+   "Askersund": "1882"
+  },
+  "kommun_code": "1882",
+  "clip_to_footprints": true,
+  "on_demand": true,
+  "built": true,
+  "epw": "SWE_OR_Snavlunda.025410_TMYx.2011-2025.epw",
+  "stats": {
+   "buildings": 16593,
+   "with_energy": 2004,
+   "epw": "SWE_OR_Snavlunda.025410_TMYx.2011-2025.epw"
+  },
+  "center": [
+   58.85224,
+   14.98954
+  ]
  }
 }

@@ -142,6 +142,39 @@
    },
    "footprint_source": "picc",
    "data_file": "be/buildings_liege_centre.json"
+  },
+  {
+   "id": "liege_saint_leonard",
+   "name": "Liège",
+   "district": "Saint-Léonard",
+   "region": "Wallonia",
+   "lat": 50.653,
+   "lon": 5.5905,
+   "radius_m": 700,
+   "buildings": 5362,
+   "with_epc": 0,
+   "estimated_from_ehs": 0,
+   "no_band": 5362,
+   "band_distribution": {
+    "A": 0,
+    "B": 0,
+    "C": 0,
+    "D": 0,
+    "E": 0,
+    "F": 0,
+    "G": 0
+   },
+   "residential": 3060,
+   "tabula_matched": 3060,
+   "with_party_walls": 5141,
+   "year_from_osm": 1,
+   "height_sources": {
+    "register_3d": 4609,
+    "default_by_use": 723,
+    "osm_levels": 30
+   },
+   "footprint_source": "picc",
+   "data_file": "be/buildings_liege_saint_leonard.json"
   }
  ]
 }
