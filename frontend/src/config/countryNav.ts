@@ -118,11 +118,11 @@ export async function loadSeCities(timeoutMs = 2500): Promise<void> {
   } catch { /* backend down: the static cities still work */ }
 }
 
-// Belgian 3D viewer (/be_3d.html?city=<id>): Brussels opens on Saint-Gilles,
-// Liège on Centre; the city's other districts are switchable inside the
-// viewer (tools/be/cities.py).
+// Belgian 3D viewer (/be_3d.html?city=<id>): Brussels opens on Saint-Gilles
+// (Schaerbeek switchable inside the viewer); Liège is one whole-municipality
+// district (tools/be/cities.py).
 export function beViewerCityId(city?: string | null): string {
-  return city === "Liège" ? "liege_centre" : "brussels_saint_gilles";
+  return city === "Liège" ? "liege" : "brussels_saint_gilles";
 }
 
 // Country-level fallback center (no city selected, or a country with no

@@ -620,6 +620,15 @@ const HEATED_AREA_SOURCE_LABEL: Record<string, string> = {
   gross: "no certificate: gross floor area",
 };
 
+// Walloon EPB certificate groups (tools/be/ingest_peb_wallonia.py) in words.
+const PEB_GROUP_LABEL: Record<string, string> = {
+  "SINGLE_FAMILY_HOUSE|TWO_FREE|*": "terraced houses",
+  "SINGLE_FAMILY_HOUSE|THREE_FREE|*": "end-terrace / semi-detached houses",
+  "SINGLE_FAMILY_HOUSE|DETACHED|*": "detached houses",
+  "SINGLE_FAMILY_HOUSE|*|*": "houses",
+  "APARTMENT|*|*": "apartments",
+};
+
 const FIELD_MAP: Record<string, BKey> = {
   // Renovation Planning
   r_fp:    "footprint_m2",
@@ -2064,6 +2073,27 @@ function BuildingDataBanner({
               {building.boiler_efficiency_epc != null && <>{building.epc_median_year != null ? " · " : ""}gas boiler efficiency {Math.round(building.boiler_efficiency_epc * 100)}% (from the EPC heating rating, approximate)</>}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Wallonia: EPB certificates of similar dwellings - the open data has no
+          address, so this is a municipality reference, not this building's certificate */}
+      {isBE && building.peb_ref_n != null && (
+        <div className="mx-3 mb-2 rounded-lg border border-emerald-700/30 bg-emerald-900/10 px-3 py-2 text-[11px] text-white/70 space-y-1"
+          title="Open Data Wallonie-Bruxelles EPB certificates (CC BY 4.0). E_spec is the certificate's primary energy per heated m² per year — a calculated rating, not metered use.">
+          <div>
+            <b className="text-emerald-300">EPB certificates of similar homes in {building.peb_ref_scope}:</b>{" "}
+            median E_spec <b className="text-white/85">{building.peb_ref_e_spec_median} kWh/m²·yr</b>
+            {" "}(middle half {building.peb_ref_e_spec_p25}–{building.peb_ref_e_spec_p75}, most common label {building.peb_ref_label_mode},
+            {" "}{building.peb_ref_n.toLocaleString("en-GB")} certificates, {PEB_GROUP_LABEL[building.peb_ref_group ?? ""] ?? building.peb_ref_group})
+          </div>
+          {building.peb_period_e_spec_median != null && (
+            <div>
+              Same construction period: median {building.peb_period_e_spec_median} ({building.peb_period_n?.toLocaleString("en-GB")} certificates)
+              {building.year_source !== "osm" && <span className="text-amber-300"> — this building's period is estimated from Statbel, so indicative only</span>}
+            </div>
+          )}
+          <div className="text-white/45">Not this building's own certificate: the open register has no addresses. Primary energy, so higher than the delivered heat the model reports.</div>
         </div>
       )}
 

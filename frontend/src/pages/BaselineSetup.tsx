@@ -803,7 +803,7 @@ export default function BaselineSetup() {
             )}
             {project.country === "Belgium" ? (
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
-              * Real EnergyPlus (EPSM) output with Uccle weather. Belgium has no open per-building EPCs, so the
+              * Real EnergyPlus (EPSM) output with {project.city === "Liège" ? "Liège-Bierset" : "Uccle"} weather. Belgium has no open per-building EPCs, so the
               envelope is the TABULA Belgium archetype for the building's type and construction period, and the
               period is sampled from Statbel's municipal building stock unless OpenStreetMap records a year.
               Shared walls with neighbours are modelled as adiabatic. Heating is ideal loads (heat delivered, not

@@ -184,6 +184,7 @@ export default function RenovationReport() {
   const isUK = project.country === "United Kingdom";
   // Belgium: no cost data yet (packages carry no cost), numbers in en-GB style.
   const isBE = project.country === "Belgium";
+  const isLiege = isBE && project.city === "Liège";
   const numLocale = isUK || isBE ? "en-GB" : "sv-SE";
   const money = (n: number) => (isBE ? "—" : isUK ? fmtGBP(n) : sek(n));
   // Belgium: packages carry no carbon figure, so there is no saving to report.
@@ -685,8 +686,10 @@ export default function RenovationReport() {
 
   <div class="foot">
     Energy from EnergyPlus (EPSM) single-zone shoebox simulation · ${isBE
-      ? `as-built and refurbished U-values from TABULA Belgium (VITO, EPISCOPE) · weather: Uccle TMYx ·
-    footprints and addresses from UrbIS (paradigm.brussels, CC0), heights from UrbIS 3D; construction period sampled from
+      ? `as-built and refurbished U-values from TABULA Belgium (VITO, EPISCOPE) · weather: ${isLiege ? "Liège-Bierset" : "Uccle"} TMYx ·
+    ${isLiege
+      ? "footprints from the PICC and heights from Bâtiments 3D LoD1 (SPW, CC BY 4.0), addresses from BeST (BOSA, CC BY 4.0)"
+      : "footprints and addresses from UrbIS (paradigm.brussels, CC0), heights from UrbIS 3D"}; construction period sampled from
     Statbel's building stock unless OpenStreetMap records a year. Belgium publishes no open per-building EPCs, so there is
     no baseline energy class. No open Belgian retrofit cost or carbon data is wired in yet, so packages are not costed.
     Heating is ideal loads (heat delivered, not fuel); the model is not yet calibrated against Belgian EPB certificate statistics.`

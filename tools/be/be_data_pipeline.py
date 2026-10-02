@@ -140,7 +140,64 @@ PARTY_TOUCH_M = 0.3
 # ---------------------------------------------------------------------------
 # Fetching
 # ---------------------------------------------------------------------------
+def _overpass(q: str) -> list[dict]:
+    for attempt in range(6):
+        url = OVERPASS_MIRRORS[attempt % len(OVERPASS_MIRRORS)]
+        try:
+            r = requests.post(url, data={"data": q}, headers=HEADERS, timeout=400)
+            if r.status_code in (429, 502, 503, 504):
+                raise requests.HTTPError(str(r.status_code))
+            r.raise_for_status()
+            return r.json().get("elements", [])
+        except (requests.RequestException, ValueError) as e:
+            print(f"    {url.split('/')[2]} busy ({e}); trying next")
+            time.sleep(10 * (attempt + 1))
+    raise SystemExit("Overpass kept refusing; try again later")
+
+
+_BOUNDARY: dict[str, object] = {}
+
+
+def city_boundary(city: dict):
+    """Municipality outline (Lambert 72) for whole-municipality districts, else None.
+
+    Taken from the OSM administrative boundary relation (ODbL) and cached; the
+    member ways are stitched with polygonize.
+    """
+    spec = city.get("boundary_osm")
+    if not spec:
+        return None
+    if city["id"] in _BOUNDARY:
+        return _BOUNDARY[city["id"]]
+    from shapely.geometry import LineString, mapping
+    from shapely.ops import polygonize, unary_union
+    cache = RAW_DIR / f"boundary_{city['id']}.json"
+    if cache.exists():
+        geom = shape(json.loads(cache.read_text(encoding="utf-8")))
+    else:
+        print(f"  Overpass boundary {spec['name']} (admin_level {spec['admin_level']}) ...")
+        els = _overpass(f"""[out:json][timeout:120];
+rel["boundary"="administrative"]["admin_level"="{spec['admin_level']}"]["name"="{spec['name']}"](around:2000,{city['lat']},{city['lon']});
+out geom;""")
+        rel = next((e for e in els if e.get("type") == "relation"), None)
+        if rel is None:
+            raise SystemExit(f"no OSM boundary found for {spec['name']}")
+        lines = [LineString([TO_L72.transform(p["lon"], p["lat"]) for p in m["geometry"]])
+                 for m in rel.get("members", []) if m.get("type") == "way" and m.get("role") in ("outer", "")
+                 and len(m.get("geometry") or []) >= 2]
+        geom = unary_union(list(polygonize(unary_union(lines))))
+        RAW_DIR.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(mapping(geom)), encoding="utf-8")
+        print(f"    boundary {geom.area / 1e6:.1f} km2 -> {cache.name}")
+    _BOUNDARY[city["id"]] = geom
+    return geom
+
+
 def _bbox_l72(city: dict) -> tuple[float, float, float, float]:
+    b = city_boundary(city)
+    if b is not None:
+        x0, y0, x1, y1 = b.bounds
+        return x0 - 20, y0 - 20, x1 + 20, y1 + 20
     x, y = TO_L72.transform(city["lon"], city["lat"])
     r = city["radius_m"]
     return x - r, y - r, x + r, y + r
@@ -244,26 +301,34 @@ def fetch_osm(city: dict, refresh: bool) -> list[dict]:
     cache = RAW_DIR / f"osm_{city['id']}.json"
     if cache.exists() and not refresh:
         return json.loads(cache.read_text(encoding="utf-8"))
-    q = f"""[out:json][timeout:240];
+    if city_boundary(city) is None:
+        q = f"""[out:json][timeout:240];
 (way["building"](around:{city['radius_m'] + 50},{city['lat']},{city['lon']});
  relation["building"]["type"="multipolygon"](around:{city['radius_m'] + 50},{city['lat']},{city['lon']}););
 out geom;"""
-    print("  Overpass (OSM building tags) ...")
-    els = None
-    for attempt in range(6):
-        url = OVERPASS_MIRRORS[attempt % len(OVERPASS_MIRRORS)]
-        try:
-            r = requests.post(url, data={"data": q}, headers=HEADERS, timeout=300)
-            if r.status_code in (429, 502, 503, 504):
-                raise requests.HTTPError(str(r.status_code))
-            r.raise_for_status()
-            els = r.json().get("elements", [])
-            break
-        except (requests.RequestException, ValueError) as e:
-            print(f"    {url.split('/')[2]} busy ({e}); trying next")
-            time.sleep(10 * (attempt + 1))
-    if els is None:
-        raise SystemExit("Overpass kept refusing; try again later")
+        print("  Overpass (OSM building tags) ...")
+        els = _overpass(q)
+    else:
+        # A whole municipality in one query times out on the public servers:
+        # fetch it in ~2 km tiles and de-duplicate ways that straddle a tile edge.
+        x0, y0, x1, y1 = _bbox_l72(city)
+        nx, ny = max(1, math.ceil((x1 - x0) / 2000)), max(1, math.ceil((y1 - y0) / 2000))
+        seen, els = set(), []
+        print(f"  Overpass (OSM building tags) in {nx * ny} tiles ...")
+        for i in range(nx):
+            for j in range(ny):
+                ax, ay = x0 + (x1 - x0) * i / nx, y0 + (y1 - y0) * j / ny
+                bx, by = x0 + (x1 - x0) * (i + 1) / nx, y0 + (y1 - y0) * (j + 1) / ny
+                w, s = TO_WGS.transform(ax, ay)
+                e, n = TO_WGS.transform(bx, by)
+                bb = f"{s:.6f},{w:.6f},{n:.6f},{e:.6f}"
+                for el in _overpass(f"""[out:json][timeout:240];
+(way["building"]({bb}); relation["building"]["type"="multipolygon"]({bb}););
+out geom;"""):
+                    key = (el.get("type"), el.get("id"))
+                    if key not in seen:
+                        seen.add(key)
+                        els.append(el)
     cache.write_text(json.dumps(els), encoding="utf-8")
     print(f"    {len(els):,} OSM buildings -> {cache.name}")
     return els
@@ -340,6 +405,54 @@ class TabulaBE:
         return code if code in self.by_code else None
 
 
+class PebLink:
+    """Links a Walloon building to the EPB certificates of similar dwellings.
+
+    The ODWB certificates have no address, so this is never the building's own
+    certificate: it is the distribution for the same dwelling type and number of
+    free facades in the same municipality (tools/be/ingest_peb_wallonia.py),
+    falling back to any facade count, then to Wallonia. A second, period-specific
+    median is added when the group is large enough - but the building's own period
+    is usually Statbel-sampled (year_source), so treat that one as indicative.
+    """
+
+    def __init__(self, city: dict) -> None:
+        path = OUT_DIRS[0] / "peb_wallonia_stats.json"
+        self.munis = (json.loads(path.read_text(encoding="utf-8"))["municipalities"]
+                      if path.exists() else {})
+        self.default_nis = city.get("nis")
+        if not self.munis:
+            print("  (no peb_wallonia_stats.json - run tools/be/ingest_peb_wallonia.py to link certificates)")
+
+    def lookup(self, use_cat: str, neighbours: int, period: str | None, nis: str | None) -> dict:
+        if not self.munis:
+            return {}
+        if use_cat == "bostad_enfamilj":
+            dest, facade = "SINGLE_FAMILY_HOUSE", {0: "DETACHED", 1: "THREE_FREE"}.get(neighbours, "TWO_FREE")
+        elif use_cat == "bostad_flerfamilj":
+            dest, facade = "APARTMENT", "*"
+        else:
+            return {}
+        for scope in dict.fromkeys(s for s in (nis, self.default_nis, "wallonia") if s):
+            groups = (self.munis.get(scope) or {}).get("groups", {})
+            for key in dict.fromkeys((f"{dest}|{facade}|*", f"{dest}|*|*")):
+                g = groups.get(key)
+                if not g:
+                    continue
+                out = {
+                    "peb_ref_group": key, "peb_ref_scope": self.munis[scope]["name"],
+                    "peb_ref_n": g["n"], "peb_ref_e_spec_median": g["e_spec_median"],
+                    "peb_ref_e_spec_p25": g["e_spec_p25"], "peb_ref_e_spec_p75": g["e_spec_p75"],
+                    "peb_ref_label_mode": max(g["labels"], key=g["labels"].get) if g["labels"] else None,
+                }
+                gp = groups.get(key[:-1] + period) if period else None
+                if gp:
+                    out["peb_period_n"] = gp["n"]
+                    out["peb_period_e_spec_median"] = gp["e_spec_median"]
+                return out
+        return {}
+
+
 # ---------------------------------------------------------------------------
 # Build one district
 # ---------------------------------------------------------------------------
@@ -359,6 +472,13 @@ def build_city(city: dict, refresh: bool = False) -> dict:
 
     cx, cy = TO_L72.transform(city["lon"], city["lat"])
     centre = Point(cx, cy)
+    boundary = city_boundary(city)
+    if boundary is not None:
+        from shapely.prepared import prep
+        inside = prep(boundary).contains
+    else:
+        inside = lambda pt: pt.distance(centre) <= city["radius_m"]  # noqa: E731
+    peb = PebLink(city) if src == "picc" else None
     polys, props = [], []
     for f in bfeats:
         if src == "grb" and (f["properties"].get("LBLTYPE") or "") not in ("hoofdgebouw", "bijgebouw"):
@@ -366,7 +486,7 @@ def build_city(city: dict, refresh: bool = False) -> dict:
         g = shape(f["geometry"])
         if g.geom_type == "MultiPolygon":
             g = max(g.geoms, key=lambda p: p.area)
-        if g.geom_type != "Polygon" or g.area < 8 or g.centroid.distance(centre) > city["radius_m"]:
+        if g.geom_type != "Polygon" or g.area < 8 or not inside(g.centroid):
             continue
         if not g.is_valid:
             g = g.buffer(0)
@@ -375,7 +495,7 @@ def build_city(city: dict, refresh: bool = False) -> dict:
         polys.append(g)
         props.append(f["properties"])
     tree = STRtree(polys)
-    print(f"  {len(polys):,} footprints inside {city['radius_m']} m")
+    print(f"  {len(polys):,} footprints inside " + ("the municipality" if boundary is not None else f"{city['radius_m']} m"))
     # PICC draws a terrace house's back extension as its own "Annexe" footprint.
     # A wall shared with it is still not exposed, but it does not make the house
     # terraced/semi-detached, so annexes are left out of the neighbour count.
@@ -535,6 +655,8 @@ def build_city(city: dict, refresh: bool = False) -> dict:
         arch = tabula.by_code.get(code) if code else None
         ab = (arch or {}).get("as_built") or {}
         stats["tabula_matched"] += bool(arch)
+        ref = peb.lookup(use_cat, len(neighbours), period, nis) if peb else {}
+        stats["peb_linked"] += bool(ref)
 
         ring = [[round(v, 7) for v in TO_WGS.transform(x, y)] for x, y in pg.exterior.coords]
         records.append({
@@ -574,6 +696,7 @@ def build_city(city: dict, refresh: bool = False) -> dict:
             "tabula_u_source": ("known_year" if year_source == "osm" else "statbel_sampled_period") if arch else None,
             "gross_floor_area_m2": round(pg.area * floors, 1),
             "height_ridge": ridge,
+            **ref,
         })
 
     n = len(records)
@@ -588,6 +711,7 @@ def build_city(city: dict, refresh: bool = False) -> dict:
         "year_from_osm": stats["year_osm"],
         "height_sources": {k[7:]: v for k, v in stats.items() if k.startswith("height_")},
         "footprint_source": src,
+        "peb_linked": stats["peb_linked"],
         "data_file": f"be/buildings_{city['id']}.json",
     }
     for out_dir in OUT_DIRS:

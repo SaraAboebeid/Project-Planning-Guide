@@ -206,7 +206,8 @@ export interface BuildingLookup {
   postcode?: string | null;
   floors_source?: "epc_property_type" | "height_estimate" | "eubucco" | null;
   area_source?: "epc_sum" | "epc_mean_x_dwellings" | null;
-  year_source?: "epc_age_band" | "eubucco_osm" | null;
+  /** UK: "epc_age_band" | "eubucco_osm"; Belgium: "osm" | "statbel_prior". */
+  year_source?: "epc_age_band" | "eubucco_osm" | "osm" | "statbel_prior" | null;
   energy_source?: "epc" | "tabula_estimate" | null;
   sap?: number | null;
   /** "EPC register (OS UPRN)" / "epc" = real certificate; "ehs_prior_*" = estimated band */
@@ -255,6 +256,17 @@ export interface BuildingLookup {
   u_roof_epc?: number | null;
   u_win_epc?: number | null;
   u_floor_epc?: number | null;
+  // ── Wallonia only: EPB certificates of SIMILAR dwellings in the municipality
+  // (the open register has no addresses, so never this building's own) ──
+  peb_ref_group?: string | null;
+  peb_ref_scope?: string | null;
+  peb_ref_n?: number | null;
+  peb_ref_e_spec_median?: number | null;
+  peb_ref_e_spec_p25?: number | null;
+  peb_ref_e_spec_p75?: number | null;
+  peb_ref_label_mode?: string | null;
+  peb_period_n?: number | null;
+  peb_period_e_spec_median?: number | null;
 }
 
 export interface EpcPoint {

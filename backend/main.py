@@ -680,6 +680,19 @@ def _uk_building_response(best: dict, footprint, perimeter_m, wall_area_m2, c_la
         "height_source": best.get("height_source"),
         "height_ridge":  _clean(best.get("height_ridge")),
         "tabula_code":   best.get("tabula_code"),
+        "register_class": best.get("register_class"),
+        # Wallonia: EPB certificates of SIMILAR dwellings in the municipality (same
+        # type and free facades) - never this building's own certificate, which the
+        # open data cannot be matched to (tools/be/ingest_peb_wallonia.py).
+        "peb_ref_group": best.get("peb_ref_group"),
+        "peb_ref_scope": best.get("peb_ref_scope"),
+        "peb_ref_n":     best.get("peb_ref_n"),
+        "peb_ref_e_spec_median": best.get("peb_ref_e_spec_median"),
+        "peb_ref_e_spec_p25": best.get("peb_ref_e_spec_p25"),
+        "peb_ref_e_spec_p75": best.get("peb_ref_e_spec_p75"),
+        "peb_ref_label_mode": best.get("peb_ref_label_mode"),
+        "peb_period_n":  best.get("peb_period_n"),
+        "peb_period_e_spec_median": best.get("peb_period_e_spec_median"),
         "lat":           round(c_lat, 6),
         "lon":           round(c_lon, 6),
         "dist_m":        round(dist_m, 1),
@@ -3156,9 +3169,8 @@ CITY_TO_EPW = {
     "brussels_saint_gilles": "BEL_VLG_Uccle.064470_TMYx.2011-2025.epw",
     "brussels_schaerbeek": "BEL_VLG_Uccle.064470_TMYx.2011-2025.epw",
     "gent_centrum": "BEL_VLG_Uccle.064470_TMYx.2011-2025.epw",
-    # Liege: Bierset airport, ~8 km west of the centre.
-    "liege_centre": "BEL_WAL_Liege.AP.064780_TMYx.2011-2025.epw",
-    "liege_saint_leonard": "BEL_WAL_Liege.AP.064780_TMYx.2011-2025.epw",
+    # Liege (whole municipality): Bierset airport, ~8 km west of the centre.
+    "liege": "BEL_WAL_Liege.AP.064780_TMYx.2011-2025.epw",
 }
 
 

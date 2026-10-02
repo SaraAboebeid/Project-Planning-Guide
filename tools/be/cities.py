@@ -42,29 +42,21 @@ CITIES = [
         "source": "grb",
         "nis": "44021",
     },
-    # Liège: Wallonia is the only region with open per-certificate EPB data
-    # (commune-level), so these districts are where the model gets calibrated.
+    # Liège: Wallonia is the only region with open per-certificate EPB data, and
+    # it is published per municipality - so the district is the whole
+    # municipality (boundary from OSM), matching the certificates' own scale.
+    # lat/lon is the centre the viewer opens on; radius_m only sizes the camera.
     {
-        "id": "liege_centre",
+        "id": "liege",
         "name": "Liège",
-        "district": "Centre / Outremeuse",
+        "district": "Liège (whole municipality)",
         "region": "Wallonia",
         "lat": 50.6410,
         "lon": 5.5780,
-        "radius_m": 700,
+        "radius_m": 5500,
         "source": "picc",
         "nis": "62063",
-    },
-    {
-        "id": "liege_saint_leonard",
-        "name": "Liège",
-        "district": "Saint-Léonard",
-        "region": "Wallonia",
-        "lat": 50.6530,
-        "lon": 5.5905,
-        "radius_m": 700,
-        "source": "picc",
-        "nis": "62063",
+        "boundary_osm": {"name": "Liège", "admin_level": "8"},
     },
 ]
 
