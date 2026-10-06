@@ -285,7 +285,7 @@ function _irLegend() {
   }
   el.innerHTML =
     `<div style="height:8px;border-radius:4px;background:linear-gradient(90deg,${grad.slice(0,-1)})"></div>` +
-    `<div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,0.5);margin-top:2px"><span>0</span><span>${Math.round(maxv)} kWh/m² (${_irSeason})</span></div>`;
+    `<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--sb-muted);margin-top:2px"><span>0</span><span>${Math.round(maxv)} kWh/m² (${_irSeason})</span></div>`;
 }
 
 function _injectIncident() {
@@ -305,20 +305,20 @@ function _injectIncident() {
 
   const panel = document.createElement("div");
   panel.id = "incident-panel";
-  panel.style.cssText = "display:none;padding:8px 10px;margin:4px 0 8px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)";
+  panel.style.cssText = "display:none;padding:8px 10px;margin:4px 0 8px;border-radius:8px;background:var(--sb-surface);border:1px solid var(--sb-border)";
   panel.innerHTML =
     '<div style="display:flex;gap:4px;margin-bottom:8px">' +
-      '<button class="ir-mode-btn" data-mode="ground" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:rgba(245,158,11,0.25);color:rgba(255,255,255,0.85)">Ground</button>' +
-      '<button class="ir-mode-btn" data-mode="surfaces" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.85)">Roofs &amp; facades</button>' +
+      '<button class="ir-mode-btn" data-mode="ground" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--sb-border);background:rgba(245,158,11,0.25);color:var(--sb-text)">Ground</button>' +
+      '<button class="ir-mode-btn" data-mode="surfaces" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--sb-border);background:transparent;color:var(--sb-text)">Roofs &amp; facades</button>' +
     '</div>' +
-    '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:6px">Period</div>' +
+    '<div style="font-size:10px;color:var(--sb-muted);margin-bottom:6px">Period</div>' +
     '<div id="incident-seasons" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"></div>' +
-    '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:4px">Radius: <span id="incident-rval">150</span> m</div>' +
+    '<div style="font-size:10px;color:var(--sb-muted);margin-bottom:4px">Radius: <span id="incident-rval">150</span> m</div>' +
     '<input id="incident-radius" type="range" min="60" max="350" step="10" value="150" style="width:100%">' +
     '<div id="incident-legend" style="margin-top:8px"></div>' +
-    '<div id="incident-status" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.4"></div>' +
-    '<div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:6px;line-height:1.4">Cumulative solar radiation from an EPW typical-year sky matrix. Ground disc, or roofs &amp; facades of nearby buildings. Shaded by buildings + trees (semi-transparent, Gothenburg).</div>' +
-    '<button id="incident-exit" style="width:100%;margin-top:8px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid rgba(239,68,68,0.45);background:rgba(239,68,68,0.15);color:#fca5a5">✕ Exit analysis</button>';
+    '<div id="incident-status" style="font-size:10px;color:var(--sb-muted);margin-top:6px;line-height:1.4"></div>' +
+    '<div style="font-size:9px;color:var(--sb-faint);margin-top:6px;line-height:1.4">Cumulative solar radiation from an EPW typical-year sky matrix. Ground disc, or roofs &amp; facades of nearby buildings. Shaded by buildings + trees (semi-transparent, Gothenburg).</div>' +
+    '<button id="incident-exit" style="width:100%;margin-top:8px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid rgba(239,68,68,0.45);background:rgba(239,68,68,0.10);color:#b91c1c">✕ Exit analysis</button>';
   btn.after(panel);
   panel.querySelector("#incident-exit").onclick = _irExit;
 
@@ -344,8 +344,8 @@ function _injectIncident() {
     b.textContent = label;
     b.className = "ir-season-btn";
     b.dataset.season = val;
-    b.style.cssText = "padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:" +
-      (val === _irSeason ? "rgba(245,158,11,0.25)" : "transparent") + ";color:rgba(255,255,255,0.8)";
+    b.style.cssText = "padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--sb-border);background:" +
+      (val === _irSeason ? "rgba(245,158,11,0.25)" : "transparent") + ";color:var(--sb-text)";
     b.onclick = () => { _irSeason = val; _irSyncView(); if (_irMode === "surfaces") _irRenderSurfaces(); else _irApplyColors(); };
     seasons.appendChild(b);
   });

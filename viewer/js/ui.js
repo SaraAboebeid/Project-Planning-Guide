@@ -224,7 +224,6 @@ window.arRow = function (label, value, unit, opts) {
 })();
 
 let selectedBuilding = null;
-let highlightEntity  = null;
 
 // Resolve the building under a screen position. Normally that means picking the
 // extruded boxes, which carry the index. On the photorealistic basemap they are
@@ -298,7 +297,11 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
   const suppressBuilding = window._shActive || window._irActive || window._tcActive ||
       window._urbanActive || window._scbActive || window._facadeInspectActive;
 
-  if (found != null && DATA[found] && !suppressBuilding) {
+  // The selected building already has the full card; a hover card over it would
+  // repeat the same facts, so it is only shown for other buildings.
+  const isSelected = selectedBuilding && selectedBuilding._idx === found;
+
+  if (found != null && DATA[found] && !suppressBuilding && !isSelected) {
     const idx = found;
     const x = movement.endPosition.x, y = movement.endPosition.y;
     hoverCard.style.left = Math.min(x + 18, window.innerWidth  - 300) + 'px';
@@ -436,37 +439,14 @@ async function showInfoPanel(b, idx) {
   document.getElementById('info-content').innerHTML = rows.join('');
   document.getElementById('info-panel').style.display = 'block';
 
-  // Highlight outline
-  if (highlightEntity) viewer.entities.remove(highlightEntity);
-  const ring = b.coordinates[0];
-  if (ring && ring.length >= 3) {
-    const flat = [];
-    for (const [lo, la] of ring) { flat.push(lo, la); }
-    let centerLon = 0, centerLat = 0;
-    for (const [lo, la] of ring) { centerLon += lo; centerLat += la; }
-    centerLon /= ring.length;
-    centerLat /= ring.length;
-    const baseH = (typeof window.getBuildingBaseOffset === 'function')
-      ? window.getBuildingBaseOffset(centerLon, centerLat)
-      : 0;
-    const roofH = baseH + Math.max(3, b.height || 6) + 0.5;
-    highlightEntity = viewer.entities.add({
-      polygon: {
-        hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
-        extrudedHeight: roofH,
-        height: baseH,
-        material: Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.0),
-        outline: true,
-        outlineColor: Cesium.Color.fromCssColorString('#a78bfa'),
-        outlineWidth: 3,
-      },
-    });
-  }
+  // Selection effect (glowing volume + roof pin) and the floating card beside it.
+  drawSelectionEffect(b);
+  showSelectionCard(b, idx);
 }
 
 function hideInfoPanel() {
   document.getElementById('info-panel').style.display = 'none';
-  if (highlightEntity) { viewer.entities.remove(highlightEntity); highlightEntity = null; }
+  clearSelectionEffect();
   selectedBuilding = null;
   // Disable analysis tool buttons
   document.getElementById('btn-inspect').disabled = true;
@@ -478,13 +458,258 @@ function hideInfoPanel() {
   if (typeof window.stopSimulationPolling === 'function') window.stopSimulationPolling();
 }
 
-/** The violet outline drawn around the selected building. Hidden during a
+/** The selection effect drawn around the selected building. Hidden during a
  *  facade capture for the same reason as the fill highlight. */
 window.setSelectionOutlineVisible = function (visible) {
-  if (highlightEntity) highlightEntity.show = visible;
+  for (const e of selectionEntities) e.show = visible;
+  selectionHidden = !visible;
 };
 
 document.getElementById('info-close').addEventListener('click', hideInfoPanel);
+
+// The UK page (and the Belgian page derived from it) hard-codes "London — King's
+// Cross" as the sidebar subtitle; name the district actually loaded instead.
+(function syncCitySubtitle() {
+  const el = document.getElementById('city-subtitle');
+  const c = window.VIEWER_CITY;
+  if (el && c && c.name && c.district) el.textContent = c.district.startsWith(c.name) ? c.district : `${c.name} — ${c.district}`;
+})();
+
+// =============================================================
+// Selection effect + floating building card
+//
+// Clicking a building lights it up (translucent violet volume, glowing roof and
+// base outline, a pin on the roof) and opens a card beside the map with its key
+// facts and a street-level photo, joined to the pin by a leader line. The sidebar
+// info panel and its tools are unchanged - the card is a summary on top.
+// =============================================================
+const SEL_VIOLET = '#8b5cf6';
+let selectionEntities = [];
+let selectionHidden = false;
+let selPinPos = null;       // Cartesian3 of the roof pin, for the leader line
+let selCard = null, selLeader = null, selToken = 0;
+const selPhotoCache = new Map();  // idx -> {image,date,copyright} | {error}
+
+function clearSelectionEffect() {
+  for (const e of selectionEntities) viewer.entities.remove(e);
+  selectionEntities = [];
+  selPinPos = null;
+  selToken++;
+  if (selCard) selCard.style.display = 'none';
+  if (selLeader) selLeader.style.display = 'none';
+}
+
+function drawSelectionEffect(b) {
+  clearSelectionEffect();
+  const ring = b.coordinates && b.coordinates[0];
+  if (!ring || ring.length < 3) return;
+  let cLon = 0, cLat = 0;
+  for (const [lo, la] of ring) { cLon += lo; cLat += la; }
+  cLon /= ring.length; cLat /= ring.length;
+  const baseH = (typeof window.getBuildingBaseOffset === 'function') ? window.getBuildingBaseOffset(cLon, cLat) : 0;
+  const roofH = baseH + Math.max(3, b.height || 6) + 0.3;
+  const violet = Cesium.Color.fromCssColorString(SEL_VIOLET);
+  // The tint is a shell ~0.6 m outside the building box: drawn exactly on top of
+  // the box, its faces z-fight with the box's own and the tint never shows.
+  const mLat = 111320, mLon = 111320 * Math.cos(cLat * Math.PI / 180), GROW = 0.6;
+  const flat = [], roof = [], base = [];
+  for (const [lo, la] of ring) {
+    const dx = (lo - cLon) * mLon, dy = (la - cLat) * mLat, d = Math.hypot(dx, dy) || 1;
+    flat.push(lo + (dx / d) * GROW / mLon, la + (dy / d) * GROW / mLat);
+    roof.push(lo, la, roofH); base.push(lo, la, baseH + 0.3);
+  }
+  const add = (ent) => { const e = viewer.entities.add(ent); e.show = !selectionHidden; selectionEntities.push(e); };
+
+  // Translucent volume tinting the building.
+  add({ polygon: {
+    hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
+    // Photorealistic mesh: a light veil so the real building stays readable;
+    // flat coloured boxes need a stronger tint to stand out from their own colour.
+    height: baseH, extrudedHeight: roofH + 0.4,
+    material: violet.withAlpha(window.isPhotoMode && window.isPhotoMode() ? 0.22 : 0.62),
+  } });
+  // Glowing roof and base outlines (polylines: polygon outlines are 1 px on WebGL).
+  add({ polyline: { positions: Cesium.Cartesian3.fromDegreesArrayHeights(roof), width: 14,
+    material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.3, color: violet.withAlpha(1.0) }) } });
+  add({ polyline: { positions: Cesium.Cartesian3.fromDegreesArrayHeights(base), width: 9,
+    material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.2, color: violet.withAlpha(0.7) }) } });
+  // Vertical edges at the corners (skip near-collinear points so curved outlines stay light).
+  const n = ring.length - (ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1] ? 1 : 0);
+  for (let i = 0; i < n && n <= 60; i++) {
+    const p = ring[(i - 1 + n) % n], q = ring[i], r = ring[(i + 1) % n];
+    const turn = Math.abs(Math.atan2(r[1] - q[1], r[0] - q[0]) - Math.atan2(q[1] - p[1], q[0] - p[0]));
+    if (Math.min(turn, 2 * Math.PI - turn) < 0.35) continue;
+    add({ polyline: { positions: Cesium.Cartesian3.fromDegreesArrayHeights([q[0], q[1], baseH, q[0], q[1], roofH]), width: 7,
+      material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.25, color: violet.withAlpha(0.8) }) } });
+  }
+  // Roof pin: soft halo + white dot with a violet ring, always drawn on top.
+  selPinPos = Cesium.Cartesian3.fromDegrees(cLon, cLat, roofH + 1);
+  add({ position: selPinPos, point: { pixelSize: 30, color: violet.withAlpha(0.28), disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+  add({ position: selPinPos, point: { pixelSize: 15, color: Cesium.Color.WHITE, outlineColor: violet, outlineWidth: 4,
+    disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+}
+
+// ── Card ────────────────────────────────────────────────────────
+const SEL_ICONS = {
+  pin: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  use: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M11 21v-3h2v3"/>',
+  energy: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  year: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  area: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+  height: '<path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/>',
+  floors: '<path d="M4 20h4v-4h4v-4h4V8h4"/>',
+};
+const USE_LABELS = {
+  bostad_enfamilj: 'Residential – house', bostad_flerfamilj: 'Residential – apartments',
+  verksamhet: 'Commercial / Office', industri: 'Industrial', samhalle: 'Public / institutional',
+  komplement: 'Ancillary building', ovrigt: 'Other',
+};
+const ESTIMATED_YEAR = new Set(['statbel_prior', 'ehs_prior', 'ehs_sampled', 'tabula_prior']);
+
+function _selEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function _selEnsureDom() {
+  if (selCard) return;
+  const style = document.createElement('style');
+  style.textContent = `
+  .sel-card{position:fixed;top:105px;right:30px;width:480px;max-width:calc(125vw - 60px);z-index:950;display:none;zoom:0.8;
+    background:#fff;color:#0f172a;border-radius:18px;box-shadow:0 22px 50px rgba(15,23,42,.22),0 0 0 1px rgba(139,92,246,.18);
+    font-family:inherit;overflow:hidden}
+  .sel-card .sc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 20px 10px}
+  .sel-card h3{margin:0;font-size:21px;font-weight:700;line-height:1.2;color:#1e1b4b}
+  .sel-card .sc-sub{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:13px;color:#64748b}
+  .sel-card .sc-badge{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}
+  .sel-card .sc-badge b{display:flex;align-items:center;justify-content:center;min-width:46px;height:40px;border-radius:9px;
+    font-size:22px;font-weight:800;color:#0f172a}
+  .sel-card .sc-badge span{font-size:11px;color:#64748b;white-space:nowrap}
+  .sel-card .sc-body{display:grid;grid-template-columns:1fr 168px;gap:14px;padding:6px 20px 16px}
+  .sel-card .sc-row{display:grid;grid-template-columns:18px 76px 1fr;align-items:center;gap:8px;padding:6px 0;font-size:13px}
+  .sel-card .sc-row svg{width:17px;height:17px;stroke:#475569;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .sel-card .sc-lbl{color:#64748b}
+  .sel-card .sc-val{font-weight:600;color:#0f172a;white-space:nowrap}
+  .sel-card .sc-val small{font-weight:400;color:#94a3b8;margin-left:3px}
+  .sel-card .sc-photo{border-radius:12px;overflow:hidden;background:#f1f5f9;height:150px;position:relative;align-self:start}
+  .sel-card .sc-photo img{width:100%;height:100%;object-fit:cover;display:block}
+  .sel-card .sc-photo .sc-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    text-align:center;padding:10px;font-size:11px;color:#94a3b8}
+  .sel-card .sc-credit{font-size:9.5px;color:#94a3b8;margin-top:4px;text-align:right}
+  .sel-card .sc-close{border:none;background:transparent;color:#94a3b8;font-size:16px;cursor:pointer;padding:0 0 0 6px;line-height:1}
+  .sel-card .sc-close:hover{color:#475569}
+  @keyframes scPulse{0%,100%{opacity:.55}50%{opacity:1}}
+  .sel-card .sc-loading{animation:scPulse 1.2s ease-in-out infinite}`;
+  document.head.appendChild(style);
+
+  selCard = document.createElement('div');
+  selCard.className = 'sel-card';
+  document.body.appendChild(selCard);
+
+  // Leader line from the roof pin to the card, redrawn every frame.
+  selLeader = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  selLeader.setAttribute('style', 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:949;display:none');
+  selLeader.innerHTML = `<line stroke="${SEL_VIOLET}" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>` +
+    `<circle r="4" fill="${SEL_VIOLET}"/>`;
+  document.body.appendChild(selLeader);
+  const toWindow = Cesium.SceneTransforms.worldToWindowCoordinates || Cesium.SceneTransforms.wgs84ToWindowCoordinates;
+  viewer.scene.postRender.addEventListener(() => {
+    if (!selPinPos || selCard.style.display === 'none' || selectionHidden) { selLeader.style.display = 'none'; return; }
+    const w = toWindow(viewer.scene, selPinPos);
+    if (!w) { selLeader.style.display = 'none'; return; }
+    const c = viewer.canvas.getBoundingClientRect();
+    const px = c.left + w.x, py = c.top + w.y;
+    const r = selCard.getBoundingClientRect();
+    if (px > r.left - 8) { selLeader.style.display = 'none'; return; }   // pin is behind the card
+    const ex = r.left, ey = Math.min(Math.max(py, r.top + 30), r.bottom - 30);
+    const line = selLeader.firstChild, dot = selLeader.lastChild;
+    line.setAttribute('x1', px); line.setAttribute('y1', py); line.setAttribute('x2', ex); line.setAttribute('y2', ey);
+    dot.setAttribute('cx', ex); dot.setAttribute('cy', ey);
+    selLeader.style.display = 'block';
+  });
+}
+
+function showSelectionCard(b, idx) {
+  _selEnsureDom();
+  const token = ++selToken;
+  const city = window.VIEWER_CITY || {};
+  const profile = (typeof VIEWER_PROFILE !== 'undefined' && VIEWER_PROFILE) || {};
+  const place = [city.name, profile.country_name || (document.body.getAttribute('data-country') === 'se' ? 'Sweden' : null)]
+    .filter(Boolean).join(', ');
+  const country = profile.country || document.body.getAttribute('data-country') || 'se';
+
+  // Energy class: real certificate, estimated band, or none (Belgium has no open EPCs).
+  let badge;
+  if (b.eclass) {
+    const col = ECLASS_COLORS_CSS[b.eclass] || '#cbd5e1';
+    const est = country === 'gb' && b.has_epc === false;
+    badge = `<b style="background:${col}">${_selEsc(b.eclass)}</b><span>Energy class${est ? ' (est.)' : ''}</span>`;
+  } else {
+    badge = `<b style="background:#f1f5f9;color:#94a3b8">—</b><span>${country === 'be' ? 'No open EPC' : 'No EPC'}</span>`;
+  }
+
+  const rows = [];
+  const row = (icon, lbl, val, note) => {
+    if (val == null || val === '') return;
+    rows.push(`<div class="sc-row"><svg viewBox="0 0 24 24">${SEL_ICONS[icon]}</svg><span class="sc-lbl">${lbl}</span>` +
+      `<span class="sc-val">${val}${note ? `<small>${note}</small>` : ''}</span></div>`);
+  };
+  row('use', 'Use', USE_LABELS[b.use_cat] || (b.use_cat ? _selEsc(b.use_cat.replace(/_/g, ' ')) : null));
+  if (b.energy != null) row('energy', 'Energy use', `${Math.round(b.energy)} kWh/m²/yr`);
+  else if (b.tabula_kwh_m2_yr != null) row('energy', 'Energy use',
+    `<span title="TABULA archetype heating need - no certificate for this building">${Math.round(b.tabula_kwh_m2_yr)} kWh/m²/yr</span>`, 'est.');
+  if (b.year) row('year', 'Year built', b.year, ESTIMATED_YEAR.has(b.year_source) ? 'est.' : '');
+  // Sweden: `area` is the EPC's Atemp (heated floor area); UK: certified heated area.
+  const area = b.area || b.atemp || b.area_atemp || b.heated_area_m2 || b.floor_area_m2;
+  if (area) row('area', 'Floor area', `${Math.round(area).toLocaleString('en-US')} m²`);
+  else if (b.gross_floor_area_m2 || (b.footprint_m2 && b.floors))
+    row('area', 'Floor area', `${Math.round(b.gross_floor_area_m2 || b.footprint_m2 * b.floors).toLocaleString('en-US')} m²`, 'gross est.');
+  if (b.height) row('height', 'Height', `${Math.round(b.height)} m`);
+  if (b.floors) row('floors', 'Floors', b.floors);
+
+  selCard.innerHTML =
+    `<div class="sc-head"><div><h3>${_selEsc(b.address || b.all_addresses || 'Building')}</h3>` +
+      (place ? `<div class="sc-sub"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:#94a3b8;fill:none;stroke-width:2">${SEL_ICONS.pin}</svg>${_selEsc(place)}</div>` : '') +
+    `</div><div style="display:flex;gap:6px;align-items:flex-start"><div class="sc-badge">${badge}</div>` +
+    `<button class="sc-close" aria-label="Close">&#x2715;</button></div></div>` +
+    `<div class="sc-body"><div>${rows.join('')}</div>` +
+    `<div><div class="sc-photo"><div class="sc-msg sc-loading">Loading street view…</div></div><div class="sc-credit"></div></div></div>`;
+  selCard.querySelector('.sc-close').onclick = hideInfoPanel;
+  selCard.style.display = 'block';
+
+  // Street-level photo, fetched once per building per session.
+  const ring = b.coordinates && b.coordinates[0];
+  if (!ring || !ring.length) return _selPhoto(null, { error: 'No location' });
+  const lat = ring.reduce((s, c) => s + c[1], 0) / ring.length;
+  const lon = ring.reduce((s, c) => s + c[0], 0) / ring.length;
+  const cached = selPhotoCache.get(idx);
+  if (cached) return _selPhoto(token, cached);
+  // Midpoints of the longest walls, for blocks whose centre is far from any street.
+  const walls = [];
+  for (let i = 0; i + 1 < ring.length; i++) {
+    const [a, c] = [ring[i], ring[i + 1]];
+    walls.push({ len: Math.hypot((c[0] - a[0]) * Math.cos(lat * Math.PI / 180), c[1] - a[1]), lat: (a[1] + c[1]) / 2, lon: (a[0] + c[0]) / 2 });
+  }
+  const alt = walls.sort((x, y) => y.len - x.len).slice(0, 6).map((w) => `${w.lat.toFixed(6)},${w.lon.toFixed(6)}`).join(';');
+  const q = `lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}` + (b.height ? `&height_m=${Math.min(300, Math.max(1, b.height)).toFixed(1)}` : '') +
+    (alt ? `&walls=${encodeURIComponent(alt)}` : '');
+  fetch(`/api/streetview/thumbnail?${q}`)
+    .then(async (r) => r.ok ? r.json() : { error: r.status === 404 ? 'No street-level photo near this building' : r.status === 503 ? 'Street View not configured' : 'Photo unavailable' })
+    .catch(() => ({ error: 'Photo unavailable' }))
+    .then((res) => { selPhotoCache.set(idx, res); _selPhoto(token, res); });
+}
+
+function _selPhoto(token, res) {
+  if (token !== null && token !== selToken) return;   // another building was selected meanwhile
+  const box = selCard.querySelector('.sc-photo'), credit = selCard.querySelector('.sc-credit');
+  if (!box) return;
+  if (res && res.image) {
+    box.innerHTML = `<img alt="Street view of the building" src="${res.image}">`;
+    credit.textContent = `${res.copyright || '© Google'}${res.date ? ' · ' + res.date : ''}`;
+  } else {
+    box.innerHTML = `<div class="sc-msg">${_selEsc((res && res.error) || 'Photo unavailable')}</div>`;
+    credit.textContent = '';
+  }
+}
 
 // =============================================================
 // Draggable floating panels

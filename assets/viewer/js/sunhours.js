@@ -273,7 +273,7 @@ function _shLegend() {
     const lit = `rgb(${Math.round(_SH_LIT.red*255)},${Math.round(_SH_LIT.green*255)},${Math.round(_SH_LIT.blue*255)})`;
     const sh = `rgb(${Math.round(_SH_SHADE.red*255)},${Math.round(_SH_SHADE.green*255)},${Math.round(_SH_SHADE.blue*255)})`;
     el.innerHTML =
-      `<div style="display:flex;gap:12px;font-size:10px;color:rgba(255,255,255,0.7)">` +
+      `<div style="display:flex;gap:12px;font-size:10px;color:var(--sb-text)">` +
       `<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${lit};margin-right:4px"></span>in sun</span>` +
       `<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${sh};margin-right:4px"></span>in shade</span></div>`;
     return;
@@ -286,7 +286,7 @@ function _shLegend() {
   }
   el.innerHTML =
     `<div style="height:8px;border-radius:4px;background:linear-gradient(90deg,${grad.slice(0,-1)})"></div>` +
-    `<div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,0.5);margin-top:2px"><span>0 h (shaded)</span><span>${maxh} h (full sun)</span></div>`;
+    `<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--sb-muted);margin-top:2px"><span>0 h (shaded)</span><span>${maxh} h (full sun)</span></div>`;
 }
 
 function _injectSunHours() {
@@ -315,21 +315,21 @@ function _injectSunHours() {
   group.appendChild(btn);
   const panel = document.createElement("div");
   panel.id = "sunhours-panel";
-  panel.style.cssText = "display:none;padding:8px 10px;margin:4px 0 8px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)";
+  panel.style.cssText = "display:none;padding:8px 10px;margin:4px 0 8px;border-radius:8px;background:var(--sb-surface);border:1px solid var(--sb-border)";
   panel.innerHTML =
-    '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:6px">Day of year</div>' +
+    '<div style="font-size:10px;color:var(--sb-muted);margin-bottom:6px">Day of year</div>' +
     '<div id="sunhours-dates" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"></div>' +
-    '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:4px">Radius: <span id="sunhours-rval">150</span> m</div>' +
+    '<div style="font-size:10px;color:var(--sb-muted);margin-bottom:4px">Radius: <span id="sunhours-rval">150</span> m</div>' +
     '<input id="sunhours-radius" type="range" min="60" max="400" step="10" value="150" style="width:100%">' +
     '<div style="display:flex;gap:4px;margin:10px 0 6px">' +
-      '<button class="sh-mode-btn" data-mode="hours" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:rgba(245,158,11,0.25);color:rgba(255,255,255,0.85)">Sun hours</button>' +
-      '<button class="sh-mode-btn" data-mode="shadow" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.85)">Shadow at time</button>' +
+      '<button class="sh-mode-btn" data-mode="hours" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--sb-border);background:rgba(245,158,11,0.25);color:var(--sb-text)">Sun hours</button>' +
+      '<button class="sh-mode-btn" data-mode="shadow" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--sb-border);background:transparent;color:var(--sb-text)">Shadow at time</button>' +
     '</div>' +
-    '<div id="sunhours-hourlbl" style="font-size:10px;color:rgba(255,255,255,0.7);margin-bottom:2px;text-align:center">—</div>' +
+    '<div id="sunhours-hourlbl" style="font-size:10px;color:var(--sb-text);margin-bottom:2px;text-align:center">—</div>' +
     '<input id="sunhours-hour" type="range" min="0" max="1" step="1" value="0" style="width:100%">' +
     '<div id="sunhours-legend" style="margin-top:8px"></div>' +
-    '<div id="sunhours-status" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.4"></div>' +
-    '<button id="sunhours-exit" style="width:100%;margin-top:8px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid rgba(239,68,68,0.45);background:rgba(239,68,68,0.15);color:#fca5a5">✕ Exit analysis</button>';
+    '<div id="sunhours-status" style="font-size:10px;color:var(--sb-muted);margin-top:6px;line-height:1.4"></div>' +
+    '<button id="sunhours-exit" style="width:100%;margin-top:8px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid rgba(239,68,68,0.45);background:rgba(239,68,68,0.10);color:#b91c1c">✕ Exit analysis</button>';
   btn.after(panel);
   panel.querySelector("#sunhours-exit").onclick = _shExit;
 
@@ -338,8 +338,8 @@ function _injectSunHours() {
     const b = document.createElement("button");
     b.textContent = label;
     b.className = "sh-date-btn";
-    b.style.cssText = "padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:" +
-      (val === _shDate ? "rgba(245,158,11,0.25)" : "transparent") + ";color:rgba(255,255,255,0.8)";
+    b.style.cssText = "padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--sb-border);background:" +
+      (val === _shDate ? "rgba(245,158,11,0.25)" : "transparent") + ";color:var(--sb-text)";
     b.onclick = () => {
       _shDate = val;
       panel.querySelectorAll(".sh-date-btn").forEach(x => x.style.background = "transparent");

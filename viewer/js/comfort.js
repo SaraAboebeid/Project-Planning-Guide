@@ -270,7 +270,7 @@ function _tcReadout(f) {
     const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
     const hrs = (_tcSeasonData.hours && _tcSeasonData.hours[_tcSeason]) || 0;
     el.innerHTML = `Comfortable <b>${Math.round(mean)}%</b> of ${hrs} daytime hours` +
-      `<br><span style="font-weight:400;color:rgba(255,255,255,0.6)">${_tcSeason}, area average</span>`;
+      `<br><span style="font-weight:400;color:var(--sb-muted)">${_tcSeason}, area average</span>`;
     return;
   }
   const u = f.utci;
@@ -282,7 +282,7 @@ function _tcReadout(f) {
   for (const k in counts) if (counts[k] > best) { best = counts[k]; dom = +k; }
   const label = (_tcData.labels || [])[dom] || "";
   const rng = (Math.round(mn) === Math.round(mx)) ? `${Math.round(mn)}°C` : `${Math.round(mn)} to ${Math.round(mx)}°C`;
-  el.innerHTML = `Feels like (UTCI) <b>${rng}</b><br><span style="font-weight:400;color:rgba(255,255,255,0.6)">${label}</span>`;
+  el.innerHTML = `Feels like (UTCI) <b>${rng}</b><br><span style="font-weight:400;color:var(--sb-muted)">${label}</span>`;
 }
 
 function _tcSyncView() {
@@ -316,14 +316,14 @@ function _tcLegend() {
     }
     el.innerHTML =
       `<div style="height:8px;border-radius:4px;background:linear-gradient(90deg,${bar.slice(0, -1)})"></div>` +
-      `<div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,0.5);margin-top:2px"><span>0% comfortable</span><span>100%</span></div>`;
+      `<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--sb-muted);margin-top:2px"><span>0% comfortable</span><span>100%</span></div>`;
     return;
   }
   let bar = "";
   _TC_PAL.forEach((c, i) => { bar += `${c} ${i * 10}%, ${c} ${(i + 1) * 10}%,`; });
   el.innerHTML =
     `<div style="height:8px;border-radius:4px;background:linear-gradient(90deg,${bar.slice(0, -1)})"></div>` +
-    `<div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,0.5);margin-top:2px"><span>cold stress</span><span>comfortable</span><span>heat stress</span></div>`;
+    `<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--sb-muted);margin-top:2px"><span>cold stress</span><span>comfortable</span><span>heat stress</span></div>`;
 }
 
 function _injectComfort() {
@@ -342,29 +342,29 @@ function _injectComfort() {
 
   const panel = document.createElement("div");
   panel.id = "comfort-panel";
-  panel.style.cssText = "display:none;padding:8px 10px;margin:4px 0 8px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)";
+  panel.style.cssText = "display:none;padding:8px 10px;margin:4px 0 8px;border-radius:8px;background:var(--sb-surface);border:1px solid var(--sb-border)";
   panel.innerHTML =
     '<div style="display:flex;gap:4px;margin-bottom:8px">' +
-      '<button class="tc-mode-btn" data-mode="hourly" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:rgba(245,158,11,0.25);color:rgba(255,255,255,0.85)">Hour of day</button>' +
-      '<button class="tc-mode-btn" data-mode="seasonal" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.85)">Season comfort %</button>' +
+      '<button class="tc-mode-btn" data-mode="hourly" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--sb-border);background:rgba(245,158,11,0.25);color:var(--sb-text)">Hour of day</button>' +
+      '<button class="tc-mode-btn" data-mode="seasonal" style="flex:1;padding:4px 6px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--sb-border);background:transparent;color:var(--sb-text)">Season comfort %</button>' +
     '</div>' +
     '<div id="tc-hourly-group">' +
-      '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:6px">Day of year</div>' +
+      '<div style="font-size:10px;color:var(--sb-muted);margin-bottom:6px">Day of year</div>' +
       '<div id="comfort-dates" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"></div>' +
-      '<div id="comfort-hourlbl" style="font-size:10px;color:rgba(255,255,255,0.7);margin:2px 0 2px;text-align:center">—</div>' +
+      '<div id="comfort-hourlbl" style="font-size:10px;color:var(--sb-text);margin:2px 0 2px;text-align:center">—</div>' +
       '<input id="comfort-hour" type="range" min="0" max="1" step="1" value="0" style="width:100%">' +
     '</div>' +
     '<div id="tc-seasonal-group" style="display:none">' +
-      '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:6px">Season</div>' +
+      '<div style="font-size:10px;color:var(--sb-muted);margin-bottom:6px">Season</div>' +
       '<div id="comfort-seasons" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px"></div>' +
     '</div>' +
-    '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin:8px 0 4px">Radius: <span id="comfort-rval">150</span> m</div>' +
+    '<div style="font-size:10px;color:var(--sb-muted);margin:8px 0 4px">Radius: <span id="comfort-rval">150</span> m</div>' +
     '<input id="comfort-radius" type="range" min="60" max="350" step="10" value="150" style="width:100%">' +
-    '<div id="comfort-readout" style="font-size:11px;color:rgba(255,255,255,0.9);text-align:center;margin-top:6px;font-weight:600"></div>' +
+    '<div id="comfort-readout" style="font-size:11px;color:var(--sb-text);text-align:center;margin-top:6px;font-weight:600"></div>' +
     '<div id="comfort-legend" style="margin-top:8px"></div>' +
-    '<div id="comfort-status" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.4"></div>' +
-    '<div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:6px;line-height:1.4">UTCI from EPW climate. Longwave MRT from sky temperature × sky-view; solar gain (SolarCal) orientation-averaged. Wind = EPW 10 m (UTCI standard). Season % = share of daytime hours in the no-stress band (9–26 °C).</div>' +
-    '<button id="comfort-exit" style="width:100%;margin-top:8px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid rgba(239,68,68,0.45);background:rgba(239,68,68,0.15);color:#fca5a5">✕ Exit analysis</button>';
+    '<div id="comfort-status" style="font-size:10px;color:var(--sb-muted);margin-top:6px;line-height:1.4"></div>' +
+    '<div style="font-size:9px;color:var(--sb-faint);margin-top:6px;line-height:1.4">UTCI from EPW climate. Longwave MRT from sky temperature × sky-view; solar gain (SolarCal) orientation-averaged. Wind = EPW 10 m (UTCI standard). Season % = share of daytime hours in the no-stress band (9–26 °C).</div>' +
+    '<button id="comfort-exit" style="width:100%;margin-top:8px;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid rgba(239,68,68,0.45);background:rgba(239,68,68,0.10);color:#b91c1c">✕ Exit analysis</button>';
   btn.after(panel);
   panel.querySelector("#comfort-exit").onclick = _tcExit;
 
@@ -372,7 +372,7 @@ function _injectComfort() {
   _TC_DATES.forEach(([val, label]) => {
     const b = document.createElement("button");
     b.textContent = label; b.className = "tc-date-btn"; b.dataset.date = val;
-    b.style.cssText = "padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.8)";
+    b.style.cssText = "padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--sb-border);background:transparent;color:var(--sb-text)";
     b.onclick = () => { _tcDate = val; if (_tcCenter) _tcRun(_tcCenter[0], _tcCenter[1]); else _tcSyncView(); };
     dates.appendChild(b);
   });
@@ -381,7 +381,7 @@ function _injectComfort() {
   _TC_SEASONS.forEach(([val, label]) => {
     const b = document.createElement("button");
     b.textContent = label; b.className = "tc-season-btn"; b.dataset.season = val;
-    b.style.cssText = "padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.8)";
+    b.style.cssText = "padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--sb-border);background:transparent;color:var(--sb-text)";
     b.onclick = () => { _tcSeason = val; _tcSyncView(); _tcApplyColors(); };
     seasons.appendChild(b);
   });

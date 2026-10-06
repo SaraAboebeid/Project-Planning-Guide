@@ -587,8 +587,18 @@ export default function LocationMap({
   const isBuilding = scale === "Building";
   const countryCode = countryCodeFromName(country);
   const mapCenter = mapCenterFor(countryCode, city);
-  // Boundary highlight + address validation only apply to Gothenburg (SE).
+  // Boundary highlight + address validation apply where the app knows the
+  // covered area: Gothenburg (SE) and the built Belgian cities (Brussels' focus
+  // districts, the whole Liège municipality).
   const isGothenburg = countryCode === "se" && (city ?? "").toLowerCase().includes("gothenburg");
+  const coverageUrl = isGothenburg
+    ? "/api/se/gothenburg-boundary"
+    : countryCode === "be" && city
+      ? `/api/be/coverage?city=${encodeURIComponent(city)}`
+      : null;
+  const coverageName = isGothenburg
+    ? "the Gothenburg municipality"
+    : city === "Liège" ? "the Liège municipality" : `the ${city ?? ""} districts with building data`;
   const [boundary, setBoundary] = useState<BoundaryFeature | null>(null);
   const [districtBoundary, setDistrictBoundary] = useState<BoundaryFeature | null>(null);
 
@@ -661,17 +671,17 @@ export default function LocationMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scale]);
 
-  // Fetch the Gothenburg municipality boundary once (for the map highlight +
-  // the "inside the area?" check). Other cities: no boundary, no restriction.
+  // Fetch the covered-area boundary once (for the map highlight + the
+  // "inside the area?" check). Other cities: no boundary, no restriction.
   useEffect(() => {
-    if (!isGothenburg) { setBoundary(null); return; }
+    if (!coverageUrl) { setBoundary(null); return; }
     let alive = true;
-    fetch("/api/se/gothenburg-boundary")
+    fetch(coverageUrl)
       .then((r) => (r.ok ? r.json() : null))
       .then((b) => { if (alive && b?.geometry) setBoundary(b as BoundaryFeature); })
       .catch(() => { /* boundary optional — no restriction if it fails */ });
     return () => { alive = false; };
-  }, [isGothenburg]);
+  }, [coverageUrl]);
 
   // Fetch the selected district polygon (primärområde) for visual confirmation.
   useEffect(() => {
@@ -690,7 +700,7 @@ export default function LocationMap({
   // up so Continue can gate. (Addresses are tested per-point; a bbox by its centre;
   // a polygon by its centroid.)
   useEffect(() => {
-    if (!isGothenburg || !boundary) { onLocationValidityChange?.(true, null); return; }
+    if (!coverageUrl || !boundary) { onLocationValidityChange?.(true, null); return; }
     const geom = boundary.geometry;
     const addrPts = geoPoints.filter((p): p is GeoPoint => !!p && typeof p.lat === "number");
     const tests: { lat: number; lon: number; kind: "address" | "area" }[] =
@@ -708,16 +718,16 @@ export default function LocationMap({
     if (outside.length > 0) {
       const anyArea = outside.some((o) => o.kind === "area");
       const msg = anyArea
-        ? "The selected area is outside the Gothenburg municipality."
+        ? `The selected area is outside ${coverageName}.`
         : addrPts.length > 1
-          ? `${outside.length} of ${addrPts.length} addresses are outside the Gothenburg municipality.`
-          : "This address is outside the Gothenburg municipality.";
+          ? `${outside.length} of ${addrPts.length} addresses are outside ${coverageName}.`
+          : `This address is outside ${coverageName}.`;
       onLocationValidityChange?.(false, msg);
     } else {
       onLocationValidityChange?.(true, null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geoPoints, bbox, polyVerts, polyDone, boundary, isGothenburg]);
+  }, [geoPoints, bbox, polyVerts, polyDone, boundary, coverageUrl, coverageName]);
 
   /* Street / area search → select every building inside the feature's bounds.
      Nominatim returns a boundingbox for each hit: for "Jättestensgatan" that is

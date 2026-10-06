@@ -1875,6 +1875,547 @@ practical way to see whether the address join lands on the right buildings.
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# BELGIUM — tab content for DATA_SOURCES / COVERAGE / PIPELINES below
+# ─────────────────────────────────────────────────────────────────────────────
+# Belgium is the third country chain, started 2026-09-28. It differs from both
+# of the others in one decisive way: there is no open per-building certificate
+# anywhere in the country, so the Swedish geometric join and the UK address join
+# both have nothing to join to. Every energy figure for a Belgian building is
+# therefore modelled, never measured.
+BE_DATA = {
+    "title": "Belgium · Data Sources",
+    "stage": "raw",
+    "code_refs": "inline",
+    "purpose": """
+One card per dataset the Belgian track uses. Belgium is federal, and that shows
+in the data: each of the three regions keeps **its own building register** under
+its own licence, so the footprint source changes with the city — UrbIS in
+Brussels, the GRB in Flanders, the PICC in Wallonia. There is no national one.
+
+The decisive difference from Sweden and the UK: **no region publishes open
+per-building energy certificates**, so `has_epc` is false for every Belgian
+building and no energy class is shown. What stands in for it is on the Belgium
+tab of **2. Coverage & Quality**; the method is on the Belgium tab of
+**3. Pipelines**.
+
+Counts were read from the served payloads on 2026-10-02; "our copy last updated"
+is read from disk each time this page loads.
+""",
+    "overview": {
+        "title": "What is built",
+        "subtitle": "Three cities, three regions, three registers — 27,685 buildings.",
+        "items": [
+            ("Brussels", "Saint-Gilles / Ixelles (5,839 buildings) and Schaerbeek (5,723), from UrbIS."),
+            ("Liège", "Centre / Outremeuse (6,666) and Saint-Léonard (5,362), from the PICC — the only region with open certificate microdata."),
+            ("Gent", "Gent centrum (4,095), from the GRB. Built, but hidden in the app."),
+            ("No certificates", "Not one of the 27,685 buildings carries an energy class. This is a property of Belgian open data, not of the pipeline."),
+        ],
+    },
+    "sections": [
+        {
+            "title": "Building footprints — UrbIS (Brussels-Capital)",
+            "dataset": {
+                "publisher": "paradigm.brussels — UrbIS Buildings and Addresses",
+                "link": "https://datastore.brussels/",
+                "access": "Fetched & cached",
+                "connection": " The pipeline reads the UrbIS **WFS** for footprints and address points, and the Buildings3D SHP tiles from the ATOM feed for heights. GeoServer paging needs `sortBy`, or pages repeat. No key.",
+                "format": "WFS (GML/JSON) + SHP tiles",
+                "source_version": "Continuously maintained by the region; no version numbers.",
+                "source_short": "continuous",
+                "local": ["data/be_raw"],
+                "refresh": "Only when the pipeline is re-run for a district.",
+                "stored_as": "One static payload per district, `frontend/public/be/buildings_<id>.json`, mirrored to `assets/be/`.",
+                "stage": "raw",
+                "stage_note": "**CC0** — the most permissive of the three regional registers.",
+                "used_in": ["3D viewer — Belgian districts", "Steps 1–4 for Belgian buildings"],
+                "processed_by": ["tools/be/be_data_pipeline.py", "tools/be/ingest_urbis3d.py", "tools/be/cities.py"],
+            },
+        },
+        {
+            "title": "Building footprints and heights — PICC and LoD1 (Wallonia)",
+            "dataset": {
+                "publisher": "Service public de Wallonie (SPW) — PICC building footprints and Bâtiments 3D LoD1",
+                "link": "https://geoportail.wallonie.be/",
+                "access": "Fetched & cached",
+                "connection": " INSPIRE WFS at `geoservices.wallonie.be/geoserver/inspire_bu` — layer `BU.Building_building_emprise` for footprints, `BU.Building_building_lod1` for heights. The two share a UUID, which is how a height is matched to its footprint. No key.",
+                "format": "WFS (GML)",
+                "source_version": "Footprints maintained continuously; the LoD1 heights come from the **2013–14 LiDAR survey** and have not been reflown.",
+                "source_short": "LiDAR 2013–14",
+                "local": ["data/be_raw"],
+                "refresh": "Only when the pipeline is re-run.",
+                "stored_as": "Static district payloads, as above.",
+                "stage": "raw",
+                "stage_note": "**CC BY 4.0.** `gml_description` carries a building class (Habitation, Annexe, Scolaire…) which is the only direct use statement in any of the three registers.",
+                "used_in": ["3D viewer — Liège", "Steps 1–4 for Walloon buildings"],
+                "processed_by": ["tools/be/be_data_pipeline.py", "tools/be/cities.py"],
+            },
+            "body": """
+**The heights read high.** The LoD1 value is the roof *top*, and it comes out
+5–7 m above 3.1 × the OSM storey count — on flat roofs as well as pitched ones,
+so it is not simply a ridge. From a 299-building comparison the pipeline derives
+floors as **(h − 5) / 3.3** and a volume height of **h − 2.5**, keeping the raw
+value as the ridge. Those two constants are the correction, and they are the
+least evidenced numbers in the Belgian chain.
+""",
+        },
+        {
+            "title": "Building footprints — GRB (Flanders)",
+            "dataset": {
+                "publisher": "Digitaal Vlaanderen — GRB *Gebouw aan de grond* and *Adres*",
+                "link": "https://www.vlaanderen.be/digitaal-vlaanderen/",
+                "access": "Fetched & cached",
+                "connection": " GRB WFS for footprints and address points. No key.",
+                "format": "WFS",
+                "source_version": "Continuously maintained.",
+                "source_short": "continuous",
+                "local": ["data/be_raw"],
+                "refresh": "Only when the pipeline is re-run.",
+                "stored_as": "`frontend/public/be/buildings_gent_centrum.json` — built, but not offered in the app.",
+                "stage": "raw",
+                "stage_note": "**Modellicentie Gratis Hergebruik.** No 3D product is ingested for Flanders, which is why 94% of Gent's heights are defaults.",
+                "used_in": ["Built and served, but Gent is hidden in the city picker"],
+                "processed_by": ["tools/be/be_data_pipeline.py"],
+            },
+        },
+        {
+            "title": "Addresses — BeST (Wallonia)",
+            "dataset": {
+                "publisher": "BOSA — BeST / openaddress-bewal",
+                "link": "https://opendata.bosa.be/",
+                "access": "Downloaded once",
+                "connection": " A zip of Walloon address points. Used in preference to the ICAR WFS, which carries street **ids** but not street names.",
+                "format": "Zipped CSV",
+                "source_version": "Periodic releases from BOSA.",
+                "source_short": "periodic",
+                "local": ["data/be_raw"],
+                "refresh": "Manual re-download.",
+                "stored_as": "Points matched into the district payloads — address, postcode and a dwelling estimate from box numbers.",
+                "stage": "raw",
+                "stage_note": "**CC BY 4.0** for the Walloon extract. Matched point-in-polygon, then nearest within 5 m.",
+                "used_in": ["Address search in Step 1", "Dwelling counts behind the archetype choice"],
+                "processed_by": ["tools/be/be_data_pipeline.py"],
+            },
+        },
+        {
+            "title": "Energy certificates — Wallonia only (and not per building)",
+            "dataset": {
+                "publisher": "Open Data Wallonie-Bruxelles (ODWB) — *PEB — certification résidentielle — bâtiment existant*",
+                "link": "https://www.odwb.be/",
+                "access": "Downloaded once",
+                "connection": " A single JSON export of **874,605 certificates**, read by `tools/be/ingest_peb_wallonia.py`. The API also answers anonymously.",
+                "format": "JSON",
+                "source_version": "Certificates dated 2010–2026; the file is a point-in-time export.",
+                "source_short": "874,605 certs, 2010–2026",
+                "local": ["frontend/public/be/peb_wallonia_stats.json"],
+                "refresh": "Manual re-export from ODWB.",
+                "stored_as": "**Not** per building. Summarised into grouped statistics — `frontend/public/be/peb_wallonia_stats.json`, 261 municipalities plus a Wallonia-wide group.",
+                "stage": "reference",
+                "stage_note": "A **reference distribution**, not a measurement of any particular building — the certificates carry no address or coordinate.",
+                "used_in": ["Walloon buildings, as a plausibility reference for modelled energy"],
+                "processed_by": ["tools/be/ingest_peb_wallonia.py", "tools/be/be_data_pipeline.py"],
+            },
+            "body": """
+This is the **only** free per-certificate microdata in Belgium, and it is worth
+being precise about what it can and cannot do.
+
+**What it carries:** one row per certificate with specific primary energy
+(`E_spec`), label, dwelling type, number of free façades, construction period,
+heating device and heated floor area.
+
+**What it does not carry:** any address or coordinate. The finest location is
+the **municipality**. So a certificate can never be matched to a building — not
+by a weaker method, not with more effort. The data simply does not contain the
+link.
+
+**What is done instead:** each Walloon building is linked to the certificates of
+*similar dwellings in its own municipality* — same dwelling type, same number of
+free façades — and carries their median and quartiles. For Liège (NIS 62063)
+that is 37 groups out of 71,000 certificates, for example 14,675 terraced houses
+with a median of 376 kWh/m²·yr (IQR 286–477) and 47,728 apartments at 276
+(IQR 187–417). Groups below ten certificates are dropped.
+
+> **Do not read these as the building's own performance.** `E_spec` is *primary*
+> energy from an asset rating under standardised use — it is not metered, and it
+> is not the delivered energy the tool's own simulation produces. The two are
+> not directly comparable, and the logbook does not present them as such.
+""",
+        },
+        {
+            "title": "Construction period — Statbel building stock",
+            "dataset": {
+                "publisher": "Statbel — building stock by municipality, building type and construction class",
+                "link": "https://statbel.fgov.be/",
+                "access": "Downloaded once",
+                "connection": " A national table, ingested once by `tools/be/ingest_statbel.py`.",
+                "format": "CSV → JSON",
+                "source_version": "Annual statistics.",
+                "source_short": "annual",
+                "local": ["frontend/public/be/statbel_building_stock.json"],
+                "refresh": "Manual.",
+                "stored_as": "`frontend/public/be/statbel_building_stock.json` (0.8 MB).",
+                "stage": "reference",
+                "stage_note": "**CC BY 4.0.** This is a *prior*, not a record: a building's year is **sampled** from the municipality's distribution, never looked up.",
+                "used_in": ["The construction year of almost every Belgian building", "Choosing the TABULA period"],
+                "processed_by": ["tools/be/ingest_statbel.py", "tools/be/be_data_pipeline.py"],
+            },
+        },
+        {
+            "title": "Archetypes — TABULA BE",
+            "dataset": {
+                "publisher": "EPISCOPE / TABULA, Belgian typology by VITO",
+                "link": "https://episcope.eu/building-typology/",
+                "access": "Downloaded once",
+                "connection": " Read out of the EPISCOPE `tabula-calculator.xlsx` by `tools/be/ingest_tabula.py`.",
+                "format": "XLSX → JSON",
+                "source_version": "Frozen with the EPISCOPE project; a national typology, not regional.",
+                "source_short": "frozen",
+                "local": ["frontend/public/be/tabula_be.json"],
+                "refresh": "Never — the source is closed.",
+                "stored_as": "`frontend/public/be/tabula_be.json` — 35 `BE.N` archetypes with refurbishment tiers 001 / 002 / 003.",
+                "stage": "reference",
+                "stage_note": "Supplies every U-value for every Belgian building. There is no measured alternative.",
+                "used_in": ["Baseline U-values in Step 3", "The renovation tiers in Step 4"],
+                "processed_by": ["tools/be/ingest_tabula.py"],
+            },
+            "body": """
+**One source quirk worth knowing.** The tier descriptions read "new build in
+20xx" with years that do not line up with the tiers. That is a fill-down
+artefact in the source spreadsheet, not a statement about the archetype — the
+tiers themselves are the standard TABULA 001 / 002 / 003 refurbishment levels.
+""",
+        },
+        {
+            "title": "Use and tags — OpenStreetMap",
+            "dataset": {
+                "publisher": "OpenStreetMap contributors, through Overpass",
+                "link": "https://www.openstreetmap.org/",
+                "access": "Fetched & cached",
+                "connection": " Three Overpass mirrors are tried in turn. Supplies building use where an OSM building overlaps a register footprint, occasionally a construction year, and heights for Gent.",
+                "format": "JSON (Overpass)",
+                "source_version": "Edited continuously.",
+                "source_short": "continuous",
+                "local": ["data/be_raw"],
+                "refresh": "Only when the pipeline is re-run with its cache cleared.",
+                "stored_as": "Merged into the district payloads; `use_source` records where each use came from.",
+                "stage": "raw",
+                "stage_note": "**ODbL.** In Liège OSM is the second opinion behind the PICC class; in Brussels and Gent it is a main source of use.",
+                "used_in": ["Building use, and therefore the archetype and the gains assumptions"],
+                "processed_by": ["tools/be/be_data_pipeline.py"],
+            },
+        },
+        {
+            "title": "What is deliberately absent",
+            "badge": "metadata",
+            "body": """
+Three things the other two countries have, and Belgium does not. Each is a
+property of what is published, not an unfinished job.
+
+| Missing | Why | What the tool does instead |
+|---|---|---|
+| **Per-building energy certificates** | Flanders (VEKA) and Brussels publish per-address lookups only — a form with a captcha, not a dataset. Bulk access needs a signed research agreement with the region. | Nothing: `has_epc` is false, no class is shown. Walloon buildings carry a municipal reference distribution instead. |
+| **Cost data** | Belgian construction-cost references are commercial (ASPEN, ABEX). | Step 4 shows "—" for cost on Belgian buildings. |
+| **Carbon factors** | TOTEM is ecoinvent-based and not redistributable; the ECO Portal forbids redistribution; the EF 3.1 licences expired at the end of 2025. | Step 4 and the Step 5 report show "—" for CO₂e on Belgian buildings. |
+
+The energy side is complete and the economic side is empty — which is a
+deliberate, visible gap rather than a plausible-looking placeholder.
+""",
+            "files": ["tools/be/be_data_pipeline.py"],
+        },
+    ],
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+BE_COVERAGE = {
+    "title": "Belgium · Coverage & Quality",
+    "stage": "metadata",
+    "code_refs": "inline",
+    "purpose": """
+What the Belgian model knows about its buildings, for how many, and — more
+sharply than for either other country — **how much of it is modelled rather
+than observed**. Every figure below was counted from the payloads the tool
+serves (`frontend/public/be/buildings_<id>.json`) on 2026-10-02.
+
+Belgian coverage is **not comparable with Sweden's or the UK's**. Both of those
+report how many buildings have a real certificate. Here the answer is zero, by
+construction, so the honest measure is a different one: how much of each field
+comes from a register, and how much from a prior.
+""",
+    "overview": {
+        "title": "In four lines",
+        "subtitle": "Five districts — 27,685 buildings.",
+        "items": [
+            ("Energy class", "**Zero** buildings, in all five districts. No open per-building certificate exists in any Belgian region."),
+            ("Geometry", "Register footprints for all of them; real 3D heights for 94–97% in Brussels and Liège, but only 6% in Gent."),
+            ("Construction year", "Sampled from a municipal distribution for 99–100% of buildings. Fewer than 1% have a year from a source that names the building."),
+            ("Archetype", "60–89% carry a TABULA type. The gap is annexes and non-residential buildings, which have no archetype to match."),
+        ],
+    },
+    "sections": [
+        {
+            "title": "What is covered — field by field",
+            "body": """
+Counted per district from the served payloads, 2026-10-02.
+
+| Field | Saint-Gilles | Schaerbeek | Liège Centre | Saint-Léonard | Gent |
+|---|---|---|---|---|---|
+| Buildings | 5,839 | 5,723 | 6,666 | 5,362 | 4,095 |
+| Footprint, height, floors, use | 100% | 100% | 100% | 100% | 100% |
+| **Energy class** | **0** | **0** | **0** | **0** | **0** |
+| Height from a 3D register | 95% | 97% | 94% | 86% | **0%** |
+| Address matched | 89% | — | 57% | — | — |
+| TABULA archetype | 89% | 86% | 60% | 57% | 87% |
+| Party walls detected | 98% | 97% | 99% | 96% | 97% |
+
+**Why Liège's archetype coverage is lower.** The PICC labels 39–51% of its
+footprints *Annexe* — back extensions, garages and sheds. They are real
+buildings and they are kept, because they carry party walls that matter for the
+neighbouring house, but they are not dwellings and get no archetype. Brussels'
+UrbIS does not separate annexes the same way, so its percentage looks higher
+without the stock being different.
+""",
+        },
+        {
+            "title": "What is missing — and why",
+            "body": """
+**Energy certificates — every building, every district.**
+This is the single defining limitation of the Belgian track, so it is worth
+stating precisely rather than as "no data". Per-building certificates *exist* in
+all three regions; none is *published as data*:
+
+- **Flanders** — VEKA's "Zoek een EPC" is a per-address lookup, now
+  discontinued. VEKA's open data are EPB declarations with no address.
+- **Brussels** — the PEB registry is a captcha-protected per-address lookup.
+- **Wallonia** — 874,605 certificates *are* published, openly and usably, but
+  with the municipality as the finest location. No address, no coordinate.
+
+Bulk per-building access needs a signed research protocol with the region
+(precedents exist: VEKA–NBB 2024, VEKA–AOE 2023). That is a request that has
+been drafted but not sent, not a technical obstacle.
+
+**Construction year.** 99–100% of years are *sampled* from Statbel's building
+stock for the municipality and building type. This gives a defensible age
+distribution for a district and an unreliable year for any single building — so
+a Belgian building's period, and therefore its archetype and U-values, should be
+read as a stock-level statement. Between 1 and 55 buildings per district have a
+year from OSM instead.
+
+**Heights in Gent.** Flanders publishes a 3D GRB product that is not ingested,
+so 94% of Gent's heights are defaults by use and 5% come from OSM storey counts.
+That is the main reason Gent is built but hidden.
+
+**Use type.** No register states use directly except the PICC. Brussels infers
+it from the number of addresses in a building (75–84%), then OSM, then footprint
+size. Gent is 77% OSM.
+""",
+        },
+        {
+            "title": "What stands in for a certificate",
+            "badge": "reference",
+            "body": """
+For Wallonia only, a building carries the certificate statistics of **similar
+dwellings in its own municipality** — same dwelling type, same number of free
+façades — from the 874,605-certificate ODWB export. For Liège that is 37 groups;
+the two largest are:
+
+| Group | Certificates | Median E_spec | IQR |
+|---|---|---|---|
+| Terraced single-family house | 14,675 | 376 kWh/m²·yr | 286–477 |
+| Apartment | 47,728 | 276 kWh/m²·yr | 187–417 |
+
+**Three cautions, in order of importance.**
+
+1. **It is not this building.** It is the distribution for buildings like it in
+   the same municipality. A single building's own performance can sit anywhere
+   in that range, and the IQRs above are wide — roughly a factor of 1.7.
+2. **It is primary energy, from an asset rating.** `E_spec` assumes standardised
+   use and applies primary-energy factors. The tool's own simulation produces
+   delivered energy for the modelled building. **The two numbers are not on the
+   same basis and must not be differenced.**
+3. **The period-specific figure is weaker still**, because the building's own
+   period is itself sampled from Statbel.
+
+Used as a plausibility check on the modelled stock, it is informative. Used as a
+per-building baseline, it would be wrong.
+""",
+        },
+        {
+            "title": "Limitations",
+            "body": """
+- **No measured energy anywhere in the Belgian model.** Every kWh is modelled
+  from a TABULA archetype over a sampled construction year.
+- **Construction year is a sample, not a record** — for 99–100% of buildings.
+- **Walloon heights come from a 2013–14 LiDAR survey** and read 5–7 m above
+  storey-count estimates; the correction `(h − 5) / 3.3` is fitted on 299
+  buildings and is the least evidenced constant in the chain.
+- **Gent has no 3D heights at all** — 94% are defaults by use.
+- **A large single-address town house may really be flats** with no box numbers,
+  which makes the dwelling estimate — and therefore the archetype — too low.
+- **TABULA BE is a national typology**, applied unchanged across three regions
+  with quite different building traditions.
+- **No cost and no carbon data**, so Step 4 and the Step 5 report show "—" for
+  both on Belgian buildings.
+- **Simulation defaults are generic** — the shoebox still uses the Swedish
+  setpoints, infiltration and Sveby hot-water intensity (**6. Energy Simulation
+  - EPSM & IDF**). There is no Belgian calibration yet.
+- **The served payloads are one rebuild behind the code** — see the note at the
+  end of the Belgium tab of **3. Pipelines**.
+""",
+        },
+    ],
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+BELGIUM_PIPELINE = {
+    "title": "Belgium Pipeline",
+    "stage": "interim",
+    "code_refs": "inline",
+    "purpose": """
+How a Belgian district becomes a payload the viewer and the wizard can read. The
+output has the **same shape** as the UK's, deliberately, so the viewer, backend
+and simulation need no new schema — what changes is where each field comes from.
+
+Four ingest scripts prepare the national reference data once; one pipeline
+script then builds a district at a time.
+""",
+    "overview": {
+        "title": "The chain, in run order",
+        "subtitle": "The first four are run once; the last is run per district.",
+        "items": [
+            ("ingest_tabula.py", "EPISCOPE's calculator spreadsheet → 35 BE.N archetypes with refurbishment tiers."),
+            ("ingest_statbel.py", "National building stock per municipality × type × construction class — the year prior."),
+            ("ingest_urbis3d.py", "Brussels Buildings3D tiles → a height per building."),
+            ("ingest_peb_wallonia.py", "874,605 Walloon certificates → grouped statistics per municipality."),
+            ("be_data_pipeline.py", "Per district: footprints, addresses, OSM tags, party walls, year, archetype → one JSON payload."),
+        ],
+    },
+    "sections": [
+        {
+            "title": "Step by step — what the pipeline does per district",
+            "body": """
+1. **Fetch the footprints** from the region's own register — UrbIS WFS for
+   Brussels, GRB WFS for Flanders, the INSPIRE `BU.Building_building_emprise`
+   layer for Wallonia. GeoServer paging needs `sortBy`, or pages silently
+   repeat.
+2. **Attach a height.** Brussels uses the ingested Buildings3D value; Wallonia
+   joins `BU.Building_building_lod1` on the shared UUID; otherwise OSM height,
+   then OSM storeys, then a default by use. `height_source` records which, for
+   every building.
+3. **Attach addresses** — UrbIS Addresses, GRB Adres, or BeST for Wallonia.
+   Point-in-polygon first, then nearest within 5 m. House and box numbers give
+   `dwellings_est`, and in Brussels also a CaPaKey and statistical sector.
+4. **Overlay OpenStreetMap** for building use and the occasional construction
+   year.
+5. **Detect party walls.** Footprint edges that touch a neighbour become
+   adiabatic walls in the energy model. The registers are topologically clean,
+   so terraces share exact edges — this is reliable in a way it would not be on
+   OSM geometry. Walloon *annexes* keep their party walls but are **excluded
+   from the neighbour count** used to pick the archetype, so a back extension
+   does not turn a terraced house into a mid-terrace.
+6. **Sample a construction year** from Statbel's stock for that municipality and
+   building type, unless OSM supplied one (`year_source`).
+7. **Choose a TABULA archetype** from the number of attached walls and the
+   dwelling count — detached / semi / terraced, house or apartment block — and
+   the period from the year.
+8. **Link Walloon certificate statistics** (below).
+9. **Write the payload** to `frontend/public/be/` and `assets/be/`.
+""",
+            "files": ["tools/be/be_data_pipeline.py", "tools/be/cities.py"],
+        },
+        {
+            "title": "How Walloon certificates are linked — and why not matched",
+            "body": """
+`PebLink` in `tools/be/be_data_pipeline.py` looks up a group key built from the
+building's own attributes:
+
+```
+<dwelling type> | <free façades> | <period>
+```
+
+- **Dwelling type** — `SINGLE_FAMILY_HOUSE` or `APARTMENT`, from `use_cat`.
+- **Free façades** — from the attached-neighbour count: 0 neighbours →
+  `DETACHED`, 1 → `THREE_FREE`, otherwise `TWO_FREE`. Apartments have no façade
+  split in the certificates, so theirs is always `*`.
+- **Period** — the TABULA period code, which for almost every building comes
+  from the *sampled* year.
+
+The lookup falls back in a fixed order: the building's own municipality → the
+district's municipality → Wallonia as a whole, and within each, the exact façade
+group → any façade count. Groups with fewer than ten certificates are dropped
+at ingest, so a median is never taken over a handful of rows.
+
+**This is a join on building characteristics, not on identity.** The certificates
+have no address — the strongest possible version of this link is still a
+distribution, and the code names its fields accordingly (`peb_ref_*`, "ref" for
+reference).
+""",
+            "files": ["tools/be/ingest_peb_wallonia.py", "tools/be/be_data_pipeline.py"],
+        },
+        {
+            "title": "Where the output goes",
+            "body": """
+| What | Where |
+|---|---|
+| District payloads | `frontend/public/be/buildings_<id>.json`, mirrored to `assets/be/` |
+| City index | `frontend/public/be/cities.json` — country `be`, with per-district counts and source attributions |
+| Archetypes | `frontend/public/be/tabula_be.json` |
+| Year prior | `frontend/public/be/statbel_building_stock.json` |
+| Certificate statistics | `frontend/public/be/peb_wallonia_stats.json` (1.85 MB) |
+| Backend routes | `/api/be/cities`, `/api/be/tabula`, `/api/be/statbel`, `/api/be/buildings/{id}`, `/api/be/building` |
+| Weather | Brussels → Uccle TMYx; Liège → `BEL_WAL_Liege.AP.064780_TMYx.2011-2025` |
+| 3D viewer | `tools/be/build_be_viewer.py` derives `assets/be_3d.*` from the built UK viewer; served at `/be_3d.html`, route `/viewer/be` |
+
+The backend generalised its UK helpers rather than copying them: `_district_cc()`
+takes a country code that defaults to `gb`, and the bbox, simulation, batch,
+analysis and Street View routes all accept `country=be`.
+""",
+            "files": ["backend/main.py", "tools/be/build_be_viewer.py"],
+        },
+        {
+            "title": "Rebuild in progress — the code is ahead of the payloads",
+            "badge": "interim",
+            "body": """
+Checked on 2026-10-02, and worth knowing before quoting any Liège figure.
+
+**Liège is being redefined from two districts to one municipality.**
+`tools/be/cities.py` now describes a single area, `liege`, covering the **whole
+municipality** with its boundary taken from OSM — the reasoning being that the
+Walloon certificates are published per municipality, so the model area should
+match the data's own scale. The payloads on disk are still the previous two
+district files, `buildings_liege_centre.json` (6,666) and
+`buildings_liege_saint_leonard.json` (5,362), built 2026-09-29. **The counts on
+the Belgium tab of Coverage & Quality describe those two files**, which the app
+is serving today.
+
+**The certificate link is in the code but not yet in the payloads.**
+`PebLink` and `ingest_peb_wallonia.py` were added on 2026-09-30, after the Liège
+payloads were built. `peb_wallonia_stats.json` exists and is complete, but no
+`peb_ref_*` field appears in any served building record yet. They will appear on
+the next rebuild.
+
+**`coverage_liege.geojson` is present but empty** — zero features. It appears
+to be the start of the municipality-wide build rather than a finished artefact.
+
+Re-run `tools/be/be_data_pipeline.py` and these three resolve together; this
+page should then be re-checked against the new payloads.
+""",
+            "files": ["tools/be/cities.py", "tools/be/be_data_pipeline.py"],
+        },
+        {
+            "title": "What is not done yet",
+            "body": """
+| Open item | Why it matters |
+|---|---|
+| Belgian simulation defaults | The shoebox still uses Swedish setpoints, infiltration and hot-water intensity. Nothing in the model is Belgian except the geometry, the archetype and the weather file. |
+| Calibration against the Walloon certificates | The reference distributions exist; comparing them to modelled output needs the primary-vs-delivered energy conversion to be settled first. |
+| Belgian cost and carbon | Both blocked on licensing, not on effort — see **Belgium · Data Sources**. |
+| Gent 3D heights | The 3D GRB product is published; ingesting it is what would let Gent be shown. |
+| Flemish / Brussels certificate access | A research agreement with VEKA or Bruxelles Environnement is the only route to per-building certificates. |
+""",
+        },
+    ],
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 DIGITAL_TWIN = {
     "number": 5,
     "title": "Digital Twin Construction",
@@ -5648,11 +6189,13 @@ DATA_SOURCES = {
     "purpose": """
 Where every dataset in the tool comes from, how the tool is connected to it,
 how up to date it is, how it is stored and where it is used - one card per
-dataset. Sweden and the United Kingdom draw on almost entirely different
-sources, so each has its own tab. Services and keys shared by both are on
+dataset. The three countries draw on almost entirely different sources, so each
+has its own tab. Belgium is the sharpest case: it is federal, so even its
+building register changes with the region, and no region publishes open
+per-building certificates at all. Services and keys shared by all three are on
 **14. Services, Keys & Access**.
 """,
-    "tabs": [("Sweden", SE_DATA), ("United Kingdom", UK_DATA)],
+    "tabs": [("Sweden", SE_DATA), ("United Kingdom", UK_DATA), ("Belgium", BE_DATA)],
 }
 
 COVERAGE = {
@@ -5662,13 +6205,14 @@ COVERAGE = {
     "purpose": """
 How far each country's numbers can be trusted: what exactly is covered and for
 how many buildings, what is missing and why, what the tool falls back on, how
-old the records are, and the limitations. Read this
-before quoting a number outside the project - and note that Swedish and UK
-coverage figures are **not comparable**: Sweden matches certificates to
-buildings geometrically, the UK by address. Where each dataset comes from is on
+old the records are, and the limitations. Read this before quoting a number
+outside the project - and note that the three countries' coverage figures are
+**not comparable**: Sweden matches certificates to buildings geometrically, the
+UK by address, and Belgium cannot match them at all, because no Belgian region
+publishes a per-building certificate. Where each dataset comes from is on
 **1. Data Sources**; how it is processed is on **3. Pipelines**.
 """,
-    "tabs": [("Sweden", SE_COVERAGE), ("United Kingdom", UK_COVERAGE)],
+    "tabs": [("Sweden", SE_COVERAGE), ("United Kingdom", UK_COVERAGE), ("Belgium", BE_COVERAGE)],
 }
 
 PIPELINES = {
@@ -5678,11 +6222,13 @@ PIPELINES = {
     "purpose": """
 How each country's raw registers become the building model the viewer and the
 wizard read, step by step - loading, cleaning, matching certificates to
-buildings, and what happens when they do not match. The two chains share almost
-nothing - different geometry source, different certificate join - except the
-output schema, which is why one viewer renders both.
+buildings, and what happens when they do not match. The three chains share
+almost nothing - different geometry source, different certificate join, and in
+Belgium's case no certificate join at all - except the output schema, which is
+why one viewer renders all of them.
 """,
-    "tabs": [("Sweden", SWEDEN_PIPELINE), ("United Kingdom", UK_PIPELINE)],
+    "tabs": [("Sweden", SWEDEN_PIPELINE), ("United Kingdom", UK_PIPELINE),
+             ("Belgium", BELGIUM_PIPELINE)],
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

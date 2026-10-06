@@ -1,4 +1,4 @@
-const VIEWER_BUILD_VERSION = "20260803-scb2";
+const VIEWER_BUILD_VERSION = "20261006-selcard6";
 const PERIOD_CARDS = {};
 const ECLASS_CARDS = {};
 const USE_CARDS = {};

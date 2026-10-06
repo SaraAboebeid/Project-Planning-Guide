@@ -140,8 +140,8 @@ PARTY_TOUCH_M = 0.3
 # ---------------------------------------------------------------------------
 # Fetching
 # ---------------------------------------------------------------------------
-def _overpass(q: str) -> list[dict]:
-    for attempt in range(6):
+def _overpass(q: str, attempts: int = 6) -> list[dict]:
+    for attempt in range(attempts):
         url = OVERPASS_MIRRORS[attempt % len(OVERPASS_MIRRORS)]
         try:
             r = requests.post(url, data={"data": q}, headers=HEADERS, timeout=400)
@@ -193,6 +193,23 @@ out geom;""")
     return geom
 
 
+def write_coverage(city: dict) -> None:
+    """be/coverage_<id>.geojson: the district outline in WGS84, simplified to ~10 m.
+    Step 1's map draws it and keeps selections inside it (backend /api/be/coverage).
+    Only whole-municipality districts get one; circles are drawn from radius_m."""
+    b = city_boundary(city)
+    if b is None:
+        return
+    from shapely.geometry import mapping
+    from shapely.ops import transform
+    wgs = transform(lambda x, y, z=None: TO_WGS.transform(x, y), b.simplify(10))
+    feat = {"type": "Feature", "properties": {"id": city["id"], "name": city["name"], "district": city["district"]},
+            "geometry": mapping(wgs)}
+    for out_dir in OUT_DIRS:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / f"coverage_{city['id']}.geojson").write_text(json.dumps(feat, ensure_ascii=False), encoding="utf-8")
+
+
 def _bbox_l72(city: dict) -> tuple[float, float, float, float]:
     b = city_boundary(city)
     if b is not None:
@@ -203,10 +220,30 @@ def _bbox_l72(city: dict) -> tuple[float, float, float, float]:
     return x - r, y - r, x + r, y + r
 
 
+# The INSPIRE BU features carry ~40 mostly-empty attributes each; a whole
+# municipality cached verbatim is ~700 MB. Only these are read.
+PICC_KEEP = ("gml_description", "inspireid_localid", "heightaboveground")
+
+
+def _slim(city: dict, feats: list[dict], layer: str = "") -> list[dict]:
+    if city["source"] != "picc":
+        return feats
+    # LoD1 is only read for its height (joined to the footprint by id), so its
+    # 3D geometry - most of a ~600 MB municipality cache - is not kept.
+    return [{"geometry": None if layer == "lod1" else f["geometry"],
+             "properties": {k: f["properties"].get(k) for k in PICC_KEEP if f["properties"].get(k) is not None}}
+            for f in feats]
+
+
 def fetch_wfs(city: dict, layer: str, refresh: bool) -> list[dict]:
     cache = RAW_DIR / f"{city['source']}_{city['id']}_{layer}.json"
     if cache.exists() and not refresh:
-        return json.loads(cache.read_text(encoding="utf-8"))
+        feats = json.loads(cache.read_text(encoding="utf-8"))
+        if city["source"] == "picc" and feats and (len(feats[0]["properties"]) > len(PICC_KEEP)
+                                                   or (layer == "lod1" and feats[0].get("geometry"))):
+            feats = _slim(city, feats, layer)  # older verbose cache: rewrite once
+            cache.write_text(json.dumps(feats), encoding="utf-8")
+        return feats
     src = WFS[city["source"]]
     x0, y0, x1, y1 = _bbox_l72(city)
     feats, start, page = [], 0, 5000
@@ -234,6 +271,7 @@ def fetch_wfs(city: dict, layer: str, refresh: bool) -> list[dict]:
             break
         start += page
     RAW_DIR.mkdir(parents=True, exist_ok=True)
+    feats = _slim(city, feats, layer)
     cache.write_text(json.dumps(feats), encoding="utf-8")
     print(f"    {len(feats):,} features -> {cache.name}")
     return feats
@@ -311,9 +349,12 @@ out geom;"""
     else:
         # A whole municipality in one query times out on the public servers:
         # fetch it in ~2 km tiles and de-duplicate ways that straddle a tile edge.
+        # OSM is only a refinement where the register already classifies every
+        # building (PICC), so a tile the busy servers refuse is skipped, not fatal;
+        # the cache is only written when every tile arrived, so a re-run retries.
         x0, y0, x1, y1 = _bbox_l72(city)
         nx, ny = max(1, math.ceil((x1 - x0) / 2000)), max(1, math.ceil((y1 - y0) / 2000))
-        seen, els = set(), []
+        seen, els, failed = set(), [], 0
         print(f"  Overpass (OSM building tags) in {nx * ny} tiles ...")
         for i in range(nx):
             for j in range(ny):
@@ -322,13 +363,21 @@ out geom;"""
                 w, s = TO_WGS.transform(ax, ay)
                 e, n = TO_WGS.transform(bx, by)
                 bb = f"{s:.6f},{w:.6f},{n:.6f},{e:.6f}"
-                for el in _overpass(f"""[out:json][timeout:240];
+                try:
+                    tile = _overpass(f"""[out:json][timeout:240];
 (way["building"]({bb}); relation["building"]["type"="multipolygon"]({bb}););
-out geom;"""):
+out geom;""", attempts=3)
+                except SystemExit:
+                    failed += 1
+                    continue
+                for el in tile:
                     key = (el.get("type"), el.get("id"))
                     if key not in seen:
                         seen.add(key)
                         els.append(el)
+        if failed:
+            print(f"    {failed}/{nx * ny} tiles refused - continuing without their OSM tags (not cached)")
+            return els
     cache.write_text(json.dumps(els), encoding="utf-8")
     print(f"    {len(els):,} OSM buildings -> {cache.name}")
     return els
@@ -453,15 +502,28 @@ class PebLink:
         return {}
 
 
+def _compact(r: dict) -> dict:
+    """Whole-municipality payloads (~130k buildings) are mostly repeated keys:
+    drop null fields (every consumer reads with .get() / != null), round the
+    outline to 6 dp (~0.1 m) and strip the constant PICC id prefix. ~160 -> ~120 MB."""
+    out = {k: v for k, v in r.items() if v is not None}
+    out["coordinates"] = [[[round(x, 6), round(y, 6)] for x, y in ring] for ring in r["coordinates"]]
+    if out.get("party_wall_midpoints"):
+        out["party_wall_midpoints"] = [[round(x, 6), round(y, 6)] for x, y in r["party_wall_midpoints"]]
+    if isinstance(out.get("register_id"), str):
+        out["register_id"] = out["register_id"].removeprefix("BE.WL.GEOREF.")
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Build one district
 # ---------------------------------------------------------------------------
-def build_city(city: dict, refresh: bool = False) -> dict:
+def build_city(city: dict, refresh: bool = False, no_osm: bool = False) -> dict:
     print(f"\n== {city['id']} ({city['district']}) ==")
     src = city["source"]
     bfeats = fetch_wfs(city, "buildings", refresh)
     afeats = fetch_best(city, refresh) if src == "picc" else fetch_wfs(city, "addresses", refresh)
-    osm = fetch_osm(city, refresh)
+    osm = [] if no_osm else fetch_osm(city, refresh)
     statbel = json.loads((OUT_DIRS[0] / "statbel_building_stock.json").read_text(encoding="utf-8"))["municipalities"]
     tabula = TabulaBE()
     heights_path = RAW_DIR / f"heights_{city['id']}.json"
@@ -714,15 +776,18 @@ def build_city(city: dict, refresh: bool = False) -> dict:
         "peb_linked": stats["peb_linked"],
         "data_file": f"be/buildings_{city['id']}.json",
     }
+    if src == "picc":
+        records = [_compact(r) for r in records]
     for out_dir in OUT_DIRS:
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / f"buildings_{city['id']}.json").write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
+    write_coverage(city)
     print(f"  {n:,} buildings -> be/buildings_{city['id']}.json")
     print(f"    residential {summary['residential']:,}  TABULA {stats['tabula_matched']:,}  "
           f"party walls {summary['with_party_walls']:,}  OSM-tagged {len(osm_for):,}")
     print(f"    heights {summary['height_sources']}  year: osm {stats['year_osm']:,}, "
           f"statbel prior {stats['year_statbel_prior']:,}, none {stats['year_None']:,}")
-    print(f"    TABULA types {dict(Counter((r['tabula_code'] or '-')[5:-3] for r in records).most_common(8))}")
+    print(f"    TABULA types {dict(Counter((r.get('tabula_code') or '-')[5:-3] for r in records).most_common(8))}")
     return summary
 
 
@@ -730,9 +795,12 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--city", help="build one district only")
     ap.add_argument("--refresh", action="store_true", help="ignore cached WFS/Overpass responses")
+    ap.add_argument("--no-osm", action="store_true",
+                    help="skip OpenStreetMap tags (when Overpass is overloaded); register classes, "
+                         "addresses and LoD1 heights still apply")
     args = ap.parse_args()
     targets = [be_cities.get(args.city)] if args.city else be_cities.CITIES
-    summaries = [build_city(c, refresh=args.refresh) for c in targets]
+    summaries = [build_city(c, refresh=args.refresh, no_osm=args.no_osm) for c in targets]
 
     for out_dir in OUT_DIRS:
         reg = out_dir / "cities.json"

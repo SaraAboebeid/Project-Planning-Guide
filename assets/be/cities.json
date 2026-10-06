@@ -111,17 +111,17 @@
    "data_file": "be/buildings_gent_centrum.json"
   },
   {
-   "id": "liege_centre",
+   "id": "liege",
    "name": "Liège",
-   "district": "Centre / Outremeuse",
+   "district": "Liège (whole municipality)",
    "region": "Wallonia",
    "lat": 50.641,
    "lon": 5.578,
-   "radius_m": 700,
-   "buildings": 6666,
+   "radius_m": 5500,
+   "buildings": 129899,
    "with_epc": 0,
    "estimated_from_ehs": 0,
-   "no_band": 6666,
+   "no_band": 129899,
    "band_distribution": {
     "A": 0,
     "B": 0,
@@ -131,50 +131,17 @@
     "F": 0,
     "G": 0
    },
-   "residential": 3976,
-   "tabula_matched": 3976,
-   "with_party_walls": 6581,
-   "year_from_osm": 25,
+   "residential": 70307,
+   "tabula_matched": 70307,
+   "with_party_walls": 117279,
+   "year_from_osm": 0,
    "height_sources": {
-    "register_3d": 6258,
-    "default_by_use": 388,
-    "osm_levels": 20
+    "register_3d": 114097,
+    "default_by_use": 15802
    },
    "footprint_source": "picc",
-   "data_file": "be/buildings_liege_centre.json"
-  },
-  {
-   "id": "liege_saint_leonard",
-   "name": "Liège",
-   "district": "Saint-Léonard",
-   "region": "Wallonia",
-   "lat": 50.653,
-   "lon": 5.5905,
-   "radius_m": 700,
-   "buildings": 5362,
-   "with_epc": 0,
-   "estimated_from_ehs": 0,
-   "no_band": 5362,
-   "band_distribution": {
-    "A": 0,
-    "B": 0,
-    "C": 0,
-    "D": 0,
-    "E": 0,
-    "F": 0,
-    "G": 0
-   },
-   "residential": 3060,
-   "tabula_matched": 3060,
-   "with_party_walls": 5141,
-   "year_from_osm": 1,
-   "height_sources": {
-    "register_3d": 4609,
-    "default_by_use": 723,
-    "osm_levels": 30
-   },
-   "footprint_source": "picc",
-   "data_file": "be/buildings_liege_saint_leonard.json"
+   "peb_linked": 70307,
+   "data_file": "be/buildings_liege.json"
   }
  ]
 }

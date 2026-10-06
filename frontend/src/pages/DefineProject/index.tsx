@@ -1377,8 +1377,11 @@ export default function DefineProject() {
               style={{ color: "#fca5a5", background: "rgba(226,72,59,0.10)", border: "1px solid rgba(226,72,59,0.35)" }}>
               <span>⚠</span>
               <span>
-                <span className="font-semibold">{locationMsg}</span> This tool currently covers <b>Gothenburg</b> only —
-                pick a location inside the highlighted area to continue.
+                <span className="font-semibold">{locationMsg}</span>{" "}
+                {isBE
+                  ? <>Building data for <b>{project.city}</b> covers only the highlighted area —</>
+                  : <>This tool currently covers <b>Gothenburg</b> only —</>}
+                {" "}pick a location inside the highlighted area to continue.
               </span>
             </div>
           )}

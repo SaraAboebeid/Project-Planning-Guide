@@ -434,6 +434,22 @@ def _get_uk_buildings_list(city_id: str, cc: str = "gb") -> list:
     return _UK_BUILDINGS_CACHE[key]
 
 
+_UK_CENTROID_CACHE: dict[str, list[tuple[float, float]]] = {}
+
+
+def _district_centroids(city_id: str, cc: str = "gb") -> list[tuple[float, float]]:
+    """(lat, lon) centroid per building, aligned with _get_uk_buildings_list.
+    Computed once per district: re-deriving 130k centroids (whole Liège) on
+    every lookup cost ~2.5 s per request."""
+    key = f"{cc}:{city_id}"
+    buildings = _get_uk_buildings_list(city_id, cc)
+    cached = _UK_CENTROID_CACHE.get(key)
+    if cached is None or len(cached) != len(buildings):
+        cached = [_polygon_centroid(b.get("coordinates") or []) for b in buildings]
+        _UK_CENTROID_CACHE[key] = cached
+    return cached
+
+
 def _resolve_uk_city_id(lat: float, lon: float, cc: str = "gb") -> str:
     """Nearest built district (UK or Belgium) to a point, so callers don't need
     their own copy of the district registry - mirrors how Sweden's /api/building
@@ -468,9 +484,12 @@ def _district_building(lat: float, lon: float, city_id: str | None, cc: str) -> 
     buildings = _get_uk_buildings_list(city_id, cc)
 
     candidates: list[tuple[float, dict]] = []
-    for b in buildings:
-        coords = b.get("coordinates") or []
-        c_lat, c_lon = _polygon_centroid(coords)
+    # Cheap degree box (>150 m in any direction at Belgian/UK latitudes) before the
+    # haversine - 130k haversines per lookup was most of a whole-municipality request.
+    dlat, dlon = 0.0015, 0.0015 / max(0.2, math.cos(math.radians(lat)))
+    for b, (c_lat, c_lon) in zip(buildings, _district_centroids(city_id, cc)):
+        if abs(c_lat - lat) > dlat or abs(c_lon - lon) > dlon:
+            continue
         if c_lat == 0.0 and c_lon == 0.0:
             continue
         d = _haversine_m(lat, lon, c_lat, c_lon)
@@ -527,6 +546,33 @@ def be_statbel():
 def be_buildings(city_id: str):
     """Extruded building payload for one Belgian district, same schema as /api/uk/buildings."""
     return _get_uk_buildings_list(city_id, "be")
+
+
+@app.get("/api/be/coverage")
+def be_coverage(city: str = Query(..., description="City name as in the app, e.g. 'Brussels', 'Liège'")):
+    """Outline of the area a Belgian city's buildings cover, for Step 1's map
+    highlight and its "is this address inside?" check. Whole-municipality
+    districts ship their outline (be/coverage_<id>.geojson); circular districts
+    are drawn from their centre and radius."""
+    districts = [c for c in (_read_uk_json("cities.json", "be").get("cities") or []) if c.get("name") == city]
+    if not districts:
+        raise HTTPException(404, f"No built Belgian districts for '{city}'")
+    polys: list = []
+    for d in districts:
+        f = _BE_DIR / f"coverage_{d['id']}.geojson"
+        if f.exists():
+            g = json.loads(f.read_text(encoding="utf-8"))["geometry"]
+            polys += [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
+        else:
+            lat0, lon0, r = d["lat"], d["lon"], d["radius_m"]
+            dlat = r / 111_320.0
+            dlon = r / (111_320.0 * math.cos(math.radians(lat0)))
+            ring = [[round(lon0 + dlon * math.cos(2 * math.pi * k / 64), 6),
+                     round(lat0 + dlat * math.sin(2 * math.pi * k / 64), 6)] for k in range(65)]
+            polys.append([ring])
+    return {"type": "Feature",
+            "properties": {"city": city, "districts": [d["district"] for d in districts]},
+            "geometry": {"type": "MultiPolygon", "coordinates": polys}}
 
 
 @app.get("/api/be/building")
@@ -1212,8 +1258,7 @@ def _uk_bbox_match(north: float, south: float, east: float, west: float, poly, c
     polygon), from the district nearest the bbox centre."""
     city_id = _resolve_uk_city_id((north + south) / 2, (east + west) / 2, cc)
     out = []
-    for b in _get_uk_buildings_list(city_id, cc):
-        c_lat, c_lon = _polygon_centroid(b.get("coordinates") or [])
+    for b, (c_lat, c_lon) in zip(_get_uk_buildings_list(city_id, cc), _district_centroids(city_id, cc)):
         if c_lat == 0.0 and c_lon == 0.0:
             continue
         if south <= c_lat <= north and west <= c_lon <= east:
@@ -3479,15 +3524,17 @@ async def submit_simulation(req: SimulationSubmitRequest):
         # never return one) - re-resolve the real building server-side, same
         # nearest-match logic those endpoints use, so we're not trusting a
         # client-reconstructed building dict for something as physical as geometry.
-        def _dist(b: dict) -> float:
-            c_lat, c_lon = _polygon_centroid(b.get("coordinates") or [])
-            return _haversine_m(req.lat, req.lon, c_lat, c_lon)
-
-        source = _get_uk_buildings_list(city_id, _district_cc(req.country)) if _district_cc(req.country) else _se_buildings(city_id)
-        candidates = [b for b in source if _dist(b) <= 150]
+        cc = _district_cc(req.country)
+        source = _get_uk_buildings_list(city_id, cc) if cc else _se_buildings(city_id)
+        cents = (_district_centroids(city_id, cc) if cc
+                 else [_polygon_centroid(b.get("coordinates") or []) for b in source])
+        dlat, dlon = 0.0015, 0.0015 / max(0.2, math.cos(math.radians(req.lat)))
+        scored = [(_haversine_m(req.lat, req.lon, c[0], c[1]), b) for b, c in zip(source, cents)
+                  if abs(c[0] - req.lat) <= dlat and abs(c[1] - req.lon) <= dlon]
+        candidates = [(d, b) for d, b in scored if d <= 150]
         if not candidates:
             raise HTTPException(404, "No building with real geometry found near this location")
-        building = min(candidates, key=_dist)
+        building = min(candidates, key=lambda t: t[0])[1]
 
     try:
         idf_text = build_shoebox_idf(
@@ -5587,6 +5634,78 @@ def _sv_lookup_footprint(lat: float, lon: float, country: str) -> tuple[list[tup
     if best and _haversine_m(lat, lon, best[1], best[2]) <= 25.0:
         return best[0], best[3]
     return None
+
+
+@app.get("/api/streetview/thumbnail")
+async def streetview_thumbnail(
+    lat: float = Query(..., description="Building centroid latitude"),
+    lon: float = Query(..., description="Building centroid longitude"),
+    height_m: float | None = Query(None, ge=1.0, le=300.0, description="Building height, to tilt the camera up"),
+    width: int = Query(640, ge=200, le=640),
+    height: int = Query(400, ge=150, le=640),
+    walls: str | None = Query(None, description="Fallback targets 'lat,lon;lat,lon' - midpoints of the longest "
+                                                "walls, for blocks whose centre is far from any street"),
+):
+    """One street-level photo of a building for the 3D viewer's selection card.
+
+    Unlike /api/streetview/facade (one specific wall, square-on, refuses oblique
+    shots) this takes the nearest Google outdoor panorama and simply points the
+    camera at the building - a recognisable picture, not a measurement. Returns
+    JSON with the image as base64 plus its capture date for the attribution
+    line. Nothing is stored (Google Street View terms).
+    """
+    import base64, httpx
+    from math import atan2, cos, degrees, radians, sin, sqrt
+
+    key = (os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("STREET_VIEW_API_KEY") or "").strip()
+    if not key:
+        raise HTTPException(503, "Street View not configured (GOOGLE_MAPS_API_KEY / STREET_VIEW_API_KEY).")
+
+    targets = [(lat, lon)]
+    for part in (walls or "").split(";")[:6]:
+        try:
+            a, o = (float(v) for v in part.split(","))
+            targets.append((a, o))
+        except ValueError:
+            continue
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        meta = None
+        # The centre first; a large block's centre can be >60 m from any street,
+        # so then try its longest walls and aim at the one that was found.
+        for t_lat, t_lon in targets:
+            m = (await client.get("https://maps.googleapis.com/maps/api/streetview/metadata", params={
+                "location": f"{t_lat},{t_lon}", "radius": 60, "source": "outdoor", "key": key})).json()
+            # Only Google's own car panoramas: user photospheres are often interiors.
+            if m.get("status") == "OK" and "Google" in (m.get("copyright") or ""):
+                meta, lat, lon = m, t_lat, t_lon
+                break
+        if meta is None:
+            raise HTTPException(404, "No Google street-level panorama within 60 m of this building")
+        p_lat, p_lon = meta["location"]["lat"], meta["location"]["lng"]
+
+        # Bearing and distance from the panorama to the building centroid.
+        y = sin(radians(lon - p_lon)) * cos(radians(lat))
+        x = cos(radians(p_lat)) * sin(radians(lat)) - sin(radians(p_lat)) * cos(radians(lat)) * cos(radians(lon - p_lon))
+        heading = (degrees(atan2(y, x)) + 360.0) % 360.0
+        dist = max(5.0, _haversine_m(p_lat, p_lon, lat, lon))
+        # Tilt toward mid-height (camera ~2.5 m up); widen the view for close buildings.
+        pitch = max(0.0, min(30.0, degrees(atan2((height_m or 12.0) / 2 - 2.5, dist))))
+        fov = 90.0 if dist < 15 else 75.0 if dist < 30 else 60.0 if dist < 50 else 45.0
+
+        img = await client.get("https://maps.googleapis.com/maps/api/streetview", params={
+            "size": f"{width}x{height}", "pano": meta["pano_id"], "heading": round(heading, 1),
+            "pitch": round(pitch, 1), "fov": fov, "key": key})
+        if img.status_code != 200 or not img.headers.get("content-type", "").startswith("image/"):
+            raise HTTPException(502, "Street View image request failed")
+
+    return {
+        "image": "data:image/jpeg;base64," + base64.b64encode(img.content).decode("ascii"),
+        "date": meta.get("date"),
+        "copyright": meta.get("copyright"),
+        "distance_m": round(dist, 1),
+        "heading": round(heading, 1),
+    }
 
 
 @app.get("/api/streetview/facade")
