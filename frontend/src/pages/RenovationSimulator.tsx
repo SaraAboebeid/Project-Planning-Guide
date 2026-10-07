@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, type RenovationCalcPackage, type RenovationCalcBuildingResult, type RenovationCalcSelection } from "../store/wizard";
-import { climateGoalFor, assessAgainstGoal } from "../config/climateGoals";
-import ClimateGoalPanel from "../components/ClimateGoalPanel";
+import { climateGoalFor, assessAgainstGoal, assessRating, isScorable } from "../config/climateGoals";
+import ClimateGoalPanel, { ClimateGoalInfo, ClimateGoalRatingPanel } from "../components/ClimateGoalPanel";
 import DecisionAnalysisPanel from "../components/DecisionAnalysisPanel";
 import HeatingSystemPanel from "../components/HeatingSystemPanel";
 import { ukHvacCatalogue, type UkRetailTariffs } from "../config/hvacSystemsUK";
@@ -29,6 +29,7 @@ import { computeAssemblyCarbon, nearestWikellsAssembly } from "../utils/assembly
 import { parseAssemblyParts } from "../config/materialProperties";
 import type { OptimizeComponentInput, OptimizeParams, OptimizePoint } from "../api/client";
 import type { WikellsItem } from "../config/wikellsData";
+import { catalogueAssembliesFor, catalogueNote, type CatalogueAssembly } from "../config/materialCatalogue";
 import type { BoverketResource, WWRRecord } from "../types";
 import { Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight, Play, Layers, Settings } from "lucide-react";
 
@@ -55,8 +56,19 @@ const COMPONENT_COLORS: Record<string, string> = {
    precision - the unit rates are catalogue averages and the quantities come from
    a shoebox. Show MSEK to one decimal above a million, kSEK above ten thousand,
    and exact SEK only for the per-m2 rates where the digits are real. */
+/* Step 4 keeps every cost in the `costSEK` fields whatever the country, and the
+   page sets the currency they actually hold (SEK, or GBP / EUR from the UK and
+   Belgian catalogues) once per render - see the component body. */
+let MONEY: "SEK" | "GBP" | "EUR" = "SEK";
 function fmtSEK(n: number): string {
   const abs = Math.abs(n);
+  if (MONEY !== "SEK") {
+    const sym = MONEY === "GBP" ? "£" : "€";
+    const loc = MONEY === "GBP" ? "en-GB" : "nl-BE";
+    if (abs >= 1_000_000) return `${sym}${(n / 1_000_000).toFixed(1)}M`;
+    if (abs >= 10_000) return `${sym}${Math.round(n / 1_000).toLocaleString(loc)}k`;
+    return sym + n.toLocaleString(loc, { maximumFractionDigits: 0 });
+  }
   if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} MSEK`;
   if (abs >= 10_000) return `${Math.round(n / 1_000).toLocaleString("sv-SE")} kSEK`;
   return n.toLocaleString("sv-SE", { maximumFractionDigits: 0 }) + " SEK";
@@ -294,7 +306,18 @@ function baselineUForKey(key: string, geo?: ResolvedBuildingGeometry | null): nu
   return null;
 }
 
-function assumptionValue(country: "SE" | "UK", key: string): number | null {
+/** Where a package's cost and carbon come from, for the Results footnotes:
+ *  a TABULA tier or a DESNZ-optimiser pick (installed costs), or materials picked
+ *  from the UK/BE catalogue (material only), or Sweden's Wikells. */
+function pkgCostSource(p: RenovationCalcPackage): "desnz" | "catalogue" | "wikells" | null {
+  if (p.isBaseline) return null;
+  const sels = Object.entries(p.selections);
+  if (sels.some(([k, s]) => k === UK_TIER_SELECTIONS_KEY || s.wikellsCode?.startsWith("uk:"))) return "desnz";
+  if (sels.some(([, s]) => /^(gb|be):/.test(s.wikellsCode ?? ""))) return "catalogue";
+  return "wikells";
+}
+
+function assumptionValue(country: "SE" | "UK" | "BE", key: string): number | null {
   return ASSUMPTIONS[country].find((a) => a.key === key)?.value ?? null;
 }
 
@@ -418,6 +441,7 @@ function LineItemPicker({
         onBlur={() => setHoveredCode(null)}
         title={checked ? "Remove this configuration"
           : worsens ? `${it.description}\n\n⚠ U ${it.uValue} is worse than the building's current ~${baselineU} — this would RAISE energy use.`
+          : (it as CatalogueAssembly).sourceNote ? `${it.description}\n\n${(it as CatalogueAssembly).sourceNote}`
           : it.description}
         style={{
           width: "100%", display: "grid",
@@ -434,7 +458,7 @@ function LineItemPicker({
           border: `2px solid ${checked ? "#4ECDC4" : hovered ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.2)"}`,
           background: checked ? "#4ECDC4" : "transparent",
         }}>{checked ? "✓" : ""}</span>
-        <span style={{ fontSize: 9.5, fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>{it.code}</span>
+        <span style={{ fontSize: 9.5, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", overflow: "hidden" }}>{it.code.replace(/^(gb|be):/, "")}</span>
 
         <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ fontSize: 11, color: hovered ? "#fff" : "rgba(255,255,255,0.7)", lineHeight: 1.25,
@@ -466,7 +490,9 @@ function LineItemPicker({
         </span>
 
         <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>
-          {fmtSEK(it.costSEK)}/{item.quantityKind === "area" ? "m²" : "st"}
+          {(it as CatalogueAssembly).costMissing
+            ? <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 600 }} title="No price in the materials catalogue">price n/a</span>
+            : `${fmtSEK(it.costSEK)}/${item.quantityKind === "area" ? "m²" : "st"}`}
         </span>
         <span style={{ textAlign: "right" }}>
           {ul && (
@@ -691,6 +717,7 @@ export default function RenovationSimulator() {
   // HVAC catalogue, optimiser) stay behind isUK.
   const isBE = project.country === "Belgium";
   const COUNTRY = isUK ? "gb" : isBE ? "be" : "se";
+  MONEY = isUK ? "GBP" : isBE ? "EUR" : "SEK";   // what fmtSEK prints for this project
 
   const components = project.renovationEnvelopeComponents.length > 0
     ? project.renovationEnvelopeComponents
@@ -777,7 +804,10 @@ export default function RenovationSimulator() {
   const [discountOpen, setDiscountOpen] = useState(false);
   // The optimiser is a power feature; it should not stand between the user and
   // the run button.
-  const [optimizerOpen, setOptimizerOpen] = useState(false);
+  // Open from the start when the user asked for optimisation in Step 1 - hiding
+  // the one output they chose behind an "Advanced" toggle made it look missing.
+  const [optimizerOpen, setOptimizerOpen] = useState(
+    () => (useWizardStore.getState().project.explorationApproaches ?? []).includes("Multi-objective Optimization"));
   // Results can be read two ways: by package (portfolio aggregate per design) or
   // by building (every address as a row, baseline next to each package so you can
   // compare a single building across all designs). The matrix is what a user means
@@ -1073,13 +1103,22 @@ export default function RenovationSimulator() {
   const discountMul = 1 - Math.min(90, Math.max(0, project.supplierDiscountPct || 0)) / 100;
   const discountItems = (items: WikellsItem[]) =>
     project.supplierDiscountPct ? items.map((it) => ({ ...it, costSEK: it.costSEK != null ? it.costSEK * discountMul : it.costSEK })) : items;
-  const activeCatalogue = activeItem ? discountItems(itemsForLineItem(activeItem)) : [];
-  const activeBoverket = activeItem ? (boverketByComponent[activeItem.boverketComponent] ?? []) : [];
   /* Everything in the picker describes the building selected in 4.1: its
      quantities, its as-built U, and therefore its recommendations. "All
      buildings" uses the first as the representative one. */
   const pickedIdx = targetIdx === "all" ? 0 : targetIdx;
   const pickedGeo = geometries[pickedIdx] ?? geometries[0] ?? null;
+  /* Sweden picks complete Wikells assemblies. The UK and Belgium pick from their
+     own materials catalogues, turned into options for THIS building: the
+     insulation added to its current U, priced and carbon-rated per m² from the
+     workbook (config/materialCatalogue.ts). Same item shape, so everything
+     downstream - picker, recommendations, build-ups, packages - is shared. */
+  const catalogueFor = (li: AreaLineItem): WikellsItem[] =>
+    isUK || isBE
+      ? catalogueAssembliesFor(isUK ? "gb" : "be", li.key, baselineUForKey(li.key, pickedGeo))
+      : itemsForLineItem(li);
+  const activeCatalogue = activeItem ? discountItems(catalogueFor(activeItem)) : [];
+  const activeBoverket = activeItem ? (boverketByComponent[activeItem.boverketComponent] ?? []) : [];
 
   const activeRecommendations = useMemo(
     () => (activeItem ? recommendationsForLineItem(activeCatalogue, activeBoverket, project.selectedKpis, baselineUForKey(activeItem.key, pickedGeo)) : {}),
@@ -1094,9 +1133,11 @@ export default function RenovationSimulator() {
   const itemByCode = useMemo(() => {
     const mul = 1 - Math.min(90, Math.max(0, project.supplierDiscountPct || 0)) / 100;
     const all = lineItems.flatMap((li) =>
-      itemsForLineItem(li).map((it) => ({ ...it, costSEK: it.costSEK != null ? it.costSEK * mul : it.costSEK })));
+      catalogueFor(li).map((it) => ({ ...it, costSEK: it.costSEK != null ? it.costSEK * mul : it.costSEK })));
     return Object.fromEntries(all.map((i) => [i.code, i]));
-  }, [lineItems, project.supplierDiscountPct]);
+    // catalogueFor depends on the country and (UK/BE) on the picked building's U.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineItems, project.supplierDiscountPct, isUK, isBE, pickedGeo]);
 
   const boverketAll = useMemo(() => Object.values(boverketByComponent).flat(), [boverketByComponent]);
 
@@ -1114,7 +1155,8 @@ export default function RenovationSimulator() {
       name: draftName.trim() || matShort(it),
       source: "catalogue", wikellsCode: code,
       uValue: it.uValue ?? null,
-      costPerM2: it.costSEK ?? null,
+      // A UK/BE material with no price in the catalogue stays "cost —", never free.
+      costPerM2: (it as CatalogueAssembly).costMissing ? null : (it.costSEK ?? null),
       carbonPerM2: estimateCarbon(it, boverketAll).value ?? null,
     }]);
     setDraftName("");
@@ -1490,9 +1532,9 @@ export default function RenovationSimulator() {
   // City climate target (Gothenburg: −30% by 2030). Scored against the baseline
   // energy demand once packages have completed results — same helper the Step 5
   // report uses, so the two never disagree.
-  const climateGoal = climateGoalFor(project.city, project.country);
+  const climateGoal = useMemo(() => climateGoalFor(project.city, project.country), [project.city, project.country]);
   const goalAssessment = useMemo(() => {
-    if (!climateGoal || baselineAgg?.avgTotalKwhM2Yr == null) return null;
+    if (!climateGoal || !isScorable(climateGoal) || baselineAgg?.avgTotalKwhM2Yr == null) return null;
     const rows = packages
       .filter((p) => !p.isBaseline)
       .map((p) => ({ pkg: p, total: pkgAggregate(p).avgTotalKwhM2Yr }))
@@ -1501,6 +1543,17 @@ export default function RenovationSimulator() {
     if (!rows.length) return null;
     return assessAgainstGoal(climateGoal, baselineAgg.avgTotalKwhM2Yr, rows);
   }, [climateGoal, baselineAgg?.avgTotalKwhM2Yr, packages, itemByCode]);
+
+  // Rating goal (Rotherham: EPC band C): where each package leaves every building on
+  // the EPC scale, anchored on that building's own certificate.
+  const ratingAssessment = useMemo(() => {
+    if (climateGoal?.kind !== "rating") return null;
+    const src = project.bboxRows.length
+      ? project.bboxRows.map((b) => ({ address: b.address, lat: b.lat, lon: b.lon, sap: b.sap ?? null, band: b.epc_class }))
+      : [...project.lookedUpBuildings, ...(project.lookedUpBuilding ? [project.lookedUpBuilding] : [])]
+          .map((b) => ({ address: b.address ?? "", lat: b.lat, lon: b.lon, sap: b.sap ?? null, band: b.eclass }));
+    return assessRating(climateGoal, packages, src);
+  }, [climateGoal, packages, project.bboxRows, project.lookedUpBuildings, project.lookedUpBuilding]);
 
   /* ── Regret / robustness decision analysis (Step 4 → Step 5 report) ──────────
      Score each package + the do-nothing baseline by its 30-yr net benefit under
@@ -1578,7 +1631,10 @@ export default function RenovationSimulator() {
      EPSM via validateOptimizerPick below. */
   const optimizerInput = useMemo((): { input: { components: OptimizeComponentInput[]; params: OptimizeParams } | null; disabledReason?: string } => {
     const repIdx = targetIdx === "all" ? 0 : targetIdx;
-    if (isUK) {
+    // UK with no saved build-ups: the DESNZ measure set (installed costs). Once
+    // materials are picked from the catalogue, the UK optimises over those -
+    // the same as Sweden and Belgium, further down.
+    if (isUK && configs.length === 0) {
       const g = geometries[repIdx];
       if (!g) return { input: null, disabledReason: "No building resolved yet." };
       const baseTotal = baselinePkg?.buildings[repIdx]?.totalKwhM2Yr ?? null;
@@ -1646,7 +1702,28 @@ export default function RenovationSimulator() {
     if (comps.length === 0)
       return { input: null, disabledReason: "Save build-ups per component in the builder above — the trade-off curve appears here and updates as you go." };
 
-    const params: OptimizeParams = {
+    // Economy + climate of the project's own country. UK and Belgian homes mostly
+    // burn gas: the price and carbon of USEFUL heat are the gas figures over an
+    // 85% boiler efficiency, as in the UK DESNZ branch above.
+    const eff = 0.85;
+    const ukGas = ukHvac?.carriers.gas;
+    const params: OptimizeParams = isUK ? {
+      f_dh: (24 * (assumptionValue("UK", "degree_days") ?? 2108)) / 1000,
+      energy_price: Math.round(((ukGas?.tariffSek ?? assumptionValue("UK", "gas_price") ?? 0.079) / eff) * 1000) / 1000,
+      carbon_factor_heat: Math.round(((ukGas?.carbonKgPerKwh ?? assumptionValue("UK", "carbon_factor_heat") ?? 0.183) / eff) * 1000) / 1000,
+      discount_rate: assumptionValue("UK", "discount_rate") ?? 0.035,
+      study_period_yr: 30,
+      floor_area_m2: Math.round(repGeo.heatedAreaM2 ?? floorArea),
+      baseline_total_kwh_m2_yr: baseTotal,
+    } : isBE ? {
+      f_dh: (24 * (project.city === "Liège" ? 2001 : (assumptionValue("BE", "degree_days") ?? 1820))) / 1000,
+      energy_price: Math.round(((assumptionValue("BE", "energy_price") ?? 0.078) / eff) * 1000) / 1000,
+      carbon_factor_heat: Math.round(((assumptionValue("BE", "carbon_factor_heat") ?? 0.202) / eff) * 1000) / 1000,
+      discount_rate: assumptionValue("BE", "discount_rate") ?? 0.03,
+      study_period_yr: 30,
+      floor_area_m2: Math.round(repGeo.heatedAreaM2 ?? floorArea),
+      baseline_total_kwh_m2_yr: baseTotal,
+    } : {
       f_dh: (24 * (assumptionValue("SE", "degree_days") ?? 3300)) / 1000,
       energy_price: livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8,
       carbon_factor_heat: assumptionValue("SE", "carbon_factor_heat") ?? 0.022,
@@ -1656,7 +1733,7 @@ export default function RenovationSimulator() {
       baseline_total_kwh_m2_yr: baseTotal,
     };
     return { input: { components: comps, params } };
-  }, [isUK, ukHvac, targetIdx, geometries, baselinePkg, lineItems, configs, wwrByIndex, manualOverrides, boverketAll, livePriceSek]);
+  }, [isUK, isBE, project.city, ukHvac, targetIdx, geometries, baselinePkg, lineItems, configs, wwrByIndex, manualOverrides, boverketAll, livePriceSek]);
 
   // Which optimizer picks are already validated (as a package) — keyed by the
   // touched (non-"keep") component→material selections, matching the panel.
@@ -1729,6 +1806,10 @@ export default function RenovationSimulator() {
         && Math.abs(p.buildings[0]!.lon - g.lon) < 1e-6;
     };
     const kept = opts?.auto ? packages.filter((p) => !p.auto || !sameTarget(p)) : packages;
+    // Stay on the chart. The new package completes the Results stage, which made
+    // the auto-advance jump to 4.4 and collapse 4.2 a second after the curve was
+    // drawn - so the Pareto chart was computed but never actually seen.
+    justRanRef.current = true;
     setProject({ renovationCalcPackages: [...kept, pkg] });
     submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
   }
@@ -1762,6 +1843,7 @@ export default function RenovationSimulator() {
     const id = `pkg-opt-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
     const pkg: RenovationCalcPackage = { id, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows, ...(opts?.auto ? { auto: true } : {}) };
     const kept = opts?.auto ? packages.filter((p) => !p.auto) : packages;
+    justRanRef.current = true;   // stay on the chart (see validateOptimizerPick)
     setProject({ renovationCalcPackages: [...kept, pkg] });
     submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
   }
@@ -1832,10 +1914,8 @@ export default function RenovationSimulator() {
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>Renovation Calculator</h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          {isUK || isBE
-            ? "Pick a refurbishment tier and compare its simulated performance against the baseline."
-            : <>Design build-ups, combine them into packages, and simulate each against the baseline to compare energy, cost and carbon
-               {geometries.length > 1 ? ` — across the ${geometries.length} buildings from Step 3.` : "."}</>}
+          <>Pick materials per component, combine them into packages, and simulate each against the baseline to compare energy, cost and carbon
+            {geometries.length > 1 ? ` — across the ${geometries.length} buildings from Step 3.` : "."}</>
         </p>
       </div>
 
@@ -1848,11 +1928,11 @@ export default function RenovationSimulator() {
       {geometries.length > 0 && (
         <>
           <div ref={(el) => { stageRefs.current[1] = el; }} style={{ scrollMarginTop: 80 }} />
-          <StageHeader n={1} title={isUK || isBE ? "Choose refurbishment tier & run" : "Design assemblies"}
+          <StageHeader n={1} title="Design assemblies"
             hint={isUK || isBE
               ? (baselineAgg?.avgTotalKwhM2Yr != null
-                ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr · TABULA standard or ambitious refurbishment`
-                : "TABULA standard or ambitious refurbishment, simulated in EnergyPlus")
+                ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr · pick materials per component, or a TABULA refurbishment tier`
+                : "pick materials per component from the catalogue, or a TABULA refurbishment tier")
               : baselineAgg?.avgTotalKwhM2Yr != null
               ? `as-built ${baselineAgg.avgTotalKwhM2Yr} kWh/m²·yr · components in scope, build-ups saved per component`
               : "pick components, design build-ups, save them as configurations"}
@@ -1885,7 +1965,7 @@ export default function RenovationSimulator() {
         </div>
       )}
 
-      {geometries.length > 0 && !isUK && !isBE && hasEnvelope && (
+      {geometries.length > 0 && hasEnvelope && (
         <>
 
           {/* Supplier discount — the % the property owner gets off catalogue material
@@ -2044,7 +2124,9 @@ export default function RenovationSimulator() {
                 <div style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
                     {(() => {
-                      const canLayers = !!kindForKey(activeItem.key);
+                      // Layer build-ups are costed from the nearest Wikells assembly,
+                      // which is Swedish (SEK) - so UK/BE pick catalogue materials only.
+                      const canLayers = !!kindForKey(activeItem.key) && !isUK && !isBE;
                       const effective = draftMode === "layers" && !canLayers ? "catalogue" : draftMode;
                       // Catalogue first — pick a ready-made assembly to start, then
                       // switch to Build-from-layers to compose one from real layers.
@@ -2070,7 +2152,12 @@ export default function RenovationSimulator() {
                         border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 11.5 }} />
                   </div>
 
-                  {(draftMode === "layers" && kindForKey(activeItem.key)) ? (
+                  {(isUK || isBE) && (
+                    <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.42)", lineHeight: 1.5, margin: "-2px 0 10px" }}>
+                      {catalogueNote(isUK ? "gb" : "be")} Hover an option for its price and carbon sources.
+                    </div>
+                  )}
+                  {(draftMode === "layers" && kindForKey(activeItem.key) && !isUK && !isBE) ? (
                     <>
                       {baselineUForKey(activeItem.key, pickedGeo) != null && (
                         <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", marginBottom: 8, lineHeight: 1.5 }}>
@@ -2130,7 +2217,7 @@ export default function RenovationSimulator() {
                               U {c.uValue?.toFixed(2) ?? "—"} W/m²K
                             </div>
                             <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
-                              {c.costPerM2 != null ? `${Math.round(c.costPerM2).toLocaleString("sv-SE")} SEK/m²` : "cost —"}
+                              {c.costPerM2 != null ? `${fmtSEK(c.costPerM2)}/${activeItem.quantityKind === "area" ? "m²" : "unit"}` : "cost —"}
                               {" · "}
                               {c.carbonPerM2 != null ? `${c.carbonPerM2.toFixed(1)} kg CO₂e/m²` : "carbon —"}
                             </div>
@@ -2156,6 +2243,65 @@ export default function RenovationSimulator() {
         </>
           )}
 
+          {/* UK / Belgium: the TABULA refurbishment tier stays as a one-click
+              alternative to designing component by component above. */}
+          {(isUK || isBE) && openStage === 1 && (
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", margin: "6px 0 -4px" }}>
+              Or, in one click: a TABULA refurbishment tier
+            </div>
+          )}
+          {(isUK || isBE) && openStage === 1 && (
+            <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(114,28,184,0.2)" }}>
+              <UkTierPicker
+                country={isBE ? "be" : "gb"}
+                archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier}
+                quantities={geometries[0] ? ukQuantitiesFor(geometries[0], wwrByIndex[0] ?? null) : null} buildingCount={geometries.length}
+                uSource={geometries[0]?.tabulaUSource ?? null}
+              />
+            </div>
+          )}
+          {(isUK || isBE) && openStage === 1 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <input value={packageName} onChange={(e) => setPackageName(e.target.value)}
+                placeholder="Package name (optional)"
+                style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }} />
+              <button onClick={() => addPackage()} disabled={!canAddPackage}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  border: "1px solid rgba(47,180,119,0.4)", background: "rgba(47,180,119,0.12)", color: "#2FB477",
+                  cursor: canAddPackage ? "pointer" : "not-allowed", opacity: canAddPackage ? 1 : 0.5 }}>
+                <Plus size={13} /> Add package
+              </button>
+            </div>
+          )}
+
+          {/* UK multi-objective optimiser: mixes wall / loft / glazing / floor
+              measures per component (DESNZ costs, DESNZ insulation carbon) on the
+              building's own EPC fabric; each validated pick runs in EPSM. */}
+          {isUK && openStage === 1 && configs.length === 0 && (
+            <div>
+              <button
+                onClick={() => setOptimizerOpen((o) => !o)}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: 0, cursor: "pointer",
+                  color: "rgba(255,255,255,0.45)", fontSize: 11.5, fontWeight: 700, padding: "6px 0" }}>
+                <ChevronDown size={13} style={{ transform: optimizerOpen ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} />
+                Advanced — multi-objective optimiser
+                <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.3)" }}>
+                  · mix measures per component, Pareto front over cost, carbon &amp; energy
+                </span>
+              </button>
+              {optimizerOpen && (
+                <OptimizerPanel
+                  input={optimizerInput.input}
+                  disabledReason={optimizerInput.disabledReason}
+                  onValidate={validateOptimizerPick}
+                  currency="GBP"
+                  validatedKeys={validatedKeys}
+                  selectedKpis={project.selectedKpis}
+                />
+              )}
+            </div>
+          )}
+
           <div ref={(el) => { stageRefs.current[2] = el; }} style={{ scrollMarginTop: 80 }} />
           <StageHeader n={2} title="Build packages & run"
             hint={(() => {
@@ -2173,7 +2319,7 @@ export default function RenovationSimulator() {
       {geometries.length > 0 && (
         <>
           {/* ══ PACKAGES — folded into stage 2 (Design & Packages) ══════ */}
-          {!isUK && !isBE && hasEnvelope && openStage === 2 && (
+          {hasEnvelope && openStage === 2 && (
             <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Packages</span>
@@ -2312,63 +2458,9 @@ export default function RenovationSimulator() {
             </div>
           )}
 
-          {/* UK keeps the tier-based flow. It lives in stage 1 because the
-              stage 2 header only exists for the Swedish assembly designer. */}
-          {(isUK || isBE) && openStage === 1 && (
-            <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(114,28,184,0.2)" }}>
-              <UkTierPicker
-                country={isBE ? "be" : "gb"}
-                archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier}
-                quantities={geometries[0] ? ukQuantitiesFor(geometries[0], wwrByIndex[0] ?? null) : null} buildingCount={geometries.length}
-                uSource={geometries[0]?.tabulaUSource ?? null}
-              />
-            </div>
-          )}
-          {(isUK || isBE) && openStage === 1 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 12, padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <input value={packageName} onChange={(e) => setPackageName(e.target.value)}
-                placeholder="Package name (optional)"
-                style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }} />
-              <button onClick={() => addPackage()} disabled={!canAddPackage}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                  border: "1px solid rgba(47,180,119,0.4)", background: "rgba(47,180,119,0.12)", color: "#2FB477",
-                  cursor: canAddPackage ? "pointer" : "not-allowed", opacity: canAddPackage ? 1 : 0.5 }}>
-                <Plus size={13} /> Add package
-              </button>
-            </div>
-          )}
-
-          {/* UK multi-objective optimiser: mixes wall / loft / glazing / floor
-              measures per component (DESNZ costs, DESNZ insulation carbon) on the
-              building's own EPC fabric; each validated pick runs in EPSM. */}
-          {isUK && openStage === 1 && (
-            <div>
-              <button
-                onClick={() => setOptimizerOpen((o) => !o)}
-                style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: 0, cursor: "pointer",
-                  color: "rgba(255,255,255,0.45)", fontSize: 11.5, fontWeight: 700, padding: "6px 0" }}>
-                <ChevronDown size={13} style={{ transform: optimizerOpen ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} />
-                Advanced — multi-objective optimiser
-                <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.3)" }}>
-                  · mix measures per component, Pareto front over cost, carbon &amp; energy
-                </span>
-              </button>
-              {optimizerOpen && (
-                <OptimizerPanel
-                  input={optimizerInput.input}
-                  disabledReason={optimizerInput.disabledReason}
-                  onValidate={validateOptimizerPick}
-                  currency="GBP"
-                  validatedKeys={validatedKeys}
-                  selectedKpis={project.selectedKpis}
-                />
-              )}
-            </div>
-          )}
-
           {/* The trade-off curve now updates live from the same picks, so it's a
               companion view (not a separate "run this instead" tool). */}
-          {!isUK && !isBE && hasEnvelope && openStage === 2 && (
+          {hasEnvelope && openStage === 2 && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 -4px" }}>
               <span style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
               <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "rgba(255,255,255,0.28)" }}>
@@ -2381,7 +2473,7 @@ export default function RenovationSimulator() {
           {/* Multi-objective optimizer (Sweden) — Pareto front over the fast
               degree-day physics; each validated winner runs in EPSM and drops
               into the comparison table below. */}
-          {!isUK && !isBE && hasEnvelope && openStage === 2 && (
+          {hasEnvelope && openStage === 2 && (
             <div>
               <button
                 onClick={() => setOptimizerOpen((o) => !o)}
@@ -2398,7 +2490,7 @@ export default function RenovationSimulator() {
               input={optimizerInput.input}
               disabledReason={optimizerInput.disabledReason}
               onValidate={validateOptimizerPick}
-              currency="SEK"
+              currency={MONEY}
                   validatedKeys={validatedKeys}
                   selectedKpis={project.selectedKpis}
                 />
@@ -2484,10 +2576,10 @@ export default function RenovationSimulator() {
                 { k: "exp", l: "" },
                 { k: "pkg", l: "Package" },
                 { k: "cost", l: "Cost", sub: isUK
-                  ? `installed capex — DESNZ install costs, ${UK_COST_PRICE_BASIS}, one-off`
-                  : isBE ? "no open Belgian cost data yet"
+                  ? `tiers & DESNZ optimiser: installed, ${UK_COST_PRICE_BASIS} · catalogue picks: materials incl. VAT, excl. labour`
+                  : isBE ? "catalogue picks: materials incl. VAT, excl. labour · TABULA tiers: no cost data"
                   : "installed capex — materials + labour (Wikells), one-off" },
-                { k: "carbon", l: "Carbon", sub: isUK ? "embodied A1-A3, Boverket" : isBE ? "not yet available" : undefined },
+                { k: "carbon", l: "Carbon", sub: isUK || isBE ? "embodied A1-A3 (materials catalogue)" : undefined },
                 { k: "heat", l: "Heating", sub: "kWh/m²·yr" },
                 { k: "total", l: "Total energy", sub: "heating + hot water + cooling + lighting + equipment, kWh/m²·yr" },
                 { k: "status", l: "Status" },
@@ -2533,7 +2625,7 @@ export default function RenovationSimulator() {
                       {pkg.name}{agg.n > 1 ? ` (${agg.n} buildings)` : ""}
                       {/* Applied envelope U-values — makes an uninsulated pick (which
                           replaces, never adds to, the baseline U) explain its own result. */}
-                      {!pkg.isBaseline && !isUK && !isBE && (() => {
+                      {!pkg.isBaseline && ((!isUK && !isBE) || pkgCostSource(pkg) === "catalogue") && (() => {
                         const us = appliedUValues(pkg, itemByCode);
                         if (!us.length) return null;
                         return (
@@ -2561,10 +2653,11 @@ export default function RenovationSimulator() {
                       )}
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && agg.totalCostSEK != null ? `DESNZ install costs, ${UK_COST_PRICE_BASIS}; doors not costed` : undefined}>
-                      {agg.totalCostSEK == null ? "—" : isUK ? `${fmtGBP(agg.totalCostSEK)}*` : fmtSEK(agg.totalCostSEK)}
+                      {agg.totalCostSEK == null ? "—" : fmtSEK(agg.totalCostSEK)}
                     </span>
-                    <span style={{ fontSize: 12, color: "#4A90E2" }} title={isUK && agg.totalCarbonKgCO2e != null ? "Boverket klimatdatabas A1-A3 (Swedish products)" : undefined}>
-                      {agg.totalCarbonKgCO2e == null ? "—" : isUK ? `${agg.totalCarbonKgCO2e.toLocaleString("en-GB")} kg*` : `${agg.totalCarbonKgCO2e.toLocaleString("sv-SE")} kg`}
+                    <span style={{ fontSize: 12, color: "#4A90E2" }} title={pkgCostSource(pkg) === "catalogue" ? "Materials catalogue, embodied carbon A1-A3" : isUK && agg.totalCarbonKgCO2e != null ? "DESNZ insulation factor + Boverket window proxy" : undefined}>
+                      {agg.totalCarbonKgCO2e == null ? "—"
+                        : `${agg.totalCarbonKgCO2e.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg${pkgCostSource(pkg) === "desnz" ? "*" : pkgCostSource(pkg) === "catalogue" && (isUK || isBE) ? "†" : ""}`}
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>
                       {agg.avgHeatingKwhM2Yr ?? "—"}
@@ -2599,7 +2692,7 @@ export default function RenovationSimulator() {
                       {pkg.buildings.map((b) => (
                         <div key={`${pkg.id}-${b.address}-${b.lat}-${b.lon}`} style={{ display: "grid", gridTemplateColumns: BREAKDOWN_COLS, gap: 10, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.address}</span>
-                          <span>{b.costSEK == null ? "—" : isUK ? fmtGBP(b.costSEK) : fmtSEK(b.costSEK)}</span>
+                          <span>{b.costSEK == null ? "—" : fmtSEK(b.costSEK)}</span>
                           <span>{b.carbonKgCO2e == null ? "—" : `${b.carbonKgCO2e.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
                           <span>{b.heatingKwhM2Yr ?? "—"}</span>
                           <span>
@@ -2629,9 +2722,14 @@ export default function RenovationSimulator() {
             {packages.length === 0 && (
               <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>No packages yet.</p>
             )}
-            {isUK && packages.some((p) => pkgAggregate(p).totalCostSEK != null) && (
+            {isUK && packages.some((p) => pkgCostSource(p) === "desnz" && pkgAggregate(p).totalCostSEK != null) && (
               <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
                 * {UK_COST_CARBON_SOURCE_NOTE}
+              </p>
+            )}
+            {(isUK || isBE) && packages.some((p) => pkgCostSource(p) === "catalogue") && (
+              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
+                † {catalogueNote(isUK ? "gb" : "be")} Package cost = material per m² × each building's own area; labour and installation are not included.
               </p>
             )}
             </>
@@ -2751,6 +2849,9 @@ export default function RenovationSimulator() {
 
               {openStage === 4 && (<>
                 {goalAssessment && <ClimateGoalPanel a={goalAssessment} />}
+                {ratingAssessment && <ClimateGoalRatingPanel a={ratingAssessment} />}
+                {climateGoal && (climateGoal.kind === "info" || (climateGoal.kind === "rating" && !ratingAssessment))
+                  && <ClimateGoalInfo goal={climateGoal} />}
 
                 {regretResult && regretResult.options.length >= 2 && (
                   <DecisionAnalysisPanel

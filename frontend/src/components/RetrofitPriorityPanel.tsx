@@ -18,7 +18,7 @@ const CRITERION_HELP: Record<string, { what: string; from: string }> = {
   },
   F: {
     what: "Condition of the facade from the photos analysed in 2.2 - cracks, spalling, corrosion and the like.",
-    from: "The ML defect detector plus the AI second opinion. Buildings with no photos score a dash, and their weight is spread across the other three.",
+    from: "The defects found on the façade photos — ML detector plus the AI's two looks, cumulative — weighted by severity (cracks and bulges count most, then spalling and corrosion, then staining). Buildings with no usable photos score a dash, and their weight is spread across the other three.",
   },
   C: {
     what: "How likely the building is to be dated, and how much of it there is.",
@@ -50,6 +50,18 @@ function ScoreBar({ k, s }: { k: CriterionKey; s: SubScore }) {
         <div className="h-full rounded-full" style={{ width: `${s.value}%`, background: CRITERION_COLORS[k] }} />
       </div>
       <span className="text-[10px] text-white/45 tabular-nums w-5 text-right">{Math.round(s.value)}</span>
+    </div>
+  );
+}
+
+/** The façade column: the score bar, and under it WHAT the detector found, so the
+ *  defect results are visibly the reason for the number rather than a hidden input. */
+function FacadeCell({ s }: { s: SubScore }) {
+  if (!s.available) return <ScoreBar k="F" s={s} />;
+  return (
+    <div className="space-y-0.5">
+      <ScoreBar k="F" s={s} />
+      <div className="text-[9px] leading-tight text-white/40 max-w-[130px]" title={s.note}>{s.note}</div>
     </div>
   );
 }
@@ -249,7 +261,11 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
                     <span className="font-bold tabular-nums w-7 text-right" style={{ color: scoreColor(r.P) }}>{Math.round(r.P)}</span>
                   </div>
                 </td>
-                {CRITS.map(k => <td key={k} className="px-2 py-2"><ScoreBar k={k} s={r.scores[k]} /></td>)}
+                {CRITS.map(k => (
+                  <td key={k} className="px-2 py-2">
+                    {k === "F" ? <FacadeCell s={r.scores.F} /> : <ScoreBar k={k} s={r.scores[k]} />}
+                  </td>
+                ))}
                 <td className="px-2 py-2">
                   <span className={`tabular-nums ${r.confidence >= 0.7 ? "text-emerald-400" : r.confidence >= 0.4 ? "text-amber-400" : "text-red-400"}`}>
                     {Math.round(r.confidence * 100)}%

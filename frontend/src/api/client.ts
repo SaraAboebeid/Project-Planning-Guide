@@ -133,6 +133,12 @@ export const api = {
       ...seCityParam(country),
     }),
 
+  /** Street address for a point from OpenStreetMap (UK/Belgium footprints with no address). */
+  osmAddress: (lat: number, lon: number) =>
+    get<{ address: string | null; exact: boolean; postcode: string | null }>(
+      "/osm/address", { lat: lat.toFixed(5), lon: lon.toFixed(5) },
+    ),
+
   /** Named neighborhoods (Gothenburg primärområden) with building counts */
   listDistricts: (country = "se") =>
     get<{ country: string; districts: { name: string; count: number; lat: number; lon: number }[] }>(
@@ -302,8 +308,15 @@ export const api = {
   },
 
   /* ── Facade defect second opinion — general vision-language model (GPT-4o/Claude) ── */
-  facadeVision: async (blob: Blob, threshold = 0.3): Promise<FacadeDetectResponse> => {
-    const res = await fetch(`${BASE}/facade-vision?threshold=${threshold}`, { method: "POST", body: blob });
+  facadeVision: async (blob: Blob, threshold = 0.3,
+                       opts?: { round?: number; prior?: { label: string; box: number[] }[] }): Promise<FacadeDetectResponse> => {
+    const q = new URLSearchParams({ threshold: String(threshold) });
+    if (opts?.round && opts.round > 1) {
+      q.set("round", String(opts.round));
+      // Round 2 is told what is already found so it only reports what was missed.
+      if (opts.prior?.length) q.set("prior", JSON.stringify(opts.prior));
+    }
+    const res = await fetch(`${BASE}/facade-vision?${q}`, { method: "POST", body: blob });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.detail) throw new Error(d.detail || `Vision model error (${res.status})`);
     return d as FacadeDetectResponse;
@@ -339,6 +352,8 @@ export interface StreetViewFacadeResponse {
   pano: { lat: number; lon: number; date: string | null; pano_id: string; copyright: string | null; distance_m: number };
   facade: {
     aimed_at: "footprint_wall" | "centroid"; normal_deg: number; width_m: number | null; off_normal_deg: number;
+    /** Midpoint of the wall that was photographed - identifies the wall itself. */
+    lat?: number; lon?: number;
     panoramas_considered: number; unblocked_by_buildings?: number;
     /** Present for framing=facade: stitched from `tiles` shots and flattened onto the wall plane. */
     rectified?: boolean; tiles?: number; coverage?: number; height_m?: number;
@@ -353,6 +368,8 @@ export interface StreetViewFacadeResponse {
 export interface FacadeDetection {
   label: string; score: number; box: [number, number, number, number];
   source?: "ml" | "ai"; note?: string;
+  /** Which AI pass found it (1 = first look, 2 = the "look again for what was missed" pass). */
+  round?: number;
 }
 export interface FacadeDetectResponse {
   detections: FacadeDetection[]; width: number; height: number;

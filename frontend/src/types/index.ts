@@ -78,6 +78,9 @@ export interface BboxStats {
 /** Individual building record returned by /api/buildings/bbox/list */
 export interface BuildingRecord {
   address: string;
+  /** Where a filled-in address came from: EPC certificate, or OpenStreetMap
+   *  ("osm" = the building's own address, "osm_street" = nearest street only). */
+  address_source?: string | null;
   all_addresses?: string | null;   // every entrance on this EPC, "16A | 16B | 16C"
   cadastral_id: string | null;
   lat: number;

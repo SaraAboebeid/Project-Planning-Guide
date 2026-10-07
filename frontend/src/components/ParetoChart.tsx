@@ -62,7 +62,7 @@ export default function ParetoChart({
   pareto: OptimizePoint[];
   baseline: { energy_kwh_m2_yr: number; total_cost: number; total_carbon: number };
   axes: { x: ObjKey; y: ObjKey; color: ObjKey };
-  currency: "SEK" | "GBP";
+  currency: "SEK" | "GBP" | "EUR";
   evaluated: number;
   onValidate: (p: OptimizePoint) => void;
   validatedKeys: Set<string>;
@@ -74,7 +74,8 @@ export default function ParetoChart({
 
   const fmt = (v: number, o: typeof xO) =>
     o.money
-      ? (currency === "SEK" ? `${Math.round(v).toLocaleString("sv-SE")} SEK` : `£${Math.round(v).toLocaleString("en-GB")}`)
+      ? (currency === "SEK" ? `${Math.round(v).toLocaleString("sv-SE")} SEK`
+        : currency === "EUR" ? `€${Math.round(v).toLocaleString("nl-BE")}` : `£${Math.round(v).toLocaleString("en-GB")}`)
       : `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })}${o.unit ? " " + o.unit : ""}`;
   const tick = (v: number, o: typeof xO) =>
     o.money ? (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1000)}k`) : `${Math.round(v)}`;

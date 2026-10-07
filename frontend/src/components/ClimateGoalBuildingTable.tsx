@@ -1,5 +1,5 @@
 import { CheckCircle2 } from "lucide-react";
-import { type BuildingGoalAssessment, type GoalTier } from "../config/climateGoals";
+import { type BuildingGoalAssessment, type GoalTier, requiredPct } from "../config/climateGoals";
 
 /* Per-building view of the city target: every building's own goal (its baseline
  * cut by the target %), and how each package lands against it — met, how far
@@ -29,8 +29,10 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 10, lineHeight: 1.6 }}>
-        Each building's own target is its baseline cut by {goal.reductionPct}%. A package "meets" the
-        target for a building when that building reaches its own −{goal.reductionPct}% line.
+        {goal.kind === "absolute"
+          ? <>Every building must reach ≤ {goal.targetKwhM2} kWh/m²·yr, so each needs a different cut from its own baseline. A package "meets" the target for a building when that building gets there.</>
+          : <>Each building's own target is its baseline cut by {goal.reductionPct}%. A package "meets" the
+            target for a building when that building reaches its own −{goal.reductionPct}% line.</>}
       </div>
 
       {/* Wide matrix scrolls in its own container — never widens the page. */}
@@ -40,7 +42,7 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
             <tr>
               <th style={thStyle("left")}>Building</th>
               <th style={thStyle("right")}>Baseline</th>
-              <th style={thStyle("right")}>Goal −{goal.reductionPct}%</th>
+              <th style={thStyle("right")}>{goal.kind === "absolute" ? `Goal ≤ ${goal.targetKwhM2}` : `Goal −${goal.reductionPct}%`}</th>
               {columns.map((c) => (
                 <th key={c.label} style={thStyle("right")}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -74,7 +76,7 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
                         {met && <CheckCircle2 size={11} color="#2FB477" style={{ marginLeft: 4, verticalAlign: "-1px" }} />}
                       </div>
                       <div style={{ fontSize: 9.5, color, opacity: 0.85, marginTop: 1 }}>
-                        {cellText(cell.reductionPct, cell.tier, goal.reductionPct)}
+                        {cellText(cell.reductionPct, cell.tier, requiredPct(goal, r.baselineEnergy))}
                       </div>
                     </td>
                   );
@@ -87,7 +89,7 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
 
       {/* Legend */}
       <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
-        <Legend color="#2FB477" label={`Meets target (≥ −${goal.reductionPct}%)`} />
+        <Legend color="#2FB477" label={goal.kind === "absolute" ? `Meets target (≤ ${goal.targetKwhM2} kWh/m²·yr)` : `Meets target (≥ −${goal.reductionPct}%)`} />
         <Legend color="#E8880C" label="Below target (reduces, not enough)" />
         <Legend color="#E2483B" label="No reduction vs baseline" />
         <span style={{ marginLeft: "auto", opacity: 0.7 }}>values in kWh/m²·yr · pp = percentage points short</span>

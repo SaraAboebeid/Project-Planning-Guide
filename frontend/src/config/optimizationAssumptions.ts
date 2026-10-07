@@ -10,7 +10,7 @@
    LIVE from /api/energy-price (Nord Pool) — the number here is only a fallback.
    ───────────────────────────────────────────────────────────────────────────── */
 
-export type Country = "SE" | "UK";
+export type Country = "SE" | "UK" | "BE";
 
 export interface Assumption {
   key: string;
@@ -117,6 +117,39 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       source: "DESNZ GHG Conversion Factors 2025, UK electricity generation 0.17700 + transmission & distribution losses 0.01853 (OGL v3.0)",
       sourceUrl: "https://www.gov.uk/government/collections/government-conversion-factors-for-company-reporting",
       note: "The 2026 set is ~26% lower (0.13096 + 0.01299), partly from a DESNZ method change — don't mix years.",
+    },
+  ],
+  BE: [
+    {
+      key: "energy_price",
+      label: "Gas price (household, all-in)",
+      value: 0.078, unit: "EUR/kWh", provisional: true,
+      source: "Belgian average residential natural-gas price, September 2025, all taxes and fees included (GlobalPetrolPrices, from CREG data)",
+      sourceUrl: "https://www.globalpetrolprices.com/Belgium/natural_gas_prices/",
+      note: "Most Belgian homes heat with gas. Divided by an 85% boiler efficiency in Step 4 to price useful heat. Refresh from CREG's monthly price report.",
+    },
+    {
+      key: "degree_days",
+      label: "Heating degree-days (HDD)",
+      value: 1820, unit: "K·day/yr (base 15.5 °C)",
+      source: "Computed from the Uccle TMYx 2011–2025 weather file the simulation uses (climate.onebuilding.org); Liège Airport TMYx gives 2,001",
+      sourceUrl: "https://climate.onebuilding.org/",
+      note: "Same base as the SE/UK values. Step 4 uses 2,001 for Liège and 1,820 for Brussels and Ghent.",
+    },
+    {
+      key: "discount_rate",
+      label: "Real discount rate",
+      value: 0.03, unit: "fraction/yr (real)",
+      source: "EU cost-optimal framework (Delegated Reg. 244/2012), societal real rate",
+      sourceUrl: "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32012R0244",
+    },
+    {
+      key: "carbon_factor_heat",
+      label: "Natural-gas heating carbon factor",
+      value: 0.202, unit: "kg CO₂e/kWh",
+      source: "IPCC 2006 Guidelines default for natural gas, 56.1 t CO₂/TJ (combustion, net CV)",
+      sourceUrl: "https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html",
+      note: "Combustion only; upstream (well-to-tank) adds roughly 10–20%.",
     },
   ],
 };

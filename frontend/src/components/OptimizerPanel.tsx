@@ -24,7 +24,7 @@ export default function OptimizerPanel({
   input: { components: OptimizeComponentInput[]; params: OptimizeParams } | null;
   onValidate: (point: OptimizePoint, opts?: { auto?: boolean }) => void;
   disabledReason?: string;
-  currency: "SEK" | "GBP";
+  currency: "SEK" | "GBP" | "EUR";
   validatedKeys: Set<string>;
   selectedKpis: string[];
 }) {
@@ -39,7 +39,9 @@ export default function OptimizerPanel({
   const fmtMoney = (n: number) =>
     (currency === "SEK"
       ? n.toLocaleString("sv-SE", { maximumFractionDigits: 0 }) + " SEK"
-      : "£" + n.toLocaleString("en-GB", { maximumFractionDigits: 0 }));
+      : currency === "EUR"
+        ? "€" + n.toLocaleString("nl-BE", { maximumFractionDigits: 0 })
+        : "£" + n.toLocaleString("en-GB", { maximumFractionDigits: 0 }));
 
   const canRun = !!input && input.components.length > 0 && !disabledReason;
 

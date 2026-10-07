@@ -71,6 +71,25 @@ const DISABLED_PROJECT_TYPES = new Set<string>([
 // selector markup below is kept (behind this flag) so it can be re-enabled.
 const HIDE_PROJECT_TYPE = true;
 
+/** Example project name that follows the selected city, so the hint never names
+ *  somewhere other than where the user is planning. */
+const PROJECT_NAME_EXAMPLE: Record<string, string> = {
+  Gothenburg: "Lindholmen Retrofit Study",
+  Malmö: "Rosengård Retrofit Study",
+  Ystad: "Ystad Centrum Retrofit Study",
+  Alingsås: "Alingsås Centrum Retrofit Study",
+  Askersund: "Askersund Retrofit Study",
+  Stockholm: "Hammarby Retrofit Study",
+  Rotherham: "Rotherham Terraced Housing Retrofit",
+  Brussels: "Ixelles Retrofit Study",
+  Liège: "Liège Retrofit Study",
+  Gent: "Gent Retrofit Study",
+};
+function projectNamePlaceholder(city: string | null | undefined): string {
+  if (!city) return "e.g. Neighbourhood Retrofit Study";
+  return `e.g. ${PROJECT_NAME_EXAMPLE[city] ?? `${city} Retrofit Study`}`;
+}
+
 export default function DefineProject() {
   const { project, setProject, setStep } = useWizardStore();
   const navigate = useNavigate();
@@ -95,6 +114,9 @@ export default function DefineProject() {
   const [locationValid, setLocationValid] = useState(true);
   const [locationMsg, setLocationMsg] = useState<string | null>(null);
   const [buildingLoading, setBuildingLoading] = useState(false);
+  // Set when a drawn box/shape matched no buildings (the backend 404s). Without
+  // it the map showed no result at all and Step 2 opened empty.
+  const [areaEmpty, setAreaEmpty] = useState(false);
   const lookupDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const areaLookupSeq = useRef(0);
   // For auto-scrolling to each newly revealed question.
@@ -233,10 +255,12 @@ export default function DefineProject() {
       areaLookupSeq.current += 1;
       setProject({ bboxStats: null, lookedUpBuilding: null, lookedUpBuildings: [], bboxRows: [] });
       setBuildingLoading(false);
+      setAreaEmpty(false);
       return;
     }
     const reqId = ++areaLookupSeq.current;
     setBuildingLoading(true);
+    setAreaEmpty(false);
     try {
       const [stats, rows] = await Promise.all([
         api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west, undefined, project.country),
@@ -260,7 +284,8 @@ export default function DefineProject() {
       try { localStorage.setItem('ppg_bbox', JSON.stringify(bbox)); } catch { /* ignore */ }
     } catch {
       if (reqId !== areaLookupSeq.current) return;
-      setProject({ bboxStats: null });
+      setProject({ bboxStats: null, bboxRows: [], currentBbox: null });
+      setAreaEmpty(true);
     } finally {
       if (reqId === areaLookupSeq.current) setBuildingLoading(false);
     }
@@ -275,10 +300,12 @@ export default function DefineProject() {
       areaLookupSeq.current += 1;
       setProject({ bboxStats: null, selectionPolygon: null, bboxRows: [] });
       setBuildingLoading(false);
+      setAreaEmpty(false);
       return;
     }
     const reqId = ++areaLookupSeq.current;
     setBuildingLoading(true);
+    setAreaEmpty(false);
     try {
       const [stats, rows] = await Promise.all([
         api.lookupBuildingsBbox(bbox.north, bbox.south, bbox.east, bbox.west, polygon, project.country),
@@ -300,7 +327,8 @@ export default function DefineProject() {
       try { localStorage.setItem('ppg_bbox', JSON.stringify(bbox)); } catch { /* ignore */ }
     } catch {
       if (reqId !== areaLookupSeq.current) return;
-      setProject({ bboxStats: null, selectionPolygon: null });
+      setProject({ bboxStats: null, selectionPolygon: null, bboxRows: [], currentBbox: null });
+      setAreaEmpty(true);
     } finally {
       if (reqId === areaLookupSeq.current) setBuildingLoading(false);
     }
@@ -442,6 +470,23 @@ export default function DefineProject() {
 
   const [triedContinue, setTriedContinue] = useState(false);
 
+  // Why Continue is blocked by the location/buildings, if it is. Null = buildings
+  // have been found (a drawn area, a district, or looked-up addresses).
+  const hasBuildings = (project.bboxStats?.count ?? 0) > 0
+    || (project.lookedUpBuildings?.length ?? 0) > 0
+    || !!project.lookedUpBuilding
+    || !!project.district;
+  // The questions are revealed in order and the map comes last, so the buildings
+  // rule only applies once everything before it is answered; until then Continue
+  // stays clickable and lists what is still missing.
+  const locationBlock: string | null =
+    getMissing().length > 0 ? null
+    : !locationValid ?"Pick a location inside the covered area to continue."
+    : areaEmpty ? "No buildings found in the area you drew — redraw it over built-up streets."
+    : buildingLoading ? "Looking up buildings…"
+    : !hasBuildings ? "Select buildings on the map (an address, a box or a shape) to continue."
+    : null;
+
   function handleContinue() {
     setTriedContinue(true);
     const missing = getMissing();
@@ -450,35 +495,33 @@ export default function DefineProject() {
       setWizardNextError(`Add ${missing.join(", ")} to continue.`);
       return;
     }
-    if (!locationValid) { setWizardNextError("Pick a location inside the covered area to continue."); return; }
+    if (locationBlock) { setWizardNextError(locationBlock); return; }
     setValidationErrors([]);
     setWizardNextError(null);
     setStep(2);
     navigate("/step/2");
   }
 
-  // Once the user has tried Continue, keep the footer message in sync as they
-  // fill things in — it clears itself the moment nothing is missing.
+  // The footer message and the Continue button follow the same rule: Continue is
+  // disabled (with the reason shown) until buildings have actually been found —
+  // and after the user has tried Continue, the missing-field list stays in sync
+  // as they fill things in.
   useEffect(() => {
-    if (!triedContinue) return;
+    setWizardCanNext(!locationBlock);
+    if (locationBlock) { setWizardNextError(locationBlock); return; }
+    if (!triedContinue) { setWizardNextError(null); return; }
     const missing = getMissing();
     setValidationErrors(missing);
-    if (missing.length) setWizardNextError(`Add ${missing.join(", ")} to continue.`);
-    else if (!locationValid) setWizardNextError("Pick a location inside the covered area to continue.");
-    else setWizardNextError(null);
+    setWizardNextError(missing.length ? `Add ${missing.join(", ")} to continue.` : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triedContinue, project.projectName, project.systemsInScope, project.explorationApproaches,
-      project.selectedKpis, project.scale, project.ecEnergyFocus, project.renovationEnvelopeComponents, locationValid, pt]);
+  }, [locationBlock, triedContinue, project.projectName, project.systemsInScope, project.explorationApproaches,
+      project.selectedKpis, project.scale, project.ecEnergyFocus, project.renovationEnvelopeComponents, pt]);
 
   // The wizard footer's Continue runs this page's validation + advance.
   useWizardStepNav({ onNext: handleContinue });
 
-  // Gate the footer Continue button while the location is invalid; always
-  // re-enable it when leaving Step 1.
-  useEffect(() => {
-    setWizardCanNext(locationValid);
-    return () => { setWizardCanNext(true); setWizardNextError(null); };
-  }, [locationValid]);
+  // Always re-enable Continue (and clear its message) when leaving Step 1.
+  useEffect(() => () => { setWizardCanNext(true); setWizardNextError(null); }, []);
 
   /* ── follow-up helpers ───────────────────────────────────────── */
   const followUps = (pt && FOLLOW_UP_SYSTEMS[pt]) || {};
@@ -588,7 +631,7 @@ export default function DefineProject() {
     <div ref={rootRef} className="space-y-2">
 
       {/* ── PROJECT TYPE ── */}
-      <Card>
+      {!HIDE_PROJECT_TYPE && <Card>
         {HIDE_PROJECT_TYPE ? (
           <div>
             <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "1.4px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>Project type</div>
@@ -718,7 +761,7 @@ export default function DefineProject() {
           })}
         </div>
         </>)}
-      </Card>
+      </Card>}
 
       {/* ── PROJECT NAME (first, when the project type is fixed) ── */}
       {HIDE_PROJECT_TYPE && showProjectName && (() => {
@@ -730,7 +773,7 @@ export default function DefineProject() {
               type="text"
               value={project.projectName}
               onChange={(e) => setProject({ projectName: e.target.value })}
-              placeholder="e.g. Lindholmen Retrofit Study"
+              placeholder={projectNamePlaceholder(project.city)}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1 ${
                 nameMissing ? "border-red-400" : "border-gray-300"}`}
             />
@@ -1308,7 +1351,7 @@ export default function DefineProject() {
               type="text"
               value={project.projectName}
               onChange={(e) => setProject({ projectName: e.target.value })}
-              placeholder="e.g. Lindholmen Retrofit Study"
+              placeholder={projectNamePlaceholder(project.city)}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1 ${
                 nameMissing ? "border-red-400" : "border-gray-300"}`}
             />
@@ -1378,9 +1421,9 @@ export default function DefineProject() {
               <span>⚠</span>
               <span>
                 <span className="font-semibold">{locationMsg}</span>{" "}
-                {isBE
+                {project.city && project.city !== "Gothenburg"
                   ? <>Building data for <b>{project.city}</b> covers only the highlighted area —</>
-                  : <>This tool currently covers <b>Gothenburg</b> only —</>}
+                  : <>This tool currently covers the <b>Gothenburg</b> municipality —</>}
                 {" "}pick a location inside the highlighted area to continue.
               </span>
             </div>
@@ -1406,6 +1449,17 @@ export default function DefineProject() {
             <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
               <span>✓</span>
               <span>Building found — <span className="font-semibold">{project.lookedUpBuilding.address ?? "EUBUCCO match"}</span>. Full data shown in Step 2.</span>
+            </div>
+          )}
+          {locationValid && !buildingLoading && areaEmpty && (
+            <div className="mt-2 flex items-start gap-2 text-xs rounded-lg px-3 py-2"
+              style={{ color: "#fca5a5", background: "rgba(226,72,59,0.10)", border: "1px solid rgba(226,72,59,0.35)" }}>
+              <span>⚠</span>
+              <span>
+                <span className="font-semibold">No buildings found in the area you drew.</span>{" "}
+                {project.city ? <>Building data for <b>{project.city}</b> only covers part of the map.</> : null}{" "}
+                Redraw the shape over a built-up area (or use an address) to continue.
+              </span>
             </div>
           )}
           {locationValid && !buildingLoading && project.bboxStats && (

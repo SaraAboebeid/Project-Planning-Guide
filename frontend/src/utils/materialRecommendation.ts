@@ -35,7 +35,15 @@ function gwpMinOf(r: BoverketResource): number | null {
   return typeof v === "number" ? v : null;
 }
 
-export type CarbonConfidence = "legacy" | "boverket-estimate" | "fallback";
+export type CarbonConfidence = "legacy" | "catalogue" | "boverket-estimate" | "fallback";
+
+/** UK/BE material-catalogue options carry their own carbon (materialCatalogue.ts). */
+const ownCarbon = (item: WikellsItem): number | null => {
+  const v = (item as { carbonPerUnit?: number | null }).carbonPerUnit;
+  return typeof v === "number" ? v : null;
+};
+/** An option the catalogue has no price for: never the "cheapest", never free. */
+const unpriced = (item: WikellsItem) => !!(item as { costMissing?: boolean }).costMissing;
 
 /**
  * Embodied-carbon estimate per the item's own unit (kg CO2e per m² for area
@@ -54,6 +62,8 @@ export function estimateCarbon(
   item: WikellsItem,
   boverketResources: BoverketResource[]
 ): { value: number; confidence: CarbonConfidence } {
+  const own = ownCarbon(item);
+  if (own != null) return { value: own, confidence: "catalogue" };
   const legacy = WIKELLS_CARBON_MAP[item.code];
   if (legacy) return { value: legacy.kgCO2ePerM2, confidence: "legacy" };
 
@@ -112,8 +122,9 @@ export function recommendationsForLineItem(
     : items;
   if (!pool.length) return out;
 
-  if (selectedKpis.includes("Economic")) {
-    const cheapest = pool.reduce((a, b) => (a.costSEK <= b.costSEK ? a : b));
+  const priced = pool.filter((i) => !unpriced(i));
+  if (selectedKpis.includes("Economic") && priced.length) {
+    const cheapest = priced.reduce((a, b) => (a.costSEK <= b.costSEK ? a : b));
     tag(cheapest.code, "Economic");
   }
   if (selectedKpis.includes("Environmental")) {
@@ -142,7 +153,8 @@ export function recommendationsForLineItem(
   if (activeKpis.length >= 2) {
     const wantPerf = activeKpis.includes("Energy Demand");
     // Performance needs a U-value; require one only when that KPI is active.
-    const cand = pool.filter((i) => !wantPerf || i.uValue != null);
+    const cand = pool.filter((i) => (!wantPerf || i.uValue != null)
+      && (!activeKpis.includes("Economic") || !unpriced(i)));
     if (cand.length) {
       const metrics = cand.map((i) => ({
         code: i.code,

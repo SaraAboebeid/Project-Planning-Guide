@@ -3,8 +3,8 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useWizardStore } from "../store/wizard";
 import { wizardNav, useWizardCanNext, useWizardNextError } from "./wizardNav";
 import SettingsModal from "./SettingsModal";
-import { LIBRARY_TABS, tabPathFor, countryCodeFromName } from "../config/countryNav";
-import CountryCitySelector from "./CountryCitySelector";
+import { countryCodeFromName } from "../config/countryNav";
+import TopBar from "./TopBar";
 import ThemeToggle from "./ThemeToggle";
 
 // ── Confetti ─────────────────────────────────────────────────────────────────
@@ -322,75 +322,16 @@ export default function WizardLayout() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* ── TOP BAR ─────────────────────────────────────────────────── */}
-        <header className="shrink-0 flex flex-col z-20"
-                style={{ background: "#0d1117", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-
-          <div className="flex items-center gap-3 px-6 py-3">
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 10,
-                fontWeight: 800,
-                background: "rgba(var(--brand-rgb),0.25)",
-                border: "1px solid rgba(var(--brand-rgb),0.55)",
-                color: "#fff",
-              }}>
-                {activeStep.number}
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>
-                {activeStep.label}
-              </span>
-            </div>
-
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              padding: 4,
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}>
-              {LIBRARY_TABS.map((tab) => {
-                const targetPath = tabPathFor(tab, countryCodeFromName(project.country));
-                const isActive = location.pathname === tab.path || location.pathname === targetPath;
-                return (
-                  <button
-                    key={tab.label}
-                    onClick={() => navigate(targetPath)}
-                    style={{
-                      border: 0,
-                      borderRadius: 8,
-                      padding: "6px 10px",
-                      cursor: "pointer",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                      color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
-                      background: isActive ? "var(--brand-deep)" : "transparent",
-                      transition: "all 0.15s",
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ flex: 1 }} />
-
-            {/* Country → city selector + account — same as every other page's
-                TopBar, so it stays visible (and editable) inside the steps. */}
-            <CountryCitySelector />
-          </div>
-
-        </header>
+        {/* Same bar as the landing page (shared TopBar), plus the current step
+            and a read-only country › city badge so it's always clear what the
+            steps are planning for. */}
+        <TopBar
+          country={countryCodeFromName(project.country)}
+          hideLocationPicker
+          showLocationBadge
+          step={{ number: activeStep.number, label: activeStep.label }}
+          tabsRightWidth={540}
+        />
 
         {/* ── CONTENT + RIGHT PANEL ───────────────────────────────────── */}
         <div className="flex flex-1 overflow-hidden">

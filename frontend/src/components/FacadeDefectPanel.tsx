@@ -50,6 +50,11 @@ interface ImgEntry {
   /** How much wall one pixel covers, for Street View captures. Decides whether
    *  "nothing found" is worth anything - see LOW_DETAIL_MM_PER_PX. */
   mmPerPx?: number | null;
+  /** True while the AI's second look is still running on a photo whose first
+   *  round is already on screen. */
+  pass2?: boolean;
+  /** Which physical wall a Street View capture shows (building + wall midpoint). */
+  wallKey?: string;
 }
 
 /**
@@ -78,18 +83,34 @@ function iou(a: number[], b: number[]): number {
   return u > 0 ? inter / u : 0;
 }
 
-function mergeDetections(ml: FacadeDetectResponse, ai: FacadeDetectResponse | null): FacadeDetectResponse {
-  const mlDets: FacadeDetection[] = ml.detections.map(d => ({ ...d, source: "ml" }));
-  if (!ai || !ai.detections.length) return { ...ml, detections: mlDets };
-  const W = ml.width, H = ml.height;
-  const aiDets: FacadeDetection[] = ai.detections.map(d => ({
-    ...d, source: "ai",
+/** AI boxes are normalised 0-1; scale them into the photo's pixel space. */
+function scaleAi(ai: FacadeDetectResponse, W: number, H: number, round: number): FacadeDetection[] {
+  return ai.detections.map(d => ({
+    ...d, source: "ai" as const, round,
     box: (ai.normalized
       ? [d.box[0] * W, d.box[1] * H, d.box[2] * W, d.box[3] * H]
       : d.box) as [number, number, number, number],
   }));
-  const aiKept = aiDets.filter(a => !mlDets.some(m => iou(m.box, a.box) > 0.45));
-  return { width: W, height: H, detections: [...mlDets, ...aiKept], model: ai.model };
+}
+
+/** Add only the detections that are genuinely new: a box that overlaps something
+ *  already found is the same defect seen again, so it is dropped (a looser overlap
+ *  counts when the label agrees too). This is what makes the rounds cumulative
+ *  instead of double-counting. */
+function addNew(existing: FacadeDetection[], incoming: FacadeDetection[]): FacadeDetection[] {
+  const out = [...existing];
+  for (const n of incoming) {
+    const dup = out.some(e => iou(e.box, n.box) > (e.label === n.label ? 0.3 : 0.45));
+    if (!dup) out.push(n);
+  }
+  return out;
+}
+
+/** ML detections plus whatever the AI's first look adds that the ML did not box. */
+function mergeDetections(ml: FacadeDetectResponse, ai: FacadeDetectResponse | null): FacadeDetectResponse {
+  const mlDets: FacadeDetection[] = ml.detections.map(d => ({ ...d, source: "ml" as const }));
+  if (!ai || !ai.detections.length) return { ...ml, detections: mlDets };
+  return { width: ml.width, height: ml.height, detections: addNew(mlDets, scaleAi(ai, ml.width, ml.height, 1)), model: ai.model };
 }
 
 function prepImage(file: File): Promise<Blob> {
@@ -150,7 +171,8 @@ function drawAnnotated(canvas: HTMLCanvasElement, img: HTMLImageElement, result:
     ctx.setLineDash(isAi ? [lw * 3, lw * 2] : []);
     ctx.strokeRect(x1 * sx, y1 * sy, (x2 - x1) * sx, (y2 - y1) * sy);
     ctx.setLineDash([]);
-    const cap = `${i + 1}. ${isAi ? "AI " : ""}${d.label} ${Math.round(d.score * 100)}%`;
+    // Source is shown by the line style (solid = ML, dashed = AI), not in the text.
+    const cap = `${i + 1}. ${d.label} ${Math.round(d.score * 100)}%`;
     const w = ctx.measureText(cap).width + 8;
     const ty = Math.max(0, y1 * sy - 17);
     ctx.fillStyle = c; ctx.fillRect(x1 * sx, ty, w, 17);
@@ -259,7 +281,7 @@ function Lightbox({ entry, buildingLabel, onClose, onDownload }: {
                     <span className="text-[12px] font-medium text-white/85">{DEFECT_LABELS[d.label] ?? d.label}</span>
                     <span className="text-[10px] text-white/40">{Math.round(d.score * 100)}%</span>
                     <span className={`text-[9px] px-1 py-0.5 rounded ${d.source === "ai" ? "bg-sky-600/25 text-sky-300" : "bg-violet-600/25 text-violet-300"}`}>
-                      {d.source === "ai" ? "AI vision" : "ML model"}
+                      {d.source === "ai" ? `AI vision${d.round ? ` · round ${d.round}` : ""}` : "ML model"}
                     </span>
                   </div>
                   {d.note && <div className="text-[10px] text-white/40 mt-0.5">{d.note}</div>}
@@ -299,7 +321,8 @@ function Thumb({ entry, onOpen, onRemove, onRerun }: {
         {entry.status === "done" && (
           <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-medium"
             style={total > 0 ? { background: "#000a", color: "#fca5a5" } : { background: "#000a", color: "#6ee7b7" }}>
-            {total > 0 ? `${total} defect${total === 1 ? "" : "s"}` : "clean"}
+            {total > 0 ? `${total} defect${total === 1 ? "" : "s"}` : (entry.pass2 ? "no defects yet" : "clean")}
+            {entry.pass2 && <span className="text-sky-300"> · 2nd look…</span>}
           </span>
         )}
       </div>
@@ -346,6 +369,10 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
   const [dragSlot, setDragSlot] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(0.45);
   const [aiAssist, setAiAssist] = useState(true);
+  /** Run the AI a second time, told what round 1 found, and keep both rounds' findings. */
+  const [aiSecondLook, setAiSecondLook] = useState(true);
+  /** Whether the on-host ML detector answered on the last run (null = not run yet). */
+  const [mlStatus, setMlStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [lightbox, setLightbox] = useState<{ entry: ImgEntry; label: string } | null>(null);
   /** Street View capture state per facade slot, keyed "<building>|<orientation>". */
   const [svSlots, setSvSlots] = useState<Record<string, { busy: boolean; error: string | null }>>({});
@@ -362,6 +389,8 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
   const autoStopped = useRef(false);
   const autoQueue = useRef<{ b: FacadeBuilding; o: FacadeOrientation }[]>([]);
   const autoRunning = useRef(false);
+  /** wall (building + midpoint) -> the facade slot that already shows it. */
+  const wallClaims = useRef<Map<string, FacadeOrientation>>(new Map());
   const unmounted = useRef(false);
   // Reset on mount, not just set on unmount: StrictMode mounts, unmounts and
   // remounts in dev, which otherwise latches this true and kills the queue.
@@ -390,6 +419,7 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
   const writeSummary = (key: string, entries: ImgEntry[]) => {
     const done = entries.filter(e => e.status === "done");
     const byClass: Record<string, number> = {};
+    const aiByClass: Record<string, number> = {};
     const byOrientation: Partial<Record<FacadeOrientation, { imageCount: number; defectCount: number; byClass: Record<string, number> }>> = {};
     let defectCount = 0;
     for (const e of done) {
@@ -397,6 +427,7 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
       o.imageCount++;
       for (const d of e.result?.detections ?? []) {
         byClass[d.label] = (byClass[d.label] ?? 0) + 1;
+        if (d.source === "ai") aiByClass[d.label] = (aiByClass[d.label] ?? 0) + 1;
         o.byClass[d.label] = (o.byClass[d.label] ?? 0) + 1;
         o.defectCount++;
         defectCount++;
@@ -416,7 +447,7 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
       }));
     const summary: FacadeDefectSummary = {
       label: buildings.find(b => b.key === key)?.label,
-      imageCount: done.length, defectCount, byClass,
+      imageCount: done.length, defectCount, byClass, aiByClass,
       // Where the evidence came from. A clean result from street imagery alone
       // is weaker than one from uploaded close-ups, and the prioritisation
       // scores it with lower confidence rather than as a clean bill of health.
@@ -427,7 +458,10 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
         e => e.source === "streetview" && (e.mmPerPx ?? 0) > LOW_DETAIL_MM_PER_PX),
       checkedAt: new Date().toISOString(), byOrientation, photos,
     };
-    const next = { ...(project.facadeDefects ?? {}) };
+    // Read the store NOW, not the `project` captured when this render ran: several
+    // buildings finish detection at once, and merging into a stale copy made each
+    // write erase the others' results (3 inspected buildings showed as "1 of 7").
+    const next = { ...(useWizardStore.getState().project.facadeDefects ?? {}) };
     if (done.length === 0) delete next[key]; else next[key] = summary;
     setProject({ facadeDefects: next });
   };
@@ -471,6 +505,14 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
       let result: FacadeDetectResponse;
       const mlOk = mlRes.status === "fulfilled";
       const aiOk = aiRes.status === "fulfilled" && !!aiRes.value;
+      // Say plainly when the specialist model did not run. Before this the panel
+      // quietly showed AI-only results as if detection had happened, so a dead
+      // ML service went unnoticed for months.
+      if (mlOk) setMlStatus({ ok: true, message: "" });
+      else setMlStatus({
+        ok: false,
+        message: mlRes.reason instanceof Error ? mlRes.reason.message : String(mlRes.reason),
+      });
 
       if (mlOk) {
         const ai = aiOk ? aiRes.value : null;
@@ -479,15 +521,8 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
         // ML failed but AI still produced detections: keep the workflow alive.
         const ai = aiRes.value;
         const { width, height } = await readImageSize(blob);
-        const aiPx: FacadeDetection[] = (ai.detections ?? []).map((d) => ({
-          ...d,
-          source: "ai",
-          box: (ai.normalized
-            ? [d.box[0] * width, d.box[1] * height, d.box[2] * width, d.box[3] * height]
-            : d.box) as [number, number, number, number],
-        }));
         result = {
-          detections: aiPx,
+          detections: scaleAi(ai, width, height, 1),
           width,
           height,
           model: ai.model ?? "AI vision",
@@ -499,14 +534,45 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
         throw new Error(`Detection failed: ${mlErr}. ${aiAssist ? aiErr : "AI assist disabled."}`);
       }
 
+      // Round 1 goes on screen straight away; the second AI look (below) then
+      // adds to it. `pass2` shows that more is coming.
+      const willSecondLook = aiAssist && aiSecondLook && (aiOk || mlOk);
       const ms = performance.now() - t0;
       let doneEntry: ImgEntry | undefined;
       setImages(key, prev => {
-        const next = prev.map(e => e.id === id ? { ...e, status: "done" as const, result, ms } : e);
+        const next = prev.map(e => e.id === id ? { ...e, status: "done" as const, result, ms, pass2: willSecondLook } : e);
         doneEntry = next.find(e => e.id === id);
-        writeSummary(key, next);
+        // Deferred: a store write from inside a state updater re-renders other
+        // components mid-render (React's "setState while rendering" warning).
+        queueMicrotask(() => writeSummary(key, next));
         return next;
       });
+
+      // ── Round 2: the AI looks again, knowing what is already found, and reports
+      // only what it missed. The final result is the cumulative union of both rounds.
+      if (willSecondLook) {
+        try {
+          const W = result.width, H = result.height;
+          const prior = result.detections.map(d => ({
+            label: d.label,
+            box: d.box.map((v, i) => Math.round((v / (i % 2 === 0 ? W : H)) * 1000) / 1000),
+          }));
+          const ai2 = await api.facadeVision(blob, 0.3, { round: 2, prior });
+          const extra = ai2.detections.length ? scaleAi(ai2, W, H, 2) : [];
+          const merged: FacadeDetectResponse = { ...result, detections: addNew(result.detections, extra) };
+          setImages(key, prev => {
+            const next = prev.map(e => e.id === id ? { ...e, result: merged, pass2: false, ms: performance.now() - t0 } : e);
+            doneEntry = next.find(e => e.id === id);
+            queueMicrotask(() => writeSummary(key, next));
+            return next;
+          });
+          // The report copy must carry both rounds, whenever React runs the updater.
+          if (doneEntry) doneEntry = { ...(doneEntry as ImgEntry), result: merged };
+        } catch {
+          // The second look is a bonus; round 1 already stands.
+          setImages(key, prev => prev.map(e => e.id === id ? { ...e, pass2: false } : e));
+        }
+      }
 
       // Persist the annotated render so Step 5 can show it after a reload. A
       // failure here must not fail the detection the user is looking at - the
@@ -520,7 +586,7 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
             const saved = await api.facadeImageSave(id, annotated);
             setImages(key, prev => {
               const next = prev.map(e => e.id === id ? { ...e, savedUrl: saved.url } : e);
-              writeSummary(key, next);
+              queueMicrotask(() => writeSummary(key, next));
               return next;
             });
           }
@@ -564,6 +630,22 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
     if (!auto) setExpanded(prev => new Set(prev).add(b.key));
     try {
       const res = await api.streetviewFacade(b.lat, b.lon, orientation, b.country ?? "se");
+      // The wall finder accepts any wall within 60° of the requested compass side,
+      // so a wall facing north-east answers both "north" and "east", and a terrace
+      // with only a front and a back wall answers all four with those two. The same
+      // photo under two facades also counts its defects twice in the score. Claim
+      // each physical wall once; later slots that resolve to it say so instead.
+      let wallKey: string | undefined;
+      if (res.facade.aimed_at === "footprint_wall" && res.facade.lat != null && res.facade.lon != null) {
+        wallKey = `${b.key}|${res.facade.lat.toFixed(5)},${res.facade.lon.toFixed(5)}`;
+        const owner = wallClaims.current.get(wallKey);
+        if (owner && owner !== orientation) {
+          setSvSlots(prev => ({ ...prev, [slotKey]: { busy: false, error:
+            `Same wall as the ${ORIENTATION_LABELS[owner]} facade — no separate ${ORIENTATION_LABELS[orientation].toLowerCase()} wall faces the street, so it is not photographed twice.` } }));
+          return;
+        }
+        wallClaims.current.set(wallKey, orientation);
+      }
       const shot = res.images[0]!;
       const bytes = Uint8Array.from(atob(shot.b64), c => c.charCodeAt(0));
       const blob = new Blob([bytes], { type: "image/jpeg" });
@@ -579,7 +661,7 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
             : " · close-up (no square-on view)"),
         url: URL.createObjectURL(blob), blob, orientation, source: "streetview",
         status: "idle", result: null, error: null, ms: null, savedUrl: null,
-        mmPerPx: res.mm_per_px,
+        mmPerPx: res.mm_per_px, wallKey,
       };
       setImages(b.key, prev => [...prev, entry]);
       setSvSlots(prev => ({ ...prev, [slotKey]: { busy: false, error: null } }));
@@ -645,11 +727,12 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
     setImages(key, prev => {
       const gone = prev.find(e => e.id === id);
       if (gone) URL.revokeObjectURL(gone.url);
+      if (gone?.wallKey) wallClaims.current.delete(gone.wallKey);   // the wall is free to be re-captured
       // Drop the stored copy too, so deleting a photo here also removes it from
       // the Step 5 report rather than leaving an orphan on disk.
       if (gone?.savedUrl) void api.facadeImageDelete(id).catch(() => {});
       const next = prev.filter(e => e.id !== id);
-      writeSummary(key, next);
+      queueMicrotask(() => writeSummary(key, next));
       return next;
     });
   };
@@ -700,6 +783,12 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
             <input type="checkbox" checked={aiAssist} onChange={e => setAiAssist(e.target.checked)} className="w-3.5 h-3.5 accent-sky-500 cursor-pointer" />
             <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-sky-300" /> AI vision assist</span>
           </label>
+          <label className={`text-[11px] flex items-center gap-1.5 select-none ${aiAssist ? "text-white/50 cursor-pointer" : "text-white/25 cursor-not-allowed"}`}
+            title="After the first pass the AI looks again, is told what was already found, and reports only what it missed. Both rounds' findings are kept (cumulative).">
+            <input type="checkbox" checked={aiSecondLook && aiAssist} disabled={!aiAssist}
+              onChange={e => setAiSecondLook(e.target.checked)} className="w-3.5 h-3.5 accent-sky-500 cursor-pointer" />
+            <span>Second AI look</span>
+          </label>
           <label className="text-[11px] text-white/45 flex items-center gap-1.5">
             Sensitivity:
             <select value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))}
@@ -709,6 +798,20 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
             </select>
           </label>
         </div>
+
+        {/* The specialist model not answering is not a detail: without it the results
+            are the general AI model's alone. Say so instead of looking normal. */}
+        {mlStatus && !mlStatus.ok && (
+          <div className="text-[11px] rounded-md px-3 py-2 leading-snug"
+            style={{ color: "#fcd34d", background: "rgba(232,136,12,0.10)", border: "1px solid rgba(232,136,12,0.35)" }}>
+            <b>The ML defect detector is not running</b> — these results come from the AI vision model only.
+            Start it with <code>tools\ml\run_facade_service.ps1</code> (port 8021), then press ↻ on a photo to re-run it.
+            <span className="text-white/35"> ({mlStatus.message.slice(0, 140)})</span>
+          </div>
+        )}
+        {mlStatus?.ok && (
+          <div className="text-[10px] text-emerald-400/80">ML defect detector connected.</div>
+        )}
 
         {/* Auto-capture: progress while it runs, and the switch to stop paying for it. */}
         <div className="flex items-center gap-2 flex-wrap">

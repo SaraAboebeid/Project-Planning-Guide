@@ -28,7 +28,7 @@ import L from "leaflet";
 import type { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapPin, Search, Square, PenTool, X } from "lucide-react";
-import { countryCodeFromName, mapCenterFor } from "../config/countryNav";
+import { countryCodeFromName, mapCenterFor, seCityId } from "../config/countryNav";
 
 // ── Fix Leaflet default icon paths broken by Vite bundling ──────────────────
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -591,14 +591,20 @@ export default function LocationMap({
   // covered area: Gothenburg (SE) and the built Belgian cities (Brussels' focus
   // districts, the whole Liège municipality).
   const isGothenburg = countryCode === "se" && (city ?? "").toLowerCase().includes("gothenburg");
+  // Every city with generated building data gets its covered area outlined:
+  // Gothenburg's municipality, the footprint hull of other built Swedish cities,
+  // and the built UK / Belgian districts. Cities with no data have no outline.
+  const seId = seCityId(city);
   const coverageUrl = isGothenburg
     ? "/api/se/gothenburg-boundary"
-    : countryCode === "be" && city
-      ? `/api/be/coverage?city=${encodeURIComponent(city)}`
-      : null;
+    : countryCode === "se" && seId !== "gothenburg"
+      ? `/api/se/coverage?city_id=${encodeURIComponent(seId)}`
+      : (countryCode === "be" || countryCode === "gb") && city
+        ? `/api/${countryCode === "be" ? "be" : "uk"}/coverage?city=${encodeURIComponent(city)}`
+        : null;
   const coverageName = isGothenburg
     ? "the Gothenburg municipality"
-    : city === "Liège" ? "the Liège municipality" : `the ${city ?? ""} districts with building data`;
+    : city === "Liège" ? "the Liège municipality" : `the ${city ?? ""} area with building data`;
   const [boundary, setBoundary] = useState<BoundaryFeature | null>(null);
   const [districtBoundary, setDistrictBoundary] = useState<BoundaryFeature | null>(null);
 
@@ -674,7 +680,8 @@ export default function LocationMap({
   // Fetch the covered-area boundary once (for the map highlight + the
   // "inside the area?" check). Other cities: no boundary, no restriction.
   useEffect(() => {
-    if (!coverageUrl) { setBoundary(null); return; }
+    setBoundary(null);   // drop the previous city's outline straight away
+    if (!coverageUrl) return;
     let alive = true;
     fetch(coverageUrl)
       .then((r) => (r.ok ? r.json() : null))
@@ -1102,13 +1109,13 @@ Kungsgatan 10,Göteborg</div>
           {boundary && (
             <>
               <GeoJSON
-                key="gbg-halo"
+                key={`halo:${coverageUrl}`}
                 data={boundary as never}
                 interactive={false}
                 style={() => ({ color: "#ffffff", weight: 7, opacity: 0.7, fill: false })}
               />
               <GeoJSON
-                key="gbg-boundary"
+                key={`boundary:${coverageUrl}`}
                 data={boundary as never}
                 interactive={false}
                 style={() => ({ color: "var(--brand-deep)", weight: 3.5, opacity: 1, fillColor: "var(--brand-deep)", fillOpacity: 0.10 })}

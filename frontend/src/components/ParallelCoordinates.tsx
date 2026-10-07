@@ -30,7 +30,7 @@ export default function ParallelCoordinates({
   pareto, currency, colorBy = "energy", onValidate, validatedKeys, pointKey,
 }: {
   pareto: OptimizePoint[];
-  currency: "SEK" | "GBP";
+  currency: "SEK" | "GBP" | "EUR";
   colorBy?: ObjKey;
   onValidate?: (pt: OptimizePoint) => void;
   validatedKeys?: Set<string>;
@@ -109,7 +109,7 @@ export default function ParallelCoordinates({
 
   const fmt = (key: ObjKey, v: number) =>
     key === "cost"
-      ? (currency === "SEK" ? `${(v / 1e6).toFixed(2)}M` : `£${(v / 1e6).toFixed(2)}M`)
+      ? (currency === "SEK" ? `${(v / 1e6).toFixed(2)}M` : `${currency === "EUR" ? "€" : "£"}${(v / 1e6).toFixed(2)}M`)
       : key === "carbon" ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`;
 
   const passes = (pt: OptimizePoint) =>

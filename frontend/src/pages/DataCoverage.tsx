@@ -1030,6 +1030,42 @@ function BboxDataBanner({
     return () => { alive = false; };
   }, [rows, country]);
 
+  // UK / Belgian footprints often carry no address and there is no cadastre to
+  // look one up in, so ask OpenStreetMap for the rest, one at a time (the backend
+  // spaces calls to respect Nominatim's 1 req/s policy and caches every answer).
+  // Cap per area so a huge selection can't queue for minutes; the cache means a
+  // revisit is instant.
+  const [addrProgress, setAddrProgress] = useState<{ done: number; total: number } | null>(null);
+  const addrTried = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if ((country !== "United Kingdom" && country !== "Belgium") || !rows) return;
+    const todo = rows
+      .filter(r => !(r.address ?? "").trim() && typeof r.lat === "number" && typeof r.lon === "number")
+      .filter(r => !addrTried.current.has(`${r.lat},${r.lon}`))
+      .slice(0, 150);
+    if (!todo.length) return;
+    let alive = true;
+    (async () => {
+      setAddrProgress({ done: 0, total: todo.length });
+      for (let i = 0; i < todo.length; i++) {
+        const t = todo[i]!;
+        addrTried.current.add(`${t.lat},${t.lon}`);
+        try {
+          const res = await api.osmAddress(t.lat, t.lon);
+          if (!alive) return;
+          if (res.address) {
+            setRows(prev => prev && prev.map(r =>
+              r.lat === t.lat && r.lon === t.lon && !(r.address ?? "").trim()
+                ? { ...r, address: res.address!, address_source: res.exact ? "osm" : "osm_street" }
+                : r));
+          }
+        } catch { /* Nominatim busy or offline — leave this building as it was */ }
+        if (alive) setAddrProgress({ done: i + 1, total: todo.length });
+      }
+    })();
+    return () => { alive = false; };
+  }, [rows?.length, country]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // In district mode there are no precomputed aggregate stats, so derive them
   // from the fetched rows once they load.
   // Describe EXACTLY the rows in the table below. The server aggregate counts
@@ -1315,6 +1351,11 @@ function BboxDataBanner({
           <div>
             <span className="text-sm font-bold text-white/85">{bboxStats.count.toLocaleString()} buildings</span>
             <span className="text-xs text-white/35 ml-2">Bounding box</span>
+            {addrProgress && addrProgress.done < addrProgress.total && (
+              <span className="text-[11px] text-white/45 ml-3">
+                Looking up addresses from OpenStreetMap… {addrProgress.done}/{addrProgress.total}
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0 ml-3">
@@ -2269,11 +2310,6 @@ export default function DataCoverage() {
   const bboxStats  = project.bboxStats ?? null;
   const isMulti    = buildings.length > 1;
 
-  // Step 2 should never inherit a disabled Continue button from Step 1.
-  useEffect(() => {
-    setWizardCanNext(true);
-    setWizardNextError(null);
-  }, []);
 
   // Façade defect detection is only shown when the walls are part of the
   // renovation scope picked in Step 1 (defects live on the wall surface). With
@@ -2339,6 +2375,16 @@ export default function DataCoverage() {
   const [bboxRows, setBboxRows]               = useState<BuildingRecord[]>(project.bboxRows ?? []);
   const [bboxSelectedIdx, setBboxSelectedIdx] = useState<Set<number>>(new Set());
 
+  // Continue is only available once buildings are actually loaded — table rows
+  // from an area/district, or looked-up addresses. Resets Step 1's gate on entry
+  // and on leaving, so it never inherits (or leaks) a disabled button.
+  const hasBuildings = bboxRows.length > 0 || buildings.length > 0 || !!building;
+  useEffect(() => {
+    setWizardCanNext(hasBuildings);
+    setWizardNextError(hasBuildings ? null : "No buildings loaded yet — select an area or addresses in Step 1.");
+  }, [hasBuildings]);
+  useEffect(() => () => { setWizardCanNext(true); setWizardNextError(null); }, []);
+
   // Active rows: the buildings the user CHECKED (or all bbox rows if none are
   // checked yet). These are what coverage is computed on AND what flows to
   // Steps 3-4 - so the user simulates only the buildings they selected here.
@@ -2360,7 +2406,7 @@ export default function DataCoverage() {
   // (canonical carried-forward set), falling back to single/multi address lookups.
   const facadeBuildings = useMemo<FacadeBuilding[]>(() => {
     const rows = activeCovRows.length ? activeCovRows : bboxRows;
-    const src: { address: string | null; cadastral_id?: string | null; lat?: number | null; lon?: number | null }[] =
+    const src: { address: string | null; cadastral_id?: string | null; lat?: number | null; lon?: number | null; address_source?: string | null }[] =
       rows.length ? rows : buildings.map(b => ({ address: b.address, lat: b.lat, lon: b.lon }));
     const keys = makeBuildingKeys(src);
     const country = project.country === "United Kingdom" ? "gb" : project.country === "Belgium" ? "be" : "se";
@@ -2543,6 +2589,19 @@ export default function DataCoverage() {
         />
       )}
 
+      {/* Nothing to work on yet — say so instead of showing an empty page. Hidden
+          while a neighbourhood's rows are still being fetched. */}
+      {!hasBuildings && !project.district && (
+        <div className="flex items-start gap-2 text-sm rounded-xl px-4 py-3"
+          style={{ color: "#fca5a5", background: "rgba(226,72,59,0.10)", border: "1px solid rgba(226,72,59,0.35)" }}>
+          <span>⚠</span>
+          <span>
+            <span className="font-semibold">No buildings loaded.</span>{" "}
+            Go back to Step 1 and draw an area over built-up streets{project.city ? ` in ${project.city}` : ""}, or add addresses — then they will appear here.
+          </span>
+        </div>
+      )}
+
       {/* 🔗 Viewer selection — building highlighted in the 3D viewer */}
       {viewerSelection && (
         <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#0d1117] px-4 py-2.5">
@@ -2627,6 +2686,10 @@ function Step2Sections({
   // and those panels no longer have their own headers - so the section header
   // itself has to be able to close, not just open.
   const [openSec, setOpenSec] = useState<Sec2Id | null>(firstSection);
+  // Facade detection costs Street View + AI calls, so it still waits for the user
+  // to open it - but once started it keeps running in the background.
+  const [facadeEverOpened, setFacadeEverOpened] = useState(false);
+  useEffect(() => { if (openSec === "facade") setFacadeEverOpened(true); }, [openSec]);
   const prevOpen = useRef<string | null>(firstSection);
   const overviewRef = useRef<HTMLDivElement>(null);
   const facadeRef = useRef<HTMLDivElement>(null);
@@ -2740,8 +2803,12 @@ function Step2Sections({
             label="Facade Defect Detection"
             subtitle="Upload photos per facade to detect surface defects"
           />
-          {openSec === "facade" && (
-            <div style={{ padding: "0 18px 18px" }}>
+          {/* Mounted on first open, then only HIDDEN when another section opens.
+              Unmounting it stopped the Street View queue mid-run and dropped every
+              detection that finished afterwards, so moving on to Prioritisation
+              while photos were processing left the façade column empty. */}
+          {facadeEverOpened && (
+            <div style={{ padding: "0 18px 18px", display: openSec === "facade" ? "block" : "none" }}>
               <FacadeDefectPanel buildings={facadeBuildings} />
             </div>
           )}

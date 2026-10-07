@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, FACADE_ORIENTATIONS, type FacadeOrientation } from "../store/wizard";
 import { filterToBaselineShortlist } from "../utils/baselineShortlist";
-import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal } from "../config/climateGoals";
+import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal, assessRating, isScorable, goalStatement, requiredPct } from "../config/climateGoals";
 import ClimateGoalPanel from "../components/ClimateGoalPanel";
 import ClimateGoalBuildingTable from "../components/ClimateGoalBuildingTable";
 import type { BuildingLookup, BuildingRecord } from "../types";
@@ -272,7 +272,7 @@ export default function RenovationReport() {
   /* ── City climate target (Gothenburg: −30% by 2030) ────────────────────────
      Same helper Step 4 uses, so the report can't contradict what was shown when
      the packages were simulated. */
-  const climateGoal = climateGoalFor(project.city, project.country);
+  const climateGoal = useMemo(() => climateGoalFor(project.city, project.country), [project.city, project.country]);
   // simResults[].energyUse is a PORTFOLIO AVERAGE across buildings, so the goal
   // panel must measure it against the portfolio-average baseline — not
   // baselines[0] (one building), which made the panel disagree with the
@@ -281,7 +281,7 @@ export default function RenovationReport() {
     ? baselines.reduce((s, b) => s + b.energyUse, 0) / baselines.length
     : baselineEU;
   const goalAssessment = useMemo(() => {
-    if (!climateGoal || !climateBaselineEU || !simResults.length) return null;
+    if (!climateGoal || !isScorable(climateGoal) || !climateBaselineEU || !simResults.length) return null;
     return assessAgainstGoal(
       climateGoal,
       climateBaselineEU,
@@ -292,9 +292,19 @@ export default function RenovationReport() {
   // Per-building goal detail — each building's own target and how each package
   // lands against it. Uses the per-building results kept in renovationCalcPackages.
   const buildingGoal = useMemo(() => {
-    if (!climateGoal) return null;
+    if (!climateGoal || !isScorable(climateGoal)) return null;
     return assessBuildingsAgainstGoal(climateGoal, project.renovationCalcPackages ?? []);
   }, [climateGoal, project.renovationCalcPackages]);
+
+  // Rating goal (EPC band) - same estimate Step 4 shows.
+  const ratingGoal = useMemo(() => {
+    if (climateGoal?.kind !== "rating") return null;
+    const src = (project.bboxRows ?? []).length
+      ? project.bboxRows.map((b) => ({ address: b.address, lat: b.lat, lon: b.lon, sap: b.sap ?? null, band: b.epc_class }))
+      : [...(project.lookedUpBuildings ?? []), ...(project.lookedUpBuilding ? [project.lookedUpBuilding] : [])]
+          .map((b) => ({ address: b.address ?? "", lat: b.lat, lon: b.lon, sap: b.sap ?? null, band: b.eclass }));
+    return assessRating(climateGoal, project.renovationCalcPackages ?? [], src);
+  }, [climateGoal, project.renovationCalcPackages, project.bboxRows, project.lookedUpBuildings, project.lookedUpBuilding]);
 
   /* ── Recommended packages ── */
   const bestEnergy  = simResults[0] ?? null;   // already sorted by saving desc
@@ -650,7 +660,7 @@ export default function RenovationReport() {
 
   ${goalAssessment ? `
   <h2>${esc(goalAssessment.goal.city)} climate target</h2>
-  <p class="sub">Target: reduce the as-built baseline energy demand by ${goalAssessment.goal.reductionPct}% by ${goalAssessment.goal.targetYear}. ${esc(goalAssessment.goal.source)}.</p>
+  <p class="sub">${esc(goalStatement(goalAssessment.goal))} Official target: ${esc(goalAssessment.goal.basis)} Source: ${esc(goalAssessment.goal.source)}${goalAssessment.goal.sourceUrl ? ` (${esc(goalAssessment.goal.sourceUrl)})` : ""}.</p>
   <p style="font-weight:700;margin:2px 0 6px;color:${goalAssessment.achievers.length ? "#15803d" : "#b45309"}">
     ${goalAssessment.achievers.length
       ? `✓ ${esc(goalAssessment.achievers[0]!.label)} reaches −${goalAssessment.achievers[0]!.reductionPct!.toFixed(0)}%, meeting the target${goalAssessment.achievers.length > 1 ? ` (${goalAssessment.achievers.length} packages meet it)` : ""}.`
@@ -666,8 +676,8 @@ export default function RenovationReport() {
       <td>${r.meets ? "✓ Yes" : "No"}</td></tr>`).join("")}
   </tbody></table>
   ${buildingGoal ? `
-  <h3 style="font-size:10.5pt;margin:14px 0 4px">Per-building goal — each building's own −${buildingGoal.goal.reductionPct}% target</h3>
-  <table><thead><tr><th>Building</th><th>Baseline</th><th>Goal −${buildingGoal.goal.reductionPct}%</th>${buildingGoal.columns.map((c) => `<th>${esc(c.label)}<br><span style="font-weight:400;color:#64748b">${c.met}/${c.total} meet</span></th>`).join("")}</tr></thead><tbody>
+  <h3 style="font-size:10.5pt;margin:14px 0 4px">Per-building goal — ${buildingGoal.goal.kind === "absolute" ? `every building to ≤ ${buildingGoal.goal.targetKwhM2} kWh/m²·yr` : `each building's own −${buildingGoal.goal.reductionPct}% target`}</h3>
+  <table><thead><tr><th>Building</th><th>Baseline</th><th>${buildingGoal.goal.kind === "absolute" ? `Goal ≤ ${buildingGoal.goal.targetKwhM2}` : `Goal −${buildingGoal.goal.reductionPct}%`}</th>${buildingGoal.columns.map((c) => `<th>${esc(c.label)}<br><span style="font-weight:400;color:#64748b">${c.met}/${c.total} meet</span></th>`).join("")}</tr></thead><tbody>
   ${buildingGoal.rows.map((r) => `<tr>
       <td>${esc(r.address)}</td>
       <td>${r.baselineEnergy.toFixed(0)}</td>
@@ -677,12 +687,22 @@ export default function RenovationReport() {
         const col = met ? "#15803d" : cell.tier === "below" ? "#b45309" : cell.tier === "worse" ? "#b91c1c" : "#64748b";
         const pct = cell.reductionPct == null ? "—"
           : cell.tier === "worse" ? `+${Math.abs(Math.round(cell.reductionPct))}%`
-          : cell.tier === "below" ? `−${Math.round(cell.reductionPct)}% (${buildingGoal.goal.reductionPct - Math.round(cell.reductionPct)}pp short)`
+          : cell.tier === "below" ? `−${Math.round(cell.reductionPct)}% (${requiredPct(buildingGoal.goal, r.baselineEnergy) - Math.round(cell.reductionPct)}pp short)`
           : `−${Math.round(cell.reductionPct)}%`;
         return `<td style="color:${col}">${cell.energy == null ? "—" : cell.energy.toFixed(0)}${met ? " ✓" : ""}<br><span style="font-size:8pt">${pct}</span></td>`;
       }).join("")}</tr>`).join("")}
   </tbody></table>
-  <p class="sub" style="margin-top:4px">Values in kWh/m²·yr · pp = percentage points short of the −${buildingGoal.goal.reductionPct}% target.</p>` : ""}` : ""}
+  <p class="sub" style="margin-top:4px">Values in kWh/m²·yr · pp = percentage points short of the building's target.</p>` : ""}` : ""}
+  ${climateGoal && !isScorable(climateGoal) ? `
+  <h2>${esc(climateGoal.city)} climate target</h2>
+  <p class="sub">${esc(goalStatement(climateGoal))} ${climateGoal.headline ? `Headline goal: ${esc(climateGoal.headline)}. ` : ""}Official target: ${esc(climateGoal.basis)} Source: ${esc(climateGoal.source)}${climateGoal.sourceUrl ? ` (${esc(climateGoal.sourceUrl)})` : ""}.</p>
+  ${ratingGoal ? `
+  <p style="font-weight:700;margin:2px 0 6px">Buildings at band ${esc(climateGoal.targetRating ?? "")} or better: ${ratingGoal.metToday}/${ratingGoal.rows.length} today${ratingGoal.columns.map((c) => ` · ${esc(c.label)}: ${c.met}/${c.total} (est.)`).join("")}</p>
+  <table><thead><tr><th>Building</th><th>Today (certificate)</th>${ratingGoal.columns.map((c) => `<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>
+  ${ratingGoal.rows.map((r) => `<tr><td>${esc(r.address)}${r.from === "band" ? " *" : ""}</td><td>${r.nowBand} (SAP ${r.nowSap})</td>${r.cells.map((c) =>
+      `<td style="color:${c.meets ? "#15803d" : "#b45309"}">${c.band ? `${c.band} (SAP ${c.sap})${c.meets ? " ✓" : ""}` : "—"}</td>`).join("")}</tr>`).join("")}
+  </tbody></table>
+  <p class="sub" style="margin-top:4px">Package bands are estimates: each building's certificate SAP, moved by the simulated change in fuel use (SAP 2012 energy-cost factor).${ratingGoal.rows.some((r) => r.from === "band") ? " * No certificate SAP — starts from the middle of its band." : ""}</p>` : ""}` : ""}
 
   <div class="foot">
     Energy from EnergyPlus (EPSM) single-zone shoebox simulation · ${isBE

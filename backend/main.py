@@ -323,7 +323,7 @@ async def status():
     openai_on = bool(os.environ.get("OPENAI_API_KEY", "").strip())
     anthropic_on = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
     epsm_url = os.environ.get("EPSM_BASE_URL", "http://localhost:8010").strip()
-    facade_url = _resolve_facade_ml_url(default="http://host.docker.internal:8020")
+    facade_url = _resolve_facade_ml_url(default="http://host.docker.internal:8021")
 
     async def reachable(url: str) -> bool:
         try:
@@ -551,15 +551,27 @@ def be_buildings(city_id: str):
 @app.get("/api/be/coverage")
 def be_coverage(city: str = Query(..., description="City name as in the app, e.g. 'Brussels', 'Liège'")):
     """Outline of the area a Belgian city's buildings cover, for Step 1's map
-    highlight and its "is this address inside?" check. Whole-municipality
-    districts ship their outline (be/coverage_<id>.geojson); circular districts
-    are drawn from their centre and radius."""
-    districts = [c for c in (_read_uk_json("cities.json", "be").get("cities") or []) if c.get("name") == city]
+    highlight and its "is this address inside?" check."""
+    return _district_coverage(city, "be")
+
+
+@app.get("/api/uk/coverage")
+def uk_coverage(city: str = Query(..., description="City name as in the app, e.g. 'Rotherham', 'London'")):
+    """Same outline for the built UK districts (London's four districts come back
+    as one multi-polygon, Rotherham as its 4 km circle)."""
+    return _district_coverage(city, "gb")
+
+
+def _district_coverage(city: str, cc: str) -> dict:
+    """Whole-municipality districts ship their outline (<cc>/coverage_<id>.geojson);
+    circular districts are drawn from their centre and radius."""
+    base = _DISTRICT_COUNTRIES[cc][0]
+    districts = [c for c in (_read_uk_json("cities.json", cc).get("cities") or []) if c.get("name") == city]
     if not districts:
-        raise HTTPException(404, f"No built Belgian districts for '{city}'")
+        raise HTTPException(404, f"No built {cc.upper()} districts for '{city}'")
     polys: list = []
     for d in districts:
-        f = _BE_DIR / f"coverage_{d['id']}.geojson"
+        f = base / f"coverage_{d['id']}.geojson"
         if f.exists():
             g = json.loads(f.read_text(encoding="utf-8"))["geometry"]
             polys += [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
@@ -573,6 +585,61 @@ def be_coverage(city: str = Query(..., description="City name as in the app, e.g
     return {"type": "Feature",
             "properties": {"city": city, "districts": [d["district"] for d in districts]},
             "geometry": {"type": "MultiPolygon", "coordinates": polys}}
+
+
+_OSM_ADDR_FILE = PROJECT_ROOT / "data" / "osm_address_cache.json"
+_OSM_ADDR_CACHE: dict | None = None
+_OSM_ADDR_LOCK = __import__("threading").Lock()
+_OSM_ADDR_LAST = 0.0
+
+
+@app.get("/api/osm/address")
+def osm_address(lat: float = Query(...), lon: float = Query(...)):
+    """Street address for a point from OpenStreetMap (Nominatim reverse), for UK /
+    Belgian buildings whose footprints carry no address and have no cadastre to
+    look one up in. Results are cached on disk by ~1 m cell, and calls are spaced
+    >= 1.1 s apart to respect Nominatim's usage policy (public instance: max 1
+    request/second, identifying User-Agent). ``exact`` is true only when OSM
+    returned a house number, i.e. an address of the building itself rather than
+    just the street it stands on."""
+    global _OSM_ADDR_CACHE, _OSM_ADDR_LAST
+    import httpx
+    key = f"{lat:.5f},{lon:.5f}"
+    with _OSM_ADDR_LOCK:
+        if _OSM_ADDR_CACHE is None:
+            try:
+                _OSM_ADDR_CACHE = json.loads(_OSM_ADDR_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                _OSM_ADDR_CACHE = {}
+        if key in _OSM_ADDR_CACHE:
+            return _OSM_ADDR_CACHE[key]
+        wait = 1.1 - (_time.monotonic() - _OSM_ADDR_LAST)
+        if wait > 0:
+            _time.sleep(wait)
+        try:
+            r = httpx.get("https://nominatim.openstreetmap.org/reverse",
+                          params={"lat": lat, "lon": lon, "format": "jsonv2", "zoom": 18, "addressdetails": 1},
+                          headers={"User-Agent": "RenovationPlanningToolbox/1.0 (Chalmers; saraabo@chalmers.se)"},
+                          timeout=15)
+        finally:
+            _OSM_ADDR_LAST = _time.monotonic()
+        if r.status_code != 200:
+            raise HTTPException(502, f"Nominatim answered {r.status_code}")
+        a = (r.json() or {}).get("address") or {}
+        road = a.get("road") or a.get("pedestrian") or a.get("footway") or a.get("path")
+        house = a.get("house_number")
+        place = a.get("suburb") or a.get("neighbourhood") or a.get("village") or a.get("town") or a.get("city")
+        name = a.get("building") if a.get("building") not in (None, "yes") else None
+        first = " ".join(x for x in (house, road) if x) or name
+        out = {"address": ", ".join(x for x in (first, place) if x) or None,
+               "exact": bool(house), "postcode": a.get("postcode")}
+        _OSM_ADDR_CACHE[key] = out
+        try:
+            _OSM_ADDR_FILE.parent.mkdir(parents=True, exist_ok=True)
+            _OSM_ADDR_FILE.write_text(json.dumps(_OSM_ADDR_CACHE, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
+        return out
 
 
 @app.get("/api/be/building")
@@ -1583,6 +1650,40 @@ def gothenburg_boundary():
             "geometry": mapping(merged),
         }
     return _GBG_BOUNDARY_CACHE
+
+
+_SE_COVERAGE_CACHE: dict[str, dict] = {}
+
+
+@app.get("/api/se/coverage")
+def se_coverage(city_id: str = Query(..., description="Backend city id, e.g. 'malmo'")):
+    """Outline of the area a built Swedish city's buildings cover (other than
+    Gothenburg, which has its own municipality boundary). The hull of the built
+    footprints, padded ~150 m and simplified - i.e. exactly where there is data.
+    Cached per city; re-built when the city's payload file changes."""
+    if city_id == "gothenburg":
+        return gothenburg_boundary()
+    f = _se_city_file(city_id)
+    if not f.exists():
+        raise HTTPException(404, f"City '{city_id}' has not been built")
+    stamp = f.stat().st_mtime
+    hit = _SE_COVERAGE_CACHE.get(city_id)
+    if hit and hit["stamp"] == stamp:
+        return hit["feature"]
+    from shapely.geometry import MultiPoint, mapping
+    pts = []
+    for b in _se_buildings(city_id):
+        la, lo = _polygon_centroid(b.get("coordinates") or [])
+        if la or lo:
+            pts.append((lo, la))
+    if len(pts) < 3:
+        raise HTTPException(404, f"City '{city_id}' has no building footprints")
+    hull = MultiPoint(pts).convex_hull.buffer(0.0015).simplify(0.0005, preserve_topology=True)
+    feature = {"type": "Feature",
+               "properties": {"city_id": city_id, "buildings": len(pts)},
+               "geometry": mapping(hull)}
+    _SE_COVERAGE_CACHE[city_id] = {"stamp": stamp, "feature": feature}
+    return feature
 
 
 @app.get("/api/se/district-boundary")
@@ -2907,7 +3008,7 @@ async def trafikverket_data(refresh: bool = False):
 # ── Facade defect detection (MBDD2025 Faster R-CNN) — CONNECTED ─────────────
 # Proxies to the on-host torch service (tools/ml/facade_detect_service.py) via
 # FACADE_ML_URL (preferred) / FACADE_MODEL_URL (legacy alias). In prod that is
-# set to http://host.docker.internal:8020 in docker-compose.prod.yml (same
+# set to http://host.docker.internal:8021 in docker-compose.prod.yml (same
 # host-gateway pattern as EPSM). If neither env var is set OR the service is
 # down, it falls back to a clearly-labelled placeholder
 # ("model_connected": false) so the UI degrades gracefully.
@@ -5334,13 +5435,23 @@ async def facade_detect(request: Request, threshold: float = 0.5):
     """Forward a captured facade image to the on-host ML service and return the
     detected defects (crack/leakage/abscission/corrosion/bulge) as boxes."""
     import httpx
-    facade_url = _resolve_facade_ml_url(default="http://host.docker.internal:8020")
+    facade_url = _resolve_facade_ml_url(default="http://host.docker.internal:8021")
     body = await request.body()
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             r = await client.post(f"{facade_url}/detect", params={"threshold": threshold},
                                   content=body, headers={"content-type": "application/octet-stream"})
-        return JSONResponse(r.json(), status_code=r.status_code)
+        data = r.json()
+        # Something else may be squatting on the port (another project's server
+        # answered 404 here for months, silently leaving only the AI second
+        # opinion). Only our service returns a `classes` list - anything else is
+        # reported as "not connected" instead of being passed through as a result.
+        if r.status_code != 200 or not isinstance(data, dict) or "classes" not in data:
+            raise HTTPException(503, f"{facade_url} answered but is not the facade ML service "
+                                     f"(HTTP {r.status_code}). Another program may be using that port.")
+        return JSONResponse(data)
+    except HTTPException:
+        raise
     except Exception as e:  # noqa: BLE001
         raise HTTPException(503, f"Facade ML service unreachable at {facade_url}. Start it with "
                                  f"`python tools/ml/facade_detect_service.py`. ({type(e).__name__})")
@@ -6051,7 +6162,8 @@ _VISION_DEFECT_CLASSES = ("crack", "leakage", "abscission", "corrosion", "bulge"
 
 
 @app.post("/api/facade-vision")
-async def facade_vision(request: Request, threshold: float = 0.3):
+async def facade_vision(request: Request, threshold: float = 0.3,
+                        ai_round: int = Query(1, alias="round"), prior: str = ""):
     """Second-opinion facade defect detection using a general vision-language model
     (GPT-4o / Claude) to catch defects the specialised MBDD2025 detector may miss.
 
@@ -6088,6 +6200,26 @@ async def facade_vision(request: Request, threshold: float = 0.3):
         "x1,y1 = bottom-right) and must tightly bound each defect. Report only genuine, "
         "clearly visible defects; if there are none return {\"defects\":[]}."
     )
+    if ai_round >= 2:
+        # Round 2 is a second, deliberately different look: it is told what the first
+        # pass already found and asked only for what that pass MISSED, so the two
+        # rounds add up instead of repeating each other. `prior` is a compact JSON
+        # list of {label, box} with the same normalised boxes this endpoint returns.
+        try:
+            found = [p for p in (json.loads(prior) if prior else []) if isinstance(p, dict)][:40]
+        except json.JSONDecodeError:
+            found = []
+        listing = "; ".join(f'{p.get("label", "?")} at {p.get("box")}' for p in found) or "none"
+        prompt += (
+            "\n\nA first inspection of this same photograph has ALREADY reported these defects "
+            f"(normalised boxes): {listing}.\n"
+            "Look again, slowly, and report ONLY ADDITIONAL defects that are not already listed. "
+            "Check specifically for what a first glance misses: hairline or short cracks, "
+            "early or faint staining and efflorescence, defects around window and door reveals, "
+            "sills, lintels, balconies, the roof edge and the base of the wall, small patches of "
+            "missing render or brick, and rust at fixings. Do not repeat or re-box anything "
+            "already listed. If nothing further is visible return {\"defects\":[]}."
+        )
 
     content_text: Optional[str] = None
     model_used: Optional[str] = None
@@ -6112,24 +6244,40 @@ async def facade_vision(request: Request, threshold: float = 0.3):
             print(f"[facade-vision] Anthropic call failed: {exc}")
 
     if content_text is None and openai_key:
-        try:
+        # FACADE_VISION_MODEL picks the OpenAI model (default gpt-5.5); gpt-4o is the
+        # fallback if that one is unavailable or errors, so a bad setting never
+        # turns detection off. GPT-5 / o-series are reasoning models: they take
+        # `max_completion_tokens` (which must leave room for the hidden reasoning,
+        # or the visible answer comes back empty) and no `max_tokens`.
+        preferred = os.environ.get("FACADE_VISION_MODEL", "gpt-5.5").strip() or "gpt-5.5"
+        for model_name in dict.fromkeys([preferred, "gpt-4o"]):
+            reasoning = model_name.startswith(("gpt-5", "o1", "o3", "o4"))
             payload = {
-                "model": "gpt-4o", "max_tokens": 900,
+                "model": model_name,
                 "messages": [{"role": "user", "content": [
                     {"type": "text", "text": prompt},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"}},
                 ]}],
+                **({"max_completion_tokens": 6000, "reasoning_effort": "low"} if reasoning else {"max_tokens": 900}),
             }
-            async with httpx.AsyncClient(timeout=45) as client:
-                r = await client.post("https://api.openai.com/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {openai_key}"}, json=payload)
-                r.raise_for_status()
-                content_text = r.json()["choices"][0]["message"]["content"].strip()
-                model_used = "gpt-4o-vision"
-        except Exception as exc:  # noqa: BLE001
-            print(f"[facade-vision] OpenAI call failed: {exc}")
+            try:
+                async with httpx.AsyncClient(timeout=90) as client:
+                    r = await client.post("https://api.openai.com/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {openai_key}"}, json=payload)
+                    r.raise_for_status()
+                    text = (r.json()["choices"][0]["message"].get("content") or "").strip()
+                if text:
+                    content_text, model_used = text, f"{model_name}-vision"
+                    break
+                print(f"[facade-vision] {model_name} returned no text; trying the fallback")
+            except Exception as exc:  # noqa: BLE001
+                body = getattr(getattr(exc, "response", None), "text", "")[:200]
+                print(f"[facade-vision] OpenAI {model_name} failed: {exc} {body}")
 
     detections: list[dict] = []
+    # Round 2 is asked to keep looking, which invites over-reporting; hold it to a
+    # higher confidence than the first pass so "more" does not mean "more guesses".
+    min_conf = max(threshold, 0.6) if ai_round >= 2 else threshold
     if content_text:
         m = _re.search(r'\{.*\}', content_text, _re.DOTALL)
         if m:
@@ -6137,7 +6285,7 @@ async def facade_vision(request: Request, threshold: float = 0.3):
                 for d in (json.loads(m.group()).get("defects") or []):
                     try:
                         conf = float(d.get("confidence", 0.5))
-                        if conf < threshold:
+                        if conf < min_conf:
                             continue
                         box = d.get("box") or []
                         if len(box) != 4:
@@ -6160,7 +6308,7 @@ async def facade_vision(request: Request, threshold: float = 0.3):
                         detections.append({
                             "label": label, "score": round(conf, 3),
                             "box": [round(xa, 4), round(ya, 4), round(xb, 4), round(yb, 4)],
-                            "source": "ai", "note": str(d.get("note", ""))[:80],
+                            "source": "ai", "round": ai_round, "note": str(d.get("note", ""))[:80],
                         })
                     except (TypeError, ValueError):
                         continue

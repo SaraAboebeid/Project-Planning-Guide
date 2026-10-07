@@ -104,13 +104,26 @@ const DEFECT_SEVERITY: Record<string, number> = {
  *  score entirely and the other criteria are re-weighted (per user preference). */
 function scoreFacade(summary: FacadeDefectSummary | undefined): SubScore {
   if (summary && summary.imageCount > 0) {
-    let load = 0;
-    for (const [k, c] of Object.entries(summary.byClass)) load += (DEFECT_SEVERITY[k] ?? 0.75) * c;
+    // A defect the ML detector boxed counts in full. One that only the general AI
+    // model reported counts half: its boxes are the less reliable of the two (it
+    // can mark sky or shadow), and it was asked to keep looking for more.
+    let load = 0, aiOnly = 0;
+    for (const [k, c] of Object.entries(summary.byClass)) {
+      const ai = Math.min(c, summary.aiByClass?.[k] ?? 0);
+      aiOnly += ai;
+      load += (DEFECT_SEVERITY[k] ?? 0.75) * ((c - ai) + 0.5 * ai);
+    }
     // Saturating curve: a handful of severe defects already means "bad".
     const value = (1 - Math.exp(-load / 4)) * 100;
     const photos = `${summary.imageCount} photo${summary.imageCount === 1 ? "" : "s"}`;
     if (summary.defectCount > 0) {
-      return { value, confidence: 1, note: `${summary.defectCount} defect${summary.defectCount === 1 ? "" : "s"} in ${photos}`, available: true };
+      // Name WHAT was found, worst first - "5 defects" alone does not tell a planner
+      // whether the wall has hairline staining or structural cracking.
+      const breakdown = Object.entries(summary.byClass)
+        .sort((a, b) => (DEFECT_SEVERITY[b[0]] ?? 0.75) * b[1] - (DEFECT_SEVERITY[a[0]] ?? 0.75) * a[1])
+        .map(([k, c]) => `${c} ${k}`).join(", ");
+      return { value, confidence: summary.streetviewOnly ? 0.8 : 1, available: true,
+               note: `${breakdown} (${photos}${aiOnly ? `, ${aiOnly} AI-only` : ""})` };
     }
     // "Nothing found" is only as strong as the photo it was found in. Street
     // imagery is shot from the road, so fine cracking is not resolvable, and
@@ -196,11 +209,20 @@ export interface PriorityInput { key: string; label: string; row: BuildingRecord
 /** Stable per-building key (cadastral id, else normalised address, else index),
  *  de-duplicated. MUST match the key the façade panel writes `facadeDefects` under
  *  so the F criterion picks up each building's inspection. */
-export function makeBuildingKeys(rows: { address: string | null; cadastral_id?: string | null }[]): string[] {
+export function makeBuildingKeys(rows: {
+  address: string | null; cadastral_id?: string | null;
+  lat?: number | null; lon?: number | null; address_source?: string | null;
+}[]): string[] {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
   const seen = new Set<string>();
   return rows.map((b, i) => {
-    let key = (b.cadastral_id && b.cadastral_id.trim()) || norm(b.address ?? "") || `bldg-${i}`;
+    // An address that was looked up from OpenStreetMap AFTER the building was
+    // listed must not become its key: the key would change mid-session and orphan
+    // the façade photos and results already stored under the old one. Such
+    // buildings (and ones with no address at all) key on their position instead.
+    const own = b.address_source?.startsWith("osm") ? "" : norm(b.address ?? "");
+    const pos = b.lat != null && b.lon != null ? `ll${b.lat.toFixed(5)}_${b.lon.toFixed(5)}` : "";
+    let key = (b.cadastral_id && b.cadastral_id.trim()) || own || pos || `bldg-${i}`;
     while (seen.has(key)) key = `${key}-${i}`;
     seen.add(key);
     return key;
@@ -245,9 +267,13 @@ export function computePriorities(
     const contrib = availKeys
       .map(k => ({ k, c: eff[k] * scores[k].value }))
       .sort((a, b) => b.c - a.c);
-    const drivers = contrib.slice(0, 2)
-      .filter(d => d.c > 0)
-      .map(d => `${CRITERION_LABELS[d.k]}: ${scores[d.k].note}`);
+    const top = contrib.slice(0, 2).filter(d => d.c > 0);
+    // Detected façade defects are always worth stating as a reason, even when the
+    // energy criteria outweigh them in the score.
+    if (scores.F.available && scores.F.value >= 30 && !top.some(d => d.k === "F")) {
+      top.push({ k: "F", c: eff.F * scores.F.value });
+    }
+    const drivers = top.map(d => `${CRITERION_LABELS[d.k]}: ${scores[d.k].note}`);
 
     return { key: it.key, label: it.label, row: it.row, P, scores, confidence, drivers };
   });

@@ -35,8 +35,11 @@ services:
         required: false
     environment:
       EPSM_BASE_URL: "http://host.docker.internal:8010"
-      FACADE_ML_URL: "http://localhost:8020"
-      FACADE_MODEL_URL: "http://host.docker.internal:8020"
+      # The detector runs on the HOST (port 8021 - 8020 is taken by another
+      # project's server here). Inside this container "localhost" is the container
+      # itself, so both names must point at host.docker.internal.
+      FACADE_ML_URL: "http://host.docker.internal:8021"
+      FACADE_MODEL_URL: "http://host.docker.internal:8021"
       EUBUCCO_DATA_DIR: "/app/data/eubucco"
     extra_hosts:
       - "host.docker.internal:host-gateway"

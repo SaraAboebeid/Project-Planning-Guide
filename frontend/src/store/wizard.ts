@@ -293,6 +293,10 @@ export interface FacadeDefectSummary {
   imageCount: number;
   defectCount: number;
   byClass: Record<string, number>;   // e.g. { crack: 3, corrosion: 1 }
+  /** How many of `byClass` came from the AI vision model ALONE (the ML detector
+   *  did not box them). Its boxes are less reliable, so prioritisation counts them
+   *  at half weight and says how many there were. */
+  aiByClass?: Record<string, number>;
   checkedAt: string;                  // ISO timestamp
   /** True when every analysed photo came from Street View rather than an upload.
    *  "No defects" from a street shot is weaker evidence than from a close-up, so

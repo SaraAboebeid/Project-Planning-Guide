@@ -2,12 +2,12 @@
 env + the trained model from the ML project). The app's backend proxies to it
 at /api/facade-detect.
 
-    python tools/ml/facade_detect_service.py           # serves on :8020
+    python tools/ml/facade_detect_service.py           # serves on :8021
 
 Config (env):
     FACADE_ML_ROOT   default C:/Users/saraabo/Desktop/ML  (the ML repo)
     FACADE_MODEL     default outputs/mbdd2025_pretrained/best.pt  (best_score 0.77)
-    FACADE_ML_PORT   default 8020
+    FACADE_ML_PORT   default 8021  (not 8020: another local project's server took that)
 
 POST /detect  (raw image bytes, ?threshold=0.5) -> {detections:[{box,label,score}], width, height}
 """
@@ -18,7 +18,7 @@ from pathlib import Path
 
 ML_ROOT = Path(os.environ.get("FACADE_ML_ROOT", r"C:/Users/saraabo/Desktop/ML"))
 MODEL_REL = os.environ.get("FACADE_MODEL", "outputs/mbdd2025_pretrained/best.pt")
-PORT = int(os.environ.get("FACADE_ML_PORT", "8020"))
+PORT = int(os.environ.get("FACADE_ML_PORT", "8021"))
 
 sys.path.insert(0, str(ML_ROOT / "src"))          # make the facade_ml package importable
 import numpy as np

@@ -40,6 +40,8 @@ export default function TopBar({
   onCityChange,
   hideLocationPicker = false,
   tabsRightWidth,
+  step,
+  showLocationBadge = false,
 }: {
   country?: CountryCode;
   city?: string;
@@ -49,6 +51,11 @@ export default function TopBar({
   hideLocationPicker?: boolean;
   /** Home page: put the tabs at the right edge at this width, lined up with the card below. */
   tabsRightWidth?: number;
+  /** Wizard: the step being worked on, shown as a chip after the product name. */
+  step?: { number: number; label: string };
+  /** Wizard: show the project's country › city as a read-only badge, so it is
+   *  always clear what the steps are planning for. Changed from the home page. */
+  showLocationBadge?: boolean;
 } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -83,6 +90,11 @@ export default function TopBar({
     if (onCityChange) onCityChange(name);
     else setProject({ city: name });
   }
+
+  // Badge reads the project's own location (the wizard URLs carry no country).
+  const badgeCountry = COUNTRIES.find((c) => c.id === countryCodeFromName(project.country)) ?? COUNTRIES[0];
+  const badgeCityRaw = project.city ?? defaultCityFor(badgeCountry!.id);
+  const badgeCity = cityEnabled(badgeCountry!.id, badgeCityRaw) ? badgeCityRaw : defaultCityFor(badgeCountry!.id);
 
   const pill = {
     display: "flex",
@@ -184,9 +196,32 @@ export default function TopBar({
         </button>
       </div>
 
+      {step && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <span style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)" }} />
+          <span style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center",
+            justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff",
+            background: "rgba(var(--brand-rgb),0.25)", border: "1px solid rgba(var(--brand-rgb),0.55)" }}>
+            {step.number}
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>{step.label}</span>
+        </div>
+      )}
+
       {!tabsRightWidth && tabs}
 
       <div style={{ flex: 1 }} />
+
+      {showLocationBadge && (
+        <div title="Planning location — change it from the home page"
+          style={{ ...pill, padding: "5px 12px", gap: 7, flexShrink: 0, fontSize: 11, whiteSpace: "nowrap" }}>
+          <span style={{ fontWeight: 700, color: "#fff" }}>{badgeCountry!.name}</span>
+          {badgeCity && (<>
+            <span style={{ color: "rgba(255,255,255,0.3)" }}>›</span>
+            <span style={{ fontWeight: 700, color: "#4ECDC4" }}>{badgeCity}</span>
+          </>)}
+        </div>
+      )}
 
       {/* Country → city selector. Switching to a country or city that has no
           build yet is a no-op for the page content; the pill still moves so the
