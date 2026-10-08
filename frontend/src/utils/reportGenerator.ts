@@ -3,6 +3,8 @@
  * Open the result in a new tab — user can print to PDF or save as HTML.
  */
 
+import { buildingUseLabel } from "./useLabels";
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface ReportTimeline {
@@ -197,19 +199,6 @@ function coveragePill(available: boolean) {
     : `<span style="color:#dc2626;font-weight:600;">✘ Missing / Proxy</span>`;
 }
 
-function useLabel(raw: string | null) {
-  if (!raw) return "—";
-  const map: Record<string, string> = {
-    bostad_enfamilj: "Single-family residential",
-    bostad_flerfamilj: "Multi-family residential",
-    handel: "Retail",
-    kontor: "Office",
-    industri: "Industrial",
-    komplement: "Ancillary / Garage",
-    ovrigt: "Other",
-  };
-  return map[raw] ?? raw;
-}
 
 // ── Main generator ─────────────────────────────────────────────────────────
 
@@ -249,7 +238,7 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
     <p class="sub-label">Looked-up Building</p>
     <table class="kv-table">
       ${kv("Address", loc.address)}
-      ${kv("Building Use", useLabel(loc.use_cat))}
+      ${kv("Building Use", buildingUseLabel(loc.use_cat))}
       ${kv("Year Built", loc.year)}
       ${kv("Height", loc.height, "m")}
       ${kv("Floors", loc.floors)}
@@ -278,7 +267,7 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
       ${kv("Avg. Year Built", bbox.avg_year != null ? Math.round(bbox.avg_year) : null)}
       ${kv("Avg. Energy Use", bbox.avg_energy != null ? bbox.avg_energy.toFixed(0) : null, "kWh/m²/yr")}
       ${kv("Avg. Footprint", bbox.avg_footprint != null ? bbox.avg_footprint.toFixed(0) : null, "m²")}
-      ${kv("Most Common Use", useLabel(bbox.common_use))}
+      ${kv("Most Common Use", buildingUseLabel(bbox.common_use))}
     </table>`;
   }
 
@@ -301,7 +290,7 @@ export function generateReport(project: ReportProject, computed: ReportComputedV
     const rowHtml = (rows: typeof buildingRows) => rows.map(r => `
       <tr>
         <td>${esc(r.address)}</td>
-        <td>${esc(useLabel(r.building_use))}</td>
+        <td>${esc(buildingUseLabel(r.building_use))}</td>
         <td>${esc(r.year_built)}</td>
         <td>${r.epc_class ? `<strong>${esc(r.epc_class)}</strong>` : "—"}</td>
         <td>${r.energy_kwh_m2 != null ? r.energy_kwh_m2.toFixed(0) : "—"}</td>

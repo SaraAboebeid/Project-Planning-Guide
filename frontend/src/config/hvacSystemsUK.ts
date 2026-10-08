@@ -20,13 +20,17 @@
  * - flagged provisional.
  */
 import type { EnergyCarrier, HvacCatalogue, HvacSystem } from "./hvacSystems";
+import { ASSUMPTIONS } from "./optimizationAssumptions";
 
 export interface UkRetailTariffs {
   electricityGbpPerKwh: number | null;
   gasGbpPerKwh: number | null;
 }
 
-const FALLBACK = { electricity: 0.25305, gas: 0.07265 }; // Yorkshire cap, Jul–Sep 2026, DD, incl. VAT
+// Fallbacks and carbon factors come from the Data Explorer's assumption list,
+// so Systems, the optimiser and the documentation can't drift apart.
+const ukA = (key: string, dflt: number) => ASSUMPTIONS.UK.find((a) => a.key === key)?.value ?? dflt;
+const FALLBACK = { electricity: ukA("electricity_price", 0.256), gas: ukA("gas_price", 0.079) }; // Yorkshire cap, Oct–Dec 2026, DD
 
 export function ukCarriers(t?: UkRetailTariffs | null): Record<"gas" | "electricity", EnergyCarrier> {
   const live = (v: number | null | undefined) => v != null;
@@ -36,7 +40,7 @@ export function ukCarriers(t?: UkRetailTariffs | null): Record<"gas" | "electric
       label: "Mains gas",
       tariffSek: t?.gasGbpPerKwh ?? FALLBACK.gas,
       // Scope 1 combustion 0.18296 + well-to-tank 0.03021 - life-cycle, like the Swedish carriers.
-      carbonKgPerKwh: 0.18296 + 0.03021,
+      carbonKgPerKwh: ukA("carbon_factor_heat", 0.18296 + 0.03021),
       source: `Price: Ofgem price cap, Yorkshire, Direct Debit, incl. VAT (${live(t?.gasGbpPerKwh) ? "live via Octopus Energy API" : "fallback value"}). Carbon: DESNZ GHG factors 2025, natural gas kWh gross CV incl. well-to-tank.`,
       sourceUrl: "https://www.gov.uk/government/collections/government-conversion-factors-for-company-reporting",
     },
@@ -45,7 +49,7 @@ export function ukCarriers(t?: UkRetailTariffs | null): Record<"gas" | "electric
       label: "Electricity",
       tariffSek: t?.electricityGbpPerKwh ?? FALLBACK.electricity,
       // Generation 0.17700 + transmission & distribution losses 0.01853.
-      carbonKgPerKwh: 0.17700 + 0.01853,
+      carbonKgPerKwh: ukA("carbon_factor_elec", 0.17700 + 0.01853),
       source: `Price: Ofgem price cap, Yorkshire, Direct Debit (${live(t?.electricityGbpPerKwh) ? "live via Octopus Energy API" : "fallback value"}). Carbon: DESNZ GHG factors 2025, UK electricity generation + T&D losses (location-based).`,
       sourceUrl: "https://www.gov.uk/government/collections/government-conversion-factors-for-company-reporting",
       note: "The 2026 DESNZ set is ~26% lower partly from a method change - don't mix years.",

@@ -996,7 +996,7 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: 0 }}>Pathways</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: 0 }}>Workflow</h2>
           <span style={{
             padding: "2px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700,
             background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.40)",

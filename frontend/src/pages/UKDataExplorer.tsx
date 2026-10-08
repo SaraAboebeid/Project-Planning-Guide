@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import OptimizationAssumptions from "../components/OptimizationAssumptions";
 import MethodEquationsPanel from "../components/MethodEquationsPanel";
+import MaterialCatalogueCard from "../components/MaterialCatalogueCard";
 
 function Icon({ d, size = 16 }: { d: string; size?: number }) {
   return (
@@ -459,6 +460,7 @@ export default function UKDataExplorer() {
       {/* Optimization assumptions + equations + sources (defaults to UK) */}
       <MethodEquationsPanel />
       <OptimizationAssumptions country="UK" />
+      <MaterialCatalogueCard country="UK" />
 
       <div style={{ marginTop: 24, fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
         Sources: OpenStreetMap (ODbL) · Energy Performance of Buildings Register, MHCLG (Open Government Licence v3.0) ·

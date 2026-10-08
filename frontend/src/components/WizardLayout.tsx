@@ -367,8 +367,8 @@ export default function WizardLayout() {
               ) : (
                 <div style={{ maxWidth: 620, fontSize: 11.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.45, textAlign: "center" }}>
                   <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginRight: 7 }}>Next</span>
-                  <b style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>{nextStepLabel}</b>
-                  {nextHint ? <span style={{ color: "rgba(255,255,255,0.42)" }}> — {nextHint}</span> : null}
+                  <b style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>{wizardNav.nextInfo?.label ?? nextStepLabel}</b>
+                  {(wizardNav.nextInfo?.hint ?? nextHint) ? <span style={{ color: "rgba(255,255,255,0.42)" }}> — {wizardNav.nextInfo?.hint ?? nextHint}</span> : null}
                 </div>
               )}
             </div>

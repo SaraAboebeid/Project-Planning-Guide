@@ -25,8 +25,19 @@ export const wizardNav: {
   /** A short "fill in X to continue" message the footer shows next to Continue
    *  when the current step's validation fails. Null = nothing missing. */
   nextError: string | null;
+  /** Overrides the footer's "Next <step> — hint" preview when Continue does
+   *  something within the page (Step 4 moves between its views). */
+  nextInfo: { label: string; hint: string } | null;
   _listeners: Set<() => void>;
-} = { onNext: null, onBack: null, canNext: true, nextError: null, _listeners: new Set() };
+} = { onNext: null, onBack: null, canNext: true, nextError: null, nextInfo: null, _listeners: new Set() };
+
+/** Set (or clear with null) the footer's Next preview. */
+export function setWizardNextInfo(info: { label: string; hint: string } | null) {
+  const cur = wizardNav.nextInfo;
+  if (cur?.label === info?.label && cur?.hint === info?.hint) return;
+  wizardNav.nextInfo = info;
+  wizardNav._listeners.forEach((l) => l());
+}
 
 export function useWizardStepNav(handlers: { onNext?: NavHandler; onBack?: NavHandler }) {
   const { onNext, onBack } = handlers;

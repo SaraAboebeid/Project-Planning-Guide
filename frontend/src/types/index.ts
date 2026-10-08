@@ -105,6 +105,8 @@ export interface BuildingRecord {
   boplats_avg_rent_per_m2_sek: number | null;
   // UK only (country=gb): see backend _uk_bbox_row.
   energy_source?: "epc" | "tabula_estimate" | null;
+  /** Belgium: "statbel_prior" = year sampled from Statbel, not recorded. */
+  year_source?: "epc_age_band" | "eubucco_osm" | "osm" | "statbel_prior" | null;
   epc_source?: string | null;
   sap?: number | null;
   u_floor?: number | null;

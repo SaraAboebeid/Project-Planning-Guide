@@ -126,17 +126,23 @@ export interface AssemblyResult {
  * resistance is the area-weighted harmonic mean of the insulated and the
  * timber path. Ignoring it understates U materially.
  */
-export function computeAssemblyU(layers: AssemblyLayer[], kind: ComponentKind): AssemblyResult {
+export function computeAssemblyU(
+  layers: AssemblyLayer[], kind: ComponentKind,
+  /** Material set to resolve ids against - the UK/BE catalogue passes its own. */
+  byId: Record<string, LayerMaterial> = MATERIAL_BY_ID,
+): AssemblyResult {
   const { rsi, rse } = SURFACE_RESISTANCE[kind];
   const warnings: string[] = [];
   let framingApplied = false;
 
   // Resolve each layer's resistance first (framing handled below).
   const resolved = layers.map((l) => {
-    const m = MATERIAL_BY_ID[l.materialId];
+    const m = byId[l.materialId];
     if (!m) return null;
     const d = Math.max(0, l.thicknessMm) / 1000;
     const r = m.lambda == null ? (m.fixedR ?? 0) : (m.lambda > 0 ? d / m.lambda : 0);
+    // (A fixed-R layer - a cavity, or the UK/BE "existing wall as built" - keeps
+    // its R whatever thickness is typed.)
     return { m, thicknessMm: l.thicknessMm, r };
   }).filter((x): x is { m: LayerMaterial; thicknessMm: number; r: number } => x !== null);
 
@@ -170,6 +176,9 @@ export function computeAssemblyU(layers: AssemblyLayer[], kind: ComponentKind): 
 
   if (!resolved.some((x) => x.m.category === "insulation")) {
     warnings.push("No insulation layer — this is a bare build-up, not a retrofit assembly.");
+  }
+  if (resolved.some((x) => x.m.id === "existing") && resolved[0]?.m.id !== "existing" && resolved[resolved.length - 1]?.m.id !== "existing") {
+    warnings.push("The existing wall/roof/floor sits between new layers — check the order (it doesn't change U, but it does change what is buildable).");
   }
   if (uValue != null && uValue > 1.0) {
     warnings.push(`U = ${uValue.toFixed(2)} W/m²K is worse than a typical as-built envelope.`);

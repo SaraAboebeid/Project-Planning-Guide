@@ -39,7 +39,7 @@ export interface OptimizeOption { code: string; label?: string; u_value: number;
 export interface OptimizeComponentInput { key: string; area_m2: number; baseline_u: number; options: OptimizeOption[]; }
 export interface OptimizeParams {
   f_dh: number; energy_price: number; carbon_factor_heat: number; discount_rate: number;
-  study_period_yr: number; floor_area_m2: number; baseline_total_kwh_m2_yr: number;
+  study_period_yr: number; floor_area_m2: number; baseline_total_kwh_m2_yr: number; baseline_heating_kwh_m2_yr?: number;
 }
 export interface OptimizeRequestBody {
   components: OptimizeComponentInput[]; params: OptimizeParams; max_results?: number;
@@ -260,6 +260,8 @@ export const api = {
     }>;
     wwr_override?: number;
     u_wall_override?: number; u_roof_override?: number; u_win_override?: number; u_floor_override?: number;
+    /** Components replaced rather than insulated - exempt from the UK/BE never-worse clamp. */
+    replace_components?: string[];
     package_id?: string; package_label?: string | null;
   }) => post<{ batch_id: string; task_id: string; total: number; status: string }>("/simulation-batch-submit", body),
 

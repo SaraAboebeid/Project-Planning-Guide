@@ -1096,9 +1096,11 @@ def _derive_u_values(use_cat: str | None, period: str | None) -> tuple[float | N
     """Return (u_wall, u_win) from TABULA/BBR table, or (None, None) if not applicable."""
     if not period:
         return (None, None)
-    btype = _USE_TO_TABULA_TYPE.get(use_cat or "")
-    if not btype:
-        return (None, None)
+    # TABULA Sweden only types dwellings. Non-residential buildings (verksamhet,
+    # samhälle, industri, unknown use) take the multi-family values of the same
+    # era as a proxy — same construction practice per period — instead of
+    # leaving U blank when the year is known.
+    btype = _USE_TO_TABULA_TYPE.get(use_cat or "") or "MFH"
     pair = _TABULA_U.get(btype, {}).get(period)
     if pair is None:
         return (None, None)
@@ -1354,6 +1356,9 @@ def _uk_bbox_row(b: dict, lat: float, lon: float) -> dict:
         "building_use":    b.get("use_cat"),
         "primary_area":    None,
         "year_built":      b.get("year"),
+        # Belgium: "statbel_prior" = a year drawn from Statbel's construction-period
+        # mix for the commune, NOT this building's own year — the table marks it.
+        "year_source":     b.get("year_source"),
         "height_m":        b.get("height"),
         "floors":          b.get("floors"),
         "atemp":           b.get("floor_area_m2"),
@@ -3518,8 +3523,18 @@ def _envelope_overrides(building: dict, country: str, req) -> dict:
     }
     if (country or "").lower() not in ("gb", "be"):
         return out
-    for key, fields in (("u_wall_override", ("u_wall_epc", "tabula_u_wall")), ("u_roof_override", ("u_roof_epc", "tabula_u_roof")),
-                        ("u_win_override", ("u_win_epc", "tabula_u_win")), ("u_floor_override", ("u_floor_epc", "tabula_u_floor"))):
+    # A component the package REPLACES (new windows; a wall or roof rebuilt from
+    # scratch in Step 4's "replace" mode) gets exactly the U that was designed,
+    # even if it is worse than today's - that is a real, if poor, choice and the
+    # UI flags it. Only ADDED insulation and the TABULA tiers are clamped, because
+    # adding material can never make a component worse.
+    replaced = {c.lower() for c in (getattr(req, "replace_components", None) or [])}
+    for key, comp, fields in (("u_wall_override", "wall", ("u_wall_epc", "tabula_u_wall")),
+                              ("u_roof_override", "roof", ("u_roof_epc", "tabula_u_roof")),
+                              ("u_win_override", "window", ("u_win_epc", "tabula_u_win")),
+                              ("u_floor_override", "floor", ("u_floor_epc", "tabula_u_floor"))):
+        if comp in replaced:
+            continue
         current = next((building.get(f) for f in fields if building.get(f) is not None), None)
         if out[key] is not None and current is not None:
             out[key] = min(out[key], float(current))
@@ -3560,6 +3575,9 @@ class SimulationSubmitRequest(BaseModel):
     u_roof_override: Optional[float] = None
     u_win_override: Optional[float] = None
     u_floor_override: Optional[float] = None
+    # Components this package REPLACES rather than insulates ("wall", "roof",
+    # "floor", "window") - exempt from the UK/BE never-worse clamp.
+    replace_components: Optional[list[str]] = None
     # Per-facade glazing ratio; see BatchBuildingSpec.wwr_by_orientation.
     wwr_by_orientation: Optional[dict[str, float]] = None
     # Distinguishes multiple simulations at the SAME building location (the
@@ -3593,6 +3611,7 @@ class SimulationBatchSubmitRequest(BaseModel):
     u_roof_override: Optional[float] = None
     u_win_override: Optional[float] = None
     u_floor_override: Optional[float] = None
+    replace_components: Optional[list[str]] = None   # see SimulationSubmitRequest
     package_id: str = "baseline"
     package_label: Optional[str] = None
     # "ideal" | "gas_boiler"; None = gas boiler for gas-heated UK homes, ideal loads otherwise.
@@ -4139,6 +4158,10 @@ class OptimizeParams(BaseModel):
     study_period_yr: int = 30
     floor_area_m2: float
     baseline_total_kwh_m2_yr: float   # measured baseline from the EPSM run — anchors Q_fixed
+    # EPSM baseline space heating. When given, only heating responds to U-values
+    # (hot water, lighting, equipment stay fixed) and the degree-day transmission
+    # is scaled to reproduce it — see the anchoring in optimize().
+    baseline_heating_kwh_m2_yr: Optional[float] = None
 
 
 class OptimizeRequest(BaseModel):
@@ -4169,7 +4192,22 @@ async def optimize_renovation(req: OptimizeRequest):
     # point when every component is left at its as-built U-value.
     baseline_htr = sum(c.area_m2 * c.baseline_u for c in req.components)
     baseline_total_kwh = p.baseline_total_kwh_m2_yr * floor_area
-    q_fixed = max(0.0, baseline_total_kwh - baseline_htr * p.f_dh)
+    trans0 = baseline_htr * p.f_dh
+    # k scales the steady-state transmission H·HDD (which ignores solar and
+    # internal gains) so the curve reproduces EPSM's simulated heating.
+    k_trans = 1.0
+    if p.baseline_heating_kwh_m2_yr is not None and trans0 > 0:
+        heat0 = p.baseline_heating_kwh_m2_yr * floor_area
+        if trans0 >= heat0:
+            # Degree-day loss overshoots the simulated heating (gains): scale it
+            # down; everything that isn't heating stays fixed.
+            k_trans = heat0 / trans0 if heat0 > 0 else 0.0
+            q_fixed = max(0.0, baseline_total_kwh - heat0)
+        else:
+            # Heating also covers ventilation/infiltration the envelope doesn't touch.
+            q_fixed = max(0.0, baseline_total_kwh - trans0)
+    else:
+        q_fixed = max(0.0, baseline_total_kwh - trans0)
 
     # Each component contributes exactly one option. A synthetic "keep as-built"
     # option (U = baseline, no cost/carbon) lets the optimizer decide a component
@@ -4204,7 +4242,7 @@ async def optimize_renovation(req: OptimizeRequest):
 
     def score(combo: list[tuple[OptimizeComponent, OptimizeOption]]) -> dict:
         htr = sum(comp.area_m2 * opt.u_value for comp, opt in combo)
-        q_total = q_fixed + htr * p.f_dh
+        q_total = q_fixed + k_trans * htr * p.f_dh
         energy_m2 = q_total / floor_area
         init_cost = sum(opt.cost for _, opt in combo)
         init_carbon = sum(opt.carbon for _, opt in combo)
@@ -4228,6 +4266,11 @@ async def optimize_renovation(req: OptimizeRequest):
     for combo in itertools.product(*choice_lists):
         if evaluated >= req.max_combos:
             break
+        # "Change nothing" is the baseline (reported separately), not a package —
+        # left in, it always won "cheapest", which says nothing about the packages.
+        if all(opt.code == "__keep__" for _, opt in combo):
+            evaluated += 1
+            continue
         pt = score(list(combo))
         sig = (pt["total_cost"], pt["total_carbon"], pt["energy_kwh_m2_yr"])
         if sig not in seen:
@@ -4314,9 +4357,10 @@ async def optimize_renovation(req: OptimizeRequest):
         # implied by the as-built U-values. When it doesn't, q_fixed clamps to 0
         # and every absolute energy figure is inflated — surface it rather than
         # quietly reporting impossible numbers.
-        "anchor_ok": baseline_total_kwh >= baseline_htr * p.f_dh,
+        "anchor_ok": p.baseline_heating_kwh_m2_yr is not None or baseline_total_kwh >= trans0,
         "params_used": {
             "annuity_factor": round(annuity, 3),
+            "transmission_scale": round(k_trans, 3),
             "q_fixed_kwh_yr": round(q_fixed),
             "study_period_yr": N,
         },

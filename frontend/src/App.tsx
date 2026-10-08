@@ -22,6 +22,7 @@ import MapViewer from "./pages/MapViewer";
 import UKMapViewer from "./pages/UKMapViewer";
 import BEMapViewer from "./pages/BEMapViewer";
 import UKDataExplorer from "./pages/UKDataExplorer";
+import BEDataExplorer from "./pages/BEDataExplorer";
 import { useWizardStore } from "./store/wizard";
 
 function ScrollToTop() {
@@ -70,7 +71,8 @@ export default function App() {
       <Route path="/workspace" element={<Navigate to="/" replace />} />
       <Route path="/data"      element={<DataLayout><DataExplorer /></DataLayout>} />
       <Route path="/data/uk"   element={<DataLayout title="Data Explorer" accentColor="#4A90E2" accentBadge="United Kingdom Data"><UKDataExplorer /></DataLayout>} />
-      <Route path="/pathways"  element={<DataLayout title="Pathways"       accentColor="var(--brand)" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
+      <Route path="/data/be"   element={<DataLayout title="Data Explorer" accentColor="#E8880C" accentBadge="Belgium Data"><BEDataExplorer /></DataLayout>} />
+      <Route path="/pathways"  element={<DataLayout title="Workflow"       accentColor="var(--brand)" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
       <Route path="/analysis"  element={<DataLayout title="Analysis" accentColor="#4ECDC4" accentBadge="Tools"><AnalysisTools /></DataLayout>} />
       <Route path="/viewer"    element={<DataLayout title="" accentColor="#5FA5FF" accentBadge=""><MapViewer /></DataLayout>} />
       <Route path="/viewer/uk" element={<DataLayout title="" accentColor="#5FA5FF" accentBadge=""><UKMapViewer /></DataLayout>} />

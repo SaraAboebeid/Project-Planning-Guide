@@ -881,24 +881,51 @@ source, and is deliberately not scraped.
             },
         },
         {
-            "title": "Cost & carbon - synthetic placeholders",
+            "title": "Cost & carbon - UK renovation materials catalogue",
             "dataset": {
-                "publisher": "None - made-up round numbers written for this project",
-                "access": "Synthetic",
-                "connection": " Hard-coded in `ukPlaceholderCostCarbon.ts`. No real UK cost and carbon source has been adopted yet.",
-                "format": "TypeScript constants",
-                "source_version": "Not applicable. Standard refurbishment **£180/m², 45 kgCO₂e/m²**; ambitious refurbishment **£320/m², 75 kgCO₂e/m²**.",
-                "source_short": "n/a - invented",
-                "local": ["frontend/src/config/ukPlaceholderCostCarbon.ts"],
-                "refresh": "To be replaced by a real UK cost and carbon source.",
-                "stored_as": "Constants compiled into the frontend.",
-                "stage": "synthetic",
-                "stage_note": "Exists only so the UK track runs end to end. Must never be presented as real.",
+                "publisher": "Compiled for this project from published EPDs, the ICE database and UK retail prices",
+                "access": "Derived",
+                "connection": " A workbook, `UK_Renovation_Materials_Catalogue.xlsx`, ingested by `tools/catalog/ingest_material_catalogue.py` into a generated TypeScript file. The workbook is the source of truth; the file is **never hand-edited**.",
+                "format": "XLSX -> generated TypeScript",
+                "source_version": "Compiled 2026-10-07. **60 materials** in eight categories; prices in GBP including 20% VAT.",
+                "source_short": "2026-10, 60 materials",
+                "local": ["frontend/src/config/materialCatalogueUK.ts"],
+                "refresh": "Edit the workbook, then re-run the ingest script.",
+                "stored_as": "`frontend/src/config/materialCatalogueUK.ts`, compiled into the frontend.",
+                "stage": "reference",
+                "stage_note": "This **replaced the invented placeholders** (a flat £180/m² and 45 kgCO₂e/m²) on 2026-10-07. Every row now carries its own source and a quality flag.",
                 "used_in": [
-                    "Step 4 - cost and carbon of UK renovation packages",
-                    "They also reach the Step 5 report, where they are **labelled SEK** - a known bug",
+                    "Step 4 - the material picker and the cost and carbon of UK packages",
+                    "Step 5 - the report's cost and carbon figures",
                 ],
+                "processed_by": ["tools/catalog/ingest_material_catalogue.py"],
             },
+            "body": """
+Each row carries its price and its GWP (A1–A3) **with the source and a quality
+flag for each**, so a weak number is visible rather than hidden. Measured from
+the generated file on 2026-10-07:
+
+| | Price | Carbon (GWP A1–A3) |
+|---|---|---|
+| Present | 49 of 60 (82%) | 51 of 60 (85%) |
+| Quality **OK** | 30 | 30 |
+| Single source | 12 | — |
+| Weak / proxy | 5 | 21 |
+| Cost guide / indicative | 2 | — |
+| Missing | 11 | 9 |
+
+**Carbon origin:** 41 rows come from the UK generic ICE database, 8 from
+non-UK EPDs, 2 from UK literature or a generic dataset.
+
+**What is unpriced:** 11 rows — 6 heating systems, 3 windows and doors, one wall
+insulation and one cladding. These show "price n/a" in Step 4 and can never be
+selected as the cheapest option.
+
+> **Prices are material only — no labour.** This is a real difference from the
+> Swedish Wikells catalogue, whose prices are *installed*. Step 4 marks the
+> distinction with a "†" footnote. A UK and a Swedish cost must not be compared
+> without accounting for it.
+""",
         },
     ],
 }
@@ -1008,7 +1035,8 @@ mean SAP) - 11,744 of them onto 455 Canary Wharf buildings alone.
 | Construction year (for U-values only) | an era drawn from the survey's dwelling-age distribution; the displayed year stays empty | 15,489 |
 | Height | OSM height tag → EUBUCCO estimate → levels × 3 m → a default by use (3–12 m) | - |
 | Building type | EUBUCCO subtype replaces a generic `building=yes` | - |
-| Cost and carbon | synthetic placeholders - see **1. Data Sources** | all UK buildings |
+| Cost and carbon | the UK materials catalogue - see **1. Data Sources**; 11 of its 60 rows have no price and 9 no carbon figure, and those show "price n/a" rather than a guess | all UK buildings |
+| Address | filled from the certificate register where the footprint carries no `addr:*` tag - see *Addresses filled from certificates* below | 8,797 in Rotherham |
 
 **Why one band is drawn instead of the distribution:** it keeps the record in
 the same shape as a certified building, so the viewer and wizard need no UK
@@ -1871,6 +1899,47 @@ practical way to see whether the address join lands on the right buildings.
 """,
             "files": ["tools/uk/sample_epc_matches.py"],
         },
+        {
+            "title": "Step 8 - Addresses filled from the certificates",
+            "badge": "processed",
+            "body": """
+Added 2026-10-07, and run **after** the payload exists rather than inside the
+build.
+
+**The problem it solves.** The certificate join and the UPRN anchoring both
+copy the band, the SAP score and the fabric onto a building — but never the
+certificate's *address*. Most OpenStreetMap footprints carry no `addr:*` tag, so
+Rotherham ended up with thousands of buildings that held a certificate and still
+showed no address, which made them impossible to find by searching.
+
+**What it does.** `tools/uk/fill_addresses.py` places each certificate on a
+footprint with the same UPRN geometry that `anchor_epc_uprn.py` uses — the point
+inside the polygon, or the nearest polygon within 30 m — and then takes, per
+building:
+
+1. the **most common building-level label** among its domestic certificates,
+   with the flat or unit prefix stripped (the same `building_label` rule the
+   ingest uses), or
+2. failing that, the **newest** non-domestic certificate or DEC address.
+
+**Result in Rotherham**, measured from the payload on 2026-10-07:
+
+| | Buildings | Share |
+|---|---|---|
+| Address from a domestic certificate | 8,452 | 58% |
+| Address from a non-domestic certificate or DEC | 345 | 2% |
+| Address already present from OSM | 2,240 | 15% |
+| **Still no address** | **5,686** | **39%** |
+| Total | 14,483 | |
+
+**It is deliberately inert.** The script touches only `address` and
+`address_source`, and only where the address was empty. Nothing the energy model
+or the Rotherham calibration reads is changed, so **no result moves** — this is
+a findability fix, not a modelling one. Both payload copies
+(`frontend/public/uk` and `assets/uk`) are rewritten together.
+""",
+            "files": ["tools/uk/fill_addresses.py", "tools/uk/anchor_epc_uprn.py"],
+        },
     ],
 }
 
@@ -1903,12 +1972,12 @@ is read from disk each time this page loads.
 """,
     "overview": {
         "title": "What is built",
-        "subtitle": "Three cities, three regions, three registers — 27,685 buildings.",
+        "subtitle": "Three cities, three regions, three registers — 145,556 buildings.",
         "items": [
+            ("Liège", "The **whole municipality** — 129,899 buildings from the PICC, rebuilt 2026-10-02 from two small districts. Wallonia is the only region with open certificate microdata, published per municipality, so the model area now matches the data's own scale."),
             ("Brussels", "Saint-Gilles / Ixelles (5,839 buildings) and Schaerbeek (5,723), from UrbIS."),
-            ("Liège", "Centre / Outremeuse (6,666) and Saint-Léonard (5,362), from the PICC — the only region with open certificate microdata."),
             ("Gent", "Gent centrum (4,095), from the GRB. Built, but hidden in the app."),
-            ("No certificates", "Not one of the 27,685 buildings carries an energy class. This is a property of Belgian open data, not of the pipeline."),
+            ("No certificates", "Not one of the 145,556 buildings carries an energy class. This is a property of Belgian open data, not of the pipeline — but 70,307 Walloon buildings now carry a municipal reference distribution instead."),
         ],
     },
     "sections": [
@@ -2104,20 +2173,83 @@ tiers themselves are the standard TABULA 001 / 002 / 003 refurbishment levels.
             },
         },
         {
-            "title": "What is deliberately absent",
+            "title": "Cost & carbon - Belgian renovation materials catalogue",
+            "dataset": {
+                "publisher": "Compiled for this project from published EPDs (B-EPD, Ökobaudat, EU) and Belgian and Dutch retail prices",
+                "access": "Derived",
+                "connection": " A workbook, `Belgium_Renovation_Materials_Catalogue.xlsx`, ingested by `tools/catalog/ingest_material_catalogue.py`. The workbook is the source of truth; the generated file is **never hand-edited**.",
+                "format": "XLSX -> generated TypeScript",
+                "source_version": "Compiled 2026-10-07. **60 materials** in eight categories; prices in EUR including 21% VAT.",
+                "source_short": "2026-10, 60 materials",
+                "local": ["frontend/src/config/materialCatalogueBE.ts"],
+                "refresh": "Edit the workbook, then re-run the ingest script.",
+                "stored_as": "`frontend/src/config/materialCatalogueBE.ts`, compiled into the frontend.",
+                "stage": "reference",
+                "stage_note": "Added 2026-10-07. Until then Step 4 showed \"—\" for both cost and carbon on every Belgian building.",
+                "used_in": [
+                    "Step 4 - the material picker and the cost and carbon of Belgian packages",
+                    "Step 5 - the report's cost and carbon figures",
+                ],
+                "processed_by": ["tools/catalog/ingest_material_catalogue.py"],
+            },
+            "body": """
+**This replaces what this page previously recorded as an unfillable gap.** The
+licensing problem was real — TOTEM is ecoinvent-based and not redistributable,
+the ECO Portal forbids redistribution, the EF 3.1 licences expired at the end of
+2025, and the Belgian cost references (ASPEN, ABEX) are commercial. The route
+taken instead was to compile a catalogue row by row from published EPDs and
+retail listings, and to record a source and a quality flag against every number.
+
+Measured from the generated file on 2026-10-07:
+
+| | Price | Carbon (GWP A1–A3) |
+|---|---|---|
+| Present | 36 of 60 (60%) | 59 of 60 (98%) |
+| Quality **OK** | 23 | 52 |
+| Weak / proxy | 12 | 7 |
+| Single source | 1 | — |
+| Missing | 24 | 1 |
+
+**Carbon is strong, price is thin — and they fail in opposite directions.**
+Carbon covers 98% of rows, but only 11 of those are Belgian in origin (4 B-EPD,
+7 Belgian production); 43 come from the German Ökobaudat and 5 from other EU
+EPDs. Price covers only 60%, and the 24 unpriced rows include **all seven
+windows and doors**, five heating systems and four cladding items.
+
+| Unpriced, by category | Rows |
+|---|---|
+| Windows & doors | 7 (all of them) |
+| Heating systems | 5 |
+| Wall cladding & finishes | 4 |
+| Wall insulation | 3 |
+| Roof insulation / covering | 4 |
+| Floor insulation | 1 |
+
+An unpriced row shows "price n/a" in Step 4 and can never be chosen as the
+cheapest option — so a Belgian cost total is a **partial** total, and one that
+silently omits glazing.
+
+> **Prices are material only — no labour**, unlike the Swedish Wikells
+> catalogue, whose prices are installed. Step 4 marks this with a "†" footnote.
+""",
+        },
+        {
+            "title": "What is still absent",
             "badge": "metadata",
             "body": """
-Three things the other two countries have, and Belgium does not. Each is a
-property of what is published, not an unfinished job.
+One thing the other two countries have and Belgium does not, and it is a
+property of what is published rather than an unfinished job.
 
-| Missing | Why | What the tool does instead |
-|---|---|---|
-| **Per-building energy certificates** | Flanders (VEKA) and Brussels publish per-address lookups only — a form with a captcha, not a dataset. Bulk access needs a signed research agreement with the region. | Nothing: `has_epc` is false, no class is shown. Walloon buildings carry a municipal reference distribution instead. |
-| **Cost data** | Belgian construction-cost references are commercial (ASPEN, ABEX). | Step 4 shows "—" for cost on Belgian buildings. |
-| **Carbon factors** | TOTEM is ecoinvent-based and not redistributable; the ECO Portal forbids redistribution; the EF 3.1 licences expired at the end of 2025. | Step 4 and the Step 5 report show "—" for CO₂e on Belgian buildings. |
+**Per-building energy certificates.** Flanders (VEKA) and Brussels publish
+per-address lookups only — a form with a captcha, not a dataset. Bulk access
+needs a signed research agreement with the region; precedents exist (VEKA–NBB
+2024, VEKA–AOE 2023) and a request has been drafted but not sent. So `has_epc`
+is false for every Belgian building and no class is shown. Walloon buildings
+carry a municipal reference distribution instead — see *Energy certificates —
+Wallonia only*.
 
-The energy side is complete and the economic side is empty — which is a
-deliberate, visible gap rather than a plausible-looking placeholder.
+Cost and carbon **were** on this list until 2026-10-07; the materials catalogue
+above closed them, with the caveats recorded there.
 """,
             "files": ["tools/be/be_data_pipeline.py"],
         },
@@ -2133,7 +2265,7 @@ BE_COVERAGE = {
 What the Belgian model knows about its buildings, for how many, and — more
 sharply than for either other country — **how much of it is modelled rather
 than observed**. Every figure below was counted from the payloads the tool
-serves (`frontend/public/be/buildings_<id>.json`) on 2026-10-02.
+serves (`frontend/public/be/buildings_<id>.json`) on 2026-10-07.
 
 Belgian coverage is **not comparable with Sweden's or the UK's**. Both of those
 report how many buildings have a real certificate. Here the answer is zero, by
@@ -2142,36 +2274,46 @@ comes from a register, and how much from a prior.
 """,
     "overview": {
         "title": "In four lines",
-        "subtitle": "Five districts — 27,685 buildings.",
+        "subtitle": "Three cities — 145,556 buildings, of which Liège is 129,899.",
         "items": [
-            ("Energy class", "**Zero** buildings, in all five districts. No open per-building certificate exists in any Belgian region."),
-            ("Geometry", "Register footprints for all of them; real 3D heights for 94–97% in Brussels and Liège, but only 6% in Gent."),
-            ("Construction year", "Sampled from a municipal distribution for 99–100% of buildings. Fewer than 1% have a year from a source that names the building."),
-            ("Archetype", "60–89% carry a TABULA type. The gap is annexes and non-residential buildings, which have no archetype to match."),
+            ("Liège is now the whole municipality", "Rebuilt 2026-10-02 from two 6,000-building districts into one 129,899-building area, because the Walloon certificates are published per municipality."),
+            ("Energy class", "**Zero** buildings, everywhere. No open per-building certificate exists in any Belgian region."),
+            ("Certificate reference", "70,307 Walloon buildings (54% of Liège) now carry the certificate distribution for similar dwellings in their municipality — added to the payload on 2026-10-02."),
+            ("Construction year", "Sampled from a municipal distribution for 99–100% of buildings. In Liège it is now **100%** — not one building has a year from a source that names it."),
         ],
     },
     "sections": [
         {
             "title": "What is covered — field by field",
             "body": """
-Counted per district from the served payloads, 2026-10-02.
+Counted from the served payloads, 2026-10-07.
 
-| Field | Saint-Gilles | Schaerbeek | Liège Centre | Saint-Léonard | Gent |
-|---|---|---|---|---|---|
-| Buildings | 5,839 | 5,723 | 6,666 | 5,362 | 4,095 |
-| Footprint, height, floors, use | 100% | 100% | 100% | 100% | 100% |
-| **Energy class** | **0** | **0** | **0** | **0** | **0** |
-| Height from a 3D register | 95% | 97% | 94% | 86% | **0%** |
-| Address matched | 89% | — | 57% | — | — |
-| TABULA archetype | 89% | 86% | 60% | 57% | 87% |
-| Party walls detected | 98% | 97% | 99% | 96% | 97% |
+| Field | Liège | Saint-Gilles | Schaerbeek | Gent |
+|---|---|---|---|---|
+| Buildings | 129,899 | 5,839 | 5,723 | 4,095 |
+| Footprint, height, floors, use | 100% | 100% | 100% | 100% |
+| **Energy class** | **0** | **0** | **0** | **0** |
+| Height from a 3D register | 88% | 95% | 97% | **0%** |
+| Address matched | 49% | 89% | — | — |
+| TABULA archetype | 54% | 89% | 86% | 87% |
+| Party walls detected | 90% | 98% | 97% | 97% |
+| Certificate reference attached | **54%** | — | — | — |
 
-**Why Liège's archetype coverage is lower.** The PICC labels 39–51% of its
-footprints *Annexe* — back extensions, garages and sheds. They are real
-buildings and they are kept, because they carry party walls that matter for the
-neighbouring house, but they are not dwellings and get no archetype. Brussels'
-UrbIS does not separate annexes the same way, so its percentage looks higher
-without the stock being different.
+**Why Liège's archetype coverage is lower.** The PICC labels **46% of its
+footprints *Annexe*** — back extensions, garages and sheds — and a further 2%
+commercial, school or industrial. They are real buildings and they are kept,
+because they carry party walls that matter for the house they lean on, but they
+are not dwellings and get no archetype. Of 129,899 footprints, 67,825 are
+*Habitation* and 59,344 *Annexe*. Brussels' UrbIS does not separate annexes the
+same way, so its percentage looks higher without the stock being different.
+
+**What the whole-municipality rebuild changed.** Beyond the count, two things
+moved. Building use now comes from the PICC class for **98%** of buildings
+(it was 78% in the old central district), because the municipality-wide fetch
+carries the register's own classification throughout. And `year_source` is now
+`statbel_prior` for **100%** — the handful of OSM-tagged years in the old
+districts are gone, so no Liège building has a construction year from a source
+that names it.
 """,
         },
         {
@@ -2214,13 +2356,29 @@ size. Gent is 77% OSM.
             "body": """
 For Wallonia only, a building carries the certificate statistics of **similar
 dwellings in its own municipality** — same dwelling type, same number of free
-façades — from the 874,605-certificate ODWB export. For Liège that is 37 groups;
-the two largest are:
+façades — from the 874,605-certificate ODWB export. This reached the served
+payload on 2026-10-02: **70,307 of Liège's 129,899 buildings (54%)** now carry
+`peb_ref_*` fields, and 69,902 also carry a period-specific median.
 
-| Group | Certificates | Median E_spec | IQR |
-|---|---|---|---|
-| Terraced single-family house | 14,675 | 376 kWh/m²·yr | 286–477 |
-| Apartment | 47,728 | 276 kWh/m²·yr | 187–417 |
+What they resolve to, counted from the payload:
+
+| Group | Buildings | Certificates behind it | Median E_spec | IQR | Modal label |
+|---|---|---|---|---|---|
+| Terraced house (two free façades) | 33,099 | 14,675 | 376 kWh/m²·yr | 286–477 | **E** |
+| End-terrace / semi (three free) | 15,985 | — | 437 | — | **G** |
+| Apartment | 13,457 | 47,728 | 276 | 187–417 | **C** |
+| Detached house | 7,766 | — | 445 | — | **G** |
+
+The modal labels are worth pausing on: for the two commonest house types in
+Liège the most frequent certificate label is **E** and **G**. That is the
+Walloon certified stock, not a property of this model — but it is the backdrop
+any retrofit result here should be read against.
+
+**A small boundary artefact.** 20 buildings resolve to a *neighbouring*
+commune's statistics — Ans, Beyne-Heusay, Chaudfontaine, Herstal — because the
+OSM municipal boundary used for the build takes in a sliver of each. The lookup
+uses the building's own NIS code, so those 20 get their true commune's
+distribution; it is correct behaviour, visible in the data.
 
 **Three cautions, in order of importance.**
 
@@ -2243,22 +2401,27 @@ per-building baseline, it would be wrong.
             "body": """
 - **No measured energy anywhere in the Belgian model.** Every kWh is modelled
   from a TABULA archetype over a sampled construction year.
-- **Construction year is a sample, not a record** — for 99–100% of buildings.
+- **Construction year is a sample, not a record** — 99–100% everywhere, and
+  **100% in Liège** since the municipality-wide rebuild.
 - **Walloon heights come from a 2013–14 LiDAR survey** and read 5–7 m above
   storey-count estimates; the correction `(h − 5) / 3.3` is fitted on 299
-  buildings and is the least evidenced constant in the chain.
+  buildings and is the least evidenced constant in the chain. It now carries
+  129,899 buildings rather than 12,000.
+- **Only half of Liège has an address** (49%), so address search covers much
+  less of the municipality than of the old central districts.
 - **Gent has no 3D heights at all** — 94% are defaults by use.
 - **A large single-address town house may really be flats** with no box numbers,
   which makes the dwelling estimate — and therefore the archetype — too low.
 - **TABULA BE is a national typology**, applied unchanged across three regions
   with quite different building traditions.
-- **No cost and no carbon data**, so Step 4 and the Step 5 report show "—" for
-  both on Belgian buildings.
+- **Belgian costs are partial.** 24 of the 60 catalogue materials have no price,
+  including every window and door, so a Belgian cost total omits glazing
+  entirely. Carbon covers 98% of rows but only 11 are Belgian in origin.
 - **Simulation defaults are generic** — the shoebox still uses the Swedish
   setpoints, infiltration and Sveby hot-water intensity (**6. Energy Simulation
   - EPSM & IDF**). There is no Belgian calibration yet.
-- **The served payloads are one rebuild behind the code** — see the note at the
-  end of the Belgium tab of **3. Pipelines**.
+- **The Liège payload is 123 MB**, an order of magnitude larger than any other
+  district file, which is worth knowing before loading it in a browser.
 """,
         },
     ],
@@ -2355,8 +2518,8 @@ reference).
             "body": """
 | What | Where |
 |---|---|
-| District payloads | `frontend/public/be/buildings_<id>.json`, mirrored to `assets/be/` |
-| City index | `frontend/public/be/cities.json` — country `be`, with per-district counts and source attributions |
+| District payloads | `frontend/public/be/buildings_<id>.json`, mirrored to `assets/be/`. Liège is **123 MB**; the Brussels and Gent files are 5–7 MB |
+| City index | `frontend/public/be/cities.json` — country `be`, with per-area counts and source attributions. **Only what it lists is served**, which is how the superseded Liège district files were retired |
 | Archetypes | `frontend/public/be/tabula_be.json` |
 | Year prior | `frontend/public/be/statbel_building_stock.json` |
 | Certificate statistics | `frontend/public/be/peb_wallonia_stats.json` (1.85 MB) |
@@ -2371,32 +2534,36 @@ analysis and Street View routes all accept `country=be`.
             "files": ["backend/main.py", "tools/be/build_be_viewer.py"],
         },
         {
-            "title": "Rebuild in progress — the code is ahead of the payloads",
-            "badge": "interim",
+            "title": "The 2026-10-02 rebuild — Liège became one municipality",
+            "badge": "processed",
             "body": """
-Checked on 2026-10-02, and worth knowing before quoting any Liège figure.
+This page previously recorded three things as pending. The rebuild on
+2026-10-02 settled two of them; the third is still open.
 
-**Liège is being redefined from two districts to one municipality.**
-`tools/be/cities.py` now describes a single area, `liege`, covering the **whole
-municipality** with its boundary taken from OSM — the reasoning being that the
-Walloon certificates are published per municipality, so the model area should
-match the data's own scale. The payloads on disk are still the previous two
-district files, `buildings_liege_centre.json` (6,666) and
-`buildings_liege_saint_leonard.json` (5,362), built 2026-09-29. **The counts on
-the Belgium tab of Coverage & Quality describe those two files**, which the app
-is serving today.
+**Done — Liège is one area, not two districts.** `tools/be/cities.py` now
+describes a single `liege` covering the **whole municipality**, with its
+boundary fetched from OpenStreetMap (`admin_level=8`) rather than a 700 m
+circle. The reasoning is that the Walloon certificates are published per
+municipality, so the model area should match the scale of the data it is being
+compared against.
 
-**The certificate link is in the code but not yet in the payloads.**
-`PebLink` and `ingest_peb_wallonia.py` were added on 2026-09-30, after the Liège
-payloads were built. `peb_wallonia_stats.json` exists and is complete, but no
-`peb_ref_*` field appears in any served building record yet. They will appear on
-the next rebuild.
+| | Before (2 districts) | After (municipality) |
+|---|---|---|
+| Buildings | 12,028 | **129,899** |
+| Payload | 7.8 MB + 6.0 MB | **123 MB** |
+| Use from the PICC class | 78% / 71% | **98%** |
+| Year from OSM | 25 / 1 buildings | **0** |
 
-**`coverage_liege.geojson` is present but empty** — zero features. It appears
-to be the start of the municipality-wide build rather than a finished artefact.
+`buildings_liege_centre.json` and `buildings_liege_saint_leonard.json` are still
+on disk but are **no longer listed in `cities.json`**, so nothing serves them.
 
-Re-run `tools/be/be_data_pipeline.py` and these three resolve together; this
-page should then be re-checked against the new payloads.
+**Done — the certificate reference reached the payload.** `PebLink` now runs
+during the build, and 70,307 buildings carry `peb_ref_*` fields. See *What
+stands in for a certificate* on the Belgium tab of **2. Coverage & Quality**.
+
+**Still open — `coverage_liege.geojson` is written but empty.** It has zero
+features. It appears to be intended as the municipality's coverage outline and
+is not yet produced.
 """,
             "files": ["tools/be/cities.py", "tools/be/be_data_pipeline.py"],
         },
@@ -2405,10 +2572,11 @@ page should then be re-checked against the new payloads.
             "body": """
 | Open item | Why it matters |
 |---|---|
-| Belgian simulation defaults | The shoebox still uses Swedish setpoints, infiltration and hot-water intensity. Nothing in the model is Belgian except the geometry, the archetype and the weather file. |
-| Calibration against the Walloon certificates | The reference distributions exist; comparing them to modelled output needs the primary-vs-delivered energy conversion to be settled first. |
-| Belgian cost and carbon | Both blocked on licensing, not on effort — see **Belgium · Data Sources**. |
+| Belgian simulation defaults | The shoebox still uses Swedish setpoints, infiltration and hot-water intensity. Nothing in the model is Belgian except the geometry, the archetype, the materials catalogue and the weather file. |
+| Calibration against the Walloon certificates | The reference distributions are now attached to 70,307 buildings, so the comparison is finally possible — but it needs the primary-vs-delivered energy conversion settled first, and the certificates' own asset-rating assumptions understood. |
+| Prices for Belgian windows and heating | 24 of 60 catalogue rows are unpriced, including all seven windows and doors, so a Belgian cost total omits glazing. |
 | Gent 3D heights | The 3D GRB product is published; ingesting it is what would let Gent be shown. |
+| `coverage_liege.geojson` | Written on every build, still empty. |
 | Flemish / Brussels certificate access | A research agreement with VEKA or Bruxelles Environnement is the only route to per-building certificates. |
 """,
         },

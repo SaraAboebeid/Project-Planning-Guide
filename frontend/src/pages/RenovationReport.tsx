@@ -1,9 +1,12 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, FACADE_ORIENTATIONS, type FacadeOrientation } from "../store/wizard";
 import { filterToBaselineShortlist } from "../utils/baselineShortlist";
+import { buildingUseLabel } from "../utils/useLabels";
 import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal, assessRating, isScorable, goalStatement, requiredPct } from "../config/climateGoals";
-import ClimateGoalPanel from "../components/ClimateGoalPanel";
+import ClimateGoalPanel, { ClimateGoalInfo, ClimateGoalRatingPanel } from "../components/ClimateGoalPanel";
+import DecisionAnalysisPanel from "../components/DecisionAnalysisPanel";
+import { computeRegret } from "../utils/regretAnalysis";
 import ClimateGoalBuildingTable from "../components/ClimateGoalBuildingTable";
 import type { BuildingLookup, BuildingRecord } from "../types";
 import { fmtGBP, UK_COST_CARBON_SOURCE_NOTE } from "../config/ukCostCarbon";
@@ -99,12 +102,16 @@ function svgCompareBars(
   const barW = W - labelW - padR;
   const max = Math.max(1, ...rows.map((r) => r.value));
   const H = rows.length * (rowH + gap) + 4;
+  // A package that uses MORE energy than the baseline must not look like a win.
+  const base = rows.find((r) => r.highlight)?.value ?? null;
+  const fillOf = (r: { value: number; highlight?: boolean }) =>
+    r.highlight ? "#94a3b8" : base != null && r.value > base ? "#E2483B" : "#2FB477";
   const body = rows.map((r, i) => {
     const y = i * (rowH + gap);
     const w = Math.max(1, (r.value / max) * barW);
     const label = r.label.length > 32 ? r.label.slice(0, 31) + "…" : r.label;
     return `<text x="${labelW - 8}" y="${y + rowH / 2 + 3.5}" text-anchor="end" font-size="9" fill="${theme.label}">${escHtml(label)}</text>`
-      + `<rect x="${labelW}" y="${y}" width="${w.toFixed(1)}" height="${rowH}" fill="${r.highlight ? "#94a3b8" : "#2FB477"}" rx="2"/>`
+      + `<rect x="${labelW}" y="${y}" width="${w.toFixed(1)}" height="${rowH}" fill="${fillOf(r)}" rx="2"/>`
       + `<text x="${(labelW + w + 6).toFixed(1)}" y="${y + rowH / 2 + 3.5}" font-size="9" font-weight="600" fill="${theme.value}">${r.value.toFixed(1)} ${escHtml(unit)}</text>`;
   }).join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="Total energy per package, ${escHtml(unit)}">${body}</svg>`;
@@ -179,7 +186,7 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
 /* ─── Main page ───────────────────────────────────────────────────────────── */
 export default function RenovationReport() {
   const navigate = useNavigate();
-  const { project } = useWizardStore();
+  const { project, setProject } = useWizardStore();
   // UK projects are costed in GBP from UK sources; everything else is Swedish.
   const isUK = project.country === "United Kingdom";
   // Belgium: no cost data yet (packages carry no cost), numbers in en-GB style.
@@ -306,6 +313,44 @@ export default function RenovationReport() {
     return assessRating(climateGoal, project.renovationCalcPackages ?? [], src);
   }, [climateGoal, project.renovationCalcPackages, project.bboxRows, project.lookedUpBuildings, project.lookedUpBuilding]);
 
+  /* ── Future energy prices (moved here from Step 4) ──────────────────────────
+     Step 4 saves the analysis INPUTS (each package's energy and cost, floor area,
+     discount factor). Here the user sets the three future prices and the decision
+     style, and the comparison is recomputed live. The result is written back to
+     the store so the exported report shows exactly what is on screen. */
+  const regretInputs = project.regretInputs ?? null;
+  const [regretPrices, setRegretPrices] = useState<number[]>(
+    () => regretInputs?.settings?.prices ?? regretInputs?.defaultPrices ?? [0.5, 1, 2]);
+  const [regretAlpha, setRegretAlpha] = useState<number>(() => regretInputs?.settings?.alpha ?? 0.5);
+  // Step 4 can re-seed the default prices (e.g. the UK gas/electricity blend
+  // arrives later); follow them until the user sets their own.
+  useEffect(() => {
+    if (regretInputs && !regretInputs.settings) setRegretPrices(regretInputs.defaultPrices);
+  }, [regretInputs?.defaultPrices?.join(","), !!regretInputs?.settings]); // eslint-disable-line react-hooks/exhaustive-deps
+  const liveRegret = useMemo(() => {
+    if (!regretInputs || regretInputs.options.length < 2 || regretPrices.length < 3) return null;
+    const scenarios = [
+      { key: "low", label: "Low", priceSek: regretPrices[0]! },
+      { key: "med", label: "Medium", priceSek: regretPrices[1]! },
+      { key: "high", label: "High", priceSek: regretPrices[2]! },
+    ];
+    const res = computeRegret(regretInputs.options, scenarios, regretInputs.config, regretAlpha, regretInputs.studyPeriodYr, "");
+    return { ...res, currency: regretInputs.currency, priceBasis: regretInputs.priceBasis };
+  }, [regretInputs, regretPrices, regretAlpha]);
+  const regretSig = useRef("");
+  useEffect(() => {
+    if (!liveRegret || !regretInputs) return;
+    const sig = JSON.stringify([liveRegret.options.map((o) => o.benefits), regretPrices, regretAlpha]);
+    if (sig === regretSig.current) return;
+    regretSig.current = sig;
+    const userSet = regretInputs.settings
+      || regretAlpha !== 0.5 || regretPrices.join(",") !== regretInputs.defaultPrices.join(",");
+    setProject({
+      regretAnalysis: { ...liveRegret, generatedAt: new Date().toISOString() },
+      ...(userSet ? { regretInputs: { ...regretInputs, settings: { prices: regretPrices, alpha: regretAlpha } } } : {}),
+    });
+  }, [liveRegret, regretPrices, regretAlpha]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ── Recommended packages ── */
   const bestEnergy  = simResults[0] ?? null;   // already sorted by saving desc
   const bestCost    = [...simResults].sort((a, b) => a.cost - b.cost)[0] ?? null;
@@ -396,16 +441,20 @@ export default function RenovationReport() {
   /* ── Chart data ── */
   const chartData = useMemo(() => {
     const top = simResults.slice(0, 8);
+    // Colour says what the bar MEANS, not its rank: green = best package,
+    // blue = also saves energy, red = uses MORE than the as-built baseline.
+    // (Ranks 3+ used the pink brand tint, which read as neither.)
+    const base = climateBaselineEU;
     return [
-      { name: "Baseline", energyUse: baselineEU, saving: 0, fill: "rgba(255,255,255,0.2)" },
+      { name: "Baseline", energyUse: Math.round(base * 10) / 10, saving: 0, fill: "#94a3b8" },
       ...top.map((r, i) => ({
         name: `Pkg ${r.packageIndex}`,
         energyUse: r.energyUse,
         saving: r.saving,
-        fill: i === 0 ? "#2FB477" : i === 1 ? "#4ECDC4" : "rgba(var(--brand-rgb),0.7)",
+        fill: base && r.energyUse > base ? "#E2483B" : i === 0 ? "#2FB477" : "#4A90E2",
       })),
     ];
-  }, [simResults, baselineEU]);
+  }, [simResults, climateBaselineEU]);
 
   /* ── Printable report (→ Save as PDF) ──────────────────────────────────────
      Opens a self-contained, print-styled document and calls print(); the browser's
@@ -940,7 +989,7 @@ export default function RenovationReport() {
                 <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr repeat(5, auto)", gap: 12, alignItems: "center", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{b.address ?? `Building ${i + 1}`}</div>
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{b.use_cat ?? "—"} · {b.year ?? "—"}</div>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{project.country !== "Sweden" ? buildingUseLabel(b.use_cat) : (b.use_cat ?? "—")} · {b.year ?? "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>Area</div>
@@ -1054,7 +1103,10 @@ export default function RenovationReport() {
         <Card>
           <SectionTitle icon={<Zap size={15} color="#E8880C" />} title="Energy Use Comparison" />
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "0 0 16px" }}>
-            Top {Math.min(simResults.length, 8)} packages vs as-built baseline ({kwh(baselineEU)})
+            Top {Math.min(simResults.length, 8)} packages vs as-built baseline ({kwh(Math.round(climateBaselineEU * 10) / 10)})
+            {" · "}<span style={{ color: "#2FB477" }}>■</span> best
+            {" "}<span style={{ color: "#4A90E2" }}>■</span> saves energy
+            {" "}<span style={{ color: "#E2483B" }}>■</span> uses more than today
           </p>
           {/* Every package, matching the printed report exactly; the interactive
               chart below shows the top few with tooltips. */}
@@ -1064,10 +1116,13 @@ export default function RenovationReport() {
               <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} unit=" kWh" />
               <Tooltip
+                cursor={{ fill: "rgba(148,163,184,0.15)" }}
                 contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, fontSize: 11 }}
+                labelStyle={{ color: "#fff", fontWeight: 700 }}
+                itemStyle={{ color: "#fff" }}
                 formatter={(v: number) => [`${v} kWh/m²·yr`]}
               />
-              <ReferenceLine y={baselineEU} stroke="rgba(226,72,59,0.5)" strokeDasharray="4 3" label={{ value: "Baseline", fill: "rgba(226,72,59,0.6)", fontSize: 10 }} />
+              <ReferenceLine y={climateBaselineEU} stroke="rgba(226,72,59,0.5)" strokeDasharray="4 3" label={{ value: "Baseline", fill: "rgba(226,72,59,0.6)", fontSize: 10 }} />
               <Bar dataKey="energyUse" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
               </Bar>
@@ -1221,7 +1276,19 @@ export default function RenovationReport() {
         </Card>
       )}
 
-      {/* ── City climate target ── */}
+      {/* ── City climate target (moved here from Step 4) ── */}
+      {ratingGoal && (
+        <Card>
+          <SectionTitle icon={<Target size={15} color="#2FB477" />} title="City climate target" />
+          <ClimateGoalRatingPanel a={ratingGoal} />
+        </Card>
+      )}
+      {climateGoal && (climateGoal.kind === "info" || (climateGoal.kind === "rating" && !ratingGoal)) && (
+        <Card>
+          <SectionTitle icon={<Target size={15} color="#2FB477" />} title="City climate target" />
+          <ClimateGoalInfo goal={climateGoal} />
+        </Card>
+      )}
       {goalAssessment && (
         <Card>
           <SectionTitle icon={<Target size={15} color="#2FB477" />} title="City climate target" />
@@ -1237,8 +1304,22 @@ export default function RenovationReport() {
         </Card>
       )}
 
-      {/* ── 8. Compare options across future energy prices ── */}
-      {project.regretAnalysis && project.regretAnalysis.options.length >= 2 && (() => {
+      {/* ── 8. Future energy prices — interactive (moved here from Step 4) ── */}
+      {liveRegret && liveRegret.options.length >= 2 && regretInputs && (
+        <Card accent="#4ECDC4">
+          <SectionTitle icon={<Award size={15} color="#4ECDC4" />} title="Compare Retrofit Choices Across Future Energy Prices" />
+          <DecisionAnalysisPanel
+            result={liveRegret}
+            alpha={regretAlpha}
+            setAlpha={setRegretAlpha}
+            prices={regretPrices}
+            setPrices={setRegretPrices}
+            currentPrice={regretInputs.currentPrice}
+          />
+        </Card>
+      )}
+      {/* Older projects saved only the result (no inputs): show it read-only. */}
+      {!liveRegret && project.regretAnalysis && project.regretAnalysis.options.length >= 2 && (() => {
         const ra = project.regretAnalysis!;
         const fmtM = (v: number) => `${v < 0 ? "−" : ""}${(Math.abs(v) / 1e6).toFixed(2)}M`;
         const scenarioHint = (label: string, index: number) => {

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { RegretResult } from "../utils/regretAnalysis";
+import type { RegretResult, RegretOptionInput, RegretConfig } from "../utils/regretAnalysis";
 import type { HvacOutcome } from "../utils/hvacAnalysis";
 import type { ProjectType, BuildingDevelopmentType } from "../config/projectConfig";
 import type { BuildingLookup, BboxStats, WWRRecord, BuildingRecord } from "../types";
@@ -112,6 +112,11 @@ export interface RenovationCalcSelection {
    *  Step-4 calculator. Lets the optimizer round-trip an assembly pick (whose
    *  identity isn't a single Wikells code) back to its exact build-up. */
   configId?: string;
+  /** "add": insulation/finish added to the existing component (its U includes the
+   *  old construction). "replace": the component is rebuilt or swapped (windows
+   *  always are) and the U is the new build-up alone. Reaches EnergyPlus as the
+   *  same U override; "replace" also lifts the UK/BE never-worse clamp. */
+  mode?: "add" | "replace";
 }
 
 /** One selected building's own simulation outcome within a package - a
@@ -241,6 +246,24 @@ interface ProjectState {
   /* Step 4 — regret-based decision analysis (minimax regret / range / Hurwicz over
      retrofit options under future energy-price scenarios); rendered in the Step 5 report. */
   regretAnalysis: RegretResult | null;
+  /* Step 4 saved build-ups ("configurations"), keyed "all" or a building index.
+     Kept in the project so leaving Step 4 and coming back does not wipe them -
+     before, only the simulated packages survived. Shape: RenovationSimulator's
+     ComponentConfig. */
+  renovationConfigs?: Record<string, unknown[]>;
+  /* The INPUTS to that analysis, saved by Step 4 so Step 5 can recompute it live
+     as the user changes the future prices or decision style (both now live in
+     Step 5). `settings` is the user's own prices/alpha, kept across visits. */
+  regretInputs?: {
+    options: RegretOptionInput[];
+    config: RegretConfig;
+    defaultPrices: number[];
+    currentPrice: number;
+    currency: "SEK" | "GBP";
+    priceBasis?: string;
+    studyPeriodYr: number;
+    settings?: { prices: number[]; alpha: number };
+  } | null;
   /* Step 4 — the package chosen FOR a specific building, keyed by
      "lat,lon" (6dp). Iterating buildings one at a time is the normal way to
      work: the best package for a 1960s block is rarely the best for its
@@ -394,7 +417,7 @@ export const LOCATION_SCOPED_RESET: Partial<ProjectState> = {
   baselineStatus: "idle", renovationBaselineResults: [], baselineBatchId: null,
   renovationSimResults: [], facadeDefects: {}, facadeWwr: {},
   prioritizedBuildingIndices: [], prioritizedBuildingCount: 0,
-  regretAnalysis: null, selectedPackageByBuilding: {}, heatingAnalysis: null,
+  regretAnalysis: null, regretInputs: null, renovationConfigs: {}, selectedPackageByBuilding: {}, heatingAnalysis: null,
 };
 
 /* sessionStorage wrapper that never throws — if storage is disabled or over

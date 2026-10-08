@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
-  LAYER_MATERIALS, MATERIAL_BY_ID, SURFACE_RESISTANCE, PRESETS,
-  computeAssemblyU, type AssemblyLayer, type ComponentKind, type LayerCategory,
+  LAYER_MATERIALS, SURFACE_RESISTANCE, PRESETS,
+  computeAssemblyU, type AssemblyLayer, type ComponentKind, type LayerCategory, type LayerMaterial,
 } from "../config/assemblyLayers";
 import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react";
 
@@ -22,14 +22,24 @@ const CAT_LABEL: Record<LayerCategory, string> = {
 };
 
 export default function AssemblyBuilder({
-  kind, layers, onChange,
+  kind, layers, onChange, materials, presets, layerNote,
 }: {
   kind: ComponentKind;
   layers: AssemblyLayer[];
   onChange: (layers: AssemblyLayer[]) => void;
+  /** Country material set (UK/BE catalogue); defaults to the Swedish/BBR list. */
+  materials?: LayerMaterial[];
+  presets?: { label: string; layers: AssemblyLayer[] }[];
+  /** Per-layer annotation, e.g. its catalogue price and carbon. */
+  layerNote?: (layer: AssemblyLayer) => string | null;
 }) {
+  const LAYER_LIST = materials ?? LAYER_MATERIALS;
+  const MATERIAL_BY_ID = useMemo(
+    () => Object.fromEntries(LAYER_LIST.map((m) => [m.id, m])) as Record<string, LayerMaterial>,
+    [LAYER_LIST]);
+  const PRESET_LIST = presets ?? PRESETS[kind];
   const [addOpen, setAddOpen] = useState(false);
-  const result = useMemo(() => computeAssemblyU(layers, kind), [layers, kind]);
+  const result = useMemo(() => computeAssemblyU(layers, kind, MATERIAL_BY_ID), [layers, kind, MATERIAL_BY_ID]);
   const white = (o: number) => `rgba(255,255,255,${o})`;
   const sr = SURFACE_RESISTANCE[kind];
 
@@ -50,7 +60,9 @@ export default function AssemblyBuilder({
     setAddOpen(false);
   };
 
-  const uText = result.uValue == null ? "—" : result.uValue.toFixed(3);
+  // An empty stack has no U - showing the bare surface resistances (U≈5.9)
+  // read as a terrible wall rather than "nothing built yet".
+  const uText = result.uValue == null || layers.length === 0 ? "—" : result.uValue.toFixed(3);
   const uGood = result.uValue != null && result.uValue <= 0.20;
 
   return (
@@ -58,7 +70,7 @@ export default function AssemblyBuilder({
       {/* Presets */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
         <span style={{ fontSize: 10, color: white(0.4), textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Start from</span>
-        {PRESETS[kind].map((p) => (
+        {PRESET_LIST.map((p) => (
           <button key={p.label} onClick={() => onChange(p.layers.map((l) => ({ ...l })))}
             style={{ fontSize: 10.5, padding: "3px 9px", borderRadius: 99, cursor: "pointer",
               background: "rgba(255,255,255,0.05)", border: `1px solid ${white(0.12)}`, color: white(0.7) }}>
@@ -116,7 +128,7 @@ export default function AssemblyBuilder({
                 style={{ background: "#11161d", color: "#fff", border: `1px solid ${white(0.12)}`, borderRadius: 6, padding: "4px 6px", fontSize: 11.5 }}>
                 {(["insulation", "structure", "board", "cladding", "cavity"] as LayerCategory[]).map((cat) => (
                   <optgroup key={cat} label={CAT_LABEL[cat]} style={{ background: "#11161d" }}>
-                    {LAYER_MATERIALS.filter((mm) => mm.category === cat).map((mm) => (
+                    {LAYER_LIST.filter((mm) => mm.category === cat).map((mm) => (
                       <option key={mm.id} value={mm.id} style={{ background: "#11161d", color: "#fff" }}>{mm.label}</option>
                     ))}
                   </optgroup>
@@ -133,7 +145,10 @@ export default function AssemblyBuilder({
               <span style={{ fontSize: 10.5, color: white(0.5) }} title={m.lambda == null ? "Fixed cavity resistance" : `λ = ${m.lambda} W/m·K`}>
                 R {r ? r.r.toFixed(2) : "—"}
               </span>
-              <span style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
+              {layerNote?.(l) && (
+                <span style={{ gridColumn: "2 / -1", gridRow: 2, fontSize: 9.5, color: white(0.38), marginTop: -2 }}>{layerNote(l)}</span>
+              )}
+              <span style={{ display: "flex", gap: 2, justifyContent: "flex-end", gridRow: 1, gridColumn: 5 }}>
                 <button onClick={() => move(i, -1)} disabled={i === 0} title="Move out"
                   style={{ background: "transparent", border: 0, cursor: i === 0 ? "default" : "pointer", color: white(i === 0 ? 0.15 : 0.45), padding: 2 }}><ChevronUp size={12} /></button>
                 <button onClick={() => move(i, 1)} disabled={i === layers.length - 1} title="Move in"
@@ -160,7 +175,7 @@ export default function AssemblyBuilder({
               <div key={cat}>
                 <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase",
                   color: CAT_COLOR[cat], padding: "6px 10px 2px" }}>{CAT_LABEL[cat]}</div>
-                {LAYER_MATERIALS.filter((m) => m.category === cat).map((m) => (
+                {LAYER_LIST.filter((m) => m.category === cat).map((m) => (
                   <button key={m.id} onClick={() => add(m.id)}
                     style={{ display: "block", width: "100%", textAlign: "left", padding: "5px 10px", fontSize: 11.5,
                       background: "transparent", border: 0, cursor: "pointer", color: white(0.8) }}>
@@ -176,7 +191,7 @@ export default function AssemblyBuilder({
         )}
       </div>
 
-      {result.warnings.map((w) => (
+      {layers.length > 0 && result.warnings.map((w) => (
         <div key={w} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11, color: "#E8880C" }}>
           <AlertTriangle size={13} style={{ marginTop: 1, flexShrink: 0 }} />{w}
         </div>

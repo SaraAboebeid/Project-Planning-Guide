@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { api, type OptimizeComponentInput, type OptimizeParams, type OptimizePoint, type OptimizeResponse } from "../api/client";
-import { Loader2, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
+import { Loader2, ChevronDown, ChevronRight, Sparkles, Play } from "lucide-react";
 import ParetoChart, { axesFromKpis, OBJECTIVES } from "./ParetoChart";
 import ParallelCoordinates from "./ParallelCoordinates";
 
@@ -10,29 +10,48 @@ import ParallelCoordinates from "./ParallelCoordinates";
  * runs /api/optimize (fast degree-day physics over every combination), shows
  * the Pareto front, and hands each chosen winner back to be validated in EPSM. */
 
-type SortKey = "energy_kwh_m2_yr" | "total_cost" | "total_carbon";
+type SortKey = "energy_kwh_m2_yr" | "total_cost" | "total_carbon" | "initial_cost";
 
 const TAG_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
-  "cheapest":       { bg: "rgba(47,180,119,0.16)",  fg: "#2FB477", label: "Cheapest" },
+  // "cheapest" is the lowest LIFE-CYCLE cost (total_cost), so say that.
+  "cheapest":       { bg: "rgba(185,139,232,0.18)", fg: "#9B6BD6", label: "Lowest 30-yr cost" },
   "lowest-carbon":  { bg: "rgba(78,205,196,0.16)",  fg: "#4ECDC4", label: "Lowest carbon" },
   "lowest-energy":  { bg: "rgba(74,144,226,0.16)",  fg: "#4A90E2", label: "Lowest energy" },
 };
 
 export default function OptimizerPanel({
-  input, onValidate, disabledReason, currency, validatedKeys, selectedKpis,
+  input, onValidate, disabledReason, note, currency, validatedKeys, runningKeys = new Set<string>(), selectedKpis,
+  result: extResult, loading: extLoading, error: extError, onOpenTable, scopeLabel,
 }: {
+  /** Which building the figures are for, when there are several. */
+  scopeLabel?: string;
   input: { components: OptimizeComponentInput[]; params: OptimizeParams } | null;
   onValidate: (point: OptimizePoint, opts?: { auto?: boolean }) => void;
+  /** When given, the parent runs /api/optimize (so the Results table can list
+   *  the same estimates) and this panel only draws the chart. */
+  result?: OptimizeResponse | null;
+  loading?: boolean;
+  error?: string | null;
+  /** Shown instead of the panel's own table: jump to the combined table. */
+  onOpenTable?: () => void;
   disabledReason?: string;
+  /** Shown under the header, e.g. build-ups left out for having no price. */
+  note?: string;
   currency: "SEK" | "GBP" | "EUR";
   validatedKeys: Set<string>;
+  /** Packages whose EnergyPlus run is still queued/running. */
+  runningKeys?: Set<string>;
   selectedKpis: string[];
 }) {
   const axes = axesFromKpis(selectedKpis);
   const [open, setOpen] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<OptimizeResponse | null>(null);
+  const controlled = extResult !== undefined;
+  const [ownLoading, setLoading] = useState(false);
+  const [ownError, setError] = useState<string | null>(null);
+  const [ownResult, setResult] = useState<OptimizeResponse | null>(null);
+  const result = controlled ? extResult : ownResult;
+  const loading = controlled ? !!extLoading : ownLoading;
+  const error = controlled ? (extError ?? null) : ownError;
   const [sort, setSort] = useState<SortKey>("energy_kwh_m2_yr");
 
   const white = (o: number) => `rgba(255,255,255,${o})`;
@@ -63,6 +82,7 @@ export default function OptimizerPanel({
   // physics (no EnergyPlus), so it's cheap to re-run on every selection change;
   // debounced so rapid ticking doesn't fire a request per keystroke.
   useEffect(() => {
+    if (controlled) return;
     if (!canRun) { setResult(null); return; }
     const t = setTimeout(() => { run(); }, 450);
     return () => clearTimeout(t);
@@ -91,27 +111,11 @@ export default function OptimizerPanel({
   const pointKey = (pt: OptimizePoint) =>
     Object.entries(pt.selections).filter(([, v]) => v !== "__keep__").sort().map(([k, v]) => `${k}=${v}`).join("|");
 
-  // Auto-run the lowest-energy Pareto pick in EPSM once the curve settles, so the
-  // Results table and the Step-5 report fill in WITHOUT any manual click. Debounced
-  // and de-duped by point key so it fires once per settled best pick; the page
-  // replaces the previous auto-package, so exploring never piles up runs.
-  const lastAutoKey = useRef<string | null>(null);
-  useEffect(() => {
-    if (!result || result.pareto.length === 0) return;
-    const best = [...result.pareto].sort((a, b) => a.energy_kwh_m2_yr - b.energy_kwh_m2_yr)[0];
-    if (!best) return;
-    const key = pointKey(best);
-    if (key === "" || lastAutoKey.current === key || validatedKeys.has(key)) return;
-    const t = setTimeout(() => {
-      lastAutoKey.current = key;
-      onValidate(best, { auto: true });
-    }, 1600);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, validatedKeys]);
+  // No auto-run: EnergyPlus (EPSM) only runs when the user asks, via the
+  // "Simulate in EnergyPlus" button on a row or a click on a chart point.
 
   return (
-    <div style={{ borderRadius: 14, background: "rgba(var(--brand-rgb),0.06)", border: "1px solid rgba(var(--brand-rgb),0.28)", overflow: "hidden" }}>
+    <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden" }}>
       {/* No "optimize" button — the curve recomputes live as materials are
           picked (see the effect above). The header just shows status. */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px" }}>
@@ -123,7 +127,7 @@ export default function OptimizerPanel({
           }}
         >
           <Sparkles size={16} color="#B98BE8" />
-          <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Optimization · Pareto curve — updates live as you pick materials</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Optimisation &amp; Screening · Pareto curve and estimated packages</span>
           {loading && <Loader2 size={13} color="#B98BE8" style={{ animation: "spin 1s linear infinite" }} />}
           {result && !loading && (
             <span style={{ fontSize: 11, color: white(0.45) }}>
@@ -147,9 +151,10 @@ export default function OptimizerPanel({
           <p style={{ fontSize: 12, color: white(0.5), margin: "0 0 12px", lineHeight: 1.6 }}>
             As you pick materials, this scores <b>every combination</b> of your picks on the fast degree-day
             physics (no EnergyPlus) and plots the <b>Pareto-optimal</b> set live — the packages where you can't
-            improve one objective without sacrificing another. The best pick <b>runs automatically</b> in
-            EnergyPlus (EPSM) so the Results table and the report fill in on their own — or pin any other
-            point on the chart to run that one too. Model after Enerbäck &amp; Strömberg.
+            improve one objective without sacrificing another. Cost is <b>life-cycle over 30 years</b>: material
+            cost today plus the energy bill (at the energy price below, discounted) over the study period.
+            Shortlist the promising ones: click a chart point or <b>Simulate</b> in the table below to verify
+            that package in EnergyPlus (EPSM). Model after Enerbäck &amp; Strömberg.
           </p>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
@@ -158,9 +163,14 @@ export default function OptimizerPanel({
               <span style={{ fontSize: 11.5, color: white(0.45) }}>
                 {result.combinations_total.toLocaleString()} combinations evaluated · {result.pareto_count} Pareto-optimal
                 {result.truncated && " · search truncated (too many combinations — narrow the material list)"}
+                {scopeLabel && <> · figures for {scopeLabel}</>}
               </span>
             )}
           </div>
+
+          {note && (
+            <div style={{ fontSize: 11.5, color: "#E8880C", marginBottom: 10, lineHeight: 1.5 }}>{note}</div>
+          )}
 
           {error && (
             <div style={{ fontSize: 12, color: "#E2483B", marginBottom: 10 }}>Optimization failed: {error}</div>
@@ -194,8 +204,8 @@ export default function OptimizerPanel({
                   <div style={{ marginLeft: "auto", display: "flex", gap: 7 }}>
                     <button onClick={() => setShowParallel(v => !v)}
                       style={{ fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
-                        border: `1px solid ${showParallel ? "var(--brand-deep)" : "rgba(255,255,255,0.14)"}`,
-                        background: showParallel ? "var(--brand-deep)" : "transparent", color: showParallel ? "#fff" : white(0.6) }}>
+                        border: `1px solid ${showParallel ? "#4ECDC4" : "rgba(255,255,255,0.14)"}`,
+                        background: showParallel ? "#4ECDC4" : "transparent", color: showParallel ? "#0b1220" : white(0.6) }}>
                       {showParallel ? "Hide parallel view" : "＋ Parallel view"}
                     </button>
                     <button onClick={() => setMaximized(true)} title="Maximise the chart"
@@ -234,7 +244,7 @@ export default function OptimizerPanel({
                 <div onClick={() => setMaximized(false)}
                   style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(5,7,12,0.9)", display: "flex", flexDirection: "column", padding: 20 }}>
                   <div onClick={e => e.stopPropagation()}
-                    style={{ background: "#0d1117", border: "1px solid rgba(var(--brand-rgb),0.4)", borderRadius: 14, padding: "16px 20px", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                    style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: "16px 20px", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Pareto frontier</span>
                       <span style={{ fontSize: 11, color: white(0.45) }}>
@@ -258,16 +268,44 @@ export default function OptimizerPanel({
                 </div>
               )}
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, marginTop: 16, flexWrap: "wrap" }}>
+              {/* One table for every package lives in Results (estimates until
+                  simulated); the chart view links to it instead of repeating it. */}
+              {onOpenTable ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, padding: "10px 14px", borderRadius: 10,
+                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: white(0.6), flex: 1, lineHeight: 1.5 }}>
+                    Every package — with cost, carbon, 30-year cost and carbon, heating and total energy — is in one
+                    table under <b style={{ color: "#fff" }}>Results &amp; comparison</b>: estimates until simulated, EnergyPlus figures after.
+                    Click a point above to simulate it.
+                  </span>
+                  <button onClick={onOpenTable}
+                    style={{ fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 8, cursor: "pointer",
+                      border: "1px solid #4ECDC4", background: "rgba(78,205,196,0.14)", color: "#4ECDC4" }}>
+                    Open the packages table →
+                  </button>
+                </div>
+              ) : (<>
+              {/* The table IS the chart's points, so it sits in the same card under
+                  a joining rule — one analysis, two read-outs. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18 }}>
+                <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: white(0.4), textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                  Estimated packages · the points above
+                </span>
+                <span style={{ flex: 1, height: 1, background: white(0.1) }} />
+              </div>
+              <div style={{ fontSize: 10.5, color: white(0.4), margin: "4px 0 0" }}>
+                Fast-model estimates to shortlist from — <b>Simulate</b> the promising ones; verified results appear in Simulation Results &amp; Comparison.
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 11, color: white(0.4) }}>Sort by:</span>
                 {/* "Cost" here is life-cycle, unlike the capex-only Cost in 4.3 —
                     the two answer different questions and can rank differently. */}
-                {([["energy_kwh_m2_yr", "Energy"], ["total_cost", "Cost"], ["total_carbon", "Carbon"]] as const).map(([k, lbl]) => (
+                {([["energy_kwh_m2_yr", "Energy"], ["initial_cost", "Upfront cost"], ["total_cost", "30-yr cost"], ["total_carbon", "30-yr carbon"]] as const).map(([k, lbl]) => (
                   <button key={k} onClick={() => setSort(k)} style={{
                     fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
-                    border: `1px solid ${sort === k ? "var(--brand-deep)" : "rgba(255,255,255,0.12)"}`,
-                    background: sort === k ? "var(--brand-deep)" : "transparent",
-                    color: sort === k ? "#fff" : white(0.55),
+                    border: `1px solid ${sort === k ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
+                    background: sort === k ? "#4ECDC4" : "transparent",
+                    color: sort === k ? "#0b1220" : white(0.55),
                   }}>{lbl}</button>
                 ))}
                 {canShowAll && (
@@ -297,9 +335,12 @@ export default function OptimizerPanel({
                     <tr style={{ color: white(0.45), textAlign: "left" }}>
                       <th style={{ padding: "6px 8px", fontWeight: 600 }}>Package (selected options)</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Energy</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Upfront cost</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}
-                          title="Life-cycle cost = installed capex + discounted energy over the study period (op_cost = demand x energy price x annuity factor). NOT the same as the capex-only Cost column in the results table below.">Cost (life-cycle)</th>
-                      <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Carbon (life-cycle)</th>
+                          title="Upfront cost + 30 years of energy at today's price, discounted (energy × price × annuity factor)">30-yr cost (LCC)</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}
+                          title="Embodied carbon + 30 years of energy">30-yr carbon</th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -307,11 +348,14 @@ export default function OptimizerPanel({
                     <tr style={{ borderTop: `1px solid ${white(0.08)}`, color: white(0.55) }}>
                       <td style={{ padding: "8px", fontStyle: "italic" }}>Baseline (as-built)</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{result.baseline.energy_kwh_m2_yr} kWh/m²/yr</td>
+                      <td style={{ padding: "8px", whiteSpace: "nowrap" }}>—</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{fmtMoney(result.baseline.total_cost)}</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{Math.round(result.baseline.total_carbon).toLocaleString()} kg</td>
                       <td />
                     </tr>
                     {shown.map((pt, i) => {
+                      const ptKey = pointKey(pt);
+                      const simulated = ptKey !== "" && validatedKeys.has(ptKey);
                       const deltaPct = baseEnergy ? Math.round(((baseEnergy - pt.energy_kwh_m2_yr) / baseEnergy) * 100) : null;
                       const touched = Object.entries(pt.selection_labels).filter(([, v]) => v !== "Keep as-built");
                       return (
@@ -344,14 +388,32 @@ export default function OptimizerPanel({
                               <div style={{ fontSize: 10.5, color: "#2FB477" }}>−{deltaPct}% vs baseline</div>
                             )}
                           </td>
-                          <td style={{ padding: "8px", whiteSpace: "nowrap", color: white(0.8) }}>{fmtMoney(pt.total_cost)}</td>
+                          <td style={{ padding: "8px", whiteSpace: "nowrap", color: white(0.8) }}>{fmtMoney(pt.initial_cost)}</td>
+                          <td style={{ padding: "8px", whiteSpace: "nowrap", color: "#9B6BD6", fontWeight: 600 }}>{fmtMoney(pt.total_cost)}</td>
                           <td style={{ padding: "8px", whiteSpace: "nowrap", color: white(0.8) }}>{Math.round(pt.total_carbon).toLocaleString()} kg</td>
+                          <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
+                            {ptKey === "" ? null : runningKeys.has(ptKey) ? (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700, color: "#E8880C" }}>
+                                <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> Running in EnergyPlus…
+                              </span>
+                            ) : simulated ? (
+                              <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2FB477" }}>✓ Simulated · see Results</span>
+                            ) : (
+                              <button onClick={() => onValidate(pt)}
+                                style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700,
+                                  padding: "5px 11px", borderRadius: 8, cursor: "pointer",
+                                  border: "1px solid rgba(47,180,119,0.45)", background: "rgba(47,180,119,0.14)", color: "#2FB477" }}>
+                                <Play size={11} /> Simulate in EnergyPlus
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
+              </>)}
 
             </>
           )}

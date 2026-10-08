@@ -149,9 +149,9 @@ export const LIBRARY_TABS: {
   path: string;
   pathByCountry?: Partial<Record<CountryCode, string>>;
 }[] = [
-  { label: "Pathways", path: "/pathways" },
+  { label: "Workflow", path: "/pathways" },   // URL kept so existing links still work
   { label: "Analysis Tools", path: "/analysis" },
-  { label: "Data Explorer", path: "/data", pathByCountry: { gb: "/data/uk" } },
+  { label: "Data Explorer", path: "/data", pathByCountry: { gb: "/data/uk", be: "/data/be" } },
   { label: "3D Viewer", path: "/viewer", pathByCountry: { gb: "/viewer/uk", be: "/viewer/be" } },
   { label: "Sample Reports", path: "/reports" },
   { label: "Project Team", path: "/team" },

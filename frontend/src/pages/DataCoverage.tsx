@@ -7,6 +7,7 @@ import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import FacadeDefectPanel, { type FacadeBuilding } from "../components/FacadeDefectPanel";
 import RetrofitPriorityPanel from "../components/RetrofitPriorityPanel";
 import ModelScopeNotice from "../components/ModelScopeNotice";
+import { buildingUseLabel } from "../utils/useLabels";
 import { makeBuildingKeys, type PriorityInput } from "../utils/retrofitPriority";
 import {
   ChevronUp, ChevronDown,
@@ -1645,16 +1646,34 @@ function BboxDataBanner({
                         const val     = r[c.key];
                         const present = val !== null && val !== undefined;
                         const isBoplats = (c.key as string).startsWith("boplats_");
+                        // Estimates must never read as measured data: a TABULA archetype
+                        // energy (no certificate) and, in Belgium, a Statbel-sampled year
+                        // (and the era/U-values that follow from it) are marked "≈".
+                        const yearEstimated = r.year_source === "statbel_prior";
+                        const estimateNote =
+                          c.key === "energy_kwh_m2" && r.energy_source === "tabula_estimate"
+                            ? "No energy certificate for this building — typical value of its TABULA archetype (type × era), not a measurement."
+                          : c.key === "year_built" && yearEstimated
+                            ? "No recorded construction year — drawn from Statbel's construction-period mix for this commune and building type. Indicative only."
+                          : (c.key === "tabula_period" || c.key === "u_wall" || c.key === "u_window" || c.key === "u_roof") && yearEstimated
+                            ? "TABULA archetype value for an ESTIMATED construction era (the year is sampled from Statbel), not measured for this building."
+                          : null;
+                        const estimated = present && !!estimateNote;
                         const cell = isSelected
                           ? ""
                           : present
-                            ? isBoplats ? "bg-amber-900/20 text-amber-300" : "bg-emerald-900/15 text-white/70"
+                            ? isBoplats || estimated ? "bg-amber-900/20 text-amber-300" : "bg-emerald-900/15 text-white/70"
                             : "bg-red-900/15 text-white/25";
+                        // Use codes are the shared (Swedish-schema) keys — show English
+                        // labels outside Sweden, where the Swedish words mean nothing.
+                        const nonSE = useWizardStore.getState().project.country !== "Sweden";
                         const display = c.key === "address"
                           ? (isCadastralId(val as string, r.cadastral_id) ? "—" : formatAddress(val as string))
-                          : present ? String(val) : "—";
+                          : c.key === "building_use" && nonSE && present
+                            ? buildingUseLabel(val as string)
+                          : present ? `${estimated ? "≈ " : ""}${String(val)}` : "—";
                         return (
-                          <td key={c.key}
+                          <td key={c.key} title={estimated ? estimateNote! : undefined}
                               className={`px-2 py-1 ${editing ? "" : cell} whitespace-nowrap`}
                               onClick={editing ? (e => e.stopPropagation()) : undefined}>
                             {editing ? (
@@ -2084,7 +2103,9 @@ function BuildingDataBanner({
             <FieldChip
               key={String(f.key)}
               label={f.label}
-              value={building[f.key] as string | number | null}
+              value={f.key === "use_cat" && (isUK || isBE) && building.use_cat
+                ? buildingUseLabel(building.use_cat)
+                : building[f.key] as string | number | null}
               critical={critical.has(f.key)}
             />
           )
@@ -2271,7 +2292,7 @@ function MultiBuildingDataBanner({
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium text-white/75 truncate">{isCadastralId(b.address) ? "EUBUCCO building" : (formatAddress(b.address) ?? "EUBUCCO building")}</div>
               <div className="flex flex-wrap gap-x-3 mt-0.5 text-[10px] text-white/40">
-                {b.use_cat    && <span>{b.use_cat}</span>}
+                {b.use_cat    && <span>{b.country === "gb" || b.country === "be" ? buildingUseLabel(b.use_cat) : b.use_cat}</span>}
                 {b.year       && <span>Built {b.year}</span>}
                 {b.floors     && <span>{b.floors} floors</span>}
                 {b.eclass     && <span>Class {b.eclass}</span>}
@@ -2610,7 +2631,7 @@ export default function DataCoverage() {
             <span className="font-semibold text-white/80">{isCadastralId(viewerSelection.address) ? "No street address" : (formatAddress(viewerSelection.address) || "Unknown address")}</span>
             <span className="text-white/20 mx-2">|</span>
             <span className="text-white/40 space-x-3">
-              {viewerSelection.use_cat && <span>{viewerSelection.use_cat}</span>}
+              {viewerSelection.use_cat && <span>{useWizardStore.getState().project.country !== "Sweden" ? buildingUseLabel(viewerSelection.use_cat) : viewerSelection.use_cat}</span>}
               {viewerSelection.year    && <span>Built {viewerSelection.year}</span>}
               {viewerSelection.height  && <span>{viewerSelection.height} m</span>}
               {viewerSelection.floors  && <span>{viewerSelection.floors} fl</span>}
