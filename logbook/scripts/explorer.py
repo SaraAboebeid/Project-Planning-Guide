@@ -119,7 +119,10 @@ def load_buildings(rel: str) -> pd.DataFrame:
         rows.append(r)
     df = pd.DataFrame(rows)
     df["use"] = df.get("use_cat", pd.Series(index=df.index, dtype=object)).map(USE_LABELS).fillna("Unknown")
-    df["eclass"] = df["eclass"].where(df["eclass"].isin(CLASSES), None)
+    # Belgian payloads carry no energy class at all - no region publishes open
+    # per-building certificates - so the column has to be created, not filtered.
+    ec = df.get("eclass", pd.Series(index=df.index, dtype=object))
+    df["eclass"] = ec.where(ec.isin(CLASSES), None)
     df["year"] = pd.to_numeric(df.get("year"), errors="coerce")
     df.loc[(df["year"] < 1500) | (df["year"] > 2030), "year"] = np.nan
     df["has_epc"] = df.get("has_epc", False).fillna(False).astype(bool)
@@ -136,7 +139,9 @@ def _year_band(y: float) -> str:
 
 
 def buildings_explorer(rel: str, key: str, energy_col: str | None, energy_label: str,
-                       extra_cols: list[str]) -> None:
+                       extra_cols: list[str], colour_default: str = "Energy class") -> None:
+    """`colour_default` exists for Belgium: colouring by energy class there
+    paints every building grey, because no Belgian region publishes one."""
     df = load_buildings(rel)
     source_line(rel, note="one record per building, exactly as the viewer and the wizard read it")
 
@@ -171,19 +176,15 @@ def buildings_explorer(rel: str, key: str, energy_col: str | None, energy_label:
         f = f[f["address"].astype(str).str.contains(text, case=False, na=False, regex=False)]
 
     n = len(f)
-    m = st.columns(5)
-    m[0].metric("Buildings", f"{n:,}", help=f"of {len(df):,} in the file")
-    pct = (lambda s: f"{100 * s.mean():.0f}%" if n else "-")
-    m[1].metric("With construction year", pct(f["year"].notna()))
-    m[2].metric("With energy class", pct(f["eclass"].notna()))
-    m[3].metric("With a certificate", pct(f["has_epc"]))
-    m[4].metric("Median height", f"{f['height'].median():.1f} m" if n else "-")
     if not n:
         st.info("No buildings match these filters.")
         return
+    st.caption(f"{n:,} of {len(df):,} buildings in the file match these filters.")
 
-    colour_by = st.radio("Colour the map by", ["Energy class", "Construction year", "Use", "Height"],
-                         horizontal=True, key=f"{key}_col")
+    colour_modes = ["Energy class", "Construction year", "Use", "Height"]
+    colour_by = st.radio("Colour the map by", colour_modes, horizontal=True, key=f"{key}_col",
+                         index=colour_modes.index(colour_default)
+                         if colour_default in colour_modes else 0)
     mdf = f[["lon", "lat", "address", "use", "eclass", "year", "height"]].copy()
     if colour_by == "Energy class":
         mdf["rgb"] = [_hex_rgb(EPC_COLORS[c]) if c in EPC_COLORS else GREY for c in mdf["eclass"]]
@@ -501,7 +502,7 @@ def _boplats_map(df: pd.DataFrame) -> None:
     st.caption(
         f"{len(placed):,} of {len(df):,} listings are placed - the other "
         f"{len(df) - len(placed):,} have an address that matches no building in the model. "
-        "Energy class is the **building's** certificate, not the individual apartment's."
+        "Energy class is the building's certificate, not the individual apartment's."
     )
 
 
@@ -510,7 +511,7 @@ def market_explorer() -> None:
                      horizontal=True, key="mkt_which")
     if which.startswith("Booli"):
         df = _booli()
-        source_line("booli_listings.db", note="scraped weekly; see **4. Scraped Market Data**")
+        source_line("booli_listings.db", note="scraped weekly; see 4. Scraped Market Data")
         m = st.columns(4)
         m[0].metric("Listings", f"{len(df):,}")
         m[1].metric("Median price per m²", f"{df['sqm_price'].median():,.0f} SEK")
@@ -534,7 +535,7 @@ def market_explorer() -> None:
     else:
         df = _boplats_located()
         source_line("boplats_apartments.db", "frontend/public/buildings.json",
-                    note="rentals scraped daily (see **4. Scraped Market Data**), placed on "
+                    note="rentals scraped daily (see 4. Scraped Market Data), placed on "
                          "the building model by address")
         df["rent_m2"] = df["rent_sek"] / df["size_m2"]
         m = st.columns(4)
@@ -600,7 +601,7 @@ def sims_explorer(country: str) -> None:
         st.warning(f"`{SIM_DB}` is not on this computer.")
         return
     source_line(SIM_DB, note="every EnergyPlus run the tool has sent to EPSM, with its results; "
-                             "see **6. Energy Simulation - EPSM & IDF**")
+                             "see 6. Energy Simulation - EPSM & IDF")
     df = _sims()
     df = df[df["country"] == country]
     if df.empty:
@@ -770,7 +771,7 @@ def _json(rel: str):
 
 
 def _meta_line(d: dict) -> None:
-    bits = [f"**{k}:** {d[k]}" for k in ("dataset", "publisher", "source", "licence", "currency") if d.get(k)]
+    bits = [f"{k}: {d[k]}" for k in ("dataset", "publisher", "source", "licence", "currency") if d.get(k)]
     if bits:
         st.caption(" · ".join(bits))
     if d.get("note"):
@@ -837,3 +838,82 @@ def reference_uk() -> None:
         source_line(rel)
         _meta_line(d)
         show_dataframe_safe(pd.DataFrame(d.get("kpis", [])))
+
+
+def reference_be() -> None:
+    """Belgium's three reference tables. There is no certificate table, because
+    no Belgian region publishes per-building certificates - the Walloon one is
+    a distribution per municipality, which is why it reads differently."""
+    choice = st.radio("Table", ["TABULA archetypes (BE)", "Building stock (Statbel)",
+                                "Walloon EPB certificates (ODWB)"],
+                      horizontal=True, key="be_ref")
+
+    if choice.startswith("TABULA"):
+        rel = "frontend/public/be/tabula_be.json"
+        d = _json(rel)
+        source_line(rel, note="the national Belgian typology - every U-value in the Belgian "
+                              "model comes from here")
+        _meta_line(d if isinstance(d, dict) else {})
+        rows = d["archetypes"] if isinstance(d, dict) and "archetypes" in d else d
+        show_dataframe_safe(pd.json_normalize(rows))
+
+    elif choice.startswith("Building stock"):
+        rel = "frontend/public/be/statbel_building_stock.json"
+        d = _json(rel)
+        source_line(rel, note="the construction-period prior - a Belgian building's year is "
+                              "sampled from this, never looked up")
+        _meta_line(d if isinstance(d, dict) else {})
+        rows = d["rows"] if isinstance(d, dict) and "rows" in d else d
+        df = pd.json_normalize(rows)
+        show_dataframe_safe(df.head(3000))
+        download_csv(df, "statbel_building_stock.csv", "be_statbel_dl")
+
+    else:
+        rel = "frontend/public/be/peb_wallonia_stats.json"
+        d = _json(rel)
+        source_line(rel, note="874,605 Walloon certificates, grouped. They carry no address, so "
+                              "a building is linked to *similar dwellings in its municipality* - "
+                              "never to its own certificate")
+        st.caption(d.get("source", ""))
+        st.info(d.get("note", ""), icon="ℹ️")
+
+        munis = d["municipalities"]
+        names = {k: (v.get("name") or k) for k, v in munis.items()}
+        order = sorted(names, key=lambda k: (k != "62063", names[k]))   # Liège first
+        pick = st.selectbox("Municipality", order, format_func=names.get, key="be_peb_mun")
+        g = munis[pick]["groups"]
+
+        rows = []
+        for key, s in g.items():
+            dest, facade, period = key.split("|")
+            rows.append({
+                "dwelling type": "House" if dest == "SINGLE_FAMILY_HOUSE" else "Apartment",
+                "free facades": {"DETACHED": "4 (detached)", "THREE_FREE": "3 (semi / end)",
+                                 "TWO_FREE": "2 (terraced)", "ONE_FREE": "1 (enclosed)",
+                                 "*": "any"}.get(facade, facade),
+                "period": period,
+                "certificates": s["n"],
+                "E_spec p25": s["e_spec_p25"],
+                "E_spec median": s["e_spec_median"],
+                "E_spec p75": s["e_spec_p75"],
+                "commonest label": max(s["labels"], key=s["labels"].get) if s.get("labels") else None,
+                "heated floor median m2": s.get("heated_floor_median_m2"),
+            })
+        df = pd.DataFrame(rows).sort_values("certificates", ascending=False)
+
+        whole = df[df["period"] == "*"]
+        if len(whole):
+            _chart(alt.Chart(whole, title="Specific primary energy by dwelling type "
+                                          "(median, with the quartile range)")
+                   .mark_bar(opacity=0.85, color="#6E2AAE")
+                   .encode(y=alt.Y("dwelling type:N", title=None),
+                           yOffset="free facades:N",
+                           x=alt.X("E_spec median:Q", title="kWh/m² per year (primary)"),
+                           color=alt.Color("free facades:N", title="free façades"),
+                           tooltip=list(whole.columns))
+                   .properties(height=max(200, 34 * len(whole))))
+        st.caption("`E_spec` is primary energy from an asset rating under standardised use. "
+                   "The tool's own simulation produces delivered energy for the modelled "
+                   "building - the two are not on the same basis and must not be differenced.")
+        show_dataframe_safe(df)
+        download_csv(df, f"peb_wallonia_{pick}.csv", "be_peb_dl")

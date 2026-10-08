@@ -30,9 +30,23 @@ LOGBOOK_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = LOGBOOK_DIR.parent
 PAGES_DIR = LOGBOOK_DIR / "pages"
 
-# "**4. Sweden Pipeline**" - the space after the dot keeps "**1.88 million**"
-# from matching.
-XREF = re.compile(r"\*\*(\d+)\.\s+([^*]+?)\*\*")
+# "see 4. Sweden Pipeline". References used to be bold, so this looked for
+# "**4. Sweden Pipeline**"; the bold was dropped from the prose on 2026-10-08,
+# which silently took this check from 74 references to 0.
+#
+# Matching "a number, a dot, Title Case" instead is not safe - every ordered
+# list in the prose ("4. Region proposals", "1. The assistant ...") looks the
+# same. So the pattern is built from the page titles themselves: only a real
+# title counts as a reference. That still catches the failure this check exists
+# for - renumbering a page leaves references pointing at the wrong number -
+# while ignoring ordinary numbered lists completely.
+#
+# Titles are matched longest-first so "Coverage & Quality" wins over any
+# shorter title that is a prefix of it.
+_TITLES = sorted({p["title"] for p in PAGES.values()}, key=len, reverse=True)
+XREF = re.compile(
+    r"(\d+)\.\s+(" + "|".join(re.escape(t).replace(r"\ ", r"\s+") for t in _TITLES) + r")"
+)
 
 errors: list[str] = []
 warnings: list[str] = []

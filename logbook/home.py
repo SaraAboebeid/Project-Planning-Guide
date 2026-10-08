@@ -5,18 +5,16 @@ builds the navigation. The contents cards below follow the same NAV groups as
 the sidebar, so the two cannot disagree.
 """
 import re
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
 
 from logbook_content import NAV, PAGES  # noqa: E402
 from scripts.architecture import build_svg  # noqa: E402
-from scripts.ui_utils import REPO_ROOT, badge, inject_css, show_dataframe_safe  # noqa: E402
+from scripts.ui_utils import badge, inject_css  # noqa: E402
 
 st.set_page_config(page_title="Renovation Planner Logbook", layout="wide")
 inject_css()
@@ -63,7 +61,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ── contents, grouped exactly like the sidebar ───────────────────────────────
+# â”€â”€ contents, grouped exactly like the sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 st.markdown(
     """
     <style>
@@ -133,7 +131,7 @@ for group, keys in NAV:
             # asterisks only - underscores are literal here (data_pipeline.py).
             plain = re.sub(r"[`*]", "", " ".join(page["purpose"].split()))
             tabs = (f"<span class='lb-tile-tabs'>"
-                    + " · ".join(label for label, _ in page["tabs"]) + "</span>"
+                    + " Â· ".join(label for label, _ in page["tabs"]) + "</span>"
                     ) if page.get("tabs") else ""
             # Tool.py gives every page url_path = key with underscores as dashes.
             href = key.replace("_", "-")
@@ -143,7 +141,7 @@ for group, keys in NAV:
                     f"<span class='lb-tile-num'>{page['number']:02d}</span> "
                     f"{badge(page['stage'])}"
                     f"<span class='lb-tile-title'>{page['title']}</span>"
-                    f"<span class='lb-tile-desc'>{plain[:118].rstrip()}…</span>"
+                    f"<span class='lb-tile-desc'>{plain[:118].rstrip()}â€¦</span>"
                     f"{tabs}</a>",
                     unsafe_allow_html=True,
                 )
@@ -151,7 +149,7 @@ for group, keys in NAV:
 
 st.divider()
 
-# ── architecture ─────────────────────────────────────────────────────────────
+# â”€â”€ architecture â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Inline SVG, not a picture: it follows bright and dark mode, stays searchable
 # text, and is edited by changing LAYERS in scripts/architecture.py.
 st.subheader("How it fits together")
@@ -159,8 +157,8 @@ st.caption(
     "The five steps across the top, then inputs on the left flowing to outputs "
     "on the right, with every external service the tool calls banded underneath "
     "- each marked with whether it needs an API key, and whether that key is "
-    "free or billed. The detail behind each box is on **14. Services, Keys & "
-    "Access** and **13. Analysis Inventory**. Scroll sideways to see it all."
+    "free or billed. The detail behind each box is on 14. Services, Keys & "
+    "Access and 13. Analysis Inventory. Scroll sideways to see it all."
 )
 st.markdown(
     # The diagram is wider than a narrow window: it scrolls in its own box so
@@ -174,96 +172,10 @@ st.caption(
 )
 
 st.divider()
-
-# ── live repository state ────────────────────────────────────────────────────
-st.subheader("Repository state")
-st.caption(
-    "Read from disk each time this page loads, so the logbook reports what is "
-    "actually there rather than what was true when it was written."
-)
-
-
-@st.cache_data(show_spinner=False)
-def repo_snapshot() -> dict:
-    def count(pattern: str, root: str = ".") -> int:
-        base = REPO_ROOT / root
-        if not base.exists():
-            return 0
-        return sum(1 for _ in base.rglob(pattern))
-
-    try:
-        commit = subprocess.run(
-            ["git", "log", "-1", "--format=%h %ad %s", "--date=short"],
-            cwd=REPO_ROOT, capture_output=True, text=True, timeout=10,
-        ).stdout.strip()
-    except Exception:
-        commit = "unavailable"
-    try:
-        branch = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=REPO_ROOT, capture_output=True, text=True, timeout=10,
-        ).stdout.strip()
-    except Exception:
-        branch = "unavailable"
-
-    return {
-        "branch": branch,
-        "commit": commit,
-        "backend_py": count("*.py", "backend"),
-        "viewer_js": count("*.js", "viewer/js"),
-        "frontend_tsx": count("*.tsx", "frontend/src"),
-        "tools_py": count("*.py", "tools"),
-    }
-
-
-snap = repo_snapshot()
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Backend modules", snap["backend_py"])
-c2.metric("Viewer scripts", snap["viewer_js"])
-c3.metric("React components/pages", snap["frontend_tsx"])
-c4.metric("Pipeline tools", snap["tools_py"])
-
-st.caption(f"Branch **{snap['branch']}** · last commit `{snap['commit']}`")
-
-# ── does the code this logbook describes still exist? ────────────────────────
-st.subheader("Consistency check")
-
-KEY_PATHS = [
-    ("Code map", "CODEMAP.md"),
-    ("Core pipeline", "data_pipeline.py"),
-    ("Viewer build", "build.py"),
-    ("Backend API", "backend/main.py"),
-    ("Shoebox IDF generator", "tools/idf/generate_idf.py"),
-    ("Prioritisation model", "frontend/src/utils/retrofitPriority.ts"),
-    ("Regret analysis", "frontend/src/utils/regretAnalysis.ts"),
-    ("EPSM stack", "docker-compose.epsm.yml"),
-    ("EPC register", "data/sensitivity/epc_sweden.duckdb"),
-    ("Simulation cache", "data/simulation_database.sqlite3"),
-]
-
-rows = []
-for label, rel in KEY_PATHS:
-    exists = (REPO_ROOT / rel).exists()
-    rows.append({"What": label, "Path": rel, "Present": "yes" if exists else "NO"})
-
-df = pd.DataFrame(rows)
-missing = df[df["Present"] == "NO"]
-show_dataframe_safe(df)
-
-if missing.empty:
-    st.success("Every file this logbook depends on is present.")
-else:
-    st.error(
-        "Missing: "
-        + ", ".join(f"`{p}`" for p in missing["Path"])
-        + " - pages citing these will flag them too."
-    )
-
-st.divider()
 st.caption(
     "Going deeper: `NOTEBOOK.md` at the repository root holds the full method "
     "write-up - every threshold, the reasoning behind it and how it fails. "
-    "`CODEMAP.md` maps the code file by file; page 15 renders it."
+    "`CODEMAP.md` maps the code file by file; the Repository map page renders it."
 )
 st.caption(
     "Edit page text in `logbook_content.py`; the sidebar groups are `NAV` at the "

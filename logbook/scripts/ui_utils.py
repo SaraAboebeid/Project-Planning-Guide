@@ -388,7 +388,9 @@ def page_header(number, title: str, stage: str | None = None) -> None:
 
 
 def overview_card(title: str, subtitle: str, items: list[tuple[str, str]]) -> None:
-    lis = "".join(f"<li><strong>{lab}</strong> - {txt}</li>" for lab, txt in items)
+    # The label used to be <strong>; bold was dropped from the logbook's text
+    # on 2026-10-08, so it is plain here too.
+    lis = "".join(f"<li>{lab} - {txt}</li>" for lab, txt in items)
     st.markdown(
         f"<div class='lb-card'><h4>{title}</h4><p>{subtitle}</p><ol>{lis}</ol></div>",
         unsafe_allow_html=True,
@@ -716,7 +718,7 @@ def dataset_card(ds: dict) -> None:
         _inline(ds.get("source_version", "not stated by the publisher")))
 
     if ds.get("local"):
-        ours = (f"<strong>{local_updated(tuple(ds['local']))}</strong> "
+        ours = (f"{local_updated(tuple(ds['local']))} "
                 f"<span class='lb-dim'>(read from disk now)</span>")
         if ds.get("refresh"):
             ours += "<br>" + _inline(ds["refresh"])

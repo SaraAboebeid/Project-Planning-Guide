@@ -55,12 +55,6 @@ if not codemap.exists():
     st.stop()
 
 text = codemap.read_text(encoding="utf-8", errors="replace")
-stat = codemap.stat()
-
-c1, c2, c3 = st.columns(3)
-c1.metric("Lines", f"{text.count(chr(10)) + 1:,}")
-c2.metric("Size", f"{stat.st_size / 1024:.1f} KB")
-c3.metric("Sections", str(text.count(chr(10) + "## ")))
 
 query = st.text_input(
     "Filter by file or keyword",
