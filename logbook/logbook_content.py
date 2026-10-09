@@ -408,7 +408,7 @@ handle takes an exclusive lock and blocks the backend.
                 "publisher": "Boplats Göteborg - the region's rental-housing queue",
                 "link": "https://www.boplats.se/sok?types=1hand&area=508A8CB406FE001F00030A60",
                 "access": "Scraped",
-                "connection": " `requests` + BeautifulSoup over the public search page. Runs daily at 03:00 as the Windows task `PPG-Boplats-Daily-Refresh`. Full method on 4. Scraped Market Data.",
+                "connection": " `requests` + BeautifulSoup over the public search page. Runs daily at 03:00 as the Windows task `PPG-Boplats-Daily-Refresh`.",
                 "format": "HTML → SQLite → JSON",
                 "source_version": "Live listings - Boplats adds and removes flats continuously.",
                 "source_short": "live listings",
@@ -432,7 +432,7 @@ handle takes an exclusive lock and blocks the backend.
                 "publisher": "Booli - property sale listings",
                 "link": "https://www.booli.se/",
                 "access": "Scraped",
-                "connection": " Reads the `__NEXT_DATA__` JSON embedded in each search page - no paid API. Full method on 4. Scraped Market Data.",
+                "connection": " Reads the `__NEXT_DATA__` JSON embedded in each search page - no paid API.",
                 "format": "HTML → SQLite → JSON",
                 "source_version": "Live listings.",
                 "source_short": "live listings",
@@ -668,9 +668,7 @@ One card per dataset the UK track uses - publisher, link, how the tool is
 connected to it, how fresh the data is, how it is stored, its stage and where
 it is used. The UK shares almost nothing with Sweden: a different geometry
 source, a different certificate register, and a survey-based fallback where no
-certificate matches. Matching quality is on the United Kingdom tab of
-2. Coverage & Quality; the method is on the United Kingdom tab of
-3. Pipelines.
+certificate matches. Matching quality is on the United Kingdom tab of 2. Coverage & Quality; the method is on the United Kingdom tab of 3. Pipelines.
 
 "Our copy last updated" is read from the files on disk each time this page
 loads. Everything else was checked against the repository and the publishers'
@@ -1080,10 +1078,11 @@ Housing Survey 2024-25.
 # SHARED REFERENCE
 # ─────────────────────────────────────────────────────────────────────────────
 ACCESS = {
-    "number": 14,
+    "number": 13,
     "title": "Services, Keys & Access",
     "nav_title": "Services, keys & access",
     "stage": "metadata",
+    "kicker": "The page I actually open when something breaks.",
     "purpose": """
 Everything the tool depends on outside its own code: the services it calls, the
 keys those need, the ports each piece listens on, how it is deployed, and -
@@ -1091,7 +1090,7 @@ most useful when something breaks - what happens when a given service or key
 is missing. Almost nothing here fails hard: the tool is written to degrade,
 which is convenient in use and confusing in diagnosis, so each entry says
 exactly how it degrades. Country-specific datasets are on 1. Data Sources;
-the analyses that use these services are on 13. Analysis Inventory.
+the analyses that use these services are on 12. Analysis Inventory.
 
 Checked against the code and probed live on this computer on 2026-09-16. No key
 value appears on this page or anywhere in the logbook.
@@ -1196,8 +1195,9 @@ proxy and worth remembering if the backend is ever exposed directly. A custom
 error wrapper attaches the cross-origin header to unhandled 500s, because
 without it the browser reported a healthy backend as "not reachable".
 
-b) EPSM - the EnergyPlus simulation manager (6. Energy Simulation - EPSM
-& IDF). A separate four-container stack: Django backend, a Celery worker,
+b) EPSM - the EnergyPlus simulation manager
+(5. Energy Simulation - EPSM & IDF). A separate four-container stack:
+Django backend, a Celery worker,
 PostgreSQL and Redis. Both application containers run as root so they can reach
 the Docker socket and start `nrel/energyplus:23.2.0` containers as siblings.
 
@@ -1213,7 +1213,7 @@ When simulations fail, check Docker Desktop first - that has been the cause
 every time so far.
 
 c) The façade defect service - a small FastAPI app on port 8021 holding
-the trained detector (10. AI, ML & Vision Models), started by hand with
+the trained detector (9. AI, ML & Vision Models), started by hand with
 `python tools/ml/facade_detect_service.py`. It offers `/health` and `/detect`,
 has no authentication, and loads its model from a path that defaults to a
 personal folder outside the repository. The backend proxies to it and answers
@@ -1275,7 +1275,7 @@ UK data
 | Energy certificate register (GOV.UK) | certificates for UK buildings | bearer token | on disk, two caches | falls back to survey-based band estimates. Documented limit: the published quota is 6,000 requests per five minutes, but bursts are throttled after roughly 25–175 requests |
 | English Housing Survey | band and cost reference tables | none | downloaded files | manual download, documented in the ingest script |
 
-AI providers (10. AI, ML & Vision Models)
+AI providers (9. AI, ML & Vision Models)
 
 | Provider | Models used | Timeouts | When it fails |
 |---|---|---|---|
@@ -1283,7 +1283,7 @@ AI providers (10. AI, ML & Vision Models)
 | OpenAI | GPT-4o / GPT-4.1 for chat, window ratio, vision | 30–60 s | the assistant returns a polite message; nothing raises |
 | Google Street View Static API | façade images from the street | 30 s | 503 without a key; quota exhaustion is reported as such. Images are deliberately not cached to disk, because the terms cover display, not accumulation |
 
-Scraped sites (4. Scraped Market Data)
+Scraped sites
 
 | Site | Politeness | Note |
 |---|---|---|
@@ -1310,7 +1310,7 @@ they are why the viewer needs internet access of its own.
 | Esri ArcGIS | Light, Dark, Satellite and hillshade basemaps | none - chosen for exactly that reason | tiles go blank |
 | CARTO | the sharper Light and Dark basemaps | `CARTO_API`, handed to the browser inside the tile address by `/api/viewer-config` | falls back to Esri. Without a key CARTO still answers, but stamps "API KEY REQUIRED" across every tile |
 | Cesium ion → Google | photorealistic 3D tiles, and OSM Buildings in the UK viewer | an ion token (see below) | the token panel opens; the flat map and buildings keep working |
-| Statistics Sweden map service | the twelve SCB layers (12. Viewer Layers & Visualisation) | none | the layer just does not appear |
+| Statistics Sweden map service | the twelve SCB layers (11. Viewer Layers & Visualisation) | none | the layer just does not appear |
 | Nominatim, OpenStreetMap tiles, Google Fonts | viewer search, the Leaflet map in Step 1, typography | none | search reports failure; tiles blank; fallback fonts |
 
 The Cesium ion token. It is a real credential and it is hard-coded in the
@@ -1445,8 +1445,8 @@ therefore always the slow one.
 5. The viewer will not load at all? The Cesium library comes from a public
    CDN; if that is blocked nothing renders.
 6. An analysis 500s? Two Python packages the requirements pin have been
-   missing from the local environment in the past - see 13. Analysis
-   Inventory.
+   missing from the local environment in the past -
+   see 12. Analysis Inventory.
 7. Odd map or missing green layers? The pre-built green-area file is served
    only from `assets/`; some ways of running the viewer silently fall back to
    approximations.
@@ -1457,9 +1457,11 @@ therefore always the slow one.
 
 # ─────────────────────────────────────────────────────────────────────────────
 SCRIPT_BROWSER = {
-    "number": 15,
+    "number": 14,
     "title": "Repository map",
     "stage": "metadata",
+    "kicker": "The code map, rendered live from the repository so it cannot "
+                "quietly go stale the way a copied one would.",
     "purpose": """
 What every file in the codebase does. This page renders CODEMAP.md from the
 repository root, so it cannot drift from the map that is version-controlled
@@ -1985,8 +1987,7 @@ Brussels, the GRB in Flanders, the PICC in Wallonia. There is no national one.
 The decisive difference from Sweden and the UK: no region publishes open
 per-building energy certificates, so `has_epc` is false for every Belgian
 building and no energy class is shown. What stands in for it is on the Belgium
-tab of 2. Coverage & Quality; the method is on the Belgium tab of
-3. Pipelines.
+tab of 2. Coverage & Quality; the method is on the Belgium tab of 3. Pipelines.
 
 Counts were read from the served payloads on 2026-10-02; "our copy last updated"
 is read from disk each time this page loads.
@@ -2545,9 +2546,12 @@ is not yet produced.
 
 # ─────────────────────────────────────────────────────────────────────────────
 DIGITAL_TWIN = {
-    "number": 5,
+    "number": 4,
     "title": "Digital Twin Construction",
     "stage": "processed",
+    "kicker": "How a row in a register becomes something you can fly a camera "
+                "around.",
+    "stats": [("92,973", "Gothenburg buildings")],
     "purpose": """
 How the digital twin is put together: the 3D city in which every building
 carries its own data, and on which every layer and analysis sits. This page
@@ -2709,8 +2713,7 @@ the payload - there is no partial update.
 | Address search | Nominatim | `assets/viewer/js/search.js` | anywhere |
 
 The text behind every (i) button is kept in one file,
-`assets/viewer/js/layer_docs.js`. The full layer list is on
-12. Viewer Layers & Visualisation.
+`assets/viewer/js/layer_docs.js`. The full layer list is on 11. Viewer Layers & Visualisation.
 """,
             "files": ["assets/viewer/js/layers.js", "assets/viewer/js/layer_docs.js", "assets/sidebar-theme.css"],
         },
@@ -2734,8 +2737,7 @@ When a building is clicked, the viewer first looks for saved results within
 | Incident solar radiation | click a point | `/api/analysis/incident-radiation` | ground disc in kWh/m², per season | - |
 | Outdoor thermal comfort (UTCI) | click a point | `/api/analysis/thermal-comfort` | ground disc, per hour or share of a season | - |
 
-Methods in full: 6. Energy Simulation - EPSM & IDF, 10. AI, ML & Vision Models,
-11. Climate & Environmental Analysis.
+Methods in full: 5. Energy Simulation - EPSM & IDF, 9. AI, ML & Vision Models, 10. Climate & Environmental Analysis.
 """,
             "files": [
                 "assets/viewer/js/energy_sim.js",
@@ -2799,10 +2801,13 @@ wizard, not the 3D twin, which is still Gothenburg-only.
 
 # ─────────────────────────────────────────────────────────────────────────────
 SHOEBOX_IDF = {
-    "number": 6,
+    "number": 5,
     "title": "Energy Simulation - EPSM & IDF",
     "nav_title": "Energy simulation (EPSM)",
     "stage": "method",
+    "kicker": "Every building gets a one-room model of itself. Crude, defensible, "
+                "and the thing every number downstream rests on.",
+    "stats": [("3,882", "stored runs"), ("23.2", "EnergyPlus")],
     "purpose": """
 How a building in the tool becomes an EnergyPlus simulation: what EPSM is,
 how the tool is connected to it, how an IDF (EnergyPlus input file) is
@@ -2827,7 +2832,7 @@ results are stored and reused, and where every file is.
             "body": """
 EPSM - Energy Performance Simulation Manager - is an open-source web
 service developed at Chalmers (Sanjay Somanath, lead developer; Alexander
-Hollberg, principal investigator - see 16. Project Team & Credits). It
+Hollberg, principal investigator - see 15. Project Team & Credits). It
 takes EnergyPlus input files and a weather file over an HTTP API, queues them,
 runs EnergyPlus, and turns EnergyPlus's output into energy-use tables per end
 use. Source: <https://github.com/snjsomnath/epsm>.
@@ -2903,7 +2908,7 @@ building per run:
    (Alingsås) and Snavlunda (Askersund) for Sweden; London City for the four
    London districts and Doncaster-Sheffield for Rotherham; Uccle for Brussels
    and Gent, Liège for Liège. The rest of the folder is future-climate
-   scenarios for Gothenburg (11. Climate & Environmental Analysis) and
+   scenarios for Gothenburg (10. Climate & Environmental Analysis) and
    files kept but unused - Heathrow, Göteborg City, Kiruna.
 3. Geometry - the shoebox. The footprint is projected from longitude and
    latitude into local metres and extruded to the building's full height as
@@ -3123,9 +3128,12 @@ energy declaration.
 
 # ─────────────────────────────────────────────────────────────────────────────
 PRIORITISATION = {
-    "number": 7,
+    "number": 6,
     "title": "Retrofit Prioritisation",
     "stage": "method",
+    "kicker": "Which buildings first? The scoring is deliberately simple, because "
+                "the moment it is not, nobody can argue with it.",
+    "stats": [("4", "criteria")],
     "purpose": """
 Which buildings to renovate first. In Step 2 every selected building gets a
 priority score from 0 to 100, built from four criteria whose relative weights
@@ -3215,7 +3223,7 @@ The code calls 60 / 250 kWh/m²·yr "a Swedish residential rule of thumb"
 
 F - Façade / envelope condition *(more severe defects ⇒ higher priority)*
 
-Defects found by the façade inspection (10. AI, ML & Vision Models) are
+Defects found by the façade inspection (9. AI, ML & Vision Models) are
 weighted by severity - crack 1.0, bulge 1.0 (structural), corrosion
 0.75, abscission 0.75, leakage 0.6 - and summed into a *load*, which is
 passed through a saturating curve:
@@ -3339,9 +3347,11 @@ $$P = \\sum_{k \\in \\text{available}} \\tilde w_k \\, S_k, \\qquad \\tilde w_k 
 
 # ─────────────────────────────────────────────────────────────────────────────
 OPTIMISATION = {
-    "number": 8,
+    "number": 7,
     "title": "Optimisation Process",
     "stage": "method",
+    "kicker": "Finding the handful of renovation packages worth looking at, out "
+                "of the tens of thousands that are not.",
     "purpose": """
 How Step 4 finds the renovation packages that trade life-cycle cost,
 global warming potential and energy demand best: the source of the
@@ -3520,7 +3530,7 @@ The Pareto front is every package that no other package dominates.
 | Discounting | real rate *r* = 3%, applied to costs only |
 | Annuity factor | the constant yearly energy cost is discounted in one step: $\\sum_{y=1}^{N} \\frac{p\\,Q}{(1+r)^y} = p\\,Q \\cdot AF$, with $AF = \\sum_{y=1}^{N} (1+r)^{-y}$ = 19.600 for 3% and 30 years - 1 SEK a year for 30 years is worth 19.60 SEK today |
 | Carbon over time | summed, not discounted: operational carbon = $N \\cdot Q \\cdot f_{CO_2}$ |
-| Energy price over time | constant at today's spot price; how the choice holds up under low, medium and high future prices is tested afterwards in 9. Decision Analysis under Uncertainty |
+| Energy price over time | constant at today's spot price; how the choice holds up under low, medium and high future prices is tested afterwards in 8. Decision Analysis under Uncertainty |
 | Weather | one typical year (the degree-days, and the TMYx weather file of the EnergyPlus baseline) - no climate change over the 30 years |
 
 Computation time. The model is solved exactly by evaluating every
@@ -3572,8 +3582,8 @@ energy as colour); a parallel-coordinates view is optional.
 h) Validate in EnergyPlus. The lowest-energy package on the front is
 sent to EPSM automatically as an *"Optimal · …"* package; any other point runs
 with a click. Validated packages join the hand-built ones in the Step 4 results
-table, then go on to 9. Decision Analysis under Uncertainty and the Step 5
-report. How a package becomes an IDF is on 6. Energy Simulation - EPSM & IDF.
+table, then go on to 8. Decision Analysis under Uncertainty and the Step 5
+report. How a package becomes an IDF is on 5. Energy Simulation - EPSM & IDF.
 
 The AI assistant's `recommend_retrofit` runs the same optimiser for an address
 and checks its best-balance pick in EnergyPlus the same way.
@@ -3625,9 +3635,12 @@ visible instead of hiding it in one score.
 
 # ─────────────────────────────────────────────────────────────────────────────
 DECISION_ANALYSIS = {
-    "number": 9,
+    "number": 8,
     "title": "Decision Analysis under Uncertainty",
     "stage": "method",
+    "kicker": "Nobody knows the energy price in 2040. This page is about choosing "
+                "well anyway.",
+    "stats": [("3", "decision rules")],
     "purpose": """
 How Step 4 helps choose between renovation packages when the future energy
 price - the biggest unknown in whether a renovation pays off - cannot be
@@ -3676,7 +3689,7 @@ unknown.
             "title": "Step by step - the process in Step 4",
             "body": """
 a) Options. Every renovation package with an EnergyPlus result - built by
-hand or picked from the optimiser (8. Optimisation Process) - becomes a
+hand or picked from the optimiser (7. Optimisation Process) - becomes a
 row. Its energy $E_i$ is the average of its buildings' simulated
 kWh/m²·yr; its investment $I_i$ is the sum of its buildings' costs (Wikells).
 Keep as-built is added as the reference row. The analysis appears as soon
@@ -3852,7 +3865,7 @@ Already in the tool
 | The three price scenarios, editable | energy price | this panel |
 | The *Outcome spread* column | energy price (best − worst) | this panel |
 | The α slider | the decision-maker's optimism | this panel |
-| The live Pareto front | material choices | 8. Optimisation Process |
+| The live Pareto front | material choices | 7. Optimisation Process |
 
 Break-even points - derived from the payoff equation. Because $B_{i,s}$ is
 linear in the price and α, the exact points where a conclusion flips can be
@@ -3919,7 +3932,7 @@ What could be added
 | A tornado chart of the payoff: price, discount rate, investment ±20%, energy saving ±10% | which assumption the decision is most sensitive to |
 | An α sweep strip | how far the Hurwicz pick holds as optimism changes |
 | Re-run the OAT study on the current EnergyPlus model, or a global method (Sobol indices) | which building inputs drive the simulated energy |
-| Sensitivity of the prioritisation ranking to its weights | links to 7. Retrofit Prioritisation |
+| Sensitivity of the prioritisation ranking to its weights | links to 6. Retrofit Prioritisation |
 """,
             "files": [
                 "frontend/src/config/sensitivityData.ts",
@@ -4020,9 +4033,13 @@ Step 5 report.
 
 # ─────────────────────────────────────────────────────────────────────────────
 FACADE_ML = {
-    "number": 10,
+    "number": 9,
     "title": "AI, ML & Vision Models",
     "stage": "method",
+    "kicker": "The parts of the tool that guess. I have tried to be explicit "
+                "about where a model is reading a photograph and where a person "
+                "still should.",
+    "stats": [("41.4 M", "detector parameters")],
     "purpose": """
 The learned components in the tool. Most of this page is about façade
 inspection: how a trained defect detector and general vision-language models
@@ -4048,7 +4065,7 @@ needed for a simulation, an optimisation or a ranking to complete.
             "body": """
 | Component | Kind | Model | Runs | Input → output | Used by | Status |
 |---|---|---|---|---|---|---|
-| Defect detector | trained object detector | Faster R-CNN, ResNet-50 + FPN (41.4 M parameters), fine-tuned on MBDD2025 | locally, service on port 8021 (CPU) | façade image → boxes for crack, leakage, abscission, corrosion, bulge | Step 2 photos, viewer *Defects* → F criterion (7. Retrofit Prioritisation) | deployed; service must be started |
+| Defect detector | trained object detector | Faster R-CNN, ResNet-50 + FPN (41.4 M parameters), fine-tuned on MBDD2025 | locally, service on port 8021 (CPU) | façade image → boxes for crack, leakage, abscission, corrosion, bulge | Step 2 photos, viewer *Defects* → F criterion (6. Retrofit Prioritisation) | deployed; service must be started |
 | Defect second opinion | general vision-language model | Claude Sonnet 4.5, else GPT-4o | Anthropic / OpenAI API | façade image → boxes + note | Step 2 *AI assist* | deployed |
 | Window-to-wall estimate | general vision-language model | Claude Sonnet 4.5, else GPT-4.1, else a rule | Anthropic / OpenAI API | façade view + building facts → WWR %, balconies | viewer façade inspector → energy simulation | deployed |
 | Data assistant | tool-calling language model | GPT-4o, else Claude Sonnet 4.5 | OpenAI / Anthropic API | question → tool calls → answer | landing-page chat | deployed |
@@ -4065,7 +4082,7 @@ detector is wired into the tool.
             "body": """
 | Source | How the image is made | Where the result goes |
 |---|---|---|
-| Step 2 photo upload | The user drops photos into four façade slots per building (north, east, south, west). Large photos are scaled to at most 1,280 px on the longest side. A sensitivity setting chooses the detector's threshold: high 0.30, medium 0.45 (default), low 0.60. | defect boxes drawn on the photo; the annotated photo is stored in `data/facade_images/` for the Step 5 report; a per-building summary feeds the F criterion of 7. Retrofit Prioritisation |
+| Step 2 photo upload | The user drops photos into four façade slots per building (north, east, south, west). Large photos are scaled to at most 1,280 px on the longest side. A sensitivity setting chooses the detector's threshold: high 0.30, medium 0.45 (default), low 0.60. | defect boxes drawn on the photo; the annotated photo is stored in `data/facade_images/` for the Step 5 report; a per-building summary feeds the F criterion of 6. Retrofit Prioritisation |
 | 3D viewer - façade inspector | For the selected building the camera flies to each façade, far enough back to fit the building's height (+10%) and width, at mid-height, looking straight at the wall. *Capture all* grabs the four views; *Draw & capture* lets the user drag a crop box. The selection tint and outline are hidden during the grab so they cannot skew the model. | window-to-wall ratio and balconies (saved to `data/wwr_database.json`); defect boxes on the captured view |
 | Google Street View (`/api/streetview/facade`) | The backend looks for the nearest panorama on the right side of the façade, re-aims at the building from where the car actually drove, and can sweep up to five narrow shots across it. It reports the panorama date and how many millimetres of wall one pixel covers - below about 2 mm/px hairline cracks are plausible; at 8 mm/px only staining, spalling and gross cracking survive. | written but not connected - no screen calls it yet, and it needs `GOOGLE_MAPS_API_KEY` |
 
@@ -4178,7 +4195,7 @@ render.
    threshold - 0.30 / 0.45 / 0.60 from the Step 2 sensitivity setting, 0.50 in
    the viewer - and returns boxes in pixels, labels and scores, highest first.
 8. Into the ranking. Step 2 counts the boxes per class; weighted by severity
-   they become the F criterion of 7. Retrofit Prioritisation.
+   they become the F criterion of 6. Retrofit Prioritisation.
 
 Steps 2–6 are torchvision's `fasterrcnn_resnet50_fpn` defaults; nothing in the
 service changes them.
@@ -4250,7 +4267,7 @@ self-reported, not calibrated like the detector's scores.
             "body": """
 Why. The window-to-wall ratio (WWR) strongly drives heating demand, and no
 register holds it per building. Without an estimate the energy simulation uses
-a default by use (15–30%, see 6. Energy Simulation - EPSM & IDF).
+a default by use (15–30%, see 5. Energy Simulation - EPSM & IDF).
 
 How. Each captured façade view (JPEG, cropped to the building) is sent to
 `/api/estimate-wwr` together with the façade direction and the building's
@@ -4438,7 +4455,7 @@ The eleven tools and the data each one reads:
 | `get_boplats_rentals` | rents, rent per m², sizes by area | `boplats_apartments.db` |
 | `get_scb_datasets` | which SCB layers exist and their years | a fixed description (values are viewed on the map) |
 | `list_datasets` | what the assistant can answer | a fixed list |
-| `recommend_retrofit` | three packages - cheapest, lowest-energy, best balance - with the balanced one checked in EnergyPlus | the optimiser (8. Optimisation Process) and EPSM; takes about 15–30 s |
+| `recommend_retrofit` | three packages - cheapest, lowest-energy, best balance - with the balanced one checked in EnergyPlus | the optimiser (7. Optimisation Process) and EPSM; takes about 15–30 s |
 
 Why tool calling. An assistant that recalled Swedish building statistics
 from its training would be confidently wrong in ways nobody could check; one
@@ -4483,9 +4500,12 @@ answer without any AI at all.
 
 # ─────────────────────────────────────────────────────────────────────────────
 CLIMATE_ENV = {
-    "number": 11,
+    "number": 10,
     "title": "Climate & Environmental Analysis",
     "stage": "method",
+    "kicker": "Sun, radiation and comfort, written from the published methods "
+                "rather than wrapped around someone else's library.",
+    "stats": [("145", "sky patches")],
     "purpose": """
 How the 3D viewer analyses the outdoor environment around a point the user
 clicks: how many hours of direct sun reach the ground, how much solar
@@ -4561,7 +4581,7 @@ the solar part of the mean radiant temperature.
             "body": """
 Buildings. Each building is its footprint polygon with one height - a flat
 extruded block. Sweden: `frontend/public/buildings.json`, the footprints and
-heights of the Gothenburg model (5. Digital Twin Construction); UK: the
+heights of the Gothenburg model (4. Digital Twin Construction); UK: the
 district's building file. A missing height is taken as floors × 3 m, and as
 6 m (two floors) when the floors are missing too. The ground is flat:
 building bases and ground cells are all at height 0; the terrain model is not
@@ -5115,7 +5135,7 @@ thermal stress:
             "body": """
 These three layers are computed in the browser for the whole city, not around a
 clicked point. They are simple indices, not physical models. (The layers
-themselves are listed on 12. Viewer Layers & Visualisation.)
+themselves are listed on 11. Viewer Layers & Visualisation.)
 
 Data. Green areas from OpenStreetMap: parks, gardens, nature reserves,
 recreation grounds, grass, forest, meadow, wood, scrub and grassland.
@@ -5346,8 +5366,7 @@ down.
             "body": """
 Data. `frontend/public/buildings.json`: 92,973 buildings from EUBUCCO
 footprints, Boverket certificates and TABULA. The page fetches it once and the
-browser caches it per build version. How it is built is on
-5. Digital Twin Construction.
+browser caches it per build version. How it is built is on 4. Digital Twin Construction.
 
 Drawing. Each building is an extruded footprint, drawn in chunks of 12,000.
 Its height is:
@@ -5414,14 +5433,12 @@ Clicking a building enables three tools:
 
 | Tool | What it does | Where it is documented |
 |---|---|---|
-| Façade Inspection | captures façade views, estimates the window-to-wall ratio with a vision model, detects defects, saves the ratio | 10. AI, ML & Vision Models |
-| Rooftop PV Estimate | PVGIS yield for 80% of the footprint at 0.2 kWp/m², 35° tilt, facing south, 14% loss | 13. Analysis Inventory |
-| Run Energy Simulation | an EnergyPlus shoebox run through EPSM | 6. Energy Simulation - EPSM & IDF |
+| Façade Inspection | captures façade views, estimates the window-to-wall ratio with a vision model, detects defects, saves the ratio | 9. AI, ML & Vision Models |
+| Rooftop PV Estimate | PVGIS yield for 80% of the footprint at 0.2 kWp/m², 35° tilt, facing south, 14% loss | 12. Analysis Inventory |
+| Run Energy Simulation | an EnergyPlus shoebox run through EPSM | 5. Energy Simulation - EPSM & IDF |
 
 Environmental Analysis holds sun hours, incident radiation and thermal
-comfort. They are run by clicking a point; method and equations are on
-11. Climate & Environmental Analysis, and recordings and live examples on
-13. Analysis Inventory.
+comfort. They are run by clicking a point; method and equations are on 10. Climate & Environmental Analysis, and recordings and live examples on 12. Analysis Inventory.
 
 Their panels are hard to read. The panels were styled for the old dark
 sidebar: labels, readouts and legend text are white (`rgba(255,255,255,…)`)
@@ -5443,7 +5460,7 @@ key reaches the browser.
 | Commuter Parking | `/api/vasttrafik/parking`, `/parking/{id}/availability` → Västtrafik parking API | availability on click; the list once per load | green "P" icons. Availability bar: green above 40% free, yellow above 15%, red below |
 
 The query area is fixed to Gothenburg in the backend. Keys and services are
-listed on 14. Services, Keys & Access.
+listed on 13. Services, Keys & Access.
 """,
             "files": ["assets/viewer/js/vasttrafik.js", "assets/viewer/js/trafik_canvas.js"],
         },
@@ -5501,10 +5518,10 @@ The (i) text says 47 layers; the code has 12 groups with 50 year versions.
             "body": """
 | Layer | What it is | Notes |
 |---|---|---|
-| Green Index | points on a ~280 m grid coloured by distance to the nearest green area, $e^{-d/200}$ | method on 11. Climate & Environmental Analysis |
+| Green Index | points on a ~280 m grid coloured by distance to the nearest green area, $e^{-d/200}$ | method on 10. Climate & Environmental Analysis |
 | Heat Island Proxy | ~667 m cells, extruded 80 m, coloured by a building-stock score (energy class, age, use) lowered near green | not a temperature |
 | Green Accessibility | points in three distance bands: under 400 m, 400–800 m, over 800 m | straight-line distance |
-| Space Syntax | street segments coloured by centrality: betweenness (through-movement), integration (closeness) or reach (network within 1 km), with a Recompute control | see *Space syntax* below, and the live example on 13. Analysis Inventory |
+| Space Syntax | street segments coloured by centrality: betweenness (through-movement), integration (closeness) or reach (network within 1 km), with a Recompute control | see *Space syntax* below, and the live example on 12. Analysis Inventory |
 
 Data. Green areas come from `assets/gothenburg_greenspaces.json`, 22,851
 OpenStreetMap areas. That file exists only in `assets/`.
@@ -5705,7 +5722,7 @@ Analysis, below a "Site analysis · click a point" label. The UK page has no
 Environmental Analysis section, so the scripts fall back to that group. They
 use the UK buildings and UK weather files; there is no tree shading, since
 trees exist only for Gothenburg. Sun-hours clock labels use UTC+0, plus one
-hour in summer. Methods are on 11. Climate & Environmental Analysis.
+hour in summer. Methods are on 10. Climate & Environmental Analysis.
 
 Address search (Nominatim) is limited to the UK and adds the city and
 "United Kingdom" to the query.
@@ -5730,9 +5747,11 @@ Space Syntax is not in the UK page at all.
 }
 
 VIEWER_LAYERS = {
-    "number": 12,
+    "number": 11,
     "title": "Viewer Layers & Visualisation",
     "stage": "result",
+    "kicker": "Everything the 3D city can show - and the honest note that most of "
+                "it is Gothenburg only.",
     "purpose": """
 Everything that can be switched on in the two 3D viewers: base maps, the
 building layer and its colours, extra layers, live traffic, statistics and
@@ -5740,249 +5759,22 @@ analysis overlays. For each: where the data comes from, whether it is live or
 pre-built, and how it is drawn. Sweden and the UK have very
 different viewers - Gothenburg has traffic, SCB statistics, terrain relief and
 its own Environmental Analysis section - so each has its own tab. The analyses
-the viewers can run are on 13. Analysis Inventory; the colour-vision
+the viewers can run are on 12. Analysis Inventory; the colour-vision
 palette of the web app is in `frontend/src/config/colors.ts`.
 """,
     "tabs": [("Sweden", SE_VIEWER), ("United Kingdom", UK_VIEWER)],
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-SCRAPED_DATA = {
-    "number": 4,
-    "title": "Scraped Market Data",
-    "nav_title": "Market data (Sweden)",
-    "stage": "raw",
-    "purpose": """
-The two housing-market feeds the tool scrapes itself - Boplats (first-hand
-rentals) and Booli (sales and sold prices) - in full: how each site is
-reached, what is stored, how often it runs, and whether it is running right now.
-
-Everything else in the tool arrives via a file download or an official API
-(1. Data Sources). These two are the only sources we scrape, which makes them
-the only ones that can break because someone else changed a web page.
-""",
-    "overview": {
-        "title": "Two scrapers, two very different techniques",
-        "subtitle": "Both write SQLite, then export JSON for the Data Explorer.",
-        "items": [
-            ("Boplats", "Server-rendered HTML parsed with BeautifulSoup. 1,253 rentals held (2026-09-14)."),
-            ("Booli", "Next.js site - the JSON payload is read out of the page itself. 243 listings held."),
-            ("Accumulating", "Both keep first_seen / last_seen per record, so history builds up rather than being overwritten."),
-            ("Fragile by nature", "A layout change upstream breaks them, unlike an API contract."),
-        ],
-    },
-    "sections": [
-        {
-            "title": "Boplats - first-hand rentals",
-            "badge": "raw",
-            "body": """
-Target. `https://boplats.se/sok?types=1hand&area=508A8CB406FE001F00030A60`
-- the `area` token is Gothenburg; `types=1hand` restricts to first-hand
-contracts, which is the segment with regulated rents and therefore the
-meaningful one for renovation economics.
-
-Technique. Plain `requests` plus BeautifulSoup over server-rendered
-HTML. No browser automation, no API.
-
-Politeness. `REQUEST_DELAY = 1.2` seconds between requests, with a
-desktop-browser `User-Agent`.
-
-Stored in `boplats_apartments.db`, table `apartments` - 1,253 rows on 2026-09-14,
-15 columns:
-
-`id · url · address · area_name · rooms · size_m2 · floor_current ·
-floor_total · rent_sek · move_in_date · apply_by · floorplan_image_path ·
-floorplan_image_url · first_seen · last_seen`
-
-Floor plans are downloaded to `boplats_images/<apartment_id>.jpg`, then
-synced into `assets/boplats_images` and `frontend/public/boplats_images`.
-
-Why `floor_current` / `floor_total` matter. They are the only routine source
-in the whole tool for *which storey* a dwelling is on - relevant to both
-retrofit sequencing and comfort, and absent from EUBUCCO and the certificates.
-
-Modes. `--watch 60` re-scrapes on an interval; `--export` dumps the database
-to JSON without scraping.
-""",
-            "files": [
-                "boplats_scraper.py",
-                "boplats_to_assets.py",
-                "boplats_apartments.db",
-                "assets/boplats_data.json",
-            ],
-        },
-        {
-            "title": "Booli - sales, sold prices and upcoming",
-            "badge": "raw",
-            "body": """
-Technique - the interesting part. Booli is a Next.js site: every search
-page ships its own data as JSON inside
-`<script id="__NEXT_DATA__">` (Apollo normalised state). The scraper reads
-`Listing` (for-sale / upcoming) and `SoldProperty` (sold) entities straight out
-of that payload rather than parsing rendered HTML.
-
-Why that is better here. The embedded payload is the same data the page
-renders from, so it carries typed fields - coordinates, tenure, fees, energy
-class - that would have to be scraped back out of formatted text otherwise. It
-is also more stable than the DOM: a visual redesign usually leaves the payload
-shape intact.
-
-No paid API. An earlier iteration used a paid Apify actor. The current
-scraper is direct - worth knowing, because the weekly cadence was originally
-chosen to limit paid calls and is now purely about being polite.
-
-Status paths. `till-salu` (for sale) and `slutpriser` (sold). *Upcoming* is
-not a separate path - it is derived from the `upcomingSale` flag on the
-for-sale set.
-
-Images come from the CDN pattern `https://bcdn.se/images/cache/{id}_1280x0.webp`.
-
-Configuration, all via `.env`:
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `BOOLI_AREA_IDS` | *(required)* | comma-separated area ids - find one by searching booli.se and copying `areaIds=` from the URL |
-| `BOOLI_MAX_ITEMS` | 200 | cap per area and status |
-| `BOOLI_MAX_PAGES` | 20 | page cap per area and status |
-| `BOOLI_DELAY` | 1.5 s | between requests |
-| `BOOLI_STATUSES` | all | subset of `for_sale,sold,upcoming` |
-
-Stored in `booli_listings.db`, table `listings` - 243 rows, 28 columns,
-including `latitude` / `longitude`, `energy_class`, `sold_price`, `sold_date`,
-`sqm_price`, `construction_year`, `monthly_fee`, `agency_name`, and the complete
-`raw_json` of each record.
-
-Keeping `raw_json` is deliberate. The parsed columns are a lossy projection
-of a payload that changes shape upstream; retaining the original means a new
-field can be back-filled from data already collected instead of re-scraping.
-
-> Cloudflare. Booli sits behind it. This works at city volume with polite
-> delays. Scraping all of Sweden would very likely be challenged or blocked and
-> may breach Booli's terms - the scraper's own docstring says to throttle hard
-> and prefer per-city runs. Treat that as a constraint, not a suggestion.
-""",
-            "files": [
-                "booli_scraper.py",
-                "booli_to_assets.py",
-                "booli_listings.db",
-                "assets/booli_data.json",
-            ],
-        },
-        {
-            "title": "From database to the app",
-            "badge": "processed",
-            "body": """
-Each scraper is paired with an exporter that writes two copies of the JSON -
-`assets/` and `frontend/public/` - because the viewer reads one and the React
-Data Explorer reads the other.
-
-`frontend/public/` is bind-mounted into the web container, so a refreshed export
-is picked up live: no rebuild, just a browser refresh.
-
-Boplats exports collapse to unique addresses (684 at the last successful
-run) rather than one row per listing, since several listings can share an
-entrance.
-""",
-            "files": [
-                "assets/boplats_data.json",
-                "assets/booli_data.json",
-                "frontend/public/boplats_data.json",
-                "frontend/public/booli_data.json",
-            ],
-        },
-        {
-            "title": "Scheduling - and the outage found on 2026-09-03",
-            "badge": "metadata",
-            "body": """
-Intended cadence: Boplats daily at 03:00, Booli weekly.
-
-Actual state when checked on 2026-09-03:
-
-| Feed | Newest record | Age |
-|---|---|---|
-| Boplats | `last_seen` 2026-08-17 06:53 | 17 days |
-| Booli | `last_seen` 2026-07-30 13:44 | 35 days |
-
-The Windows task `PPG-Boplats-Daily-Refresh` was firing correctly every day
-- it ran that morning at 03:16 and reported exit code 0 - while doing
-nothing at all.
-
-Root cause. Commit `e2f95ee3` (2026-08-17, *"Refactor project path
-resolution in PowerShell scripts for flexibility"*) replaced a hardcoded project
-root with a fallback chain:
-
-```powershell
-$proj = if ($env:PROJECT_ROOT) { $env:PROJECT_ROOT }
-        elseif ($PSScriptRoot)  { $PSScriptRoot }      # ← resolves to <root>\\tools
-        else { (Get-Location).Path }
-```
-
-The script lives in `tools\\`, so `$PSScriptRoot` is `<root>\\tools`, not the
-project root. `PROJECT_ROOT` is not set at process, user or machine level, so
-that middle branch always won. Consequently the scraper was invoked as
-`tools\\boplats_scraper.py` (which does not exist) and the log was directed at
-`tools\\tools\\boplats_refresh.log` - a directory that does not exist, so
-`Add-Content` silently failed too.
-
-Why no alert. The failure-email branch redirects its own output to the same
-unwritable log and calls `boplats_notify.py`, which was equally unreachable from
-the wrong directory. And the scheduled task reports the PowerShell process
-exit code, which is 0 regardless. So: firing daily, succeeding on paper, doing
-nothing, alerting nobody, for 17 days.
-
-Booli was worse. The same day's commit `deb0312d` (*"Update paths … for
-Docker compatibility"*) wrote container paths into the PowerShell script -
-`$proj = '/app'` and `$py = '/usr/local/bin/python3'` - which cannot run on
-Windows at all. Those belong in `refresh_booli.sh`, which already handles them
-properly via `PPG_PROJECT_ROOT` / `PPG_PYTHON`. There is also no
-`PPG-Booli-Weekly` scheduled task registered, despite the script header naming
-one, so Booli has had no automation regardless.
-
-Fixed on 2026-09-03: both `.ps1` scripts now resolve the root with
-`Split-Path $PSScriptRoot -Parent`, create the log directory before writing, and
-abort loudly with exit 2 if the resolved directory does not contain the
-scraper. The `.sh` variants were already correct and were not touched.
-
-Still outstanding: no Booli scheduled task exists, and the disabled legacy
-task `Boplats Database` (last run 2026-07-30, result 1) is still registered.
-""",
-            "files": [
-                "tools/refresh_boplats.ps1",
-                "tools/refresh_booli.ps1",
-                "tools/refresh_boplats.sh",
-                "tools/refresh_booli.sh",
-                "boplats_notify.py",
-                "tools/boplats_refresh.log",
-            ],
-        },
-        {
-            "title": "What this teaches about scheduled work",
-            "badge": "metadata",
-            "body": """
-Three properties the outage lacked, worth applying to any future job:
-
-1. A scheduled task's exit code is not the job's exit code. The wrapper must
-   propagate failure, and the check must be on *data freshness*, not on whether
-   the task ran.
-2. A path fallback that silently resolves to the wrong place is worse than a
-   hardcoded path. The hardcoded version was inflexible but visibly correct;
-   the "flexible" version was invisibly wrong.
-3. Alerting that shares a failure mode with the thing it monitors is not
-   alerting. The notifier could not run for exactly the reason the job could
-   not run.
-
-A freshness assertion - *newest `last_seen` is younger than 48 hours* - would
-have caught this on day two.
-""",
-        },
-    ],
-}
 
 # ─────────────────────────────────────────────────────────────────────────────
 ANALYSIS_INVENTORY = {
-    "number": 13,
+    "number": 12,
     "title": "Analysis Inventory",
     "stage": "method",
+    "kicker": "One card per analysis, with a recording of it running. If "
+                "something here does not work today, its card says so.",
+    "stats": [("17", "analyses")],
     "purpose": """
 Every analysis the tool can run, one card each: where it lives in the tool,
 what it computes, what it runs on, and which page documents its method. The
@@ -6044,7 +5836,7 @@ on port 5173), driven by a script in a headless browser:
   switched off to keep it responsive.
 - Cropping: the sidebar is cropped out, because the analysis panels' white
   text is unreadable on the light sidebar - a real viewer bug, listed on
-  12. Viewer Layers & Visualisation. The caption bar and colour key in each
+  11. Viewer Layers & Visualisation. The caption bar and colour key in each
   animation are added afterwards and state what the panel would show.
 
 Thermal comfort could not come from the local backend, which is missing its
@@ -6130,9 +5922,11 @@ fails on the local backend for want of one package.
 
 # ─────────────────────────────────────────────────────────────────────────────
 PROJECT_TEAM = {
-    "number": 16,
+    "number": 15,
     "title": "Project Team & Credits",
     "stage": "metadata",
+    "kicker": "Who did what, and which parts of the method we inherited rather "
+                "than invented.",
     "purpose": """
 This page records the project lineage, the people directly involved, and the
 external methods and data sources that make the platform possible. It is meant
@@ -6200,7 +5994,7 @@ retrofit prioritisation and investment decisions.
 Every EnergyPlus simulation in the tool runs on EPSM, the Energy
 Performance Simulation Manager developed at Chalmers. Its developers are
 credited here; they are not part of the core project team. How the tool uses
-EPSM is on 6. Energy Simulation - EPSM & IDF.
+EPSM is on 5. Energy Simulation - EPSM & IDF.
 """,
             "table": [
                 ["Name", "Role", "Contribution"],
@@ -6250,8 +6044,8 @@ adapted, integrated, or run as external services, and are credited accordingly.
 | Optimisation model | Adapted from earlier DT4PED work | Jenny Enerbäck and Ann-Brith Strömberg for the optimisation logic; Liane Thuvander as project lead in the research context |
 | 3D viewer / web visualisation stack | Integration of geospatial and web technologies into the project environment | Project-level implementation within this repository and the digital twin workflow |
 
-The simulation workflow is documented in 6. Energy Simulation - EPSM & IDF and the
-optimisation logic in 8. Optimisation Process. Those pages are the
+The simulation workflow is documented in 5. Energy Simulation - EPSM & IDF and the
+optimisation logic in 7. Optimisation Process. Those pages are the
 technical counterparts to this attributions page.
 """,
             "files": ["frontend/src/pages/AnalysisTools.tsx", "logbook/logbook_content.py"],
@@ -6270,14 +6064,17 @@ DATA_SOURCES = {
     "number": 1,
     "title": "Data Sources",
     "stage": "raw",
+    "kicker": "Nothing in this tool is invented. This page is the receipt for "
+                "every dataset behind it - who published it, what it cost to get, "
+                "and when I last pulled it.",
+    "stats": [("3", "countries"), ("14", "built areas")],
     "purpose": """
 Where every dataset in the tool comes from, how the tool is connected to it,
 how up to date it is, how it is stored and where it is used - one card per
 dataset. The three countries draw on almost entirely different sources, so each
 has its own tab. Belgium is the sharpest case: it is federal, so even its
 building register changes with the region, and no region publishes open
-per-building certificates at all. Services and keys shared by all three are on
-14. Services, Keys & Access.
+per-building certificates at all. Services and keys shared by all three are on 13. Services, Keys & Access.
 """,
     "tabs": [("Sweden", SE_DATA), ("United Kingdom", UK_DATA), ("Belgium", BE_DATA)],
 }
@@ -6286,6 +6083,9 @@ COVERAGE = {
     "number": 2,
     "title": "Coverage & Quality",
     "stage": "metadata",
+    "kicker": "The honest version of what the model knows. I would rather you saw "
+                "the 12% here than discovered it in a result.",
+    "stats": [("199,059", "Swedish buildings"), ("30%", "with a certificate")],
     "purpose": """
 How far each country's numbers can be trusted: what exactly is covered and for
 how many buildings, what is missing and why, what the tool falls back on, and
@@ -6293,8 +6093,7 @@ how old the records are. Read this before quoting a number
 outside the project - and note that the three countries' coverage figures are
 not comparable: Sweden matches certificates to buildings geometrically, the
 UK by address, and Belgium cannot match them at all, because no Belgian region
-publishes a per-building certificate. Where each dataset comes from is on
-1. Data Sources; how it is processed is on 3. Pipelines.
+publishes a per-building certificate. Where each dataset comes from is on 1. Data Sources; how it is processed is on 3. Pipelines.
 """,
     "tabs": [("Sweden", SE_COVERAGE), ("United Kingdom", UK_COVERAGE), ("Belgium", BE_COVERAGE)],
 }
@@ -6303,6 +6102,9 @@ PIPELINES = {
     "number": 3,
     "title": "Pipelines",
     "stage": "interim",
+    "kicker": "Three countries, three completely different routes to the same "
+                "JSON. This is the part that took longest and shows least.",
+    "stats": [("3", "country chains"), ("1", "output schema")],
     "purpose": """
 How each country's raw registers become the building model the viewer and the
 wizard read, step by step - loading, cleaning, matching certificates to
@@ -6321,7 +6123,6 @@ PAGES = {
     "data_sources":    DATA_SOURCES,
     "coverage":        COVERAGE,
     "pipelines":       PIPELINES,
-    "scraped_data":    SCRAPED_DATA,
     # Methods - apply to both countries
     "digital_twin":    DIGITAL_TWIN,
     "shoebox_idf":     SHOEBOX_IDF,
@@ -6338,11 +6139,16 @@ PAGES = {
     "project_team":    PROJECT_TEAM,
 }
 
+# Each page's drawn mark (scripts/motifs.py) is its own key, so a page
+# cannot end up wearing another page's glyph.
+for _key, _page in PAGES.items():
+    _page.setdefault("motif", _key)
+
 # Sidebar structure: one header per group, pages in the order listed. Page
 # numbers must run 1..N in exactly this order - scripts/check_content.py
 # enforces it.
 NAV = [
-    ("Data & pipelines", ["data_sources", "coverage", "pipelines", "scraped_data"]),
+    ("Data & pipelines", ["data_sources", "coverage", "pipelines"]),
     ("Methods", ["digital_twin", "shoebox_idf", "prioritisation",
                  "optimisation", "decision", "facade_ml", "climate_env",
                  "viewer_layers", "analysis_index"]),

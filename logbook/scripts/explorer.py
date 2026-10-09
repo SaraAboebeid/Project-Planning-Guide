@@ -511,7 +511,7 @@ def market_explorer() -> None:
                      horizontal=True, key="mkt_which")
     if which.startswith("Booli"):
         df = _booli()
-        source_line("booli_listings.db", note="scraped weekly; see 4. Scraped Market Data")
+        source_line("booli_listings.db", note="scraped weekly")
         m = st.columns(4)
         m[0].metric("Listings", f"{len(df):,}")
         m[1].metric("Median price per m²", f"{df['sqm_price'].median():,.0f} SEK")
@@ -535,7 +535,7 @@ def market_explorer() -> None:
     else:
         df = _boplats_located()
         source_line("boplats_apartments.db", "frontend/public/buildings.json",
-                    note="rentals scraped daily (see 4. Scraped Market Data), placed on "
+                    note="rentals scraped daily, placed on "
                          "the building model by address")
         df["rent_m2"] = df["rent_sek"] / df["size_m2"]
         m = st.columns(4)

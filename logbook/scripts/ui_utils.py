@@ -23,6 +23,8 @@ from urllib.parse import quote
 import pandas as pd
 import streamlit as st
 
+from scripts import motifs
+
 # logbook/scripts/ui_utils.py -> logbook/ -> repo root
 LOGBOOK_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = LOGBOOK_DIR.parent
@@ -80,6 +82,7 @@ THEMES = {
         # A neutral hue for "no credential dimension" chips in the architecture
         # diagram. t["dim"] is an rgba string and cannot be tinted further.
         "muted":       "#8B9BB4",
+        "hairline":    "rgba(255,255,255,0.10)",
     },
     "light": {
         "page":        "#f6f8fc",   # body.bright-mode background
@@ -107,6 +110,7 @@ THEMES = {
         "num_fg":      BRAND,
         "btn_fg":      "#ffffff",
         "muted":       "#64748b",
+        "hairline":    "#e4e7ee",
     },
 }
 
@@ -163,7 +167,7 @@ def _css(t: dict) -> str:
     :root, so a colour is stated once, here, and never twice in a rule."""
     return f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap');
 
 :root {{
   --lb-page:{t["page"]}; --lb-panel:{t["panel"]}; --lb-pop:{t["pop"]};
@@ -178,6 +182,7 @@ def _css(t: dict) -> str:
   --lb-txt:{t["txt"]}; --lb-dim:{t["dim"]}; --lb-heading:{t["heading"]};
   --lb-line:{t["line"]};
   --lb-num-fg:{t["num_fg"]}; --lb-btn-fg:{t["btn_fg"]}; --lb-muted:{t["muted"]};
+  --lb-hairline:{t["hairline"]};
   /* Chip fills for the architecture diagram - the same tint the badges use. */
   --lb-chip-teal:{tint(t["teal"], t["chip_bg"])};
   --lb-chip-info:{tint(t["info"], t["chip_bg"])};
@@ -354,6 +359,65 @@ a.lb-file:hover code {{ background:var(--lb-hover); color:var(--lb-teal);
 
 /* Wide content scrolls in its own container; the page never scrolls sideways. */
 .lb-scroll {{ overflow-x:auto; }}
+
+/* ── the notebook layer ─────────────────────────────────────────────────── */
+/* Prose is set in a serif, because this is a written record rather than a UI.
+   Chrome - headings, labels, chips, tables - stays Inter, so the logbook still
+   reads as the same product as the planner. */
+[data-testid="stExpander"] .stMarkdown p,
+[data-testid="stExpander"] .stMarkdown li,
+[data-testid="stExpander"] .stMarkdown blockquote {{
+  font-family:'Source Serif 4', Georgia, serif;
+  font-size:1.015rem; line-height:1.72; letter-spacing:0.002em;
+}}
+.lb-lede {{ font-family:'Source Serif 4', Georgia, serif;
+  font-size:1.09rem; line-height:1.72; color:var(--lb-txt); max-width:74ch; }}
+
+/* A quotation is a margin remark, not a shout. */
+[data-testid="stExpander"] blockquote {{
+  border-left:2px solid var(--lb-accent); margin:1.1rem 0; padding:0.1rem 0 0.1rem 1rem;
+  color:var(--lb-dim); font-style:italic; background:none; }}
+
+/* Section bodies carry a hairline margin rule, like a ruled page. */
+[data-testid="stExpander"] details[open] [data-testid="stExpanderDetails"] {{
+  border-left:2px solid var(--lb-hairline); margin-left:1.05rem;
+  padding-left:1.05rem; }}
+
+/* ── page opener ────────────────────────────────────────────────────────── */
+.lb-open {{ display:flex; gap:1.05rem; align-items:flex-start; margin:0 0 0.2rem 0; }}
+.lb-open-mark {{ flex:0 0 auto; width:50px; height:50px; border-radius:14px;
+  display:flex; align-items:center; justify-content:center; color:var(--lb-accent);
+  background:rgba(var(--lb-brand-rgb),0.12);
+  border:1px solid var(--lb-card-border); }}
+.lb-open-text {{ flex:1 1 auto; min-width:0; }}
+.lb-kicker {{ font-family:'Source Serif 4', Georgia, serif; font-style:italic;
+  font-size:1rem; line-height:1.6; color:var(--lb-dim); max-width:72ch;
+  margin:0.5rem 0 0 0; }}
+
+/* key numbers under the title - the page's own measurements */
+.lb-stats {{ display:flex; flex-wrap:wrap; gap:0.45rem; margin:0.75rem 0 0 0; }}
+.lb-stat {{ border:1px solid var(--lb-card-border); border-radius:10px;
+  background:var(--lb-card); padding:0.4rem 0.7rem; line-height:1.15; }}
+.lb-stat b {{ display:block; font-size:1.0rem; font-weight:800; color:var(--lb-heading);
+  font-variant-numeric:tabular-nums; }}
+.lb-stat span {{ font-size:0.68rem; letter-spacing:0.07em; text-transform:uppercase;
+  color:var(--lb-dim); }}
+
+/* ── the A-G ladder ─────────────────────────────────────────────────────── */
+.lb-epc {{ display:inline-flex; align-items:center; gap:0.5rem; flex-wrap:wrap; }}
+.lb-epc-label {{ font-size:0.68rem; font-weight:800; letter-spacing:0.09em;
+  text-transform:uppercase; color:var(--lb-dim); }}
+.lb-epc-chips {{ display:inline-flex; gap:3px; }}
+
+/* ── a dated stamp and a margin aside ───────────────────────────────────── */
+.lb-stamp {{ display:inline-block; font-size:0.66rem; font-weight:700;
+  letter-spacing:0.1em; text-transform:uppercase; color:var(--lb-dim);
+  border:1px dashed var(--lb-card-border); border-radius:6px;
+  padding:0.12rem 0.5rem; }}
+.lb-aside {{ font-family:'Source Serif 4', Georgia, serif; font-style:italic;
+  font-size:0.93rem; line-height:1.6; color:var(--lb-dim);
+  border-left:2px solid var(--lb-teal); padding:0.15rem 0 0.15rem 0.85rem;
+  margin:0.9rem 0; }}
 </style>
 """
 
@@ -370,18 +434,43 @@ def badge(stage: str) -> str:
             f"border:1px solid {tint(hue, t['chip_border'])};'>{stage}</span>")
 
 
-def page_header(number, title: str, stage: str | None = None) -> None:
-    """The planner's step header, for a logbook page: a small uppercase eyebrow
-    carrying the page number and stage, the title at full weight, and the brand
-    rule under it."""
+def page_header(number, title: str, stage: str | None = None,
+                motif: str | None = None, kicker: str | None = None,
+                stats: list[tuple[str, str]] | None = None) -> None:
+    """A page's opener.
+
+    The planner's step header - purple number chip, uppercase eyebrow, the
+    title at full weight - with three additions, so pages stop opening
+    identically:
+
+      motif   the page's own drawn mark (scripts/motifs.py)
+      kicker  one line in the author's voice about why the page exists
+      stats   the page's own measured numbers, as a strip
+
+    Closed by the short brand rule the planner uses.
+    """
     hues = stage_colors()
     num = f"<span class='lb-num'>{number}</span>" if number is not None else ""
     stage_bit = (f"<span style='color:{hues.get(stage, theme()['accent'])}'>{stage}</span>"
                  if stage else "")
     sep = "<span style='opacity:0.35'>·</span>" if num and stage_bit else ""
+
+    mark = (f"<div class='lb-open-mark'>{motifs.glyph(motif)}</div>"
+            if motif else "")
+    kick = (f"<p class='lb-kicker'>{html.escape(kicker)}</p>" if kicker else "")
+    strip = ""
+    if stats:
+        cells = "".join(f"<div class='lb-stat'><b>{html.escape(str(v))}</b>"
+                        f"<span>{html.escape(str(lab))}</span></div>"
+                        for v, lab in stats)
+        strip = f"<div class='lb-stats'>{cells}</div>"
+
     st.markdown(
-        f"<div class='lb-hero'><div class='lb-eyebrow'>{num}{sep}{stage_bit}</div>"
+        f"<div class='lb-hero'><div class='lb-open'>{mark}"
+        f"<div class='lb-open-text'>"
+        f"<div class='lb-eyebrow'>{num}{sep}{stage_bit}</div>"
         f"<div class='lb-title'>{html.escape(title)}</div>"
+        f"{kick}{strip}</div></div>"
         f"<div class='lb-rule'></div></div>",
         unsafe_allow_html=True,
     )
@@ -909,13 +998,19 @@ def render_page(page: dict, extra=None) -> None:
     st.set_page_config(page_title=page["title"], layout="wide")
     inject_css()
 
-    page_header(page["number"], page["title"], page.get("stage"))
+    page_header(page["number"], page["title"], page.get("stage"),
+                motif=page.get("motif"), kicker=page.get("kicker"),
+                stats=page.get("stats"))
 
     if page.get("tabs"):
         # One page per topic, one tab per country: Sweden and the UK are built
         # from different sources, so their content is never interleaved.
         if page.get("purpose"):
             st.markdown(linkify_markdown(page["purpose"]))
+        # `extra` belongs to the page, not to a country, so it is drawn once
+        # above the tabs rather than repeated inside each one.
+        if extra is not None:
+            extra()
         labels = [label for label, _ in page["tabs"]]
         for tab, (label, part) in zip(st.tabs(labels), page["tabs"]):
             with tab:
@@ -937,7 +1032,8 @@ def _render_body(page: dict, key: str, extra=None) -> None:
     if page.get("purpose"):
         # Plain st.markdown, NOT an HTML wrapper: Streamlit does not parse
         # markdown inside raw HTML, so a wrapper leaks literal ** and ` into
-        # the rendered page.
+        # the rendered page - and an opening div in one st.markdown call does
+        # not wrap the next, because each call is its own container.
         st.markdown(linkify_markdown(page["purpose"]))
 
     if page.get("overview"):
@@ -958,12 +1054,25 @@ def _render_body(page: dict, key: str, extra=None) -> None:
         for sec in sections:
             label = sec["title"]
             with st.expander(label, expanded=expand_all):
+                # A badge and a dated stamp share the first line, so a section
+                # can say when it was last checked without a sentence for it.
+                marks = []
                 if sec.get("badge") and not sec.get("dataset"):
-                    st.markdown(badge(sec["badge"]), unsafe_allow_html=True)
+                    marks.append(badge(sec["badge"]))
+                if sec.get("logged"):
+                    marks.append(f"<span class='lb-stamp'>checked {sec['logged']}</span>")
+                if marks:
+                    st.markdown("<div style='display:flex;gap:.5rem;align-items:center;"
+                                "flex-wrap:wrap'>" + "".join(marks) + "</div>",
+                                unsafe_allow_html=True)
                 if sec.get("dataset"):
                     dataset_card(sec["dataset"])
                 if sec.get("body"):
                     st.markdown(linkify_markdown(sec["body"]))
+                # A margin remark: the author's aside, not part of the record.
+                if sec.get("aside"):
+                    st.markdown(f"<p class='lb-aside'>{html.escape(sec['aside'])}</p>",
+                                unsafe_allow_html=True)
                 if sec.get("table"):
                     rows = sec["table"]
                     show_dataframe_safe(pd.DataFrame(rows[1:], columns=rows[0]))

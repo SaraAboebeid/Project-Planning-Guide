@@ -27,7 +27,9 @@ page = PAGES["script_browser"]
 
 st.set_page_config(page_title=page["title"], layout="wide")
 inject_css()
-page_header(page["number"], page["title"], page.get("stage"))
+page_header(page["number"], page["title"], page.get("stage"),
+            motif=page.get("motif"), kicker=page.get("kicker"),
+            stats=page.get("stats"))
 st.markdown(page["purpose"])
 
 if page.get("overview"):
