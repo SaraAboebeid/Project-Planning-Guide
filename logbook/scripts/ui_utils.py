@@ -231,9 +231,6 @@ html, body, .stApp {{
                letter-spacing:0; }}
 .lb-title {{ font-size:2.1rem; font-weight:900; letter-spacing:-0.025em;
              color:var(--lb-heading); line-height:1.15; margin:0 0 0.5rem 0; }}
-.lb-rule {{ height:3px; width:88px; border-radius:2px;
-            background:linear-gradient(90deg, var(--lb-brand) 0%, var(--lb-teal) 100%); }}
-
 /* ── chips and badges ──────────────────────────────────────────────────── */
 .lb-badge {{ display:inline-block; padding:0.16rem 0.62rem; border-radius:999px;
              font-size:0.68rem; font-weight:800; letter-spacing:0.09em;
@@ -394,15 +391,6 @@ a.lb-file:hover code {{ background:var(--lb-hover); color:var(--lb-teal);
   font-size:1rem; line-height:1.6; color:var(--lb-dim); max-width:72ch;
   margin:0.5rem 0 0 0; }}
 
-/* key numbers under the title - the page's own measurements */
-.lb-stats {{ display:flex; flex-wrap:wrap; gap:0.45rem; margin:0.75rem 0 0 0; }}
-.lb-stat {{ border:1px solid var(--lb-card-border); border-radius:10px;
-  background:var(--lb-card); padding:0.4rem 0.7rem; line-height:1.15; }}
-.lb-stat b {{ display:block; font-size:1.0rem; font-weight:800; color:var(--lb-heading);
-  font-variant-numeric:tabular-nums; }}
-.lb-stat span {{ font-size:0.68rem; letter-spacing:0.07em; text-transform:uppercase;
-  color:var(--lb-dim); }}
-
 /* ── the A-G ladder ─────────────────────────────────────────────────────── */
 .lb-epc {{ display:inline-flex; align-items:center; gap:0.5rem; flex-wrap:wrap; }}
 .lb-epc-label {{ font-size:0.68rem; font-weight:800; letter-spacing:0.09em;
@@ -435,19 +423,15 @@ def badge(stage: str) -> str:
 
 
 def page_header(number, title: str, stage: str | None = None,
-                motif: str | None = None, kicker: str | None = None,
-                stats: list[tuple[str, str]] | None = None) -> None:
+                motif: str | None = None, kicker: str | None = None) -> None:
     """A page's opener.
 
     The planner's step header - purple number chip, uppercase eyebrow, the
-    title at full weight - with three additions, so pages stop opening
+    title at full weight - with two additions, so pages stop opening
     identically:
 
       motif   the page's own drawn mark (scripts/motifs.py)
       kicker  one line in the author's voice about why the page exists
-      stats   the page's own measured numbers, as a strip
-
-    Closed by the short brand rule the planner uses.
     """
     hues = stage_colors()
     num = f"<span class='lb-num'>{number}</span>" if number is not None else ""
@@ -458,20 +442,13 @@ def page_header(number, title: str, stage: str | None = None,
     mark = (f"<div class='lb-open-mark'>{motifs.glyph(motif)}</div>"
             if motif else "")
     kick = (f"<p class='lb-kicker'>{html.escape(kicker)}</p>" if kicker else "")
-    strip = ""
-    if stats:
-        cells = "".join(f"<div class='lb-stat'><b>{html.escape(str(v))}</b>"
-                        f"<span>{html.escape(str(lab))}</span></div>"
-                        for v, lab in stats)
-        strip = f"<div class='lb-stats'>{cells}</div>"
 
     st.markdown(
         f"<div class='lb-hero'><div class='lb-open'>{mark}"
         f"<div class='lb-open-text'>"
         f"<div class='lb-eyebrow'>{num}{sep}{stage_bit}</div>"
         f"<div class='lb-title'>{html.escape(title)}</div>"
-        f"{kick}{strip}</div></div>"
-        f"<div class='lb-rule'></div></div>",
+        f"{kick}</div></div></div>",
         unsafe_allow_html=True,
     )
 
@@ -999,8 +976,7 @@ def render_page(page: dict, extra=None) -> None:
     inject_css()
 
     page_header(page["number"], page["title"], page.get("stage"),
-                motif=page.get("motif"), kicker=page.get("kicker"),
-                stats=page.get("stats"))
+                motif=page.get("motif"), kicker=page.get("kicker"))
 
     if page.get("tabs"):
         # One page per topic, one tab per country: Sweden and the UK are built

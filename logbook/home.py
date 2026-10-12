@@ -38,6 +38,25 @@ st.markdown(
         should be able to show its working. Where a number is measured, it says so.
         Where it is assumed, it says that too.
       </p>
+      <div class="lb-links">
+        <a class="lb-link" href="https://github.com/SaraAboebeid/Project-Planning-Guide"
+           target="_blank" rel="noopener">
+          <span class="lb-link-t">Repository</span>
+          <span class="lb-link-s">github.com/SaraAboebeid/Project-Planning-Guide &mdash;
+          the tool and this logbook, in one repo</span>
+        </a>
+        <a class="lb-link" href="https://renovation-planner.ace.chalmers.se/"
+           target="_blank" rel="noopener">
+          <span class="lb-link-t">Deployed tool <span class="lb-warn-dot">behind a login, and behind the repo</span></span>
+          <span class="lb-link-s">renovation-planner.ace.chalmers.se &mdash; not rebuilt
+          on every push, so run the repository for anything current</span>
+        </a>
+        <a class="lb-link" href="running" target="_self">
+          <span class="lb-link-t">How to run it yourself</span>
+          <span class="lb-link-s">Docker, or without it &mdash; and how to start this
+          logbook on its own</span>
+        </a>
+      </div>
       <div class="lb-landing-note">
         <span>&#9679;</span>
         <span>A continuation of Digital Twin for Positive Energy Districts (DT4PED),
@@ -68,6 +87,25 @@ st.markdown(
         border-left:2px solid var(--lb-accent); padding-left:1rem; }
       .lb-landing-sign { margin-top:1rem; font-size:0.78rem; letter-spacing:0.07em;
         text-transform:uppercase; color:var(--lb-dim); }
+      /* Where to get it, where it is running, how to start it. */
+      .lb-links { display:flex; flex-wrap:wrap; gap:0.6rem; margin:0 0 1.1rem 0; }
+      a.lb-link { flex:1 1 230px; min-width:230px; text-decoration:none;
+        border:1px solid var(--lb-card-border); border-radius:12px;
+        padding:0.7rem 0.9rem; background:var(--lb-card);
+        transition:border-color .15s, background .15s; }
+      a.lb-link:hover { border-color:var(--lb-teal); background:var(--lb-hover);
+        text-decoration:none; }
+      .lb-link-t { display:block; font-size:0.88rem; font-weight:800;
+        color:var(--lb-heading); margin-bottom:0.2rem; }
+      a.lb-link:hover .lb-link-t { color:var(--lb-teal); }
+      .lb-link-s { display:block; font-size:0.76rem; line-height:1.5;
+        color:var(--lb-dim); }
+      /* The deployed copy needs a caveat attached to its name, not hidden
+         in the small print underneath. */
+      .lb-warn-dot { display:inline-block; margin-left:0.35rem; font-size:0.62rem;
+        font-weight:700; letter-spacing:0.05em; text-transform:uppercase;
+        color:var(--lb-warn); border:1px solid var(--lb-warn);
+        border-radius:999px; padding:0.05rem 0.45rem; vertical-align:middle; }
       .lb-landing-note { display:flex; gap:0.7rem; align-items:flex-start;
         max-width:70ch; font-size:0.88rem; line-height:1.6;
         color:var(--lb-txt); padding:0.75rem 0.95rem; border-radius:11px;

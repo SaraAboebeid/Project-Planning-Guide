@@ -1343,46 +1343,6 @@ the way the CARTO key is handled - and deleting the backups would fix both.
                       "docker/nginx.conf", "launch.py"],
         },
         {
-            "title": "How it is deployed",
-            "badge": "metadata",
-            "body": """
-Three Docker stacks, all optional for development.
-
-a) Development (`docker-compose.yml`): the backend with reload on 8000, and
-a Node container running Vite on 5180 that serves the React app *and* the
-viewer and proxies the API to the backend. One origin, so nothing needs a
-cross-origin exception. The repository is bind-mounted, so code changes are
-live. Before uvicorn starts, a script optionally downloads the certificate
-database.
-
-b) Production (`docker-compose.prod.yml`): the same backend without reload,
-not published, plus an nginx container on 8080 serving the built app, the
-viewer files, and proxying `/api` to the backend with a 300-second read timeout
-for long simulations. The image is built with Vite directly rather than
-`npm run build`, deliberately, because the project has a known type-check
-backlog.
-
-c) Simulation (`docker-compose.epsm.yml`): the EPSM stack described above.
-
-Without Docker: run the backend with uvicorn and the frontend with
-`npm run dev` (port 5173 by default, not the 5180 the documentation quotes), or
-use `launch.py`, which serves `assets/` on 8765 and starts the backend on 8000.
-
-> `launch.py` no longer gives the viewer a working API. The viewer asks for
-> `/api/...` relative to wherever it was loaded, so on port 8765 every analysis,
-> simulation and live layer gets a 404. Use the development server or the
-> production proxy for anything beyond looking at the buildings.
-
-The build step and the served viewer. `build.py` copies viewer scripts from
-`viewer/` into `assets/`, and `assets/` is what is served. Two scripts exist
-only in `assets/`, so a rebuild cannot refresh them. Keep both copies in step -
-this project edits both.
-""",
-            "files": ["docker-compose.yml", "docker-compose.prod.yml", "docker/Dockerfile.backend",
-                      "docker/Dockerfile.web", "docker/nginx.conf", "frontend/vite.config.ts",
-                      "launch.py", "build.py", "docker/README.md"],
-        },
-        {
             "title": "Scheduled jobs and alerting",
             "badge": "metadata",
             "table": [
@@ -1457,7 +1417,7 @@ therefore always the slow one.
 
 # ─────────────────────────────────────────────────────────────────────────────
 SCRIPT_BROWSER = {
-    "number": 14,
+    "number": 15,
     "title": "Repository map",
     "stage": "metadata",
     "kicker": "The code map, rendered live from the repository so it cannot "
@@ -2551,7 +2511,6 @@ DIGITAL_TWIN = {
     "stage": "processed",
     "kicker": "How a row in a register becomes something you can fly a camera "
                 "around.",
-    "stats": [("92,973", "Gothenburg buildings")],
     "purpose": """
 How the digital twin is put together: the 3D city in which every building
 carries its own data, and on which every layer and analysis sits. This page
@@ -2807,7 +2766,6 @@ SHOEBOX_IDF = {
     "stage": "method",
     "kicker": "Every building gets a one-room model of itself. Crude, defensible, "
                 "and the thing every number downstream rests on.",
-    "stats": [("3,882", "stored runs"), ("23.2", "EnergyPlus")],
     "purpose": """
 How a building in the tool becomes an EnergyPlus simulation: what EPSM is,
 how the tool is connected to it, how an IDF (EnergyPlus input file) is
@@ -2832,7 +2790,7 @@ results are stored and reused, and where every file is.
             "body": """
 EPSM - Energy Performance Simulation Manager - is an open-source web
 service developed at Chalmers (Sanjay Somanath, lead developer; Alexander
-Hollberg, principal investigator - see 15. Project Team & Credits). It
+Hollberg, principal investigator - see 16. Project Team & Credits). It
 takes EnergyPlus input files and a weather file over an HTTP API, queues them,
 runs EnergyPlus, and turns EnergyPlus's output into energy-use tables per end
 use. Source: <https://github.com/snjsomnath/epsm>.
@@ -3133,7 +3091,6 @@ PRIORITISATION = {
     "stage": "method",
     "kicker": "Which buildings first? The scoring is deliberately simple, because "
                 "the moment it is not, nobody can argue with it.",
-    "stats": [("4", "criteria")],
     "purpose": """
 Which buildings to renovate first. In Step 2 every selected building gets a
 priority score from 0 to 100, built from four criteria whose relative weights
@@ -3640,7 +3597,6 @@ DECISION_ANALYSIS = {
     "stage": "method",
     "kicker": "Nobody knows the energy price in 2040. This page is about choosing "
                 "well anyway.",
-    "stats": [("3", "decision rules")],
     "purpose": """
 How Step 4 helps choose between renovation packages when the future energy
 price - the biggest unknown in whether a renovation pays off - cannot be
@@ -4039,7 +3995,6 @@ FACADE_ML = {
     "kicker": "The parts of the tool that guess. I have tried to be explicit "
                 "about where a model is reading a photograph and where a person "
                 "still should.",
-    "stats": [("41.4 M", "detector parameters")],
     "purpose": """
 The learned components in the tool. Most of this page is about façade
 inspection: how a trained defect detector and general vision-language models
@@ -4505,7 +4460,6 @@ CLIMATE_ENV = {
     "stage": "method",
     "kicker": "Sun, radiation and comfort, written from the published methods "
                 "rather than wrapped around someone else's library.",
-    "stats": [("145", "sky patches")],
     "purpose": """
 How the 3D viewer analyses the outdoor environment around a point the user
 clicks: how many hours of direct sun reach the ground, how much solar
@@ -5774,7 +5728,6 @@ ANALYSIS_INVENTORY = {
     "stage": "method",
     "kicker": "One card per analysis, with a recording of it running. If "
                 "something here does not work today, its card says so.",
-    "stats": [("17", "analyses")],
     "purpose": """
 Every analysis the tool can run, one card each: where it lives in the tool,
 what it computes, what it runs on, and which page documents its method. The
@@ -5922,7 +5875,7 @@ fails on the local backend for want of one package.
 
 # ─────────────────────────────────────────────────────────────────────────────
 PROJECT_TEAM = {
-    "number": 15,
+    "number": 16,
     "title": "Project Team & Credits",
     "stage": "metadata",
     "kicker": "Who did what, and which parts of the method we inherited rather "
@@ -6067,7 +6020,6 @@ DATA_SOURCES = {
     "kicker": "Nothing in this tool is invented. This page is the receipt for "
                 "every dataset behind it - who published it, what it cost to get, "
                 "and when I last pulled it.",
-    "stats": [("3", "countries"), ("14", "built areas")],
     "purpose": """
 Where every dataset in the tool comes from, how the tool is connected to it,
 how up to date it is, how it is stored and where it is used - one card per
@@ -6085,7 +6037,6 @@ COVERAGE = {
     "stage": "metadata",
     "kicker": "The honest version of what the model knows. I would rather you saw "
                 "the 12% here than discovered it in a result.",
-    "stats": [("199,059", "Swedish buildings"), ("30%", "with a certificate")],
     "purpose": """
 How far each country's numbers can be trusted: what exactly is covered and for
 how many buildings, what is missing and why, what the tool falls back on, and
@@ -6104,7 +6055,6 @@ PIPELINES = {
     "stage": "interim",
     "kicker": "Three countries, three completely different routes to the same "
                 "JSON. This is the part that took longest and shows least.",
-    "stats": [("3", "country chains"), ("1", "output schema")],
     "purpose": """
 How each country's raw registers become the building model the viewer and the
 wizard read, step by step - loading, cleaning, matching certificates to
@@ -6118,6 +6068,277 @@ why one viewer renders all of them.
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+RUNNING = {
+    "number": 14,
+    "title": "Running & Deployment",
+    "nav_title": "Running it yourself",
+    "stage": "metadata",
+    "kicker": "Everything needed to get this running on a machine that is not "
+              "mine - which is the only real test of whether it is reproducible.",
+    "purpose": """
+How to clone the repository and run the tool and this logbook, with and without
+Docker; what the three Docker stacks are and which one to use; what travels in
+git and what has to be fetched separately; and where the deployed copy lives.
+
+If something starts but misbehaves, the per-service failure behaviour is on
+13. Services, Keys & Access.
+""",
+    "overview": {
+        "title": "Four ways in",
+        "subtitle": "Pick by what you are doing, not by what is newest.",
+        "items": [
+            ("Just look at it", "The deployed copy at renovation-planner.ace.chalmers.se - no setup, but it lags behind the repository."),
+            ("Run the whole tool", "`docker compose up` gives app, viewer and backend on one origin at port 5180."),
+            ("Run only this logbook", "`logbook/run.bat` - a separate, much lighter virtual environment on port 8501. It needs no API keys and no Docker."),
+            ("Develop", "Clone in VS Code, open the folder, run the backend and the frontend separately so both hot-reload."),
+        ],
+    },
+    "sections": [
+        {
+            "title": "Where the code is",
+            "badge": "metadata",
+            "body": """
+Everything is in one repository - the tool, the data pipelines, the 3D viewer
+and this logbook:
+
+<https://github.com/SaraAboebeid/Project-Planning-Guide>
+
+There is no separate logbook repository. The logbook is the `logbook/` folder,
+with its own `requirements.txt` and its own virtual environment, so it can be
+run on its own without installing the tool's much heavier geospatial stack.
+
+| What | Where in the repository |
+|---|---|
+| Backend (FastAPI) | `backend/` |
+| React app | `frontend/` |
+| 3D viewer | `assets/` (served) and `viewer/` (source) |
+| Data pipelines | `data_pipeline.py`, `tools/se/`, `tools/uk/`, `tools/be/` |
+| Energy model | `tools/idf/` |
+| This logbook | `logbook/` |
+| Container setup | `docker/`, `docker-compose*.yml` |
+""",
+            "files": ["docker/README.md", "requirements.txt", "logbook/requirements.txt"],
+        },
+        {
+            "title": "The deployed copy",
+            "badge": "result",
+            "body": """
+<https://renovation-planner.ace.chalmers.se/>
+
+Hosted by ACE at Chalmers. Two things to know before sending anyone the link:
+
+- It is behind authentication. A plain request answers `401 Unauthorized`, so
+  it is not publicly readable - a visitor needs access to open it at all.
+- It lags the repository. The deployed build is not updated with every push,
+  so a feature described in this logbook may not be there yet. For anything
+  current, run the repository locally.
+
+Treat the deployed copy as a demonstration, not as the reference. The
+repository is the reference.
+""",
+        },
+        {
+            "title": "Run the tool with Docker",
+            "badge": "metadata",
+            "body": """
+The usual route, and the one that needs least from the host - only Docker
+Desktop.
+
+```bash
+git clone https://github.com/SaraAboebeid/Project-Planning-Guide.git
+cd Project-Planning-Guide
+cp .env.example .env        # every key in it is optional
+docker compose up           # the first run builds the backend image
+```
+
+| URL | What |
+|---|---|
+| <http://localhost:5180> | the whole app - wizard, calculator, report |
+| <http://localhost:5180/gothenburg_3d.html> | the 3D viewer on its own |
+| <http://localhost:8000/docs> | the backend's own API documentation |
+
+Vite serves the React app and the viewer and proxies `/api` to the backend, so
+everything is on one origin and nothing needs a cross-origin exception. Port
+5180 rather than Vite's default 5173, so it can run alongside another project's
+dev server. Editing Python, TypeScript or viewer JavaScript reloads live.
+Stop with `docker compose down`.
+
+You can start with no `.env` at all. Features whose keys are missing disable
+themselves and say so; nothing fails hard.
+""",
+            "files": ["docker-compose.yml", ".env.example"],
+        },
+        {
+            "title": "Run the tool without Docker",
+            "badge": "metadata",
+            "body": """
+Two processes, in two terminals, from the repository root:
+
+```bash
+python -m venv .venv && .venv\\Scripts\\activate     # Windows
+pip install -r requirements.txt
+python -m uvicorn backend.main:app --reload --port 8000
+```
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend then serves on Vite's default 5173 and proxies `/api` to 8000.
+Note that is 5173, not the 5180 the Docker documentation quotes - the two
+differ, and a stale `.env` or bookmark pointing at the wrong one is a common
+few-minutes-lost.
+
+> There is also `launch.py`, which serves `assets/` on 8765 and starts the
+> backend on 8000. It is kept for opening the viewer quickly, but the viewer
+> asks for `/api/...` relative to wherever it was loaded, so on 8765 every
+> analysis, simulation and live layer answers 404. Use the dev server or the
+> production proxy for anything beyond looking at the buildings.
+""",
+            "files": ["launch.py", "requirements.txt", "frontend/package.json"],
+        },
+        {
+            "title": "Run this logbook",
+            "badge": "metadata",
+            "body": """
+The logbook is deliberately independent of the tool: Streamlit, pandas and
+duckdb, and nothing else. It needs no API keys, no Docker and no running
+backend - it reads the repository from disk.
+
+```bash
+cd logbook
+run.bat                 # creates .venv on the first run, then starts Streamlit
+```
+
+Or by hand, which is the same thing:
+
+```bash
+cd logbook
+python -m venv .venv
+.venv\\Scripts\\pip install -r requirements.txt
+.venv\\Scripts\\python -m streamlit run Tool.py --server.port 8501
+```
+
+Then open <http://localhost:8501>. `run.bat 8502` or `set PORT=8502` moves it
+off 8501.
+
+Two things it will do better with, but does not need: the backend running on
+8080 (or wherever `PPG_API` points), which makes the live examples in
+12. Analysis Inventory real rather than stored; and the certificate database on
+disk, which the Data Explorer uses for its register queries.
+
+> Edits to `logbook_content.py` do not always reach a running server, because
+> it is an imported module rather than the page script. If text you have just
+> saved does not appear, restart Streamlit.
+""",
+            "files": ["logbook/run.bat", "logbook/setup.bat", "logbook/requirements.txt",
+                      "logbook/Tool.py"],
+        },
+        {
+            "title": "From VS Code",
+            "badge": "metadata",
+            "body": """
+1. Clone: Ctrl-Shift-P, *Git: Clone*, paste
+   `https://github.com/SaraAboebeid/Project-Planning-Guide.git`, then open the
+   folder.
+2. Copy `.env.example` to `.env`. Fill in any keys you have; leave the rest.
+3. Pick the Python interpreter: Ctrl-Shift-P, *Python: Select Interpreter*, and
+   choose the repository's `.venv`. The logbook has a second interpreter of its
+   own at `logbook/.venv` - select that one when a logbook file is open, or its
+   imports will look broken.
+4. Run what you need:
+   - the whole tool in Docker: a terminal, `docker compose up`;
+   - the backend alone: `python -m uvicorn backend.main:app --reload`;
+   - this logbook: a terminal in `logbook/`, then `run.bat`.
+
+The repository has no committed VS Code launch configurations, so these are
+terminal commands rather than F5 targets.
+""",
+        },
+        {
+            "title": "The three Docker stacks",
+            "badge": "metadata",
+            "body": """
+All three are optional for development, and they are deliberately separate so
+one can be restarted without disturbing the others.
+
+a) Development (`docker-compose.yml`): the backend with reload on 8000, and a
+Node container running Vite on 5180 that serves the React app *and* the viewer
+and proxies the API to the backend. One origin. The repository is bind-mounted,
+so code changes are live. Before uvicorn starts, a script optionally downloads
+the certificate database.
+
+b) Production (`docker-compose.prod.yml`): the same backend without reload and
+not published, plus an nginx container on 8080 serving the built app, the viewer
+files, and proxying `/api` to the backend with a 300-second read timeout for
+long simulations. The image is built with Vite directly rather than
+`npm run build`, deliberately, because the project has a known type-check
+backlog.
+
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+Then <http://localhost:8080>, or `http://<server-ip>:8080` from another machine -
+every URL is relative, so it works remotely without configuration.
+
+c) Simulation (`docker-compose.epsm.yml`): the EPSM stack - Django, a Celery
+worker, PostgreSQL and Redis - on 8010, which starts EnergyPlus containers of
+its own. Started separately:
+
+```bash
+docker compose -f docker-compose.epsm.yml up -d
+```
+
+The backend reaches it at `host.docker.internal:8010`. If it is not running the
+simulation endpoints degrade and the rest of the tool is unaffected - and when
+simulations fail, a stopped Docker Desktop has been the cause every time so far.
+
+The build step and the served viewer. `build.py` copies viewer scripts from
+`viewer/` into `assets/`, and `assets/` is what is served. Two scripts exist
+only in `assets/`, so a rebuild cannot refresh them. Keep both copies in step -
+this project edits both.
+""",
+            "files": ["docker-compose.yml", "docker-compose.prod.yml",
+                      "docker-compose.epsm.yml", "docker/Dockerfile.backend",
+                      "docker/Dockerfile.web", "docker/nginx.conf", "build.py"],
+        },
+        {
+            "title": "What travels in git, and what does not",
+            "badge": "metadata",
+            "body": """
+Almost everything the tool needs is committed, including the large building
+payloads. One asset cannot be: the national certificate register
+`data/sensitivity/epc_sweden.duckdb` is 461 MB, over GitHub's limit.
+
+It travels as a zip (about 193 MB) plus `scripts/fetch_epc_db.py`, which runs on
+every `docker compose up` and makes the database appear from whichever source is
+available:
+
+1. already unpacked - nothing to do;
+2. the local zip is present - it unzips it;
+3. `EPC_DB_URL` and `EPC_DB_TOKEN` are set - it downloads, then unzips;
+4. none of the above - the tool still runs, and only the dataset-wide
+   certificate questions are disabled, with a message saying so.
+
+Neither the database nor its zip is committed.
+
+Also not in git: `.env`, which is loaded at runtime and never copied into an
+image, and the trained façade-defect model, which lives outside the repository
+entirely (9. AI, ML & Vision Models).
+
+> The offline data pipelines have absolute Windows paths. That is fine for
+> running the tool, which ships with its data already built, but regenerating
+> data inside a container would need those paths changed first.
+""",
+            "files": ["scripts/fetch_epc_db.py", ".env.example", "docker/README.md"],
+        },
+    ],
+}
+
 PAGES = {
     # Data & pipelines (the first three have a Sweden / United Kingdom tab each)
     "data_sources":    DATA_SOURCES,
@@ -6135,6 +6356,7 @@ PAGES = {
     "analysis_index":  ANALYSIS_INVENTORY,
     # Reference
     "access":          ACCESS,
+    "running":         RUNNING,
     "script_browser":  SCRIPT_BROWSER,
     "project_team":    PROJECT_TEAM,
 }
@@ -6152,5 +6374,5 @@ NAV = [
     ("Methods", ["digital_twin", "shoebox_idf", "prioritisation",
                  "optimisation", "decision", "facade_ml", "climate_env",
                  "viewer_layers", "analysis_index"]),
-    ("Reference", ["access", "script_browser", "project_team"]),
+    ("Reference", ["access", "running", "script_browser", "project_team"]),
 ]
