@@ -1,4 +1,4 @@
-﻿"""Logbook home page - shown first in the sidebar, as "Tool".
+"""Logbook home page - shown first in the sidebar, as "Tool".
 
 Moved out of Tool.py when the sidebar became country-grouped: Tool.py now only
 builds the navigation. The contents cards below follow the same NAV groups as
@@ -31,13 +31,6 @@ st.markdown(
         it runs on, what that data does and does not know, how a building becomes a
         simulation, and how renovation options get ranked and chosen.
       </p>
-      <p class="lb-landing-hand">
-        I keep it for two reasons. The first is that in six months I will not remember
-        why a threshold is 25 metres and not 50, and neither will anyone else. The
-        second is that a tool which recommends spending money on someone's building
-        should be able to show its working. Where a number is measured, it says so.
-        Where it is assumed, it says that too.
-      </p>
       <div class="lb-links">
         <a class="lb-link" href="https://github.com/SaraAboebeid/Project-Planning-Guide"
            target="_blank" rel="noopener">
@@ -57,13 +50,6 @@ st.markdown(
           logbook on its own</span>
         </a>
       </div>
-      <div class="lb-landing-note">
-        <span>&#9679;</span>
-        <span>A continuation of Digital Twin for Positive Energy Districts (DT4PED),
-        upscaling that approach from a single district to national and European
-        level.</span>
-      </div>
-      <div class="lb-landing-sign">Sara Abouebeid &middot; Chalmers University of Technology</div>
     </div>
     <style>
       /* Colours come from the --lb-* variables inject_css() sets for the mode
@@ -79,16 +65,8 @@ st.markdown(
         -webkit-background-clip:text; background-clip:text; color:transparent; }
       .lb-landing-sub { max-width:63ch; font-size:1rem; line-height:1.7;
         color:var(--lb-txt); margin:0 0 0.9rem 0; }
-      /* The one place the logbook speaks in the first person. Serif, because
-         it is a written note rather than interface copy. */
-      .lb-landing-hand { max-width:68ch; margin:0 0 1.2rem 0;
-        font-family:'Source Serif 4', Georgia, serif; font-size:1.02rem;
-        line-height:1.74; color:var(--lb-dim);
-        border-left:2px solid var(--lb-accent); padding-left:1rem; }
-      .lb-landing-sign { margin-top:1rem; font-size:0.78rem; letter-spacing:0.07em;
-        text-transform:uppercase; color:var(--lb-dim); }
       /* Where to get it, where it is running, how to start it. */
-      .lb-links { display:flex; flex-wrap:wrap; gap:0.6rem; margin:0 0 1.1rem 0; }
+      .lb-links { display:flex; flex-wrap:wrap; gap:0.6rem; margin:0; }
       a.lb-link { flex:1 1 230px; min-width:230px; text-decoration:none;
         border:1px solid var(--lb-card-border); border-radius:12px;
         padding:0.7rem 0.9rem; background:var(--lb-card);
@@ -106,10 +84,6 @@ st.markdown(
         font-weight:700; letter-spacing:0.05em; text-transform:uppercase;
         color:var(--lb-warn); border:1px solid var(--lb-warn);
         border-radius:999px; padding:0.05rem 0.45rem; vertical-align:middle; }
-      .lb-landing-note { display:flex; gap:0.7rem; align-items:flex-start;
-        max-width:70ch; font-size:0.88rem; line-height:1.6;
-        color:var(--lb-txt); padding:0.75rem 0.95rem; border-radius:11px;
-        background:var(--lb-hover); border:1px solid var(--lb-teal); }
     </style>
     """,
     unsafe_allow_html=True,

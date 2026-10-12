@@ -508,7 +508,7 @@ figures below are Gothenburg, counted from `frontend/public/buildings.json` on
 2026-10-08. Read this before quoting a Swedish number outside the project.
 """,
     "overview": {
-        "title": "In four lines",
+        "title": "",
         "subtitle": "Five cities - 199,059 buildings, of which Gothenburg is 92,973.",
         "items": [
             ("Five cities, not one", "Gothenburg, Malmö, Alingsås, Askersund and Ystad are all built and served. Gothenburg is the only one with a 3D viewer; the rest are reached through the wizard."),
@@ -953,7 +953,7 @@ not comparable with Sweden's: the join is by address, and residential
 buildings without a certificate get a survey-based estimate.
 """,
     "overview": {
-        "title": "In four lines",
+        "title": "",
         "subtitle": "Five districts - 22,203 buildings.",
         "items": [
             ("Area", "Four 900 m circles in central London (7,720 buildings) and a 4 km circle over Rotherham (14,483). Birmingham and Nottingham are not built."),
@@ -2235,7 +2235,7 @@ construction, so the honest measure is a different one: how much of each field
 comes from a register, and how much from a prior.
 """,
     "overview": {
-        "title": "In four lines",
+        "title": "",
         "subtitle": "Three cities — 145,556 buildings, of which Liège is 129,899.",
         "items": [
             ("Liège is now the whole municipality", "Rebuilt 2026-10-02 from two 6,000-building districts into one 129,899-building area, because the Walloon certificates are published per municipality."),

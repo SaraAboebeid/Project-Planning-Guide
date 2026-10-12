@@ -457,8 +457,11 @@ def overview_card(title: str, subtitle: str, items: list[tuple[str, str]]) -> No
     # The label used to be <strong>; bold was dropped from the logbook's text
     # on 2026-10-08, so it is plain here too.
     lis = "".join(f"<li>{lab} - {txt}</li>" for lab, txt in items)
+    # An empty title draws the card without a heading - the coverage pages use
+    # that, because "In four lines" said nothing the card did not already show.
+    head = f"<h4>{title}</h4>" if title else ""
     st.markdown(
-        f"<div class='lb-card'><h4>{title}</h4><p>{subtitle}</p><ol>{lis}</ol></div>",
+        f"<div class='lb-card'>{head}<p>{subtitle}</p><ol>{lis}</ol></div>",
         unsafe_allow_html=True,
     )
 
@@ -876,8 +879,12 @@ def _body_markdown(part: dict, level: int) -> list[str]:
     md = [part.get("purpose", "").strip(), ""]
     ov = part.get("overview")
     if ov:
-        md += [f"{h} {ov['title']}", "", ov.get("subtitle", ""), ""]
-        md += [f"{i}. **{lab}** - {txt}" for i, (lab, txt) in enumerate(ov["items"], 1)]
+        # A card can have no heading (the coverage pages), and an empty "## "
+        # would be a stray heading in the export.
+        if ov.get("title"):
+            md += [f"{h} {ov['title']}", ""]
+        md += [ov.get("subtitle", ""), ""]
+        md += [f"{i}. {lab} - {txt}" for i, (lab, txt) in enumerate(ov["items"], 1)]
         md += [""]
     for sec in part.get("sections", []):
         md += [f"{h} {sec['title']}", ""]
