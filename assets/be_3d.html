@@ -6,7 +6,7 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="be_3d.css?v=20261006-112225-be">
+  <link rel="stylesheet" href="be_3d.css?v=20261013-lpfont">
   <link rel="stylesheet" href="sidebar-theme.css?v=20260812-cvd">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
@@ -169,7 +169,7 @@
           </button>
           <button class="info-btn" data-title="Buildings" data-desc="10,235 building footprints across 5 UK focus area(s). Coloured by use type, EPC band, or construction era. Bands come from the Energy Performance of Buildings Register where a certificate matches, otherwise they are estimated from English Housing Survey 2024-25 distributions and marked as estimates." data-source="OpenStreetMap · EPB Register (MHCLG) · English Housing Survey 2024-25"></button>
         </div>
-        <div id="photo-pick-hint" style="display:none;font-size:10px;color:var(--muted);padding:2px 12px 6px;line-height:1.5">Photorealistic view: data boxes are hidden — hover or click the 3D model itself to select a building.</div>
+        <div id="photo-pick-hint" style="display:none;font-size:12px;color:var(--muted);padding:2px 12px 6px;line-height:1.5">Photorealistic view: data boxes are hidden — hover or click the 3D model itself to select a building.</div>
         <div class="overlay-row">
           <button class="overlay-btn" id="btn-osm-buildings" aria-pressed="false">
             <span class="overlay-check"></span>
@@ -203,7 +203,7 @@
       <button class="info-btn" data-layer="traffic-layers"></button>
     </div>
     <div id="traffic-content" class="collapse-content collapsed se-only">
-      <div class="overlay-group-label" style="font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:2px 10px 2px">Public transport</div>
+      <div class="overlay-group-label" style="font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:2px 10px 2px">Public transport</div>
       <div class="overlay-group">
         <div class="overlay-row">
           <button class="overlay-btn" id="btn-overlay-transit" aria-pressed="false">
@@ -230,7 +230,7 @@
           <button class="info-btn" data-layer="commuter-parking"></button>
         </div>
       </div>
-      <div class="overlay-group-label" style="font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px 2px">Roads &amp; highways</div>
+      <div class="overlay-group-label" style="font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px 2px">Roads &amp; highways</div>
       <div class="overlay-group">
         <div class="overlay-row">
           <button class="overlay-btn" id="btn-tv-cameras" aria-pressed="false">
@@ -265,8 +265,8 @@
           <button class="info-btn" data-layer="road-parking"></button>
         </div>
       </div>
-      <div id="tv-status" style="display:none;font-size:10px;color:var(--muted);padding:4px 8px 0;line-height:1.5"></div>
-      <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:2px 8px 0"></div>
+      <div id="tv-status" style="display:none;font-size:12px;color:var(--muted);padding:4px 8px 0;line-height:1.5"></div>
+      <div id="vt-status" style="display:none;font-size:12px;color:var(--muted);padding:2px 8px 0"></div>
     </div>
 
     <!-- ─ Statistics (SCB — Sweden only) ──────────────────────────────── -->
@@ -325,8 +325,8 @@
             <button class="info-btn" data-layer="green-space-accessibility"></button>
           </div>
         </div>
-        <div id="urban-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
-        <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:11px;color:var(--text)"></div>
+        <div id="urban-status" style="display:none;font-size:12px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
+        <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:13px;color:var(--text)"></div>
       </div>
     </div>
 
@@ -436,7 +436,7 @@
 </div>
 
 <!-- Västtrafik departures panel -->
-<div class="panel" id="vt-panel" style="display:none;top:16px;left:260px;width:280px;max-height:360px;overflow-y:auto">
+<div class="panel" id="vt-panel" style="display:none;top:16px;left:324px;width:280px;max-height:360px;overflow-y:auto">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
     <h2 style="margin:0">Departures</h2>
     <button class="btn" id="btn-vt-close" style="padding:2px 8px">&#x2715;</button>

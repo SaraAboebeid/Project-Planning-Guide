@@ -324,7 +324,12 @@ export default function LandingPage() {
 
               {/* Main heading */}
               <h1 className="text-[2.6rem] font-black text-white leading-[1.08] tracking-tight mb-2">
-                Renovation Planning Toolbox
+                Renovation Planning Toolbox + EPBD
+                <span className="ml-2 align-top relative top-[0.35em] text-[10px] font-bold tracking-[0.14em] uppercase
+                                 text-white/80 border border-white/30 px-1.5 py-[1px] rounded
+                                 select-none whitespace-nowrap">
+                  Beta
+                </span>
               </h1>
               <div className="text-[15px] font-semibold mb-3" style={{ color: "#B98BE8" }}>
                 Digital Twin Decision Support

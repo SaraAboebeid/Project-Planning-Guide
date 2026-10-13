@@ -6,7 +6,7 @@
   <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/';</script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.143.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="gothenburg_3d.css?v=20260813-icons3">
+  <link rel="stylesheet" href="gothenburg_3d.css?v=20261013-lpfont">
   <link rel="stylesheet" href="sidebar-theme.css?v=20260812-cvd">
   <style>
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
@@ -119,7 +119,7 @@
          in the Buildings section so their IDs & handlers remain valid; these
          selects just drive the same setBasemap / setColorMode globals. -->
     <div style="padding:2px 12px 8px;display:flex;flex-direction:column;gap:9px">
-      <div style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.4)">Base Map</div>
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.4)">Base Map</div>
       <div class="basemap-thumbs" role="radiogroup" aria-label="Base map">
         <button class="bm-thumb active" data-mode="light" role="radio" aria-checked="true" title="Light">
           <span class="bm-thumb-img" style="background-color:#e6e6e6;background-image:url('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/12/1240/2184')"><span class="bm-check">&#10003;</span></span>
@@ -143,7 +143,7 @@
         </button>
       </div>
       <div id="color-by-row" style="display:none;align-items:center;justify-content:space-between;gap:10px">
-        <span style="font-size:12px;color:rgba(255,255,255,0.62)">Color By</span>
+        <span style="font-size:14px;color:rgba(255,255,255,0.62)">Color By</span>
         <select id="color-by-select" class="ctrl-select" aria-label="Colour buildings by">
           <option value="use">Asset type</option>
           <option value="eclass">Energy class</option>
@@ -250,7 +250,7 @@
           </button>
           <button class="info-btn" data-title="Buildings" data-desc="92,973 building footprints with 3D volumes for Gothenburg. Coloured by use type, energy class, or construction year. EPC data linked from the Boverket register." data-source="EUBUCCO v0.2 · Boverket EPC register"></button>
         </div>
-        <div id="photo-pick-hint" style="display:none;font-size:10px;color:var(--muted);padding:2px 12px 6px;line-height:1.5">Photorealistic view: data boxes are hidden — hover or click the 3D model itself to select a building.</div>
+        <div id="photo-pick-hint" style="display:none;font-size:12px;color:var(--muted);padding:2px 12px 6px;line-height:1.5">Photorealistic view: data boxes are hidden — hover or click the 3D model itself to select a building.</div>
         <!-- OSM Buildings hidden: it only renders on the Photorealistic basemap,
              where it overlaps Google's photorealistic mesh and reads as redundant.
              Kept in the DOM (display:none) so it can be re-enabled later. -->
@@ -303,7 +303,7 @@
       <button class="info-btn" data-layer="traffic-layers"></button>
     </div>
     <div id="traffic-content" class="collapse-content collapsed se-only">
-      <div class="overlay-group-label" style="font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:2px 10px 2px">Public transport</div>
+      <div class="overlay-group-label" style="font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:2px 10px 2px">Public transport</div>
       <div class="overlay-group">
         <div class="overlay-row">
           <button class="overlay-btn" id="btn-overlay-transit" aria-pressed="false">
@@ -330,7 +330,7 @@
           <button class="info-btn" data-layer="commuter-parking"></button>
         </div>
       </div>
-      <div class="overlay-group-label" style="font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px 2px">Roads &amp; highways</div>
+      <div class="overlay-group-label" style="font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px 2px">Roads &amp; highways</div>
       <div class="overlay-group">
         <div class="overlay-row">
           <button class="overlay-btn" id="btn-tv-cameras" aria-pressed="false">
@@ -365,8 +365,8 @@
           <button class="info-btn" data-layer="road-parking"></button>
         </div>
       </div>
-      <div id="tv-status" style="display:none;font-size:10px;color:var(--muted);padding:4px 8px 0;line-height:1.5"></div>
-      <div id="vt-status" style="display:none;font-size:10px;color:var(--muted);padding:2px 8px 0"></div>
+      <div id="tv-status" style="display:none;font-size:12px;color:var(--muted);padding:4px 8px 0;line-height:1.5"></div>
+      <div id="vt-status" style="display:none;font-size:12px;color:var(--muted);padding:2px 8px 0"></div>
     </div>
 
     <!-- ─ Statistics (SCB — Sweden only) ──────────────────────────────── -->
@@ -434,7 +434,7 @@
           </div>
         </div>
         <div id="ss-controls" style="display:none;padding:2px 12px 6px">
-          <div style="font-size:10px;color:var(--muted);line-height:1.45;margin-bottom:6px">
+          <div style="font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:6px">
             <b>1.</b> Pan/zoom to a neighbourhood &nbsp;<b>2.</b> Pick a measure &nbsp;<b>3.</b> Press <b>↻ Recompute</b>.<br>Streets colour <span style="color:#4a66dc">blue</span>→<span style="color:#e05a23">red</span> = low→high.
           </div>
           <div id="ss-tabs" role="tablist" style="display:flex;gap:4px;margin-bottom:5px">
@@ -442,12 +442,12 @@
             <button class="lp-tab" id="ss-tab-integration" role="tab">Integration</button>
             <button class="lp-tab" id="ss-tab-reach" role="tab">Reach</button>
           </div>
-          <button class="btn" id="ss-refresh" style="width:100%;font-size:10px;padding:5px">&#8635; Recompute for current view</button>
+          <button class="btn" id="ss-refresh" style="width:100%;font-size:12px;padding:5px">&#8635; Recompute for current view</button>
         </div>
-        <div id="ss-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
+        <div id="ss-status" style="display:none;font-size:12px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
         <div id="ss-legend" style="display:none;padding:4px 12px 8px"></div>
-        <div id="urban-status" style="display:none;font-size:10px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
-        <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:11px;color:var(--text)"></div>
+        <div id="urban-status" style="display:none;font-size:12px;color:var(--muted);padding:3px 12px 2px;font-style:italic"></div>
+        <div id="urban-legend" style="display:none;padding:4px 12px 8px;font-size:13px;color:var(--text)"></div>
       </div>
     </div>
 
@@ -557,7 +557,7 @@
 </div>
 
 <!-- Västtrafik departures panel -->
-<div class="panel" id="vt-panel" style="display:none;top:16px;left:260px;width:280px;max-height:360px;overflow-y:auto">
+<div class="panel" id="vt-panel" style="display:none;top:16px;left:324px;width:280px;max-height:360px;overflow-y:auto">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
     <h2 style="margin:0">Departures</h2>
     <button class="btn" id="btn-vt-close" style="padding:2px 8px">&#x2715;</button>

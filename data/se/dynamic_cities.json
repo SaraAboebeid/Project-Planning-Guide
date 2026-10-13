@@ -97,5 +97,38 @@
    58.85224,
    14.98954
   ]
+ },
+ "bjuv": {
+  "name": "Bjuv",
+  "nuts2": "SE22",
+  "bbox4326": [
+   12.88183,
+   55.97443,
+   13.04414,
+   56.12129
+  ],
+  "slug": "bjuv",
+  "eubucco": "data/eubucco/bjuv.gpkg",
+  "kommun": "Bjuv",
+  "region_kommuns": [
+   "Bjuv"
+  ],
+  "kommun_codes": {
+   "Bjuv": "1260"
+  },
+  "kommun_code": "1260",
+  "clip_to_footprints": true,
+  "on_demand": true,
+  "built": true,
+  "epw": "SWE_SN_Helsingborg.026110_TMYx.2011-2025.epw",
+  "stats": {
+   "buildings": 9156,
+   "with_energy": 2235,
+   "epw": "SWE_SN_Helsingborg.026110_TMYx.2011-2025.epw"
+  },
+  "center": [
+   56.04786,
+   12.96298
+  ]
  }
 }

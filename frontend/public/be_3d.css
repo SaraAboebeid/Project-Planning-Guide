@@ -30,7 +30,7 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
 
 /* ─── Left sidebar ─── */
 #left-panel {
-  position:absolute; top:16px; left:16px; bottom:16px; width:256px;
+  position:absolute; top:16px; left:16px; bottom:16px; width:296px;
   z-index:20; background:var(--surface); backdrop-filter:blur(16px);
   border:1px solid var(--border); border-radius:var(--radius);
   box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:hidden;
@@ -981,3 +981,47 @@ body { font-family:'Inter',system-ui,sans-serif; background:#0f1117; color:var(-
 .lp-divider,
 #lp-stats,
 #city-switcher { flex-shrink: 0; }
+
+/* >>> left-panel text +2px (generated) */
+html #left-panel .panel h2 { font-size:13px; }
+html #left-panel .panel .sub { font-size:13px; }
+html #left-panel .lp-title { font-size:16px; }
+html #left-panel .lp-sub { font-size:13px; }
+html #left-panel .stat-num { font-size:20px; }
+html #left-panel .stat-lbl { font-size:12px; }
+html #left-panel .lp-tab { font-size:13px; }
+html #left-panel .lp-hint { font-size:12px; }
+html #left-panel .opt-btn { font-size:13px !important; }
+html #left-panel .tool-btn { font-size:14px; }
+html #left-panel .analysis-result { font-size:13px; }
+html #left-panel .analysis-result .ar-unit { font-size:12px; }
+html #left-panel .analysis-result .ar-note { font-size:12px; }
+html #left-panel .analysis-result .ar-close { font-size:13px; }
+html #left-panel #lp-no-selection { font-size:12px; }
+html #left-panel .analysis-tools-group .tool-btn { font-size:13px; }
+html #left-panel .btn { font-size:14px; }
+html #left-panel #info-panel .close-btn { font-size:18px; }
+html #left-panel .fi-actions .btn { font-size:13px; }
+html #left-panel .fi-zoom .btn { font-size:17px; }
+html #left-panel .collapse-toggle { font-size:12px; }
+html #left-panel #search-input { font-size:14px; }
+html #left-panel .layer-pill { font-size:12px; }
+html #left-panel .base-btn, html #left-panel .overlay-btn { font-size:14px; }
+html #left-panel .info-btn { font-size:13px; }
+html #left-panel .overlay-btn.active .overlay-check::after { font-size:11px; }
+html #left-panel .collapse-toggle { font-size:13px; }
+html #left-panel .collapse-chevron { font-size:11px; }
+html #left-panel .sec-badge { font-size:11.5px; }
+html #left-panel #lp-no-selection { font-size:12.5px; }
+html #left-panel .lp-subhead { font-size:11.5px; }
+html #left-panel .filter-wrap input { font-size:13px; }
+html #left-panel .filter-count { font-size:11.5px; }
+html #left-panel .collapse-toggle { font-size:12px !important; }
+html #left-panel .base-btn, html #left-panel .overlay-btn, html #left-panel .tool-btn, html #left-panel #btn-reset { font-size:14px !important; }
+html #left-panel .layer-pill, html #left-panel .lp-hint, html #left-panel .analysis-note, html #left-panel #lp-no-selection, html #left-panel #vt-status, html #left-panel #urban-status { font-size:12px !important; }
+html #left-panel .stat-num { font-size:17px !important; }
+html #left-panel .stat-lbl { font-size:11px !important; }
+html #left-panel .analysis-tools-group .tool-btn { font-size:13px !important; }
+html #left-panel .analysis-tools-group .tool-btn { font-size:14px !important; }
+html #left-panel .info-btn::after { font-size:13px !important; }
+/* <<< left-panel text +2px */
