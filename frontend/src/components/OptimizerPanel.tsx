@@ -21,8 +21,10 @@ const TAG_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
 
 export default function OptimizerPanel({
   input, onValidate, disabledReason, note, currency, validatedKeys, runningKeys = new Set<string>(), selectedKpis,
-  result: extResult, loading: extLoading, error: extError, onOpenTable, scopeLabel,
+  result: extResult, loading: extLoading, error: extError, onOpenTable, onShowResults, scopeLabel,
 }: {
+  /** Opens the Results step - offered on a row once it has been simulated. */
+  onShowResults?: () => void;
   /** Which building the figures are for, when there are several. */
   scopeLabel?: string;
   input: { components: OptimizeComponentInput[]; params: OptimizeParams } | null;
@@ -397,7 +399,16 @@ export default function OptimizerPanel({
                                 <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> Running in EnergyPlus…
                               </span>
                             ) : simulated ? (
-                              <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2FB477" }}>✓ Simulated · see Results</span>
+                              onShowResults ? (
+                                <button onClick={onShowResults} title="Open the Results step"
+                                  style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700,
+                                    padding: "5px 11px", borderRadius: 8, cursor: "pointer",
+                                    border: "1px solid rgba(47,180,119,0.45)", background: "transparent", color: "#2FB477" }}>
+                                  ✓ Simulated — see results in the next step →
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2FB477" }}>✓ Simulated — see results in the next step</span>
+                              )
                             ) : (
                               <button onClick={() => onValidate(pt)}
                                 style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700,

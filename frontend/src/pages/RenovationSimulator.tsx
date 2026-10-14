@@ -4,6 +4,7 @@ import { useWizardStore, type RenovationCalcPackage, type RenovationCalcBuilding
 import HeatingSystemPanel from "../components/HeatingSystemPanel";
 import { ukHvacCatalogue, type UkRetailTariffs } from "../config/hvacSystemsUK";
 import { computeRegret, annuityFactor, type RegretOptionInput } from "../utils/regretAnalysis";
+import { reportedTotalKwhM2 } from "../utils/energyTotals";
 import DecisionAnalysisPanel from "../components/DecisionAnalysisPanel";
 import { api } from "../api/client";
 import { seCityId } from "../config/countryNav";
@@ -200,6 +201,16 @@ function kindForKey(key: string): ComponentKind | null {
   if (key === "Floor" || key === "VertExt::Floor") return "floor";
   return null;
 }
+/** U of a complete catalogue assembly built ONTO the existing construction:
+ *  the two in series, with the inside+outside surface resistances counted once
+ *  (EN ISO 6946: walls 0.13+0.04, roofs 0.10+0.04, floors 0.17+0.04 m²K/W). */
+const SURFACE_R_TOTAL: Record<ComponentKind, number> = { wall: 0.17, roof: 0.14, floor: 0.21 } as Record<ComponentKind, number>;
+function uAddedToExisting(existingU: number | null, addedU: number | null | undefined, kind: ComponentKind): number | null {
+  if (addedU == null) return null;
+  if (existingU == null || existingU <= 0) return addedU;
+  const r = 1 / existingU + 1 / addedU - (SURFACE_R_TOTAL[kind] ?? 0.17);
+  return r > 0 ? Math.round((1 / r) * 1000) / 1000 : addedU;
+}
 function uLabel(u?: number) {
   if (!u) return null;
   if (u <= 0.13) return { label: "Excellent", color: "#2FB477" };
@@ -224,17 +235,32 @@ function overridesFromSeSelections(
   itemByCode: Record<string, WikellsItem>
 ): Record<string, number> {
   const overrides: Record<string, number> = {};
+  let newRoofU: number | undefined;
   for (const [key, sel] of Object.entries(selections)) {
     // A layer-composed assembly wins: its U comes from the actual build-up
     // (EN ISO 6946) rather than a catalogue row, so it REPLACES the catalogue
     // U-value when rebuilding the shoebox IDF.
     const u = sel.customUValue ?? itemByCode[sel.wikellsCode]?.uValue;
+    if (key.startsWith("VertExt::")) {
+      // Any new-storey item means the building is simulated one storey taller.
+      overrides.extension_storeys = 1;
+      if (!u) continue;
+      // New walls/windows cover only the new storey's share of the facade (the
+      // backend weights them by height); the new roof becomes the building's
+      // roof; the new floor slab sits between two heated floors - no heat loss.
+      if (key === "VertExt::Walls") overrides.u_ext_wall = u;
+      if (key === "VertExt::Windows") overrides.u_ext_win = u;
+      if (key === "VertExt::Roof") newRoofU = u;
+      continue;
+    }
     if (!u) continue;
-    if (key === "Walls" || key === "VertExt::Walls") overrides.u_wall_override = u;
-    if (key === "Roof" || key === "VertExt::Roof") overrides.u_roof_override = u;
+    if (key === "Walls") overrides.u_wall_override = u;
+    if (key === "Roof") overrides.u_roof_override = u;
     if (key === "Windows") overrides.u_win_override = u;
-    if (key === "Floor" || key === "VertExt::Floor") overrides.u_floor_override = u;
+    if (key === "Floor") overrides.u_floor_override = u;
   }
+  // With a storey on top, the old roof is an internal ceiling: the new one counts.
+  if (newRoofU != null) overrides.u_roof_override = newRoofU;
   return overrides;
 }
 
@@ -245,7 +271,11 @@ function replacedComponents(selections: Record<string, RenovationCalcSelection>)
   const out = new Set<string>();
   for (const [key, sel] of Object.entries(selections)) {
     const comp = key.replace("VertExt::", "");
-    if (comp === "Windows") out.add("window");
+    // New-storey windows are added glass, not a replacement of the existing ones.
+    if (key === "Windows") out.add("window");
+    // The new storey's roof is new construction: apply its U as designed.
+    else if (key === "VertExt::Roof") out.add("roof");
+    else if (key.startsWith("VertExt::")) continue;
     else if (sel.mode === "replace") {
       if (comp === "Walls") out.add("wall");
       if (comp === "Roof") out.add("roof");
@@ -300,6 +330,8 @@ function appliedUValues(
     { label: "roof", u: o.u_roof_override },
     { label: "window", u: o.u_win_override },
     { label: "floor", u: o.u_floor_override },
+    { label: "new-storey wall", u: o.u_ext_wall },
+    { label: "new-storey window", u: o.u_ext_win },
   ].filter((x): x is { label: string; u: number } => x.u != null);
 }
 
@@ -328,10 +360,14 @@ function baselineUForKey(key: string, geo?: ResolvedBuildingGeometry | null): nu
   // (tools/idf/defaults.py) only as a fallback. Scoring every building against
   // the same generic baseline made the "recommended for this building"
   // shortlist identical everywhere, which is not what it claims to be.
-  if (key === "Walls" || key === "VertExt::Walls") return geo?.tabulaUWall ?? 0.40;
-  if (key === "Roof" || key === "VertExt::Roof") return geo?.tabulaURoof ?? 0.30;
+  // A vertical extension's parts are NEW construction with nothing existing to
+  // improve on, so they have no baseline: no "worse than existing" flags, and the
+  // degree-day optimiser leaves them out (an added storey is not an insulation
+  // measure it can estimate) - EnergyPlus simulates the taller building instead.
+  if (key === "Walls") return geo?.tabulaUWall ?? 0.40;
+  if (key === "Roof") return geo?.tabulaURoof ?? 0.30;
   if (key === "Windows") return geo?.tabulaUWin ?? 1.80;
-  if (key === "Floor" || key === "VertExt::Floor") return 0.40;
+  if (key === "Floor") return 0.40;
   return null;
 }
 
@@ -392,6 +428,9 @@ function pkgAggregate(pkg: RenovationCalcPackage) {
     avgTotalKwhM2Yr: avg(pkg.buildings.map((b) => b.totalKwhM2Yr)),
     totalCostSEK: sumOrNull(pkg.buildings.map((b) => b.costSEK)),
     totalCarbonKgCO2e: sumOrNull(pkg.buildings.map((b) => b.carbonKgCO2e)),
+    /** Simulated floor area of all buildings, when every row reports one. */
+    floorAreaM2: pkg.buildings.length && pkg.buildings.every((b) => b.floorAreaM2 != null)
+      ? pkg.buildings.reduce((s, b) => s + (b.floorAreaM2 ?? 0), 0) : null,
   };
 }
 
@@ -925,8 +964,11 @@ export default function RenovationSimulator() {
                   status: (row.status as RenovationCalcBuildingResult["status"]) ?? b.status,
                   heatingKwhM2Yr: row.results?.heating_kwh_m2_yr ?? b.heatingKwhM2Yr,
                   coolingKwhM2Yr: row.results?.cooling_kwh_m2_yr ?? b.coolingKwhM2Yr,
-                  totalKwhM2Yr: row.results?.total_kwh_m2_yr ?? b.totalKwhM2Yr,
+                  // Same basis as the Step 3 baseline (utils/energyTotals): Sweden
+                  // leaves household/business electricity out of the total.
+                  totalKwhM2Yr: reportedTotalKwhM2(row.results, useWizardStore.getState().project.country) ?? b.totalKwhM2Yr,
                   totalGasKwh: row.results?.total_gas_kwh ?? b.totalGasKwh ?? null,
+                  floorAreaM2: row.results?.total_floor_area_m2 ?? b.floorAreaM2 ?? null,
                   dwellings: row.results?.dwellings ?? b.dwellings ?? null,
                   error: row.error ?? b.error,
                 };
@@ -1040,6 +1082,7 @@ export default function RenovationSimulator() {
           heatingKwhM2Yr: step3[idx]?.heating ?? null,
           coolingKwhM2Yr: step3[idx]?.cooling ?? null,
           totalKwhM2Yr: step3[idx]?.energyUse ?? null,
+          floorAreaM2: step3[idx]?.heatedAreaM2 ?? null,
           costSEK: null, carbonKgCO2e: null, error: null,
         })),
       };
@@ -1175,12 +1218,22 @@ export default function RenovationSimulator() {
      or REPLACE it with a new build-up (U from the new layers alone). Both reach
      EnergyPlus as that component's U; "replace" also lifts the UK/BE clamp. */
   const [layerMode, setLayerMode] = useState<"add" | "replace">("add");
+  // A vertical extension's walls/roof/floor are NEW - there is nothing to add to,
+  // so the add/replace choice does not apply: always built from new layers.
+  const isNewBuild = !!activeItem?.key.startsWith("VertExt::");
+  const effLayerMode: "add" | "replace" = isNewBuild ? "replace" : layerMode;
+  // A draft begun on an existing component carries its "existing construction"
+  // layer; a new storey has none, so drop it on switching there.
+  useEffect(() => {
+    if (isNewBuild) setDraftLayers((ls) => ls.some((l) => l.materialId === EXISTING_LAYER_ID)
+      ? ls.filter((l) => l.materialId !== EXISTING_LAYER_ID) : ls);
+  }, [isNewBuild]);
   const activeLayerMaterials = useMemo(
     () => (activeItem && activeLayerKind
-      ? layerMaterialsFor(layerCountry ?? "se", activeLayerKind, baselineUForKey(activeItem.key, pickedGeo), layerMode)
+      ? layerMaterialsFor(layerCountry ?? "se", activeLayerKind, baselineUForKey(activeItem.key, pickedGeo), effLayerMode)
       : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [layerCountry, activeItem?.key, activeLayerKind, pickedGeo, layerMode]);
+    [layerCountry, activeItem?.key, activeLayerKind, pickedGeo, effLayerMode]);
   const activeBoverket = activeItem ? (boverketByComponent[activeItem.boverketComponent] ?? []) : [];
 
   const activeRecommendations = useMemo(
@@ -1212,15 +1265,26 @@ export default function RenovationSimulator() {
     if (!activeItem) return;
     const it = itemByCode[code];
     if (!it) return;
+    // Sweden: an existing wall/roof/floor can take the Wikells assembly ON TOP of
+    // what is there (Add) or be replaced by it (Replace) - the switch above the
+    // list. UK/BE catalogue options are insulation measures, always added; windows
+    // and new-storey items are always new.
+    const kind = kindForKey(activeItem.key);
+    const seChoice = !isUK && !isBE && !isNewBuild && kind != null;
+    const mode: "add" | "replace" = activeItem.key === "Windows" || isNewBuild ? "replace"
+      : (isUK || isBE) ? "add" : seChoice ? layerMode : "replace";
+    const uValue = seChoice && mode === "add"
+      ? uAddedToExisting(baselineUForKey(activeItem.key, pickedGeo), it.uValue, kind!)
+      : (it.uValue ?? null);
     setConfigs((cs) => [...cs, {
       id: `cfg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       componentKey: activeItem.key,
-      name: draftName.trim() || matShort(it),
+      name: draftName.trim() || (seChoice && mode === "add" ? `+ ${matShort(it)}` : matShort(it)),
       source: "catalogue", wikellsCode: code,
-      // A Wikells row is a complete construction (replaces the component); a UK/BE
-      // catalogue option is insulation ADDED to it; windows are always replaced.
-      mode: activeItem.key === "Windows" || (!isUK && !isBE) ? "replace" : "add",
-      uValue: it.uValue ?? null,
+      // Price and carbon are the assembly's own in both modes (no demolition cost);
+      // the mode changes only the U-value and so the energy.
+      mode,
+      uValue,
       // A UK/BE material with no price in the catalogue stays "cost —", never free.
       costPerM2: (it as CatalogueAssembly).costMissing ? null : (it.costSEK ?? null),
       carbonPerM2: estimateCarbon(it, boverketAll).value ?? null,
@@ -1235,7 +1299,7 @@ export default function RenovationSimulator() {
     // UK / Belgium: layers come from the country catalogue and are priced and
     // carbon-rated layer by layer from it (structural layers in "replace" mode are
     // not in the workbook and are listed as such).
-    const verb = layerMode === "add" ? "+" : "new";
+    const verb = effLayerMode === "add" ? "+" : "new";
     if (layerCountry && activeLayerMaterials) {
       const byId = Object.fromEntries(activeLayerMaterials.map((m) => [m.id, m]));
       const u = computeAssemblyU(draftLayers, kind, byId);
@@ -1246,7 +1310,7 @@ export default function RenovationSimulator() {
         id: `cfg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         componentKey: activeItem.key,
         name: draftName.trim() || `${verb} ${added} · U ${u.uValue?.toFixed(2) ?? "—"}`,
-        source: "layers", layers: draftLayers, uValue: u.uValue, mode: layerMode,
+        source: "layers", layers: draftLayers, uValue: u.uValue, mode: effLayerMode,
         costPerM2: cc.costPerM2, carbonPerM2: cc.carbonPerM2,
         carbonUnmatched: [...cc.unpriced.map((n) => `${n} (no price)`), ...cc.noCarbon.map((n) => `${n} (no carbon)`)],
       }]);
@@ -1276,7 +1340,7 @@ export default function RenovationSimulator() {
       id: `cfg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       componentKey: activeItem.key,
       name: draftName.trim() || `${verb} ${insName} · U ${u.uValue?.toFixed(2) ?? "—"}`,
-      source: "layers", layers: draftLayers, uValue: u.uValue, mode: layerMode,
+      source: "layers", layers: draftLayers, uValue: u.uValue, mode: effLayerMode,
       costPerM2: cost?.costSEK ?? null, costFromCode: cost?.code, costDeltaU: cost?.deltaU,
       carbonPerM2: carbon.total, carbonUnmatched: carbon.unmatched,
     }]);
@@ -1523,7 +1587,11 @@ export default function RenovationSimulator() {
           configId: cfg.id,
           ...(cfg.source === "layers" && cfg.uValue != null
             ? { customUValue: cfg.uValue, customLabel: cfg.name, layers: cfg.layers }
-            : {}),
+            // A catalogue assembly ADDED to the existing construction: the
+            // combined U, not the assembly's own, is what is simulated.
+            : cfg.source === "catalogue" && cfg.mode === "add" && cfg.uValue != null
+              ? { customUValue: cfg.uValue }
+              : {}),
           ...(cfg.mode ? { mode: cfg.mode } : {}),
         };
       });
@@ -1652,10 +1720,12 @@ export default function RenovationSimulator() {
       if (p.isBaseline) continue;
       const agg = pkgAggregate(p);
       if (agg.avgTotalKwhM2Yr == null) continue; // only options that have an energy result
-      opts.push({ id: p.id, label: p.name, energyKwhM2: agg.avgTotalKwhM2Yr, investmentSek: agg.totalCostSEK ?? 0 });
+      // Per baseline m² (a vertical extension's rate covers more floor area).
+      const scale = agg.floorAreaM2 && baselineAgg?.floorAreaM2 ? agg.floorAreaM2 / baselineAgg.floorAreaM2 : 1;
+      opts.push({ id: p.id, label: p.name, energyKwhM2: agg.avgTotalKwhM2Yr * scale, investmentSek: agg.totalCostSEK ?? 0 });
     }
     return opts;
-  }, [packages, baselineAgg?.avgTotalKwhM2Yr]);
+  }, [packages, baselineAgg?.avgTotalKwhM2Yr, baselineAgg?.floorAreaM2]);
   const regretResult = useMemo(() => {
     if (regretOptions.length < 2 || baselineAgg?.avgTotalKwhM2Yr == null || totalFloorAreaM2 <= 0) return null;
     if (isUK && !ukBlend) return null;
@@ -1758,8 +1828,14 @@ export default function RenovationSimulator() {
 
     const comps: OptimizeComponentInput[] = [];
     const unpricedNames: string[] = [];
+    let hasExtension = false;
     for (const li of lineItems) {
-      const baseU = baselineUForKey(li.key, geometries[repIdx] ?? pickedGeo);
+      // Vertical-extension items have no as-built U. They enter with U 0 on both
+      // sides - cost and carbon counted, no change to the degree-day heat loss -
+      // so extension packages can be listed and sent to EnergyPlus, which then
+      // simulates the taller building properly. The estimate shows no energy effect.
+      const isExt = li.key.startsWith("VertExt::");
+      const baseU = isExt ? 0 : baselineUForKey(li.key, geometries[repIdx] ?? pickedGeo);
       if (baseU == null) continue; // not a U-override component
       const area = computeAreaForLineItem(li, repGeo, wwrByIndex[repIdx] ?? null, manualOverrides);
       if (area == null || area <= 0) continue;
@@ -1776,15 +1852,21 @@ export default function RenovationSimulator() {
       const options = compConfigs.map((c) => ({
         code: c.id,                         // config id — unique; assemblies have no single Wikells code
         label: c.name,
-        u_value: c.uValue!,
+        u_value: isExt ? 0 : c.uValue!,
         cost: Math.round((c.costPerM2 ?? 0) * area),
         carbon: Math.round((c.carbonPerM2 ?? 0) * area),
       }));
+      if (isExt) hasExtension = true;
       comps.push({ key: li.key, area_m2: Math.round(area), baseline_u: baseU, options });
     }
-    const unpricedNote = unpricedNames.length
-      ? `Left out of the trade-off — no price in the materials catalogue: ${unpricedNames.join(" · ")}. They can still be simulated in EnergyPlus for energy and carbon.`
-      : undefined;
+    const unpricedNote = [
+      unpricedNames.length
+        ? `Left out of the trade-off — no price in the materials catalogue: ${unpricedNames.join(" · ")}. They can still be simulated in EnergyPlus for energy and carbon.`
+        : "",
+      hasExtension
+        ? "Vertical-extension options show their cost and carbon here but no energy effect — the fast model cannot add a storey. Simulate them in EnergyPlus for the taller building's real energy."
+        : "",
+    ].filter(Boolean).join(" ") || undefined;
     if (comps.length === 0)
       return { input: null, disabledReason: unpricedNote ?? "Save build-ups per component in the builder above — the trade-off curve appears here and updates as you go." };
 
@@ -1792,7 +1874,8 @@ export default function RenovationSimulator() {
     // saved, plus air leakage/ventilation. Without them ALL of the simulated
     // heating was blamed on the walls/roof being retrofitted, and the curve
     // promised savings (−57 %) that EnergyPlus then didn't find (−26 %).
-    const present = new Set(comps.map((c) => c.key.replace("VertExt::", "")));
+    // New-storey items do not touch the existing walls/roof/floor, whose heat loss stays.
+    const present = new Set(comps.filter((c) => !c.key.startsWith("VertExt::")).map((c) => c.key));
     const allAreas = ukOptimiserAreas(repGeo, wwrByIndex[repIdx] ?? null);
     const cur = repGeo.currentU;
     const fallbackU: Record<string, number | null | undefined> = {
@@ -1899,7 +1982,7 @@ export default function RenovationSimulator() {
   // option codes) so the panel can flag which Pareto points are already run.
   const pkgKey = (p: RenovationCalcPackage) =>
     Object.entries(p.selections)
-      .filter(([k]) => baselineUForKey(k) != null)
+      .filter(([k]) => baselineUForKey(k) != null || k.startsWith("VertExt::"))
       .map(([k, s]) => `${k}=${s.configId ?? s.wikellsCode}`)
       .sort()
       .join("|");
@@ -1965,7 +2048,9 @@ export default function RenovationSimulator() {
         configId: cfg.id,
         ...(cfg.source === "layers" && cfg.uValue != null
           ? { customUValue: cfg.uValue, customLabel: cfg.name, layers: cfg.layers }
-          : {}),
+          : cfg.source === "catalogue" && cfg.mode === "add" && cfg.uValue != null
+            ? { customUValue: cfg.uValue }
+            : {}),
         ...(cfg.mode ? { mode: cfg.mode } : {}),
       } as RenovationCalcSelection])
     );
@@ -2037,9 +2122,12 @@ export default function RenovationSimulator() {
         const total = agg.avgTotalKwhM2Yr ?? baselineAgg?.avgTotalKwhM2Yr ?? 0;
         const baseTotal = baselineAgg?.avgTotalKwhM2Yr ?? total;
         const saving = Math.max(0, Math.round(baseTotal - total));
+        // Operational CO2e saved per m² a year, on the same heat carbon factor as
+        // the 30-yr carbon column (Gothenburg district heating 0.022 kg/kWh) - it
+        // was a flat 0.2, ~9x too high for Gothenburg.
         const carbonSaving = agg.totalCarbonKgCO2e != null && baselineAgg?.totalCarbonKgCO2e != null
           ? Math.max(0, Math.round(baselineAgg.totalCarbonKgCO2e - agg.totalCarbonKgCO2e))
-          : Math.round(saving * 0.2);
+          : Math.round(saving * (lcCarbonFactor ?? 0.022) * 10) / 10;
         return {
           packageIndex: i + 1,
           name: p.name,
@@ -2148,7 +2236,12 @@ export default function RenovationSimulator() {
     const a = pkgAggregate(r.pkg);
     const cost = r.pkg.isBaseline ? 0 : a.totalCostSEK;
     const carbon = r.pkg.isBaseline ? 0 : a.totalCarbonKgCO2e;
-    return { cost, carbon, total: a.avgTotalKwhM2Yr, lcc: lcc30(cost, a.avgTotalKwhM2Yr), lcc_c: lcCarbon30(carbon, a.avgTotalKwhM2Yr) };
+    // A vertical extension is simulated with more floor area, so its per-m² rate
+    // applies to more m²: scale the energy by its area relative to the baseline's.
+    const areaScale = !r.pkg.isBaseline && a.floorAreaM2 && baselineAgg?.floorAreaM2
+      ? a.floorAreaM2 / baselineAgg.floorAreaM2 : 1;
+    const kwhEq = a.avgTotalKwhM2Yr == null ? null : a.avgTotalKwhM2Yr * areaScale;
+    return { cost, carbon, total: a.avgTotalKwhM2Yr, lcc: lcc30(cost, kwhEq), lcc_c: lcCarbon30(carbon, kwhEq) };
   };
   const tableRows: (PkgRow | EstRow)[] = (() => {
     const base = packages.filter((p) => p.isBaseline).map((pkg): PkgRow => ({ kind: "pkg", id: pkg.id, pkg }));
@@ -2484,7 +2577,13 @@ export default function RenovationSimulator() {
                   )}
                   {(draftMode === "layers" && kindForKey(activeItem.key)) ? (
                     <>
-                      {/* Add to what is there, or build it new - same in every country. */}
+                      {/* Add to what is there, or build it new - same in every country.
+                          Not for a new storey: there is nothing there to add to. */}
+                      {isNewBuild ? (
+                        <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, marginBottom: 8 }}>
+                          New construction for the added storey — the U-value comes from these layers alone.
+                        </div>
+                      ) : (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                         <div style={{ display: "inline-flex", padding: 3, borderRadius: 9, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
                           {([["add", "Add to existing"], ["replace", "Replace with new"]] as const).map(([m, label]) => (
@@ -2503,19 +2602,20 @@ export default function RenovationSimulator() {
                             : <>The existing {activeItem.label.toLowerCase()} is removed and built new — the U-value comes from the new layers alone. Demolition is not costed.</>}
                         </span>
                       </div>
-                      {baselineUForKey(activeItem.key, pickedGeo) != null && (
+                      )}
+                      {!isNewBuild && baselineUForKey(activeItem.key, pickedGeo) != null && (
                         <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", marginBottom: 8, lineHeight: 1.5 }}>
                           Compose the assembly layer by layer — the live U-value updates as you go.
                           {" "}Aim <strong style={{ color: "#4ECDC4" }}>below U {baselineUForKey(activeItem.key, pickedGeo)!.toFixed(2)}</strong> to improve this building's {activeItem.label.toLowerCase()}.
                         </div>
                       )}
                       <AssemblyBuilder
-                        key={layerMode}
+                        key={effLayerMode}
                         kind={kindForKey(activeItem.key)!}
                         layers={draftLayers}
                         onChange={setDraftLayers}
                         materials={activeLayerMaterials}
-                        presets={layerPresetsFor(layerCountry ?? "se", kindForKey(activeItem.key)!, layerMode)}
+                        presets={layerPresetsFor(layerCountry ?? "se", kindForKey(activeItem.key)!, effLayerMode)}
                         layerNote={layerCountry ? (l) => catalogueLayerNote(layerCountry, l) : undefined}
                       />
                       <button onClick={saveLayerConfig} disabled={draftLayers.length === 0}
@@ -2528,6 +2628,27 @@ export default function RenovationSimulator() {
                     </>
                   ) : (
                     <>
+                      {/* Sweden: a Wikells assembly can go ON the existing wall/roof/floor or
+                          replace it. Not windows, not the new storey (always new). */}
+                      {!isUK && !isBE && !isNewBuild && kindForKey(activeItem.key) && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                          <div style={{ display: "inline-flex", padding: 3, borderRadius: 9, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                            {([["add", "Add to existing"], ["replace", "Replace with new"]] as const).map(([m, label]) => (
+                              <button key={m} type="button" onClick={() => setLayerMode(m)}
+                                style={{ padding: "5px 12px", borderRadius: 7, border: 0, cursor: "pointer", fontSize: 11.5, fontWeight: 700,
+                                  background: layerMode === m ? "#4ECDC4" : "transparent",
+                                  color: layerMode === m ? "#0b1220" : "rgba(255,255,255,0.6)" }}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, flex: 1, minWidth: 220 }}>
+                            {layerMode === "add"
+                              ? <>The existing {activeItem.label.toLowerCase()} stays and the assembly is built onto it — the U-value combines both. Ticked items are saved this way.</>
+                              : <>The existing {activeItem.label.toLowerCase()} is removed and the assembly replaces it — its own U-value applies. Demolition is not costed.</>}
+                          </span>
+                        </div>
+                      )}
                       <LineItemPicker
                         item={activeItem}
                         items={activeCatalogue}
@@ -2563,6 +2684,11 @@ export default function RenovationSimulator() {
                             </div>
                             <div style={{ fontSize: 11, color: "#4ECDC4", fontWeight: 700, marginTop: 3 }}>
                               U {c.uValue?.toFixed(2) ?? "—"} W/m²K
+                              {c.mode && kindForKey(c.componentKey) && !c.componentKey.startsWith("VertExt::") && (
+                                <span style={{ fontWeight: 600, color: "rgba(255,255,255,0.5)" }}>
+                                  {" · "}{c.mode === "add" ? "added to existing" : "replaces existing"}
+                                </span>
+                              )}
                             </div>
                             <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
                               {c.costPerM2 != null ? `${fmtSEK(c.costPerM2)}/${activeItem.quantityKind === "area" ? "m²" : "unit"}` : "cost —"}
@@ -2626,145 +2752,8 @@ export default function RenovationSimulator() {
 
       {geometries.length > 0 && (
         <>
-          {/* ══ PACKAGES — part of the Materials & packages view ══════ */}
-          {hasEnvelope && openStage === 1 && (
-            <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Packages</span>
-                {geometries.length > 1 && combosByBuilding.length > 0 && (
-                  <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", width: "100%", marginTop: 4 }}>
-                    Designed so far:{" "}
-                    {combosByBuilding.map((b, i) => (
-                      <span key={b.key}>
-                        {i > 0 && " · "}
-                        <b style={{ color: b.key === cfgKey ? "#4ECDC4" : "rgba(255,255,255,0.6)" }}>{b.label}</b>
-                        {" "}{b.combos.length} package{b.combos.length === 1 ? "" : "s"}
-                      </span>
-                    ))}
-                    {" — "}<b style={{ color: "rgba(255,255,255,0.6)" }}>{totalCombosAllBuildings} total</b>.
-                    {" "}Switch building in 4.1 to design another; Run below simulates the one shown.
-                  </span>
-                )}
-                {geometries.length > 1 && (
-                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
-                    color: targetIdx === "all" ? "rgba(255,255,255,0.5)" : "#4ECDC4",
-                    background: targetIdx === "all" ? "rgba(255,255,255,0.06)" : "rgba(78,205,196,0.14)" }}>
-                    {targetIdx === "all"
-                      ? `for all ${geometries.length} buildings`
-                      : `for ${geometries[targetIdx]?.address ?? `Building ${targetIdx + 1}`} only`}
-                  </span>
-                )}
-                {configuredComponents.length > 0 ? (
-                  <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)" }}>
-                    {configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" × ")}
-                    {" = "}
-                    <strong style={{ color: "#4ECDC4" }}>{packageCombosList.length} package{packageCombosList.length === 1 ? "" : "s"}</strong>
-                  </span>
-                ) : (
-                  <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.35)", fontStyle: "italic" }}>
-                    Save at least one configuration above to build packages.
-                  </span>
-                )}
-              </div>
-
-              {packageCombosList.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 10 }}>
-                  {packageCombosList.map((combo) => {
-                    const key = comboKey(combo);
-                    const on = !excludedCombos.has(key);
-                    return (
-                      <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5,
-                        color: on ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)", cursor: "pointer", padding: "3px 0" }}>
-                        <input type="checkbox" checked={on} onChange={() => setExcludedCombos((st) => {
-                          const n = new Set(st); n.has(key) ? n.delete(key) : n.add(key); return n;
-                        })} style={{ accentColor: "#4ECDC4" }} />
-                        <span style={{ flex: 1 }}>{combo.map((c) => c.name).join("  +  ")}</span>
-                        <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)" }}>
-                          {combo.map((c) => `U ${c.uValue?.toFixed(2) ?? "—"}`).join(" · ")}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-
-              {packageCombosList.length > 0 && (() => {
-                // Only count packages that are ACTIVELY running (have at least one
-                // queued/running building). Completed packages from previous runs
-                // are excluded — otherwise old results inflate the total and make
-                // isRunning true even before a new run is triggered.
-                const activeSimPkgs = packages.filter(
-                  // batchId must be set — packages that exist in the store but have
-                  // never been submitted to EPSM have batchId: null and must not
-                  // trigger the "Simulating" state before the user presses Run.
-                  (pk) => !pk.isBaseline && pk.batchId !== null && pk.buildings.some((b) => b.status === "queued" || b.status === "running")
-                );
-                let simTotal = 0, simDone = 0;
-                for (const p of activeSimPkgs) {
-                  for (const b of p.buildings) {
-                    simTotal++;
-                    if (b.status === "completed" || b.status === "failed") simDone++;
-                  }
-                }
-                const pct = simTotal > 0 ? Math.round((simDone / simTotal) * 100) : 0;
-                const isRunning = activeSimPkgs.length > 0;
-                return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                      {combosByBuilding.length > 1 && (
-                        <button onClick={simulateAllBuildings} disabled={isRunning}
-                          title="Simulate every building's saved packages in one go"
-                          style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 9,
-                            fontSize: 12.5, fontWeight: 800, border: "1px solid rgba(78,205,196,0.45)",
-                            background: "rgba(78,205,196,0.12)", color: "#4ECDC4",
-                            cursor: isRunning ? "not-allowed" : "pointer", opacity: isRunning ? 0.5 : 1 }}>
-                          <Play size={13} /> Run all buildings · {totalCombosAllBuildings} package{totalCombosAllBuildings === 1 ? "" : "s"}
-                        </button>
-                      )}
-                      <button onClick={() => simulateConfiguredPackages()} disabled={activeCombos.length === 0 || isRunning}
-                        style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 9,
-                          fontSize: 12.5, fontWeight: 800,
-                          border: `1px solid ${isRunning ? "rgba(232,136,12,0.45)" : "rgba(47,180,119,0.45)"}`,
-                          background: isRunning ? "rgba(232,136,12,0.12)" : "rgba(47,180,119,0.14)",
-                          color: isRunning ? "#E8880C" : "#2FB477",
-                          cursor: (activeCombos.length && !isRunning) ? "pointer" : "not-allowed",
-                          opacity: activeCombos.length ? 1 : 0.45,
-                          minWidth: 260, position: "relative", overflow: "hidden" }}>
-                        {isRunning
-                          ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite", flexShrink: 0 }} />
-                          : <Play size={14} style={{ flexShrink: 0 }} />}
-                        <span style={{ flex: 1 }}>
-                          {isRunning
-                            ? `Simulating\u2026 ${simDone}\u200a/\u200a${simTotal} runs \u00b7 ${activeSimPkgs.length} package${activeSimPkgs.length === 1 ? "" : "s"} \u00d7 ${geometries.length} building${geometries.length === 1 ? "" : "s"}`
-                            : `Run energy simulation (EPSM) \u00b7 ${activeCombos.length} package${activeCombos.length === 1 ? "" : "s"}${geometries.length > 1 && targetIdx === "all" ? ` \u00d7 ${geometries.length} buildings` : ""}`}
-                        </span>
-                        {isRunning && (
-                          <span style={{ fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{pct}%</span>
-                        )}
-                        {/* Progress fill behind text */}
-                        {isRunning && (
-                          <span style={{
-                            position: "absolute", left: 0, top: 0, bottom: 0,
-                            width: `${pct}%`,
-                            background: "rgba(232,136,12,0.18)",
-                            transition: "width 0.4s ease",
-                            pointerEvents: "none",
-                          }} />
-                        )}
-                      </button>
-                      <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", maxWidth: 460, lineHeight: 1.5 }}>
-                        {isRunning
-                          ? `EnergyPlus is running \u2014 results will appear in section 4.3 automatically.`
-                          : activeCombos.length <= 10
-                            ? "Small enough to run every combination in EnergyPlus directly \u2014 exact results for exactly these designs."
-                            : "That\u2019s a lot of EnergyPlus runs. Use the optimizer below to find the best trade-offs first, then simulate only those."}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
+          {/* The Packages card (combination list + Run buttons) was removed: packages are
+              simulated from the Optimisation table's rows, which open Results when done. */}
 
           {/* ══ OPTIMISATION view ══ Pareto front over the fast degree-day
               physics, from the saved build-ups (UK with none saved: the DESNZ
@@ -2775,6 +2764,10 @@ export default function RenovationSimulator() {
               disabledReason={optimizerInput.disabledReason}
               note={optimizerInput.note}
               onValidate={validateOptimizerPick}
+              onShowResults={() => {
+                setOpenStage(3);
+                setTimeout(() => stageRefs.current[3]?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+              }}
               currency={isUK && configs.length === 0 ? "GBP" : MONEY}
               validatedKeys={validatedKeys}
               runningKeys={runningKeys}
@@ -2919,7 +2912,9 @@ export default function RenovationSimulator() {
                 { k: "lcc", l: "30-yr cost", sub: "cost + 30 yrs of energy at today's price, discounted" },
                 { k: "lcco2", l: "30-yr carbon", sub: "embodied + 30 yrs of energy" },
                 { k: "heat", l: "Heating", sub: "kWh/m²·yr" },
-                { k: "total", l: "Total energy", sub: "heating + hot water + cooling + lighting + equipment, kWh/m²·yr" },
+                { k: "total", l: "Total energy", sub: isUK || isBE
+                    ? "heating + hot water + cooling + lighting + equipment, kWh/m²·yr"
+                    : "heating + hot water + cooling, kWh/m²·yr (household electricity excluded, as in energy declarations)" },
                 { k: "status", l: "Status" },
               ].map((h) => (
                 <span key={h.k} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>

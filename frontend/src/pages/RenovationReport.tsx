@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useWizardStore, FACADE_ORIENTATIONS, type FacadeOrientation } from "../store/wizard";
 import { filterToBaselineShortlist } from "../utils/baselineShortlist";
 import { buildingUseLabel } from "../utils/useLabels";
+import { excludesHouseholdElectricity } from "../utils/energyTotals";
 import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal, assessRating, isScorable, goalStatement, requiredPct } from "../config/climateGoals";
 import ClimateGoalPanel, { ClimateGoalInfo, ClimateGoalRatingPanel } from "../components/ClimateGoalPanel";
 import ClimateGoalBuildingTable from "../components/ClimateGoalBuildingTable";
@@ -148,10 +149,15 @@ const COMP_COLORS: Record<string, string> = {
   "Floor": "#4A90E2", "Roof": "#4ECDC4", "Balcony": "#2FB477",
   "Structure (Columns & Beams)": "#E2483B", "Vertical Extension (New Floor)": "#F97316",
 };
+/** "VertExt::Roof" → "New roof": the new storey's parts, in words. */
+const compLabel = (comp: string) =>
+  comp.startsWith("VertExt::") ? `New ${comp.slice("VertExt::".length).toLowerCase()}` : comp;
+const compColor = (comp: string) =>
+  comp.startsWith("VertExt::") ? COMP_COLORS["Vertical Extension (New Floor)"]! : (COMP_COLORS[comp] ?? "var(--brand)");
 
-function sek(n: number) { return `${Math.round(n).toLocaleString("sv-SE")} SEK/m²`; }
 function kwh(n: number) { return `${Math.round(n)} kWh/m²·yr`; }
-function kg(n: number)  { return `${Math.round(n)} kg CO₂e/m²·yr`; }
+// One decimal below 10: on Gothenburg's low-carbon heat a saving is ~1-2 kg/m²·yr.
+function kg(n: number)  { return `${Math.abs(n) < 10 ? (Math.round(n * 10) / 10).toFixed(1) : Math.round(n)} kg CO₂e/m²·yr`; }
 
 function Badge({ color, children }: { color: string; children: React.ReactNode }) {
   return (
@@ -191,7 +197,8 @@ export default function RenovationReport() {
   const isBE = project.country === "Belgium";
   const isLiege = isBE && project.city === "Liège";
   const numLocale = isUK || isBE ? "en-GB" : "sv-SE";
-  const money = (n: number) => (isBE ? "—" : isUK ? fmtGBP(n) : sek(n));
+  // Package costs are whole-project totals, not per m².
+  const money = (n: number) => (isBE ? "—" : isUK ? fmtGBP(n) : `${Math.round(n).toLocaleString("sv-SE")} SEK`);
   // Belgium: packages carry no carbon figure, so there is no saving to report.
   const co2Saved = (n: number) => (isBE ? "—" : `−${kg(n)}`);
 
@@ -377,8 +384,11 @@ export default function RenovationReport() {
         { key: "heating", value: b.heating ?? 0 },
         { key: "dhw", value: b.dhw || Math.max(0, (b.energyUse ?? 0) - (b.heating ?? 0) - (b.cooling ?? 0) - (b.lighting ?? 0) - (b.equipment ?? 0)) },
         { key: "cooling", value: b.cooling ?? 0 },
-        { key: "lighting", value: b.lighting ?? 0 },
-        { key: "equipment", value: b.equipment ?? 0 },
+        // Sweden leaves household/business electricity out (utils/energyTotals).
+        ...(excludesHouseholdElectricity(project.country) ? [] : [
+          { key: "lighting", value: b.lighting ?? 0 },
+          { key: "equipment", value: b.equipment ?? 0 },
+        ]),
       ],
     }));
     const present = END_USE_STYLE.map((e) => e.key)
@@ -731,8 +741,10 @@ export default function RenovationReport() {
       : `U-values per EN ISO 6946 ·
     cost from Wikells Sektionsfakta · embodied carbon from Boverket Klimatdatabas ·
     ${project.supplierDiscountPct ? `All material costs are net of a ${project.supplierDiscountPct}% supplier discount entered in Step 4. ` : ""}Costs are installed capex (materials + labour); they exclude energy, maintenance and replacement.
-    baseline energy class from Boverket EPC. Hot water is a Sveby standard draw profile played
-    back through EnergyPlus, not a prediction.`} Cooling reads 0 because EPSM&#39;s end-use table
+    baseline energy class from Boverket EPC. Homes use Sveby 2.0 standard use: hot water per occupant,
+    heated from the city's weather-derived mains temperature (excluding circulation losses). Household and
+    business electricity is simulated for its heat but, as in Swedish energy declarations, not counted in the
+    totals or shown.`} Cooling reads 0 because EPSM&#39;s end-use table
     carries only electricity and district heating; the hourly trace does show ideal-loads
     cooling, which a single-zone model with no openable windows overstates.
   </div>
@@ -806,16 +818,16 @@ export default function RenovationReport() {
           {icon}
           <span style={{ fontSize: 11, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: 1 }}>{label}</span>
         </div>
-        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 8 }}>Package #{result.packageIndex}</div>
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 8 }}>Package {result.packageIndex}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {Object.entries(result.components).map(([comp, item]) => (
             <div key={comp} style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: COMP_COLORS[comp] ?? "var(--brand)", flexShrink: 0, alignSelf: "center" }} />
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", flexShrink: 0 }}>{comp}</span>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: compColor(comp), flexShrink: 0, alignSelf: "center" }} />
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", flexShrink: 0 }}>{compLabel(comp)}</span>
               <span style={{ fontSize: 10, color: "rgba(255,255,255,0.75)", flex: 1, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={layerText(item) || item.description}>
                 {item.description || item.code}
               </span>
-              {item.uValue != null && <Badge color={COMP_COLORS[comp] ?? "var(--brand)"}>U {item.uValue.toFixed(2)}</Badge>}
+              {item.uValue != null && <Badge color={compColor(comp)}>U {item.uValue.toFixed(2)}</Badge>}
             </div>
           ))}
         </div>
@@ -1138,12 +1150,12 @@ export default function RenovationReport() {
         <Card>
           <SectionTitle icon={<TrendingDown size={15} color="#4ECDC4" />} title={`All ${simResults.length} Packages — Ranked by Energy Saving`} />
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 130px 120px 120px 120px", gap: 10, padding: "3px 12px", marginBottom: 2 }}>
-              {["", "Components", "Energy use", "Saving", "CO₂e saved", "Cost"].map((h, i) => (
+            <div style={{ display: "grid", gridTemplateColumns: "78px 1fr 130px 120px 120px 130px", gap: 10, padding: "3px 12px", marginBottom: 2 }}>
+              {["Package", "Components", "Energy use", "Saving", "CO₂e saved", "Cost"].map((h, i) => (
                 <span key={i} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, textAlign: i > 1 ? "right" : "left" }}>{h}</span>
               ))}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 130px 120px 120px 120px", gap: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "78px 1fr 130px 120px 120px 130px", gap: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", alignItems: "center" }}>
               <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>—</span>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>Baseline</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.4)", textAlign: "right" }}>{kwh(baselineEU)}</span>
@@ -1153,12 +1165,17 @@ export default function RenovationReport() {
             </div>
             {simResults.map((r, i) => (
               <div key={i} style={{
-                display: "grid", gridTemplateColumns: "28px 1fr 130px 120px 120px 120px", gap: 10,
+                display: "grid", gridTemplateColumns: "78px 1fr 130px 120px 120px 130px", gap: 10,
                 padding: "9px 12px", borderRadius: 10, alignItems: "center",
                 background: i === 0 ? "rgba(47,180,119,0.05)" : "rgba(255,255,255,0.02)",
                 border: `1px solid ${i === 0 ? "rgba(47,180,119,0.2)" : "rgba(255,255,255,0.05)"}`,
               }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? "#2FB477" : "rgba(255,255,255,0.2)" }}>{i === 0 ? "★" : `#${i + 1}`}</span>
+                {/* The package's own number - the same one the chart and the cards use -
+                    with ★ on the biggest saving (rows are ranked by saving). */}
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: i === 0 ? "#2FB477" : "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}
+                  title={i === 0 ? "Biggest energy saving" : `Rank ${i + 1} by energy saving`}>
+                  {i === 0 ? "★ " : ""}Package {r.packageIndex}
+                </span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {/* Which building this package is for — identical materials on
                       two buildings were otherwise indistinguishable here. */}
@@ -1167,8 +1184,8 @@ export default function RenovationReport() {
                   </span>
                   {Object.entries(r.components).map(([comp, item]) => (
                     <div key={comp} style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 5 }}>
-                      <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 5, flexShrink: 0, background: `${COMP_COLORS[comp] ?? "var(--brand)"}22`, color: COMP_COLORS[comp] ?? "var(--brand)", border: `1px solid ${COMP_COLORS[comp] ?? "var(--brand)"}44` }}>
-                        {comp}
+                      <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 5, flexShrink: 0, background: `${compColor(comp)}22`, color: compColor(comp), border: `1px solid ${compColor(comp)}44` }}>
+                        {compLabel(comp)}
                       </span>
                       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>
                         {layerText(item) || item.description || item.code}
@@ -1185,7 +1202,10 @@ export default function RenovationReport() {
             ))}
           </div>
           <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: "10px 0 0" }}>
-            * Illustrative EPSM outputs. {isBE ? "Cost and CO₂e are not reported for Belgium: no open Belgian retrofit cost or carbon data is wired in yet." : "CO₂e savings at 0.2 kg CO₂e/kWh."}
+            * EnergyPlus (EPSM) results; packages are numbered as in Step 4, ★ marks the biggest energy saving.{" "}
+            {isBE
+              ? "Cost and CO₂e are not reported for Belgium: no open Belgian retrofit cost or carbon data is wired in yet."
+              : `CO₂e saved is operational, per m² a year, at the heating carbon factor used in Step 4${isUK ? "" : " (Gothenburg district heating, 0.022 kg CO₂e/kWh)"}. Cost is the package's total material cost.`}
           </p>
         </Card>
       )}
@@ -1204,8 +1224,8 @@ export default function RenovationReport() {
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
               {Object.entries(bestBalanced.components).map(([comp, item]) => (
-                <span key={comp} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 7, background: `${COMP_COLORS[comp] ?? "var(--brand)"}22`, color: COMP_COLORS[comp] ?? "var(--brand)", border: `1px solid ${COMP_COLORS[comp] ?? "var(--brand)"}44`, fontWeight: 600 }}>
-                  {comp}: {item.description}{layerText(item) ? ` (${layerText(item)})` : ""}
+                <span key={comp} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 7, background: `${compColor(comp)}22`, color: compColor(comp), border: `1px solid ${compColor(comp)}44`, fontWeight: 600 }}>
+                  {compLabel(comp)}: {item.description}{layerText(item) ? ` (${layerText(item)})` : ""}
                 </span>
               ))}
             </div>

@@ -80,6 +80,9 @@ DEFAULT_INTERNAL_GAINS = _LOW_USE
 # Goteborg's 72,133 declared hot-water figures have a median of 23.6
 # (p25 14.9, p75 25.0). Includes circulation (VVC) losses, which is why the
 # water heater below is modelled with no separate standby loss.
+# Swedish HOMES no longer use the two dwelling rows: they follow the Sveby 2.0
+# block below (21 kWh/m2, excluding VVC - Sveby 2.0 states circulation and
+# standby losses are NOT in the figure, contrary to the note above).
 DHW_KWH_M2_YR_BY_USE: dict[str, float] = {
     "bostad_enfamilj": 25.0,
     "bostad_flerfamilj": 25.0,
@@ -95,6 +98,54 @@ DEFAULT_DHW_KWH_M2_YR = 2.0
 # enough for screening, but it is a Swedish standard applied to UK stock -
 # swap in SAP/BREDEM figures if UK results ever need defending on their own.
 
+# ── Swedish homes: Sveby Brukarindata bostäder 2.0 (2024-11-11) ──────────
+# Replaces the flat W/m2 gains and the 25 kWh/m2 hot water above for SE dwellings
+# (bostad_*), so the loads come out of the simulation instead of being one
+# number per building type:
+#  - hot water is a draw VOLUME per person, heated from the mains temperature
+#    EnergyPlus derives from the city's own weather file - so it differs between
+#    cities and between winter and summer, and with how many people live there;
+#  - occupants follow the Sveby persons-per-apartment table, scaled per building
+#    by the apartment sizes listed for its address (Boplats), when there are any;
+#  - household electricity follows Sveby's monthly profile with 70 % as heat.
+# Page refs below are to the Sveby 2.0 PDF (SBUF 14302 bilaga).
+SVEBY_DHW_KWH_M2_YR = 21.0          # tappvarmvatten, excl. VVC/standby losses (p. 12, tab. 1)
+SVEBY_HOUSEHOLD_EL_KWH_M2_YR = 21.0  # hushållsel incl. lighting (p. 13)
+SVEBY_HOUSEHOLD_EL_HEAT_FRACTION = 0.70  # share available as internal heat (p. 13)
+# Table 9.1: monthly mean household-electricity power, W/m2 (Jan..Dec). Used as
+# the SHAPE of the year; the level comes from SVEBY_HOUSEHOLD_EL_KWH_M2_YR.
+SVEBY_HOUSEHOLD_EL_MONTHLY_W_M2 = [1.92, 1.95, 1.80, 1.63, 1.50, 1.41, 1.32, 1.45, 1.58, 1.71, 1.87, 2.01]
+SVEBY_PERSON_W = 80.0               # total heat per person (p. 19)
+SVEBY_PERSON_SENSIBLE_FRACTION = 50.0 / 80.0  # 50 W sensible, 30 W latent
+# Present 14 h a day, 17:00-07:00 every day (p. 19).
+SVEBY_PRESENCE_PATTERN: list[tuple[str, float]] = [("07:00", 1.0), ("17:00", 0.0), ("24:00", 1.0)]
+# Table 12.1, persons per apartment by number of rooms (+ kitchen); 5 = "5 rk" and up.
+SVEBY_PERSONS_BY_ROOMS: dict[int, float] = {1: 1.42, 2: 1.63, 3: 2.18, 4: 2.79, 5: 3.51}
+# Citywide occupancy for SE homes per m2 of heated area. Kept from the old
+# default: the Sveby table applied to every Boplats listing gives ~31 m2 of
+# APARTMENT area per person, i.e. ~35 per m2 Atemp once stairwells and other
+# shared heated area are added. A building's own listings move it up or down
+# relative to the citywide listing mean (backend _occupancy_factor_for).
+SE_HOME_M2_PER_PERSON = 35.0
+# Hot-water volume per person: the Sveby 21 kWh/m2 at the citywide occupancy,
+# delivered at the mean tank temperature from a 10 C mains (the previous fixed
+# value, a Swedish annual mean). Real energy then follows the local mains.
+DHW_REFERENCE_MAINS_C = 10.0
+# Lowest mains temperature the water heater is sized for (capacity only).
+DHW_DESIGN_MAINS_C = 2.0
+
+# ── Daylight-dimmed lighting (non-residential) ───────────────────────────
+# Homes have no separate lighting load (Sveby counts it in household el), so
+# this applies to offices, shops, schools etc. Lights dim continuously to keep
+# the setpoint at a reference point inside the most glazed facade; the share of
+# the floor they control is the floor within DAYLIGHT_DEPTH_M of a glazed wall
+# (the classic ~15 ft / 4.5 m daylit perimeter depth), so a deep or windowless
+# building saves little and a narrow, well-glazed one saves a lot.
+DAYLIGHT_DEPTH_M = 4.5
+DAYLIGHT_SETPOINT_LUX = 300.0       # typical office/school task level
+DAYLIGHT_MIN_POWER_FRACTION = 0.3   # continuous dimming floor (driver losses)
+DAYLIGHT_MIN_LIGHT_FRACTION = 0.2
+
 DHW_SUPPLY_TEMP_C = 55.0      # BBR minimum at the tap to control legionella
 DHW_DEADBAND_K = 2.0
 # The tank cycles across the deadband rather than sitting exactly on setpoint,
@@ -103,9 +154,10 @@ DHW_DEADBAND_K = 2.0
 # deadband/(2*dT) - measured at 2.3% against a real EnergyPlus run before this
 # was accounted for. The generator sizes on the mean instead, which removes it.
 DHW_COLD_TEMP_C = 10.0        # incoming mains, Swedish annual mean
-# Fixed rather than left blank on purpose: blank makes EnergyPlus use the
-# site's own varying mains temperature, which would drift the annual total
-# away from the intensity we are calibrating to.
+# Fixed for the UK (its SAP hot-water figure already assumes a mean dT) and for
+# Swedish non-residential use. Swedish homes instead leave it blank so
+# EnergyPlus uses the site's own mains temperature from the weather file - see
+# the Sveby block above: there the varying total is the point, not a drift.
 
 # Daily draw profile (fraction of peak): morning and evening peaks, the
 # classic residential tapping pattern. The generator derives the peak flow

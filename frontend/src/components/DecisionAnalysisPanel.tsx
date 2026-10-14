@@ -223,7 +223,7 @@ export default function DecisionAnalysisPanel({
           const rec = options.find((o) => o.id === picks.minimaxRegret);
           return rec ? (
             <div style={{ fontSize: 12.5, color: white(0.8), marginBottom: 4, lineHeight: 1.5 }}>
-              👉 If you're going to retrofit, the most robust choice across all three price futures is{" "}
+              If you are going to renovate, the most robust choice across all three price futures is{" "}
               <b style={{ color: "#4ECDC4" }}>{rec.label}</b> — it leaves the least on the table if the future turns out badly.
             </div>
           ) : null;

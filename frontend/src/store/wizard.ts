@@ -136,6 +136,9 @@ export interface RenovationCalcBuildingResult {
   /** UK gas-boiler runs: space heating + hot water gas, whole building (kWh/yr). */
   totalGasKwh?: number | null;
   dwellings?: number | null;
+  /** Floor area the run was simulated at (m²) - larger than the baseline's for
+   *  a vertical extension, so per-m² figures are turned back into kWh with it. */
+  floorAreaM2?: number | null;
   costSEK: number | null;
   carbonKgCO2e: number | null;
   error: string | null;
@@ -275,6 +278,15 @@ interface ProjectState {
   /* Step 4 — computed heating-system comparison + the picked system, for Step 5. */
   // currency: "SEK" (Gothenburg catalogue) or "GBP" (UK catalogue); absent on older saves = SEK.
   heatingAnalysis: (HvacOutcome & { selectedId: string; heatingDemandKwhM2Yr: number; currency?: "SEK" | "GBP" }) | null;
+  /* Step 4 — the user's own values over the heating-system catalogue defaults,
+     keyed by catalogue currency ("SEK" Gothenburg, "GBP" UK). Absent = defaults. */
+  hvacOverrides?: Record<string, HvacOverrides>;
+}
+
+export interface HvacOverrides {
+  carriers?: Record<string, { tariffSek?: number; carbonKgPerKwh?: number }>;
+  /** spfBase moves the low/high band with it (same ratios). */
+  systems?: Record<string, { spfBase?: number; capexFixedSek?: number; capexPerKwSek?: number; lifetimeYr?: number }>;
 }
 
 /** The four facades a user uploads against. Fixed set, fixed order (N-E-S-W)

@@ -11,7 +11,8 @@
  *      4. "Redraw" to start over, map returns to normal pan/zoom
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   MapContainer,
   TileLayer,
@@ -27,7 +28,7 @@ import {
 import L from "leaflet";
 import type { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MapPin, Search, Square, PenTool, X } from "lucide-react";
+import { MapPin, Search, Square, PenTool, X, Maximize2, Minimize2 } from "lucide-react";
 import { countryCodeFromName, mapCenterFor, seCityId } from "../config/countryNav";
 
 // ── Fix Leaflet default icon paths broken by Vite bundling ──────────────────
@@ -246,6 +247,17 @@ function FitToBoundary({ boundary }: { boundary: BoundaryFeature }) {
       if (b.isValid()) map.fitBounds(b, { padding: [16, 16] });
     } catch { /* ignore */ }
   }, [boundary, map]);
+  return null;
+}
+
+// Leaflet measures its container once; tell it to re-measure after the map is
+// maximized or restored, otherwise tiles only fill the old 256px box.
+function MapResizeOnToggle({ trigger }: { trigger: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize(), 60);
+    return () => clearTimeout(t);
+  }, [trigger, map]);
   return null;
 }
 
@@ -500,8 +512,10 @@ function AddressInput({
       </div>
 
       {showPanel && (hasResults || error || (!loading && trimmed.length >= 3)) && (
+        // theme-preserve: drawn as authored (white, dark text) in both themes -
+        // bright mode's app-wide inversion was turning it black.
         <div
-          className="absolute z-[10000] w-full mt-1 rounded-lg text-sm overflow-hidden"
+          className="theme-preserve absolute z-[10000] w-full mt-1 rounded-lg text-sm overflow-hidden"
           style={{
             backgroundColor: "#fff",
             border: "1px solid #e5e7eb",
@@ -627,6 +641,42 @@ export default function LocationMap({
   // Free-form polygon vertices ([lat, lng] for Leaflet); done = closed & applied
   const [polyVerts, setPolyVerts] = useState<LatLngTuple[]>([]);
   const [polyDone, setPolyDone] = useState(false);
+
+  // Maximized map: fills the screen so an area is easier to find and draw.
+  const [mapMaximized, setMapMaximized] = useState(false);
+  // The Step 1 cards keep a CSS transform from their fade-in, which would trap a
+  // position:fixed overlay inside the card. So the map renders into its own node
+  // that is moved to <body> when maximized and back to its slot after — moving
+  // the node (not re-rendering) keeps the Leaflet map, its view and any drawing.
+  const [mapHost] = useState(() => document.createElement("div"));
+  const mapSlotRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const target = mapMaximized ? document.body : mapSlotRef.current;
+    if (target && mapHost.parentNode !== target) target.appendChild(mapHost);
+    // In <body> it sits outside #root, so it takes #root's bright-mode inversion
+    // itself (index.css .ppg-map-portal); fixed full-screen so that filter's
+    // containing block is the viewport.
+    mapHost.className = mapMaximized ? "ppg-map-portal" : "";
+    mapHost.style.cssText = mapMaximized ? "position:fixed;inset:0;z-index:2000" : "";
+  }, [mapMaximized, mapHost]);
+  useEffect(() => () => mapHost.remove(), [mapHost]);
+  useEffect(() => {
+    if (!mapMaximized) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMapMaximized(false); };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prevOverflow; };
+  }, [mapMaximized]);
+
+  function resetBbox(redraw: boolean) {
+    setBbox(null);
+    setBboxPreview(null);
+    setBboxDone(false);
+    setBboxRedrawMode(redraw);
+    onBboxChange?.(null);
+    onAddressChange("");
+  }
 
   function switchLocationMode(next: LocationMode) {
     if (next === locationMode) return;
@@ -1049,27 +1099,13 @@ Kungsgatan 10,Göteborg</div>
           {bboxDone && (
             <>
               <button
-                onClick={() => {
-                  setBbox(null);
-                  setBboxPreview(null);
-                  setBboxDone(false);
-                  setBboxRedrawMode(true);
-                  onBboxChange?.(null);
-                  onAddressChange("");
-                }}
+                onClick={() => resetBbox(true)}
                 className="ml-auto text-xs text-teal hover:underline whitespace-nowrap"
               >
                 Redraw
               </button>
               <button
-                onClick={() => {
-                  setBbox(null);
-                  setBboxPreview(null);
-                  setBboxDone(false);
-                  setBboxRedrawMode(false);
-                  onBboxChange?.(null);
-                  onAddressChange("");
-                }}
+                onClick={() => resetBbox(false)}
                 className="text-xs text-white/70 hover:underline whitespace-nowrap"
               >
                 Clear
@@ -1089,15 +1125,68 @@ Kungsgatan 10,Göteborg</div>
         </div>
       )}
 
-      {/* Leaflet Map — with the polygon draw controls docked to its bottom edge */}
-      <div className="rounded-xl overflow-hidden border border-gray-200">
-        <div className="h-64">
+      {/* Leaflet Map — with the polygon draw controls docked to its bottom edge.
+          Maximized, the same map fills the screen with its own draw toolbar. */}
+      <div ref={mapSlotRef} />
+      {createPortal(<>
+      {mapMaximized && (
+        <div className="fixed inset-0 z-[1999] bg-black/60" onClick={() => setMapMaximized(false)} />
+      )}
+      <div className={mapMaximized
+        ? "fixed inset-3 sm:inset-6 z-[2000] flex flex-col rounded-xl overflow-hidden border border-white/15 bg-[#0b1118] shadow-2xl"
+        : "rounded-xl overflow-hidden border border-gray-200"}>
+        {mapMaximized && (
+          <div className="flex items-center gap-2 flex-wrap px-3 py-2 border-b border-white/10">
+            <span className="text-sm font-semibold text-white mr-1">Select your area</span>
+            {isBuilding && LOCATION_MODES.filter((m) => m.key === "bbox" || m.key === "polygon").map((m) => {
+              const active = locationMode === m.key;
+              const Icon = m.icon;
+              return (
+                <button key={m.key} onClick={() => switchLocationMode(m.key)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition ${
+                    active ? "bg-[var(--brand-deep)]/35 border-[var(--brand-deep)] text-white" : "border-white/15 text-white/65 hover:text-white hover:border-white/30"}`}>
+                  <Icon size={13} />
+                  {m.label}
+                </button>
+              );
+            })}
+            <span className="text-xs text-white/55">
+              {!isBuilding
+                ? "Pan and zoom to explore the area."
+                : locationMode === "bbox"
+                  ? (bboxDone ? "Area drawn. Drag the handles to resize or the centre to move." : "Click and drag on the map to draw your area.")
+                  : locationMode === "polygon"
+                    ? "Click on the map to drop each corner of your area."
+                    : "Choose Draw box or Draw shape to select an area."}
+            </span>
+            {isBuilding && locationMode === "bbox" && bboxDone && (
+              <span className="flex gap-3">
+                <button onClick={() => resetBbox(true)} className="text-xs text-teal hover:underline">Redraw</button>
+                <button onClick={() => resetBbox(false)} className="text-xs text-white/70 hover:underline">Clear</button>
+              </span>
+            )}
+            <button onClick={() => setMapMaximized(false)}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-lg bg-teal text-white text-xs font-semibold hover:brightness-110">
+              <Minimize2 size={13} />
+              Done
+            </button>
+          </div>
+        )}
+        <div className={mapMaximized ? "relative flex-1 min-h-0" : "relative h-64"}>
+        {!mapMaximized && (
+          <button type="button" onClick={() => setMapMaximized(true)} title="Maximize the map"
+            className="absolute top-2 right-2 z-[1000] flex items-center gap-1.5 px-3 py-1 rounded-lg bg-teal text-white text-xs font-semibold shadow hover:brightness-110">
+            <Maximize2 size={13} />
+            Maximize
+          </button>
+        )}
         <MapContainer
           center={defaultCenter}
           zoom={mapCenter.zoom}
           className="h-full w-full"
           scrollWheelZoom
         >
+          <MapResizeOnToggle trigger={mapMaximized} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -1228,6 +1317,7 @@ Kungsgatan 10,Göteborg</div>
           </div>
         )}
       </div>
+      </>, mapHost)}
     </div>
   );
 }

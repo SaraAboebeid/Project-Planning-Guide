@@ -210,7 +210,7 @@ function AnnotatedCanvas({ entry, mode, className, onClick }: {
   }, [mode]);
   useEffect(() => {
     const canvas = ref.current; if (!canvas) return;
-    const maxW = mode === "full" ? Math.min(window.innerWidth * 0.82, 1400) : 460;
+    const maxW = mode === "full" ? Math.min(window.innerWidth * 0.82, 1400) : 720;
     const maxH = mode === "full" ? window.innerHeight * 0.8 : 9999;
     const img = new Image();
     img.onload = () => drawAnnotated(canvas, img, entry.result, maxW, maxH);
@@ -305,7 +305,7 @@ function Thumb({ entry, onOpen, onRemove, onRerun }: {
   return (
     <div className="rounded-lg border border-white/10 bg-black/20 overflow-hidden">
       <div className="relative group bg-black/40 flex items-center justify-center cursor-zoom-in" onClick={onOpen}>
-        <AnnotatedCanvas entry={entry} mode="thumb" className="max-w-full block" />
+        <AnnotatedCanvas entry={entry} mode="thumb" className="block w-full h-auto max-h-64 object-contain" />
         {entry.status === "running" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white/80 text-[10px] gap-1.5">
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> Detecting…
@@ -496,6 +496,9 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
   const runDetection = async (key: string, id: string, blob: Blob) => {
     setImages(key, prev => prev.map(e => e.id === id ? { ...e, status: "running", error: null } : e));
     const t0 = performance.now();
+    // Tiled ML scanning of Street View captures (api.facadeDetect's `tiles`) was
+    // tried and switched off: 20-35 s per photo on CPU for little practical gain
+    // on real facades. The ML sees the whole image; the AI covers the rest.
     try {
       const [mlRes, aiRes] = await Promise.allSettled([
         api.facadeDetect(blob, threshold),
@@ -895,7 +898,7 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
                             )}
                           </div>
 
-                          <div className="p-1.5 grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
+                          <div className="p-1.5 grid gap-1.5 grid-cols-1">
                             {slotImgs.map(e => (
                               <Thumb key={e.id} entry={e}
                                 onOpen={() => setLightbox({ entry: e, label: b.label })}

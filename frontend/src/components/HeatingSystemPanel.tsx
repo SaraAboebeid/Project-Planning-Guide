@@ -2,7 +2,31 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Flame, ChevronDown, ChevronUp, Info, Check } from "lucide-react";
 import { computeHvac, type HvacResult } from "../utils/hvacAnalysis";
 import { SE_HVAC_CATALOGUE, type HvacCatalogue } from "../config/hvacSystems";
-import { useWizardStore } from "../store/wizard";
+import { useWizardStore, type HvacOverrides } from "../store/wizard";
+import { applyHvacOverrides, hasHvacOverrides } from "../utils/hvacOverrides";
+
+/** Number box that commits on blur/Enter; an emptied box (or the default
+ *  value) clears the override. Edited values are highlighted. */
+function NumField({ value, def, step, width = 64, onCommit }: {
+  value: number; def: number; step?: number; width?: number; onCommit: (v: number | undefined) => void;
+}) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+  const edited = Math.abs(value - def) > 1e-9;
+  const commit = () => {
+    const v = parseFloat(text.replace(",", "."));
+    if (!Number.isFinite(v) || v < 0) { setText(String(value)); return; }
+    onCommit(Math.abs(v - def) < 1e-9 ? undefined : v);
+  };
+  return (
+    <input type="number" step={step ?? "any"} value={text} title={edited ? `Default ${def}` : "Default value"}
+      onChange={(e) => setText(e.target.value)} onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      style={{ width, padding: "3px 6px", borderRadius: 6, fontSize: 11, textAlign: "right",
+        border: `1px solid ${edited ? "#E8880C" : "rgba(255,255,255,0.15)"}`,
+        background: edited ? "rgba(232,136,12,0.10)" : "rgba(255,255,255,0.05)", color: "#fff" }} />
+  );
+}
 
 const white = (o: number) => `rgba(255,255,255,${o})`;
 
@@ -22,7 +46,7 @@ const PICKS: Record<string, { fg: string; label: string }> = {
 };
 
 export default function HeatingSystemPanel({
-  heatingDemandKwhM2Yr, floorAreaM2, studyPeriodYr = 30, discountRate = 0.03, catalogue = SE_HVAC_CATALOGUE,
+  heatingDemandKwhM2Yr, floorAreaM2, studyPeriodYr = 30, discountRate = 0.03, catalogue: baseCatalogue = SE_HVAC_CATALOGUE,
 }: {
   heatingDemandKwhM2Yr: number;
   floorAreaM2: number;
@@ -30,6 +54,19 @@ export default function HeatingSystemPanel({
   discountRate?: number;
   catalogue?: HvacCatalogue;
 }) {
+  // The user's own values (Assumptions & sources) over the catalogue defaults,
+  // kept per catalogue currency so Swedish and UK edits never mix.
+  const overrides = useWizardStore((s) => s.project.hvacOverrides?.[baseCatalogue.currency]);
+  const catalogue = useMemo(() => applyHvacOverrides(baseCatalogue, overrides), [baseCatalogue, overrides]);
+  const edited = hasHvacOverrides(overrides);
+  const setOverrides = (fn: (o: HvacOverrides) => HvacOverrides) => {
+    const all = useWizardStore.getState().project.hvacOverrides ?? {};
+    useWizardStore.getState().setProject({ hvacOverrides: { ...all, [baseCatalogue.currency]: fn(all[baseCatalogue.currency] ?? {}) } });
+  };
+  const setCarrier = (key: string, field: "tariffSek" | "carbonKgPerKwh", v: number | undefined) =>
+    setOverrides((o) => ({ ...o, carriers: { ...o.carriers, [key]: { ...o.carriers?.[key], [field]: v } } }));
+  const setSystem = (id: string, field: "spfBase" | "capexFixedSek" | "capexPerKwSek" | "lifetimeYr", v: number | undefined) =>
+    setOverrides((o) => ({ ...o, systems: { ...o.systems, [id]: { ...o.systems?.[id], [field]: v } } }));
   const cur = catalogue.currency;
   const sek = (v: number) => compact(v, catalogue.locale);
   const [open, setOpen] = useState(true);   // open by default, like the other Step-4 panels
@@ -166,28 +203,87 @@ export default function HeatingSystemPanel({
           {/* Assumptions & sources */}
           <button onClick={() => setShowSources((v) => !v)}
             style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: 0, color: white(0.5), cursor: "pointer", fontSize: 11 }}>
-            <Info size={13} /> Assumptions &amp; sources {showSources ? "▲" : "▼"}
+            <Info size={13} /> Assumptions &amp; sources — edit values {showSources ? "▲" : "▼"}
           </button>
-          {showSources && (
-            <div style={{ marginTop: 8, fontSize: 10.5, color: white(0.45), lineHeight: 1.6, display: "flex", flexDirection: "column", gap: 8 }}>
-              <div>
-                <b style={{ color: white(0.6) }}>Energy carriers</b> (editable defaults):
-                {Object.values(catalogue.carriers).filter((c) => !!c).map((c) => (
-                  <div key={c!.key} style={{ marginLeft: 8 }}>· <b style={{ color: white(0.6) }}>{c!.label}</b>: {c!.tariffSek} {cur}/kWh · {(c!.carbonKgPerKwh * 1000).toFixed(0)} g CO₂e/kWh — <span style={{ color: white(0.35) }}>{c!.source}</span></div>
-                ))}
+          {edited && (
+            <span style={{ marginLeft: 10, fontSize: 10.5, color: "#E8880C" }}>
+              Using your own values (orange boxes).{" "}
+              <button onClick={() => setOverrides(() => ({}))}
+                style={{ background: "transparent", border: 0, padding: 0, cursor: "pointer", color: "#4ECDC4", fontSize: 10.5, textDecoration: "underline" }}>
+                Reset to defaults
+              </button>
+            </span>
+          )}
+          {showSources && (() => {
+            const ths: React.CSSProperties = { padding: "4px 6px", fontWeight: 600, color: white(0.45), textAlign: "right", whiteSpace: "nowrap", fontSize: 10.5 };
+            const tds: React.CSSProperties = { padding: "4px 6px", textAlign: "right", whiteSpace: "nowrap" };
+            return (
+            <div style={{ marginTop: 8, fontSize: 10.5, color: white(0.45), lineHeight: 1.6, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ color: white(0.5) }}>
+                Change any value and press Enter (or click away) — the table above recalculates. Empty a box to go back to its default.
               </div>
               <div>
-                <b style={{ color: white(0.6) }}>Systems</b> — SPF (low/base/high) &amp; sources:
-                {catalogue.systems.map((s) => (
-                  <div key={s.id} style={{ marginLeft: 8 }}>· <b style={{ color: white(0.6) }}>{s.shortName}</b>: SPF {s.spf.low}/{s.spf.base}/{s.spf.high}, life {s.lifetimeYr} yr{s.provisional ? " (cost provisional)" : ""} — <span style={{ color: white(0.35) }}>{s.source}</span></div>
-                ))}
+                <b style={{ color: white(0.6) }}>Energy carriers</b>
+                <table style={{ borderCollapse: "collapse", marginTop: 4 }}>
+                  <thead><tr>
+                    <th style={{ ...ths, textAlign: "left" }}></th>
+                    <th style={ths}>Price ({cur}/kWh)</th>
+                    <th style={ths}>Carbon (g CO₂e/kWh)</th>
+                    <th style={{ ...ths, textAlign: "left" }}>Source of the default</th>
+                  </tr></thead>
+                  <tbody>
+                    {Object.entries(baseCatalogue.carriers).filter(([, c]) => !!c).map(([key, def]) => {
+                      const c = catalogue.carriers[key]!;
+                      return (
+                        <tr key={key} style={{ borderTop: `1px solid ${white(0.06)}` }}>
+                          <td style={{ ...tds, textAlign: "left", color: white(0.7), fontWeight: 700 }}>{def!.label}</td>
+                          <td style={tds}><NumField value={c.tariffSek} def={def!.tariffSek} step={0.01} onCommit={(v) => setCarrier(key, "tariffSek", v)} /></td>
+                          <td style={tds}><NumField value={Math.round(c.carbonKgPerKwh * 10000) / 10} def={Math.round(def!.carbonKgPerKwh * 10000) / 10} step={1}
+                            onCommit={(v) => setCarrier(key, "carbonKgPerKwh", v == null ? undefined : v / 1000)} /></td>
+                          <td style={{ ...tds, textAlign: "left", whiteSpace: "normal", color: white(0.35), maxWidth: 520 }}>{def!.source}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <b style={{ color: white(0.6) }}>Systems</b>
+                <table style={{ borderCollapse: "collapse", marginTop: 4 }}>
+                  <thead><tr>
+                    <th style={{ ...ths, textAlign: "left" }}></th>
+                    <th style={ths} title="Seasonal performance factor (heat pumps) or efficiency. The low/high band used for robustness moves with it.">SPF / eff.</th>
+                    <th style={ths}>Install, fixed ({cur})</th>
+                    <th style={ths}>Install per kW ({cur}/kW)</th>
+                    <th style={ths}>Life (yr)</th>
+                    <th style={{ ...ths, textAlign: "left" }}>Source of the default</th>
+                  </tr></thead>
+                  <tbody>
+                    {baseCatalogue.systems.map((def) => {
+                      const s = catalogue.systems.find((x) => x.id === def.id)!;
+                      return (
+                        <tr key={def.id} style={{ borderTop: `1px solid ${white(0.06)}` }}>
+                          <td style={{ ...tds, textAlign: "left", color: white(0.7), fontWeight: 700 }}>
+                            {def.shortName}{def.provisional ? <span style={{ fontWeight: 400, color: white(0.35) }}> (cost provisional)</span> : null}
+                          </td>
+                          <td style={tds}><NumField value={s.spf.base} def={def.spf.base} step={0.1} width={56} onCommit={(v) => setSystem(def.id, "spfBase", v)} /></td>
+                          <td style={tds}><NumField value={s.capexFixedSek} def={def.capexFixedSek} step={1000} width={84} onCommit={(v) => setSystem(def.id, "capexFixedSek", v)} /></td>
+                          <td style={tds}><NumField value={s.capexPerKwSek} def={def.capexPerKwSek} step={100} width={72} onCommit={(v) => setSystem(def.id, "capexPerKwSek", v)} /></td>
+                          <td style={tds}><NumField value={s.lifetimeYr} def={def.lifetimeYr} step={1} width={48} onCommit={(v) => setSystem(def.id, "lifetimeYr", v)} /></td>
+                          <td style={{ ...tds, textAlign: "left", whiteSpace: "normal", color: white(0.35), maxWidth: 420 }}>{def.source}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
               <div style={{ color: white(0.4) }}>
-                Design-kW for capex uses {catalogue.eflhNote}. SPF is shown at its base value; the low/high band feeds the
-                robustness analysis. Values marked "provisional" are ballpark figures — replace with real quotes as you validate.
+                Design-kW for capex uses {catalogue.eflhNote}. The low/high SPF band feeds the robustness analysis and moves
+                with the value you enter. Values marked "provisional" are ballpark figures — replace with real quotes as you validate.
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
     </div>

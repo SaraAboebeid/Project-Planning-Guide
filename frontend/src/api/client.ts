@@ -300,8 +300,9 @@ export const api = {
     post<{ results: Record<string, { system: string } | null>; available: boolean }>("/epc/heating", { addresses, ...(cityId ? { city_id: cityId } : {}) }),
 
   /* ── Facade defect detection (ML) — POST raw image bytes to the on-host model ── */
-  facadeDetect: async (blob: Blob, threshold = 0.5): Promise<FacadeDetectResponse> => {
-    const res = await fetch(`${BASE}/facade-detect?threshold=${threshold}`, { method: "POST", body: blob });
+  /** `tiles`: also scan zoomed-in crops (for whole-facade Street View captures). */
+  facadeDetect: async (blob: Blob, threshold = 0.5, tiles = false): Promise<FacadeDetectResponse> => {
+    const res = await fetch(`${BASE}/facade-detect?threshold=${threshold}${tiles ? "&tiles=1" : ""}`, { method: "POST", body: blob });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.detail || d.error) {
       throw new Error(d.detail || d.error || `Facade model error (${res.status})`);

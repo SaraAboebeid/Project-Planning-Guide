@@ -1516,6 +1516,62 @@ def list_districts(country: str = Query("se")):
 
 
 _BOPLATS_MAP_CACHE: tuple[float, dict] | None = None
+_OCCUPANCY_CACHE: tuple[float, dict, float] | None = None   # (db mtime, {addr: (persons, m2)}, city persons/m2)
+
+
+def _boplats_norm(s: str) -> str:
+    """Address key shared with /api/boplats/map: lower-case, single spaces, no postcode."""
+    import re
+    s = re.sub(r"\s+", " ", (s or "").strip().lower())
+    return re.sub(r"\s+\d{4}$", "", s)
+
+
+def _occupancy_factor_for(building: dict, country: str) -> dict:
+    """Occupancy of a Swedish home relative to the city, from its rental listings.
+
+    Each Boplats listing gives a flat's rooms and size; Sveby 2.0 table 12.1
+    turns rooms into residents. A building whose flats are smaller than the
+    city's listings average houses more people per m2 (factor > 1), larger flats
+    fewer. The generator multiplies its citywide occupancy - and with it the
+    hot-water volume - by this factor. Returns the building unchanged when it is
+    not a Swedish home or has no listing (factor 1, 'citywide default').
+    """
+    global _OCCUPANCY_CACHE
+    import sqlite3
+    from tools.idf.defaults import SVEBY_PERSONS_BY_ROOMS
+    if (country or "").lower() != "se" or building.get("use_cat") not in ("bostad_enfamilj", "bostad_flerfamilj"):
+        return building
+    db = PROJECT_ROOT / "boplats_apartments.db"
+    if not db.exists():
+        return building
+    stamp = db.stat().st_mtime
+    if not _OCCUPANCY_CACHE or _OCCUPANCY_CACHE[0] != stamp:
+        try:
+            con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+            rows = con.execute("SELECT address, rooms, size_m2 FROM apartments "
+                               "WHERE address IS NOT NULL AND rooms > 0 AND size_m2 > 0").fetchall()
+            con.close()
+        except Exception:
+            return building
+        per: dict[str, list[float]] = {}
+        for addr, rooms, size in rows:
+            p = SVEBY_PERSONS_BY_ROOMS[min(5, int(rooms))]
+            acc = per.setdefault(_boplats_norm(addr), [0.0, 0.0])
+            acc[0] += p
+            acc[1] += float(size)
+        tot_p = sum(v[0] for v in per.values())
+        tot_a = sum(v[1] for v in per.values())
+        _OCCUPANCY_CACHE = (stamp, {k: (v[0], v[1]) for k, v in per.items()}, tot_p / tot_a if tot_a else 0.0)
+    _, per, city = _OCCUPANCY_CACHE
+    keys = {_boplats_norm(building.get("address") or "")}
+    keys.update(_boplats_norm(a) for a in (building.get("all_addresses") or "").split("|") if a.strip())
+    hits = [per[k] for k in keys if k and k in per]
+    if not hits or city <= 0:
+        return building
+    persons, area = sum(h[0] for h in hits), sum(h[1] for h in hits)
+    n = len(hits)
+    return {**building, "occupancy_factor": round((persons / area) / city, 3),
+            "occupancy_source": f"Boplats listings at {n} address{'es' if n > 1 else ''} (Sveby persons per flat)"}
 
 
 @app.get("/api/boplats/map")
@@ -3541,6 +3597,25 @@ def _envelope_overrides(building: dict, country: str, req) -> dict:
     return out
 
 
+def _with_extension(building: dict, req: Any) -> tuple[dict, dict]:
+    """Apply a vertical extension: the building record grows by the added
+    storeys (height, floors, and the UK heated area pro rata), so both the IDF
+    and the per-m2 normalisation see the taller building; returns it with the
+    generator kwargs for the new storey's own walls/windows."""
+    n = int(getattr(req, "extension_storeys", 0) or 0)
+    if n <= 0:
+        return building, {}
+    from tools.idf.defaults import FLOOR_HEIGHT_M
+    floors = _floors_of(building)
+    added_h = n * FLOOR_HEIGHT_M
+    b = {**building, "height": float(building.get("height") or floors * FLOOR_HEIGHT_M) + added_h,
+         "floors": floors + n, "extension_storeys": n}
+    if building.get("heated_area_m2"):
+        b["heated_area_m2"] = float(building["heated_area_m2"]) * (floors + n) / floors
+    return b, {"extension_height_m": added_h, "u_ext_wall": getattr(req, "u_ext_wall", None),
+               "u_ext_win": getattr(req, "u_ext_win", None)}
+
+
 def _per_dwelling(building_info: dict, heating_kwh: float, dhw_kwh: float, total_kwh: float,
                   gas_kwh: Optional[float] = None) -> dict:
     n = building_info.get("dwellings_est")
@@ -3578,6 +3653,10 @@ class SimulationSubmitRequest(BaseModel):
     # Components this package REPLACES rather than insulates ("wall", "roof",
     # "floor", "window") - exempt from the UK/BE never-worse clamp.
     replace_components: Optional[list[str]] = None
+    # Vertical extension; see SimulationBatchSubmitRequest.
+    extension_storeys: int = 0
+    u_ext_wall: Optional[float] = None
+    u_ext_win: Optional[float] = None
     # Per-facade glazing ratio; see BatchBuildingSpec.wwr_by_orientation.
     wwr_by_orientation: Optional[dict[str, float]] = None
     # Distinguishes multiple simulations at the SAME building location (the
@@ -3612,6 +3691,11 @@ class SimulationBatchSubmitRequest(BaseModel):
     u_win_override: Optional[float] = None
     u_floor_override: Optional[float] = None
     replace_components: Optional[list[str]] = None   # see SimulationSubmitRequest
+    # Vertical extension: storeys added on top, and the U of the new storey's
+    # walls/windows (its roof arrives as u_roof_override). See _with_extension.
+    extension_storeys: int = 0
+    u_ext_wall: Optional[float] = None
+    u_ext_win: Optional[float] = None
     package_id: str = "baseline"
     package_label: Optional[str] = None
     # "ideal" | "gas_boiler"; None = gas boiler for gas-heated UK homes, ideal loads otherwise.
@@ -3655,6 +3739,8 @@ async def submit_simulation(req: SimulationSubmitRequest):
         if not candidates:
             raise HTTPException(404, "No building with real geometry found near this location")
         building = min(candidates, key=lambda t: t[0])[1]
+    building = _occupancy_factor_for(building, req.country)
+    building, ext_kwargs = _with_extension(building, req)
 
     try:
         idf_text = build_shoebox_idf(
@@ -3663,6 +3749,7 @@ async def submit_simulation(req: SimulationSubmitRequest):
             wwr_by_orientation=req.wwr_by_orientation,
             heating_system=_heating_system_for(building, req.country, req.heating_system),
             **_envelope_overrides(building, req.country, req),
+            **ext_kwargs,
         )
     except Exception as exc:
         raise HTTPException(400, f"IDF generation failed: {exc}")
@@ -3802,7 +3889,9 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
             if not candidates:
                 raise HTTPException(404, f"No building with real geometry found near building {i} ({b.lat}, {b.lon})")
             building = min(candidates, key=_dist)
-        resolved.append({"lat": b.lat, "lon": b.lon, "address": b.address, "building": building,
+        extended, ext_kwargs = _with_extension(_occupancy_factor_for(building, req.country), req)
+        resolved.append({"lat": b.lat, "lon": b.lon, "address": b.address,
+                         "building": extended, "ext_kwargs": ext_kwargs,
                          "wwr_by_orientation": b.wwr_by_orientation})
 
     idf_payload: list[tuple[str, bytes, str]] = []
@@ -3816,6 +3905,7 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
                 wwr_by_orientation=rb["wwr_by_orientation"],
                 heating_system=_heating_system_for(rb["building"], req.country, req.heating_system),
                 **_envelope_overrides(rb["building"], req.country, req),
+                **rb["ext_kwargs"],
             )
         except Exception as exc:
             raise HTTPException(400, f"IDF generation failed for building {i} ({rb['address']}): {exc}")
@@ -4425,7 +4515,10 @@ async def _epsm_validate_once(lat: float, lon: float, address: str, u_over: dict
                 for bb in s.get("buildings", []):
                     res = bb.get("results") or {}
                     if res.get("total_kwh_m2_yr") is not None:
-                        return float(res["total_kwh_m2_yr"])
+                        # Swedish building energy excludes household/business
+                        # electricity - same rule as frontend utils/energyTotals.
+                        return float(res["total_kwh_m2_yr"]) - float(res.get("lighting_kwh_m2_yr") or 0) \
+                            - float(res.get("equipment_kwh_m2_yr") or 0)
                 return None
             await anyio.sleep(2)
     except Exception:
@@ -5475,15 +5568,18 @@ def api_incident_surfaces(req: IncidentSurfacesRequest):
 
 # ── Facade defect detection (proxy to the on-host ML inference service) ────────
 @app.post("/api/facade-detect")
-async def facade_detect(request: Request, threshold: float = 0.5):
+async def facade_detect(request: Request, threshold: float = 0.5, tiles: int = 0):
     """Forward a captured facade image to the on-host ML service and return the
-    detected defects (crack/leakage/abscission/corrosion/bulge) as boxes."""
+    detected defects (crack/leakage/abscission/corrosion/bulge) as boxes.
+    `tiles=1` also scans zoomed-in crops (whole-facade Street View captures); the
+    boxes still come back in whole-image pixels."""
     import httpx
     facade_url = _resolve_facade_ml_url(default="http://host.docker.internal:8021")
     body = await request.body()
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            r = await client.post(f"{facade_url}/detect", params={"threshold": threshold},
+        # Tiled runs are several model passes on CPU, hence the longer timeout.
+        async with httpx.AsyncClient(timeout=180 if tiles else 60) as client:
+            r = await client.post(f"{facade_url}/detect", params={"threshold": threshold, "tiles": 1 if tiles else 0},
                                   content=body, headers={"content-type": "application/octet-stream"})
         data = r.json()
         # Something else may be squatting on the port (another project's server

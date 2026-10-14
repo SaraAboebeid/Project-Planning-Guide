@@ -11,6 +11,7 @@ import { Building2, Zap, Loader2, BarChart2, Thermometer, Droplets, Download, Li
 import BaselineLoadProfile from "../components/BaselineLoadProfile";
 import ModelScopeNotice from "../components/ModelScopeNotice";
 import { makeBuildingKeys } from "../utils/retrofitPriority";
+import { excludesHouseholdElectricity, reportedTotalKwhM2 } from "../utils/energyTotals";
 
 const END_USE_COLORS = {
   heating: "#E2483B",
@@ -172,6 +173,13 @@ export default function BaselineSetup() {
   function dhwOf(r: RenovationBaselineResult) {
     return r.dhw || Math.max(0, Math.round((r.energyUse - r.heating - r.cooling - r.lighting - r.equipment) * 10) / 10);
   }
+  /** Sweden reports building energy without household/business electricity
+   *  (utils/energyTotals): no lighting/equipment shown, and results saved before
+   *  that rule get it taken out of their total here (new ones store it as 0). */
+  const showElec = !excludesHouseholdElectricity(project.country);
+  function totalOf(r: RenovationBaselineResult) {
+    return showElec ? r.energyUse : Math.round((r.energyUse - r.lighting - r.equipment) * 10) / 10;
+  }
 
   const allBuildingsChartData = useMemo(
     () => results.map((r) => ({
@@ -180,11 +188,11 @@ export default function BaselineSetup() {
       heating: r.heating,
       dhw: dhwOf(r),
       cooling: r.cooling,
-      lighting: r.lighting,
-      equipment: r.equipment,
-      total: r.energyUse,
+      lighting: showElec ? r.lighting : 0,
+      equipment: showElec ? r.equipment : 0,
+      total: totalOf(r),
     })),
-    [results],
+    [results, showElec], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const activeBuildingResult = useMemo(
@@ -198,11 +206,13 @@ export default function BaselineSetup() {
       { key: "Heating", value: activeBuildingResult.heating, color: END_USE_COLORS.heating },
       { key: "Hot water", value: dhwOf(activeBuildingResult), color: END_USE_COLORS.dhw },
       { key: "Cooling", value: activeBuildingResult.cooling, color: END_USE_COLORS.cooling },
-      { key: "Lighting", value: activeBuildingResult.lighting, color: END_USE_COLORS.lighting },
-      { key: "Equipment", value: activeBuildingResult.equipment, color: END_USE_COLORS.equipment },
-      { key: "Total", value: activeBuildingResult.energyUse, color: END_USE_COLORS.total },
+      ...(showElec ? [
+        { key: "Lighting", value: activeBuildingResult.lighting, color: END_USE_COLORS.lighting },
+        { key: "Equipment", value: activeBuildingResult.equipment, color: END_USE_COLORS.equipment },
+      ] : []),
+      { key: "Total", value: totalOf(activeBuildingResult), color: END_USE_COLORS.total },
     ];
-  }, [activeBuildingResult]);
+  }, [activeBuildingResult, showElec]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const eClassColor: Record<string, string> = { A: "#2FB477", B: "#2FB477", C: "#2FB477", D: "#E8880C", E: "#f97316", F: "#E2483B", G: "#dc2626" };
 
@@ -222,14 +232,14 @@ export default function BaselineSetup() {
     const header = [
       "address", "energy_class", "energy_class_source",
       "total_energy_use_kWh_m2_yr", "heating_demand_kWh_m2_yr", "cooling_demand_kWh_m2_yr",
-      "hot_water_demand_kWh_m2_yr", "lighting_demand_kWh_m2_yr", "equipment_demand_kWh_m2_yr",
+      "hot_water_demand_kWh_m2_yr", ...(showElec ? ["lighting_demand_kWh_m2_yr", "equipment_demand_kWh_m2_yr"] : []),
     ];
     const lines = [header.join(",")];
     for (const r of results) {
       lines.push([
         `"${(r.address ?? "").replace(/"/g, '""')}"`,
         r.eClass ?? "", r.eClassFromEpc ? "EPC" : "not available",
-        r.energyUse, r.heating, r.cooling, dhwOf(r), r.lighting, r.equipment,
+        totalOf(r), r.heating, r.cooling, dhwOf(r), ...(showElec ? [r.lighting, r.equipment] : []),
       ].join(","));
     }
     saveFile(lines.join("\n"), "epsm_baseline_results.csv", "text/csv;charset=utf-8");
@@ -243,11 +253,10 @@ export default function BaselineSetup() {
         address: r.address,
         energyClass: r.eClass,
         energyClassSource: r.eClassFromEpc ? "EPC" : "not available",
-        totalEnergyUse_kWh_m2_yr: r.energyUse,
+        totalEnergyUse_kWh_m2_yr: totalOf(r),
         heatingDemand_kWh_m2_yr: r.heating,
         coolingDemand_kWh_m2_yr: r.cooling,
-        lightingDemand_kWh_m2_yr: r.lighting,
-        equipmentDemand_kWh_m2_yr: r.equipment,
+        ...(showElec ? { lightingDemand_kWh_m2_yr: r.lighting, equipmentDemand_kWh_m2_yr: r.equipment } : {}),
         hotWaterDemand_kWh_m2_yr: dhwOf(r),
       })),
     };
@@ -310,11 +319,13 @@ export default function BaselineSetup() {
               address: row.address ?? (src ? bKey(src, i) : `Building ${i + 1}`),
               lat: row.lat ?? src?.lat,
               lon: row.lon ?? src?.lon,
-              energyUse: r?.total_kwh_m2_yr ?? 0,
+              // Sweden: household/business electricity is simulated but not part
+              // of the reported total or shown (utils/energyTotals).
+              energyUse: reportedTotalKwhM2(r, project.country) ?? 0,
               heating: r?.heating_kwh_m2_yr ?? 0,
               cooling: r?.cooling_kwh_m2_yr ?? 0,
-              lighting: r?.lighting_kwh_m2_yr ?? 0,
-              equipment: r?.equipment_kwh_m2_yr ?? 0,
+              lighting: excludesHouseholdElectricity(project.country) ? 0 : (r?.lighting_kwh_m2_yr ?? 0),
+              equipment: excludesHouseholdElectricity(project.country) ? 0 : (r?.equipment_kwh_m2_yr ?? 0),
               // Real EnergyPlus "Water Systems" output. The shoebox draws hot
               // water from a stand-alone water heater sized to the Sveby
               // standard intensity for the building's use category, so this is
@@ -699,8 +710,8 @@ export default function BaselineSetup() {
                       <Bar dataKey="heating" stackId="enduse" fill={END_USE_COLORS.heating} radius={[0, 0, 0, 0]} name="Heating" />
                       <Bar dataKey="dhw" stackId="enduse" fill={END_USE_COLORS.dhw} radius={[0, 0, 0, 0]} name="Hot water" />
                       <Bar dataKey="cooling" stackId="enduse" fill={END_USE_COLORS.cooling} radius={[0, 0, 0, 0]} name="Cooling" />
-                      <Bar dataKey="lighting" stackId="enduse" fill={END_USE_COLORS.lighting} radius={[0, 0, 0, 0]} name="Lighting" />
-                      <Bar dataKey="equipment" stackId="enduse" fill={END_USE_COLORS.equipment} radius={[0, 4, 4, 0]} name="Equipment" />
+                      {showElec && <Bar dataKey="lighting" stackId="enduse" fill={END_USE_COLORS.lighting} radius={[0, 0, 0, 0]} name="Lighting" />}
+                      {showElec && <Bar dataKey="equipment" stackId="enduse" fill={END_USE_COLORS.equipment} radius={[0, 4, 4, 0]} name="Equipment" />}
                     </BarChart>
                   ) : (
                     <BarChart data={activeBuildingChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
@@ -722,9 +733,12 @@ export default function BaselineSetup() {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
                 {[
                   { label: "Heating", color: END_USE_COLORS.heating },
+                  { label: "Hot water", color: END_USE_COLORS.dhw },
                   { label: "Cooling", color: END_USE_COLORS.cooling },
-                  { label: "Lighting", color: END_USE_COLORS.lighting },
-                  { label: "Equipment", color: END_USE_COLORS.equipment },
+                  ...(showElec ? [
+                    { label: "Lighting", color: END_USE_COLORS.lighting },
+                    { label: "Equipment", color: END_USE_COLORS.equipment },
+                  ] : []),
                 ].map((item) => (
                   <div key={item.label} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
                     <span style={{ width: 9, height: 9, borderRadius: 999, background: item.color, display: "inline-block" }} />
@@ -765,17 +779,28 @@ export default function BaselineSetup() {
                     sixth tile (hot water) wrapped onto its own line and looked
                     like a separate, lesser thing. minmax(0,1fr) lets them
                     compress instead of wrapping. */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 8 }}>
-                  {[
-                    { icon: <BarChart2 size={13} color="#E8880C" />, label: "Total energy use", value: `${r.energyUse} kWh/m²·yr`, color: "#E8880C" },
+                {(() => {
+                  // Sweden reports building energy without household/business
+                  // electricity (utils/energyTotals), so those two tiles go.
+                  const noHouseholdEl = !showElec;
+                  const tiles = [
+                    // Results saved before this rule still carry lighting/equipment
+                    // inside energyUse; new ones store them as 0, so this is a no-op there.
+                    { icon: <BarChart2 size={13} color="#E8880C" />, label: "Total energy use",
+                      value: `${noHouseholdEl ? Math.round((r.energyUse - r.lighting - r.equipment) * 10) / 10 : r.energyUse} kWh/m²·yr`, color: "#E8880C" },
                     { icon: <Thermometer size={13} color="#E2483B" />, label: "Heating demand",   value: `${r.heating} kWh/m²·yr`,  color: "#fca5a5" },
                     { icon: <Droplets size={13} color="#4A90E2" />,    label: "Cooling demand",   value: `${r.cooling} kWh/m²·yr`,  color: "#93c5fd" },
-                    { icon: <Lightbulb size={13} color="#E8880C" />,   label: "Lighting",         value: `${r.lighting} kWh/m²·yr`, color: "#fcd34d" },
-                    { icon: <Cpu size={13} color="#2FB477" />,          label: "Equipment",        value: `${r.equipment} kWh/m²·yr`, color: "#86efac" },
+                    ...(noHouseholdEl ? [] : [
+                      { icon: <Lightbulb size={13} color="#E8880C" />, label: "Lighting",  value: `${r.lighting} kWh/m²·yr`,  color: "#fcd34d" },
+                      { icon: <Cpu size={13} color="#2FB477" />,        label: "Equipment", value: `${r.equipment} kWh/m²·yr`, color: "#86efac" },
+                    ]),
                     { icon: <Droplets size={13} color="#4A90E2" />,     label: "Hot water",
                       value: `${r.dhw || Math.max(0, Math.round((r.energyUse - r.heating - r.cooling - r.lighting - r.equipment) * 10) / 10)} kWh/m²·yr`,
                       color: "#93c5fd" },
-                  ].map(m => (
+                  ];
+                  return (
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))`, gap: 8 }}>
+                  {tiles.map(m => (
                     <div key={m.label} style={{ borderRadius: 8, padding: "10px 10px", minWidth: 0, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5, minWidth: 0 }}>{m.icon}<span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</span></div>
                       <div style={{ fontSize: 13.5, fontWeight: 800, color: m.color, whiteSpace: "nowrap",
@@ -783,6 +808,8 @@ export default function BaselineSetup() {
                     </div>
                   ))}
                 </div>
+                  );
+                })()}
                 {/* UK gas-boiler runs: fuel actually burnt, which is what a gas meter reads. */}
                 {r.totalGasKwh != null && (
                   <div style={{ marginTop: 8, fontSize: 11.5, color: "rgba(255,255,255,0.65)" }}>
@@ -819,11 +846,16 @@ export default function BaselineSetup() {
             </p>
             ) : (
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
-              * Real EnergyPlus (EPSM) output. Hot water is simulated from a Sveby standard draw profile for the
-              building's use category (25 kWh/m²·yr for dwellings — the Göteborg EPC median is 23.6), so it is a
-              standard assumption played back through EnergyPlus, not a prediction: it will not vary between two
-              dwellings of the same size. Infiltration is modelled too, but EnergyPlus reports it inside heating
-              rather than as its own end use. Proceed to Step 4 to test renovation packages against this baseline.
+              * Real EnergyPlus (EPSM) output. Homes use Sveby 2.0 (2024) standard use: occupants from Sveby's
+              persons-per-flat table, raised or lowered by the flat sizes listed for the address on Boplats where
+              there are any; hot water as litres per person, heated from the mains temperature EnergyPlus derives
+              from the city's weather (so it varies with occupancy, city and season; it excludes hot-water
+              circulation losses, which an energy declaration includes). Household and business electricity
+              (appliances and lighting; 21 kWh/m²·yr in homes, of which 70% warms the building) is simulated
+              because its heat lowers the heating need, but — as in Swedish energy declarations — it is not part
+              of the total and not shown. Office, shop and school lighting is dimmed by daylight near the windows.
+              Infiltration is modelled too, but EnergyPlus reports it inside heating rather than as its own end use.
+              Proceed to Step 4 to test renovation packages against this baseline.
             </p>
             )}
           </div>

@@ -160,8 +160,17 @@ export function computeAreaForLineItem(
     case "VertExt::Roof":
     case "VertExt::Floor":
       return geometry.footprintM2;
+    // The new storey: one floor height of the perimeter, split between wall and
+    // glass at the building's own window share - net wall area, like "Walls", so
+    // the openings are not clad and glazed at once.
     case "VertExt::Walls":
-      return geometry.wallPerimeterM != null ? Math.round(geometry.wallPerimeterM * FLOOR_HEIGHT_M * 10) / 10 : null;
+      return geometry.wallPerimeterM != null
+        ? Math.round(geometry.wallPerimeterM * FLOOR_HEIGHT_M * (1 - effectiveWwr(geometry, wwr)) * 10) / 10
+        : null;
+    case "VertExt::Windows":
+      return geometry.wallPerimeterM != null
+        ? Math.max(1, Math.round(geometry.wallPerimeterM * FLOOR_HEIGHT_M * effectiveWwr(geometry, wwr) / TYPICAL_WINDOW_AREA_M2))
+        : null;
     default:
       return null;
   }

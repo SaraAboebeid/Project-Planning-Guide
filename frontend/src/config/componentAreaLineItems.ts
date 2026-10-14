@@ -46,6 +46,9 @@ export const AREA_LINE_ITEMS: Record<string, AreaLineItem[]> = {
     { key: "VertExt::Roof",  parentComponent: "Vertical Extension (New Floor)", label: "New Roof",       wikellsChapterId: "ch11", boverketComponent: "Roof",  quantityKind: "area" },
     { key: "VertExt::Walls", parentComponent: "Vertical Extension (New Floor)", label: "New Walls",      wikellsChapterId: "ch7",  boverketComponent: "Walls", quantityKind: "area" },
     { key: "VertExt::Floor", parentComponent: "Vertical Extension (New Floor)", label: "New Floor Slab", wikellsChapterId: "ch9",  boverketComponent: "Floor", quantityKind: "area" },
+    // A new storey has windows too: counted from its wall area at the building's
+    // window share, priced per unit like the Windows component.
+    { key: "VertExt::Windows", parentComponent: "Vertical Extension (New Floor)", label: "New Windows", wikellsChapterId: "ch16", boverketComponent: "Windows", quantityKind: "count" },
   ],
 };
 

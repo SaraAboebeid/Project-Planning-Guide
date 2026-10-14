@@ -72,6 +72,45 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       sourceUrl: "https://www.naturvardsverket.se/",
       note: "Swedish grid is low-carbon (hydro/nuclear/wind). Production mix ~10–40 g/kWh; Nordic residual mix is far higher — pick per accounting method.",
     },
+    /* EnergyPlus standard use for Swedish homes (tools/idf/defaults.py, Sveby
+       block). Not optimiser inputs, but they set the baseline the optimiser is
+       anchored to, so they are listed here to keep every model number traceable. */
+    {
+      key: "sveby_dhw",
+      label: "Hot water, homes (at citywide occupancy, 10 °C mains)",
+      value: 21, unit: "kWh/m²·yr",
+      source: "Sveby Brukarindata bostäder 2.0 (2024-11-11), ch. 8 — excludes circulation (VVC) and standby losses",
+      sourceUrl: "https://www.sveby.org/okategoriserad/svebys-brukarindata-for-bostader-version-2-0-ar-har/",
+      note: "Turned into litres per person; EnergyPlus heats them from the mains temperature it derives from the city's weather file, so the simulated figure varies with occupancy, city and season. Circulation losses are not modelled yet, so totals sit somewhat below an energy declaration.",
+      usedIn: "Step 3/4 EnergyPlus model (homes)",
+    },
+    {
+      key: "sveby_household_el",
+      label: "Household electricity, homes (incl. lighting)",
+      value: 21, unit: "kWh/m²·yr",
+      source: "Sveby Brukarindata bostäder 2.0, ch. 9 (monthly profile, table 9.1)",
+      sourceUrl: "https://www.sveby.org/okategoriserad/svebys-brukarindata-for-bostader-version-2-0-ar-har/",
+      note: "70 % of it counts as internal heat (Sveby). Higher in winter than summer. Lighting is part of it, so homes show no separate lighting.",
+      usedIn: "Step 3/4 EnergyPlus model (homes)",
+    },
+    {
+      key: "sveby_occupancy",
+      label: "Occupancy, homes (citywide)",
+      value: 35, unit: "m² heated area per person",
+      source: "Sveby 2.0 table 12.1 (persons per flat by rooms) applied to Boplats listings ≈ 31 m² of flat per person, plus shared heated area",
+      sourceUrl: "https://www.sveby.org/okategoriserad/svebys-brukarindata-for-bostader-version-2-0-ar-har/",
+      note: "A building with listed flats is scaled by how small or large they are vs the city's listings (×0.5–2). People give 80 W each (50 W sensible), present 17:00–07:00.",
+      usedIn: "Step 3/4 EnergyPlus model (homes)",
+    },
+    {
+      key: "daylight_setpoint",
+      label: "Daylight-dimmed lighting setpoint (non-residential)",
+      value: 300, unit: "lux",
+      source: "Typical office/school task illuminance; EnergyPlus Daylighting:Controls (SplitFlux, continuous dimming to 30 % power)",
+      sourceUrl: "https://bigladdersoftware.com/epx/docs/23-2/input-output-reference/group-daylighting.html",
+      note: "Controls the share of the floor within 4.5 m of a glazed wall, so building shape, glazing and party walls decide the saving.",
+      usedIn: "Step 3/4 EnergyPlus model (offices, shops, schools)",
+    },
   ],
   UK: [
     {

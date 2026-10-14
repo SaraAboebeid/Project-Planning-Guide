@@ -154,6 +154,13 @@ body.bright-mode .outside-root-portal canvas {
   filter: none;
 }
 
+/* Step 1's maximized map is moved into <body> (LocationMap). Give it the same
+   inversion as #root so it looks like the rest of the app, and its map tiles get
+   un-inverted by the img rule above like they are in the normal-size map. */
+body.bright-mode .ppg-map-portal {
+  filter: invert(1) hue-rotate(180deg);
+}
+
 /* The Chalmers marks are WHITE artwork. The rule above re-inverts every <img>
    back to its natural colours, which left them white-on-white in bright mode.
    Opting them out of that re-inversion lets the root inversion do its job and

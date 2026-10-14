@@ -176,15 +176,19 @@ def _day_pattern_mean(pattern: list[tuple[str, float]]) -> float:
     return mean / prev_h if prev_h else 0.0
 
 
-def _dhw_peak_flow_m3_s(annual_kwh: float, pattern: list[tuple[str, float]]) -> float:
-    """Peak draw (m3/s) that makes the scheduled profile deliver `annual_kwh`.
+def _dhw_peak_flow_m3_s(annual_kwh: float, pattern: list[tuple[str, float]],
+                        cold_c: float = D.DHW_COLD_TEMP_C) -> float:
+    """Peak draw (m3/s) that makes the scheduled profile deliver `annual_kwh`
+    when the incoming water is at `cold_c`.
 
     Inverts Q = rho * c * V * dT over the year: the schedule's own mean
     fraction sets how much of the peak is actually drawn, so the annual total
-    stays on target no matter how the profile's shape is edited.
+    stays on target no matter how the profile's shape is edited. With a
+    weather-driven mains (Swedish homes) this fixes the VOLUME, sized at the
+    reference temperature; the energy then follows the real mains.
     """
     # Mean tank temperature, not setpoint - see D.DHW_DEADBAND_K.
-    delta_t = (D.DHW_SUPPLY_TEMP_C - D.DHW_DEADBAND_K / 2.0) - D.DHW_COLD_TEMP_C
+    delta_t = (D.DHW_SUPPLY_TEMP_C - D.DHW_DEADBAND_K / 2.0) - cold_c
     kwh_per_m3 = D.WATER_DENSITY_KG_M3 * D.WATER_SPECIFIC_HEAT_J_KGK * delta_t / 3_600_000.0
     if kwh_per_m3 <= 0:
         return 0.0
@@ -194,6 +198,43 @@ def _dhw_peak_flow_m3_s(annual_kwh: float, pattern: list[tuple[str, float]]) -> 
     if mean_fraction <= 0:
         return 0.0
     return annual_m3 / (seconds_per_year * mean_fraction)
+
+
+_MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+
+def _monthly_schedule(name: str, type_limits: str, values: list[float]) -> str:
+    """Schedule:Compact holding one constant value per calendar month."""
+    fields: list[tuple] = [(name, "Name"), (type_limits, "Schedule Type Limits Name")]
+    for m, v in enumerate(values, start=1):
+        fields += [(f"Through: {m}/{_MONTH_DAYS[m - 1]}", "Field"), ("For: AllDays", "Field"),
+                   ("Until: 24:00", "Field"), (round(v, 4), "Field")]
+    return obj("Schedule:Compact", fields)
+
+
+def _epw_mains_correlation(epw_path: str | Path) -> tuple[float, float]:
+    """(annual mean, max difference of monthly means) of the weather file's
+    dry-bulb temperature - the two inputs of EnergyPlus's mains-water
+    correlation (Site:WaterMainsTemperature, Hendron et al.)."""
+    sums, counts = [0.0] * 12, [0] * 12
+    with open(epw_path, encoding="utf-8", errors="replace") as f:
+        for i, line in enumerate(f):
+            if i < 8:
+                continue                      # EPW header lines
+            parts = line.split(",")
+            if len(parts) < 7:
+                continue
+            try:
+                month, tdb = int(parts[1]), float(parts[6])
+            except ValueError:
+                continue
+            if 1 <= month <= 12 and tdb < 99:   # 99.9 = missing
+                sums[month - 1] += tdb
+                counts[month - 1] += 1
+    means = [s / c for s, c in zip(sums, counts) if c]
+    if len(means) < 12:
+        return D.DHW_REFERENCE_MAINS_C, 15.0
+    return sum(means) / 12.0, max(means) - min(means)
 
 
 def _constant_schedule(name: str, type_limits: str, value: float) -> str:
@@ -223,6 +264,9 @@ def build_shoebox_idf(
     heating_system: str = "ideal",
     boiler_efficiency: Optional[float] = None,
     wwr_by_orientation: Optional[dict[str, float]] = None,
+    extension_height_m: float = 0.0,
+    u_ext_wall: Optional[float] = None,
+    u_ext_win: Optional[float] = None,
 ) -> str:
     """Return a complete EnergyPlus 23.2 IDF (as text) for one building.
 
@@ -278,6 +322,12 @@ def build_shoebox_idf(
     total_floor_area = footprint_m2 * floors
     use_cat = building.get("use_cat")
     gains = _gains_profile(use_cat)
+    # Swedish homes follow Sveby 2.0 (defaults "Sveby" block): occupants, hot
+    # water and household electricity are modelled, not one W/m2 per type.
+    se_home = (country or "").lower() == "se" and use_cat in ("bostad_enfamilj", "bostad_flerfamilj")
+    # >1 when the building's listed flats are smaller than the city's (more
+    # people per m2), <1 when larger; 1 when nothing is listed for it.
+    occ_factor = max(0.5, min(2.0, float(building.get("occupancy_factor") or 1.0))) if se_home else 1.0
 
     # u_*_epc (UK only) come from the certificates' own fabric descriptions
     # (tools/uk/epc_fabric.py) and describe the building as it is today;
@@ -295,6 +345,19 @@ def build_shoebox_idf(
                             and u_wall >= D.UK_UNINSULATED_WALL_U_THRESHOLD)
     if uninsulated_wall:
         u_wall *= D.UK_UNINSULATED_WALL_FACTOR
+    # Vertical extension: `building` already includes the added storey(s) (the
+    # backend's _with_extension raised height/floors). The single wall and window
+    # construction then stand for both parts of the facade, weighted by height -
+    # the new storey's walls/windows over its share, the existing ones below. The
+    # new floor slab is between two heated floors and loses no heat, and the new
+    # roof arrives as u_roof_override.
+    ext_share = 0.0
+    if extension_height_m > 0 and height > extension_height_m:
+        ext_share = extension_height_m / height
+        if u_ext_wall:
+            u_wall = u_wall * (1 - ext_share) + float(u_ext_wall) * ext_share
+        if u_ext_win:
+            u_win = u_win * (1 - ext_share) + float(u_ext_win) * ext_share
     wwr = wwr_override if wwr_override is not None else D.DEFAULT_WWR_BY_USE.get(use_cat or "", D.DEFAULT_WWR_FALLBACK)
 
     name_base = _safe_name(building_name or building.get("address") or f"{city_id} building")
@@ -408,6 +471,7 @@ def build_shoebox_idf(
     n_edges = len(ring2d)
     window_count = 0
     party_walls = 0
+    glazed_walls: list[tuple] = []   # (p0, p1, width, sill, head) - for daylighting
     wwr_by_facing: dict[str, float] = {}   # what each facade actually got, for the trace
     for i in range(n_edges):
         p0, p1 = ring2d[i], ring2d[(i + 1) % n_edges]
@@ -446,6 +510,7 @@ def build_shoebox_idf(
         if win is not None:
             sill, head, win_width = win
             window_count += 1
+            glazed_walls.append((p0, p1, width, sill, head))
             objects.append(obj("FenestrationSurface:Detailed", [
                 (f"{wall_name}_Glz", "Name"), ("Window", "Surface Type"), ("Window Construction", "Construction Name"),
                 (wall_name, "Building Surface Name"), (None, "Outside Boundary Condition Object"),
@@ -463,10 +528,15 @@ def build_shoebox_idf(
     occ_sched = f"{profile_name.title()} Occupancy Schedule"
     light_sched = f"{profile_name.title()} Lighting Schedule"
     equip_sched = f"{profile_name.title()} Equipment Schedule"
-    objects.append(_schedule_compact(occ_sched, "Fractional", pattern))
+    if se_home:
+        occ_sched = "Sveby Presence Schedule"
+        objects.append(_schedule_compact(occ_sched, "Fractional", D.SVEBY_PRESENCE_PATTERN))
+    else:
+        objects.append(_schedule_compact(occ_sched, "Fractional", pattern))
     objects.append(_schedule_compact(light_sched, "Fractional", pattern))
     objects.append(_schedule_compact(equip_sched, "Fractional", pattern))
-    objects.append(_constant_schedule("Activity Level Schedule", "Activity Level", D.ACTIVITY_LEVEL_W_PER_PERSON))
+    objects.append(_constant_schedule("Activity Level Schedule", "Activity Level",
+                                      D.SVEBY_PERSON_W if se_home else D.ACTIVITY_LEVEL_W_PER_PERSON))
     objects.append(_constant_schedule("Always On Schedule", "Fractional", 1))
     if uk_home:
         # Poor-fabric homes are heated cooler than the SAP pattern assumes (the
@@ -489,28 +559,93 @@ def build_shoebox_idf(
     objects.append(_constant_schedule(f"{zone_name} Thermostat Schedule", f"{zone_name} Thermostat Schedule Type Limits", 4))
 
     # ── internal gains (scaled to total floor area, all storeys) ─────
+    if se_home:
+        people = total_floor_area / D.SE_HOME_M2_PER_PERSON * occ_factor
+    else:
+        people = total_floor_area / gains["m2_per_person"]
     objects.append(obj("People", [
         (f"{zone_name} People", "Name"), (zone_name, "Zone or ZoneList or Space or SpaceList Name"),
         (occ_sched, "Number of People Schedule Name"), ("People", "Number of People Calculation Method"),
-        (round(total_floor_area / gains["m2_per_person"], 2), "Number of People"),
+        (round(people, 2), "Number of People"),
         (None, "People per Floor Area {person/m2}"), (None, "Floor Area per Person {m2/person}"),
-        (0.3, "Fraction Radiant"), (None, "Sensible Heat Fraction"), ("Activity Level Schedule", "Activity Level Schedule Name"),
+        (0.3, "Fraction Radiant"),
+        (round(D.SVEBY_PERSON_SENSIBLE_FRACTION, 3) if se_home else None, "Sensible Heat Fraction"),
+        ("Activity Level Schedule", "Activity Level Schedule Name"),
     ]))
+    # Swedish homes: lighting is part of household electricity (Sveby), so it
+    # has no load of its own here; everything else keeps its lighting.
+    lighting_w = 0.0 if se_home else gains["lighting_w_m2"] * total_floor_area
     objects.append(obj("Lights", [
         (f"{zone_name} Lights", "Name"), (zone_name, "Zone or ZoneList or Space or SpaceList Name"),
         (light_sched, "Schedule Name"), ("LightingLevel", "Design Level Calculation Method"),
-        (round(gains["lighting_w_m2"] * total_floor_area, 1), "Lighting Level {W}"),
+        (round(lighting_w, 1), "Lighting Level {W}"),
         (None, "Watts per Zone Floor Area {W/m2}"), (None, "Watts per Person {W/person}"),
         (0, "Return Air Fraction"), (0.42, "Fraction Radiant"), (0.18, "Fraction Visible"), (1, "Fraction Replaceable"),
         ("General", "End-Use Subcategory"),
     ]))
+    if se_home:
+        # Sveby household electricity: 21 kWh/m2 a year, more in winter than in
+        # summer (table 9.1), of which 70 % warms the building - the rest leaves
+        # with drain water, through the hood, outdoors.
+        shape = D.SVEBY_HOUSEHOLD_EL_MONTHLY_W_M2
+        fractions = [w / max(shape) for w in shape]
+        full_load_h = sum(f * d * 24 for f, d in zip(fractions, _MONTH_DAYS))
+        equip_w = D.SVEBY_HOUSEHOLD_EL_KWH_M2_YR * total_floor_area * 1000.0 / full_load_h
+        equip_sched = "Sveby Household Electricity Schedule"
+        objects.append(_monthly_schedule(equip_sched, "Fractional", fractions))
+        equip_lost = round(1.0 - D.SVEBY_HOUSEHOLD_EL_HEAT_FRACTION, 3)
+    else:
+        equip_w = gains["equipment_w_m2"] * total_floor_area
+        equip_lost = 0
     objects.append(obj("ElectricEquipment", [
         (f"{zone_name} Equipment", "Name"), (zone_name, "Zone or ZoneList or Space or SpaceList Name"),
         (equip_sched, "Schedule Name"), ("EquipmentLevel", "Design Level Calculation Method"),
-        (round(gains["equipment_w_m2"] * total_floor_area, 1), "Design Level {W}"),
+        (round(equip_w, 1), "Design Level {W}"),
         (None, "Watts per Zone Floor Area {W/m2}"), (None, "Watts per Person {W/person}"),
-        (0, "Fraction Latent"), (0.2, "Fraction Radiant"), (0, "Fraction Lost"), ("Electric Equipment", "End-Use Subcategory"),
+        (0, "Fraction Latent"), (0.2, "Fraction Radiant"), (equip_lost, "Fraction Lost"), ("Electric Equipment", "End-Use Subcategory"),
     ]))
+
+    # ── daylight-dimmed lighting (non-residential) ──────────────────
+    # Lights dim to hold the setpoint at a point inside the most glazed facade;
+    # the share they control is the floor within D.DAYLIGHT_DEPTH_M of a glazed
+    # wall - so shape, glazing and party walls decide the saving, per building.
+    # Not homes: Swedish ones have no separate lighting load, and UK homes keep
+    # the lighting their metered-gas calibration was fitted with.
+    daylit_fraction = 0.0
+    residential = (use_cat or "").startswith("bostad")
+    if not residential and lighting_w > 0 and glazed_walls and footprint_m2 > 0:
+        daylit_fraction = min(1.0, sum(w for _, _, w, _, _ in glazed_walls) * D.DAYLIGHT_DEPTH_M / footprint_m2)
+        p0, p1, width, sill, head = max(glazed_walls, key=lambda g: g[2] * (g[4] - g[3]))
+        # Inward normal of a counter-clockwise ring: the edge turned left.
+        nx, ny = -(p1[1] - p0[1]) / width, (p1[0] - p0[0]) / width
+        depth = min(D.DAYLIGHT_DEPTH_M / 2.0, math.sqrt(footprint_m2) / 3.0)
+        ref_x = (p0[0] + p1[0]) / 2.0 + nx * depth
+        ref_y = (p0[1] + p1[1]) / 2.0 + ny * depth
+        # Work plane 0.8 m above the window's sill, i.e. desk height on the
+        # storey the window bottom represents in this single-zone model.
+        ref_z = min(height - 0.1, sill + 0.8)
+        objects.append(obj("Daylighting:ReferencePoint", [
+            (f"{zone_name} Daylight Ref", "Name"), (zone_name, "Zone or Space Name"),
+            (round(ref_x, 3), "X-Coordinate of Reference Point {m}"),
+            (round(ref_y, 3), "Y-Coordinate of Reference Point {m}"),
+            (round(ref_z, 3), "Z-Coordinate of Reference Point {m}"),
+        ]))
+        objects.append(obj("Daylighting:Controls", [
+            (f"{zone_name} Daylighting", "Name"), (zone_name, "Zone or Space Name"),
+            ("SplitFlux", "Daylighting Method"), (None, "Availability Schedule Name"),
+            ("Continuous", "Lighting Control Type"),
+            (D.DAYLIGHT_MIN_POWER_FRACTION, "Minimum Input Power Fraction for Continuous or ContinuousOff Dimming Control"),
+            (D.DAYLIGHT_MIN_LIGHT_FRACTION, "Minimum Light Output Fraction for Continuous or ContinuousOff Dimming Control"),
+            (None, "Number of Stepped Control Steps"),
+            (None, "Probability Lighting will be Reset When Needed in Manual Stepped Control"),
+            (None, "Glare Calculation Daylighting Reference Point Name"),
+            (None, "Glare Calculation Azimuth Angle of View Direction Clockwise from Zone y-Axis {deg}"),
+            (None, "Maximum Allowable Discomfort Glare Index"),
+            (None, "DElight Gridding Resolution {m2}"),
+            (f"{zone_name} Daylight Ref", "Daylighting Reference Point 1 Name"),
+            (round(daylit_fraction, 3), "Fraction of Lights Controlled by Reference Point 1"),
+            (D.DAYLIGHT_SETPOINT_LUX, "Illuminance Setpoint at Reference Point 1 {lux}"),
+        ]))
     objects.append(obj("ZoneInfiltration:DesignFlowRate", [
         (f"{zone_name} Infiltration", "Name"), (zone_name, "Zone or ZoneList or Space or SpaceList Name"),
         ("Always On Schedule", "Schedule Name"), ("AirChanges/Hour", "Design Flow Rate Calculation Method"),
@@ -525,9 +660,10 @@ def build_shoebox_idf(
     # documented way to model DHW without building a plant loop, and its fuel
     # lands on the "Water Systems" end use - the one EPSM reports but that was
     # always 0.0 here, because nothing in the shoebox drew hot water.
-    # Efficiency 1.0 and zero standby loss are deliberate: the Sveby intensity
-    # is already a DELIVERED figure including circulation losses, so adding
-    # tank losses or a boiler efficiency on top would double-count.
+    # Efficiency 1.0 and zero standby loss: the intensity is the energy in the
+    # water drawn. Sveby 2.0 states its figure EXCLUDES hot-water circulation
+    # (VVC) and standby losses; they are not modelled yet (no sourced figure),
+    # so Swedish totals sit somewhat below an energideklaration, which includes them.
     # UK homes: SAP 2012 Appendix J hot-water demand per dwelling (see
     # D.uk_sap_dhw_kwh_per_dwelling), heated by gas at the boiler's efficiency in
     # gas-boiler runs. It is a separate WaterHeater:Mixed, so its gas stays apart
@@ -542,19 +678,41 @@ def build_shoebox_idf(
             dhw_fuel, dhw_eff = "NaturalGas", float(boiler_efficiency or building.get("boiler_efficiency_epc") or D.UK_BOILER_EFFICIENCY)
     elif (country or "").lower() == "gb":
         dhw_kwh_m2, dhw_annual_kwh = 0.0, 0.0
+    elif se_home:
+        # Sveby 21 kWh/m2 is the draw at the citywide occupancy and a 10 C mains;
+        # occ_factor scales the people and so the litres. Fixed below as a VOLUME
+        # at that reference temperature - the energy EnergyPlus reports then
+        # follows this city's mains temperature, month by month.
+        dhw_kwh_m2 = round(D.SVEBY_DHW_KWH_M2_YR * occ_factor, 1)
+        dhw_annual_kwh = dhw_kwh_m2 * total_floor_area
     else:
         dhw_kwh_m2 = D.DHW_KWH_M2_YR_BY_USE.get(use_cat or "", D.DEFAULT_DHW_KWH_M2_YR)
         dhw_annual_kwh = dhw_kwh_m2 * total_floor_area
+    mains = None
     if dhw_annual_kwh > 0:
-        dhw_peak_flow = _dhw_peak_flow_m3_s(dhw_annual_kwh, D.DHW_DAY_PATTERN)
+        ref_cold = D.DHW_REFERENCE_MAINS_C if se_home else D.DHW_COLD_TEMP_C
+        dhw_peak_flow = _dhw_peak_flow_m3_s(dhw_annual_kwh, D.DHW_DAY_PATTERN, ref_cold)
         # Capacity to meet the peak draw instantaneously, doubled so a cold
         # tank at the start of a peak still recovers rather than clipping the
-        # draw (a capacity-limited heater would silently under-deliver).
-        delta_t = D.DHW_SUPPLY_TEMP_C - D.DHW_COLD_TEMP_C
+        # draw (a capacity-limited heater would silently under-deliver). Sized
+        # on the coldest mains the weather-driven case can see.
+        delta_t = D.DHW_SUPPLY_TEMP_C - (D.DHW_DESIGN_MAINS_C if se_home else D.DHW_COLD_TEMP_C)
         dhw_peak_w = dhw_peak_flow * D.WATER_DENSITY_KG_M3 * D.WATER_SPECIFIC_HEAT_J_KGK * delta_t
         objects.append(_schedule_compact("DHW Draw Schedule", "Fractional", D.DHW_DAY_PATTERN))
         objects.append(_constant_schedule("DHW Setpoint Schedule", "Temperature", D.DHW_SUPPLY_TEMP_C))
-        objects.append(_constant_schedule("DHW Cold Water Schedule", "Temperature", D.DHW_COLD_TEMP_C))
+        if se_home:
+            # Mains temperature from this city's weather (EnergyPlus's Hendron
+            # correlation on the file's annual mean and monthly swing); the
+            # heater's cold-water schedule is left blank so it uses this.
+            t_mean, t_swing = _epw_mains_correlation(epw_path)
+            mains = (round(t_mean, 2), round(t_swing, 2))
+            objects.append(obj("Site:WaterMainsTemperature", [
+                ("Correlation", "Calculation Method"), (None, "Temperature Schedule Name"),
+                (mains[0], "Annual Average Outdoor Air Temperature {C}"),
+                (mains[1], "Maximum Difference In Monthly Average Outdoor Air Temperatures {deltaC}"),
+            ]))
+        else:
+            objects.append(_constant_schedule("DHW Cold Water Schedule", "Temperature", D.DHW_COLD_TEMP_C))
         objects.append(_constant_schedule("DHW Ambient Schedule", "Temperature", 20.0))
         objects.append(obj("WaterHeater:Mixed", [
             (f"{zone_name} DHW", "Name"), (0.3, "Tank Volume {m3}"),
@@ -579,7 +737,7 @@ def build_shoebox_idf(
             (None, "On Cycle Loss Fraction to Zone"),
             (round(dhw_peak_flow, 10), "Peak Use Flow Rate {m3/s}"),
             ("DHW Draw Schedule", "Use Flow Rate Fraction Schedule Name"),
-            ("DHW Cold Water Schedule", "Cold Water Supply Temperature Schedule Name"),
+            (None if se_home else "DHW Cold Water Schedule", "Cold Water Supply Temperature Schedule Name"),
             (None, "Use Side Inlet Node Name"), (None, "Use Side Outlet Node Name"),
             (1.0, "Use Side Effectiveness"),
             (None, "Source Side Inlet Node Name"), (None, "Source Side Outlet Node Name"),
@@ -616,6 +774,16 @@ def build_shoebox_idf(
         "wwr_by_orientation": {k: round(v, 3) for k, v in sorted(wwr_by_facing.items())},
         "u_wall": round(u_wall, 3), "u_roof": round(u_roof, 3), "u_win": round(u_win, 3),
         "dhw_kwh_m2_yr": dhw_kwh_m2,
+        # Swedish homes: dhw_kwh_m2_yr is the draw at a 10 C reference mains; the
+        # simulated figure follows `dhw_mains_correlation` (annual mean, swing).
+        "dhw_mains_correlation": mains,
+        "loads_basis": "sveby_2.0" if se_home else "per_m2_by_use",
+        "occupants": round(people, 1),
+        "occupancy_factor": round(occ_factor, 3),
+        "occupancy_source": (building.get("occupancy_source") or "citywide default") if se_home else "per_m2_by_use",
+        "daylit_fraction": round(daylit_fraction, 3),
+        "extension_storeys": building.get("extension_storeys") or 0,
+        "extension_facade_share": round(ext_share, 3),
         "party_walls": party_walls,
         "heating_schedule": "SAP 10.2 intermittent" if uk_home else f"continuous {D.HEATING_SETPOINT_C} C",
         "fabric_source": "epc_description" if building.get("u_wall_epc") else "tabula_or_default",

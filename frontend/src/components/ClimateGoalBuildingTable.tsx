@@ -37,17 +37,20 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
 
       {/* Wide matrix scrolls in its own container — never widens the page. */}
       <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5, minWidth: 520 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}>
           <thead>
             <tr>
               <th style={thStyle("left")}>Building</th>
               <th style={thStyle("right")}>Baseline</th>
               <th style={thStyle("right")}>{goal.kind === "absolute" ? `Goal ≤ ${goal.targetKwhM2}` : `Goal −${goal.reductionPct}%`}</th>
-              {columns.map((c) => (
-                <th key={c.label} style={thStyle("right")}>
+              {/* "Package N" - the same numbering as the rest of the report (non-baseline
+                  packages in Step 4 order); the full name is in the tooltip and the key
+                  below, so a long material list never pushes the table sideways. */}
+              {columns.map((c, i) => (
+                <th key={c.label} style={thStyle("right")} title={c.label}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                     {c.color && <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color }} />}
-                    {c.label}
+                    Package {i + 1}
                   </span>
                   <div style={{ fontSize: 9, fontWeight: 600, color: c.met === c.total ? "#2FB477" : "rgba(255,255,255,0.35)", marginTop: 2 }}>
                     {c.met}/{c.total} meet
@@ -87,6 +90,17 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
         </table>
       </div>
 
+      {/* Key: which package is which */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 8, fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
+        {columns.map((c, i) => (
+          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }} title={c.label}>
+            {c.color && <span style={{ width: 7, height: 7, borderRadius: "50%", background: c.color, flexShrink: 0 }} />}
+            <b style={{ color: "rgba(255,255,255,0.65)", flexShrink: 0 }}>Package {i + 1}</b>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
+          </div>
+        ))}
+      </div>
+
       {/* Legend */}
       <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
         <Legend color="#2FB477" label={goal.kind === "absolute" ? `Meets target (≤ ${goal.targetKwhM2} kWh/m²·yr)` : `Meets target (≥ −${goal.reductionPct}%)`} />
@@ -108,14 +122,14 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 const tdStyle: React.CSSProperties = {
-  padding: "7px 12px",
+  padding: "7px 8px",
   borderTop: "1px solid rgba(255,255,255,0.05)",
   whiteSpace: "nowrap",
 };
 
 function thStyle(align: "left" | "right"): React.CSSProperties {
   return {
-    padding: "8px 12px",
+    padding: "8px 8px",
     textAlign: align,
     fontSize: 9.5,
     fontWeight: 700,
