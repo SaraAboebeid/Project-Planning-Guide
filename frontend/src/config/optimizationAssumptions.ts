@@ -81,7 +81,7 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       source: "Ofgem energy price cap, 1 Oct–31 Dec 2026, Yorkshire region, Direct Debit: 7.90 p/kWh + 29.77 p/day standing charge (incl. 5% VAT); fetched live via the Octopus Energy API",
       sourceUrl: "https://www.ofgem.gov.uk/information-consumers/energy-advice-households/get-energy-price-cap-standing-charges-and-unit-rates-region",
       note: "THE energy price of the UK optimiser: 91% of matched Rotherham certificates heat with mains gas. Divided by the boiler efficiency below to price useful heat (7.90 p ÷ 0.85 ≈ 9.3 p per kWh of heat). 0.079 is the fallback if the feed is down. Update quarterly.",
-      usedIn: "Step 4 optimiser and 30-yr cost · Step 4 Systems · Step 5 price scenarios",
+      usedIn: "Step 4 optimiser and 30-yr cost · Step 4 Systems · Step 4 price scenarios",
     },
     {
       key: "boiler_efficiency",
@@ -108,7 +108,7 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       source: "HM Treasury Green Book supplementary guidance: discounting (Feb 2026), 3.5% for years 1–30, 3.0% for 31–75",
       sourceUrl: "https://www.gov.uk/government/publications/green-book-supplementary-guidance-discounting",
       note: "An independent review (Jun 2026) recommends 3.0% for years 0–30; not adopted by HM Treasury — use as a sensitivity only.",
-      usedIn: "Step 4 optimiser and 30-yr cost · Step 5 price scenarios",
+      usedIn: "Step 4 optimiser and 30-yr cost · Step 4 price scenarios",
     },
     {
       key: "carbon_factor_heat",
@@ -125,8 +125,8 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       value: 0.256, unit: "GBP/kWh", live: true,
       source: "Ofgem energy price cap, 1 Oct–31 Dec 2026, Yorkshire, Direct Debit: 25.60 p/kWh + 61.67 p/day; fetched live via the Octopus Energy API",
       sourceUrl: "https://www.ofgem.gov.uk/information-consumers/energy-advice-households/get-energy-price-cap-standing-charges-and-unit-rates-region",
-      note: "Not used by the envelope optimiser (homes heat with gas). Used for heat pumps in Systems and for the electricity share of the blended price in Step 5.",
-      usedIn: "Step 4 Systems · Step 5 price scenarios",
+      note: "Not used by the envelope optimiser (homes heat with gas). Used for heat pumps in Systems and for the electricity share of the blended price in the Step 4 price scenarios.",
+      usedIn: "Step 4 Systems · Step 4 price scenarios",
     },
     {
       key: "carbon_factor_elec",
@@ -196,7 +196,7 @@ export const MODEL_ASSUMPTIONS: Assumption[] = [
     value: 30, unit: "years",
     source: "Modelling choice; typical LCC horizon for envelope measures (EU cost-optimal framework uses 30 years for residential buildings)",
     sourceUrl: "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32012R0244",
-    note: "Energy use, price and carbon factor are held constant over the period (no price escalation, no grid decarbonisation, no component replacements) — Step 5 tests price futures.",
+    note: "Energy use, price and carbon factor are held constant over the period (no price escalation, no grid decarbonisation, no component replacements) — the Step 4 price scenarios test other price futures.",
     usedIn: "Optimiser · 30-yr cost and carbon · Step 5",
   },
   {

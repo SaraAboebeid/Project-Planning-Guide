@@ -4,6 +4,7 @@ import { useWizardStore, type RenovationCalcPackage, type RenovationCalcBuilding
 import HeatingSystemPanel from "../components/HeatingSystemPanel";
 import { ukHvacCatalogue, type UkRetailTariffs } from "../config/hvacSystemsUK";
 import { computeRegret, annuityFactor, type RegretOptionInput } from "../utils/regretAnalysis";
+import DecisionAnalysisPanel from "../components/DecisionAnalysisPanel";
 import { api } from "../api/client";
 import { seCityId } from "../config/countryNav";
 import { lineItemsFor, type AreaLineItem } from "../config/componentAreaLineItems";
@@ -1613,13 +1614,14 @@ export default function RenovationSimulator() {
   // The city climate target is assessed in Step 5 (Report), from the packages
   // simulated here - see config/climateGoals.ts.
 
-  /* ── Regret / robustness decision analysis (Step 4 → Step 5 report) ──────────
+  /* ── Regret / robustness decision analysis (shown in the Results view) ───────
      Score each package + the do-nothing baseline by its 30-yr net benefit under
      Low/Medium/High energy-price scenarios, then rank by minimax regret, range
      and Hurwicz. Uncertain future prices → no single "best"; these rules help. */
-  // Prices and decision style are now chosen in Step 5; these are the defaults it starts from.
-  const regretAlpha = 0.5;
-  const [regretPrices, setRegretPrices] = useState<number[]>([0.5, 1.0, 2.0]); // SEK/kWh Low/Med/High (GBP for UK)
+  // Start from the prices / decision style the user last chose (saved in the store).
+  const savedRegretSettings = useWizardStore.getState().project.regretInputs?.settings;
+  const [regretAlpha, setRegretAlpha] = useState<number>(savedRegretSettings?.alpha ?? 0.5);
+  const [regretPrices, setRegretPrices] = useState<number[]>(savedRegretSettings?.prices ?? [0.5, 1.0, 2.0]); // SEK/kWh Low/Med/High (GBP for UK)
   /* UK homes mostly heat with gas, so one electricity price would overvalue
      heating savings ~3x. Blend the two retail tariffs by the baseline's heating
      share of total energy: heating at the gas price, the rest at electricity. */
@@ -1631,7 +1633,7 @@ export default function RenovationSimulator() {
     const gas = ukHvac.carriers.gas!.tariffSek, elec = ukHvac.carriers.electricity!.tariffSek;
     return { price: Math.round((share * gas + (1 - share) * elec) * 1000) / 1000, share, gas, elec };
   }, [isUK, ukHvac, baselineAgg?.avgTotalKwhM2Yr, baselineAgg?.avgHeatingKwhM2Yr]);
-  const ukScenarioSeeded = useRef(false);
+  const ukScenarioSeeded = useRef(!!savedRegretSettings?.prices);
   useEffect(() => {
     if (!ukBlend || ukScenarioSeeded.current) return;
     ukScenarioSeeded.current = true;
@@ -1673,10 +1675,9 @@ export default function RenovationSimulator() {
         + `the rest at electricity (£${ukBlend.elec}/kWh) — Ofgem price cap, ${ukTariffs?.zone ?? "Yorkshire"}. Package costs are 2020 prices, ex VAT.`,
     };
   }, [isUK, isBE, ukBlend, ukTariffs?.zone, regretOptions, baselineAgg?.avgTotalKwhM2Yr, totalFloorAreaM2, regretPrices, regretAlpha]);
-  // Persist to the store for Step 5, which now shows (and recomputes) the price
-  // scenarios: the result for the report, and the INPUTS so the user can change
-  // the future prices and decision style there. Only when the content changes,
-  // and never overwriting the prices/alpha the user set in Step 5.
+  const regretCurrentPrice = isUK ? (ukBlend?.price ?? 0) : (livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8);
+  // Persist the result and its inputs (incl. the user's prices + alpha) so they
+  // survive reloads. Only when the content changes, to avoid store loops.
   const regretSigRef = useRef<string>("");
   useEffect(() => {
     if (!regretResult) return;
@@ -1685,21 +1686,21 @@ export default function RenovationSimulator() {
       options: regretOptions,
       config: { baselineEnergyKwhM2: baselineAgg?.avgTotalKwhM2Yr ?? 0, totalFloorAreaM2, annuityFactor: af },
       defaultPrices: regretPrices,
-      currentPrice: isUK ? (ukBlend?.price ?? 0) : (livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8),
+      currentPrice: regretCurrentPrice,
       currency: (isUK ? "GBP" : "SEK") as "SEK" | "GBP",
       priceBasis: regretResult.priceBasis,
       studyPeriodYr: 30,
+      settings: { prices: regretPrices, alpha: regretAlpha },
     };
     const sig = JSON.stringify(inputs);
     if (sig === regretSigRef.current) return;
     regretSigRef.current = sig;
-    const prev = useWizardStore.getState().project.regretInputs;
     setProject({
       regretAnalysis: { ...regretResult, generatedAt: new Date().toISOString() },
-      regretInputs: { ...inputs, settings: prev?.settings },
+      regretInputs: inputs,
     });
-  }, [regretResult, regretOptions, regretPrices, baselineAgg?.avgTotalKwhM2Yr, totalFloorAreaM2,
-      isUK, ukBlend?.price, livePriceSek, setProject]);
+  }, [regretResult, regretOptions, regretPrices, regretAlpha, baselineAgg?.avgTotalKwhM2Yr, totalFloorAreaM2,
+      isUK, regretCurrentPrice, setProject]);
 
   /* ── Multi-objective optimizer input (Sweden) ────────────────────────────
      Build the per-component option matrix + economy/climate params from the
@@ -1846,7 +1847,7 @@ export default function RenovationSimulator() {
 
   // 30-year life-cycle cost for the Results table, on the SAME energy price and
   // discount rate as the optimizer: material cost today + the simulated energy
-  // bill over 30 years, discounted (annuity factor). Step 5 varies the price.
+  // bill over 30 years, discounted (annuity factor). The price scenarios in the Results view vary it.
   const lccPrice: number | null = optimizerInput.input?.params.energy_price
     ?? (isUK ? (ukBlend?.price ?? null)
       : isBE ? (assumptionValue("BE", "energy_price") ?? 0.078) / (assumptionValue("BE", "boiler_efficiency") ?? 0.85)
@@ -3065,7 +3066,7 @@ export default function RenovationSimulator() {
                       const m = rowMetrics(row);
                       return (<>
                         <span style={{ fontSize: 12, color: "#B98BE8", fontWeight: 600 }}
-                          title={`Cost today + 30 years of energy at ${lccPrice?.toFixed(3)} per kWh, discounted (same price and rate as the optimiser). Step 5 tests other price futures.`}>
+                          title={`Cost today + 30 years of energy at ${lccPrice?.toFixed(3)} per kWh, discounted (same price and rate as the optimiser). The future energy prices panel below tests other prices.`}>
                           {m.lcc == null ? "—" : fmtSEK(m.lcc)}
                         </span>
                         <span style={{ fontSize: 12, color: "#4A90E2" }}
@@ -3229,6 +3230,21 @@ export default function RenovationSimulator() {
             )}
           </div>
 
+          {/* Future energy prices: compare packages across Low/Medium/High price
+              scenarios (moved back here from Step 5). */}
+          {regretResult && regretResult.options.length >= 2 && (
+            <div style={{ marginTop: 16 }}>
+              <DecisionAnalysisPanel
+                result={regretResult}
+                alpha={regretAlpha}
+                setAlpha={setRegretAlpha}
+                prices={regretPrices}
+                setPrices={setRegretPrices}
+                currentPrice={regretCurrentPrice}
+              />
+            </div>
+          )}
+
           </>)}
 
           {/* ══ SYSTEMS view ══ heating-system swap comparison */}
@@ -3244,10 +3260,8 @@ export default function RenovationSimulator() {
           </>
           )}
 
-          {/* The climate target and the future-energy-price scenarios moved to
-              Step 5 (Report): Step 4 designs, simulates and compares packages;
-              Step 5 judges them. Both are still computed here from the results
-              and saved to the store for Step 5 (see regretInputs above). */}
+          {/* The climate target moved to Step 5 (Report); it is still computed
+              here from the results and saved to the store for Step 5. */}
 
         </>
       )}

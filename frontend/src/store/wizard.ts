@@ -244,16 +244,15 @@ interface ProjectState {
     prioritizedBuildingIndices: number[];
     prioritizedBuildingCount: number;
   /* Step 4 — regret-based decision analysis (minimax regret / range / Hurwicz over
-     retrofit options under future energy-price scenarios); rendered in the Step 5 report. */
+     retrofit options under future energy-price scenarios); shown in the Step 4 Results view. */
   regretAnalysis: RegretResult | null;
   /* Step 4 saved build-ups ("configurations"), keyed "all" or a building index.
      Kept in the project so leaving Step 4 and coming back does not wipe them -
      before, only the simulated packages survived. Shape: RenovationSimulator's
      ComponentConfig. */
   renovationConfigs?: Record<string, unknown[]>;
-  /* The INPUTS to that analysis, saved by Step 4 so Step 5 can recompute it live
-     as the user changes the future prices or decision style (both now live in
-     Step 5). `settings` is the user's own prices/alpha, kept across visits. */
+  /* The INPUTS to that analysis, saved by Step 4 so the analysis survives reloads
+     with the user's chosen future prices and decision style. `settings` is the user's own prices/alpha, kept across visits. */
   regretInputs?: {
     options: RegretOptionInput[];
     config: RegretConfig;

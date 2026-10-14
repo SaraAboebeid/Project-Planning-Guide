@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, FACADE_ORIENTATIONS, type FacadeOrientation } from "../store/wizard";
 import { filterToBaselineShortlist } from "../utils/baselineShortlist";
 import { buildingUseLabel } from "../utils/useLabels";
 import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal, assessRating, isScorable, goalStatement, requiredPct } from "../config/climateGoals";
 import ClimateGoalPanel, { ClimateGoalInfo, ClimateGoalRatingPanel } from "../components/ClimateGoalPanel";
-import DecisionAnalysisPanel from "../components/DecisionAnalysisPanel";
-import { computeRegret } from "../utils/regretAnalysis";
 import ClimateGoalBuildingTable from "../components/ClimateGoalBuildingTable";
 import type { BuildingLookup, BuildingRecord } from "../types";
 import { fmtGBP, UK_COST_CARBON_SOURCE_NOTE } from "../config/ukCostCarbon";
@@ -312,44 +310,6 @@ export default function RenovationReport() {
           .map((b) => ({ address: b.address ?? "", lat: b.lat, lon: b.lon, sap: b.sap ?? null, band: b.eclass }));
     return assessRating(climateGoal, project.renovationCalcPackages ?? [], src);
   }, [climateGoal, project.renovationCalcPackages, project.bboxRows, project.lookedUpBuildings, project.lookedUpBuilding]);
-
-  /* ── Future energy prices (moved here from Step 4) ──────────────────────────
-     Step 4 saves the analysis INPUTS (each package's energy and cost, floor area,
-     discount factor). Here the user sets the three future prices and the decision
-     style, and the comparison is recomputed live. The result is written back to
-     the store so the exported report shows exactly what is on screen. */
-  const regretInputs = project.regretInputs ?? null;
-  const [regretPrices, setRegretPrices] = useState<number[]>(
-    () => regretInputs?.settings?.prices ?? regretInputs?.defaultPrices ?? [0.5, 1, 2]);
-  const [regretAlpha, setRegretAlpha] = useState<number>(() => regretInputs?.settings?.alpha ?? 0.5);
-  // Step 4 can re-seed the default prices (e.g. the UK gas/electricity blend
-  // arrives later); follow them until the user sets their own.
-  useEffect(() => {
-    if (regretInputs && !regretInputs.settings) setRegretPrices(regretInputs.defaultPrices);
-  }, [regretInputs?.defaultPrices?.join(","), !!regretInputs?.settings]); // eslint-disable-line react-hooks/exhaustive-deps
-  const liveRegret = useMemo(() => {
-    if (!regretInputs || regretInputs.options.length < 2 || regretPrices.length < 3) return null;
-    const scenarios = [
-      { key: "low", label: "Low", priceSek: regretPrices[0]! },
-      { key: "med", label: "Medium", priceSek: regretPrices[1]! },
-      { key: "high", label: "High", priceSek: regretPrices[2]! },
-    ];
-    const res = computeRegret(regretInputs.options, scenarios, regretInputs.config, regretAlpha, regretInputs.studyPeriodYr, "");
-    return { ...res, currency: regretInputs.currency, priceBasis: regretInputs.priceBasis };
-  }, [regretInputs, regretPrices, regretAlpha]);
-  const regretSig = useRef("");
-  useEffect(() => {
-    if (!liveRegret || !regretInputs) return;
-    const sig = JSON.stringify([liveRegret.options.map((o) => o.benefits), regretPrices, regretAlpha]);
-    if (sig === regretSig.current) return;
-    regretSig.current = sig;
-    const userSet = regretInputs.settings
-      || regretAlpha !== 0.5 || regretPrices.join(",") !== regretInputs.defaultPrices.join(",");
-    setProject({
-      regretAnalysis: { ...liveRegret, generatedAt: new Date().toISOString() },
-      ...(userSet ? { regretInputs: { ...regretInputs, settings: { prices: regretPrices, alpha: regretAlpha } } } : {}),
-    });
-  }, [liveRegret, regretPrices, regretAlpha]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Recommended packages ── */
   const bestEnergy  = simResults[0] ?? null;   // already sorted by saving desc
@@ -1303,98 +1263,6 @@ export default function RenovationReport() {
           )}
         </Card>
       )}
-
-      {/* ── 8. Future energy prices — interactive (moved here from Step 4) ── */}
-      {liveRegret && liveRegret.options.length >= 2 && regretInputs && (
-        <Card accent="#4ECDC4">
-          <SectionTitle icon={<Award size={15} color="#4ECDC4" />} title="Compare Retrofit Choices Across Future Energy Prices" />
-          <DecisionAnalysisPanel
-            result={liveRegret}
-            alpha={regretAlpha}
-            setAlpha={setRegretAlpha}
-            prices={regretPrices}
-            setPrices={setRegretPrices}
-            currentPrice={regretInputs.currentPrice}
-          />
-        </Card>
-      )}
-      {/* Older projects saved only the result (no inputs): show it read-only. */}
-      {!liveRegret && project.regretAnalysis && project.regretAnalysis.options.length >= 2 && (() => {
-        const ra = project.regretAnalysis!;
-        const fmtM = (v: number) => `${v < 0 ? "−" : ""}${(Math.abs(v) / 1e6).toFixed(2)}M`;
-        const scenarioHint = (label: string, index: number) => {
-          const l = label.toLowerCase();
-          if (l.includes("low")) return "cheap energy future";
-          if (l.includes("medium")) return "middle-price future";
-          if (l.includes("high")) return "expensive energy future";
-          return ["cheap energy future", "middle-price future", "expensive energy future"][index] ?? "price scenario";
-        };
-        const PICKS: Record<string, { fg: string; label: string; tip: string }> = {
-          minimaxRegret: { fg: "#4ECDC4", label: "Safety-first", tip: "Chooses the option with the smallest worst-case disappointment" },
-          hurwicz:       { fg: "#B98BE8", label: `Balanced choice (alpha=${ra.alpha.toFixed(2)})`, tip: "Blends worst and best case using your decision-style slider" },
-          mostRobust:    { fg: "#2FB477", label: "Most stable", tip: "Smallest difference between low and high price outcomes" },
-        };
-        const th: React.CSSProperties = { padding: "6px 8px", fontWeight: 600, color: "rgba(255,255,255,0.45)", textAlign: "right", whiteSpace: "nowrap" };
-        const td: React.CSSProperties = { padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap", color: "rgba(255,255,255,0.8)" };
-        return (
-          <Card accent="#4ECDC4">
-            <SectionTitle icon={<Award size={15} color="#4ECDC4" />} title="Compare Retrofit Choices Across Future Energy Prices" />
-            <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.7, margin: "0 0 12px" }}>
-              Each retrofit option is tested in three possible futures: Low (cheap energy), Medium (middle prices), and High (expensive energy).
-              We then compare outcomes with three simple decision styles so you can choose without guessing one exact future.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
-              {(["minimaxRegret", "hurwicz", "mostRobust"] as const).map((k) => {
-                const opt = ra.options.find((o) => o.id === ra.picks[k]);
-                if (!opt) return null;
-                return (
-                  <div key={k} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 12.5, color: "rgba(255,255,255,0.7)" }}>
-                    <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 99, color: PICKS[k].fg, background: `${PICKS[k].fg}22`, whiteSpace: "nowrap" }}>★ {PICKS[k].label}</span>
-                    <span><strong style={{ color: "#fff" }}>{opt.label}</strong> - {PICKS[k].tip}.</span>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                <thead>
-                  <tr>
-                    <th style={{ ...th, textAlign: "left" }}>Retrofit option</th>
-                    {ra.scenarios.map((s, i) => (
-                      <th key={s.key} style={th} title={scenarioHint(s.label, i)}>
-                        {s.label}
-                        <br />
-                        <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>{scenarioHint(s.label, i)} · {s.priceSek} {ra.currency ?? "SEK"}/kWh</span>
-                      </th>
-                    ))}
-                    <th style={th} title="Best minus worst across scenarios">Outcome spread</th>
-                    <th style={th} title="Worst miss compared with the best option in each scenario">Worst miss vs best</th>
-                    <th style={th} title="alpha x best + (1 - alpha) x worst">Balanced score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ra.options.map((o) => (
-                    <tr key={o.id} style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
-                      <td style={{ padding: "6px 8px", color: o.isBaseline ? "rgba(255,255,255,0.5)" : "#fff", fontStyle: o.isBaseline ? "italic" : undefined, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>{o.label}</td>
-                      {o.benefits.map((b, si) => {
-                        const best = !o.isBaseline && b === ra.bestPerScenario[si];
-                        return <td key={si} style={{ ...td, color: best ? "#2FB477" : o.isBaseline ? "rgba(255,255,255,0.4)" : b < 0 ? "#fca5a5" : "rgba(255,255,255,0.8)", fontWeight: best ? 800 : 400 }}>{fmtM(b)}</td>;
-                      })}
-                      <td style={td}>{o.isBaseline ? "—" : fmtM(o.range)}</td>
-                      <td style={{ ...td, color: o.id === ra.picks.minimaxRegret ? "#4ECDC4" : "rgba(255,255,255,0.6)", fontWeight: o.id === ra.picks.minimaxRegret ? 800 : 400 }}>{o.isBaseline ? "—" : fmtM(o.maxRegret)}</td>
-                      <td style={{ ...td, color: o.id === ra.picks.hurwicz ? "#B98BE8" : "rgba(255,255,255,0.6)", fontWeight: o.id === ra.picks.hurwicz ? 800 : 400 }}>{o.isBaseline ? "—" : fmtM(o.hurwicz)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", marginTop: 10, lineHeight: 1.6 }}>
-              Values are {ra.studyPeriodYr}-year net present benefit ({ra.currency ?? "SEK"}, millions). Negative means the investment is not repaid by energy savings
-              in that future. "Balanced score" is the Hurwicz method shown in plain language.
-            </p>
-          </Card>
-        );
-      })()}
 
       {/* ── 9. Heating system (HVAC) ── */}
       {project.heatingAnalysis && project.heatingAnalysis.results.length > 0 && (() => {
