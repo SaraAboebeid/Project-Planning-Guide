@@ -214,9 +214,7 @@ export default function BaselineSetup() {
     ];
   }, [activeBuildingResult, showElec]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const eClassColor: Record<string, string> = { A: "#2FB477", B: "#2FB477", C: "#2FB477", D: "#E8880C", E: "#f97316", F: "#E2483B", G: "#dc2626" };
-
-  /** Trigger a browser download for an in-memory file. */
+ /** Trigger a browser download for an in-memory file. */
   function saveFile(contents: string, filename: string, mime: string) {
     const blob = new Blob([contents], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -230,7 +228,7 @@ export default function BaselineSetup() {
    *  because Swedish street names carry commas often enough to corrupt a CSV. */
   function downloadResultsCsv() {
     const header = [
-      "address", "energy_class", "energy_class_source",
+      "address",
       "total_energy_use_kWh_m2_yr", "heating_demand_kWh_m2_yr", "cooling_demand_kWh_m2_yr",
       "hot_water_demand_kWh_m2_yr", ...(showElec ? ["lighting_demand_kWh_m2_yr", "equipment_demand_kWh_m2_yr"] : []),
     ];
@@ -238,8 +236,7 @@ export default function BaselineSetup() {
     for (const r of results) {
       lines.push([
         `"${(r.address ?? "").replace(/"/g, '""')}"`,
-        r.eClass ?? "", r.eClassFromEpc ? "EPC" : "not available",
-        totalOf(r), r.heating, r.cooling, dhwOf(r), ...(showElec ? [r.lighting, r.equipment] : []),
+       totalOf(r), r.heating, r.cooling, dhwOf(r), ...(showElec ? [r.lighting, r.equipment] : []),
       ].join(","));
     }
     saveFile(lines.join("\n"), "epsm_baseline_results.csv", "text/csv;charset=utf-8");
@@ -251,9 +248,7 @@ export default function BaselineSetup() {
       simulation: "EPSM Baseline",
       buildings: results.map(r => ({
         address: r.address,
-        energyClass: r.eClass,
-        energyClassSource: r.eClassFromEpc ? "EPC" : "not available",
-        totalEnergyUse_kWh_m2_yr: totalOf(r),
+       totalEnergyUse_kWh_m2_yr: totalOf(r),
         heatingDemand_kWh_m2_yr: r.heating,
         coolingDemand_kWh_m2_yr: r.cooling,
         ...(showElec ? { lightingDemand_kWh_m2_yr: r.lighting, equipmentDemand_kWh_m2_yr: r.equipment } : {}),
@@ -752,21 +747,11 @@ export default function BaselineSetup() {
                 borderRadius: 12, padding: "14px 16px",
                 background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
               }}>
-                {/* Building name + energy class */}
+                {/* Building name. (The EPC energy-class badge was removed: the class is
+                    the declaration's, not this simulation's, and read as a result.) */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                   <Building2 size={13} color="rgba(255,255,255,0.4)" />
                   <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.address}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {r.eClassFromEpc && (
-                      <span style={{ fontSize: 9, fontWeight: 700, color: "#4A90E2", background: "rgba(96,165,250,0.12)", padding: "1px 6px", borderRadius: 5, border: "1px solid rgba(96,165,250,0.25)" }}>from EPC</span>
-                    )}
-                    <span style={{
-                      fontSize: 13, fontWeight: 900, padding: "2px 12px", borderRadius: 8,
-                      background: `${eClassColor[r.eClass ?? "D"] ?? "#E8880C"}22`,
-                      color: eClassColor[r.eClass ?? "D"] ?? "#E8880C",
-                      border: `1px solid ${eClassColor[r.eClass ?? "D"] ?? "#E8880C"}55`,
-                    }}>Energy class {r.eClass ?? "—"}</span>
-                  </div>
                 </div>
                 {/* Metric grid - all six are real EPSM end-use output. Hot water
                     is EnergyPlus's "Water Systems" end use, driven by a Sveby
@@ -846,11 +831,9 @@ export default function BaselineSetup() {
             </p>
             ) : (
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
-              * Real EnergyPlus (EPSM) output. Homes use Sveby 2.0 (2024) standard use: occupants from Sveby's
-              persons-per-flat table, raised or lowered by the flat sizes listed for the address on Boplats where
-              there are any; hot water as litres per person, heated from the mains temperature EnergyPlus derives
-              from the city's weather (so it varies with occupancy, city and season; it excludes hot-water
-              circulation losses, which an energy declaration includes). Household and business electricity
+              * Real EnergyPlus (EPSM) output. Homes use Sveby 2.0 (2024) standard use. Hot water is what the
+              building's own energy declaration reports where it gives a figure, otherwise Sveby's 21 kWh/m²·yr,
+              played back through EnergyPlus as given. Household and business electricity
               (appliances and lighting; 21 kWh/m²·yr in homes, of which 70% warms the building) is simulated
               because its heat lowers the heating need, but — as in Swedish energy declarations — it is not part
               of the total and not shown. Office, shop and school lighting is dimmed by daylight near the windows.

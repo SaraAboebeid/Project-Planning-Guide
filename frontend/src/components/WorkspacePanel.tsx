@@ -16,7 +16,7 @@ import {
    the 3D city. Originally the separate /workspace page; merged into the home
    page so there is one entry screen. A figure that does not exist shows "—". */
 
-const FLAG: Record<CountryCode, string> = { se: "🇸🇪", gb: "🇬🇧", be: "🇧🇪", ie: "🇮🇪" };
+const FLAG: Record<CountryCode, string> = { se: "🇸🇪", gb: "🇬🇧", be: "🇧🇪" };
 const ACCENT = "#8B5CF6";
 
 /* ── Selection card ──────────────────────────────────────────────────────────── */

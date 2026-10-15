@@ -36,7 +36,7 @@ import {
 import type { BoverketResource, WWRRecord } from "../types";
 import {
   Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight, Play, Layers, Settings,
-  ScatterChart, BarChart3, SlidersHorizontal,
+  ScatterChart, BarChart3, SlidersHorizontal, Info,
 } from "lucide-react";
 
 /* Sweden/Gothenburg is the only geometry+cost+carbon-complete dataset - UK
@@ -570,7 +570,10 @@ function LineItemPicker({
             </span>
           )}
         </span>
-        <span style={{ fontSize: 9, fontWeight: 700, color: "#4A90E2", textAlign: "right" }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: "#4A90E2", textAlign: "right" }}
+          title={carbon.a1a3 != null
+            ? `${carbon.value} kg CO₂e/m² (A1–A5) = ${carbon.a1a3} production (A1–A3) + ${carbon.a4a5} transport & installation incl. waste (A4–A5). ${carbon.basis ?? ""}`
+            : `${carbon.value} kg CO₂e per unit (A1–A3, materials catalogue)`}>
           ~{carbon.value} kg
         </span>
       </button>
@@ -1256,6 +1259,28 @@ export default function RenovationSimulator() {
   }, [lineItems, project.supplierDiscountPct, isUK, isBE, pickedGeo]);
 
   const boverketAll = useMemo(() => Object.values(boverketByComponent).flat(), [boverketByComponent]);
+
+  // Sweden: embodied carbon is A1–A5 since 2026-10-16 (was A1–A3). Configurations
+  // store their carbon when saved, so bring older ones - and any saved before the
+  // Boverket rows loaded - up to date once the data is here. UK/BE keep A1–A3.
+  useEffect(() => {
+    if (isUK || isBE || boverketAll.length === 0) return;
+    setConfigs((cs) => {
+      let changed = false;
+      const next = cs.map((c) => {
+        const v = c.source === "layers" && c.layers?.length
+          ? computeAssemblyCarbon(c.layers, boverketAll).total
+          : c.source === "catalogue" && c.wikellsCode && itemByCode[c.wikellsCode]
+            ? estimateCarbon(itemByCode[c.wikellsCode]!, boverketAll).value
+            : undefined;
+        if (v === undefined || v === null || (c.carbonPerM2 != null && Math.abs(v - c.carbonPerM2) < 0.05)) return c;
+        changed = true;
+        return { ...c, carbonPerM2: Math.round(v * 10) / 10 };
+      });
+      return changed ? next : cs;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boverketAll, isUK, isBE]);
 
 
   /* ── Configuration library: save / delete / derive packages ─────────────── */
@@ -2901,24 +2926,47 @@ export default function RenovationSimulator() {
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 8 }}>
-              {[
+              {(() => {
+                // Plain-language explanations behind the ⓘ on each heading, using the
+                // same discount rate and carbon factor the columns are computed with.
+                const rate = Math.round((optimizerInput.input?.params.discount_rate
+                  ?? assumptionValue(isUK ? "UK" : isBE ? "BE" : "SE", "discount_rate") ?? 0.03) * 1000) / 10;
+                const cf = lcCarbonFactor != null ? `${Math.round(lcCarbonFactor * 1000) / 1000} kg CO₂e per kWh` : "the heating carbon factor";
+                return [
                 { k: "exp", l: "" },
                 { k: "pkg", l: "Package" },
                 { k: "cost", l: "Cost", sub: (isUK
                   ? `tiers & DESNZ optimiser: installed, ${UK_COST_PRICE_BASIS} · catalogue picks: materials incl. VAT, excl. labour`
                   : isBE ? "catalogue picks: materials incl. VAT, excl. labour · TABULA tiers: no cost data"
-                  : "installed — materials + labour (Wikells), one-off") },
-                { k: "carbon", l: "Carbon", sub: isUK || isBE ? "embodied A1-A3 (materials catalogue)" : "embodied A1-A3" },
-                { k: "lcc", l: "30-yr cost", sub: "cost + 30 yrs of energy at today's price, discounted" },
-                { k: "lcco2", l: "30-yr carbon", sub: "embodied + 30 yrs of energy" },
-                { k: "heat", l: "Heating", sub: "kWh/m²·yr" },
+                  : "installed — materials + labour (Wikells), one-off"),
+                  info: "What the renovation itself costs, paid once when you renovate: the new materials plus the labour to install them. Doing nothing (the baseline) costs 0 here." },
+                { k: "carbon", l: "Carbon", sub: isUK || isBE ? "embodied A1-A3 (materials catalogue)" : "embodied A1–A5: production, transport, installation",
+                  info: isUK || isBE
+                    ? "The emissions from making the new materials (the production stage, A1–A3), released once when you renovate. Doing nothing emits 0 here."
+                    : "The emissions caused by the renovation itself, released once: making the new materials (A1–A3), transporting them to the site (A4), and installing them, including the material wasted on site (A5). Values from Boverket's climate database. Demolition of removed layers and later replacements are not included. Doing nothing emits 0 here." },
+                { k: "lcc", l: "30-yr cost", sub: "cost + 30 yrs of energy at today's price, discounted",
+                  info: `The upfront cost PLUS 30 years of energy bills at today's energy price. Later bills are discounted by ${rate}% a year, because money spent in the future counts for less than money spent today. Compare with the baseline: if a package's 30-year cost is higher, its energy savings do not pay back what it costs.` },
+                { k: "lcco2", l: "30-yr carbon", sub: "embodied + 30 yrs of energy",
+                  info: `The material emissions PLUS 30 years of emissions from the energy the building uses (${cf}). Compare with the baseline: if a package's 30-year carbon is higher, making its materials emits more than its energy savings avoid in 30 years.` },
+                { k: "heat", l: "Heating", sub: "kWh/m²·yr",
+                  info: "The heat the building needs per m² of heated floor area per year, from the EnergyPlus simulation." },
                 { k: "total", l: "Total energy", sub: isUK || isBE
                     ? "heating + hot water + cooling + lighting + equipment, kWh/m²·yr"
-                    : "heating + hot water + cooling, kWh/m²·yr (household electricity excluded, as in energy declarations)" },
+                    : "heating + hot water + cooling, kWh/m²·yr (household electricity excluded, as in energy declarations)",
+                  info: isUK || isBE
+                    ? "All simulated energy per m² per year: heating, hot water, cooling, lighting and equipment."
+                    : "Simulated heating + hot water + cooling per m² per year. Household electricity (appliances, lighting in flats) is simulated for the heat it gives off, but not counted here - the same rule as Swedish energy declarations." },
                 { k: "status", l: "Status" },
-              ].map((h) => (
+              ] as { k: string; l: string; sub?: string; info?: string }[];
+              })().map((h) => (
                 <span key={h.k} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>
                   {h.l}
+                  {h.info && (
+                    <span title={h.info} aria-label={h.info} tabIndex={0}
+                      style={{ display: "inline-flex", verticalAlign: "-1px", marginLeft: 4, cursor: "help", color: "rgba(255,255,255,0.45)" }}>
+                      <Info size={11} />
+                    </span>
+                  )}
                   {h.sub && (
                     <span style={{ display: "block", fontSize: 8.5, fontWeight: 600, letterSpacing: 0, textTransform: "none", color: "rgba(255,255,255,0.22)", lineHeight: 1.3, marginTop: 2 }}>
                       {h.sub}

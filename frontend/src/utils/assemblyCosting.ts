@@ -20,6 +20,7 @@
 
 import type { BoverketResource, WikellsItemLike } from "../types/assembly";
 import { MATERIAL_BY_ID, type AssemblyLayer, type ComponentKind } from "../config/assemblyLayers";
+import { a4a5PerKg } from "./materialRecommendation";
 
 /* Keywords used to find each layer material in the Boverket database. Matching
    is substring-based and scored; the best-scoring row wins. */
@@ -92,24 +93,30 @@ export interface LayerCarbon {
   boverketName: string | null;
   densityKgM3: number | null;
   gwpPerKg: number | null;
-  /** kg CO2e per m² of assembly, or null when unmatched. */
+  /** kg CO2e per m² of assembly, A1–A5, or null when unmatched. */
   kgCo2ePerM2: number | null;
+  /** The same split into production (A1–A3), transport (A4) and installation incl. waste (A5). */
+  a1a3?: number | null; a4?: number | null; a5?: number | null;
 }
 
 export interface AssemblyCarbon {
-  total: number | null;          // null when nothing could be matched at all
+  total: number | null;          // A1–A5; null when nothing could be matched at all
+  a1a3: number | null; a4: number | null; a5: number | null;
   layers: LayerCarbon[];
   unmatched: string[];           // layer labels with no Boverket entry
 }
 
-/** Embodied carbon (A1–A3) per m² of assembly, from Boverket per-material data. */
+/** Embodied carbon per m² of assembly, A1–A5, from Boverket per-material data:
+ *  production (A1–A3), transport to site (A4) and installation including the
+ *  material wasted on site (A5) - see a4a5PerKg. The existing construction
+ *  (in "add" mode) has no Boverket row and adds nothing. */
 export function computeAssemblyCarbon(
   layers: AssemblyLayer[],
   rows: BoverketResource[],
 ): AssemblyCarbon {
   const out: LayerCarbon[] = [];
   const unmatched: string[] = [];
-  let total = 0;
+  let s13 = 0, s4 = 0, s5 = 0;
   let any = false;
 
   for (const l of layers) {
@@ -119,21 +126,27 @@ export function computeAssemblyCarbon(
 
     const row = matchBoverket(l.materialId, rows);
     const density = row ? num(row["Density / Conversion"]) : null;
-    const gwp = row ? num(row["GWP A1-A3 (Typical)"]) : null;
-    const kg = (density != null && gwp != null)
-      ? (l.thicknessMm / 1000) * density * gwp
-      : null;
+    const f = row ? a4a5PerKg(row) : null;
+    const massKgM2 = density != null ? (l.thicknessMm / 1000) * density : null;
+    const a13 = massKgM2 != null && f ? massKgM2 * f.a13 : null;
+    const a4 = massKgM2 != null && f ? massKgM2 * f.a4 : null;
+    const a5 = massKgM2 != null && f ? massKgM2 * f.a5 : null;
+    const kg = a13 != null ? a13 + (a4 ?? 0) + (a5 ?? 0) : null;
 
     if (kg == null) unmatched.push(m.label);
-    else { total += kg; any = true; }
+    else { s13 += a13!; s4 += a4 ?? 0; s5 += a5 ?? 0; any = true; }
 
     out.push({
       materialId: m.id, label: m.label, thicknessMm: l.thicknessMm,
-      boverketName: row?.Name ?? null, densityKgM3: density, gwpPerKg: gwp,
-      kgCo2ePerM2: kg,
+      boverketName: row?.Name ?? null, densityKgM3: density, gwpPerKg: f?.a13 ?? null,
+      kgCo2ePerM2: kg, a1a3: a13, a4, a5,
     });
   }
-  return { total: any ? total : null, layers: out, unmatched };
+  return {
+    total: any ? s13 + s4 + s5 : null,
+    a1a3: any ? s13 : null, a4: any ? s4 : null, a5: any ? s5 : null,
+    layers: out, unmatched,
+  };
 }
 
 /* ── Cost: nearest real Wikells assembly ─────────────────────────────────── */

@@ -112,6 +112,8 @@ export interface BuildingRecord {
   u_floor?: number | null;
   u_door?: number | null;
   heating_system?: string | null;
+  /** UK: newest EPC's lodgement date (YYYY-MM-DD). Sweden's comes from /epc/heating. */
+  epc_issued?: string | null;
   main_fuel?: string | null;
   property_type?: string | null;
   postcode?: string | null;

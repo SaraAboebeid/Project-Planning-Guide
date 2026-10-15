@@ -216,6 +216,12 @@ function MapFitBounds({
   bbox: BboxCoords | null;
 }) {
   const map = useMap();
+  // Move the view only when the points or box actually CHANGE. `points` is a new
+  // array on every render, so keying the effect on it re-centred the map after
+  // every click - while drawing a shape, each click snapped back to zoom 15.
+  const key = bbox
+    ? `b:${bbox.south},${bbox.west},${bbox.north},${bbox.east}`
+    : `p:${points.map((p) => `${p.lat},${p.lon}`).join("|")}`;
   useEffect(() => {
     if (bbox) {
       map.fitBounds(
@@ -233,7 +239,8 @@ function MapFitBounds({
       );
       map.fitBounds(bounds, { padding: [40, 40] });
     }
-  }, [points, bbox, map]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, map]);
   return null;
 }
 
@@ -1234,7 +1241,9 @@ Kungsgatan 10,Göteborg</div>
           {districtBoundary && validPoints.length === 0 && !bbox && <FitToBoundary boundary={districtBoundary} />}
 
           {/* Auto-fit bounds when points or bbox changes */}
-          <MapFitBounds points={validPoints} bbox={bbox} />
+          {/* Address points steer the view only in address mode - a point left
+              over from an earlier search must not pull the map while drawing. */}
+          <MapFitBounds points={locationMode === "addresses" ? validPoints : []} bbox={bbox} />
 
           {/* Address markers */}
           {locationMode === "addresses" &&

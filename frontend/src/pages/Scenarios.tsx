@@ -80,7 +80,7 @@ const FLOW_DATA: Record<string, {
           { label: "TABULA archetype match", type: "db" },
           { label: "Add / import own data (CSV / JSON / inline)", type: "input" },
           { label: "Facade defect detection — MBDD2025 + AI vision", type: "engine" },
-          { label: "MCDA retrofit prioritization (E/F/C/R + AHP)", type: "output" },
+          { label: "MCDA retrofit prioritization (E/F/C + AHP)", type: "output" },
         ],
       },
       {

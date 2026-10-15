@@ -35,6 +35,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 import type { EpcSnapshot, EpcPassport, TabulaArchetype, MatchConfidence, BuildingLookup, BboxStats, BuildingRecord, WWRRecord, BoverketResource } from "../types";
 
 /* ── Optimizer (POST /api/optimize) ── */
+/** Annual rooftop PV potential of one building (backend /api/pvgis-estimate). */
+export interface PvgisEstimate {
+  address: string | null;
+  kWp?: number; annual_kwh?: number; specific_kwh_kwp?: number; roof_area_m2?: number;
+  source?: "saved" | "computed"; saved_at?: string; error?: string;
+}
 export interface OptimizeOption { code: string; label?: string; u_value: number; cost: number; carbon: number; }
 export interface OptimizeComponentInput { key: string; area_m2: number; baseline_u: number; options: OptimizeOption[]; }
 export interface OptimizeParams {
@@ -199,6 +205,10 @@ export const api = {
 
   /** Persist an annotated facade photo so it survives the tab and can be shown
    * in the Step 5 report. Returns the URL to render it from. */
+  /* ── Rooftop PV potential per building (PVGIS) — saved viewer result, else computed ── */
+  pvgisEstimate: (buildings: { lat: number; lon: number; address?: string | null; footprint_m2?: number | null }[]) =>
+    post<{ results: PvgisEstimate[]; assumptions: Record<string, string | number> }>("/pvgis-estimate", { buildings }),
+
   facadeImageSave: async (imageId: string, blob: Blob) => {
     const res = await fetch(`${BASE}/facade-image?image_id=${encodeURIComponent(imageId)}`, {
       method: "POST", body: blob, headers: { "Content-Type": "application/octet-stream" },
@@ -297,7 +307,9 @@ export const api = {
 
   /* ── Current heating system per building, inferred from the Boverket EPC ── */
   epcHeating: (addresses: string[], cityId?: string) =>
-    post<{ results: Record<string, { system: string } | null>; available: boolean }>("/epc/heating", { addresses, ...(cityId ? { city_id: cityId } : {}) }),
+    // system = current heating; issued = newest declaration's approval date,
+    // expires = issued + 10 years (YYYY-MM-DD).
+    post<{ results: Record<string, { system: string | null; issued?: string | null; expires?: string | null } | null>; available: boolean }>("/epc/heating", { addresses, ...(cityId ? { city_id: cityId } : {}) }),
 
   /* ── Facade defect detection (ML) — POST raw image bytes to the on-host model ── */
   /** `tiles`: also scan zoomed-in crops (for whole-facade Street View captures). */

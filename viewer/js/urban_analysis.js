@@ -1,9 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // urban_analysis.js — city-wide analysis overlays for the Gothenburg 3D viewer
 //
-//   Layer 1 – Green Index          (btn-urban-green)   distance-decay greenness
 //   Layer 2 – Heat Island Proxy    (btn-urban-uhi)     thermal stress per cell
-//   Layer 3 – Green Accessibility  (btn-urban-access)  walk distance to green
+//   Layer 3 – Green Accessibility  (btn-urban-access)  distance to nearest green
 //
 // History: this shipped as `_urban_analysis.js`, a patch script that injected
 // itself into the GENERATED assets/gothenburg_3d.html. `python build.py`
@@ -23,8 +22,7 @@
 (function () {
   'use strict';
 
-  const LAYERS = {
-    green:  { ds: null, active: false, btnId: 'btn-urban-green',  label: 'Green Index' },
+  const LAYERS = {
     uhi:    { ds: null, active: false, btnId: 'btn-urban-uhi',    label: 'Heat Island Proxy' },
     access: { ds: null, active: false, btnId: 'btn-urban-access', label: 'Green Accessibility' },
   };
@@ -32,7 +30,7 @@
   // Analysis extent + geometry. Gothenburg keeps its tuned bounds and pre-baked
   // green-space file; any other city derives a city-sized box around the viewer
   // centre and pulls green spaces live from OSM (/api/urban/green-areas). Green
-  // Index & Green Accessibility are OSM-only so both work anywhere; Heat Island
+  // Accessibility is OSM-only so it works anywhere; Heat Island
   // still needs Swedish building-energy data and stays SE-only in the UI.
   const _ctr  = window.VIEW_CENTER || { lat: 57.70, lon: 11.96 };
   const _isSE = (window.VIEWER_COUNTRY === 'se');
@@ -215,50 +213,6 @@
     if (l.ds) { viewer.dataSources.remove(l.ds, true); l.ds = null; }
   }
 
-  // ── LAYER 1: Green Index ────────────────────────────────────────────────────
-  async function buildGreenIndex() {
-    setStatus('Loading green space data...');
-    const proxies = await loadGreenProxies();
-    const dLat = 0.0025, dLon = 0.0047, D = 200;
-    const ds = new Cesium.CustomDataSource('urban-green');
-    viewer.dataSources.add(ds);
-    LAYERS.green.ds = ds;
-
-    let n = 0, row = 0;
-    const rows = Math.ceil((LAT1 - LAT0) / dLat);
-    for (let lat = LAT0; lat <= LAT1; lat += dLat, row++) {
-      for (let lon = LON0; lon <= LON1; lon += dLon) {
-        const score = Math.exp(-nearestGreenDist(lon + dLon / 2, lat + dLat / 2) / D);
-        ds.entities.add({
-          position: Cesium.Cartesian3.fromDegrees(lon + dLon / 2, lat + dLat / 2, 20),
-          point: {
-            pixelSize: 10,
-            color: Cesium.Color.fromHsl(score * 120 / 360, 0.85, 0.50, 0.80),
-            outlineWidth: 0,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          },
-        });
-        n++;
-      }
-      if ((row & 7) === 0) {
-        setStatus(`Computing Green Index... ${Math.round(row / rows * 100)}%`);
-        await yieldToUI();
-        if (!LAYERS.green.active) { removeLayer('green'); return; }   // toggled off mid-build
-      }
-    }
-
-    const src = _greenSource === 'osm' ? 'OSM parks/forests' : 'building proxies (fallback)';
-    setLegend(
-      '<div style="font-weight:600;margin-bottom:4px">Street Green Index</div>' +
-      '<div style="display:flex;gap:6px;align-items:center;font-size:10px">' +
-        '<span style="width:50px;height:6px;background:linear-gradient(to right,#e4391b,#f59e0b,#16a34a);' +
-        'border-radius:2px;display:inline-block"></span>' +
-        '<span style="color:var(--muted)">No green → Near green</span>' +
-      '</div>' +
-      `<div style="color:var(--faint);font-size:9px;margin-top:3px">${proxies.length} green areas · ${n} pts · D=200 m · ${src}</div>`);
-    setStatus('');
-  }
-
   // ── LAYER 2: Heat Island Proxy ──────────────────────────────────────────────
   async function buildUHI() {
     setStatus('Loading green space data...');
@@ -390,7 +344,7 @@
   }
 
   // ── Toggle ──────────────────────────────────────────────────────────────────
-  const BUILD = { green: buildGreenIndex, uhi: buildUHI, access: buildAccessibility };
+  const BUILD = { uhi: buildUHI, access: buildAccessibility };
 
   async function toggle(key) {
     if (_loading) return;
@@ -417,7 +371,7 @@
     } finally {
       _loading = false;
       // Flag for ui.js: suppress the per-building hover card while an urban
-      // analysis layer (green index / heat island / green accessibility) is on.
+      // analysis layer (heat island / green accessibility) is on.
       window._urbanActive = Object.values(LAYERS).some((l) => l.active);
     }
   }

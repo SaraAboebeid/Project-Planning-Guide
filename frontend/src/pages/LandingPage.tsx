@@ -101,7 +101,6 @@ const COUNTRY_BG: Record<CountryCode, BgView> = {
   se: CITY_BG.Gothenburg!,
   gb: CITY_BG.London!,
   be: { lat: 50.8467, lon: 4.3525, height: 700, heading: 20 }, // Brussels
-  ie: { lat: 53.3498, lon: -6.2603, height: 700, heading: 20 }, // Dublin
 };
 function bgUrlFor(country: CountryCode, city: string): string {
   // Municipalities built on demand have map coordinates but no hand-picked camera.

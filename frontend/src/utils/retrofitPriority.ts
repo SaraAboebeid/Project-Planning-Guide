@@ -1,15 +1,19 @@
 /**
  * Retrofit prioritization — hybrid expert-rule + MCDA (Multi-Criteria Decision Analysis).
  *
- * Each building is scored 0–100 (higher = higher retrofit priority) under four
+ * Each building is scored 0–100 (higher = higher retrofit priority) under three
  * criterion groups, then combined into one weighted priority score:
  *
- *     P = wE·E + wF·F + wC·C + wR·R      (weights normalised to sum 1)
+ *     P = wE·E + wF·F + wC·C      (weights normalised to sum 1)
  *
  *   E  Energy performance     — energy use / EPC class (worse ⇒ higher priority)
- *   F  Façade / envelope      — ML defect load, or building-age proxy
+ *   F  Façade / envelope      — ML defect load (only once inspected)
  *   C  Building characteristics— vintage + heated size (older/larger ⇒ higher)
- *   R  Retrofit potential     — energy headroom + envelope poorness + scale
+ *
+ * A fourth "renovation potential" criterion was removed (2026-10-15): it was 60 %
+ * the same energy figure as E, 25 % a wall U-value that comes from the building's
+ * age group (already in C) and 15 % size (already in C) - so it double-counted,
+ * and was the hardest part to explain.
  *
  * Sub-scores are expert rules (transparent, benchmarked thresholds). Weights are
  * either set directly or derived from expert pairwise judgements via AHP. Every
@@ -21,25 +25,25 @@
 import type { BuildingRecord } from "../types";
 import type { FacadeDefectSummary } from "../store/wizard";
 
-export type CriterionKey = "E" | "F" | "C" | "R";
-export interface CriterionWeights { E: number; F: number; C: number; R: number; }
+export type CriterionKey = "E" | "F" | "C";
+export interface CriterionWeights { E: number; F: number; C: number; }
 
-export const DEFAULT_WEIGHTS: CriterionWeights = { E: 0.35, F: 0.30, C: 0.15, R: 0.20 };
+// The former potential weight (0.20) spread over the rest in proportion.
+export const DEFAULT_WEIGHTS: CriterionWeights = { E: 0.45, F: 0.35, C: 0.20 };
 export const WEIGHT_PRESETS: Record<string, CriterionWeights> = {
-  "Balanced (default)": { E: 0.35, F: 0.30, C: 0.15, R: 0.20 },
-  "Energy-first":       { E: 0.55, F: 0.15, C: 0.10, R: 0.20 },
-  "Condition-first":    { E: 0.20, F: 0.50, C: 0.15, R: 0.15 },
-  "Cost-effectiveness": { E: 0.25, F: 0.15, C: 0.10, R: 0.50 },
+  "Balanced (default)": { E: 0.45, F: 0.35, C: 0.20 },
+  "Energy-first":       { E: 0.70, F: 0.15, C: 0.15 },
+  "Condition-first":    { E: 0.25, F: 0.60, C: 0.15 },
+  "Building-first":     { E: 0.30, F: 0.20, C: 0.50 },
 };
 
 export const CRITERION_LABELS: Record<CriterionKey, string> = {
   E: "Energy performance",
   F: "Façade / envelope condition",
   C: "Building characteristics",
-  R: "Renovation potential",
 };
 export const CRITERION_COLORS: Record<CriterionKey, string> = {
-  E: "#E8880C", F: "#E2483B", C: "#4A90E2", R: "#2FB477",
+  E: "#E8880C", F: "#E2483B", C: "#4A90E2",
 };
 
 export interface SubScore { value: number; confidence: number; note: string; available: boolean; }
@@ -58,17 +62,6 @@ const num = (v: unknown): number | null =>
   (typeof v === "number" && isFinite(v)) ? v : null;
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const lin = (x: number, lo: number, hi: number) => clamp01((x - lo) / (hi - lo)) * 100;
-function wAvg(parts: number[], weights: number[]): number {
-  const s = weights.reduce((a, b) => a + b, 0) || 1;
-  return parts.reduce((acc, p, i) => acc + p * weights[i]!, 0) / s;
-}
-
-/** kWh/m²·yr implied by an EPC letter when the metered value is missing. */
-function classEnergy(cls: string | null | undefined): number | null {
-  const c = (cls || "").trim().toUpperCase()[0];
-  const map: Record<string, number> = { A: 55, B: 85, C: 105, D: 135, E: 165, F: 200, G: 240 };
-  return c && c in map ? map[c]! : null;
-}
 
 /** Heated floor area proxy (Atemp preferred, else footprint × floors). */
 export function heatedArea(b: BuildingRecord): number | null {
@@ -171,37 +164,10 @@ function scoreBuilding(b: BuildingRecord, sizePct: number | null): SubScore {
   return { value, confidence, note: bits.join(", ") || "characteristics n/a", available: true };
 }
 
-/** R — bigger expected benefit ⇒ higher priority (headroom × envelope × scale). */
-function scoreRetrofit(b: BuildingRecord, sizePct: number | null): SubScore {
-  const eMetered = num(b.energy_kwh_m2);
-  const e = eMetered ?? classEnergy(b.epc_class);
-  const headroom = e != null ? Math.max(0, e - 70) : null;  // kWh/m² above a good target
-  const intensity = headroom != null ? lin(headroom, 0, 180) : 50;
-
-  const u = num(b.u_wall);
-  const uPoor = u != null ? lin(u, 0.15, 1.0) : null;
-
-  const parts = [intensity]; const w = [0.6];
-  if (uPoor != null) { parts.push(uPoor); w.push(0.25); }
-  if (sizePct != null) { parts.push(sizePct * 100); w.push(0.15); }
-  const value = wAvg(parts, w);
-
-  let confidence = eMetered != null ? 0.6 : (b.epc_class ? 0.4 : 0);
-  if (u != null) confidence += 0.2;
-  if (sizePct != null) confidence += 0.2;
-  confidence = Math.min(1, confidence);
-  return {
-    value,
-    confidence,
-    note: headroom != null ? `~${Math.round(headroom)} kWh/m² savings headroom` : "potential n/a",
-    available: true,
-  };
-}
-
 /* ── composite ranking ─────────────────────────────────────────────────────── */
 export function normalizeWeights(w: CriterionWeights): CriterionWeights {
-  const s = (w.E + w.F + w.C + w.R) || 1;
-  return { E: w.E / s, F: w.F / s, C: w.C / s, R: w.R / s };
+  const s = (w.E + w.F + w.C) || 1;
+  return { E: w.E / s, F: w.F / s, C: w.C / s };
 }
 
 export interface PriorityInput { key: string; label: string; row: BuildingRecord; }
@@ -249,15 +215,14 @@ export function computePriorities(
       E: scoreEnergy(it.row),
       F: scoreFacade(facadeDefects[it.key]),
       C: scoreBuilding(it.row, sizePct),
-      R: scoreRetrofit(it.row, sizePct),
     };
 
     // Only criteria with data contribute; their weights are re-normalised so the
     // composite stays comparable (e.g. an un-inspected building drops F and its
-    // 30% is spread across E/C/R).
-    const availKeys = (["E", "F", "C", "R"] as CriterionKey[]).filter(k => scores[k].available);
+    // weight is spread across E/C).
+    const availKeys = (["E", "F", "C"] as CriterionKey[]).filter(k => scores[k].available);
     const wSum = availKeys.reduce((a, k) => a + w[k], 0) || 1;
-    const eff: Record<CriterionKey, number> = { E: 0, F: 0, C: 0, R: 0 };
+    const eff: Record<CriterionKey, number> = { E: 0, F: 0, C: 0 };
     availKeys.forEach(k => { eff[k] = w[k] / wSum; });
 
     const P = availKeys.reduce((a, k) => a + eff[k] * scores[k].value, 0);
@@ -285,8 +250,8 @@ export function computePriorities(
 /* ── AHP: derive weights from pairwise expert judgements ───────────────────── */
 // Saaty 1–9 scale. `pair[a>b]` holds how many times more important a is than b
 // (reciprocal implied for the mirror). Geometric-mean priority + consistency ratio.
-const AHP_ORDER: CriterionKey[] = ["E", "F", "C", "R"];
-const RI_N4 = 0.90; // random consistency index for a 4×4 matrix
+const AHP_ORDER: CriterionKey[] = ["E", "F", "C"];
+const RI_N3 = 0.58; // Saaty random consistency index for a 3×3 matrix
 
 export interface AhpResult { weights: CriterionWeights; lambdaMax: number; CI: number; CR: number; consistent: boolean; }
 
@@ -308,9 +273,9 @@ export function ahpWeights(pairs: Record<string, number>): AhpResult {
   const Aw = A.map(row => row.reduce((acc, x, j) => acc + x * wv[j]!, 0));
   const lambdaMax = Aw.reduce((acc, x, i) => acc + x / wv[i]!, 0) / n;
   const CI = (lambdaMax - n) / (n - 1);
-  const CR = CI / RI_N4;
+  const CR = CI / RI_N3;
   return {
-    weights: { E: wv[0]!, F: wv[1]!, C: wv[2]!, R: wv[3]! },
+    weights: { E: wv[0]!, F: wv[1]!, C: wv[2]! },
     lambdaMax, CI, CR, consistent: CR <= 0.1,
   };
 }

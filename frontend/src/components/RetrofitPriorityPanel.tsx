@@ -7,10 +7,8 @@ import {
   type CriterionWeights, type CriterionKey, type PriorityInput, type PriorityResult, type SubScore,
 } from "../utils/retrofitPriority";
 
-/* The four scoring columns overlap in ways the labels do not convey - "energy
-   performance" and "renovation potential" both involve energy, and size feeds
-   two of them. These read straight from the scoring in utils/retrofitPriority.ts;
-   keep them in step if the weights there change. */
+/* What each scoring column means, read straight from the scoring in
+   utils/retrofitPriority.ts; keep them in step if the rules there change. */
 const CRITERION_HELP: Record<string, { what: string; from: string }> = {
   E: {
     what: "How much energy the building uses NOW, relative to the others in the selection.",
@@ -18,21 +16,17 @@ const CRITERION_HELP: Record<string, { what: string; from: string }> = {
   },
   F: {
     what: "Condition of the facade from the photos analysed in 2.2 - cracks, spalling, corrosion and the like.",
-    from: "The defects found on the façade photos — ML detector plus the AI's two looks, cumulative — weighted by severity (cracks and bulges count most, then spalling and corrosion, then staining). Buildings with no usable photos score a dash, and their weight is spread across the other three.",
+    from: "The defects found on the façade photos — ML detector plus the AI's two looks, cumulative — weighted by severity (cracks and bulges count most, then spalling and corrosion, then staining). Buildings with no usable photos score a dash, and their weight is spread across the other two.",
   },
   C: {
     what: "How likely the building is to be dated, and how much of it there is.",
     from: "60% construction year, 40% size percentile.",
   },
-  R: {
-    what: "How much a retrofit could realistically RECOVER - not how bad the building is, but how much is left to gain.",
-    from: "60% energy headroom (consumption above a 70 kWh/m2.yr target), 25% wall U-value (0.15-1.0 W/m2K), 15% size percentile. A building already near 70 scores low even if it is large.",
-  },
 };
 
-const CRITS: CriterionKey[] = ["E", "F", "C", "R"];
-// The 6 pairwise comparisons for AHP (upper triangle of the 4×4 matrix).
-const AHP_PAIRS: [CriterionKey, CriterionKey][] = [["E","F"],["E","C"],["E","R"],["F","C"],["F","R"],["C","R"]];
+const CRITS: CriterionKey[] = ["E", "F", "C"];
+// The 3 pairwise comparisons for AHP (upper triangle of the 3×3 matrix).
+const AHP_PAIRS: [CriterionKey, CriterionKey][] = [["E","F"],["E","C"],["F","C"]];
 const SAATY_TICKS = ["9", "7", "5", "3", "1", "3", "5", "7", "9"];
 
 /** Discrete Saaty position (-8…8) → intensity value (1/9 … 9). 0 = equal. */
@@ -137,11 +131,11 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
   const setW = (k: CriterionKey, v: number) => setWeights(w => ({ ...w, [k]: v }));
 
   const exportCsv = () => {
-    const head = ["rank", "building", "priority", "E_energy", "F_facade", "C_building", "R_potential", "confidence_pct", "drivers"];
+    const head = ["rank", "building", "priority", "E_energy", "F_facade", "C_building", "confidence_pct", "drivers"];
     const cell = (s: { value: number; available: boolean }) => s.available ? s.value.toFixed(0) : "";
     const rows = ranked.map((r, i) => [
       i + 1, `"${r.label.replace(/"/g, '""')}"`, r.P.toFixed(1),
-      cell(r.scores.E), cell(r.scores.F), cell(r.scores.C), cell(r.scores.R),
+      cell(r.scores.E), cell(r.scores.F), cell(r.scores.C),
       Math.round(r.confidence * 100), `"${r.drivers.join("; ").replace(/"/g, '""')}"`,
     ].join(","));
     const blob = new Blob([[head.join(","), ...rows].join("\n")], { type: "text/csv" });
@@ -162,7 +156,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
     <div className="space-y-2.5">
       <p className="text-[11px] text-white/40 m-0">
         Ranks {items.length} building{items.length === 1 ? "" : "s"} by a weighted score of energy, façade condition,
-        building characteristics, and renovation potential — which to renovate first.
+        and building characteristics — which to renovate first.
       </p>
       {/* Live link to façade detection — F updates automatically as photos are analysed */}
       <div className="flex items-center gap-2 text-[10px] bg-black/20 border border-white/8 rounded-md px-2.5 py-1.5">
@@ -172,7 +166,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
           {inspectedCount > 0
             ? <b className="text-violet-300"> {inspectedCount} of {items.length} building{items.length === 1 ? "" : "s"} inspected</b>
             : <span className="text-amber-400"> none inspected yet</span>}.
-          {inspectedCount < items.length && " For the rest, façade shows “—” and its weight is spread across energy performance, characteristics, and renovation potential until you add their photos above."}
+          {inspectedCount < items.length && " For the rest, façade shows “—” and its weight is spread across energy performance and characteristics until you add their photos above."}
         </span>
       </div>
 
@@ -447,14 +441,14 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
               </div>
             )}
             <div className="text-[10px] text-white/30">
-              P = {pct(norm.E * 100)} energy + {pct(norm.F * 100)} façade + {pct(norm.C * 100)} characteristics + {pct(norm.R * 100)} potential
+              P = {pct(norm.E * 100)} energy + {pct(norm.F * 100)} façade + {pct(norm.C * 100)} characteristics
             </div>
           </div>
         )}
       </div>
 
       <p className="text-[10px] text-white/30 leading-relaxed">
-        Scores are 0–100 (higher = higher priority). Energy performance, façade condition (from the AI inspection above; shown as “—” and excluded until a building is inspected), building characteristics, and renovation potential are the four scoring groups.
+        Scores are 0–100 (higher = higher priority). Energy performance, façade condition (from the AI inspection above; shown as “—” and excluded until a building is inspected), and building characteristics are the three scoring groups.
         <b className="text-white/45"> Data coverage</b> reflects how much real data backs each building — low coverage means fill gaps
         in the table or add façade photos. The flagged top {topN} are the buildings to carry into Steps 3–4 first.
       </p>

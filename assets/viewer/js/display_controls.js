@@ -48,9 +48,12 @@
       return;
     }
     // "Color By" only makes sense on the Solid (Light/Dark) maps.
+    // The colour key sits right under the dropdown and follows it.
+    const cbyLegend = document.getElementById('color-by-legend');
     const syncColorBy = (mode) => {
       const solid = mode === 'light' || mode === 'dark';
       if (cbyRow) cbyRow.style.display = solid ? 'flex' : 'none';
+      if (cbyLegend) cbyLegend.style.display = solid ? 'block' : 'none';
     };
     /* One source of truth: the hidden .base-btn radios. The badge next to the
        "Display" header is rendered from `.base-btn.active` (see ui.js), so a

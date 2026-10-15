@@ -4,7 +4,7 @@
 // is what caused DataLayout's old hardcoded tab list to always route back to
 // the Sweden pages regardless of which country you were viewing.
 
-export type CountryCode = "se" | "gb" | "be" | "ie";
+export type CountryCode = "se" | "gb" | "be";
 
 export const COUNTRIES: {
   id: CountryCode; name: string; cities: string[];
@@ -16,11 +16,11 @@ export const COUNTRIES: {
    *  listed city is shown greyed-out / "coming soon" and is not clickable. */
   enabledCities?: string[];
 }[] = [
-  { id: "se", name: "Sweden", cities: ["Stockholm", "Gothenburg", "Malmö"],
+  // Stockholm (never had data) and Ireland (no cities) removed from the top bar 2026-10-16.
+  { id: "se", name: "Sweden", cities: ["Gothenburg", "Malmö"],
     defaultCity: "Gothenburg", enabledCities: ["Gothenburg", "Malmö"] },
   { id: "gb", name: "United Kingdom", cities: ["London", "Rotherham"], defaultCity: "London" },
   { id: "be", name: "Belgium", cities: ["Brussels", "Liège"], defaultCity: "Brussels" },
-  { id: "ie", name: "Ireland", cities: [] },
 ];
 
 /** The city a country opens on — its defaultCity, else the first listed. */
@@ -131,7 +131,6 @@ export const COUNTRY_CENTER: Record<CountryCode, { lat: number; lon: number; zoo
   se: { lat: 62.0, lon: 15.0, zoom: 5 },
   gb: { lat: 54.0, lon: -2.5, zoom: 6 },
   be: { lat: 50.6403, lon: 4.6667, zoom: 8 },
-  ie: { lat: 53.1424, lon: -7.6921, zoom: 7 },
 };
 
 /** Best-known map center for a country/city pair, falling back from

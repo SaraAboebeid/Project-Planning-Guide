@@ -730,9 +730,23 @@ const BBOX_CSV_COLS: { key: keyof BuildingRecord; label: string }[] = [
   { key: "u_window",                    label: "U-Window" },
 ];
 
-const FUTURE_META_COLS = [
-  { key: "renovated", label: "Renovated", badge: "soon", title: "Renovation status is not yet available from the EPC dataset." },
-  { key: "renovation_measure", label: "Renovation measure", badge: "soon", title: "Renovation measure is a future feature and is not currently populated." },
+/** What the per-address EPC lookup returns: current heating plus the newest
+ *  certificate's issue date and its expiry (issue + 10 years). */
+type EpcInfo = { system: string | null; issued?: string | null; expires?: string | null };
+
+/** YYYY-MM-DD + 10 years - both Swedish energideklarationer and UK EPCs are valid 10 years. */
+function plus10Years(d: string | null | undefined): string | null {
+  if (!d || !/^\d{4}-\d{2}-\d{2}/.test(d)) return null;
+  const y = Number(d.slice(0, 4)) + 10;
+  const md = d.slice(5, 10) === "02-29" ? "02-28" : d.slice(5, 10);
+  return `${y}-${md}`;
+}
+
+const EPC_DATE_COLS = [
+  { key: "issued", label: "EPC issued",
+    title: "When the building's newest energy certificate was issued (Sweden: Boverket approval date; UK: lodgement date)." },
+  { key: "expires", label: "EPC expires",
+    title: "Issue date + 10 years — energy certificates are valid for 10 years. Red = expired, amber = expires within 12 months." },
 ] as const;
 
 /* ─────────────────────────────────────────────
@@ -1006,7 +1020,7 @@ function BboxDataBanner({
   const [editing, setEditing]         = useState(false);   // inline table cell editing
   const [editDraftRows, setEditDraftRows] = useState<BuildingRecord[] | null>(null);
   // Current heating system per building (from the Boverket EPC), keyed by address.
-  const [heating, setHeating]         = useState<Record<string, { system: string } | null>>({});
+  const [heating, setHeating]         = useState<Record<string, EpcInfo | null>>({});
   const country = useWizardStore(s => s.project.country);
   const projectCity = useWizardStore(s => s.project.city);
   const PAGE_SIZE = 50;
@@ -1015,8 +1029,10 @@ function BboxDataBanner({
   // UK rows already carry it from their EPC certificates.
   useEffect(() => {
     if (country === "United Kingdom") {
-      const byAddr: Record<string, { system: string } | null> = {};
-      for (const r of rows ?? []) if (r.address && r.heating_system) byAddr[r.address] = { system: r.heating_system };
+      const byAddr: Record<string, EpcInfo | null> = {};
+      for (const r of rows ?? []) if (r.address && (r.heating_system || r.epc_issued)) {
+        byAddr[r.address] = { system: r.heating_system ?? null, issued: r.epc_issued ?? null, expires: plus10Years(r.epc_issued) };
+      }
       setHeating(byAddr);
       return;
     }
@@ -1604,18 +1620,13 @@ function BboxDataBanner({
                       </th>
                     );
                   })}
-                  {FUTURE_META_COLS.map(col => (
+                  {EPC_DATE_COLS.map(col => (
                     <th
                       key={col.key}
                       className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60"
                       title={col.title}
                     >
-                      <span className="inline-flex items-center gap-1">
-                        {col.label}
-                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] uppercase tracking-[0.14em] text-amber-300">
-                          {col.badge}
-                        </span>
-                      </span>
+                      {col.label}
                     </th>
                   ))}
                   <th className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60" title="Current heating system, inferred from the Boverket EPC (energideklaration)">
@@ -1686,16 +1697,30 @@ function BboxDataBanner({
                           </td>
                         );
                       })}
-                      {FUTURE_META_COLS.map(col => (
-                        <td
-                          key={col.key}
-                          className={`px-2 py-1 whitespace-nowrap ${isSelected ? "" : "bg-white/[0.02] text-white/25"}`}
-                          title={col.title}
-                          onClick={editing ? (e => e.stopPropagation()) : undefined}
-                        >
-                          —
-                        </td>
-                      ))}
+                      {EPC_DATE_COLS.map(col => {
+                        const e = r.address ? heating[r.address] : null;
+                        const val = col.key === "issued" ? e?.issued : e?.expires;
+                        // Expiry status: expired / within 12 months / valid.
+                        const today = new Date().toISOString().slice(0, 10);
+                        const soon = new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10);
+                        const exp = e?.expires ?? null;
+                        const status = !exp ? null : exp < today ? "expired" : exp <= soon ? "soon" : "valid";
+                        const tone = !val ? "bg-white/[0.02] text-white/25"
+                          : col.key === "expires" && status === "expired" ? "bg-red-900/20 text-red-300"
+                          : col.key === "expires" && status === "soon" ? "bg-amber-900/20 text-amber-300"
+                          : "bg-emerald-900/15 text-white/70";
+                        return (
+                          <td
+                            key={col.key}
+                            className={`px-2 py-1 whitespace-nowrap ${isSelected ? "" : tone}`}
+                            title={col.key === "expires" && status === "expired" ? "This certificate has expired — its energy figure may be out of date."
+                              : col.key === "expires" && status === "soon" ? "Expires within 12 months." : col.title}
+                            onClick={editing ? (ev => ev.stopPropagation()) : undefined}
+                          >
+                            {val ?? "—"}{col.key === "expires" && status === "expired" ? " · expired" : ""}
+                          </td>
+                        );
+                      })}
                       {(() => {
                         const h = r.address ? heating[r.address] : null;
                         const sys = h?.system ?? null;
@@ -1896,7 +1921,7 @@ function BuildingDataBanner({
   const [pasteText, setPasteText] = useState("");
   const [importMsg, setImportMsg] = useState<string | null>(null);
   // Current heating system for this building (inferred from the Boverket EPC).
-  const [heating, setHeating] = useState<{ system: string } | null>(null);
+  const [heating, setHeating] = useState<EpcInfo | null>(null);
 
   const critical = projectType ? (BUILDING_CRITICAL[projectType] ?? new Set<keyof BuildingLookup>()) : new Set<keyof BuildingLookup>();
   const isUK = building.country === "gb";
@@ -2249,11 +2274,11 @@ function MultiBuildingDataBanner({
   const withEpc = buildings.filter(b => b.has_epc).length;
   const shownBuildings = expanded ? buildings : buildings.slice(0, 3);
   // Current heating system per building, inferred from the Boverket EPC.
-  const [heating, setHeating] = useState<Record<string, { system: string } | null>>({});
+  const [heating, setHeating] = useState<Record<string, EpcInfo | null>>({});
   useEffect(() => {
     if (buildings.some(b => b.country === "be")) { setHeating({}); return; }
     if (buildings.some(b => b.country === "gb")) {
-      const byAddr: Record<string, { system: string } | null> = {};
+      const byAddr: Record<string, EpcInfo | null> = {};
       for (const b of buildings) if (b.address && b.heating_system) byAddr[b.address] = { system: b.heating_system };
       setHeating(byAddr);
       return;
@@ -2851,7 +2876,7 @@ function Step2Sections({
           <SectionHeader
             id="priority"
             label="Renovation Prioritisation"
-            subtitle="Buildings ranked by energy performance and upgrade potential"
+            subtitle="Buildings ranked by energy performance, façade condition and building characteristics"
           />
           {openSec === "priority" && (
             <div style={{ padding: "0 18px 18px" }}>

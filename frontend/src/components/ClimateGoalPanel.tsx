@@ -21,6 +21,13 @@ const LAYER_COLOR: Record<string, string> = {
   cavity: "#A78BFA",
 };
 
+/* The EU-wide target, shown as a reference line under each package. Not scored:
+ * it is an economy-wide emissions goal, not a per-building energy target. The UK
+ * is outside the EU, so its cities do not get it. */
+const EU_TARGET_TEXT = "EU target: −55% net greenhouse-gas emissions by 2030 vs 1990";
+const EU_TARGET_URL = "https://www.consilium.europa.eu/en/policies/fit-for-55/";
+const NON_EU_CITIES = new Set(["London", "Rotherham"]);
+
 function barColor(r: { meets: boolean; reductionPct: number | null }) {
   if (r.meets) return MET;
   if (r.reductionPct != null && r.reductionPct < 0) return WORSE;
@@ -141,6 +148,18 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
                   {r.meets && <CheckCircle2 size={11} color={MET} style={{ marginLeft: 4, verticalAlign: "-1px" }} />}
                 </span>
               </div>
+              {/* EU reference line under every package (EU cities only). */}
+              {!NON_EU_CITIES.has(goal.city) && (
+                <div style={{ display: "grid", gridTemplateColumns: "150px 1fr", gap: 10, marginTop: 3 }}>
+                  <span />
+                  <a href={EU_TARGET_URL} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", textDecoration: "none" }}
+                    title="The European Union's binding climate target (European Climate Law). Shown for reference; it is an economy-wide emissions target, not scored per building.">
+                    <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 2, background: "#4A90E2", marginRight: 5, verticalAlign: "0px" }} />
+                    {EU_TARGET_TEXT}
+                  </a>
+                </div>
+              )}
               {/* Expanded: the assembly on each component of this package */}
               {open && hasMat && (
                 <div style={{ margin: "4px 0 6px 20px", padding: "8px 12px", borderRadius: 8,

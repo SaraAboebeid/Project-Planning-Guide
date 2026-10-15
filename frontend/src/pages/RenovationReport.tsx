@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api, type PvgisEstimate } from "../api/client";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, FACADE_ORIENTATIONS, type FacadeOrientation } from "../store/wizard";
 import { filterToBaselineShortlist } from "../utils/baselineShortlist";
@@ -11,7 +12,7 @@ import type { BuildingLookup, BuildingRecord } from "../types";
 import { fmtGBP, UK_COST_CARBON_SOURCE_NOTE } from "../config/ukCostCarbon";
 import {
   Building2, Leaf, DollarSign, Zap, CheckCircle2, Download, ScanSearch,
-  Award, TrendingDown, Package, FileText, AlertTriangle, Target, Flame,
+  Award, TrendingDown, Package, FileText, AlertTriangle, Target, Flame, Sun,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell,
@@ -149,6 +150,18 @@ const COMP_COLORS: Record<string, string> = {
   "Floor": "#4A90E2", "Roof": "#4ECDC4", "Balcony": "#2FB477",
   "Structure (Columns & Beams)": "#E2483B", "Vertical Extension (New Floor)": "#F97316",
 };
+/** Rooftop PV assumptions - the same as the 3D viewer's Rooftop PV button and the
+ *  backend's /api/pvgis-estimate; shown under the solar table on screen and in
+ *  the downloaded report. */
+const PV_ASSUMPTIONS = [
+  "Calculation: PVGIS v5.2 by the EU Joint Research Centre, using its satellite-based solar radiation data for each building's location.",
+  "Roof area: 80% of the building's footprint is usable for panels (the rest is left for edges, hatches and equipment).",
+  "System size: 0.2 kWp per m² of usable roof (about 5 m² of roof per kWp).",
+  "Panels: crystalline silicon, tilted 35° and facing south.",
+  "System losses: 14% (cables, inverter, dirt and temperature effects).",
+  "Not modelled: the real roof shape and slope, obstructions (chimneys, vents) and shading from neighbouring buildings or trees — treat it as a screening estimate.",
+];
+
 /** "VertExt::Roof" → "New roof": the new storey's parts, in words. */
 const compLabel = (comp: string) =>
   comp.startsWith("VertExt::") ? `New ${comp.slice("VertExt::".length).toLowerCase()}` : comp;
@@ -218,6 +231,33 @@ export default function RenovationReport() {
     // shortlist - not everything that was selected back in Step 2.
     return filterToBaselineShortlist(all, project.renovationBaselineResults);
   }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows, project.renovationBaselineResults]);
+
+  /* Annual rooftop PV potential (PVGIS) for the analysed buildings: the result
+     saved from the 3D viewer where there is one, otherwise computed now with the
+     viewer's assumptions (backend /api/pvgis-estimate). */
+  const [pv, setPv] = useState<{ results: PvgisEstimate[]; assumptions: Record<string, string | number> } | null>(null);
+  const [pvLoading, setPvLoading] = useState(false);
+  const pvKey = baselines.map((b) => `${b.address}@${b.lat},${b.lon}`).join("|");
+  useEffect(() => {
+    const items = baselines
+      .filter((b) => b.lat != null && b.lon != null)
+      .map((b) => ({
+        lat: b.lat!, lon: b.lon!, address: b.address,
+        footprint_m2: buildings.find((x) => x.address === b.address)?.footprint_m2 ?? null,
+      }));
+    if (!items.length) { setPv(null); return; }
+    let alive = true;
+    setPvLoading(true);
+    api.pvgisEstimate(items)
+      .then((r) => { if (alive) setPv(r); })
+      .catch(() => { if (alive) setPv(null); })
+      .finally(() => { if (alive) setPvLoading(false); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pvKey]);
+  const pvOk = (pv?.results ?? []).filter((r) => r.annual_kwh != null);
+  const pvTotalKwh = pvOk.reduce((s, r) => s + (r.annual_kwh ?? 0), 0);
+  const pvTotalKwp = pvOk.reduce((s, r) => s + (r.kWp ?? 0), 0);
 
   const baseline = baselines[0] ?? null;
   const baselineEU = baseline?.energyUse ?? 0;
@@ -479,7 +519,7 @@ export default function RenovationReport() {
     <tr><td>Step 2 — selection</td><td><b>${selectedCount}</b> building${selectedCount === 1 ? "" : "s"}</td>
         <td>Selected on the map and reviewed against the available data.</td></tr>
     ${prioritisedCount ? `<tr><td>Step 2 — prioritisation</td><td><b>${prioritisedCount}</b> flagged</td>
-        <td>Ranked by energy performance, façade condition, characteristics and upgrade potential.</td></tr>` : ""}
+        <td>Ranked by energy performance, façade condition and building characteristics.</td></tr>` : ""}
     <tr><td>Step 3 — baseline</td><td><b>${simulatedCount}</b> simulated</td>
         <td>As-built performance from EnergyPlus, the baseline everything is measured against.</td></tr>
     <tr><td>Step 4 — packages</td><td><b>${packagesTested}</b> package${packagesTested === 1 ? "" : "s"}</td>
@@ -641,6 +681,16 @@ export default function RenovationReport() {
   </tbody></table>
   ${baselineChart}
 
+  ${pvOk.length ? `
+  <h2>Solar production potential (rooftop PV)</h2>
+  <p class="sub">About <b>${(pvTotalKwh / 1000).toLocaleString("sv-SE", { maximumFractionDigits: 1 })} MWh of electricity a year</b> from ${pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp on the roofs of ${pvOk.length} building${pvOk.length === 1 ? "" : "s"}.</p>
+  <table><thead><tr><th>Building</th><th>Usable roof</th><th>System size</th><th>Annual production</th></tr></thead><tbody>
+  ${pvOk.map((r) => `<tr><td>${esc(r.address ?? "Building")}</td><td>${r.roof_area_m2?.toLocaleString("sv-SE")} m²</td><td>${r.kWp?.toLocaleString("sv-SE")} kWp</td><td><b>${Math.round(r.annual_kwh!).toLocaleString("sv-SE")} kWh/yr</b></td></tr>`).join("")}
+  ${pvOk.length > 1 ? `<tr><td><b>Total</b></td><td>${pvOk.reduce((s, r) => s + (r.roof_area_m2 ?? 0), 0).toLocaleString("sv-SE")} m²</td><td>${pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp</td><td><b>${Math.round(pvTotalKwh).toLocaleString("sv-SE")} kWh/yr</b></td></tr>` : ""}
+  </tbody></table>
+  <p class="sub"><b>Assumptions</b></p>
+  <ul class="muted">${PV_ASSUMPTIONS.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
+
   ${facadeReport}
 
   <h2>Renovation packages tested</h2>
@@ -739,10 +789,10 @@ export default function RenovationReport() {
     buildings without a certificate carry a band estimated from the English Housing Survey 2024-25.
     Hot water uses the tool's Swedish Sveby draw profile, not a UK SAP assumption.`
       : `U-values per EN ISO 6946 ·
-    cost from Wikells Sektionsfakta · embodied carbon from Boverket Klimatdatabas ·
+    cost from Wikells Sektionsfakta · embodied carbon A1–A5 (production, transport, installation incl. waste) from Boverket Klimatdatabas; replacements and end-of-life not included ·
     ${project.supplierDiscountPct ? `All material costs are net of a ${project.supplierDiscountPct}% supplier discount entered in Step 4. ` : ""}Costs are installed capex (materials + labour); they exclude energy, maintenance and replacement.
-    baseline energy class from Boverket EPC. Homes use Sveby 2.0 standard use: hot water per occupant,
-    heated from the city's weather-derived mains temperature (excluding circulation losses). Household and
+    baseline energy class from Boverket EPC. Homes use Sveby 2.0 standard use: hot water as reported in the
+    building's energy declaration, otherwise Sveby's 21 kWh/m²·yr. Household and
     business electricity is simulated for its heat but, as in Swedish energy declarations, not counted in the
     totals or shown.`} Cooling reads 0 because EPSM&#39;s end-use table
     carries only electricity and district heating; the hourly trace does show ideal-loads
@@ -1280,6 +1330,67 @@ export default function RenovationReport() {
               </div>
               <ClimateGoalBuildingTable a={buildingGoal} />
             </div>
+          )}
+        </Card>
+      )}
+
+      {/* ── Solar production potential (PVGIS) ── */}
+      {(pvLoading || pvOk.length > 0 || (pv?.results.length ?? 0) > 0) && (
+        <Card accent="#E8B10C">
+          <SectionTitle icon={<Sun size={15} color="#E8B10C" />} title="Solar Production Potential (Rooftop PV)" />
+          {pvLoading && !pv ? (
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", margin: 0 }}>Fetching PVGIS estimates for the buildings…</p>
+          ) : (
+            <>
+              <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.65)", lineHeight: 1.6, margin: "0 0 10px" }}>
+                {pvOk.length > 0 && <>Panels on the roofs of the {pvOk.length} building{pvOk.length === 1 ? "" : "s"} could produce about{" "}
+                  <strong style={{ color: "#E8B10C" }}>{(pvTotalKwh / 1000).toLocaleString("sv-SE", { maximumFractionDigits: 1 })} MWh of electricity a year</strong>{" "}
+                  from {pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp installed.</>}
+              </p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ color: "rgba(255,255,255,0.45)" }}>
+                      {["Building", "Usable roof", "System size", "Annual production"].map((h, i) => (
+                        <th key={h} style={{ padding: "6px 8px", fontWeight: 600, textAlign: i ? "right" : "left", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(pv?.results ?? []).map((r, i) => (
+                      <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+                        <td style={{ padding: "6px 8px", color: "#fff" }}>
+                          {r.address ?? "Building"}
+                          {r.source === "saved" && <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 10.5 }}> · saved from the 3D viewer</span>}
+                        </td>
+                        {r.annual_kwh == null ? (
+                          <td colSpan={3} style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>— {r.error ?? "no result"}</td>
+                        ) : (<>
+                          <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{r.roof_area_m2?.toLocaleString("sv-SE")} m²</td>
+                          <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{r.kWp?.toLocaleString("sv-SE")} kWp</td>
+                          <td style={{ padding: "6px 8px", textAlign: "right", color: "#E8B10C", fontWeight: 700 }}>{Math.round(r.annual_kwh).toLocaleString("sv-SE")} kWh/yr</td>
+                       </>)}
+                      </tr>
+                    ))}
+                    {pvOk.length > 1 && (
+                      <tr style={{ borderTop: "1px solid rgba(255,255,255,0.15)" }}>
+                        <td style={{ padding: "6px 8px", color: "#fff", fontWeight: 700 }}>Total</td>
+                        <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{pvOk.reduce((s, r) => s + (r.roof_area_m2 ?? 0), 0).toLocaleString("sv-SE")} m²</td>
+                        <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp</td>
+                        <td style={{ padding: "6px 8px", textAlign: "right", color: "#E8B10C", fontWeight: 800 }}>{Math.round(pvTotalKwh).toLocaleString("sv-SE")} kWh/yr</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {/* Assumptions behind every row (same as the 3D viewer's Rooftop PV button). */}
+              <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Assumptions</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
+                  {PV_ASSUMPTIONS.map((a) => <li key={a}>{a}</li>)}
+                </ul>
+              </div>
+            </>
           )}
         </Card>
       )}

@@ -30,9 +30,60 @@ const MATERIAL_KEYWORDS = [
   "window", "glaz", "glass", "bitumen", "membrane",
 ];
 
-function gwpMinOf(r: BoverketResource): number | null {
-  const v = r["GWP Min (Typ+A4+A5)"];
-  return typeof v === "number" ? v : null;
+const numOf = (v: unknown): number | null => (typeof v === "number" && isFinite(v) ? v : null);
+
+/** Boverket A4 + A5 per kg for one resource, as in a Swedish climate declaration:
+ *  A4 transport to site; A5 = installation (A5.1) plus the material wasted on
+ *  site, whose production and transport also had to happen:
+ *  (waste factor − 1) × (A1–A3 + A4). Null when the resource lacks the figures. */
+export function a4a5PerKg(r: BoverketResource): { a13: number; a4: number; a5: number } | null {
+  const a13 = numOf(r["GWP A1-A3 (Typical)"]);
+  if (a13 == null) return null;
+  const a4 = numOf(r["GWP A4 (Transport)"]) ?? 0;
+  const a51 = numOf(r["GWP A5.1 (Installation)"]) ?? 0;
+  const w = Number(r["Waste Factor"]);
+  const waste = isFinite(w) && w > 1 ? (w - 1) * (a13 + a4) : 0;
+  return { a13, a4, a5: a51 + waste };
+}
+
+/* Catalogue assemblies only carry one A1–A3 figure, so their A4 + A5 is
+   estimated from their MAIN material: the Boverket resource for that material
+   gives the A4+A5 share relative to its A1–A3, applied to the assembly. Ordered
+   most-specific first. */
+const MAIN_MATERIAL: [RegExp, RegExp][] = [
+  [/clt|cross-laminated/i, /cross-laminated timber/i],
+  [/glulam/i, /glulam/i],
+  [/blow|loose/i, /blowing wool/i],
+  [/wood ?fib/i, /wood ?fib/i],
+  [/mineral wool|glass ?wool|stone wool|rock wool|insulation|ins\.|\bm\d{2,3}\b/i, /glasswool, batts/i],
+  [/\beps\b|polystyrene|cellplast/i, /expanded polystyrene|\beps\b/i],
+  [/gypsum|plaster/i, /gypsum/i],
+  [/fib(er|re) ?cement/i, /fib(er|re) cement/i],
+  [/concrete/i, /concrete|wall panels/i],
+  [/brick|clinker/i, /brick/i],
+  [/bitumen|felt|membrane/i, /bitumen/i],
+  [/steel|sheet|metal|trp/i, /steel/i],
+  [/window|glaz/i, /window/i],
+  [/timber|wood|log|batten|plank|stud|panel/i, /sawn timber/i],
+];
+
+function upliftOf(r: BoverketResource): number | null {
+  const m = a4a5PerKg(r);
+  return m && m.a13 > 0 ? (m.a4 + m.a5) / m.a13 : null;
+}
+
+/** A4+A5 as a share of A1–A3 for a catalogue assembly, from its main material;
+ *  the median over the loaded Boverket rows when nothing matches; 0 (A1–A3 only)
+ *  when no Boverket data is loaded. */
+export function a4a5Share(label: string, rows: BoverketResource[]): { share: number; basis: string } {
+  for (const [kw, bov] of MAIN_MATERIAL) {
+    if (!kw.test(label)) continue;
+    const row = rows.find((r) => bov.test(r.Name) && upliftOf(r) != null);
+    if (row) return { share: upliftOf(row)!, basis: `A4/A5 from Boverket "${row.Name}"` };
+  }
+  const all = rows.map(upliftOf).filter((v): v is number => v != null).sort((a, b) => a - b);
+  if (all.length) return { share: all[Math.floor(all.length / 2)]!, basis: "A4/A5 from the median Boverket material (no main material matched)" };
+  return { share: 0, basis: "A1–A3 only (Boverket data not loaded)" };
 }
 
 export type CarbonConfidence = "legacy" | "catalogue" | "boverket-estimate" | "fallback";
@@ -61,22 +112,35 @@ const unpriced = (item: WikellsItem) => !!(item as { costMissing?: boolean }).co
 export function estimateCarbon(
   item: WikellsItem,
   boverketResources: BoverketResource[]
-): { value: number; confidence: CarbonConfidence } {
+): { value: number; confidence: CarbonConfidence; a1a3?: number; a4a5?: number; basis?: string } {
+  // UK/BE catalogue options carry their own A1–A3 figure and stay A1–A3.
   const own = ownCarbon(item);
   if (own != null) return { value: own, confidence: "catalogue" };
+
+  // Sweden (Wikells): A1–A3 for the assembly, then A4 + A5 (transport to site,
+  // installation incl. waste) from its main material - see a4a5Share. `value`
+  // is the A1–A5 total every caller (picker, packages, optimiser) uses.
+  const withA4A5 = (a1a3: number, label: string, confidence: CarbonConfidence) => {
+    const { share, basis } = a4a5Share(label, boverketResources);
+    const a4a5 = a1a3 * share;
+    return { value: Math.round((a1a3 + a4a5) * 10) / 10, confidence,
+             a1a3: Math.round(a1a3 * 10) / 10, a4a5: Math.round(a4a5 * 10) / 10, basis };
+  };
   const legacy = WIKELLS_CARBON_MAP[item.code];
-  if (legacy) return { value: legacy.kgCO2ePerM2, confidence: "legacy" };
+  if (legacy) return withA4A5(legacy.kgCO2ePerM2, `${legacy.primaryMaterial} ${item.description}`, "legacy");
 
   const desc = item.description.toLowerCase();
   const activeKws = MATERIAL_KEYWORDS.filter((k) => desc.includes(k));
   const matches = boverketResources.filter((r) => activeKws.some((k) => r.Name.toLowerCase().includes(k)));
   const pool = matches.length ? matches : boverketResources;
-  const values = pool.map(gwpMinOf).filter((v): v is number => v != null);
+  // A1–A3 only here (it used to take Boverket's A1–A3+A4+A5 sum, which would now
+  // count A4/A5 twice); A4/A5 is added by withA4A5 like every other path.
+  const values = pool.map((r) => numOf(r["GWP A1-A3 (Typical)"])).filter((v): v is number => v != null);
   if (values.length) {
     values.sort((a, b) => a - b);
     const gwpPerKg = values[Math.floor(values.length / 2)]!;
     const assumedArealDensityKgM2 = 25; // rough order-of-magnitude for a typical envelope layer
-    return { value: Math.round(gwpPerKg * assumedArealDensityKgM2 * 10) / 10, confidence: "boverket-estimate" };
+    return withA4A5(gwpPerKg * assumedArealDensityKgM2, item.description, "boverket-estimate");
   }
   return { value: 30, confidence: "fallback" };
 }

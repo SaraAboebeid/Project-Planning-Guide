@@ -137,9 +137,9 @@ const TOOLS = [
     status: "integrated",
     icon: ListOrdered,
     description:
-      "A hybrid expert-rule + Multi-Criteria Decision Analysis (MCDA) model that ranks a building stock by renovation priority. Each building is scored 0–100 under four criterion groups, combined into one weighted priority score. Weights are set directly or derived from expert pairwise judgements via the Analytic Hierarchy Process (AHP). Lives in Step 2; the top-ranked buildings are the ones carried into EPSM simulation first.",
+      "A hybrid expert-rule + Multi-Criteria Decision Analysis (MCDA) model that ranks a building stock by renovation priority. Each building is scored 0–100 under three criterion groups, combined into one weighted priority score. Weights are set directly or derived from expert pairwise judgements via the Analytic Hierarchy Process (AHP). Lives in Step 2; the top-ranked buildings are the ones carried into EPSM simulation first.",
     features: [
-      "Four criteria: energy performance, façade condition, building characteristics, renovation potential",
+      "Three criteria: energy performance, façade condition, building characteristics",
       "Transparent 0–100 expert-rule sub-scores, each with a per-building data confidence",
       "Weights via sliders/presets or AHP pairwise comparison (with a consistency check)",
       "Façade (F) uses the AI defect inspection — excluded until a building is inspected",

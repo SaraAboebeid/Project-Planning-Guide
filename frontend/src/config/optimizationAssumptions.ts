@@ -73,15 +73,16 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       note: "Swedish grid is low-carbon (hydro/nuclear/wind). Production mix ~10–40 g/kWh; Nordic residual mix is far higher — pick per accounting method.",
     },
     /* EnergyPlus standard use for Swedish homes (tools/idf/defaults.py, Sveby
-       block). Not optimiser inputs, but they set the baseline the optimiser is
-       anchored to, so they are listed here to keep every model number traceable. */
+       block, SE_HOME_LOADS = "sveby2"). Not optimiser inputs, but they set the
+       baseline the optimiser is anchored to, so they are listed here to keep
+       every model number traceable. */
     {
       key: "sveby_dhw",
-      label: "Hot water, homes (at citywide occupancy, 10 °C mains)",
+      label: "Hot water, homes (when the energy declaration gives none)",
       value: 21, unit: "kWh/m²·yr",
       source: "Sveby Brukarindata bostäder 2.0 (2024-11-11), ch. 8 — excludes circulation (VVC) and standby losses",
       sourceUrl: "https://www.sveby.org/okategoriserad/svebys-brukarindata-for-bostader-version-2-0-ar-har/",
-      note: "Turned into litres per person; EnergyPlus heats them from the mains temperature it derives from the city's weather file, so the simulated figure varies with occupancy, city and season. Circulation losses are not modelled yet, so totals sit somewhat below an energy declaration.",
+      note: "Each home uses the hot water its own energy declaration reports (newest declaration, per m² Atemp) and this Sveby value only when the declaration has no figure. Played back through EnergyPlus as given, at a fixed 10 °C cold-water temperature.",
       usedIn: "Step 3/4 EnergyPlus model (homes)",
     },
     {
@@ -90,16 +91,16 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       value: 21, unit: "kWh/m²·yr",
       source: "Sveby Brukarindata bostäder 2.0, ch. 9 (monthly profile, table 9.1)",
       sourceUrl: "https://www.sveby.org/okategoriserad/svebys-brukarindata-for-bostader-version-2-0-ar-har/",
-      note: "70 % of it counts as internal heat (Sveby). Higher in winter than summer. Lighting is part of it, so homes show no separate lighting.",
+      note: "70 % of it counts as internal heat (Sveby). Higher in winter than summer. Simulated for its heat, but - as in Swedish energy declarations - not counted in the reported total.",
       usedIn: "Step 3/4 EnergyPlus model (homes)",
     },
     {
       key: "sveby_occupancy",
-      label: "Occupancy, homes (citywide)",
+      label: "Occupancy, homes",
       value: 35, unit: "m² heated area per person",
       source: "Sveby 2.0 table 12.1 (persons per flat by rooms) applied to Boplats listings ≈ 31 m² of flat per person, plus shared heated area",
       sourceUrl: "https://www.sveby.org/okategoriserad/svebys-brukarindata-for-bostader-version-2-0-ar-har/",
-      note: "A building with listed flats is scaled by how small or large they are vs the city's listings (×0.5–2). People give 80 W each (50 W sensible), present 17:00–07:00.",
+      note: "The same for every home: no per-building occupant data is available (rental listings cover ~1% of homes). People give 80 W each (50 W sensible), present 17:00–07:00.",
       usedIn: "Step 3/4 EnergyPlus model (homes)",
     },
     {
@@ -110,8 +111,7 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       sourceUrl: "https://bigladdersoftware.com/epx/docs/23-2/input-output-reference/group-daylighting.html",
       note: "Controls the share of the floor within 4.5 m of a glazed wall, so building shape, glazing and party walls decide the saving.",
       usedIn: "Step 3/4 EnergyPlus model (offices, shops, schools)",
-    },
-  ],
+    },  ],
   UK: [
     {
       key: "gas_price",
@@ -262,7 +262,7 @@ export const MODEL_ASSUMPTIONS: Assumption[] = [
 export const OPTION_DATA_SOURCES: Record<Country, { label: string; text: string }[]> = {
   SE: [
     { label: "Cost", text: "Wikells Sektionsfakta 2024 — installed section prices (materials + labour), SEK/m². Layer build-ups are priced from the nearest real Wikells assembly matched on the U-value of the NEW layers only, so adding to or replacing a wall costs the same for the same materials." },
-    { label: "Carbon", text: "Boverket klimatdatabas — A1–A3 per material (thickness × density × GWP)." },
+    { label: "Carbon", text: "Boverket klimatdatabas — A1–A5 per material: production (A1–A3), transport to site (A4) and installation incl. on-site waste (A5). Per layer: mass × (A1–A3 + A4 + A5.1) + (waste factor − 1) × mass × (A1–A3 + A4), with mass = thickness × density. Replacements (B4) and demolition/end-of-life (C) are not included." },
   ],
   UK: [
     { label: "Cost — your build-ups", text: "UK Renovation Materials Catalogue (Oct 2026): material prices incl. VAT, excluding labour and installation. Only materials with BOTH a price and an embodied-carbon value are offered (44 of 60 rows)." },
@@ -324,8 +324,8 @@ export const EQUATIONS: EquationDoc[] = [
   },
   {
     name: "30-year carbon (KPI)",
-    latexish: "total_carbon = Σ embodied_A1–A3 + Q_b · cf_heat · N",
-    explain: "Embodied carbon of the chosen options plus 30 years of operational carbon (not discounted). Replacement embodied carbon is not modelled yet (as above).",
+    latexish: "total_carbon = Σ embodied_A1–A5 + Q_b · cf_heat · N",
+    explain: "Embodied carbon of the chosen options (Sweden: production, transport and installation, A1–A5; UK/Belgium: production only, A1–A3) plus 30 years of operational carbon (not discounted). Replacement embodied carbon is not modelled yet (as above).",
   },
 ];
 

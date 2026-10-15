@@ -1376,6 +1376,8 @@ def _uk_bbox_row(b: dict, lat: float, lon: float) -> dict:
         "u_floor":         b.get("tabula_u_floor"),
         "u_door":          b.get("tabula_u_door"),
         "heating_system":  b.get("mainheat_description"),
+        # Newest certificate's lodgement date (UK EPCs are valid 10 years).
+        "epc_issued":      b.get("epc_latest_date") or b.get("nd_epc_latest_date") or b.get("dec_latest_date"),
         "main_fuel":       b.get("main_fuel"),
         "property_type":   b.get("property_type") or b.get("nd_property_type") or b.get("dec_property_type"),
         "postcode":        b.get("epc_postcode") or b.get("postcode"),
@@ -1516,63 +1518,51 @@ def list_districts(country: str = Query("se")):
 
 
 _BOPLATS_MAP_CACHE: tuple[float, dict] | None = None
-_OCCUPANCY_CACHE: tuple[float, dict, float] | None = None   # (db mtime, {addr: (persons, m2)}, city persons/m2)
+_EPC_DHW_COLS = ["EgiFjarrvarmeVV", "EgiOljaVV", "EgiGasVV", "EgiVedVV", "EgiFlisVV", "EgiOvrBiobransleVV", "EgiElVV"]
 
 
-def _boplats_norm(s: str) -> str:
-    """Address key shared with /api/boplats/map: lower-case, single spaces, no postcode."""
-    import re
-    s = re.sub(r"\s+", " ", (s or "").strip().lower())
-    return re.sub(r"\s+\d{4}$", "", s)
+def _with_epc_dhw(building: dict, country: str, city_id: Optional[str]) -> dict:
+    """Swedish homes: the hot water the building's own energy declaration reports
+    (kWh per m2 Atemp, newest declaration), for the simulation to play back. The
+    generator uses Sveby's 21 kWh/m2 when the declaration has no hot-water figure.
 
-
-def _occupancy_factor_for(building: dict, country: str) -> dict:
-    """Occupancy of a Swedish home relative to the city, from its rental listings.
-
-    Each Boplats listing gives a flat's rooms and size; Sveby 2.0 table 12.1
-    turns rooms into residents. A building whose flats are smaller than the
-    city's listings average houses more people per m2 (factor > 1), larger flats
-    fewer. The generator multiplies its citywide occupancy - and with it the
-    hot-water volume - by this factor. Returns the building unchanged when it is
-    not a Swedish home or has no listing (factor 1, 'citywide default').
-    """
-    global _OCCUPANCY_CACHE
-    import sqlite3
-    from tools.idf.defaults import SVEBY_PERSONS_BY_ROOMS
+    Declarations from 2019 on give hot water per energy carrier (Egi*VV); the
+    2015 format gives it as EgiVVBered. Values outside 3-80 kWh/m2 are treated as
+    a data error and ignored. Returns the building unchanged when nothing usable
+    is found or the EPC register is not present."""
     if (country or "").lower() != "se" or building.get("use_cat") not in ("bostad_enfamilj", "bostad_flerfamilj"):
         return building
-    db = PROJECT_ROOT / "boplats_apartments.db"
-    if not db.exists():
+    import re as _re
+    addrs = [building.get("address") or ""] + [a for a in (building.get("all_addresses") or "").split("|") if a.strip()]
+    keys = list({_re.sub(r"\s+", "", a.lower()) for a in addrs if a.strip()})
+    if not keys:
         return building
-    stamp = db.stat().st_mtime
-    if not _OCCUPANCY_CACHE or _OCCUPANCY_CACHE[0] != stamp:
-        try:
-            con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-            rows = con.execute("SELECT address, rooms, size_m2 FROM apartments "
-                               "WHERE address IS NOT NULL AND rooms > 0 AND size_m2 > 0").fetchall()
-            con.close()
-        except Exception:
-            return building
-        per: dict[str, list[float]] = {}
-        for addr, rooms, size in rows:
-            p = SVEBY_PERSONS_BY_ROOMS[min(5, int(rooms))]
-            acc = per.setdefault(_boplats_norm(addr), [0.0, 0.0])
-            acc[0] += p
-            acc[1] += float(size)
-        tot_p = sum(v[0] for v in per.values())
-        tot_a = sum(v[1] for v in per.values())
-        _OCCUPANCY_CACHE = (stamp, {k: (v[0], v[1]) for k, v in per.items()}, tot_p / tot_a if tot_a else 0.0)
-    _, per, city = _OCCUPANCY_CACHE
-    keys = {_boplats_norm(building.get("address") or "")}
-    keys.update(_boplats_norm(a) for a in (building.get("all_addresses") or "").split("|") if a.strip())
-    hits = [per[k] for k in keys if k and k in per]
-    if not hits or city <= 0:
+    try:
+        con = _epc_con()
+    except FileNotFoundError:
         return building
-    persons, area = sum(h[0] for h in hits), sum(h[1] for h in hits)
-    n = len(hits)
-    return {**building, "occupancy_factor": round((persons / area) / city, 3),
-            "occupancy_source": f"Boplats listings at {n} address{'es' if n > 1 else ''} (Sveby persons per flat)"}
-
+    num = lambda c: f"TRY_CAST(REPLACE(CAST(\"{c}\" AS VARCHAR), ',', '.') AS DOUBLE)"
+    vv = " + ".join(f"COALESCE({num(c)}, 0)" for c in _EPC_DHW_COLS)
+    kommun = (_se_cities().get(city_id or "gothenburg") or {}).get("kommun") or "Göteborg"
+    try:
+        row = con.execute(
+            f"SELECT ({vv}) AS vv, {num('EgiVVBered')} AS vvb, {num('EgenAtemp')} AS atemp, CAST(Godkand AS VARCHAR) AS g "
+            f"FROM epc WHERE IdKommun = ? AND lower(regexp_replace(IdAdr, '\\s+', '', 'g')) IN ({', '.join(['?'] * len(keys))}) "
+            f"ORDER BY g DESC LIMIT 1", [kommun, *keys]).fetchone()
+    except Exception:
+        row = None
+    finally:
+        con.close()
+    if not row:
+        return building
+    vv_kwh, vvb, atemp, issued = row
+    kwh = vv_kwh or vvb
+    if not kwh or not atemp or atemp <= 0:
+        return building
+    per_m2 = kwh / atemp
+    if not 3 <= per_m2 <= 80:
+        return building
+    return {**building, "dhw_kwh_m2_epc": round(per_m2, 1), "dhw_source": f"energy declaration {(issued or '')[:10]}".strip()}
 
 @app.get("/api/boplats/map")
 def boplats_map():
@@ -3319,6 +3309,76 @@ async def get_pvgis_database():
     return {"records": _load_pvgis_db()}
 
 
+class PVGISEstimateBuilding(BaseModel):
+    lat: float
+    lon: float
+    address: Optional[str] = None
+    footprint_m2: Optional[float] = None
+
+
+class PVGISEstimateRequest(BaseModel):
+    buildings: list[PVGISEstimateBuilding]
+
+
+# Same assumptions as the viewer's Rooftop PV button (assets/viewer/js/pvgis.js),
+# so a building has one PV figure wherever it is shown.
+_PV_ROOF_COVERAGE = 0.8    # share of the footprint usable for panels
+_PV_KWP_PER_M2 = 0.2       # ~5 m2 of roof per kWp
+
+
+@app.post("/api/pvgis-estimate")
+async def pvgis_estimate(req: PVGISEstimateRequest):
+    """Annual rooftop PV potential for a list of buildings (Step 5 report).
+    Reuses the result saved from the 3D viewer when one exists within 25 m;
+    otherwise runs PVGIS with the viewer's assumptions and saves it, so both
+    places show the same number. Per building: kWp, annual kWh, kWh/kWp,
+    usable roof, and whether it was saved earlier or computed now."""
+    import httpx
+    records = _load_pvgis_db()
+    out, new_records = [], []
+    async with httpx.AsyncClient(timeout=40) as client:
+        for b in req.buildings:
+            saved = min(((r, _haversine_m(r["lat"], r["lon"], b.lat, b.lon)) for r in records),
+                        key=lambda t: t[1], default=(None, 1e9))
+            if saved[0] is not None and saved[1] <= 25:
+                r = saved[0]
+                out.append({"address": b.address, "kWp": r["kWp"], "annual_kwh": r["annual_kwh"],
+                            "specific_kwh_kwp": r["specific_kwh_kwp"], "roof_area_m2": r["roof_area_m2"],
+                            "source": "saved", "saved_at": r.get("saved_at")})
+                continue
+            if not b.footprint_m2 or b.footprint_m2 <= 0:
+                out.append({"address": b.address, "error": "no footprint area"})
+                continue
+            usable = b.footprint_m2 * _PV_ROOF_COVERAGE
+            kwp = round(usable * _PV_KWP_PER_M2, 1)
+            try:
+                resp = await client.get("https://re.jrc.ec.europa.eu/api/v5_2/PVcalc", params={
+                    "lat": round(b.lat, 5), "lon": round(b.lon, 5), "peakpower": kwp, "loss": 14,
+                    "angle": 35, "aspect": 0, "outputformat": "json", "pvtechchoice": "crystSi"})
+                resp.raise_for_status()
+                ey = (((resp.json().get("outputs") or {}).get("totals") or {}).get("fixed") or {}).get("E_y")
+                if not ey:
+                    raise ValueError("no yield in the PVGIS response")
+            except Exception as exc:  # noqa: BLE001
+                out.append({"address": b.address, "error": f"PVGIS unavailable ({type(exc).__name__})"})
+                continue
+            annual = round(ey)
+            rec = {"lat": b.lat, "lon": b.lon, "address": b.address, "kWp": kwp, "annual_kwh": annual,
+                   "specific_kwh_kwp": round(annual / kwp) if kwp else 0, "roof_area_m2": round(usable),
+                   "building_info": {"source": "step5-report"},
+                   "saved_at": datetime.datetime.utcnow().isoformat() + "Z"}
+            new_records.append(rec)
+            out.append({"address": b.address, "kWp": kwp, "annual_kwh": annual,
+                        "specific_kwh_kwp": rec["specific_kwh_kwp"], "roof_area_m2": rec["roof_area_m2"],
+                        "source": "computed", "saved_at": rec["saved_at"]})
+    if new_records:
+        _save_pvgis_db(records + new_records)
+    return {"results": out,
+            "assumptions": {"roof_coverage": _PV_ROOF_COVERAGE, "kwp_per_m2": _PV_KWP_PER_M2,
+                            "tilt_deg": 35, "azimuth": "south", "system_loss_pct": 14, "tech": "crystalline silicon",
+                            "source": "PVGIS v5.2 (EU Joint Research Centre)"}}
+
+
 # ── PVGIS proxy (avoids browser CORS restriction) ───────────────────────────
 @app.get("/api/pvgis")
 async def pvgis_proxy(
@@ -3739,7 +3799,7 @@ async def submit_simulation(req: SimulationSubmitRequest):
         if not candidates:
             raise HTTPException(404, "No building with real geometry found near this location")
         building = min(candidates, key=lambda t: t[0])[1]
-    building = _occupancy_factor_for(building, req.country)
+    building = _with_epc_dhw(building, req.country, city_id)
     building, ext_kwargs = _with_extension(building, req)
 
     try:
@@ -3889,7 +3949,7 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
             if not candidates:
                 raise HTTPException(404, f"No building with real geometry found near building {i} ({b.lat}, {b.lon})")
             building = min(candidates, key=_dist)
-        extended, ext_kwargs = _with_extension(_occupancy_factor_for(building, req.country), req)
+        extended, ext_kwargs = _with_extension(_with_epc_dhw(building, req.country, city_id), req)
         resolved.append({"lat": b.lat, "lon": b.lon, "address": b.address,
                          "building": extended, "ext_kwargs": ext_kwargs,
                          "wwr_by_orientation": b.wwr_by_orientation})
@@ -4860,7 +4920,7 @@ def epc_heating(req: EpcHeatingRequest):
     keys = list(wanted.keys())
     placeholders = ", ".join(["?"] * len(keys))
     sql = (
-        f"SELECT lower(regexp_replace(IdAdr, '\\s+', '', 'g')) AS k, {col_sql} "
+        f"SELECT lower(regexp_replace(IdAdr, '\\s+', '', 'g')) AS k, {col_sql}, CAST(Godkand AS VARCHAR) AS godkand "
         f"FROM epc WHERE IdKommun = ? "
         f"AND lower(regexp_replace(IdAdr, '\\s+', '', 'g')) IN ({placeholders})"
     )
@@ -4872,6 +4932,13 @@ def epc_heating(req: EpcHeatingRequest):
 
     idx = {c: i + 1 for i, c in enumerate(all_cols)}  # row[0] is the normalised key
     best: dict[str, tuple[str, float]] = {}
+    # Newest declaration per address: its approval (Godkand) is the issue date and
+    # a Swedish energideklaration is valid 10 years, so that gives the expiry.
+    issued: dict[str, str] = {}
+    for row in rows:
+        g = (row[-1] or "")[:10]
+        if g and g > issued.get(row[0], ""):
+            issued[row[0]] = g
     for row in rows:
         k = row[0]
         group_energy: dict[str, float] = {}
@@ -4892,7 +4959,22 @@ def epc_heating(req: EpcHeatingRequest):
         if k not in best or energy > best[k][1]:  # keep the record with the most heat energy
             best[k] = (label, energy)
 
-    results = {orig: ({"system": best[n][0]} if n in best else None) for n, orig in wanted.items()}
+    def _plus10(d: str) -> str:
+        try:
+            dt = datetime.date.fromisoformat(d)
+            try:
+                return dt.replace(year=dt.year + 10).isoformat()
+            except ValueError:            # 29 February
+                return dt.replace(year=dt.year + 10, day=28).isoformat()
+        except ValueError:
+            return ""
+
+    results = {
+        orig: ({"system": best[n][0] if n in best else None,
+                "issued": issued.get(n), "expires": _plus10(issued[n]) if n in issued else None}
+               if (n in best or n in issued) else None)
+        for n, orig in wanted.items()
+    }
     return {"results": results, "available": True}
 
 

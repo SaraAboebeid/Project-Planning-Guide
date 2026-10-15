@@ -183,9 +183,7 @@ def _dhw_peak_flow_m3_s(annual_kwh: float, pattern: list[tuple[str, float]],
 
     Inverts Q = rho * c * V * dT over the year: the schedule's own mean
     fraction sets how much of the peak is actually drawn, so the annual total
-    stays on target no matter how the profile's shape is edited. With a
-    weather-driven mains (Swedish homes) this fixes the VOLUME, sized at the
-    reference temperature; the energy then follows the real mains.
+    stays on target no matter how the profile's shape is edited.
     """
     # Mean tank temperature, not setpoint - see D.DHW_DEADBAND_K.
     delta_t = (D.DHW_SUPPLY_TEMP_C - D.DHW_DEADBAND_K / 2.0) - cold_c
@@ -210,31 +208,6 @@ def _monthly_schedule(name: str, type_limits: str, values: list[float]) -> str:
         fields += [(f"Through: {m}/{_MONTH_DAYS[m - 1]}", "Field"), ("For: AllDays", "Field"),
                    ("Until: 24:00", "Field"), (round(v, 4), "Field")]
     return obj("Schedule:Compact", fields)
-
-
-def _epw_mains_correlation(epw_path: str | Path) -> tuple[float, float]:
-    """(annual mean, max difference of monthly means) of the weather file's
-    dry-bulb temperature - the two inputs of EnergyPlus's mains-water
-    correlation (Site:WaterMainsTemperature, Hendron et al.)."""
-    sums, counts = [0.0] * 12, [0] * 12
-    with open(epw_path, encoding="utf-8", errors="replace") as f:
-        for i, line in enumerate(f):
-            if i < 8:
-                continue                      # EPW header lines
-            parts = line.split(",")
-            if len(parts) < 7:
-                continue
-            try:
-                month, tdb = int(parts[1]), float(parts[6])
-            except ValueError:
-                continue
-            if 1 <= month <= 12 and tdb < 99:   # 99.9 = missing
-                sums[month - 1] += tdb
-                counts[month - 1] += 1
-    means = [s / c for s, c in zip(sums, counts) if c]
-    if len(means) < 12:
-        return D.DHW_REFERENCE_MAINS_C, 15.0
-    return sum(means) / 12.0, max(means) - min(means)
 
 
 def _constant_schedule(name: str, type_limits: str, value: float) -> str:
@@ -324,10 +297,8 @@ def build_shoebox_idf(
     gains = _gains_profile(use_cat)
     # Swedish homes follow Sveby 2.0 (defaults "Sveby" block): occupants, hot
     # water and household electricity are modelled, not one W/m2 per type.
-    se_home = (country or "").lower() == "se" and use_cat in ("bostad_enfamilj", "bostad_flerfamilj")
-    # >1 when the building's listed flats are smaller than the city's (more
-    # people per m2), <1 when larger; 1 when nothing is listed for it.
-    occ_factor = max(0.5, min(2.0, float(building.get("occupancy_factor") or 1.0))) if se_home else 1.0
+    se_home = (D.SE_HOME_LOADS == "sveby2"
+               and (country or "").lower() == "se" and use_cat in ("bostad_enfamilj", "bostad_flerfamilj"))
 
     # u_*_epc (UK only) come from the certificates' own fabric descriptions
     # (tools/uk/epc_fabric.py) and describe the building as it is today;
@@ -560,7 +531,7 @@ def build_shoebox_idf(
 
     # ── internal gains (scaled to total floor area, all storeys) ─────
     if se_home:
-        people = total_floor_area / D.SE_HOME_M2_PER_PERSON * occ_factor
+        people = total_floor_area / D.SE_HOME_M2_PER_PERSON
     else:
         people = total_floor_area / gains["m2_per_person"]
     objects.append(obj("People", [
@@ -613,7 +584,7 @@ def build_shoebox_idf(
     # the lighting their metered-gas calibration was fitted with.
     daylit_fraction = 0.0
     residential = (use_cat or "").startswith("bostad")
-    if not residential and lighting_w > 0 and glazed_walls and footprint_m2 > 0:
+    if D.DAYLIGHT_DIMMING and not residential and lighting_w > 0 and glazed_walls and footprint_m2 > 0:
         daylit_fraction = min(1.0, sum(w for _, _, w, _, _ in glazed_walls) * D.DAYLIGHT_DEPTH_M / footprint_m2)
         p0, p1, width, sill, head = max(glazed_walls, key=lambda g: g[2] * (g[4] - g[3]))
         # Inward normal of a counter-clockwise ring: the edge turned left.
@@ -679,40 +650,24 @@ def build_shoebox_idf(
     elif (country or "").lower() == "gb":
         dhw_kwh_m2, dhw_annual_kwh = 0.0, 0.0
     elif se_home:
-        # Sveby 21 kWh/m2 is the draw at the citywide occupancy and a 10 C mains;
-        # occ_factor scales the people and so the litres. Fixed below as a VOLUME
-        # at that reference temperature - the energy EnergyPlus reports then
-        # follows this city's mains temperature, month by month.
-        dhw_kwh_m2 = round(D.SVEBY_DHW_KWH_M2_YR * occ_factor, 1)
+        # The building's own energy declaration when it reports hot water (the
+        # backend's _with_epc_dhw), otherwise Sveby 2.0's 21 kWh/m2. Played back
+        # exactly - fixed cold-water temperature, no occupancy or weather scaling.
+        dhw_kwh_m2 = float(building.get("dhw_kwh_m2_epc") or D.SVEBY_DHW_KWH_M2_YR)
         dhw_annual_kwh = dhw_kwh_m2 * total_floor_area
     else:
         dhw_kwh_m2 = D.DHW_KWH_M2_YR_BY_USE.get(use_cat or "", D.DEFAULT_DHW_KWH_M2_YR)
         dhw_annual_kwh = dhw_kwh_m2 * total_floor_area
-    mains = None
     if dhw_annual_kwh > 0:
-        ref_cold = D.DHW_REFERENCE_MAINS_C if se_home else D.DHW_COLD_TEMP_C
-        dhw_peak_flow = _dhw_peak_flow_m3_s(dhw_annual_kwh, D.DHW_DAY_PATTERN, ref_cold)
+        dhw_peak_flow = _dhw_peak_flow_m3_s(dhw_annual_kwh, D.DHW_DAY_PATTERN)
         # Capacity to meet the peak draw instantaneously, doubled so a cold
         # tank at the start of a peak still recovers rather than clipping the
-        # draw (a capacity-limited heater would silently under-deliver). Sized
-        # on the coldest mains the weather-driven case can see.
-        delta_t = D.DHW_SUPPLY_TEMP_C - (D.DHW_DESIGN_MAINS_C if se_home else D.DHW_COLD_TEMP_C)
+        # draw (a capacity-limited heater would silently under-deliver).
+        delta_t = D.DHW_SUPPLY_TEMP_C - D.DHW_COLD_TEMP_C
         dhw_peak_w = dhw_peak_flow * D.WATER_DENSITY_KG_M3 * D.WATER_SPECIFIC_HEAT_J_KGK * delta_t
         objects.append(_schedule_compact("DHW Draw Schedule", "Fractional", D.DHW_DAY_PATTERN))
         objects.append(_constant_schedule("DHW Setpoint Schedule", "Temperature", D.DHW_SUPPLY_TEMP_C))
-        if se_home:
-            # Mains temperature from this city's weather (EnergyPlus's Hendron
-            # correlation on the file's annual mean and monthly swing); the
-            # heater's cold-water schedule is left blank so it uses this.
-            t_mean, t_swing = _epw_mains_correlation(epw_path)
-            mains = (round(t_mean, 2), round(t_swing, 2))
-            objects.append(obj("Site:WaterMainsTemperature", [
-                ("Correlation", "Calculation Method"), (None, "Temperature Schedule Name"),
-                (mains[0], "Annual Average Outdoor Air Temperature {C}"),
-                (mains[1], "Maximum Difference In Monthly Average Outdoor Air Temperatures {deltaC}"),
-            ]))
-        else:
-            objects.append(_constant_schedule("DHW Cold Water Schedule", "Temperature", D.DHW_COLD_TEMP_C))
+        objects.append(_constant_schedule("DHW Cold Water Schedule", "Temperature", D.DHW_COLD_TEMP_C))
         objects.append(_constant_schedule("DHW Ambient Schedule", "Temperature", 20.0))
         objects.append(obj("WaterHeater:Mixed", [
             (f"{zone_name} DHW", "Name"), (0.3, "Tank Volume {m3}"),
@@ -737,7 +692,7 @@ def build_shoebox_idf(
             (None, "On Cycle Loss Fraction to Zone"),
             (round(dhw_peak_flow, 10), "Peak Use Flow Rate {m3/s}"),
             ("DHW Draw Schedule", "Use Flow Rate Fraction Schedule Name"),
-            (None if se_home else "DHW Cold Water Schedule", "Cold Water Supply Temperature Schedule Name"),
+            ("DHW Cold Water Schedule", "Cold Water Supply Temperature Schedule Name"),
             (None, "Use Side Inlet Node Name"), (None, "Use Side Outlet Node Name"),
             (1.0, "Use Side Effectiveness"),
             (None, "Source Side Inlet Node Name"), (None, "Source Side Outlet Node Name"),
@@ -774,13 +729,10 @@ def build_shoebox_idf(
         "wwr_by_orientation": {k: round(v, 3) for k, v in sorted(wwr_by_facing.items())},
         "u_wall": round(u_wall, 3), "u_roof": round(u_roof, 3), "u_win": round(u_win, 3),
         "dhw_kwh_m2_yr": dhw_kwh_m2,
-        # Swedish homes: dhw_kwh_m2_yr is the draw at a 10 C reference mains; the
-        # simulated figure follows `dhw_mains_correlation` (annual mean, swing).
-        "dhw_mains_correlation": mains,
-        "loads_basis": "sveby_2.0" if se_home else "per_m2_by_use",
+        # Swedish homes: from the building's energy declaration, else Sveby 2.0.
+        "dhw_source": (building.get("dhw_source") or "Sveby 2.0 standard (21 kWh/m2)") if se_home else "per_m2_by_use",
+        "loads_basis": "sveby_2.0" if se_home else ("legacy_flat" if D.SE_HOME_LOADS == "legacy" else "per_m2_by_use"),
         "occupants": round(people, 1),
-        "occupancy_factor": round(occ_factor, 3),
-        "occupancy_source": (building.get("occupancy_source") or "citywide default") if se_home else "per_m2_by_use",
         "daylit_fraction": round(daylit_fraction, 3),
         "extension_storeys": building.get("extension_storeys") or 0,
         "extension_facade_share": round(ext_share, 3),

@@ -38,6 +38,20 @@ function compact(v: number, locale: string): string {
   return `${Math.round(v).toLocaleString(locale)}`;
 }
 
+/** What each heating system IS, in plain words - shown behind the ⓘ next to its
+ *  name, followed by the catalogue's own trade-off note. Keyed by system id
+ *  (config/hvacSystems.ts and hvacSystemsUK.ts). */
+const SYSTEM_EXPLAIN: Record<string, string> = {
+  dh_keep: "District heating: hot water made at a central plant (in Gothenburg largely waste heat from industry and waste incineration) is piped to the building, where a heat exchanger passes the heat on to the radiators and taps. Nothing burns in the building itself.",
+  ashp: "Air-to-water heat pump: an outdoor unit extracts heat from the outside air - even when it is cold - and moves it into the building's water-based radiators and hot water, using electricity to run the compressor.",
+  gshp: "Ground-source heat pump (bergvärme): pipes in a deep borehole collect heat from the bedrock, which stays at a steady temperature all year, and a heat pump lifts it to heating temperature using electricity.",
+  eahp: "Exhaust-air heat pump (frånluftsvärmepump): recovers the heat in the warm indoor air that the ventilation system blows out of the building, and reuses it for heating and hot water.",
+  pellet: "Wood-pellet boiler: burns compressed wood pellets in a boiler in the building to heat the radiators and hot water. Needs a pellet store and ash emptying.",
+  direct_electric: "Direct electric heating: electric radiators or heating cables turn electricity straight into heat, one unit of heat per unit of electricity.",
+  gas_keep: "Existing gas boiler: the building's current boiler burns mains gas to heat the radiators and hot water.",
+  gas_condensing: "New gas boiler: a modern condensing gas boiler, which also recovers heat from its exhaust gases, so less gas is needed for the same heat.",
+};
+
 const PICKS: Record<string, { fg: string; label: string }> = {
   lowestLcc: { fg: "#2FB477", label: "Lowest 30-yr cost" },
   lowestCarbon: { fg: "#4ECDC4", label: "Lowest carbon" },
@@ -177,6 +191,20 @@ export default function HeatingSystemPanel({
                         <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
                           <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
                           <span style={{ fontStyle: s.isBaseline ? "italic" : undefined, color: s.isBaseline ? white(0.7) : "#fff" }}>{s.shortName}</span>
+                          {(() => {
+                            const sys = catalogue.systems.find((x) => x.id === s.id);
+                            const what = SYSTEM_EXPLAIN[s.id] ?? sys?.name ?? s.shortName;
+                            const eff = s.spf >= 1.5
+                              ? `SPF ${s.spf.toFixed(1)}: each kWh of energy bought gives about ${s.spf.toFixed(1)} kWh of heat.`
+                              : `Efficiency ${Math.round(s.spf * 100)}%: each kWh of energy bought gives about ${s.spf.toFixed(2)} kWh of heat.`;
+                            const tip = [what, eff, sys?.note].filter(Boolean).join("\n\n");
+                            return (
+                              <span title={tip} aria-label={tip} tabIndex={0} onClick={(e) => e.stopPropagation()}
+                                style={{ display: "inline-flex", cursor: "help", color: white(0.4) }}>
+                                <Info size={11} />
+                              </span>
+                            );
+                          })()}
                           {s.isBaseline && <span style={{ fontSize: 8.5, color: "#E8880C" }}>baseline</span>}
                           {tags.map((t) => {
                             const p = PICKS[t];

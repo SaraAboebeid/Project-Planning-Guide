@@ -151,8 +151,22 @@ function readImageSize(blob: Blob): Promise<{ width: number; height: number }> {
 }
 
 /** Draw an image + defect boxes onto a canvas, scaled to fit maxW × maxH. */
-function drawAnnotated(canvas: HTMLCanvasElement, img: HTMLImageElement, result: FacadeDetectResponse | null, maxW: number, maxH: number) {
-  const scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
+/** Size of the enlarged (lightbox) photo area - one fixed frame for every photo,
+ *  beside the ~340 px issue list on wide screens and above it on narrow ones. */
+function lightboxFrame(): { w: number; h: number } {
+  const wide = window.innerWidth >= 768;
+  return {
+    w: Math.round(Math.min(window.innerWidth * 0.96 - (wide ? 340 : 0) - 16, 1400)),
+    h: Math.round(window.innerHeight * 0.8 - (wide ? 0 : 220)),
+  };
+}
+
+function drawAnnotated(canvas: HTMLCanvasElement, img: HTMLImageElement, result: FacadeDetectResponse | null, maxW: number, maxH: number,
+                       upscale = false) {
+  // Thumbnails only ever shrink; the enlarged view also scales small photos up
+  // (a 160 px Street View crop opened tiny) so every photo fills the same frame.
+  const fit = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
+  const scale = upscale ? fit : Math.min(1, fit);
   canvas.width = Math.round(img.naturalWidth * scale);
   canvas.height = Math.round(img.naturalHeight * scale);
   const ctx = canvas.getContext("2d"); if (!ctx) return;
@@ -210,10 +224,11 @@ function AnnotatedCanvas({ entry, mode, className, onClick }: {
   }, [mode]);
   useEffect(() => {
     const canvas = ref.current; if (!canvas) return;
-    const maxW = mode === "full" ? Math.min(window.innerWidth * 0.82, 1400) : 720;
-    const maxH = mode === "full" ? window.innerHeight * 0.8 : 9999;
+    const frame = lightboxFrame();
+    const maxW = mode === "full" ? frame.w : 720;
+    const maxH = mode === "full" ? frame.h : 9999;
     const img = new Image();
-    img.onload = () => drawAnnotated(canvas, img, entry.result, maxW, maxH);
+    img.onload = () => drawAnnotated(canvas, img, entry.result, maxW, maxH, mode === "full");
     img.src = entry.url;
   }, [entry.url, entry.result, mode, tick]);
   return <canvas ref={ref} onClick={onClick} className={className} />;
@@ -243,8 +258,10 @@ function Lightbox({ entry, buildingLabel, onClose, onDownload }: {
     <div className="outside-root-portal fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3" onClick={onClose}>
       <div className="bg-[#0d1117] border border-white/15 rounded-xl max-w-[96vw] max-h-[94vh] overflow-hidden flex flex-col md:flex-row shadow-2xl"
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-center bg-black/50 p-2 overflow-auto">
-          <AnnotatedCanvas entry={entry} mode="full" className="max-w-full block" />
+        {/* Fixed frame: every photo opens at the same size, letterboxed to its shape. */}
+        <div className="flex items-center justify-center bg-black/50 p-2 overflow-hidden flex-shrink-0"
+          style={{ width: lightboxFrame().w + 16, height: lightboxFrame().h + 16 }}>
+          <AnnotatedCanvas entry={entry} mode="full" className="max-w-full max-h-full block" />
         </div>
         <div className="w-full md:w-80 shrink-0 border-t md:border-t-0 md:border-l border-white/10 flex flex-col">
           <div className="flex items-start gap-2 px-3.5 py-3 border-b border-white/10">

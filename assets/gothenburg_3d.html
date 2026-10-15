@@ -12,13 +12,14 @@
     /* Västtrafik and SCB are Swedish services with no UK counterpart. The country
        is stamped on <body> by bootstrap.js. */
     body[data-country]:not([data-country="se"]) .se-only { display: none !important; }
-    /* Display-section dropdowns (Visualization Mode / Color By). Dark-styled so the
-       native option popup isn't white-on-white. */
-    .ctrl-select { background:#11161d; color:#fff; border:1px solid rgba(255,255,255,0.16);
+    /* Display-section dropdowns (Visualization Mode / Color By). White with black
+       text to match the light sidebar; colours set on the options too, so the
+       native popup can never come out white-on-white or dark-on-dark. */
+    .ctrl-select { background:#ffffff; color:#111111; border:1px solid rgba(0,0,0,0.18);
       border-radius:8px; padding:5px 9px; font-size:12px; font-weight:600; cursor:pointer;
       min-width:132px; outline:none; transition:border-color .15s; }
     .ctrl-select:hover, .ctrl-select:focus { border-color:rgba(114,28,184,0.65); }
-    .ctrl-select option { background:#11161d; color:#fff; }
+    .ctrl-select option { background:#ffffff; color:#111111; }
     /* Base-map thumbnail picker (Light / Dark / Satellite / Terrain / 3D). */
     .basemap-thumbs { display:flex; gap:7px; }
     .bm-thumb { flex:1; min-width:0; background:transparent; border:0; padding:0; cursor:pointer;
@@ -150,6 +151,12 @@
           <option value="year">Year era</option>
         </select>
       </div>
+      <!-- The colour key, right under the dropdown that picks the colours. Shown and
+           hidden with it (display_controls.js): only the Solid maps colour buildings. -->
+      <div id="color-by-legend" style="display:none">
+        <div id="legend-container"></div>
+        <div class="lp-hint">Click a legend row to see best &amp; worst performers</div>
+      </div>
     </div>
     <div class="basemap-group" role="radiogroup" aria-label="Base map" style="display:none;padding:0 0 4px">
       <div class="base-row">
@@ -272,8 +279,7 @@
         <button class="lp-tab" id="btn-eclass" role="tab" aria-selected="false">Energy</button>
         <button class="lp-tab" id="btn-year" role="tab" aria-selected="false">Year era</button>
       </div>
-      <div id="legend-container"></div>
-      <div class="lp-hint">Click a legend row to see best &amp; worst performers</div>
+      <!-- The colour key moved up to the Display section, under "Color By". -->
       </div>
       <!-- /#colour-by-group -->
     </div>
@@ -400,14 +406,6 @@
     <div id="urban-content" class="collapse-content collapsed se-only">
       <div id="urban-analysis-section">
         <div class="overlay-group">
-          <div class="overlay-row">
-            <button class="overlay-btn" id="btn-urban-green" aria-pressed="false">
-              <span class="overlay-check"></span>
-              <span class="base-name">Green Index</span>
-              <span class="layer-pill">OSM</span>
-            </button>
-            <button class="info-btn" data-layer="street-green-index"></button>
-          </div>
           <div class="overlay-row">
             <button class="overlay-btn" id="btn-urban-uhi" aria-pressed="false">
               <span class="overlay-check"></span>
