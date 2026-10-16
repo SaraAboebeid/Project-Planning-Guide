@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Target, CheckCircle2, ChevronRight, ChevronDown } from "lucide-react";
-import { type GoalAssessment, type ClimateGoal, type RatingAssessment, goalStatement } from "../config/climateGoals";
+import { type GoalAssessment, type ClimateGoal, type RatingAssessment, goalStatement, goalTitle } from "../config/climateGoals";
 import PanelShell from "./PanelShell";
 
 /* Shows a city climate target and which renovation packages reach it. Used in
@@ -79,7 +79,7 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
     <PanelShell
       icon={<Target size={17} />}
       iconColor={accent}
-      title={`${goal.city} climate target`}
+      title={goalTitle(goal)}
       subtitle={goalStatement(goal)}
       badge={
         <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, padding: "3px 10px", borderRadius: 100, background: `${accent}1e`, color: accent, border: `1px solid ${accent}44`, flexShrink: 0 }}>
@@ -263,7 +263,7 @@ export function ClimateGoalRatingPanel({ a }: { a: RatingAssessment }) {
 
   return (
     <PanelShell icon={<Target size={17} />} iconColor={accent}
-      title={`${goal.city} climate target`} subtitle={goalStatement(goal)}
+      title={goalTitle(goal)} subtitle={goalStatement(goal)}
       badge={
         <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, padding: "3px 10px", borderRadius: 100, background: `${accent}1e`, color: accent, border: `1px solid ${accent}44`, flexShrink: 0 }}>
           EPC {goal.targetRating} BY {goal.targetYear}
@@ -340,7 +340,7 @@ export function ClimateGoalRatingPanel({ a }: { a: RatingAssessment }) {
 export function ClimateGoalInfo({ goal }: { goal: ClimateGoal }) {
   return (
     <PanelShell icon={<Target size={17} />} iconColor="#4A90E2"
-      title={`${goal.city} climate target`} subtitle={goalStatement(goal)}>
+      title={goalTitle(goal)} subtitle={goalStatement(goal)}>
       <GoalBasis goal={goal} />
       <div style={{ marginTop: 10 }}><SourceLink goal={goal} /></div>
     </PanelShell>

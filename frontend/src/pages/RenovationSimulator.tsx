@@ -21,6 +21,7 @@ import {
 import { fmtGBP, ukTierCostCarbon, ukMeasureOptions, UK_COST_CARBON_SOURCE_NOTE, UK_COST_PRICE_BASIS, type UkQuantities, type UkMeasureOption } from "../config/ukCostCarbon";
 import { useWizardStepNav, setWizardNextInfo } from "../components/wizardNav";
 import OptimizerPanel from "../components/OptimizerPanel";
+import ComponentValuePanel from "../components/ComponentValuePanel";
 import AssemblyBuilder from "../components/AssemblyBuilder";
 import { ASSUMPTIONS, MODEL_ASSUMPTIONS } from "../config/optimizationAssumptions";
 import { computeAssemblyU, MATERIAL_BY_ID, type AssemblyLayer, type ComponentKind } from "../config/assemblyLayers";
@@ -2803,6 +2804,13 @@ export default function RenovationSimulator() {
               scopeLabel={geometries.length > 1
                 ? `${geometries[targetIdx === "all" ? 0 : targetIdx]?.address ?? "the first building"} (representative building — the Results view sums all ${targetIdx === "all" ? geometries.length : 1} building${targetIdx === "all" && geometries.length > 1 ? "s" : ""})`
                 : undefined}
+            />
+          )}
+          {hasEnvelope && openStage === 2 && !isBE && (
+            <ComponentValuePanel
+              input={optimizerInput.disabledReason ? null : optimizerInput.input}
+              currency={isUK && configs.length === 0 ? "GBP" : MONEY}
+              scopeLabel={geometries.length > 1 ? geometries[targetIdx === "all" ? 0 : targetIdx]?.address ?? undefined : undefined}
             />
           )}
 

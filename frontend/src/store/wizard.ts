@@ -52,6 +52,9 @@ export interface RenovationBaselineResult {
   /** Set when the shoebox is not a fair model of this building (pools,
    *  hospitals, industry) - see backend _model_scope and ModelScopeNotice. */
   modelScope?: { level: "out_of_scope" | "caution"; reason: string; matched?: string | null } | null;
+  /** The outline's height could not hold the declared storeys, so the model
+   *  ran at floors × 3.2 m (backend _with_height_fix). */
+  heightCorrected?: { from_m: number; to_m: number; floors: number } | null;
 }
 
 export interface RenovationPackageResult {

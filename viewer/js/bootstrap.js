@@ -44,6 +44,44 @@
   window.VIEW_CENTER = { lon: city.lon, lat: city.lat };
   window.VIEW_HEIGHT = city.camera_height || 800;
 
+  // The Swedish page is built as "Gothenburg 3D"; name the city actually loaded
+  // (e.g. ?city=malmo) in the tab, the loading screen and the sidebar header.
+  if (city.id !== 'gothenburg' && city.name) {
+    const swap = (s) => s.replace(/Gothenburg/g, city.name);
+    document.title = swap(document.title);
+    document.querySelectorAll('#loading h1, #lp-header .lp-title').forEach((el) => { el.textContent = swap(el.textContent); });
+  }
+
+  // Data that exists for Gothenburg only (LiDAR trees/roofs/terrain, Västtrafik
+  // and Trafikverket feeds). In another Swedish city those controls stay
+  // visible but greyed out and unclickable, instead of showing Gothenburg's data.
+  window.cityHasLidar = () => !(profile.country === 'se' && city.id !== 'gothenburg');
+  window.markCityUnavailable = (el) => {
+    if (!el) return;
+    el.setAttribute('aria-disabled', 'true');
+    el.classList.remove('active');
+    el.style.opacity = '0.45';
+    el.style.pointerEvents = 'none';
+  };
+  if (!window.cityHasLidar()) {
+    document.querySelectorAll('.bm-thumb[data-mode="terrain"], #btn-base-terrain').forEach((el) => {
+      el.setAttribute('aria-disabled', 'true'); el.style.opacity = '0.35'; el.style.pointerEvents = 'none';
+    });
+    const tt = document.getElementById('traffic-toggle');
+    if (tt) {
+      tt.disabled = true; tt.style.opacity = '0.45';
+      tt.setAttribute('aria-expanded', 'false');
+    }
+    // The section may already be open (restored state) - hide its rows and
+    // switch every control in it off, not just the header.
+    const tc = document.getElementById('traffic-content');
+    if (tc) {
+      tc.classList.add('collapsed');
+      tc.style.setProperty('display', 'none', 'important');
+      tc.querySelectorAll('button, input').forEach((b) => { b.disabled = true; b.classList.remove('active'); });
+    }
+  }
+
   // Optional focus from the caller (e.g. Step 2's "3D view" button passes the
   // bounding box of the selected buildings / neighborhood / area) — open the
   // camera there instead of the city default. ?bbox=north,south,east,west
@@ -116,7 +154,7 @@
     'viewer/js/facade_inspector.js',
     'viewer/js/search.js',
     'viewer/js/roads.js',
-    ...(profile.country === 'se'
+    ...(profile.country === 'se' && city.id === 'gothenburg'   // the transit/road feeds are set up for Gothenburg
       ? ['viewer/js/trafik_canvas.js', 'viewer/js/vasttrafik.js', 'viewer/js/trafikverket.js']
       : []),
     'viewer/js/urban_analysis.js', // Green Accessibility works anywhere (OSM); Heat Island stays SE-only in the UI

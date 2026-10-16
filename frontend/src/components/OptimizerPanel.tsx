@@ -159,6 +159,56 @@ export default function OptimizerPanel({
             that package in EnergyPlus (EPSM). Model after Enerbäck &amp; Strömberg.
           </p>
 
+          <details style={{ marginBottom: 14, fontSize: 12, color: white(0.6), lineHeight: 1.6 }}>
+            <summary style={{ cursor: "pointer", color: "#B98BE8", fontWeight: 700 }}>How the optimisation works</summary>
+            <div style={{ padding: "8px 0 0 14px" }}>
+              <p style={{ margin: "0 0 8px" }}>
+                <b>In short:</b> it tries every mix of the build-ups you saved and keeps the mixes where nothing else is
+                cheaper, lower-carbon <i>and</i> lower-energy at the same time. It is a quick estimate to narrow the choice —
+                simulate the winners in EnergyPlus to confirm them.
+              </p>
+              <ol style={{ margin: "0 0 8px", paddingLeft: 18 }}>
+                <li style={{ marginBottom: 4 }}>
+                  <b>The choices.</b> Each component offers your saved build-ups plus a free “keep as-built” option, so the
+                  optimiser can decide a part is not worth touching. Each option carries a U-value, a cost (price per m² × the
+                  component’s area) and embodied carbon. Build-ups with no price, or that insulate worse than what is there
+                  now, are left out — and listed when that happens. Parts you have not designed anything for, and air
+                  leakage/ventilation, still count as heat loss, unchanged.
+                </li>
+                <li style={{ marginBottom: 4 }}>
+                  <b>Energy.</b> Heat loss = Σ area × U (W/K); yearly heating = heat loss × how cold the year is
+                  (degree-days{input ? <>, {Math.round((input.params.f_dh * 1000) / 24).toLocaleString()} here</> : null}).
+                  That simple formula ignores sun and internal heat, so it is <b>calibrated to your Step 3 EnergyPlus
+                  baseline</b>: “keep everything as-built” gives exactly the simulated heating. Only heating responds to
+                  better U-values; hot water and other loads stay fixed.
+                </li>
+                <li style={{ marginBottom: 4 }}>
+                  <b>30-year cost</b> = material cost today + 30 years of energy bills
+                  {input ? <> at {input.params.energy_price} {currency}/kWh</> : null}, discounted at
+                  {" "}{input ? `${Math.round(input.params.discount_rate * 1000) / 10}%` : "3%"}/yr (money later is worth less than money now).
+                  {" "}<b>30-year carbon</b> = embodied carbon + 30 years of energy × the heat carbon factor
+                  {input ? <> ({input.params.carbon_factor_heat} kg CO₂e/kWh)</> : null}, not discounted.
+                </li>
+                <li style={{ marginBottom: 4 }}>
+                  <b>Picking the winners.</b> A package is dropped when another one is at least as good on cost, carbon
+                  and energy and better on at least one. What remains is the trade-off curve. The cheapest, lowest-carbon
+                  and lowest-energy packages are tagged; at most 24 are shown, always keeping those three. “Do nothing”
+                  is never counted as a package.
+                </li>
+                <li>
+                  <b>Confirm in EnergyPlus.</b> Each package appears in the Results table as an “≈ estimate” until you
+                  press <b>Simulate</b>, which replaces it with the full simulation.
+                </li>
+              </ol>
+              <p style={{ margin: 0, color: white(0.5) }}>
+                <b>Keep in mind:</b> the estimate is still somewhat optimistic about savings, so simulate the packages you
+                care about. A new storey shows its cost and carbon but no energy effect here (EnergyPlus models it).
+                Replacing parts that wear out within 30 years is not counted yet. With several buildings, the
+                optimisation is done for one representative building and the same choices are applied to all.
+              </p>
+            </div>
+          </details>
+
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
             {disabledReason && <span style={{ fontSize: 11.5, color: "#E8880C" }}>{disabledReason}</span>}
             {result && (

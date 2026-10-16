@@ -315,10 +315,19 @@ export default function ParetoChart({
       })()}
 
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 10.5, color: white(0.5), marginTop: 2, paddingLeft: 8 }}>
-        <span><span style={{ color: "#B98BE8" }}>—●</span> {xO.short}/{yO.short} frontier</span>
-        <span><span style={{ color: "#4ECDC4" }}>◯</span> optimal package (click to select)</span>
-        <span><span style={{ color: "#2FB477" }}>●</span> validated in EPSM</span>
-        <span><span style={{ color: "#fff" }}>◆</span> baseline</span>
+        <span>
+          <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", marginRight: 4, verticalAlign: "middle",
+            background: `linear-gradient(90deg, ${viridis(0)}, ${viridis(1)})` }} />
+          one package tried (colour = {cO.short.toLowerCase()}, see bar)
+        </span>
+        <span><span style={{ color: "#B98BE8" }}>—●</span> best {xO.short.toLowerCase()}–{yO.short.toLowerCase()} trade-offs</span>
+        <span><span style={{ color: "#4ECDC4" }}>◯</span> shortlisted: nothing beats it on cost, carbon and energy at once (click to select)</span>
+        <span><span style={{ color: "#2FB477" }}>●</span> simulated in EnergyPlus</span>
+        <span><span style={{ color: "#fff" }}>◆</span> today's building (do nothing)</span>
+      </div>
+      <div style={{ fontSize: 10.5, color: white(0.4), marginTop: 4, paddingLeft: 8, lineHeight: 1.5 }}>
+        Dots stacked straight up and down use the same energy but cost more and/or emit more — e.g. build-ups with the same
+        U-value at different prices, or the same package plus a new storey (whose energy only EnergyPlus can show).
       </div>
     </div>
   );

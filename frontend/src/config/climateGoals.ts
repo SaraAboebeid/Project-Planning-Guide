@@ -39,7 +39,13 @@ export interface ClimateGoal {
   /** Short attribution shown under the goal statement. */
   source: string;
   sourceUrl?: string;
+  /** Panel heading, when "<city> climate target" would undersell what is
+   *  scored (e.g. a building-energy sub-target of a wider emissions goal). */
+  title?: string;
 }
+
+/** Heading for a goal's panel and report section. */
+export const goalTitle = (g: ClimateGoal) => g.title ?? `${g.city} climate target`;
 
 const SE_NATIONAL: Omit<ClimateGoal, "city"> = {
   kind: "pct", reductionPct: 50, targetYear: 2050, scope: "national",
@@ -57,6 +63,7 @@ export const CLIMATE_GOALS: ClimateGoal[] = [
   },
   {
     city: "Malmö", kind: "pct", reductionPct: 15, targetYear: 2030, scope: "city",
+    title: "Malmö building-energy climate target",
     basis: "Specific energy use (kWh/m², from energy declarations) of Malmö's buildings −15% by 2030 vs 2019.",
     headline: "Area emissions −70% vs 1990; 100% renewable or recycled energy by 2030",
     source: "Energistrategi för Malmö 2022–2030",

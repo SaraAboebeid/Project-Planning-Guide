@@ -64,6 +64,8 @@ export default defineConfig({
         server.middlewares.use("/gothenburg_3d.css", serveStaticFile(MAP_CSS, "text/css; charset=utf-8"));
         server.middlewares.use("/gothenburg_3d.meta.js", serveStaticFile(MAP_META_JS, "text/javascript; charset=utf-8"));
         server.middlewares.use("/buildings.json", serveStaticFile(BUILDINGS_JSON, "application/json; charset=utf-8"));
+        // Other Swedish cities in the same viewer (?city=malmo → buildings_malmo.json).
+        server.middlewares.use("/buildings_malmo.json", serveStaticFile(path.join(PROJECT_ROOT, "assets", "buildings_malmo.json"), "application/json; charset=utf-8"));
         server.middlewares.use("/viewer/js", (_req, res, next) => {
           const requestPath = (_req.url || "").split("?")[0].replace(/^\/+/, "");
           const relativePath = requestPath.replace(/^viewer\/js\//, "").replace(/^viewer\/js$/, "");

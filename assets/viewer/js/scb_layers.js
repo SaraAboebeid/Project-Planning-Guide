@@ -14,7 +14,12 @@
     + '&outputFormat=application%2Fjson&maxFeatures=10000'
     + '&srsName=EPSG%3A4326';  // force WGS84 — Cesium can't parse SWEREF99 (EPSG:3006)
 
-  const GBG_BBOX = '11.85,57.60,12.10,57.80,EPSG:4326';
+  // SCB's WFS is national: Gothenburg keeps its tuned box, other Swedish cities
+  // get a similar-sized box around the city loaded (?city=).
+  const _c = window.VIEWER_CITY;
+  const GBG_BBOX = (!_c || _c.id === 'gothenburg' || _c.lat == null)
+    ? '11.85,57.60,12.10,57.80,EPSG:4326'
+    : `${(_c.lon - 0.14).toFixed(3)},${(_c.lat - 0.1).toFixed(3)},${(_c.lon + 0.14).toFixed(3)},${(_c.lat + 0.1).toFixed(3)},EPSG:4326`;
 
   // ── Colour helpers ───────────────────────────────────────────────────────────
   function col(r, g, b, a) { return new Cesium.Color(r/255, g/255, b/255, (a||255)/255); }

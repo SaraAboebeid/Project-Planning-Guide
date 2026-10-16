@@ -114,12 +114,17 @@ export default function BaselineSetup() {
   // resolve to the same set.
   const [selected, setSelected] = useState<Set<number> | null>(null);
   const [selectionMode, setSelectionMode] = useState<"step2" | "all" | "custom">("step2");
-  const allIdx = useMemo(() => new Set(buildings.map((_, i) => i)), [buildings]);
+  // Sheds, garages and other outbuildings are usually unheated, so a heating
+  // model says nothing useful about them: they are left out of "Select all"
+  // and the Step 2 shortlist by default, but can still be ticked by hand.
+  const outbuildingIdx = useMemo(() => new Set(buildings.flatMap((b, i) =>
+    b.use_cat === "komplement" || (b.use_cat === "ovrigt" && (b.footprint_m2 ?? 0) < 50) ? [i] : [])), [buildings]);
+  const allIdx = useMemo(() => new Set(buildings.flatMap((_, i) => outbuildingIdx.has(i) ? [] : [i])), [buildings, outbuildingIdx]);
   const prioritizedIdx = useMemo(() => {
     const idx = project.prioritizedBuildingIndices ?? [];
-    const valid = idx.filter((i) => Number.isInteger(i) && i >= 0 && i < buildings.length);
+    const valid = idx.filter((i) => Number.isInteger(i) && i >= 0 && i < buildings.length && !outbuildingIdx.has(i));
     return valid.length ? new Set(valid) : null;
-  }, [project.prioritizedBuildingIndices, buildings.length]);
+  }, [project.prioritizedBuildingIndices, buildings.length, outbuildingIdx]);
   const effectiveSelected = selected ?? prioritizedIdx ?? allIdx;
   const carriesFromStep2 = selectionMode === "step2" && prioritizedIdx != null;
   /* "Use Step 2 shortlist" is only worth offering when it differs from "Select
@@ -342,6 +347,7 @@ export default function BaselineSetup() {
               // Carried from the backend so the caveat stays attached to the
               // number wherever it is shown (pools, hospitals, industry).
               modelScope: r?.model_scope ?? src?.model_scope ?? null,
+              heightCorrected: r?.height_corrected ?? null,
             };
           });
           setProject({ baselineStatus: "done", renovationBaselineResults: mapped, baselineBatchId: batch_id });
@@ -497,6 +503,10 @@ export default function BaselineSetup() {
           )}
           <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", margin: "0 0 10px" }}>
             Click a building to include or exclude it from the baseline run.
+            {outbuildingIdx.size > 0 && (
+              <> {outbuildingIdx.size} outbuilding{outbuildingIdx.size === 1 ? "" : "s"} (sheds, garages — usually unheated)
+              {outbuildingIdx.size === 1 ? " is" : " are"} left out by default; click to include.</>
+            )}
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {buildingStatus.map((bs, idx) => {
@@ -673,6 +683,22 @@ export default function BaselineSetup() {
               {resultView === "building" && activeBuildingResult?.modelScope && (
                 <ModelScopeNotice scope={activeBuildingResult.modelScope} />
               )}
+              {(() => {
+                const fixed = resultView === "building"
+                  ? (activeBuildingResult?.heightCorrected ? [activeBuildingResult] : [])
+                  : results.filter((r) => r.heightCorrected);
+                if (fixed.length === 0) return null;
+                return (
+                  <div style={{ fontSize: 12, lineHeight: 1.55, color: "#E8880C", background: "rgba(232,136,12,0.08)",
+                    border: "1px solid rgba(232,136,12,0.35)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>
+                    <b>Height corrected:</b> the building outline was too low for the number of floors in the energy
+                    declaration, so {fixed.length === 1 ? "this building was" : `${fixed.length} buildings were`} simulated
+                    at floors × 3.2 m instead —{" "}
+                    {fixed.map((r) => `${r.address}: ${r.heightCorrected!.floors} floors, ${r.heightCorrected!.from_m} m → ${r.heightCorrected!.to_m} m`).join(" · ")}.
+                    The outline may belong to a lower wing or be linked to the wrong declaration, so treat these results with care.
+                  </div>
+                );
+              })()}
               {resultView === "all" && results.some((r) => r.modelScope?.level === "out_of_scope") && (
                 <ModelScopeNotice
                   scope={{

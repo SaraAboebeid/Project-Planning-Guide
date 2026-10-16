@@ -127,6 +127,16 @@ function _refresh(force) {
 async function vegetationInit() {
   if (_vegData) return;
   if (typeof viewer === 'undefined' || !viewer || !window.getBuildingBaseOffset) { setTimeout(vegetationInit, 400); return; }
+  // LiDAR trees exist for Gothenburg only: don't download 50 MB of them for
+  // another city - show the row greyed out instead.
+  if (window.cityHasLidar && !window.cityHasLidar()) {
+    _injectVegToggle();
+    const b = document.getElementById('btn-overlay-vegetation');
+    if (b) { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); }
+    _vegVisible = false; _userVisible = false;
+    window.markCityUnavailable(b);
+    return;
+  }
   try {
     const r = await fetch('dtcc_vegetation.json', { cache: 'default' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -184,6 +194,7 @@ function _injectVegToggle() {
 // already includes real trees, so ours would double up). Restores the user's
 // previous choice when leaving photorealistic. Called from cesium.js setPhotoMode.
 window.vegetationSetPhotoForced = function (forced) {
+  if (window.cityHasLidar && !window.cityHasLidar()) return;   // row stays greyed out: no data here
   _photoForced = !!forced;
   const btn = document.getElementById('btn-overlay-vegetation');
   const note = document.getElementById('veg-photo-note');

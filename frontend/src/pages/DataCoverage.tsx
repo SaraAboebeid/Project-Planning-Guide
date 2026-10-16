@@ -1329,7 +1329,7 @@ function BboxDataBanner({
       ? `/uk_3d.html?city=${ukViewerCityId(projectCity)}&bbox=${box}`
       : country === "Belgium"
       ? `/be_3d.html?city=${beViewerCityId(projectCity)}&bbox=${box}`
-      : `/gothenburg_3d.html?bbox=${box}`;
+      : `/gothenburg_3d.html?city=${seCityId(projectCity)}&bbox=${box}`;
   })();
 
   function togglePageAll() {
@@ -1933,7 +1933,7 @@ function BuildingDataBanner({
     ? `/uk_3d.html?city=${ukViewerCityId(projectCity)}&bbox=${[building.lat + d, building.lat - d, building.lon + d, building.lon - d].join(",")}`
     : isBE
     ? `/be_3d.html?city=${beViewerCityId(projectCity)}&bbox=${[building.lat + d, building.lat - d, building.lon + d, building.lon - d].join(",")}`
-    : `/gothenburg_3d.html?lat=${building.lat}&lon=${building.lon}&zoom=17`;
+    : `/gothenburg_3d.html?city=${seCityId(projectCity)}&lat=${building.lat}&lon=${building.lon}&zoom=17`;
 
   const fields: { key: keyof BuildingLookup; label: string }[] = [
     { key: "use_cat",       label: "Use" },

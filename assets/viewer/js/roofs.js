@@ -169,6 +169,13 @@ async function roofsInit() {
   if (typeof viewer === 'undefined' || !viewer || typeof DATA === 'undefined' || !window.getBuildingBaseOffset) {
     setTimeout(roofsInit, 500); return;
   }
+  // The roof caps are keyed by Gothenburg's building index; in another city they
+  // would land on the wrong buildings, so show the row greyed out instead.
+  if (window.cityHasLidar && !window.cityHasLidar()) {
+    _injectRoofToggle();
+    window.markCityUnavailable(document.getElementById('btn-overlay-roofs'));
+    return;
+  }
   try {
     const r = await fetch('roofs_gothenburg.json', { cache: 'default' });
     if (!r.ok) throw new Error('HTTP ' + r.status);

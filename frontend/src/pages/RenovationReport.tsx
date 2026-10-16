@@ -5,7 +5,7 @@ import { useWizardStore, FACADE_ORIENTATIONS, type FacadeOrientation } from "../
 import { filterToBaselineShortlist } from "../utils/baselineShortlist";
 import { buildingUseLabel } from "../utils/useLabels";
 import { excludesHouseholdElectricity } from "../utils/energyTotals";
-import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal, assessRating, isScorable, goalStatement, requiredPct } from "../config/climateGoals";
+import { climateGoalFor, assessAgainstGoal, assessBuildingsAgainstGoal, assessRating, isScorable, goalStatement, requiredPct, goalTitle } from "../config/climateGoals";
 import ClimateGoalPanel, { ClimateGoalInfo, ClimateGoalRatingPanel } from "../components/ClimateGoalPanel";
 import ClimateGoalBuildingTable from "../components/ClimateGoalBuildingTable";
 import type { BuildingLookup, BuildingRecord } from "../types";
@@ -155,7 +155,7 @@ const COMP_COLORS: Record<string, string> = {
  *  the downloaded report. */
 const PV_ASSUMPTIONS = [
   "Calculation: PVGIS v5.2 by the EU Joint Research Centre, using its satellite-based solar radiation data for each building's location.",
-  "Roof area: 80% of the building's footprint is usable for panels (the rest is left for edges, hatches and equipment).",
+  "Roof covered with panels: set per building with the slider (default 80% of the footprint, leaving the rest for edges, hatches and equipment). Production scales in proportion: the building's PVGIS yield per kWp × the system size.",
   "System size: 0.2 kWp per m² of usable roof (about 5 m² of roof per kWp).",
   "Panels: crystalline silicon, tilted 35° and facing south.",
   "System losses: 14% (cables, inverter, dirt and temperature effects).",
@@ -255,7 +255,23 @@ export default function RenovationReport() {
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pvKey]);
-  const pvOk = (pv?.results ?? []).filter((r) => r.annual_kwh != null);
+  /* Share of each roof covered with panels, set per building with a slider
+     (default 80%, the viewer's assumption). PVGIS output is linear in system
+     size, so the building's specific yield (kWh per kWp) is simply rescaled:
+     production = footprint × coverage × 0.2 kWp/m² × kWh/kWp. */
+  const PV_DEFAULT_COV = 80;
+  const [pvCov, setPvCov] = useState<Record<string, number>>({});
+  const pvRows = (pv?.results ?? []).map((r, i) => {
+    const key = `${r.address ?? "b"}#${i}`;
+    const cov = pvCov[key] ?? PV_DEFAULT_COV;
+    if (r.annual_kwh == null || !r.kWp) return { ...r, key, cov };
+    const footprint = buildings.find((x) => x.address === r.address)?.footprint_m2 ?? (r.roof_area_m2 ?? 0) / 0.8;
+    const yieldPerKwp = r.specific_kwh_kwp ?? r.annual_kwh / r.kWp;
+    const roof = footprint * cov / 100;
+    const kWp = Math.round(roof * 0.2 * 10) / 10;
+    return { ...r, key, cov, roof_area_m2: Math.round(roof), kWp, annual_kwh: kWp * yieldPerKwp };
+  });
+  const pvOk = pvRows.filter((r) => r.annual_kwh != null);
   const pvTotalKwh = pvOk.reduce((s, r) => s + (r.annual_kwh ?? 0), 0);
   const pvTotalKwp = pvOk.reduce((s, r) => s + (r.kWp ?? 0), 0);
 
@@ -684,9 +700,9 @@ export default function RenovationReport() {
   ${pvOk.length ? `
   <h2>Solar production potential (rooftop PV)</h2>
   <p class="sub">About <b>${(pvTotalKwh / 1000).toLocaleString("sv-SE", { maximumFractionDigits: 1 })} MWh of electricity a year</b> from ${pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp on the roofs of ${pvOk.length} building${pvOk.length === 1 ? "" : "s"}.</p>
-  <table><thead><tr><th>Building</th><th>Usable roof</th><th>System size</th><th>Annual production</th></tr></thead><tbody>
-  ${pvOk.map((r) => `<tr><td>${esc(r.address ?? "Building")}</td><td>${r.roof_area_m2?.toLocaleString("sv-SE")} m²</td><td>${r.kWp?.toLocaleString("sv-SE")} kWp</td><td><b>${Math.round(r.annual_kwh!).toLocaleString("sv-SE")} kWh/yr</b></td></tr>`).join("")}
-  ${pvOk.length > 1 ? `<tr><td><b>Total</b></td><td>${pvOk.reduce((s, r) => s + (r.roof_area_m2 ?? 0), 0).toLocaleString("sv-SE")} m²</td><td>${pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp</td><td><b>${Math.round(pvTotalKwh).toLocaleString("sv-SE")} kWh/yr</b></td></tr>` : ""}
+  <table><thead><tr><th>Building</th><th>Roof covered</th><th>Panel area</th><th>System size</th><th>Annual production</th></tr></thead><tbody>
+  ${pvOk.map((r) => `<tr><td>${esc(r.address ?? "Building")}</td><td>${r.cov}%</td><td>${r.roof_area_m2?.toLocaleString("sv-SE")} m²</td><td>${r.kWp?.toLocaleString("sv-SE")} kWp</td><td><b>${Math.round(r.annual_kwh!).toLocaleString("sv-SE")} kWh/yr</b></td></tr>`).join("")}
+  ${pvOk.length > 1 ? `<tr><td><b>Total</b></td><td></td><td>${pvOk.reduce((s, r) => s + (r.roof_area_m2 ?? 0), 0).toLocaleString("sv-SE")} m²</td><td>${pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp</td><td><b>${Math.round(pvTotalKwh).toLocaleString("sv-SE")} kWh/yr</b></td></tr>` : ""}
   </tbody></table>
   <p class="sub"><b>Assumptions</b></p>
   <ul class="muted">${PV_ASSUMPTIONS.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
@@ -728,7 +744,7 @@ export default function RenovationReport() {
   </tbody></table>
 
   ${goalAssessment ? `
-  <h2>${esc(goalAssessment.goal.city)} climate target</h2>
+  <h2>${esc(goalTitle(goalAssessment.goal))}</h2>
   <p class="sub">${esc(goalStatement(goalAssessment.goal))} Official target: ${esc(goalAssessment.goal.basis)} Source: ${esc(goalAssessment.goal.source)}${goalAssessment.goal.sourceUrl ? ` (${esc(goalAssessment.goal.sourceUrl)})` : ""}.</p>
   <p style="font-weight:700;margin:2px 0 6px;color:${goalAssessment.achievers.length ? "#15803d" : "#b45309"}">
     ${goalAssessment.achievers.length
@@ -763,7 +779,7 @@ export default function RenovationReport() {
   </tbody></table>
   <p class="sub" style="margin-top:4px">Values in kWh/m²·yr · pp = percentage points short of the building's target.</p>` : ""}` : ""}
   ${climateGoal && !isScorable(climateGoal) ? `
-  <h2>${esc(climateGoal.city)} climate target</h2>
+  <h2>${esc(goalTitle(climateGoal))}</h2>
   <p class="sub">${esc(goalStatement(climateGoal))} ${climateGoal.headline ? `Headline goal: ${esc(climateGoal.headline)}. ` : ""}Official target: ${esc(climateGoal.basis)} Source: ${esc(climateGoal.source)}${climateGoal.sourceUrl ? ` (${esc(climateGoal.sourceUrl)})` : ""}.</p>
   ${ratingGoal ? `
   <p style="font-weight:700;margin:2px 0 6px">Buildings at band ${esc(climateGoal.targetRating ?? "")} or better: ${ratingGoal.metToday}/${ratingGoal.rows.length} today${ratingGoal.columns.map((c) => ` · ${esc(c.label)}: ${c.met}/${c.total} (est.)`).join("")}</p>
@@ -1347,25 +1363,43 @@ export default function RenovationReport() {
                   <strong style={{ color: "#E8B10C" }}>{(pvTotalKwh / 1000).toLocaleString("sv-SE", { maximumFractionDigits: 1 })} MWh of electricity a year</strong>{" "}
                   from {pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp installed.</>}
               </p>
+              {pvOk.length > 1 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px", fontSize: 11.5, color: "rgba(255,255,255,0.6)" }}>
+                  <span>Set all roofs to</span>
+                  <input type="range" min={0} max={100} step={5}
+                    value={pvRows[0]?.cov ?? PV_DEFAULT_COV}
+                    onChange={(e) => { const v = Number(e.target.value); setPvCov(Object.fromEntries(pvRows.map((r) => [r.key, v]))); }}
+                    style={{ width: 160, accentColor: "#E8B10C" }} />
+                  <span style={{ color: "#E8B10C", fontWeight: 700, minWidth: 34 }}>{pvRows[0]?.cov ?? PV_DEFAULT_COV}%</span>
+                  <span style={{ color: "rgba(255,255,255,0.4)" }}>covered with panels — or adjust each building below</span>
+                </div>
+              )}
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                   <thead>
                     <tr style={{ color: "rgba(255,255,255,0.45)" }}>
-                      {["Building", "Usable roof", "System size", "Annual production"].map((h, i) => (
+                      {["Building", "Roof covered with panels", "Panel area", "System size", "Annual production"].map((h, i) => (
                         <th key={h} style={{ padding: "6px 8px", fontWeight: 600, textAlign: i ? "right" : "left", whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {(pv?.results ?? []).map((r, i) => (
+                    {pvRows.map((r, i) => (
                       <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
                         <td style={{ padding: "6px 8px", color: "#fff" }}>
                           {r.address ?? "Building"}
                           {r.source === "saved" && <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 10.5 }}> · saved from the 3D viewer</span>}
                         </td>
                         {r.annual_kwh == null ? (
-                          <td colSpan={3} style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>— {r.error ?? "no result"}</td>
+                          <td colSpan={4} style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>— {r.error ?? "no result"}</td>
                         ) : (<>
+                          <td style={{ padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
+                            <input type="range" min={0} max={100} step={5} value={r.cov}
+                              onChange={(e) => setPvCov((m) => ({ ...m, [r.key]: Number(e.target.value) }))}
+                              aria-label={`Share of ${r.address ?? "the"} roof covered with panels`}
+                              style={{ width: 110, verticalAlign: "middle", accentColor: "#E8B10C" }} />
+                            <span style={{ display: "inline-block", minWidth: 38, color: "#E8B10C", fontWeight: 700 }}>{r.cov}%</span>
+                          </td>
                           <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{r.roof_area_m2?.toLocaleString("sv-SE")} m²</td>
                           <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{r.kWp?.toLocaleString("sv-SE")} kWp</td>
                           <td style={{ padding: "6px 8px", textAlign: "right", color: "#E8B10C", fontWeight: 700 }}>{Math.round(r.annual_kwh).toLocaleString("sv-SE")} kWh/yr</td>
@@ -1375,6 +1409,7 @@ export default function RenovationReport() {
                     {pvOk.length > 1 && (
                       <tr style={{ borderTop: "1px solid rgba(255,255,255,0.15)" }}>
                         <td style={{ padding: "6px 8px", color: "#fff", fontWeight: 700 }}>Total</td>
+                        <td />
                         <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{pvOk.reduce((s, r) => s + (r.roof_area_m2 ?? 0), 0).toLocaleString("sv-SE")} m²</td>
                         <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp</td>
                         <td style={{ padding: "6px 8px", textAlign: "right", color: "#E8B10C", fontWeight: 800 }}>{Math.round(pvTotalKwh).toLocaleString("sv-SE")} kWh/yr</td>

@@ -1,16 +1,18 @@
 import { Map, ExternalLink, Layers, Zap, Calendar, Building2 } from "lucide-react";
 import { useWizardStore } from "../../store/wizard";
+import { seCityId } from "../../config/countryNav";
 
 export default function BuildingMapPanel() {
   const buildingPoints = useWizardStore((s) => s.project.buildingPoints);
+  const cityId = seCityId(useWizardStore((s) => s.project.city));
 
   const cesiumUrl = (() => {
-    const base = "/gothenburg_3d.html";
+    const base = `/gothenburg_3d.html?city=${cityId}`;
     if (buildingPoints.length === 0) return base;
     const pts = buildingPoints
       .map((p) => `${p.lat.toFixed(6)},${p.lon.toFixed(6)}`)
       .join("|");
-    return `${base}?points=${encodeURIComponent(pts)}`;
+    return `${base}&points=${encodeURIComponent(pts)}`;
   })();
 
   return (

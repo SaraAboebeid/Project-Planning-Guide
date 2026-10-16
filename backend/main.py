@@ -3608,6 +3608,12 @@ def _normalize_energy(energy_use: dict, footprint_from_epsm: Optional[float], bu
         # Travels with the numbers on purpose: a result that leaves the backend
         # without its caveat gets quoted without it (null when the model fits).
         "model_scope": _model_scope(building_info),
+        # Set when the outline's height could not hold the declared storeys and
+        # the model was run at floors x 3.2 m instead (see _with_height_fix).
+        "height_corrected": ({"from_m": building_info["height_corrected_from_m"],
+                              "to_m": round(float(building_info.get("height") or 0), 1),
+                              "floors": floors}
+                             if building_info.get("height_corrected_from_m") else None),
         # UK: homes inside the footprint (OS Open UPRN address count, see
         # tools/uk/anchor_epc_uprn.py) - OSM often draws a semi pair or a terrace
         # row as one polygon, so per-home figures are what compare to one meter.
@@ -3655,6 +3661,26 @@ def _envelope_overrides(building: dict, country: str, req) -> dict:
         if out[key] is not None and current is not None:
             out[key] = min(out[key], float(current))
     return out
+
+
+def _with_height_fix(building: dict, country: str) -> dict:
+    """Sweden: floors come from the energy declaration, height from the building
+    outline, and the two sometimes describe different buildings (an outline
+    linked to the wrong EPC, or a low wing of a tall block). Eight storeys in a
+    10.5 m box leaves the model with about half its real wall area, so the
+    heating comes out far too low. When the storeys don't fit (< 2.5 m each),
+    simulate at floors x 3.2 m and record the correction so the UI can say so."""
+    if (country or "").lower() != "se":
+        return building
+    try:
+        floors = int(round(float(building.get("floors") or 0)))
+        height = float(building.get("height") or 0)
+    except (TypeError, ValueError):
+        return building
+    if floors < 2 or height <= 0 or height / floors >= 2.5:
+        return building
+    from tools.idf.defaults import FLOOR_HEIGHT_M
+    return {**building, "height": floors * FLOOR_HEIGHT_M, "height_corrected_from_m": round(height, 1)}
 
 
 def _with_extension(building: dict, req: Any) -> tuple[dict, dict]:
@@ -3799,7 +3825,7 @@ async def submit_simulation(req: SimulationSubmitRequest):
         if not candidates:
             raise HTTPException(404, "No building with real geometry found near this location")
         building = min(candidates, key=lambda t: t[0])[1]
-    building = _with_epc_dhw(building, req.country, city_id)
+    building = _with_height_fix(_with_epc_dhw(building, req.country, city_id), req.country)
     building, ext_kwargs = _with_extension(building, req)
 
     try:
@@ -3949,7 +3975,8 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
             if not candidates:
                 raise HTTPException(404, f"No building with real geometry found near building {i} ({b.lat}, {b.lon})")
             building = min(candidates, key=_dist)
-        extended, ext_kwargs = _with_extension(_with_epc_dhw(building, req.country, city_id), req)
+        extended, ext_kwargs = _with_extension(
+            _with_height_fix(_with_epc_dhw(building, req.country, city_id), req.country), req)
         resolved.append({"lat": b.lat, "lon": b.lon, "address": b.address,
                          "building": extended, "ext_kwargs": ext_kwargs,
                          "wwr_by_orientation": b.wwr_by_orientation})
@@ -5567,10 +5594,11 @@ async def energy_price(country: str = Query("se"), zone: str = Query("SE3"),
 # ── Environmental analysis: shared helpers ────────────────────────────────────
 def _analysis_buildings(country: str, city_id: str) -> list:
     """Building set to shade an analysis: UK city buildings for 'gb', else the
-    Swedish (Gothenburg) set. Keeps every site analysis correct per country."""
+    Swedish city's own set (Gothenburg by default; Malmö etc. by city_id) -
+    a Malmö point used to be shaded by Gothenburg's buildings, i.e. by none."""
     if _district_cc(country):
         return _get_uk_buildings_list(city_id or "", _district_cc(country))
-    return _get_buildings_list()
+    return _se_buildings(city_id or "gothenburg")
 
 
 def _analysis_epw_path(city_id: str) -> "Path":

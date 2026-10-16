@@ -33,7 +33,9 @@
   // Accessibility is OSM-only so it works anywhere; Heat Island
   // still needs Swedish building-energy data and stays SE-only in the UI.
   const _ctr  = window.VIEW_CENTER || { lat: 57.70, lon: 11.96 };
-  const _isSE = (window.VIEWER_COUNTRY === 'se');
+  // Gothenburg's tuned extent + pre-baked green spaces apply to Gothenburg only;
+// any other city (Malmö, UK, BE) derives its box and fetches live OSM green areas.
+const _isSE = (window.VIEWER_COUNTRY === 'se') && (!window.VIEWER_CITY || window.VIEWER_CITY.id === 'gothenburg');
   const LAT0 = _isSE ? 57.60 : _ctr.lat - 0.090;
   const LAT1 = _isSE ? 57.83 : _ctr.lat + 0.090;
   const LON0 = _isSE ? 11.79 : _ctr.lon - 0.140;

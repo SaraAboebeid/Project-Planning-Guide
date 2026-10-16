@@ -300,6 +300,8 @@ export const api = {
           gas_kwh_per_dwelling?: number | null; total_kwh_per_dwelling?: number;
           /** Set when the shoebox is not a fair model of this building (backend _model_scope). */
           model_scope?: { level: "out_of_scope" | "caution"; reason: string; matched?: string | null } | null;
+          /** Set when the outline was too short for the declared storeys and the model ran at floors × 3.2 m. */
+          height_corrected?: { from_m: number; to_m: number; floors: number } | null;
         } | null;
         error: string | null;
       }>;
