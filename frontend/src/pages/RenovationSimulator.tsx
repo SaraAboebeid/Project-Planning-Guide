@@ -35,6 +35,7 @@ import {
   EXISTING_LAYER_ID,
 } from "../config/materialCatalogue";
 import type { BoverketResource, WWRRecord } from "../types";
+import { useT, translate } from "../i18n";
 import {
   Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight, Play, Layers, Settings,
   ScatterChart, BarChart3, SlidersHorizontal, Info,
@@ -106,17 +107,17 @@ const ROW_TAG_STYLE: Record<string, { bg: string; fg: string }> = {
 /** Change against the baseline, shown under a value. Down = less energy = good. */
 function vsBaseline(value: number | null, base: number | null, isBaseline: boolean) {
   if (isBaseline) {
-    return <span style={{ display: "block", fontSize: 9.5, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>baseline</span>;
+    return <span style={{ display: "block", fontSize: 9.5, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>{translate("baseline")}</span>;
   }
   if (value == null || base == null || base === 0) return null;
   const pct = Math.round(((value - base) / base) * 100);
   if (pct === 0) {
-    return <span style={{ display: "block", fontSize: 9.5, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>±0% vs baseline</span>;
+    return <span style={{ display: "block", fontSize: 9.5, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{translate("±0% vs baseline")}</span>;
   }
   const better = pct < 0;
   return (
     <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, marginTop: 2, color: better ? "#2FB477" : "#E2483B" }}>
-      {better ? "▼" : "▲"} {Math.abs(pct)}% vs baseline
+      {better ? "▼" : "▲"} {translate("{pct}% vs baseline", { pct: Math.abs(pct) })}
     </span>
   );
 }
@@ -214,10 +215,10 @@ function uAddedToExisting(existingU: number | null, addedU: number | null | unde
 }
 function uLabel(u?: number) {
   if (!u) return null;
-  if (u <= 0.13) return { label: "Excellent", color: "#2FB477" };
-  if (u <= 0.20) return { label: "Good", color: "#4ECDC4" };
-  if (u <= 0.30) return { label: "Standard", color: "#E8880C" };
-  return { label: "Basic", color: "#E2483B" };
+  if (u <= 0.13) return { label: translate("Excellent"), color: "#2FB477" };
+  if (u <= 0.20) return { label: translate("Good"), color: "#4ECDC4" };
+  if (u <= 0.30) return { label: translate("Standard"), color: "#E8880C" };
+  return { label: translate("Basic"), color: "#E2483B" };
 }
 
 function ukOverridesFromTier(tier: TabulaArchetypeGB[RefurbTierKey] | undefined | null): Record<string, number> {
@@ -300,7 +301,7 @@ function packageMaterials(
   itemByCode: Record<string, WikellsItem>,
 ): { component: string; material: string; u: number | null; layers?: { name: string; thicknessMm: number; category?: string }[] }[] {
   const pretty = (key: string) =>
-    key.startsWith("VertExt::") ? `New ${key.slice("VertExt::".length).toLowerCase()}` : key;
+    key.startsWith("VertExt::") ? translate("New {part}", { part: translate(key.slice("VertExt::".length)).toLowerCase() }) : translate(key);
   return Object.entries(pkg.selections).map(([key, sel]) => {
     const it = itemByCode[sel.wikellsCode];
     // Layer-composed assemblies carry their full build-up; resolve each layer's
@@ -327,12 +328,12 @@ function appliedUValues(
 ): { label: string; u: number }[] {
   const o = overridesFromSeSelections(pkg.selections, itemByCode);
   return [
-    { label: "wall", u: o.u_wall_override },
-    { label: "roof", u: o.u_roof_override },
-    { label: "window", u: o.u_win_override },
-    { label: "floor", u: o.u_floor_override },
-    { label: "new-storey wall", u: o.u_ext_wall },
-    { label: "new-storey window", u: o.u_ext_win },
+    { label: translate("wall"), u: o.u_wall_override },
+    { label: translate("roof"), u: o.u_roof_override },
+    { label: translate("window"), u: o.u_win_override },
+    { label: translate("floor"), u: o.u_floor_override },
+    { label: translate("new-storey wall"), u: o.u_ext_wall },
+    { label: translate("new-storey window"), u: o.u_ext_win },
   ].filter((x): x is { label: string; u: number } => x.u != null);
 }
 
@@ -349,11 +350,11 @@ const EMPTY_CONFIGS: ComponentConfig[] = [];
  *  insulation thickness in mm. The original string stays in the tooltip. */
 function readableAssembly(description: string): string {
   return description
-    .replace(/^EW/, "Exterior wall:")
-    .replace(/^IW/, "Interior wall:")
-    .replace(/CLT (\d+)/g, "$1 mm cross-laminated timber (CLT)")
-    .replace(/M(\d+)\+(\d+)/g, "$1+$2 mm insulation")
-    .replace(/M(\d+)/g, "$1 mm insulation");
+    .replace(/^EW/, translate("Exterior wall:"))
+    .replace(/^IW/, translate("Interior wall:"))
+    .replace(/CLT (\d+)/g, translate("$1 mm cross-laminated timber (CLT)"))
+    .replace(/M(\d+)\+(\d+)/g, translate("$1+$2 mm insulation"))
+    .replace(/M(\d+)/g, translate("$1 mm insulation"));
 }
 
 function baselineUForKey(key: string, geo?: ResolvedBuildingGeometry | null): number | null {
@@ -457,8 +458,9 @@ function LineItemPicker({
 }) {
   const color = COMPONENT_COLORS[item.parentComponent] ?? "var(--brand)";
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
+  const t = useT();
   if (items.length === 0) {
-    return <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>No catalogue materials found for this item.</p>;
+    return <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{t("No catalogue materials found for this item.")}</p>;
   }
 
   // Recommended shortlist: whatever the KPI logic tagged (already filtered to
@@ -492,8 +494,8 @@ function LineItemPicker({
     if (p.frame) chips.push({ label: p.frame, color: "#E8880C" });
     if (p.insulationMm != null) {
       chips.push(p.insulationMm === 0
-        ? { label: "no insulation", color: "#E2483B" }
-        : { label: `${p.insulationMm} mm ${p.insulationType ?? "insulation"}`, color: "#4ECDC4" });
+        ? { label: t("no insulation"), color: "#E2483B" }
+        : { label: `${p.insulationMm} mm ${p.insulationType ?? t("insulation")}`, color: "#4ECDC4" });
     }
     if (p.cladding) chips.push({ label: p.cladding, color: "#4A90E2" });
     const hovered = hoveredCode === it.code;
@@ -509,8 +511,8 @@ function LineItemPicker({
         onMouseLeave={() => setHoveredCode(null)}
         onFocus={() => setHoveredCode(it.code)}
         onBlur={() => setHoveredCode(null)}
-        title={checked ? "Remove this configuration"
-          : worsens ? `${it.description}\n\n⚠ U ${it.uValue} is worse than the building's current ~${baselineU} — this would RAISE energy use.`
+        title={checked ? t("Remove this configuration")
+          : worsens ? `${it.description}\n\n⚠ ${t("U {u} is worse than the building's current ~{base} — this would RAISE energy use.", { u: String(it.uValue), base: String(baselineU) })}`
           : (it as CatalogueAssembly).sourceNote ? `${it.description}\n\n${(it as CatalogueAssembly).sourceNote}`
           : it.description}
         style={{
@@ -535,20 +537,20 @@ function LineItemPicker({
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
             title={it.description}>{readableAssembly(it.description)}</span>
           <span style={{ display: "flex", gap: 3, overflow: "hidden", whiteSpace: "nowrap", alignItems: "center" }}>
-            {tags.map((t) => {
-              const bal = t === "Balanced";
+            {tags.map((tag) => {
+              const bal = tag === "Balanced";
               const c = bal ? "#E9B949" : "#2FB477";
               return (
-                <span key={t} style={{ fontSize: 8.5, fontWeight: 800, color: c, background: `${c}24`,
-                  border: `1px solid ${c}66`, borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>★ {t}</span>
+                <span key={tag} style={{ fontSize: 8.5, fontWeight: 800, color: c, background: `${c}24`,
+                  border: `1px solid ${c}66`, borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>★ {t(tag)}</span>
               );
             })}
             {worsens && (
               <span style={{ fontSize: 8.5, fontWeight: 800, color: "#E2483B", background: "rgba(226,72,59,0.14)",
-                border: "1px solid rgba(226,72,59,0.4)", borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>▲ raises energy</span>
+                border: "1px solid rgba(226,72,59,0.4)", borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>▲ {t("raises energy")}</span>
             )}
             {improves && !tags.length && (
-              <span style={{ fontSize: 8.5, fontWeight: 700, color: "#4ECDC4", flexShrink: 0 }}>improves</span>
+              <span style={{ fontSize: 8.5, fontWeight: 700, color: "#4ECDC4", flexShrink: 0 }}>{t("improves")}</span>
             )}
             {chips.map((c) => (
               <span key={c.label} style={{
@@ -561,7 +563,7 @@ function LineItemPicker({
 
         <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>
           {(it as CatalogueAssembly).costMissing
-            ? <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 600 }} title="No price in the materials catalogue">price n/a</span>
+            ? <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 600 }} title={t("No price in the materials catalogue")}>{t("price n/a")}</span>
             : `${fmtSEK(it.costSEK)}/${item.quantityKind === "area" ? "m²" : "st"}`}
         </span>
         <span style={{ textAlign: "right" }}>
@@ -573,8 +575,8 @@ function LineItemPicker({
         </span>
         <span style={{ fontSize: 9, fontWeight: 700, color: "#4A90E2", textAlign: "right" }}
           title={carbon.a1a3 != null
-            ? `${carbon.value} kg CO₂e/m² (A1–A5) = ${carbon.a1a3} production (A1–A3) + ${carbon.a4a5} transport & installation incl. waste (A4–A5). ${carbon.basis ?? ""}`
-            : `${carbon.value} kg CO₂e per unit (A1–A3, materials catalogue)`}>
+            ? `${t("{v} kg CO₂e/m² (A1–A5) = {a13} production (A1–A3) + {a45} transport & installation incl. waste (A4–A5).", { v: carbon.value, a13: carbon.a1a3, a45: String(carbon.a4a5) })} ${carbon.basis ?? ""}`
+            : t("{v} kg CO₂e per unit (A1–A3, materials catalogue)", { v: carbon.value })}>
           ~{carbon.value} kg
         </span>
       </button>
@@ -591,18 +593,18 @@ function LineItemPicker({
     <div style={{ display: "flex", flexDirection: "column", maxHeight: 320, overflowY: "auto", overflowX: "hidden" }}>
       {baselineU != null && (
         <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", margin: "0 2px 4px", lineHeight: 1.5 }}>
-          This building's current {item.label.toLowerCase()} ≈ <strong style={{ color: "#fff" }}>U {baselineU.toFixed(2)}</strong>.
-          {" "}<span style={{ color: "#4ECDC4" }}>Lower U = better.</span>{" "}
-          <span style={{ color: "#E2483B" }}>Red rows are worse than what's already there.</span>
+          {t("This building's current {part} ≈", { part: t(item.label).toLowerCase() })} <strong style={{ color: "#fff" }}>U {baselineU.toFixed(2)}</strong>.
+          {" "}<span style={{ color: "#4ECDC4" }}>{t("Lower U = better.")}</span>{" "}
+          <span style={{ color: "#E2483B" }}>{t("Red rows are worse than what's already there.")}</span>
         </div>
       )}
       {recommended.length > 0 && (
         <>
-          <SectionLabel>✦ Recommended for this building</SectionLabel>
+          <SectionLabel>✦ {t("Recommended for this building")}</SectionLabel>
           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>{recommended.map(Row)}</div>
         </>
       )}
-      <SectionLabel>All materials ({items.length})</SectionLabel>
+      <SectionLabel>{t("All materials ({n})", { n: items.length })}</SectionLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>{rest.map(Row)}</div>
     </div>
   );
@@ -659,12 +661,12 @@ function UkTierPicker({
   country?: "gb" | "be";
 }) {
   const isBE = country === "be";
+  const t = useT();
   if (!archetype && isBE) {
     return (
       <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(232,136,12,0.1)", border: "1px solid rgba(232,136,12,0.25)" }}>
         <p style={{ fontSize: 12, color: "#E8880C", margin: 0 }}>
-          No TABULA Belgium archetype matched this building (TABULA BE covers dwellings only) - envelope U-value
-          overrides aren't available, but a baseline EnergyPlus simulation can still run on the as-built defaults.
+          {t("No TABULA Belgium archetype matched this building (TABULA BE covers dwellings only) - envelope U-value overrides aren't available, but a baseline EnergyPlus simulation can still run on the as-built defaults.")}
         </p>
       </div>
     );
@@ -673,20 +675,19 @@ function UkTierPicker({
     return (
       <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(232,136,12,0.1)", border: "1px solid rgba(232,136,12,0.25)" }}>
         <p style={{ fontSize: 12, color: "#E8880C", margin: 0 }}>
-          No TABULA GB archetype matched this building's type/era - envelope U-value overrides aren't available, but a
-          baseline EnergyPlus simulation can still run on the as-built defaults.
+          {t("No TABULA GB archetype matched this building's type/era - envelope U-value overrides aren't available, but a baseline EnergyPlus simulation can still run on the as-built defaults.")}
         </p>
       </div>
     );
   }
-  const eraLabel = uSource === "known_year" ? "known construction year" : uSource === "ehs_sampled_period" ? "estimated era"
-    : uSource === "statbel_sampled_period" ? "estimated era (Statbel)" : "era unknown";
+  const eraLabel = uSource === "known_year" ? t("known construction year") : uSource === "ehs_sampled_period" ? t("estimated era")
+    : uSource === "statbel_sampled_period" ? t("estimated era (Statbel)") : t("era unknown");
   const eraColor = uSource === "known_year" ? "#2FB477" : "#E8880C";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ borderRadius: 10, padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
-          <span>As-built (TABULA {archetype.type_label}, {archetype.period_label}) - matched from building 1{buildingCount > 1 ? ` of ${buildingCount}` : ""}</span>
+          <span>{t("As-built (TABULA {type}, {period}) - matched from building 1", { type: archetype.type_label, period: archetype.period_label })}{buildingCount > 1 ? ` ${t("of {n}", { n: buildingCount })}` : ""}</span>
           <span style={{ color: eraColor, background: `${eraColor}22`, padding: "1px 7px", borderRadius: 8, fontWeight: 700, textTransform: "none", letterSpacing: 0 }}>
             {eraLabel}
           </span>
@@ -700,7 +701,7 @@ function UkTierPicker({
             )
           ))}
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-            TABULA estimate: <b style={{ color: "rgba(255,255,255,0.8)" }}>{archetype.as_built.kwh_m2_yr} kWh/m²/yr</b>
+            {t("TABULA estimate:")} <b style={{ color: "rgba(255,255,255,0.8)" }}>{archetype.as_built.kwh_m2_yr} kWh/m²/yr</b>
           </span>
         </div>
       </div>
@@ -729,7 +730,7 @@ function UkTierPicker({
                 border: `2px solid ${checked ? color : "rgba(255,255,255,0.2)"}`,
                 background: checked ? color : "transparent",
               }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: checked ? "#fff" : "rgba(255,255,255,0.75)" }}>{label}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: checked ? "#fff" : "rgba(255,255,255,0.75)" }}>{t(label)}</span>
             </div>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", paddingLeft: 23 }}>
               {(["u_wall", "u_roof", "u_window", "u_door"] as const).map((k) => (
@@ -740,11 +741,11 @@ function UkTierPicker({
                 )
               ))}
               <span style={{ fontSize: 11, color: "#4A90E2" }}>
-                TABULA estimate: <b>{tier.kwh_m2_yr} kWh/m²/yr</b>
+                {t("TABULA estimate:")} <b>{tier.kwh_m2_yr} kWh/m²/yr</b>
               </span>
               {estCost != null && estCarbon != null && (
                 <span style={{ fontSize: 11, color: "#E8880C" }}>
-                  ~{fmtGBP(estCost)} · ~{estCarbon.toLocaleString("en-GB")} kg CO₂e <i>(building 1, {UK_COST_PRICE_BASIS})</i>
+                  ~{fmtGBP(estCost)} · ~{estCarbon.toLocaleString("en-GB")} kg CO₂e <i>({t("building 1")}, {UK_COST_PRICE_BASIS})</i>
                 </span>
               )}
             </div>
@@ -766,14 +767,13 @@ function UkTierPicker({
       })}
       {isBE ? (
       <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: 0 }}>
-        TABULA Belgium (VITO): standard = upgrade towards EPBD new-build requirements, ambitious = towards a low-energy
-        standard. No open Belgian retrofit cost dataset is wired in yet, so packages show no cost.
-        The energy columns below come from an EnergyPlus simulation using this tier's U-values, applied to every selected building.
+        {t("TABULA Belgium (VITO): standard = upgrade towards EPBD new-build requirements, ambitious = towards a low-energy standard. No open Belgian retrofit cost dataset is wired in yet, so packages show no cost.")}
+        {" "}{t("The energy columns below come from an EnergyPlus simulation using this tier's U-values, applied to every selected building.")}
       </p>
       ) : (
       <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: 0 }}>
-        {UK_COST_CARBON_SOURCE_NOTE} Quantities come from the building's footprint, wall area and window-to-wall ratio.
-        The energy columns below come from an EnergyPlus simulation using this tier's U-values, applied to every selected building.
+        {UK_COST_CARBON_SOURCE_NOTE} {t("Quantities come from the building's footprint, wall area and window-to-wall ratio.")}
+        {" "}{t("The energy columns below come from an EnergyPlus simulation using this tier's U-values, applied to every selected building.")}
       </p>
       )}
     </div>
@@ -784,6 +784,7 @@ function UkTierPicker({
 export default function RenovationSimulator() {
   const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
+  const t = useT();
 
   const isUK = project.country === "United Kingdom";
   // Belgium reuses the UK's TABULA-tier flow; UK-only parts (DESNZ £, tariffs,
@@ -941,7 +942,7 @@ export default function RenovationSimulator() {
   type GeoEntry = { g: ResolvedBuildingGeometry; idx: number };
   const allEntries: GeoEntry[] = useMemo(() => geometries.map((g, i) => ({ g, idx: i })), [geometries]);
   const targetEntries: GeoEntry[] = targetIdx === "all" ? allEntries : (geometries[targetIdx] ? [{ g: geometries[targetIdx]!, idx: targetIdx }] : allEntries);
-  const targetSuffix = () => targetIdx === "all" ? "" : ` · ${geometries[targetIdx]?.address ?? `Building ${targetIdx + 1}`}`;
+  const targetSuffix = () => targetIdx === "all" ? "" : ` · ${geometries[targetIdx]?.address ?? t("Building {n}", { n: targetIdx + 1 })}`;
 
   const stopPoll = useCallback((packageId: string) => {
     const h = pollHandles.current[packageId];
@@ -999,7 +1000,7 @@ export default function RenovationSimulator() {
                 ...p,
                 buildings: p.buildings.map((b) => isBuildingSettled(b) ? b : {
                   ...b, status: "failed" as const,
-                  error: b.error ?? "Lost contact with this simulation batch - re-run it.",
+                  error: b.error ?? translate("Lost contact with this simulation batch - re-run it."),
                 }),
               }
             ),
@@ -1325,20 +1326,20 @@ export default function RenovationSimulator() {
     // UK / Belgium: layers come from the country catalogue and are priced and
     // carbon-rated layer by layer from it (structural layers in "replace" mode are
     // not in the workbook and are listed as such).
-    const verb = effLayerMode === "add" ? "+" : "new";
+    const verb = effLayerMode === "add" ? "+" : t("new");
     if (layerCountry && activeLayerMaterials) {
       const byId = Object.fromEntries(activeLayerMaterials.map((m) => [m.id, m]));
       const u = computeAssemblyU(draftLayers, kind, byId);
       const cc = catalogueLayerCostCarbon(layerCountry, draftLayers);
       const added = draftLayers.filter((l) => byId[l.materialId]?.category === "insulation")
-        .map((l) => `${l.thicknessMm} mm ${byId[l.materialId]!.label.toLowerCase()}`).join(" + ") || "custom";
+        .map((l) => `${l.thicknessMm} mm ${byId[l.materialId]!.label.toLowerCase()}`).join(" + ") || t("custom");
       setConfigs((cs) => [...cs, {
         id: `cfg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         componentKey: activeItem.key,
         name: draftName.trim() || `${verb} ${added} · U ${u.uValue?.toFixed(2) ?? "—"}`,
         source: "layers", layers: draftLayers, uValue: u.uValue, mode: effLayerMode,
         costPerM2: cc.costPerM2, carbonPerM2: cc.carbonPerM2,
-        carbonUnmatched: [...cc.unpriced.map((n) => `${n} (no price)`), ...cc.noCarbon.map((n) => `${n} (no carbon)`)],
+        carbonUnmatched: [...cc.unpriced.map((n) => `${n} (${t("no price")})`), ...cc.noCarbon.map((n) => `${n} (${t("no carbon")})`)],
       }]);
       setDraftLayers([]); setDraftName("");
       return;
@@ -1360,8 +1361,8 @@ export default function RenovationSimulator() {
     const insLayers = draftLayers.filter((l) => l.materialId.startsWith("mw_")
       || ["eps", "xps", "pir", "cellulose", "wood_fibre"].includes(l.materialId));
     const insName = insLayers.length
-      ? insLayers.map((l) => `${l.thicknessMm} mm ${(MATERIAL_BY_ID[l.materialId]?.label ?? "insulation").toLowerCase()}`).join(" + ")
-      : "custom";
+      ? insLayers.map((l) => `${l.thicknessMm} mm ${(MATERIAL_BY_ID[l.materialId]?.label ?? t("insulation")).toLowerCase()}`).join(" + ")
+      : t("custom");
     setConfigs((cs) => [...cs, {
       id: `cfg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       componentKey: activeItem.key,
@@ -1427,8 +1428,8 @@ export default function RenovationSimulator() {
       .map(([key, cfgs]) => ({
         key,
         label: key === "all"
-          ? `All buildings (${geometries.length})`
-          : geometries[Number(key)]?.address ?? `Building ${Number(key) + 1}`,
+          ? t("All buildings ({n})", { n: geometries.length })
+          : geometries[Number(key)]?.address ?? t("Building {n}", { n: Number(key) + 1 }),
         combos: combosFor(cfgs),
       }))
       .filter((b) => b.combos.length > 0);
@@ -1646,7 +1647,7 @@ export default function RenovationSimulator() {
     const tierMeta = REFURB_TIERS.find((t) => t.key === ukTier)!;
 
     const id = `pkg-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    const name = (packageName.trim() || tierMeta.label) + targetSuffix();
+    const name = (packageName.trim() || t(tierMeta.label)) + targetSuffix();
     const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
 
     // UK money is GBP; the package row's field is still named costSEK (shared
@@ -1741,7 +1742,7 @@ export default function RenovationSimulator() {
   const regretOptions = useMemo<RegretOptionInput[]>(() => {
     const base = baselineAgg?.avgTotalKwhM2Yr;
     if (base == null) return [];
-    const opts: RegretOptionInput[] = [{ id: "baseline", label: "Keep as-built (do nothing)", energyKwhM2: base, investmentSek: 0, isBaseline: true }];
+    const opts: RegretOptionInput[] = [{ id: "baseline", label: t("Keep as-built (do nothing)"), energyKwhM2: base, investmentSek: 0, isBaseline: true }];
     for (const p of packages) {
       if (p.isBaseline) continue;
       const agg = pkgAggregate(p);
@@ -1757,9 +1758,9 @@ export default function RenovationSimulator() {
     if (isUK && !ukBlend) return null;
     if (isBE) return null;
     const scenarios = [
-      { key: "low", label: "Low", priceSek: regretPrices[0]! },
-      { key: "med", label: "Medium", priceSek: regretPrices[1]! },
-      { key: "high", label: "High", priceSek: regretPrices[2]! },
+      { key: "low", label: t("Low"), priceSek: regretPrices[0]! },
+      { key: "med", label: t("Medium"), priceSek: regretPrices[1]! },
+      { key: "high", label: t("High"), priceSek: regretPrices[2]! },
     ];
     const af = annuityFactor(assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03, 30);
     const res = computeRegret(regretOptions, scenarios,
@@ -1767,8 +1768,8 @@ export default function RenovationSimulator() {
     if (!isUK || !ukBlend) return res;
     return {
       ...res, currency: "GBP" as const,
-      priceBasis: `Blended £/kWh: ${Math.round(ukBlend.share * 100)}% of baseline energy is heating at the gas price (£${ukBlend.gas}/kWh), `
-        + `the rest at electricity (£${ukBlend.elec}/kWh) — Ofgem price cap, ${ukTariffs?.zone ?? "Yorkshire"}. Package costs are 2020 prices, ex VAT.`,
+      priceBasis: t("Blended £/kWh: {pct}% of baseline energy is heating at the gas price (£{gas}/kWh), the rest at electricity (£{elec}/kWh) — Ofgem price cap, {zone}. Package costs are 2020 prices, ex VAT.",
+        { pct: Math.round(ukBlend.share * 100), gas: ukBlend.gas, elec: ukBlend.elec, zone: ukTariffs?.zone ?? "Yorkshire" }),
     };
   }, [isUK, isBE, ukBlend, ukTariffs?.zone, regretOptions, baselineAgg?.avgTotalKwhM2Yr, totalFloorAreaM2, regretPrices, regretAlpha]);
   const regretCurrentPrice = isUK ? (ukBlend?.price ?? 0) : (livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8);
@@ -1810,11 +1811,11 @@ export default function RenovationSimulator() {
     // the same as Sweden and Belgium, further down.
     if (isUK && configs.length === 0) {
       const g = geometries[repIdx];
-      if (!g) return { input: null, disabledReason: "No building resolved yet." };
+      if (!g) return { input: null, disabledReason: t("No building resolved yet.") };
       const baseTotal = baselinePkg?.buildings[repIdx]?.totalKwhM2Yr ?? null;
-      if (baseTotal == null) return { input: null, disabledReason: "Waiting for the baseline EnergyPlus run to finish…" };
+      if (baseTotal == null) return { input: null, disabledReason: t("Waiting for the baseline EnergyPlus run to finish…") };
       const areas = ukOptimiserAreas(g, wwrByIndex[repIdx] ?? null);
-      if (!areas.heated) return { input: null, disabledReason: "Heated floor area unknown for this building." };
+      if (!areas.heated) return { input: null, disabledReason: t("Heated floor area unknown for this building.") };
       const opts = ukOptionsFor(g, wwrByIndex[repIdx] ?? null);
       const cur = g.currentU;
       const baseU: Record<string, number> = {
@@ -1827,7 +1828,7 @@ export default function RenovationSimulator() {
           key: k, area_m2: Math.round(areas[k]), baseline_u: baseU[k]!,
           options: opts[k]!.map((o) => ({ code: `uk:${o.code}`, label: o.label, u_value: o.uValue, cost: o.costGbp, carbon: o.carbonKgCo2e })),
         }));
-      if (comps.length === 0) return { input: null, disabledReason: "This building's certificates already describe insulated fabric - no measure would lower its U-values." };
+      if (comps.length === 0) return { input: null, disabledReason: t("This building's certificates already describe insulated fabric - no measure would lower its U-values.") };
       // The optimiser values USEFUL heat: a gas-heated home pays gas / boiler efficiency per kWh of heat.
       const eff = assumptionValue("UK", "boiler_efficiency") ?? 0.85;
       const gas = ukHvac?.carriers.gas;
@@ -1844,13 +1845,13 @@ export default function RenovationSimulator() {
       return { input: { components: comps, params } };
     }
     const repGeo = geometries[repIdx];
-    if (!repGeo) return { input: null, disabledReason: "No building resolved yet." };
+    if (!repGeo) return { input: null, disabledReason: t("No building resolved yet.") };
     const baseTotal = baselinePkg?.buildings[repIdx]?.totalKwhM2Yr ?? null;
-    if (baseTotal == null) return { input: null, disabledReason: "Waiting for the baseline EnergyPlus run to finish…" };
+    if (baseTotal == null) return { input: null, disabledReason: t("Waiting for the baseline EnergyPlus run to finish…") };
     const footprint = repGeo.footprintM2 ?? 0;
     const floors = Math.max(1, Math.round((repGeo.height ?? 3.2) / 3.2));
     const floorArea = footprint * floors;
-    if (!floorArea) return { input: null, disabledReason: "Building floor area unknown for this building." };
+    if (!floorArea) return { input: null, disabledReason: t("Building floor area unknown for this building.") };
 
     const comps: OptimizeComponentInput[] = [];
     const unpricedNames: string[] = [];
@@ -1887,14 +1888,14 @@ export default function RenovationSimulator() {
     }
     const unpricedNote = [
       unpricedNames.length
-        ? `Left out of the trade-off — no price in the materials catalogue: ${unpricedNames.join(" · ")}. They can still be simulated in EnergyPlus for energy and carbon.`
+        ? t("Left out of the trade-off — no price in the materials catalogue: {names}. They can still be simulated in EnergyPlus for energy and carbon.", { names: unpricedNames.join(" · ") })
         : "",
       hasExtension
-        ? "Vertical-extension options show their cost and carbon here but no energy effect — the fast model cannot add a storey. Simulate them in EnergyPlus for the taller building's real energy."
+        ? t("Vertical-extension options show their cost and carbon here but no energy effect — the fast model cannot add a storey. Simulate them in EnergyPlus for the taller building's real energy.")
         : "",
     ].filter(Boolean).join(" ") || undefined;
     if (comps.length === 0)
-      return { input: null, disabledReason: unpricedNote ?? "Save build-ups per component in the builder above — the trade-off curve appears here and updates as you go." };
+      return { input: null, disabledReason: unpricedNote ?? t("Save build-ups per component in the builder above — the trade-off curve appears here and updates as you go.") };
 
     // The rest of the heat loss, kept as-built: envelope parts with no build-up
     // saved, plus air leakage/ventilation. Without them ALL of the simulated
@@ -2164,7 +2165,7 @@ export default function RenovationSimulator() {
               const u = ukArchetype?.[s.wikellsCode as RefurbTierKey];
               return ["Envelope", {
                 code: s.wikellsCode,
-                description: `${tier?.label ?? s.wikellsCode} (TABULA Belgium${ukArchetype ? `, ${ukArchetype.type_label}` : ""})`,
+                description: `${tier?.label ? t(tier.label) : s.wikellsCode} (TABULA Belgium${ukArchetype ? `, ${ukArchetype.type_label}` : ""})`,
                 costSEK: 0,
                 uValue: u?.u_wall,
               }];
@@ -2303,10 +2304,10 @@ export default function RenovationSimulator() {
   // them; only past the last / first view does it leave Step 4.
   const systemsAvailable = hasHeating && !isBE && baselineAgg?.avgHeatingKwhM2Yr != null;
   const VIEW_NEXT: Record<number, { n: number; label: string; hint: string } | null> = {
-    1: hasEnvelope ? { n: 2, label: "Optimisation & Screening", hint: "evaluate every combination with the fast model and shortlist packages to simulate." }
-                   : { n: 3, label: "Simulation Results & Comparison", hint: "simulate your packages in EnergyPlus and compare the verified outcomes." },
-    2: { n: 3, label: "Simulation Results & Comparison", hint: "compare the EnergyPlus-verified outcomes of the packages you simulated." },
-    3: systemsAvailable ? { n: 4, label: "Systems", hint: "compare heating-system alternatives for the selected renovation scenarios." } : null,
+    1: hasEnvelope ? { n: 2, label: t("Optimisation & Screening"), hint: t("evaluate every combination with the fast model and shortlist packages to simulate.") }
+                   : { n: 3, label: t("Simulation Results & Comparison"), hint: t("simulate your packages in EnergyPlus and compare the verified outcomes.") },
+    2: { n: 3, label: t("Simulation Results & Comparison"), hint: t("compare the EnergyPlus-verified outcomes of the packages you simulated.") },
+    3: systemsAvailable ? { n: 4, label: t("Systems"), hint: t("compare heating-system alternatives for the selected renovation scenarios.") } : null,
     4: null,
   };
   const nextView = openStage != null ? VIEW_NEXT[openStage] ?? null : null;
@@ -2333,18 +2334,18 @@ export default function RenovationSimulator() {
 
       <div>
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
-          Renovation Planning · Step 4
+          {t("Renovation Planning · Step 4")}
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>Renovation Calculator</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>{t("Renovation Calculator")}</h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          <>Pick materials per component, combine them into packages, and simulate each against the baseline to compare energy, cost and carbon
-            {geometries.length > 1 ? ` — across the ${geometries.length} buildings from Step 3.` : "."}</>
+          <>{t("Pick materials per component, combine them into packages, and simulate each against the baseline to compare energy, cost and carbon")}
+            {geometries.length > 1 ? ` — ${t("across the {n} buildings from Step 3.", { n: geometries.length })}` : "."}</>
         </p>
       </div>
 
       {geometries.length === 0 && (
         <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(232,136,12,0.1)", border: "1px solid rgba(232,136,12,0.25)" }}>
-          <p style={{ fontSize: 12, color: "#E8880C", margin: 0 }}>No buildings resolved yet — go back to Step 1/2 and select a location.</p>
+          <p style={{ fontSize: 12, color: "#E8880C", margin: 0 }}>{t("No buildings resolved yet — go back to Step 1/2 and select a location.")}</p>
         </div>
       )}
 
@@ -2362,24 +2363,24 @@ export default function RenovationSimulator() {
               const best = base ? Math.max(...done.map((p) => Math.round(((base - (pkgAggregate(p).avgTotalKwhM2Yr ?? base)) / base) * 100)), -Infinity) : -Infinity;
               const running = designed.some((p) => p.buildings.some((b) => b.status === "queued" || b.status === "running"));
               return [
-                { n: 1, title: "Materials & Packages", desc: "Choose materials and build combinations", icon: <Layers size={19} />,
-                  status: base == null ? "Baseline not run yet — run it here first"
-                    : configs.length ? `${configuredComponents.map((c) => `${c.cfgs.length} ${c.item.label.toLowerCase()}`).join(" · ")} saved · ${packageCombosList.length} package${packageCombosList.length === 1 ? "" : "s"}`
-                    : `As-built ${base} kWh/m²·yr · pick materials per component` },
-                { n: 2, title: "Optimisation & Screening", desc: "All combinations on the fast model — shortlist for simulation", icon: <ScatterChart size={19} />,
+                { n: 1, title: t("Materials & Packages"), desc: t("Choose materials and build combinations"), icon: <Layers size={19} />,
+                  status: base == null ? t("Baseline not run yet — run it here first")
+                    : configs.length ? t(packageCombosList.length === 1 ? "{list} saved · {n} package" : "{list} saved · {n} packages", { list: configuredComponents.map((c) => `${c.cfgs.length} ${t(c.item.label).toLowerCase()}`).join(" · "), n: packageCombosList.length })
+                    : t("As-built {base} kWh/m²·yr · pick materials per component", { base }) },
+                { n: 2, title: t("Optimisation & Screening"), desc: t("All combinations on the fast model — shortlist for simulation"), icon: <ScatterChart size={19} />,
                   disabled: !hasEnvelope || !!optimizerInput.disabledReason,
-                  status: !hasEnvelope ? "No envelope components selected in Step 1"
-                    : optimizerInput.disabledReason ?? `${optimizerInput.input?.components.length ?? 0} components · trade-offs over every combination` },
-                { n: 3, title: "Simulation Results & Comparison", desc: "EnergyPlus-verified outcomes of simulated packages", icon: <BarChart3 size={19} />,
+                  status: !hasEnvelope ? t("No envelope components selected in Step 1")
+                    : optimizerInput.disabledReason ?? t("{n} components · trade-offs over every combination", { n: optimizerInput.input?.components.length ?? 0 }) },
+                { n: 3, title: t("Simulation Results & Comparison"), desc: t("EnergyPlus-verified outcomes of simulated packages"), icon: <BarChart3 size={19} />,
                   disabled: designed.length === 0,
-                  status: running ? "Simulations running — results fill in automatically"
-                    : done.length ? `${done.length} package${done.length === 1 ? "" : "s"} vs baseline${best > -Infinity ? ` · best −${best}% energy` : ""}`
-                    : "Run a package to compare it with the baseline" },
-                { n: 4, title: "Systems", desc: "Heating-system alternatives for the selected scenarios", icon: <SlidersHorizontal size={19} />,
+                  status: running ? t("Simulations running — results fill in automatically")
+                    : done.length ? `${t(done.length === 1 ? "{n} package vs baseline" : "{n} packages vs baseline", { n: done.length })}${best > -Infinity ? ` · ${t("best −{pct}% energy", { pct: best })}` : ""}`
+                    : t("Run a package to compare it with the baseline") },
+                { n: 4, title: t("Systems"), desc: t("Heating-system alternatives for the selected scenarios"), icon: <SlidersHorizontal size={19} />,
                   disabled: !hasHeating || isBE || base == null,
-                  status: isBE ? "Not available for Belgium yet"
-                    : !hasHeating ? "Add “Heating system” to the components in Step 1"
-                    : base == null ? "Needs the baseline" : "Compare heating systems on this building's demand" },
+                  status: isBE ? t("Not available for Belgium yet")
+                    : !hasHeating ? t("Add “Heating system” to the components in Step 1")
+                    : base == null ? t("Needs the baseline") : t("Compare heating systems on this building's demand") },
               ];
             })()}
           />
@@ -2393,7 +2394,7 @@ export default function RenovationSimulator() {
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "13px 16px", borderRadius: 12,
           background: "rgba(232,136,12,0.08)", border: "1px solid rgba(232,136,12,0.28)" }}>
           <span style={{ fontSize: 12.5, color: "rgba(255,255,255,0.7)", flex: 1, minWidth: 240 }}>
-            No as-built baseline for these buildings yet — run it in Step 3, or run it here.
+            {t("No as-built baseline for these buildings yet — run it in Step 3, or run it here.")}
           </span>
           <button
             onClick={submitBaseline}
@@ -2403,8 +2404,8 @@ export default function RenovationSimulator() {
               color: baselineRunning ? "rgba(255,255,255,0.35)" : "#0a0d14",
               fontSize: 12.5, fontWeight: 800, cursor: baselineRunning ? "not-allowed" : "pointer" }}>
             {baselineRunning
-              ? <><Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> Running baseline…</>
-              : <><Play size={13} /> Run baseline energy simulation (EPSM)</>}
+              ? <><Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> {t("Running baseline…")}</>
+              : <><Play size={13} /> {t("Run baseline energy simulation (EPSM)")}</>}
           </button>
         </div>
       )}
@@ -2420,21 +2421,21 @@ export default function RenovationSimulator() {
               replaced took a third of the stage. */}
           {geometries.length > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>These assemblies are for</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{t("These assemblies are for")}</span>
               <select
                 value={targetIdx === "all" ? "all" : String(targetIdx)}
                 onChange={(e) => setTargetIdx(e.target.value === "all" ? "all" : Number(e.target.value))}
                 style={{ padding: "5px 9px", borderRadius: 8, fontSize: 11.5, fontWeight: 700,
                   background: "#0d1117", color: "#fff", border: "1px solid rgba(255,255,255,0.15)", maxWidth: 280 }}>
-                <option value="all">All buildings ({geometries.length})</option>
+                <option value="all">{t("All buildings ({n})", { n: geometries.length })}</option>
                 {geometries.map((g, i) => (
-                  <option key={`${g.lat},${g.lon}`} value={i}>{g.address ?? `Building ${i + 1}`}</option>
+                  <option key={`${g.lat},${g.lon}`} value={i}>{g.address ?? t("Building {n}", { n: i + 1 })}</option>
                 ))}
               </select>
               <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.3)" }}>
                 {targetIdx === "all"
-                  ? "one package, applied to every building"
-                  : "a package built just for this building"}
+                  ? t("one package, applied to every building")
+                  : t("a package built just for this building")}
               </span>
             </div>
           )}
@@ -2447,15 +2448,15 @@ export default function RenovationSimulator() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 8, position: "relative" }}>
               {(project.supplierDiscountPct || 0) > 0 && (
                 <span style={{ fontSize: 10.5, color: "#2FB477", fontWeight: 700 }}>
-                  prices net of −{project.supplierDiscountPct}%
+                  {t("prices net of −{pct}%", { pct: project.supplierDiscountPct })}
                 </span>
               )}
               <button
                 onClick={() => setDiscountOpen((o) => !o)}
-                title="Supplier discount — deducted from catalogue material prices"
+                title={t("Supplier discount — deducted from catalogue material prices")}
                 style={{ display: "flex", alignItems: "center", gap: 5, background: "transparent", border: 0, cursor: "pointer",
                   color: (project.supplierDiscountPct || 0) > 0 ? "#2FB477" : "rgba(255,255,255,0.35)", fontSize: 11, padding: 2 }}>
-                <Settings size={13} /> Supplier discount
+                <Settings size={13} /> {t("Supplier discount")}
               </button>
               {discountOpen && (
                 <>
@@ -2463,15 +2464,14 @@ export default function RenovationSimulator() {
                   <div style={{ position: "absolute", top: 24, right: 0, zIndex: 40, width: 290, padding: "12px 14px", borderRadius: 10,
                     background: "#0d1117", border: "1px solid rgba(255,255,255,0.15)", boxShadow: "0 12px 30px rgba(0,0,0,0.5)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1 }}>Supplier discount</div>
-                      <button onClick={() => setDiscountOpen(false)} title="Close"
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1 }}>{t("Supplier discount")}</div>
+                      <button onClick={() => setDiscountOpen(false)} title={t("Close")}
                         style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(255,255,255,0.45)", padding: 0, lineHeight: 1 }}>
                         <XCircle size={14} />
                       </button>
                     </div>
                     <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginBottom: 9, lineHeight: 1.5 }}>
-                      Deducted from every catalogue material price (cost only — carbon is unaffected).
-                      Re-pick materials or rebuild packages to apply it to existing ones.
+                      {t("Deducted from every catalogue material price (cost only — carbon is unaffected). Re-pick materials or rebuild packages to apply it to existing ones.")}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <input
@@ -2499,7 +2499,7 @@ export default function RenovationSimulator() {
               {(() => {
                 const groups = new Map<string, typeof lineItems>();
                 lineItems.forEach((li) => {
-                  const g = li.key.startsWith("VertExt::") ? "Vertical extension (new floor)" : "Existing building";
+                  const g = li.key.startsWith("VertExt::") ? t("Vertical extension (new floor)") : t("Existing building");
                   const arr = groups.get(g); if (arr) arr.push(li); else groups.set(g, [li]);
                 });
                 return [...groups.entries()].map(([groupLabel, items]) => (
@@ -2523,7 +2523,7 @@ export default function RenovationSimulator() {
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfgCount > 0 ? "#4ECDC4" : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#fff" : "rgba(255,255,255,0.6)" }}>{item.label}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#fff" : "rgba(255,255,255,0.6)" }}>{t(item.label)}</span>
                           </div>
                           {cfgCount > 0 && (
                             <span style={{ fontSize: 10, fontWeight: 800, color: "#4ECDC4", background: "rgba(78,205,196,0.16)", borderRadius: 99, padding: "1px 7px" }}>{cfgCount}</span>
@@ -2536,7 +2536,7 @@ export default function RenovationSimulator() {
               })()}
               {lineItems.length === 0 && (
                 <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>
-                  No components selected. Go back to Step 1.
+                  {t("No components selected. Go back to Step 1.")}
                 </p>
               )}
             </div>
@@ -2544,23 +2544,23 @@ export default function RenovationSimulator() {
             {activeItem && (
               <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: `1px solid ${COMPONENT_COLORS[activeItem.parentComponent] ?? "var(--brand)"}33` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{activeItem.label}</h3>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{t(activeItem.label)}</h3>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
                     {activeQuantity != null
-                      ? `${activeQuantity.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} ${quantityUnitLabel(activeItem.quantityKind)}${geometries.length > 1 ? ` (${pickedGeo?.address ?? `building ${pickedIdx + 1}`})` : ""}`
-                      : "quantity: manual entry needed"}
+                      ? `${activeQuantity.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} ${t(quantityUnitLabel(activeItem.quantityKind))}${geometries.length > 1 ? ` (${pickedGeo?.address ?? t("building {n}", { n: pickedIdx + 1 })})` : ""}`
+                      : t("quantity: manual entry needed")}
                   </span>
                 </div>
                 {activeQuantity == null && (
                   <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
                     <input
                       type="number"
-                      placeholder={`Enter ${quantityUnitLabel(activeItem.quantityKind)}`}
+                      placeholder={t("Enter {unit}", { unit: t(quantityUnitLabel(activeItem.quantityKind)) })}
                       onChange={(e) => setManualOverrides((m) => ({ ...m, [activeItem.key]: Number(e.target.value) || 0 }))}
                       style={{ width: 140, padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }}
                     />
                     <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>
-                      {activeItem.key === "Doors" ? "no automatic signal — enter a door count (applied to every building)" : "no data source for this building yet"}
+                      {activeItem.key === "Doors" ? t("no automatic signal — enter a door count (applied to every building)") : t("no data source for this building yet")}
                     </span>
                   </div>
                 )}
@@ -2579,26 +2579,26 @@ export default function RenovationSimulator() {
                         const active = effective === m;
                         return (
                           <button key={m} disabled={disabled} onClick={() => setDraftMode(m)}
-                            title={disabled ? "Windows and doors are picked as whole units, not layer-composed" : undefined}
+                            title={disabled ? t("Windows and doors are picked as whole units, not layer-composed") : undefined}
                             style={{ fontSize: 11, fontWeight: 700, padding: "4px 11px", borderRadius: 8,
                               cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.35 : 1,
                               border: `1px solid ${active ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
                               background: active ? "#4ECDC4" : "transparent",
                               color: active ? "#0b1220" : "rgba(255,255,255,0.55)" }}>
-                            {m === "catalogue" ? "Catalogue assembly" : "Build from layers"}
+                            {m === "catalogue" ? t("Catalogue assembly") : t("Build from layers")}
                           </button>
                         );
                       });
                     })()}
                     <input value={draftName} onChange={(e) => setDraftName(e.target.value)}
-                      placeholder="Name (optional)"
+                      placeholder={t("Name (optional)")}
                       style={{ marginLeft: "auto", width: 180, padding: "5px 10px", borderRadius: 8,
                         border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 11.5 }} />
                   </div>
 
                   {(isUK || isBE) && (
                     <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.42)", lineHeight: 1.5, margin: "-2px 0 10px" }}>
-                      {catalogueNote(isUK ? "gb" : "be")} Hover an option for its price and carbon sources.
+                      {catalogueNote(isUK ? "gb" : "be")} {t("Hover an option for its price and carbon sources.")}
                     </div>
                   )}
                   {(draftMode === "layers" && kindForKey(activeItem.key)) ? (
@@ -2607,7 +2607,7 @@ export default function RenovationSimulator() {
                           Not for a new storey: there is nothing there to add to. */}
                       {isNewBuild ? (
                         <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, marginBottom: 8 }}>
-                          New construction for the added storey — the U-value comes from these layers alone.
+                          {t("New construction for the added storey — the U-value comes from these layers alone.")}
                         </div>
                       ) : (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
@@ -2618,21 +2618,21 @@ export default function RenovationSimulator() {
                               style={{ padding: "5px 12px", borderRadius: 7, border: 0, cursor: "pointer", fontSize: 11.5, fontWeight: 700,
                                 background: layerMode === m ? "#4ECDC4" : "transparent",
                                 color: layerMode === m ? "#0b1220" : "rgba(255,255,255,0.6)" }}>
-                              {label}
+                              {t(label)}
                             </button>
                           ))}
                         </div>
                         <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, flex: 1, minWidth: 220 }}>
                           {layerMode === "add"
-                            ? <>The existing {activeItem.label.toLowerCase()} stays (first layer) — add insulation and finishes to it. The U-value includes what is already there.</>
-                            : <>The existing {activeItem.label.toLowerCase()} is removed and built new — the U-value comes from the new layers alone. Demolition is not costed.</>}
+                            ? <>{t("The existing {part} stays (first layer) — add insulation and finishes to it. The U-value includes what is already there.", { part: t(activeItem.label).toLowerCase() })}</>
+                            : <>{t("The existing {part} is removed and built new — the U-value comes from the new layers alone. Demolition is not costed.", { part: t(activeItem.label).toLowerCase() })}</>}
                         </span>
                       </div>
                       )}
                       {!isNewBuild && baselineUForKey(activeItem.key, pickedGeo) != null && (
                         <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", marginBottom: 8, lineHeight: 1.5 }}>
-                          Compose the assembly layer by layer — the live U-value updates as you go.
-                          {" "}Aim <strong style={{ color: "#4ECDC4" }}>below U {baselineUForKey(activeItem.key, pickedGeo)!.toFixed(2)}</strong> to improve this building's {activeItem.label.toLowerCase()}.
+                          {t("Compose the assembly layer by layer — the live U-value updates as you go.")}
+                          {" "}{t("Aim")} <strong style={{ color: "#4ECDC4" }}>{t("below U {u}", { u: baselineUForKey(activeItem.key, pickedGeo)!.toFixed(2) })}</strong> {t("to improve this building's {part}.", { part: t(activeItem.label).toLowerCase() })}
                         </div>
                       )}
                       <AssemblyBuilder
@@ -2649,7 +2649,7 @@ export default function RenovationSimulator() {
                           borderRadius: 8, fontSize: 12, fontWeight: 700,
                           cursor: draftLayers.length ? "pointer" : "not-allowed", opacity: draftLayers.length ? 1 : 0.45,
                           border: "1px solid rgba(78,205,196,0.5)", background: "rgba(78,205,196,0.15)", color: "#4ECDC4" }}>
-                        <Plus size={13} /> Save as configuration
+                        <Plus size={13} /> {t("Save as configuration")}
                       </button>
                     </>
                   ) : (
@@ -2664,14 +2664,14 @@ export default function RenovationSimulator() {
                                 style={{ padding: "5px 12px", borderRadius: 7, border: 0, cursor: "pointer", fontSize: 11.5, fontWeight: 700,
                                   background: layerMode === m ? "#4ECDC4" : "transparent",
                                   color: layerMode === m ? "#0b1220" : "rgba(255,255,255,0.6)" }}>
-                                {label}
+                                {t(label)}
                               </button>
                             ))}
                           </div>
                           <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, flex: 1, minWidth: 220 }}>
                             {layerMode === "add"
-                              ? <>The existing {activeItem.label.toLowerCase()} stays and the assembly is built onto it — the U-value combines both. Ticked items are saved this way.</>
-                              : <>The existing {activeItem.label.toLowerCase()} is removed and the assembly replaces it — its own U-value applies. Demolition is not costed.</>}
+                              ? <>{t("The existing {part} stays and the assembly is built onto it — the U-value combines both. Ticked items are saved this way.", { part: t(activeItem.label).toLowerCase() })}</>
+                              : <>{t("The existing {part} is removed and the assembly replaces it — its own U-value applies. Demolition is not costed.", { part: t(activeItem.label).toLowerCase() })}</>}
                           </span>
                         </div>
                       )}
@@ -2695,7 +2695,7 @@ export default function RenovationSimulator() {
                   return (
                     <div style={{ marginTop: 14 }}>
                       <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 6 }}>
-                        Saved ({mine.length}) — each becomes a package option
+                        {t("Saved ({n}) — each becomes a package option", { n: mine.length })}
                       </div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {mine.map((c) => (
@@ -2703,7 +2703,7 @@ export default function RenovationSimulator() {
                             background: "rgba(78,205,196,0.07)", border: "1px solid rgba(78,205,196,0.28)" }}>
                             <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1 }}>{c.name}</span>
-                              <button onClick={() => removeConfig(c.id)} title="Delete configuration"
+                              <button onClick={() => removeConfig(c.id)} title={t("Delete configuration")}
                                 style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(226,72,59,0.75)", padding: 0 }}>
                                 <XCircle size={13} />
                               </button>
@@ -2712,23 +2712,23 @@ export default function RenovationSimulator() {
                               U {c.uValue?.toFixed(2) ?? "—"} W/m²K
                               {c.mode && kindForKey(c.componentKey) && !c.componentKey.startsWith("VertExt::") && (
                                 <span style={{ fontWeight: 600, color: "rgba(255,255,255,0.5)" }}>
-                                  {" · "}{c.mode === "add" ? "added to existing" : "replaces existing"}
+                                  {" · "}{c.mode === "add" ? t("added to existing") : t("replaces existing")}
                                 </span>
                               )}
                             </div>
                             <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
-                              {c.costPerM2 != null ? `${fmtSEK(c.costPerM2)}/${activeItem.quantityKind === "area" ? "m²" : "unit"}` : "cost —"}
+                              {c.costPerM2 != null ? `${fmtSEK(c.costPerM2)}/${activeItem.quantityKind === "area" ? "m²" : t("unit")}` : t("cost —")}
                               {" · "}
-                              {c.carbonPerM2 != null ? `${c.carbonPerM2.toFixed(1)} kg CO₂e/m²` : "carbon —"}
+                              {c.carbonPerM2 != null ? `${c.carbonPerM2.toFixed(1)} kg CO₂e/m²` : t("carbon —")}
                             </div>
                             {c.costFromCode && (
                               <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.32)", marginTop: 3 }}>
-                                cost from Wikells {c.costFromCode} (nearest, ΔU {c.costDeltaU?.toFixed(2)})
+                                {t("cost from Wikells {code} (nearest, ΔU {du})", { code: c.costFromCode, du: c.costDeltaU?.toFixed(2) ?? "—" })}
                               </div>
                             )}
                             {c.carbonUnmatched && c.carbonUnmatched.length > 0 && (
                               <div style={{ fontSize: 9.5, color: "#E8880C", marginTop: 3 }}>
-                                {layerCountry ? "missing in the catalogue" : "no Boverket data"}: {c.carbonUnmatched.join(", ")}
+                                {layerCountry ? t("missing in the catalogue") : t("no Boverket data")}: {c.carbonUnmatched.join(", ")}
                               </div>
                             )}
                           </div>
@@ -2747,7 +2747,7 @@ export default function RenovationSimulator() {
               alternative to designing component by component above. */}
           {(isUK || isBE) && openStage === 1 && (
             <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", margin: "6px 0 -4px" }}>
-              Or, in one click: a TABULA refurbishment tier
+              {t("Or, in one click: a TABULA refurbishment tier")}
             </div>
           )}
           {(isUK || isBE) && openStage === 1 && (
@@ -2767,7 +2767,7 @@ export default function RenovationSimulator() {
               <button onClick={() => addPackage()}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
                   border: "1px solid rgba(47,180,119,0.4)", background: "rgba(47,180,119,0.12)", color: "#2FB477", cursor: "pointer" }}>
-                <Plus size={13} /> Simulate this tier as a package
+                <Plus size={13} /> {t("Simulate this tier as a package")}
               </button>
             </div>
           )}
@@ -2802,7 +2802,7 @@ export default function RenovationSimulator() {
               loading={optLoading}
               error={optError}
               scopeLabel={geometries.length > 1
-                ? `${geometries[targetIdx === "all" ? 0 : targetIdx]?.address ?? "the first building"} (representative building — the Results view sums all ${targetIdx === "all" ? geometries.length : 1} building${targetIdx === "all" && geometries.length > 1 ? "s" : ""})`
+                ? `${geometries[targetIdx === "all" ? 0 : targetIdx]?.address ?? t("the first building")} (${t(targetIdx === "all" && geometries.length > 1 ? "representative building — the Results view sums all {n} buildings" : "representative building — the Results view sums all {n} building", { n: targetIdx === "all" ? geometries.length : 1 })})`
                 : undefined}
             />
           )}
@@ -2838,10 +2838,10 @@ export default function RenovationSimulator() {
                 <span style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(232,136,12,0.3)",
                   borderTopColor: "#E8880C", display: "inline-block", animation: "spin 0.9s linear infinite", flexShrink: 0 }} />
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: "#E8880C" }}>
-                  Running EnergyPlus simulations… {done}/{total} runs done
-                  {geometries.length ? ` (${Math.max(1, Math.round(total / geometries.length))} package${Math.round(total / geometries.length) === 1 ? "" : "s"} × ${geometries.length} building${geometries.length === 1 ? "" : "s"})` : ""}.
+                  {t("Running EnergyPlus simulations… {done}/{total} runs done", { done, total })}
+                  {geometries.length ? ` (${t(Math.round(total / geometries.length) === 1 ? "{n} package" : "{n} packages", { n: Math.max(1, Math.round(total / geometries.length)) })} × ${t(geometries.length === 1 ? "{n} building" : "{n} buildings", { n: geometries.length })})` : ""}.
                   <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.6)", marginLeft: 6 }}>
-                    This can take a minute — results fill in below automatically, no need to click.
+                    {t("This can take a minute — results fill in below automatically, no need to click.")}
                   </span>
                 </span>
               </div>
@@ -2855,13 +2855,13 @@ export default function RenovationSimulator() {
               background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.18)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff", flex: 1 }}>
-                  {unsimulatedCombos.length} of {activeCombos.length} designed package{activeCombos.length === 1 ? "" : "s"} not simulated yet
+                  {t(activeCombos.length === 1 ? "{n} of {total} designed package not simulated yet" : "{n} of {total} designed packages not simulated yet", { n: unsimulatedCombos.length, total: activeCombos.length })}
                 </span>
                 <button onClick={() => simulateConfiguredPackages(true)}
                   style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9,
                     fontSize: 12.5, fontWeight: 800, border: "1px solid rgba(47,180,119,0.45)",
                     background: "rgba(47,180,119,0.14)", color: "#2FB477", cursor: "pointer" }}>
-                  <Play size={14} /> Run EnergyPlus · {unsimulatedCombos.length} package{unsimulatedCombos.length === 1 ? "" : "s"}
+                  <Play size={14} /> {t("Run EnergyPlus")} · {t(unsimulatedCombos.length === 1 ? "{n} package" : "{n} packages", { n: unsimulatedCombos.length })}
                 </button>
               </div>
               {/* With optimiser estimates they're rows in the table below. */}
@@ -2888,9 +2888,9 @@ export default function RenovationSimulator() {
                 <Layers size={16} />
               </span>
               <span style={{ flex: 1 }}>
-                <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#fff" }}>Simulated packages · EnergyPlus</span>
+                <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#fff" }}>{t("Simulated packages · EnergyPlus")}</span>
                 <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
-                  Verified outcomes against the as-built baseline: heating and total energy per package and building, cost and carbon upfront and over 30 years.
+                  {t("Verified outcomes against the as-built baseline: heating and total energy per package and building, cost and carbon upfront and over 30 years.")}
                 </span>
               </span>
             </div>
@@ -2902,7 +2902,7 @@ export default function RenovationSimulator() {
                       border: `1px solid ${resultView === v ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
                       background: resultView === v ? "#4ECDC4" : "transparent",
                       color: resultView === v ? "#0b1220" : "rgba(255,255,255,0.5)" }}>
-                    {label}
+                    {t(label)}
                   </button>
                 ))}
               </div>
@@ -2910,27 +2910,27 @@ export default function RenovationSimulator() {
             {resultView === "package" ? (
             <>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Sort by:</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{t("Sort by:")}</span>
               {([["default", "Simulated first"], ["energy", "Energy"], ["cost", "Cost"], ["lcc", "30-yr cost"], ["lcCarbon", "30-yr carbon"]] as const).map(([k, lbl]) => (
                 <button key={k} onClick={() => setResultSort(k)} style={{
                   fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
                   border: `1px solid ${resultSort === k ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
                   background: resultSort === k ? "#4ECDC4" : "transparent",
-                  color: resultSort === k ? "#0b1220" : "rgba(255,255,255,0.55)" }}>{lbl}</button>
+                  color: resultSort === k ? "#0b1220" : "rgba(255,255,255,0.55)" }}>{t(lbl)}</button>
               ))}
               {estimateRows.length > 0 && (
                 <label style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer",
                   fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
                   <input type="checkbox" checked={includeEstimates} onChange={(e) => setIncludeEstimates(e.target.checked)}
                     style={{ accentColor: "#E8880C" }} />
-                  Include {estimateRows.length} unsimulated package{estimateRows.length === 1 ? "" : "s"} (estimates)
+                  {t(estimateRows.length === 1 ? "Include {n} unsimulated package (estimates)" : "Include {n} unsimulated packages (estimates)", { n: estimateRows.length })}
                 </label>
               )}
             </div>
             {includeEstimates && estimateRows.length > 0 && (
               <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", marginBottom: 8, lineHeight: 1.5 }}>
-                Rows marked <b style={{ color: "#E8880C" }}>≈ estimate</b> are not simulated yet — quick degree-day figures from the
-                optimiser, usually somewhat optimistic. Press <b>Simulate</b> to replace them with EnergyPlus results.
+                {t("Rows marked")} <b style={{ color: "#E8880C" }}>{t("≈ estimate")}</b> {t("are not simulated yet — quick degree-day figures from the optimiser, usually somewhat optimistic.")}
+                {" "}{t("Press")} <b>{t("Simulate")}</b> {t("to replace them with EnergyPlus results.")}
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 8 }}>
@@ -2939,32 +2939,32 @@ export default function RenovationSimulator() {
                 // same discount rate and carbon factor the columns are computed with.
                 const rate = Math.round((optimizerInput.input?.params.discount_rate
                   ?? assumptionValue(isUK ? "UK" : isBE ? "BE" : "SE", "discount_rate") ?? 0.03) * 1000) / 10;
-                const cf = lcCarbonFactor != null ? `${Math.round(lcCarbonFactor * 1000) / 1000} kg CO₂e per kWh` : "the heating carbon factor";
+                const cf = lcCarbonFactor != null ? t("{v} kg CO₂e per kWh", { v: Math.round(lcCarbonFactor * 1000) / 1000 }) : t("the heating carbon factor");
                 return [
                 { k: "exp", l: "" },
-                { k: "pkg", l: "Package" },
-                { k: "cost", l: "Cost", sub: (isUK
-                  ? `tiers & DESNZ optimiser: installed, ${UK_COST_PRICE_BASIS} · catalogue picks: materials incl. VAT, excl. labour`
-                  : isBE ? "catalogue picks: materials incl. VAT, excl. labour · TABULA tiers: no cost data"
-                  : "installed — materials + labour (Wikells), one-off"),
-                  info: "What the renovation itself costs, paid once when you renovate: the new materials plus the labour to install them. Doing nothing (the baseline) costs 0 here." },
-                { k: "carbon", l: "Carbon", sub: isUK || isBE ? "embodied A1-A3 (materials catalogue)" : "embodied A1–A5: production, transport, installation",
+                { k: "pkg", l: t("Package") },
+                { k: "cost", l: t("Cost"), sub: (isUK
+                  ? t("tiers & DESNZ optimiser: installed, {basis} · catalogue picks: materials incl. VAT, excl. labour", { basis: UK_COST_PRICE_BASIS })
+                  : isBE ? t("catalogue picks: materials incl. VAT, excl. labour · TABULA tiers: no cost data")
+                  : t("installed — materials + labour (Wikells), one-off")),
+                  info: t("What the renovation itself costs, paid once when you renovate: the new materials plus the labour to install them. Doing nothing (the baseline) costs 0 here.") },
+                { k: "carbon", l: t("Carbon"), sub: isUK || isBE ? t("embodied A1-A3 (materials catalogue)") : t("embodied A1–A5: production, transport, installation"),
                   info: isUK || isBE
-                    ? "The emissions from making the new materials (the production stage, A1–A3), released once when you renovate. Doing nothing emits 0 here."
-                    : "The emissions caused by the renovation itself, released once: making the new materials (A1–A3), transporting them to the site (A4), and installing them, including the material wasted on site (A5). Values from Boverket's climate database. Demolition of removed layers and later replacements are not included. Doing nothing emits 0 here." },
-                { k: "lcc", l: "30-yr cost", sub: "cost + 30 yrs of energy at today's price, discounted",
-                  info: `The upfront cost PLUS 30 years of energy bills at today's energy price. Later bills are discounted by ${rate}% a year, because money spent in the future counts for less than money spent today. Compare with the baseline: if a package's 30-year cost is higher, its energy savings do not pay back what it costs.` },
-                { k: "lcco2", l: "30-yr carbon", sub: "embodied + 30 yrs of energy",
-                  info: `The material emissions PLUS 30 years of emissions from the energy the building uses (${cf}). Compare with the baseline: if a package's 30-year carbon is higher, making its materials emits more than its energy savings avoid in 30 years.` },
-                { k: "heat", l: "Heating", sub: "kWh/m²·yr",
-                  info: "The heat the building needs per m² of heated floor area per year, from the EnergyPlus simulation." },
-                { k: "total", l: "Total energy", sub: isUK || isBE
-                    ? "heating + hot water + cooling + lighting + equipment, kWh/m²·yr"
-                    : "heating + hot water + cooling, kWh/m²·yr (household electricity excluded, as in energy declarations)",
+                    ? t("The emissions from making the new materials (the production stage, A1–A3), released once when you renovate. Doing nothing emits 0 here.")
+                    : t("The emissions caused by the renovation itself, released once: making the new materials (A1–A3), transporting them to the site (A4), and installing them, including the material wasted on site (A5). Values from Boverket's climate database. Demolition of removed layers and later replacements are not included. Doing nothing emits 0 here.") },
+                { k: "lcc", l: t("30-yr cost"), sub: t("cost + 30 yrs of energy at today's price, discounted"),
+                  info: t("The upfront cost PLUS 30 years of energy bills at today's energy price. Later bills are discounted by {rate}% a year, because money spent in the future counts for less than money spent today. Compare with the baseline: if a package's 30-year cost is higher, its energy savings do not pay back what it costs.", { rate }) },
+                { k: "lcco2", l: t("30-yr carbon"), sub: t("embodied + 30 yrs of energy"),
+                  info: t("The material emissions PLUS 30 years of emissions from the energy the building uses ({cf}). Compare with the baseline: if a package's 30-year carbon is higher, making its materials emits more than its energy savings avoid in 30 years.", { cf }) },
+                { k: "heat", l: t("Heating"), sub: "kWh/m²·yr",
+                  info: t("The heat the building needs per m² of heated floor area per year, from the EnergyPlus simulation.") },
+                { k: "total", l: t("Total energy"), sub: isUK || isBE
+                    ? t("heating + hot water + cooling + lighting + equipment, kWh/m²·yr")
+                    : t("heating + hot water + cooling, kWh/m²·yr (household electricity excluded, as in energy declarations)"),
                   info: isUK || isBE
-                    ? "All simulated energy per m² per year: heating, hot water, cooling, lighting and equipment."
-                    : "Simulated heating + hot water + cooling per m² per year. Household electricity (appliances, lighting in flats) is simulated for the heat it gives off, but not counted here - the same rule as Swedish energy declarations." },
-                { k: "status", l: "Status" },
+                    ? t("All simulated energy per m² per year: heating, hot water, cooling, lighting and equipment.")
+                    : t("Simulated heating + hot water + cooling per m² per year. Household electricity (appliances, lighting in flats) is simulated for the heat it gives off, but not counted here - the same rule as Swedish energy declarations.") },
+                { k: "status", l: t("Status") },
               ] as { k: string; l: string; sub?: string; info?: string }[];
               })().map((h) => (
                 <span key={h.k} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>
@@ -2994,18 +2994,18 @@ export default function RenovationSimulator() {
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
                       {(rowTags[row.id] ?? []).length > 0 && (
                         <span style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 3 }}>
-                          {rowTags[row.id]!.map((t) => (
-                            <span key={t} style={{ fontSize: 9.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, background: ROW_TAG_STYLE[t]?.bg, color: ROW_TAG_STYLE[t]?.fg }}>{t}</span>
+                          {rowTags[row.id]!.map((tag) => (
+                            <span key={tag} style={{ fontSize: 9.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, background: ROW_TAG_STYLE[tag]?.bg, color: ROW_TAG_STYLE[tag]?.fg }}>{t(tag)}</span>
                           ))}
                         </span>
                       )}
                       {row.parts.map(([k, v]) => (
                         <span key={k} style={{ display: "block", fontSize: 11.5 }}>
-                          <span style={{ color: "rgba(255,255,255,0.45)" }}>{k}:</span> {v}
+                          <span style={{ color: "rgba(255,255,255,0.45)" }}>{t(k)}:</span> {v}
                         </span>
                       ))}
                       <span style={{ display: "inline-block", marginTop: 3, fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 99,
-                        color: "#E8880C", background: "rgba(232,136,12,0.12)" }}>≈ estimate · not simulated</span>
+                        color: "#E8880C", background: "rgba(232,136,12,0.12)" }}>{t("≈ estimate · not simulated")}</span>
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{m.cost == null ? "—" : fmtSEK(m.cost)}</span>
                     <span style={{ fontSize: 12, color: "#4A90E2" }}>{m.carbon == null ? "—" : `${m.carbon.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
@@ -3019,14 +3019,14 @@ export default function RenovationSimulator() {
                     <span>
                       {running ? (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700, color: "#E8880C" }}>
-                          <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> Running…
+                          <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> {t("Running…")}
                         </span>
                       ) : (
                         <button onClick={() => validateOptimizerPick(row.pt)}
                           style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700,
                             padding: "5px 10px", borderRadius: 8, cursor: "pointer",
                             border: "1px solid rgba(47,180,119,0.45)", background: "rgba(47,180,119,0.14)", color: "#2FB477" }}>
-                          <Play size={11} /> Simulate
+                          <Play size={11} /> {t("Simulate")}
                         </button>
                       )}
                     </span>
@@ -3048,27 +3048,27 @@ export default function RenovationSimulator() {
                     <button
                       onClick={() => setExpandedPkg(expanded ? null : pkg.id)}
                       style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(255,255,255,0.4)", padding: 0 }}
-                      title={expanded ? "Hide per-building breakdown" : "Show per-building breakdown"}
+                      title={expanded ? t("Hide per-building breakdown") : t("Show per-building breakdown")}
                     >
                       {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </button>
                     {!pkg.isBaseline && pkg.buildings.length === 1 && geometries.length > 1 && (
-                      <span title={`Built for ${pkg.buildings[0]!.address} only`}
+                      <span title={t("Built for {address} only", { address: pkg.buildings[0]!.address })}
                         style={{ fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 99, marginRight: 6,
                           color: "#4ECDC4", background: "rgba(78,205,196,0.14)", whiteSpace: "nowrap" }}>
-                        1 building
+                        {t("1 building")}
                       </span>
                     )}
                     <span style={{ fontSize: 12, fontWeight: 600, color: pkg.isBaseline ? "rgba(255,255,255,0.5)" : "#fff" }}>
                       {(rowTags[row.id] ?? []).length > 0 && (
                         <span style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 3 }}>
-                          {rowTags[row.id]!.map((t) => (
-                            <span key={t} style={{ fontSize: 9.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, background: ROW_TAG_STYLE[t]?.bg, color: ROW_TAG_STYLE[t]?.fg }}>{t}</span>
+                          {rowTags[row.id]!.map((tag) => (
+                            <span key={tag} style={{ fontSize: 9.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, background: ROW_TAG_STYLE[tag]?.bg, color: ROW_TAG_STYLE[tag]?.fg }}>{t(tag)}</span>
                           ))}
                         </span>
                       )}
                       <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: pkg.color, marginRight: 6 }} />
-                      {pkg.name}{agg.n > 1 ? ` (${agg.n} buildings)` : ""}
+                      {pkg.isBaseline ? t(pkg.name) : pkg.name}{agg.n > 1 ? ` (${t("{n} buildings", { n: agg.n })})` : ""}
                       {/* Applied envelope U-values — makes an uninsulated pick (which
                           replaces, never adds to, the baseline U) explain its own result. */}
                       {!pkg.isBaseline && ((!isUK && !isBE) || pkgCostSource(pkg) === "catalogue") && (() => {
@@ -3076,12 +3076,12 @@ export default function RenovationSimulator() {
                         if (!us.length) return null;
                         return (
                           <span style={{ display: "block", fontSize: 9.5, marginTop: 3, color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>
-                            applies{" "}
+                            {t("applies")}{" "}
                             {us.map((x, i) => (
                               <span key={x.label}>
                                 {i > 0 ? " · " : ""}{x.label} U{" "}
                                 {/* Windows are judged on window scales (triple ≈ 0.8 is good). */}
-                                <span style={{ fontWeight: 700, color: /window/i.test(x.label)
+                                <span style={{ fontWeight: 700, color: /window|fönster/i.test(x.label)
                                   ? (x.u > 1.6 ? "#E2483B" : x.u > 1.2 ? "#E8880C" : "#2FB477")
                                   : (x.u > 0.4 ? "#E2483B" : x.u > 0.3 ? "#E8880C" : "#2FB477") }}>
                                   {x.u.toFixed(2)}
@@ -3096,20 +3096,19 @@ export default function RenovationSimulator() {
                       {!pkg.isBaseline && agg.avgTotalKwhM2Yr != null && baselineAgg?.avgTotalKwhM2Yr != null
                         && agg.avgTotalKwhM2Yr > baselineAgg.avgTotalKwhM2Yr && (
                         <span style={{ display: "block", fontSize: 9.5, marginTop: 3, color: "#E2483B", fontWeight: 600, lineHeight: 1.4 }}>
-                          ⚠ Less insulated than the current building — this raises energy use.
-                          Choose an assembly with insulation (e.g. M95 / M145 walls, or an insulated roof).
+                          ⚠ {t("Less insulated than the current building — this raises energy use. Choose an assembly with insulation (e.g. M95 / M145 walls, or an insulated roof).")}
                         </span>
                       )}
                     </span>
-                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && agg.totalCostSEK != null ? `DESNZ install costs, ${UK_COST_PRICE_BASIS}; doors not costed` : undefined}>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && agg.totalCostSEK != null ? t("DESNZ install costs, {basis}; doors not costed", { basis: UK_COST_PRICE_BASIS }) : undefined}>
                       {agg.totalCostSEK == null ? "—" : fmtSEK(agg.totalCostSEK)}
                       {!pkg.isBaseline && agg.totalCostSEK == null && pkgCostSource(pkg) === "catalogue" && (
                         <span style={{ display: "block", fontSize: 9.5, color: "#E8880C", marginTop: 2 }}>
-                          a material has no price in the catalogue
+                          {t("a material has no price in the catalogue")}
                         </span>
                       )}
                     </span>
-                    <span style={{ fontSize: 12, color: "#4A90E2" }} title={pkgCostSource(pkg) === "catalogue" ? "Materials catalogue, embodied carbon A1-A3" : isUK && agg.totalCarbonKgCO2e != null ? "DESNZ insulation factor + Boverket window proxy" : undefined}>
+                    <span style={{ fontSize: 12, color: "#4A90E2" }} title={pkgCostSource(pkg) === "catalogue" ? t("Materials catalogue, embodied carbon A1-A3") : isUK && agg.totalCarbonKgCO2e != null ? t("DESNZ insulation factor + Boverket window proxy") : undefined}>
                       {agg.totalCarbonKgCO2e == null ? "—"
                         : `${agg.totalCarbonKgCO2e.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg${pkgCostSource(pkg) === "desnz" ? "*" : pkgCostSource(pkg) === "catalogue" && (isUK || isBE) ? "†" : ""}`}
                     </span>
@@ -3117,11 +3116,11 @@ export default function RenovationSimulator() {
                       const m = rowMetrics(row);
                       return (<>
                         <span style={{ fontSize: 12, color: "#B98BE8", fontWeight: 600 }}
-                          title={`Cost today + 30 years of energy at ${lccPrice?.toFixed(3)} per kWh, discounted (same price and rate as the optimiser). The future energy prices panel below tests other prices.`}>
+                          title={t("Cost today + 30 years of energy at {price} per kWh, discounted (same price and rate as the optimiser). The future energy prices panel below tests other prices.", { price: lccPrice?.toFixed(3) ?? "—" })}>
                           {m.lcc == null ? "—" : fmtSEK(m.lcc)}
                         </span>
                         <span style={{ fontSize: 12, color: "#4A90E2" }}
-                          title={`Embodied carbon + 30 years of energy at ${lcCarbonFactor?.toFixed(3)} kg CO₂e per kWh`}>
+                          title={t("Embodied carbon + 30 years of energy at {v} kg CO₂e per kWh", { v: lcCarbonFactor?.toFixed(3) ?? "—" })}>
                           {m.lcc_c == null ? "—" : `${m.lcc_c.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}
                         </span>
                       </>);
@@ -3139,13 +3138,13 @@ export default function RenovationSimulator() {
                       {/* Pending but nothing in flight = never submitted. A spinner
                           here claims work is happening when none is. */}
                       {agg.running === 0 && agg.pending > 0 && (
-                        <span title="Not simulated yet" style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>not run</span>
+                        <span title={t("Not simulated yet")} style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{t("not run")}</span>
                       )}
                       {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#2FB477" />}
                       {agg.failed > 0 && <XCircle size={13} color="#E2483B" />}
                       {(agg.failed > 0 || agg.pending > 0) && (
                         <button onClick={() => retryPackage(pkg)}
-                          title={agg.failed > 0 ? "Retry failed buildings" : "Re-run stuck buildings"}
+                          title={agg.failed > 0 ? t("Retry failed buildings") : t("Re-run stuck buildings")}
                           style={{ background: "transparent", border: 0, cursor: "pointer",
                             color: agg.failed > 0 ? "#E2483B" : "rgba(255,255,255,0.35)" }}>
                           <RefreshCw size={12} />
@@ -3168,7 +3167,7 @@ export default function RenovationSimulator() {
                             {/* UK gas-boiler runs: what a household's gas meter would read. */}
                             {isUK && b.totalGasKwh != null && (
                               <span style={{ display: "block", fontSize: 9.5, color: "#E8880C" }}>
-                                gas {Math.round(b.totalGasKwh / Math.max(1, b.dwellings ?? 1)).toLocaleString("en-GB")} kWh/yr per home
+                                {t("gas {v} kWh/yr per home", { v: Math.round(b.totalGasKwh / Math.max(1, b.dwellings ?? 1)).toLocaleString("en-GB") })}
                               </span>
                             )}
                           </span>
@@ -3176,7 +3175,7 @@ export default function RenovationSimulator() {
                             const done = isBuildingSettled(b);
                             return (
                               <span style={{ color: b.status === "failed" ? "#fca5a5" : done ? "#2FB477" : "#E8880C" }} title={b.error ?? undefined}>
-                                {done ? "completed" : b.status}
+                                {done ? t("completed") : t(b.status)}
                               </span>
                             );
                           })()}
@@ -3188,7 +3187,7 @@ export default function RenovationSimulator() {
               );
             })}
             {packages.length === 0 && (
-              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>No packages yet.</p>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>{t("No packages yet.")}</p>
             )}
             {isUK && packages.some((p) => pkgCostSource(p) === "desnz" && pkgAggregate(p).totalCostSEK != null) && (
               <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
@@ -3197,7 +3196,7 @@ export default function RenovationSimulator() {
             )}
             {(isUK || isBE) && packages.some((p) => pkgCostSource(p) === "catalogue") && (
               <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
-                † {catalogueNote(isUK ? "gb" : "be")} Package cost = material per m² × each building's own area; labour and installation are not included.
+                † {catalogueNote(isUK ? "gb" : "be")} {t("Package cost = material per m² × each building's own area; labour and installation are not included.")}
               </p>
             )}
             </>
@@ -3236,8 +3235,8 @@ export default function RenovationSimulator() {
                   return (
                     <div style={{ minWidth: 460 }}>
                       <div style={{ display: "grid", gridTemplateColumns: cols, gap: 10, padding: "0 4px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 6 }}>
-                        <span style={{ ...th, color: "rgba(255,255,255,0.35)" }}>Building</span>
-                        <span style={{ ...th, color: "rgba(255,255,255,0.35)" }}>Baseline</span>
+                        <span style={{ ...th, color: "rgba(255,255,255,0.35)" }}>{t("Building")}</span>
+                        <span style={{ ...th, color: "rgba(255,255,255,0.35)" }}>{t("Baseline")}</span>
                         {others.map((p) => (
                           <span key={p.id} style={{ ...th, letterSpacing: 0.4, color: "rgba(255,255,255,0.55)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.name}>
                             <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: p.color, marginRight: 5 }} />
@@ -3245,7 +3244,7 @@ export default function RenovationSimulator() {
                           </span>
                         ))}
                       </div>
-                      {rows.length === 0 && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>Run a package to compare buildings.</p>}
+                      {rows.length === 0 && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>{t("Run a package to compare buildings.")}</p>}
                       {rows.map((b) => (
                         <div key={`${b.address}-${b.lat}-${b.lon}`} style={{ display: "grid", gridTemplateColumns: cols, gap: 10, padding: "7px 4px", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                           <span style={{ fontSize: 11.5, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={b.address}>{b.address}</span>
@@ -3257,7 +3256,7 @@ export default function RenovationSimulator() {
                               <button key={p.id}
                                 onClick={() => v != null && savePick(b, p.id)}
                                 disabled={v == null}
-                                title={v == null ? "Run this package first" : isSaved ? `Saved for ${b.address} — click to unsave` : `Save ${p.name} for ${b.address}`}
+                                title={v == null ? t("Run this package first") : isSaved ? t("Saved for {address} — click to unsave", { address: b.address }) : t("Save {name} for {address}", { name: p.name, address: b.address })}
                                 style={{ display: "flex", alignItems: "center", gap: 4, textAlign: "left",
                                   fontSize: 11.5, color: "rgba(255,255,255,0.85)", padding: "3px 6px", borderRadius: 7,
                                   background: isSaved ? "rgba(47,180,119,0.16)" : "transparent",
@@ -3271,8 +3270,8 @@ export default function RenovationSimulator() {
                         </div>
                       ))}
                       <p style={{ fontSize: 9.5, color: "rgba(255,255,255,0.3)", padding: "8px 4px 0", lineHeight: 1.5 }}>
-                        Total energy, kWh/m²·yr. <span style={{ color: "#2FB477" }}>▼ green</span> = less energy than as-built · <span style={{ color: "#E2483B" }}>▲ red</span> = more.
-                        <br />Click a value to <b style={{ color: "rgba(255,255,255,0.5)" }}>save that package for that building</b> — each building can keep a different one, and Step 5 reports them per building. Click again to unsave.
+                        {t("Total energy, kWh/m²·yr.")} <span style={{ color: "#2FB477" }}>▼ {t("green")}</span> {t("= less energy than as-built")} · <span style={{ color: "#E2483B" }}>▲ {t("red")}</span> {t("= more.")}
+                        <br />{t("Click a value to")} <b style={{ color: "rgba(255,255,255,0.5)" }}>{t("save that package for that building")}</b> {t("— each building can keep a different one, and Step 5 reports them per building. Click again to unsave.")}
                       </p>
                     </div>
                   );

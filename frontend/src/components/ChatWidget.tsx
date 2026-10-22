@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 import { api } from "../api/client";
+import { useT } from "../i18n";
 
 type Turn = { role: "user" | "assistant"; content: string };
 
@@ -15,6 +16,7 @@ const GREETING: Turn = {
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
+  const t = useT();
   const [messages, setMessages] = useState<Turn[]>([GREETING]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -64,11 +66,11 @@ export default function ChatWidget() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          aria-label="Open assistant"
+          aria-label={t("Open assistant")}
           className="fixed bottom-5 right-5 z-[60] flex items-center gap-2 rounded-full bg-teal px-4 py-3 text-white shadow-lg shadow-teal/30 hover:brightness-110 transition"
         >
           <MessageCircle className="w-5 h-5" />
-          <span className="text-sm font-semibold hidden sm:inline">Ask the data</span>
+          <span className="text-sm font-semibold hidden sm:inline">{t("Ask the data")}</span>
         </button>
       )}
 
@@ -83,11 +85,11 @@ export default function ChatWidget() {
                 <MessageCircle className="w-4 h-4" />
               </span>
               <div className="leading-tight">
-                <div className="text-sm font-semibold text-white/90">Data assistant</div>
-                <div className="text-[10px] text-white/40">Gothenburg buildings · EN / SV</div>
+                <div className="text-sm font-semibold text-white/90">{t("Data assistant")}</div>
+                <div className="text-[10px] text-white/40">{t("Gothenburg buildings · EN / SV")}</div>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} aria-label="Close" className="text-white/40 hover:text-white/80">
+            <button onClick={() => setOpen(false)} aria-label={t("Close")} className="text-white/40 hover:text-white/80">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -108,7 +110,7 @@ export default function ChatWidget() {
             {loading && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm border border-white/5 bg-white/[0.06] px-3 py-2 text-[13px] text-white/50">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> thinking…
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t("thinking…")}
                 </div>
               </div>
             )}
@@ -129,7 +131,7 @@ export default function ChatWidget() {
               <button
                 onClick={send}
                 disabled={!input.trim() || loading}
-                aria-label="Send"
+                aria-label={t("Send")}
                 className="mb-0.5 text-teal disabled:text-white/20 hover:brightness-125"
               >
                 <Send className="w-4 h-4" />

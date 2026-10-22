@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { X, Plug, Database, RotateCcw, Check, Loader2, Trash2 } from "lucide-react";
+import { X, Plug, Database, RotateCcw, Check, Loader2, Trash2, Languages } from "lucide-react";
+import { useT, useLang, setLang, LANGS } from "../i18n";
 import { useWizardStore } from "../store/wizard";
 
 interface StatusResp {
@@ -33,6 +34,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const setProject = useWizardStore((s) => s.setProject);
   const reset = useWizardStore((s) => s.reset);
+  const t = useT();
+  const lang = useLang();
 
   const [status, setStatus] = useState<StatusResp | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,13 +62,13 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
   const flash = (msg: string) => { setDone(msg); setTimeout(() => setDone(null), 2200); };
 
-  const clearFacade = () => { setProject({ facadeDefects: {} }); flash("Façade inspections cleared."); };
+  const clearFacade = () => { setProject({ facadeDefects: {} }); flash(t("Façade inspections cleared.")); };
   const clearSims = () => {
     setProject({ renovationCalcPackages: [], renovationSimResults: [], renovationBaselineResults: [], baselineStatus: "idle", regretAnalysis: null });
-    flash("Simulation results cleared.");
+    flash(t("Simulation results cleared."));
   };
   const resetAll = () => {
-    if (!window.confirm("Reset the entire project? This clears every step's data (selection, edits, results, façade inspections) and returns you to Step 1. This cannot be undone.")) return;
+    if (!window.confirm(t("Reset the entire project? This clears every step's data (selection, edits, results, façade inspections) and returns you to Step 1. This cannot be undone."))) return;
     reset();
     onClose();
     navigate("/step/1");
@@ -91,44 +94,63 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", borderBottom: `1px solid ${white(0.08)}`, position: "sticky", top: 0, background: "#0d1117" }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: "#fff", flex: 1 }}>Settings</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: "#fff", flex: 1 }}>{t("Settings")}</span>
           <button onClick={onClose} style={{ background: "transparent", border: 0, color: white(0.6), cursor: "pointer", padding: 4 }}><X size={18} /></button>
         </div>
 
         <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 22 }}>
+          {/* Language */}
+          <div>
+            {sectionTitle(<Languages size={15} color="#B98BE8" />, t("Language"))}
+            <p style={{ fontSize: 11, color: white(0.4), margin: "0 0 10px", lineHeight: 1.5 }}>
+              {t("Choose the language of the interface. Data such as addresses, material names and source titles stay as published.")}
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              {LANGS.map((l) => (
+                <button key={l.id} onClick={() => setLang(l.id)} aria-pressed={lang === l.id}
+                  style={{ ...btn(), ...(lang === l.id ? { background: "rgba(139,92,246,0.18)", borderColor: "rgba(139,92,246,0.6)", color: "#fff" } : {}) }}>
+                  {lang === l.id && <Check size={13} />} {l.label}
+                </button>
+              ))}
+            </div>
+            {lang === "sv" && (
+              <p style={{ fontSize: 10.5, color: white(0.35), margin: "8px 0 0" }}>{t("Some pages are not translated yet and still show English.")}</p>
+            )}
+          </div>
+
           {/* Connections & status */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {sectionTitle(<Plug size={15} color="#4ECDC4" />, "Connections & status")}
+              {sectionTitle(<Plug size={15} color="#4ECDC4" />, t("Connections & status"))}
               <button onClick={loadStatus} style={{ marginLeft: "auto", background: "transparent", border: 0, color: white(0.4), cursor: "pointer", fontSize: 11 }}>
-                {loading ? <Loader2 size={13} className="animate-spin" /> : "Refresh"}
+                {loading ? <Loader2 size={13} className="animate-spin" /> : t("Refresh")}
               </button>
             </div>
             <p style={{ fontSize: 11, color: white(0.4), margin: "0 0 6px", lineHeight: 1.5 }}>
-              Optional services — each feature degrades gracefully when its service is offline.
+              {t("Optional services — each feature degrades gracefully when its service is offline.")}
             </p>
             {status ? (
               <div>
-                <Row label="AI assistant & vision" sub={status.ai.provider ? `provider: ${status.ai.provider}` : "no API key set"} ok={status.ai.configured} okText="Configured" offText="Not set" />
-                <Row label="EPSM — energy simulation" sub={status.epsm.url} ok={status.epsm.reachable} okText="Online" offText="Offline" />
-                <Row label="Façade-ML defect model" sub={status.facade_ml.url} ok={status.facade_ml.reachable} okText="Online" offText="Offline" />
-                <Row label="3D viewer (Cesium)" sub="Google Photorealistic 3D tiles" ok={cesiumOk === true} okText={cesiumOk === null ? "…" : "Online"} offText={cesiumOk === null ? "…" : "Offline"} />
+                <Row label={t("AI assistant & vision")} sub={status.ai.provider ? t("provider: {p}", { p: status.ai.provider }) : t("no API key set")} ok={status.ai.configured} okText={t("Configured")} offText={t("Not set")} />
+                <Row label={t("EPSM — energy simulation")} sub={status.epsm.url} ok={status.epsm.reachable} okText={t("Online")} offText={t("Offline")} />
+                <Row label={t("Façade-ML defect model")} sub={status.facade_ml.url} ok={status.facade_ml.reachable} okText={t("Online")} offText={t("Offline")} />
+                <Row label={t("3D viewer (Cesium)")} sub={t("Google Photorealistic 3D tiles")} ok={cesiumOk === true} okText={cesiumOk === null ? "…" : t("Online")} offText={cesiumOk === null ? "…" : t("Offline")} />
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: white(0.4), padding: "8px 0" }}>{loading ? "Checking…" : "Status unavailable."}</div>
+              <div style={{ fontSize: 12, color: white(0.4), padding: "8px 0" }}>{loading ? t("Checking…") : t("Status unavailable.")}</div>
             )}
           </div>
 
           {/* Data & session */}
           <div>
-            {sectionTitle(<Database size={15} color="#E8880C" />, "Data & session")}
+            {sectionTitle(<Database size={15} color="#E8880C" />, t("Data & session"))}
             <p style={{ fontSize: 11, color: white(0.4), margin: "0 0 10px", lineHeight: 1.5 }}>
-              All project data lives in this browser session. Clear parts of it, or reset everything.
+              {t("All project data lives in this browser session. Clear parts of it, or reset everything.")}
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button onClick={clearFacade} style={btn()}><Trash2 size={13} /> Clear façade inspections</button>
-              <button onClick={clearSims} style={btn()}><Trash2 size={13} /> Clear simulation results</button>
-              <button onClick={resetAll} style={btn(true)}><RotateCcw size={13} /> Reset entire project</button>
+              <button onClick={clearFacade} style={btn()}><Trash2 size={13} /> {t("Clear façade inspections")}</button>
+              <button onClick={clearSims} style={btn()}><Trash2 size={13} /> {t("Clear simulation results")}</button>
+              <button onClick={resetAll} style={btn(true)}><RotateCcw size={13} /> {t("Reset entire project")}</button>
             </div>
             {done && <div style={{ marginTop: 10, fontSize: 12, color: "#2FB477", display: "flex", alignItems: "center", gap: 6 }}><Check size={14} /> {done}</div>}
           </div>

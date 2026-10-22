@@ -1,3 +1,4 @@
+import { useT } from "../i18n";
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 
@@ -16,6 +17,7 @@ function initialMode(): ThemeMode {
 
 export default function ThemeToggle() {
   const [mode, setMode] = useState<ThemeMode>(initialMode);
+  const t = useT();
 
   useEffect(() => {
     document.body.classList.toggle("bright-mode", mode === "bright");
@@ -26,13 +28,13 @@ export default function ThemeToggle() {
     <button
       onClick={() => setMode((m) => (m === "dark" ? "bright" : "dark"))}
       className="theme-toggle theme-toggle-sidebar sidebar-theme-icon no-hover-shadow"
-      title={mode === "dark" ? "Switch to bright mode" : "Switch to dark mode"}
-      aria-label={mode === "dark" ? "Switch to bright mode" : "Switch to dark mode"}
+      title={t(mode === "dark" ? "Switch to bright mode" : "Switch to dark mode")}
+      aria-label={t(mode === "dark" ? "Switch to bright mode" : "Switch to dark mode")}
     >
       {mode === "dark" ? <Sun size={16} /> : <Moon size={16} />}
       {/* Same treatment as the sidebar's other captions (SideNavItem / Settings)
           so the two controls sitting together read at the same size and weight. */}
-      <span className="text-[9px] tracking-wide font-medium leading-none">Theme</span>
+      <span className="text-[9px] tracking-wide font-medium leading-none">{t("Theme")}</span>
     </button>
   );
 }

@@ -13,6 +13,7 @@
  */
 import type { ModelScope } from "../types";
 import { C, tint } from "../config/colors";
+import { useT } from "../i18n";
 
 export default function ModelScopeNotice({
   scope,
@@ -21,6 +22,7 @@ export default function ModelScopeNotice({
   scope?: ModelScope | null;
   compact?: boolean;
 }) {
+  const t = useT();
   if (!scope) return null;
   const blocking = scope.level === "out_of_scope";
   const accent = blocking ? C.bad : C.warn;
@@ -43,19 +45,18 @@ export default function ModelScopeNotice({
       <div style={{ fontSize: compact ? 11.5 : 12.5, lineHeight: 1.55 }}>
         <strong style={{ color: accent }}>
           {blocking
-            ? "This building is outside what the energy model can represent"
-            : "Part of this building's energy use is not modelled"}
+            ? t("This building is outside what the energy model can represent")
+            : t("Part of this building's energy use is not modelled")}
         </strong>
         <div style={{ color: "rgba(255,255,255,0.72)", marginTop: 2 }}>
           {scope.reason}
           {scope.matched ? (
-            <span style={{ color: "rgba(255,255,255,0.45)" }}> (matched on “{scope.matched}”)</span>
+            <span style={{ color: "rgba(255,255,255,0.45)" }}> {t("(matched on “{m}”)", { m: scope.matched })}</span>
           ) : null}
         </div>
         {blocking && (
           <div style={{ color: "rgba(255,255,255,0.55)", marginTop: 4 }}>
-            Treat any simulated figure and any saving derived from it as not applicable to this
-            building, rather than as an estimate with a wide margin.
+            {t("Treat any simulated figure and any saving derived from it as not applicable to this building, rather than as an estimate with a wide margin.")}
           </div>
         )}
       </div>

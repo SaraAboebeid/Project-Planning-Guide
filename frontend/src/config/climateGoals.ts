@@ -17,6 +17,8 @@
  * against an old base year. `basis` says what the official figure measures so
  * the UI never presents a proxy as the city's own rule. */
 
+import { translate } from "../i18n";
+
 export interface ClimateGoal {
   /** City this target applies to — matched against project.city. */
   city: string;
@@ -45,7 +47,8 @@ export interface ClimateGoal {
 }
 
 /** Heading for a goal's panel and report section. */
-export const goalTitle = (g: ClimateGoal) => g.title ?? `${g.city} climate target`;
+export const goalTitle = (g: ClimateGoal) =>
+  g.title ? translate(g.title) : translate("{city} climate target", { city: translate(g.city) });
 
 const SE_NATIONAL: Omit<ClimateGoal, "city"> = {
   kind: "pct", reductionPct: 50, targetYear: 2050, scope: "national",
@@ -143,13 +146,13 @@ export function resolveGoal(goal: ClimateGoal, baselineEnergy: number): ClimateG
 
 /** One-sentence statement of the goal for the UI and report. */
 export function goalStatement(goal: ClimateGoal): string {
-  const whose = goal.scope === "national" ? "National target" : goal.scope === "regional" ? "Regional target" : "City target";
+  const whose = translate(goal.scope === "national" ? "National target" : goal.scope === "regional" ? "Regional target" : "City target");
   if (goal.kind === "absolute") {
-    return `${whose}: reach ≤ ${goal.targetKwhM2} kWh/m²·yr by ${goal.targetYear} — a −${goal.reductionPct}% cut from this baseline.`;
+    return translate("{whose}: reach ≤ {kwh} kWh/m²·yr by {year} — a −{pct}% cut from this baseline.", { whose, kwh: goal.targetKwhM2 ?? "", year: goal.targetYear, pct: goal.reductionPct });
   }
-  if (goal.kind === "rating") return `${whose}: reach EPC band ${goal.targetRating} or better by ${goal.targetYear}.`;
-  if (goal.kind === "info") return `${whose} for ${goal.targetYear} — shown for context, not scored.`;
-  return `${whose}: reduce energy use by ${goal.reductionPct}% by ${goal.targetYear}, measured here against the as-built baseline.`;
+  if (goal.kind === "rating") return translate("{whose}: reach EPC band {band} or better by {year}.", { whose, band: goal.targetRating ?? "", year: goal.targetYear });
+  if (goal.kind === "info") return translate("{whose} for {year} — shown for context, not scored.", { whose, year: goal.targetYear });
+  return translate("{whose}: reduce energy use by {pct}% by {year}, measured here against the as-built baseline.", { whose, pct: goal.reductionPct, year: goal.targetYear });
 }
 
 /** Percent reduction of a package's energy use vs the baseline (positive = a

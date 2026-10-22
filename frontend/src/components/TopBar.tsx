@@ -12,7 +12,10 @@ import {
   type CountryCode,
 } from "../config/countryNav";
 import { useWizardStore } from "../store/wizard";
-import { Building2 } from "lucide-react";
+import { Building2, Settings as SettingsIcon, Check } from "lucide-react";
+import { useState } from "react";
+import { useT, useLang, setLang, LANGS } from "../i18n";
+import SettingsModal from "./SettingsModal";
 
 /** Distance from the window's right edge to the right edge of the home-page
  *  tabs: bar padding (20) + gap (12) + avatar block (4 margin + 28 + 6 + 12).
@@ -61,6 +64,10 @@ export default function TopBar({
   const location = useLocation();
   const project = useWizardStore((s) => s.project);
   const setProject = useWizardStore((s) => s.setProject);
+  const t = useT();
+  const lang = useLang();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Uncontrolled: the URL is the source of truth for country, so the bar always
   // matches what's on screen even after a hard refresh or a direct link to
@@ -131,15 +138,19 @@ export default function TopBar({
               transition: "all 0.15s",
             }}
           >
-            {tab.label}
+            {t(tab.label)}
           </button>
         );
       })}
     </div>
   );
 
+  // Avatar = account menu: language switch + Settings, available on every page
+  // (the home page has no sidebar, so this is its way into Settings).
   const avatar = (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 4, flexShrink: 0 }}>
+    <div style={{ position: "relative", marginLeft: 4, flexShrink: 0 }}>
+    <button onClick={() => setMenuOpen((o) => !o)} title={t("Account and settings")} aria-haspopup="menu" aria-expanded={menuOpen}
+      style={{ display: "flex", alignItems: "center", gap: 6, border: 0, background: "transparent", padding: 0, cursor: "pointer" }}>
       <div
         style={{
           width: 28,
@@ -159,6 +170,32 @@ export default function TopBar({
       <svg width="12" height="12" viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)">
         <path d="M7 10l5 5 5-5z" />
       </svg>
+    </button>
+    {menuOpen && (<>
+      <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+      <div role="menu" style={{ position: "absolute", right: 0, top: 36, zIndex: 41, width: 200, padding: 8, borderRadius: 12,
+        background: "#0d1117", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 12px 32px rgba(0,0,0,0.5)" }}>
+        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.8, textTransform: "uppercase", color: "rgba(255,255,255,0.4)", padding: "4px 8px 6px" }}>
+          {t("Language")}
+        </div>
+        {LANGS.map((l) => (
+          <button key={l.id} role="menuitemradio" aria-checked={lang === l.id} onClick={() => { setLang(l.id); setMenuOpen(false); }}
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 8px", borderRadius: 8, border: 0, cursor: "pointer",
+              fontSize: 12.5, fontWeight: lang === l.id ? 700 : 500, textAlign: "left",
+              background: lang === l.id ? "rgba(139,92,246,0.16)" : "transparent", color: lang === l.id ? "#fff" : "rgba(255,255,255,0.75)" }}>
+            <span style={{ width: 14, display: "inline-flex" }}>{lang === l.id && <Check size={14} color="#8B5CF6" />}</span>
+            {l.label}
+          </button>
+        ))}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "6px 0" }} />
+        <button role="menuitem" onClick={() => { setMenuOpen(false); setSettingsOpen(true); }}
+          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 8px", borderRadius: 8, border: 0, cursor: "pointer",
+            fontSize: 12.5, fontWeight: 600, textAlign: "left", background: "transparent", color: "rgba(255,255,255,0.8)" }}>
+          <SettingsIcon size={14} /> {t("Settings")}
+        </button>
+      </div>
+    </>)}
+    {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 
@@ -183,15 +220,15 @@ export default function TopBar({
         <span style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)" }} />
         {/* Product name + mark. The text folds away on narrower screens so the
             tabs and the country/city pills keep their room. */}
-        <button onClick={() => navigate("/")} title="Renovation Planning Toolbox — home"
+        <button onClick={() => navigate("/")} title={t("Renovation Planning Toolbox — home")}
           style={{ display: "flex", alignItems: "center", gap: 9, border: 0, background: "transparent", padding: 0, cursor: "pointer" }}>
           <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8,
             background: "rgba(139,92,246,0.16)", border: "1px solid rgba(139,92,246,0.4)", flexShrink: 0 }}>
             <Building2 size={16} color="#8B5CF6" />
           </span>
           <span className="hidden 2xl:block" style={{ textAlign: "left", lineHeight: 1.15 }}>
-            <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: "#fff", whiteSpace: "nowrap" }}>Renovation Planning Toolbox</span>
-            <span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap" }}>Digital Twin Decision Support</span>
+            <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: "#fff", whiteSpace: "nowrap" }}>{t("Renovation Planning Toolbox")}</span>
+            <span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap" }}>{t("Digital Twin Decision Support")}</span>
           </span>
         </button>
       </div>
@@ -204,7 +241,7 @@ export default function TopBar({
             background: "rgba(var(--brand-rgb),0.25)", border: "1px solid rgba(var(--brand-rgb),0.55)" }}>
             {step.number}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>{step.label}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>{t(step.label)}</span>
         </div>
       )}
 
@@ -213,12 +250,12 @@ export default function TopBar({
       <div style={{ flex: 1 }} />
 
       {showLocationBadge && (
-        <div title="Planning location — change it from the home page"
+        <div title={t("Planning location — change it from the home page")}
           style={{ ...pill, padding: "5px 12px", gap: 7, flexShrink: 0, fontSize: 11, whiteSpace: "nowrap" }}>
-          <span style={{ fontWeight: 700, color: "#fff" }}>{badgeCountry!.name}</span>
+          <span style={{ fontWeight: 700, color: "#fff" }}>{t(badgeCountry!.name)}</span>
           {badgeCity && (<>
             <span style={{ color: "rgba(255,255,255,0.3)" }}>›</span>
-            <span style={{ fontWeight: 700, color: "#4ECDC4" }}>{badgeCity}</span>
+            <span style={{ fontWeight: 700, color: "#4ECDC4" }}>{t(badgeCity)}</span>
           </>)}
         </div>
       )}
@@ -235,7 +272,7 @@ export default function TopBar({
               key={c.id}
               onClick={enabled ? () => selectCountry(c.id) : undefined}
               disabled={!enabled}
-              title={enabled ? undefined : "Coming soon — not available yet"}
+              title={enabled ? undefined : t("Coming soon — not available yet")}
               style={{
                 padding: "4px 10px",
                 borderRadius: 8,
@@ -251,7 +288,7 @@ export default function TopBar({
                 whiteSpace: "nowrap",
               }}
             >
-              {c.name}
+              {t(c.name)}
             </button>
             );
           })}
@@ -268,7 +305,7 @@ export default function TopBar({
                   key={name}
                   onClick={enabled ? () => selectCity(name) : undefined}
                   disabled={!enabled}
-                  title={enabled ? undefined : "Coming soon — not available yet"}
+                  title={enabled ? undefined : t("Coming soon — not available yet")}
                   style={{
                     padding: "4px 10px",
                     borderRadius: 8,
@@ -284,7 +321,7 @@ export default function TopBar({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {name}
+                  {t(name)}
                 </button>
                 );
               })}

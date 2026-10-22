@@ -12,6 +12,7 @@ import BaselineLoadProfile from "../components/BaselineLoadProfile";
 import ModelScopeNotice from "../components/ModelScopeNotice";
 import { makeBuildingKeys } from "../utils/retrofitPriority";
 import { excludesHouseholdElectricity, reportedTotalKwhM2 } from "../utils/energyTotals";
+import { useT } from "../i18n";
 
 const END_USE_COLORS = {
   heating: "#E2483B",
@@ -87,6 +88,7 @@ function mergedVal(
 /* ─── Main page ───────────────────────────────────────────────────────────── */
 export default function BaselineSetup() {
   const navigate = useNavigate();
+  const t = useT();
   const { project, setProject } = useWizardStore();
 
   const buildings = useMemo<BuildingLookup[]>(() => {
@@ -441,14 +443,15 @@ export default function BaselineSetup() {
       {/* ── Header ── */}
       <div>
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
-          Renovation Planning · Step 3
+          {t("Renovation Planning · Step 3")}
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>
-          Select & Baseline
+          {t("Select & Baseline")}
         </h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
-          Simulate the as-built performance of the selected building{buildings.length !== 1 ? "s" : ""} —
-          the baseline every renovation package is measured against.
+          {buildings.length !== 1
+            ? t("Simulate the as-built performance of the selected buildings — the baseline every renovation package is measured against.")
+            : t("Simulate the as-built performance of the selected building — the baseline every renovation package is measured against.")}
         </p>
       </div>
 
@@ -456,7 +459,7 @@ export default function BaselineSetup() {
       {buildings.length === 0 ? (
         <div style={{ borderRadius: 12, padding: "20px 24px", background: "rgba(232,136,12,0.08)", border: "1px solid rgba(232,136,12,0.3)" }}>
           <p style={{ fontSize: 13, color: "#E8880C", margin: 0 }}>
-            No buildings loaded yet — go back to Step 2 to select buildings.
+            {t("No buildings loaded yet — go back to Step 2 to select buildings.")}
           </p>
         </div>
       ) : (
@@ -464,7 +467,9 @@ export default function BaselineSetup() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
             <Building2 size={14} color="#4ECDC4" />
             <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
-              {effectiveSelected.size} of {buildings.length} building{buildings.length !== 1 ? "s" : ""} selected
+              {buildings.length !== 1
+                ? t("{n} of {total} buildings selected", { n: effectiveSelected.size, total: buildings.length })
+                : t("{n} of {total} building selected", { n: effectiveSelected.size, total: buildings.length })}
             </span>
             <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
               {shortlistDiffersFromAll && (
@@ -476,7 +481,7 @@ export default function BaselineSetup() {
                   color: selectionMode === "step2" ? "#0b1220" : "#4ECDC4",
                   boxShadow: selectionMode === "step2" ? "0 0 0 1px rgba(78,205,196,0.18)" : "none",
                 }}>
-                Use Step 2 shortlist
+                {t("Use Step 2 shortlist")}
               </button>
               )}
               <button onClick={() => applySelection(new Set(allIdx), "all")}
@@ -487,32 +492,35 @@ export default function BaselineSetup() {
                   color: selectionMode === "all" ? "#0b1220" : "#4ECDC4",
                   boxShadow: selectionMode === "all" ? "0 0 0 1px rgba(78,205,196,0.18)" : "none",
                 }}>
-                Select all
+                {t("Select all")}
               </button>
               <button onClick={() => applySelection(new Set(), "custom")}
                 style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
                   background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)" }}>
-                Clear
+                {t("Clear")}
               </button>
             </span>
           </div>
           {prioritizedIdx && (
             <p style={{ fontSize: 11, color: carriesFromStep2 ? "#fcd34d" : "rgba(255,255,255,0.45)", margin: "0 0 10px" }}>
-              Step 2 flagged top priorities: {project.prioritizedBuildingCount || prioritizedIdx.size} building{(project.prioritizedBuildingCount || prioritizedIdx.size) === 1 ? "" : "s"}. These are the default buildings that will run baseline energy simulation in Step 3.
+              {(project.prioritizedBuildingCount || prioritizedIdx.size) === 1
+                ? t("Step 2 flagged top priorities: {n} building. These are the default buildings that will run baseline energy simulation in Step 3.", { n: project.prioritizedBuildingCount || prioritizedIdx.size })
+                : t("Step 2 flagged top priorities: {n} buildings. These are the default buildings that will run baseline energy simulation in Step 3.", { n: project.prioritizedBuildingCount || prioritizedIdx.size })}
             </p>
           )}
           <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", margin: "0 0 10px" }}>
-            Click a building to include or exclude it from the baseline run.
+            {t("Click a building to include or exclude it from the baseline run.")}
             {outbuildingIdx.size > 0 && (
-              <> {outbuildingIdx.size} outbuilding{outbuildingIdx.size === 1 ? "" : "s"} (sheds, garages — usually unheated)
-              {outbuildingIdx.size === 1 ? " is" : " are"} left out by default; click to include.</>
+              <>{" "}{outbuildingIdx.size === 1
+                ? t("{n} outbuilding (sheds, garages — usually unheated) is left out by default; click to include.", { n: outbuildingIdx.size })
+                : t("{n} outbuildings (sheds, garages — usually unheated) are left out by default; click to include.", { n: outbuildingIdx.size })}</>
             )}
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {buildingStatus.map((bs, idx) => {
               const on = effectiveSelected.has(idx);
               return (
-                <button key={bs.key} onClick={() => toggleBuilding(idx)} title={on ? "Click to exclude" : "Click to include"}
+                <button key={bs.key} onClick={() => toggleBuilding(idx)} title={on ? t("Click to exclude") : t("Click to include")}
                   style={{
                     fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 600, cursor: "pointer",
                     display: "inline-flex", alignItems: "center", gap: 5,
@@ -543,7 +551,13 @@ export default function BaselineSetup() {
               }}
             >
               {simRunning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={14} />}
-              {simRunning ? "Running…" : `${isRerun ? "Re-run" : "Run"} baseline energy simulation (EPSM) for ${runList.length} building${runList.length !== 1 ? "s" : ""}`}
+              {simRunning ? t("Running…") : isRerun
+                ? (runList.length !== 1
+                  ? t("Re-run baseline energy simulation (EPSM) for {n} buildings", { n: runList.length })
+                  : t("Re-run baseline energy simulation (EPSM) for {n} building", { n: runList.length }))
+                : (runList.length !== 1
+                  ? t("Run baseline energy simulation (EPSM) for {n} buildings", { n: runList.length })
+                  : t("Run baseline energy simulation (EPSM) for {n} building", { n: runList.length }))}
             </button>
           </div>
         </div>
@@ -560,24 +574,26 @@ export default function BaselineSetup() {
             ? <Loader2 size={15} color="#2FB477" style={{ animation: "spin 1s linear infinite" }} />
             : <Zap size={15} color={canRunBaseline ? "#2FB477" : "rgba(255,255,255,0.2)"} />}
           <h3 style={{ fontSize: 14, fontWeight: 700, color: canRunBaseline ? "#fff" : "rgba(255,255,255,0.35)", margin: 0 }}>
-            Baseline Energy Simulation
+            {t("Baseline Energy Simulation")}
           </h3>
           {baselineIsCurrent && !simRunning && (
             <span style={{
               marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#2FB477",
               background: "rgba(47,180,119,0.15)", padding: "2px 10px", borderRadius: 20,
             }}>
-              ✓ Baseline complete
+              ✓ {t("Baseline complete")}
             </span>
           )}
         </div>
 
         <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "0 0 16px", lineHeight: 1.55 }}>
           {simRunning
-            ? "Running EPSM simulation — please wait…"
+            ? t("Running EPSM simulation — please wait…")
             : canRunBaseline
-              ? `Send ${runList.length} building${runList.length !== 1 ? "s" : ""} to EPSM to compute the as-built baseline. Missing envelope details fall back to TABULA archetype defaults, so the run always completes.`
-              : "Select at least one building above to run the baseline."}
+              ? (runList.length !== 1
+                ? t("Send {n} buildings to EPSM to compute the as-built baseline. Missing envelope details fall back to TABULA archetype defaults, so the run always completes.", { n: runList.length })
+                : t("Send {n} building to EPSM to compute the as-built baseline. Missing envelope details fall back to TABULA archetype defaults, so the run always completes.", { n: runList.length }))
+              : t("Select at least one building above to run the baseline.")}
         </p>
 
         {/* Progress bar while running - reflects real per-building EPSM
@@ -585,7 +601,7 @@ export default function BaselineSetup() {
         {simRunning && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Running EnergyPlus for each building…</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{t("Running EnergyPlus for each building…")}</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: "#2FB477" }}>{simProgress}%</span>
             </div>
             <div style={{ height: 6, borderRadius: 4, background: "rgba(255,255,255,0.08)" }}>
@@ -596,7 +612,7 @@ export default function BaselineSetup() {
 
         {simError && !simRunning && (
           <div style={{ borderRadius: 8, padding: "10px 14px", background: "rgba(226,72,59,0.1)", border: "1px solid rgba(226,72,59,0.25)", marginBottom: 14 }}>
-            <span style={{ fontSize: 12, color: "#fca5a5" }}>⚠ Baseline simulation failed: {simError}</span>
+            <span style={{ fontSize: 12, color: "#fca5a5" }}>⚠ {t("Baseline simulation failed: {error}", { error: simError })}</span>
           </div>
         )}
 
@@ -604,7 +620,7 @@ export default function BaselineSetup() {
         {baselineIsCurrent && !simRunning && (
           <div ref={resultsRef} style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18, scrollMarginTop: 80 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 2 }}>
-              EPSM Baseline Results
+              {t("EPSM Baseline Results")}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
               <button
@@ -615,7 +631,7 @@ export default function BaselineSetup() {
                   border: "1px solid rgba(78,205,196,0.35)", background: "rgba(78,205,196,0.08)", color: "#4ECDC4",
                 }}
               >
-                <Download size={12} /> Download JSON
+                <Download size={12} /> {t("Download JSON")}
               </button>
               <button
                 onClick={downloadResultsCsv}
@@ -625,7 +641,7 @@ export default function BaselineSetup() {
                   border: "1px solid rgba(78,205,196,0.35)", background: "rgba(78,205,196,0.08)", color: "#4ECDC4",
                 }}
               >
-                <Download size={12} /> Download CSV
+                <Download size={12} /> {t("Download CSV")}
               </button>
             </div>
             <div style={{
@@ -634,9 +650,9 @@ export default function BaselineSetup() {
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Annual end-use comparison</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{t("Annual end-use comparison")}</div>
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 4 }}>
-                    Compare all buildings together, or inspect one building's annual EPSM end-use split. For monthly and hourly profiles, see the load-profile panel below.
+                    {t("Compare all buildings together, or inspect one building's annual EPSM end-use split. For monthly and hourly profiles, see the load-profile panel below.")}
                   </div>
                 </div>
                 <div style={{ display: "inline-flex", borderRadius: 10, padding: 3, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
@@ -648,7 +664,7 @@ export default function BaselineSetup() {
                       color: resultView === "all" ? "#4ECDC4" : "rgba(255,255,255,0.55)",
                     }}
                   >
-                    All buildings
+                    {t("All buildings")}
                   </button>
                   <button
                     onClick={() => setResultView("building")}
@@ -658,14 +674,14 @@ export default function BaselineSetup() {
                       color: resultView === "building" ? "#4ECDC4" : "rgba(255,255,255,0.55)",
                     }}
                   >
-                    One building
+                    {t("One building")}
                   </button>
                 </div>
               </div>
 
               {resultView === "building" && activeBuildingResult && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700 }}>Building</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700 }}>{t("Building")}</span>
                   <select
                     value={activeBuildingResult.address}
                     onChange={(e) => setActiveResultAddress(e.target.value)}
@@ -691,11 +707,12 @@ export default function BaselineSetup() {
                 return (
                   <div style={{ fontSize: 12, lineHeight: 1.55, color: "#E8880C", background: "rgba(232,136,12,0.08)",
                     border: "1px solid rgba(232,136,12,0.35)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>
-                    <b>Height corrected:</b> the building outline was too low for the number of floors in the energy
-                    declaration, so {fixed.length === 1 ? "this building was" : `${fixed.length} buildings were`} simulated
-                    at floors × 3.2 m instead —{" "}
-                    {fixed.map((r) => `${r.address}: ${r.heightCorrected!.floors} floors, ${r.heightCorrected!.from_m} m → ${r.heightCorrected!.to_m} m`).join(" · ")}.
-                    The outline may belong to a lower wing or be linked to the wrong declaration, so treat these results with care.
+                    <b>{t("Height corrected:")}</b>{" "}
+                    {fixed.length === 1
+                      ? t("the building outline was too low for the number of floors in the energy declaration, so this building was simulated at floors × 3.2 m instead —")
+                      : t("the building outline was too low for the number of floors in the energy declaration, so {n} buildings were simulated at floors × 3.2 m instead —", { n: fixed.length })}{" "}
+                    {fixed.map((r) => t("{address}: {floors} floors, {from} m → {to} m", { address: r.address, floors: r.heightCorrected!.floors, from: r.heightCorrected!.from_m, to: r.heightCorrected!.to_m })).join(" · ")}.{" "}
+                    {t("The outline may belong to a lower wing or be linked to the wrong declaration, so treat these results with care.")}
                   </div>
                 );
               })()}
@@ -703,11 +720,10 @@ export default function BaselineSetup() {
                 <ModelScopeNotice
                   scope={{
                     level: "out_of_scope",
-                    reason:
-                      `${results.filter((r) => r.modelScope?.level === "out_of_scope").length} of ${results.length} ` +
-                      "buildings in this comparison are types the model cannot represent " +
-                      "(swimming pools, hospitals, industrial process buildings). Select them " +
-                      "individually to see which.",
+                    reason: t(
+                      "{n} of {total} buildings in this comparison are types the model cannot represent (swimming pools, hospitals, industrial process buildings). Select them individually to see which.",
+                      { n: results.filter((r) => r.modelScope?.level === "out_of_scope").length, total: results.length },
+                    ),
                   }}
                 />
               )}
@@ -728,19 +744,20 @@ export default function BaselineSetup() {
                         formatter={(value: number, name: string) => [`${Number(value).toFixed(1)} kWh/m²·yr`, name]}
                         labelFormatter={(_, payload) => (payload?.[0]?.payload?.name as string) ?? ""}
                       />
-                      <Bar dataKey="heating" stackId="enduse" fill={END_USE_COLORS.heating} radius={[0, 0, 0, 0]} name="Heating" />
-                      <Bar dataKey="dhw" stackId="enduse" fill={END_USE_COLORS.dhw} radius={[0, 0, 0, 0]} name="Hot water" />
-                      <Bar dataKey="cooling" stackId="enduse" fill={END_USE_COLORS.cooling} radius={[0, 0, 0, 0]} name="Cooling" />
-                      {showElec && <Bar dataKey="lighting" stackId="enduse" fill={END_USE_COLORS.lighting} radius={[0, 0, 0, 0]} name="Lighting" />}
-                      {showElec && <Bar dataKey="equipment" stackId="enduse" fill={END_USE_COLORS.equipment} radius={[0, 4, 4, 0]} name="Equipment" />}
+                      <Bar dataKey="heating" stackId="enduse" fill={END_USE_COLORS.heating} radius={[0, 0, 0, 0]} name={t("Heating")} />
+                      <Bar dataKey="dhw" stackId="enduse" fill={END_USE_COLORS.dhw} radius={[0, 0, 0, 0]} name={t("Hot water")} />
+                      <Bar dataKey="cooling" stackId="enduse" fill={END_USE_COLORS.cooling} radius={[0, 0, 0, 0]} name={t("Cooling")} />
+                      {showElec && <Bar dataKey="lighting" stackId="enduse" fill={END_USE_COLORS.lighting} radius={[0, 0, 0, 0]} name={t("Lighting")} />}
+                      {showElec && <Bar dataKey="equipment" stackId="enduse" fill={END_USE_COLORS.equipment} radius={[0, 4, 4, 0]} name={t("Equipment")} />}
                     </BarChart>
                   ) : (
                     <BarChart data={activeBuildingChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                       <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                      <XAxis dataKey="key" stroke="rgba(255,255,255,0.35)" tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 10 }} />
+                      <XAxis dataKey="key" stroke="rgba(255,255,255,0.35)" tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 10 }} tickFormatter={(v) => t(String(v))} />
                       <YAxis stroke="rgba(255,255,255,0.35)" tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10 }} unit=" kWh/m²·yr" />
                       <Tooltip
                         contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff" }}
+                        labelFormatter={(l) => t(String(l))}
                         formatter={(value: number) => `${Number(value).toFixed(1)} kWh/m²·yr`}
                       />
                       <Bar dataKey="value" radius={[4, 4, 0, 0]}>
@@ -763,7 +780,7 @@ export default function BaselineSetup() {
                 ].map((item) => (
                   <div key={item.label} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
                     <span style={{ width: 9, height: 9, borderRadius: 999, background: item.color, display: "inline-block" }} />
-                    {item.label}
+                    {t(item.label)}
                   </div>
                 ))}
               </div>
@@ -813,7 +830,7 @@ export default function BaselineSetup() {
                 <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))`, gap: 8 }}>
                   {tiles.map(m => (
                     <div key={m.label} style={{ borderRadius: 8, padding: "10px 10px", minWidth: 0, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5, minWidth: 0 }}>{m.icon}<span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</span></div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5, minWidth: 0 }}>{m.icon}<span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t(m.label)}</span></div>
                       <div style={{ fontSize: 13.5, fontWeight: 800, color: m.color, whiteSpace: "nowrap",
                                     overflow: "hidden", textOverflow: "ellipsis" }} title={m.value}>{m.value}</div>
                     </div>
@@ -824,11 +841,11 @@ export default function BaselineSetup() {
                 {/* UK gas-boiler runs: fuel actually burnt, which is what a gas meter reads. */}
                 {r.totalGasKwh != null && (
                   <div style={{ marginTop: 8, fontSize: 11.5, color: "rgba(255,255,255,0.65)" }}>
-                    <b style={{ color: "#E8880C" }}>Gas use:</b>{" "}
-                    {Math.round(r.totalGasKwh).toLocaleString("en-GB")} kWh/yr for the building
-                    {r.dwellings && r.dwellings > 0 ? <> · <b style={{ color: "#fff" }}>{Math.round(r.totalGasKwh / r.dwellings).toLocaleString("en-GB")} kWh/yr per home</b> ({r.dwellings} home{r.dwellings === 1 ? "" : "s"})</> : null}
-                    {r.gasKwh != null && <> · space heating {Math.round(r.gasKwh).toLocaleString("en-GB")}, hot water {Math.round(r.totalGasKwh - r.gasKwh).toLocaleString("en-GB")}</>}
-                    {r.heatedAreaM2 != null && <> · simulated heated area {Math.round(r.heatedAreaM2).toLocaleString("en-GB")} m²</>}
+                    <b style={{ color: "#E8880C" }}>{t("Gas use:")}</b>{" "}
+                    {t("{n} kWh/yr for the building", { n: Math.round(r.totalGasKwh).toLocaleString("en-GB") })}
+                    {r.dwellings && r.dwellings > 0 ? <> · <b style={{ color: "#fff" }}>{t("{n} kWh/yr per home", { n: Math.round(r.totalGasKwh / r.dwellings).toLocaleString("en-GB") })}</b> ({r.dwellings === 1 ? t("{n} home", { n: r.dwellings }) : t("{n} homes", { n: r.dwellings })})</> : null}
+                    {r.gasKwh != null && <> · {t("space heating {heating}, hot water {dhw}", { heating: Math.round(r.gasKwh).toLocaleString("en-GB"), dhw: Math.round(r.totalGasKwh - r.gasKwh).toLocaleString("en-GB") })}</>}
+                    {r.heatedAreaM2 != null && <> · {t("simulated heated area {n} m²", { n: Math.round(r.heatedAreaM2).toLocaleString("en-GB") })}</>}
                   </div>
                 )}
               </div>
@@ -836,35 +853,20 @@ export default function BaselineSetup() {
             {project.baselineBatchId && (
               <BaselineLoadProfile
                 batchId={project.baselineBatchId}
-                addresses={results.map((r, i) => r.address || `Building ${i + 1}`)}
+                addresses={results.map((r, i) => r.address || t("Building {n}", { n: i + 1 }))}
               />
             )}
             {project.country === "Belgium" ? (
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
-              * Real EnergyPlus (EPSM) output with {project.city === "Liège" ? "Liège-Bierset" : "Uccle"} weather. Belgium has no open per-building EPCs, so the
-              envelope is the TABULA Belgium archetype for the building's type and construction period, and the
-              period is sampled from Statbel's municipal building stock unless OpenStreetMap records a year.
-              Shared walls with neighbours are modelled as adiabatic. Heating is ideal loads (heat delivered, not
-              fuel) and the model is not yet calibrated against Belgian EPB certificate statistics, so treat absolute values
-              as indicative and compare packages relative to this baseline in Step 4.
+              {t("* Real EnergyPlus (EPSM) output with {weather} weather. Belgium has no open per-building EPCs, so the envelope is the TABULA Belgium archetype for the building's type and construction period, and the period is sampled from Statbel's municipal building stock unless OpenStreetMap records a year. Shared walls with neighbours are modelled as adiabatic. Heating is ideal loads (heat delivered, not fuel) and the model is not yet calibrated against Belgian EPB certificate statistics, so treat absolute values as indicative and compare packages relative to this baseline in Step 4.", { weather: project.city === "Liège" ? "Liège-Bierset" : "Uccle" })}
             </p>
             ) : project.country === "United Kingdom" ? (
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
-              * Real EnergyPlus (EPSM) output for UK homes: a gas boiler with radiators (efficiency from the EPC heating
-              rating), SAP intermittent heating calibrated to DESNZ metered postcode gas, hot water from SAP 2012
-              Appendix J, simulated at the heated area (the homes' EPC floor areas) rather than the gross OSM
-              footprint. Per-m² figures are per heated m². Proceed to Step 4 to test refurbishment tiers.
+              {t("* Real EnergyPlus (EPSM) output for UK homes: a gas boiler with radiators (efficiency from the EPC heating rating), SAP intermittent heating calibrated to DESNZ metered postcode gas, hot water from SAP 2012 Appendix J, simulated at the heated area (the homes' EPC floor areas) rather than the gross OSM footprint. Per-m² figures are per heated m². Proceed to Step 4 to test refurbishment tiers.")}
             </p>
             ) : (
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
-              * Real EnergyPlus (EPSM) output. Homes use Sveby 2.0 (2024) standard use. Hot water is what the
-              building's own energy declaration reports where it gives a figure, otherwise Sveby's 21 kWh/m²·yr,
-              played back through EnergyPlus as given. Household and business electricity
-              (appliances and lighting; 21 kWh/m²·yr in homes, of which 70% warms the building) is simulated
-              because its heat lowers the heating need, but — as in Swedish energy declarations — it is not part
-              of the total and not shown. Office, shop and school lighting is dimmed by daylight near the windows.
-              Infiltration is modelled too, but EnergyPlus reports it inside heating rather than as its own end use.
-              Proceed to Step 4 to test renovation packages against this baseline.
+              {t("* Real EnergyPlus (EPSM) output. Homes use Sveby 2.0 (2024) standard use. Hot water is what the building's own energy declaration reports where it gives a figure, otherwise Sveby's 21 kWh/m²·yr, played back through EnergyPlus as given. Household and business electricity (appliances and lighting; 21 kWh/m²·yr in homes, of which 70% warms the building) is simulated because its heat lowers the heating need, but — as in Swedish energy declarations — it is not part of the total and not shown. Office, shop and school lighting is dimmed by daylight near the windows. Infiltration is modelled too, but EnergyPlus reports it inside heating rather than as its own end use. Proceed to Step 4 to test renovation packages against this baseline.")}
             </p>
             )}
           </div>

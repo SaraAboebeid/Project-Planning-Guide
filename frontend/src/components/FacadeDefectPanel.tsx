@@ -9,6 +9,7 @@ import {
   useWizardStore, FACADE_ORIENTATIONS,
   type FacadeDefectSummary, type FacadeOrientation, type FacadePhotoRecord,
 } from "../store/wizard";
+import { useT, translate } from "../i18n";
 
 /** Compass labels for the four facade slots. Order matches FACADE_ORIENTATIONS. */
 const ORIENTATION_LABELS: Record<FacadeOrientation, string> = {
@@ -144,7 +145,7 @@ function readImageSize(blob: Blob): Promise<{ width: number; height: number }> {
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Could not read uploaded image dimensions"));
+      reject(new Error(translate("Could not read uploaded image dimensions")));
     };
     img.src = url;
   });
@@ -238,6 +239,7 @@ function AnnotatedCanvas({ entry, mode, className, onClick }: {
 function Lightbox({ entry, buildingLabel, onClose, onDownload }: {
   entry: ImgEntry; buildingLabel: string; onClose: () => void; onDownload: () => void;
 }) {
+  const t = useT();
   useEffect(() => {
     const on = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", on);
@@ -269,22 +271,22 @@ function Lightbox({ entry, buildingLabel, onClose, onDownload }: {
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold text-white truncate">{buildingLabel}</div>
               <div className="text-[10px] text-white/40 truncate">
-                {ORIENTATION_LABELS[entry.orientation]} facade · {entry.name}
+                {t(`${ORIENTATION_LABELS[entry.orientation]} facade`)} · {entry.name}
               </div>
             </div>
-            <button onClick={onDownload} title="Download this photo with the detected issues drawn on it"
+            <button onClick={onDownload} title={t("Download this photo with the detected issues drawn on it")}
               className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white"><Download className="w-4 h-4" /></button>
-            <button onClick={onClose} className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white"><X className="w-4 h-4" /></button>
+            <button onClick={onClose} title={t("Close")} className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white"><X className="w-4 h-4" /></button>
           </div>
           <div className="px-3.5 py-2 border-b border-white/10 flex items-center gap-1.5 flex-wrap text-[11px]">
             {dets.length === 0
-              ? <span className="text-emerald-400 font-medium">No defects detected</span>
+              ? <span className="text-emerald-400 font-medium">{t("No defects detected")}</span>
               : <>
-                  <span className="text-white/50 font-semibold">{dets.length} issue{dets.length === 1 ? "" : "s"}:</span>
+                  <span className="text-white/50 font-semibold">{dets.length === 1 ? t("{n} issue:", { n: dets.length }) : t("{n} issues:", { n: dets.length })}</span>
                   {Object.entries(counts).map(([k, v]) => (
                     <span key={k} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-medium"
                       style={{ background: `${colorFor(k)}22`, color: colorFor(k) }}>
-                      <span className="w-2 h-2 rounded-full" style={{ background: colorFor(k) }} /> {v}× {DEFECT_LABELS[k] ?? k}
+                      <span className="w-2 h-2 rounded-full" style={{ background: colorFor(k) }} /> {v}× {t(DEFECT_LABELS[k] ?? k)}
                     </span>
                   ))}
                 </>}
@@ -295,17 +297,17 @@ function Lightbox({ entry, buildingLabel, onClose, onDownload }: {
                 <span className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ background: colorFor(d.label) }}>{i + 1}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[12px] font-medium text-white/85">{DEFECT_LABELS[d.label] ?? d.label}</span>
+                    <span className="text-[12px] font-medium text-white/85">{t(DEFECT_LABELS[d.label] ?? d.label)}</span>
                     <span className="text-[10px] text-white/40">{Math.round(d.score * 100)}%</span>
                     <span className={`text-[9px] px-1 py-0.5 rounded ${d.source === "ai" ? "bg-sky-600/25 text-sky-300" : "bg-violet-600/25 text-violet-300"}`}>
-                      {d.source === "ai" ? `AI vision${d.round ? ` · round ${d.round}` : ""}` : "ML model"}
+                      {d.source === "ai" ? `${t("AI vision")}${d.round ? ` · ${t("round {n}", { n: d.round })}` : ""}` : t("ML model")}
                     </span>
                   </div>
                   {d.note && <div className="text-[10px] text-white/40 mt-0.5">{d.note}</div>}
                 </div>
               </div>
             ))}
-            {dets.length === 0 && <div className="text-[11px] text-white/30 px-2 py-3 text-center">Nothing flagged on this photo. Try Sensitivity → High.</div>}
+            {dets.length === 0 && <div className="text-[11px] text-white/30 px-2 py-3 text-center">{t("Nothing flagged on this photo. Try Sensitivity → High.")}</div>}
           </div>
         </div>
       </div>
@@ -318,6 +320,7 @@ function Lightbox({ entry, buildingLabel, onClose, onDownload }: {
 function Thumb({ entry, onOpen, onRemove, onRerun }: {
   entry: ImgEntry; onOpen: () => void; onRemove: () => void; onRerun: () => void;
 }) {
+  const t = useT();
   const total = entry.result?.detections.length ?? 0;
   return (
     <div className="rounded-lg border border-white/10 bg-black/20 overflow-hidden">
@@ -325,28 +328,28 @@ function Thumb({ entry, onOpen, onRemove, onRerun }: {
         <AnnotatedCanvas entry={entry} mode="thumb" className="block w-full h-auto max-h-64 object-contain" />
         {entry.status === "running" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white/80 text-[10px] gap-1.5">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Detecting…
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t("Detecting…")}
           </div>
         )}
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition bg-black/25 flex items-center justify-center pointer-events-none">
           <Maximize2 className="w-5 h-5 text-white/90" />
         </div>
-        <button onClick={e => { e.stopPropagation(); onRemove(); }} title="Remove"
+        <button onClick={e => { e.stopPropagation(); onRemove(); }} title={t("Remove")}
           className="absolute top-1 right-1 p-0.5 rounded bg-black/60 hover:bg-red-900/70 text-white/70 hover:text-white transition">
           <X className="w-3 h-3" />
         </button>
         {entry.status === "done" && (
           <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-medium"
             style={total > 0 ? { background: "#000a", color: "#fca5a5" } : { background: "#000a", color: "#6ee7b7" }}>
-            {total > 0 ? `${total} defect${total === 1 ? "" : "s"}` : (entry.pass2 ? "no defects yet" : "clean")}
-            {entry.pass2 && <span className="text-sky-300"> · 2nd look…</span>}
+            {total > 0 ? (total === 1 ? t("{n} defect", { n: total }) : t("{n} defects", { n: total })) : (entry.pass2 ? t("no defects yet") : t("clean"))}
+            {entry.pass2 && <span className="text-sky-300"> · {t("2nd look…")}</span>}
           </span>
         )}
       </div>
       <div className="px-2 py-1 flex items-center gap-1.5 text-[10px]">
         <span className="text-white/40 truncate flex-1" title={entry.name}>{entry.name}</span>
-        {entry.status === "error" && <span className="text-red-400 shrink-0" title={entry.error ?? ""}>failed</span>}
-        <button onClick={onRerun} disabled={entry.status === "running"}
+        {entry.status === "error" && <span className="text-red-400 shrink-0" title={entry.error ?? ""}>{t("failed")}</span>}
+        <button onClick={onRerun} disabled={entry.status === "running"} title={t("Run detection again")}
           className="text-white/35 hover:text-white shrink-0 disabled:opacity-40">↻</button>
       </div>
     </div>
@@ -355,12 +358,13 @@ function Thumb({ entry, onOpen, onRemove, onRerun }: {
 
 /* ── defect chips for a collapsed building header ───────────────────────────── */
 function SummaryChips({ s }: { s: FacadeDefectSummary | undefined }) {
+  const t = useT();
   if (!s) return null;
-  if (s.defectCount === 0) return <span className="text-[10px] text-emerald-400 font-medium">no defects</span>;
+  if (s.defectCount === 0) return <span className="text-[10px] text-emerald-400 font-medium">{t("no defects")}</span>;
   return (
     <span className="inline-flex items-center gap-1 flex-wrap">
       {Object.entries(s.byClass).map(([k, v]) => (
-        <span key={k} className="inline-flex items-center gap-0.5" title={DEFECT_LABELS[k] ?? k}>
+        <span key={k} className="inline-flex items-center gap-0.5" title={t(DEFECT_LABELS[k] ?? k)}>
           <span className="w-2 h-2 rounded-full" style={{ background: colorFor(k) }} />
           <span className="text-[10px]" style={{ color: colorFor(k) }}>{v}</span>
         </span>
@@ -379,6 +383,7 @@ const SENSITIVITY = [
 ];
 
 export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuilding[] }) {
+  const t = useT();
   const { project, setProject } = useWizardStore();
   const [imagesByBuilding, setImagesByBuilding] = useState<Record<string, ImgEntry[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -551,7 +556,7 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
       } else {
         const mlErr = mlRes.status === "rejected" ? (mlRes.reason instanceof Error ? mlRes.reason.message : String(mlRes.reason)) : "ML unavailable";
         const aiErr = aiRes.status === "rejected" ? (aiRes.reason instanceof Error ? aiRes.reason.message : String(aiRes.reason)) : "AI unavailable";
-        throw new Error(`Detection failed: ${mlErr}. ${aiAssist ? aiErr : "AI assist disabled."}`);
+        throw new Error(t("Detection failed: {ml}. {ai}", { ml: mlErr, ai: aiAssist ? aiErr : t("AI assist disabled.") }));
       }
 
       // Round 1 goes on screen straight away; the second AI look (below) then
@@ -661,7 +666,8 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
         const owner = wallClaims.current.get(wallKey);
         if (owner && owner !== orientation) {
           setSvSlots(prev => ({ ...prev, [slotKey]: { busy: false, error:
-            `Same wall as the ${ORIENTATION_LABELS[owner]} facade — no separate ${ORIENTATION_LABELS[orientation].toLowerCase()} wall faces the street, so it is not photographed twice.` } }));
+            translate("Same wall as the {owner} facade — no separate {side} wall faces the street, so it is not photographed twice.",
+              { owner: translate(ORIENTATION_LABELS[owner]).toLowerCase(), side: translate(ORIENTATION_LABELS[orientation]).toLowerCase() }) } }));
           return;
         }
         wallClaims.current.set(wallKey, orientation);
@@ -677,8 +683,8 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
         name: `Street View ${res.pano.date ?? ""} · ${Math.round(res.mm_per_px)} mm/px`
           + (res.facade.rectified
             ? (res.facade.wall_shown && res.facade.wall_shown < 0.95
-              ? ` · ${Math.round(res.facade.wall_shown * 100)}% of wall` : " · whole wall")
-            : " · close-up (no square-on view)"),
+              ? ` · ${translate("{p}% of wall", { p: Math.round(res.facade.wall_shown * 100) })}` : ` · ${translate("whole wall")}`)
+            : ` · ${translate("close-up (no square-on view)")}`),
         url: URL.createObjectURL(blob), blob, orientation, source: "streetview",
         status: "idle", result: null, error: null, ms: null, savedUrl: null,
         mmPerPx: res.mm_per_px, wallKey,
@@ -794,27 +800,26 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
             upload target is the slot you drop onto - there is nothing to pick. */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] text-white/45">
-            Every facade is pulled from Street View automatically; upload photos where the street view is blocked or
-            too coarse. The MBDD2025 detector flags cracks, leakage, spalling, corrosion &amp; bulges.
-            {totalChecked > 0 && <b className="text-violet-300"> · {totalChecked} building{totalChecked === 1 ? "" : "s"} checked</b>}
+            {t("Every facade is pulled from Street View automatically; upload photos where the street view is blocked or too coarse. The MBDD2025 detector flags cracks, leakage, spalling, corrosion & bulges.")}
+            {totalChecked > 0 && <b className="text-violet-300"> · {totalChecked === 1 ? t("{n} building checked", { n: totalChecked }) : t("{n} buildings checked", { n: totalChecked })}</b>}
           </span>
           <label className="text-[11px] text-white/50 ml-auto flex items-center gap-1.5 cursor-pointer select-none"
-            title="Also run a general vision model as a second opinion and merge anything the ML detector missed.">
+            title={t("Also run a general vision model as a second opinion and merge anything the ML detector missed.")}>
             <input type="checkbox" checked={aiAssist} onChange={e => setAiAssist(e.target.checked)} className="w-3.5 h-3.5 accent-sky-500 cursor-pointer" />
-            <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-sky-300" /> AI vision assist</span>
+            <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-sky-300" /> {t("AI vision assist")}</span>
           </label>
           <label className={`text-[11px] flex items-center gap-1.5 select-none ${aiAssist ? "text-white/50 cursor-pointer" : "text-white/25 cursor-not-allowed"}`}
-            title="After the first pass the AI looks again, is told what was already found, and reports only what it missed. Both rounds' findings are kept (cumulative).">
+            title={t("After the first pass the AI looks again, is told what was already found, and reports only what it missed. Both rounds' findings are kept (cumulative).")}>
             <input type="checkbox" checked={aiSecondLook && aiAssist} disabled={!aiAssist}
               onChange={e => setAiSecondLook(e.target.checked)} className="w-3.5 h-3.5 accent-sky-500 cursor-pointer" />
-            <span>Second AI look</span>
+            <span>{t("Second AI look")}</span>
           </label>
           <label className="text-[11px] text-white/45 flex items-center gap-1.5">
-            Sensitivity:
+            {t("Sensitivity:")}
             <select value={threshold} onChange={e => setThreshold(parseFloat(e.target.value))}
               style={{ background: "#0d1117", color: "#e5e7eb" }}
               className="border border-white/15 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:border-violet-500/60">
-              {SENSITIVITY.map(s => <option key={s.value} value={s.value} style={{ background: "#161b22", color: "#e5e7eb" }}>{s.label}</option>)}
+              {SENSITIVITY.map(s => <option key={s.value} value={s.value} style={{ background: "#161b22", color: "#e5e7eb" }}>{t(s.label)}</option>)}
             </select>
           </label>
         </div>
@@ -824,35 +829,35 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
         {mlStatus && !mlStatus.ok && (
           <div className="text-[11px] rounded-md px-3 py-2 leading-snug"
             style={{ color: "#fcd34d", background: "rgba(232,136,12,0.10)", border: "1px solid rgba(232,136,12,0.35)" }}>
-            <b>The ML defect detector is not running</b> — these results come from the AI vision model only.
-            Start it with <code>tools\ml\run_facade_service.ps1</code> (port 8021), then press ↻ on a photo to re-run it.
+            <b>{t("The ML defect detector is not running")}</b> {t("— these results come from the AI vision model only.")}
+            {" "}{t("Start it with")} <code>tools\ml\run_facade_service.ps1</code> {t("(port 8021), then press ↻ on a photo to re-run it.")}
             <span className="text-white/35"> ({mlStatus.message.slice(0, 140)})</span>
           </div>
         )}
         {mlStatus?.ok && (
-          <div className="text-[10px] text-emerald-400/80">ML defect detector connected.</div>
+          <div className="text-[10px] text-emerald-400/80">{t("ML defect detector connected.")}</div>
         )}
 
         {/* Auto-capture: progress while it runs, and the switch to stop paying for it. */}
         <div className="flex items-center gap-2 flex-wrap">
           <label className="text-[11px] text-white/50 flex items-center gap-1.5 cursor-pointer select-none"
-            title="Fetch all four facades of every building from Street View as soon as this panel opens. Each facade costs a few Google Street View requests.">
+            title={t("Fetch all four facades of every building from Street View as soon as this panel opens. Each facade costs a few Google Street View requests.")}>
             <input type="checkbox" checked={autoCapture}
               onChange={e => { setAutoCapture(e.target.checked); if (!e.target.checked) autoStopped.current = true; }}
               className="w-3.5 h-3.5 accent-sky-500 cursor-pointer" />
-            <span className="flex items-center gap-1"><Camera className="w-3 h-3 text-sky-300" /> Auto-capture from Street View</span>
+            <span className="flex items-center gap-1"><Camera className="w-3 h-3 text-sky-300" /> {t("Auto-capture from Street View")}</span>
           </label>
           {autoCapture && buildings.length > AUTO_CAPTURE_MAX_BUILDINGS && (
             <span className="text-[11px] text-white/35">
-              first {AUTO_CAPTURE_MAX_BUILDINGS} buildings — capture the rest per facade
+              {t("first {n} buildings — capture the rest per facade", { n: AUTO_CAPTURE_MAX_BUILDINGS })}
             </span>
           )}
           {autoProgress && autoProgress.done < autoProgress.total && !autoStopped.current && (
             <span className="text-[11px] text-sky-300/80 flex items-center gap-1.5">
               <Loader2 className="w-3 h-3 animate-spin" />
-              Capturing facades… {autoProgress.done}/{autoProgress.total}
+              {t("Capturing facades…")} {autoProgress.done}/{autoProgress.total}
               <button onClick={() => { autoStopped.current = true; setAutoCapture(false); }}
-                className="text-white/40 hover:text-white underline underline-offset-2">stop</button>
+                className="text-white/40 hover:text-white underline underline-offset-2">{t("stop")}</button>
             </span>
           )}
         </div>
@@ -861,7 +866,7 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
         <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[10px] text-white/40">
           {Object.keys(DEFECT_LABELS).map(k => (
             <span key={k} className="inline-flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-sm" style={{ background: colorFor(k) }} /> {DEFECT_LABELS[k]}
+              <span className="w-2.5 h-2.5 rounded-sm" style={{ background: colorFor(k) }} /> {t(DEFECT_LABELS[k]!)}
             </span>
           ))}
         </div>
@@ -884,8 +889,8 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
                   {isOpen ? <ChevronUp className="w-3.5 h-3.5 text-white/40 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-white/40 shrink-0" />}
                   <Building2 className="w-3.5 h-3.5 text-violet-300 shrink-0" />
                   <span className="font-semibold text-white truncate">{b.label}</span>
-                  <span className="text-[10px] text-white/35 shrink-0" title="Facades with at least one photo">
-                    {covered}/4 facades
+                  <span className="text-[10px] text-white/35 shrink-0" title={t("Facades with at least one photo")}>
+                    {t("{n}/4 facades", { n: covered })}
                   </span>
                   {running ? <Loader2 className="w-3 h-3 animate-spin text-white/40 shrink-0" /> : <SummaryChips s={s} />}
                 </button>
@@ -905,12 +910,12 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
                               {ORIENTATION_SHORT[orientation]}
                             </span>
                             <span className="text-[11px] font-semibold text-white/85 flex-1 truncate">
-                              {ORIENTATION_LABELS[orientation]} facade
+                              {t(`${ORIENTATION_LABELS[orientation]} facade`)}
                             </span>
                             {slotImgs.length > 0 && (
                               <span className="text-[9px] shrink-0"
                                     style={{ color: slotDefects > 0 ? "#fca5a5" : "#6ee7b7" }}>
-                                {slotDefects > 0 ? `${slotDefects} defect${slotDefects === 1 ? "" : "s"}` : "clean"}
+                                {slotDefects > 0 ? (slotDefects === 1 ? t("{n} defect", { n: slotDefects }) : t("{n} defects", { n: slotDefects })) : t("clean")}
                               </span>
                             )}
                           </div>
@@ -935,7 +940,7 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
                               isDragging ? "border-violet-500 bg-violet-600/10" : "border-white/12 hover:border-white/25 hover:bg-white/[0.02]"}`}>
                             <Upload className="w-3.5 h-3.5 text-white/40" />
                             <span className="text-[10px] text-white/50">
-                              {slotImgs.length ? "Add another photo" : `Upload ${ORIENTATION_LABELS[orientation].toLowerCase()} photo`}
+                              {slotImgs.length ? t("Add another photo") : t(`Upload ${ORIENTATION_LABELS[orientation].toLowerCase()} photo`)}
                             </span>
                             <input type="file" accept="image/*" multiple style={{ display: "none" }}
                               onChange={ev => { if (ev.target.files) void addFiles(b.key, orientation, ev.target.files); ev.currentTarget.value = ""; }} />
@@ -944,12 +949,12 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
                             <>
                               <button onClick={() => void captureStreetView(b, orientation)}
                                 disabled={svSlots[slotKey]?.busy}
-                                title="Fetch the whole facade from Google Street View (stitched and straightened) and run defect detection on it. Takes ~5-10 s. Not saved to the report."
+                                title={t("Fetch the whole facade from Google Street View (stitched and straightened) and run defect detection on it. Takes ~5-10 s. Not saved to the report.")}
                                 className="flex items-center justify-center gap-1.5 py-1.5 mx-1.5 mb-1.5 rounded-md border border-white/12 hover:border-sky-500/50 hover:bg-sky-600/10 transition disabled:opacity-50">
                                 {svSlots[slotKey]?.busy
                                   ? <Loader2 className="w-3.5 h-3.5 text-sky-300 animate-spin" />
                                   : <Camera className="w-3.5 h-3.5 text-sky-300" />}
-                                <span className="text-[10px] text-white/60">Capture from Street View</span>
+                                <span className="text-[10px] text-white/60">{t("Capture from Street View")}</span>
                               </button>
                               {svSlots[slotKey]?.error && (
                                 <div className="text-[10px] text-amber-300/90 px-2 pb-1.5 leading-snug">{svSlots[slotKey]!.error}</div>
@@ -967,8 +972,7 @@ export default function FacadeDefectPanel({ buildings }: { buildings: FacadeBuil
         </div>
 
         <p className="text-[10px] text-white/30 leading-relaxed">
-          Click a photo to enlarge, see every issue listed and download it with the boxes drawn on. The annotated copy is
-          saved so the Step 5 report can show it; the per-facade defect summary also feeds the retrofit prioritization below.
+          {t("Click a photo to enlarge, see every issue listed and download it with the boxes drawn on. The annotated copy is saved so the Step 5 report can show it; the per-facade defect summary also feeds the retrofit prioritization below.")}
         </p>
 
       {lightbox && (

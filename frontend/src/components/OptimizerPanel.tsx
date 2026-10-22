@@ -3,6 +3,7 @@ import { api, type OptimizeComponentInput, type OptimizeParams, type OptimizePoi
 import { Loader2, ChevronDown, ChevronRight, Sparkles, Play } from "lucide-react";
 import ParetoChart, { axesFromKpis, OBJECTIVES } from "./ParetoChart";
 import ParallelCoordinates from "./ParallelCoordinates";
+import { useT } from "../i18n";
 
 /* The "pick the Pareto-optimal packages" step of the hybrid optimizer.
  * RenovationSimulator gathers the option matrix + economy/climate params from
@@ -45,6 +46,7 @@ export default function OptimizerPanel({
   runningKeys?: Set<string>;
   selectedKpis: string[];
 }) {
+  const t = useT();
   const axes = axesFromKpis(selectedKpis);
   const [open, setOpen] = useState(true);
   const controlled = extResult !== undefined;
@@ -129,18 +131,18 @@ export default function OptimizerPanel({
           }}
         >
           <Sparkles size={16} color="#B98BE8" />
-          <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Optimisation &amp; Screening · Pareto curve and estimated packages</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>{t("Optimisation & Screening · Pareto curve and estimated packages")}</span>
           {loading && <Loader2 size={13} color="#B98BE8" style={{ animation: "spin 1s linear infinite" }} />}
           {result && !loading && (
             <span style={{ fontSize: 11, color: white(0.45) }}>
-              {result.pareto_count} optimal of {result.combinations_total.toLocaleString()}
+              {t("{n} optimal of {total}", { n: result.pareto_count, total: result.combinations_total.toLocaleString() })}
             </span>
           )}
         </button>
 
         <button onClick={() => setOpen((o) => !o)}
           style={{ background: "transparent", border: 0, cursor: "pointer", color: white(0.4), padding: 0, flexShrink: 0 }}
-          title={open ? "Collapse" : "Expand"}>
+          title={open ? t("Collapse") : t("Expand")}>
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
       </div>
@@ -151,60 +153,39 @@ export default function OptimizerPanel({
       {open && (
         <div style={{ padding: "0 18px 18px" }}>
           <p style={{ fontSize: 12, color: white(0.5), margin: "0 0 12px", lineHeight: 1.6 }}>
-            As you pick materials, this scores <b>every combination</b> of your picks on the fast degree-day
-            physics (no EnergyPlus) and plots the <b>Pareto-optimal</b> set live — the packages where you can't
-            improve one objective without sacrificing another. Cost is <b>life-cycle over 30 years</b>: material
-            cost today plus the energy bill (at the energy price below, discounted) over the study period.
-            Shortlist the promising ones: click a chart point or <b>Simulate</b> in the table below to verify
-            that package in EnergyPlus (EPSM). Model after Enerbäck &amp; Strömberg.
+            {t("As you pick materials, this scores ")}<b>{t("every combination")}</b>{t(" of your picks on the fast degree-day physics (no EnergyPlus) and plots the ")}<b>{t("Pareto-optimal")}</b>{t(" set live — the packages where you can't improve one objective without sacrificing another. Cost is ")}<b>{t("life-cycle over 30 years")}</b>{t(": material cost today plus the energy bill (at the energy price below, discounted) over the study period. Shortlist the promising ones: click a chart point or ")}<b>{t("Simulate")}</b>{t(" in the table below to verify that package in EnergyPlus (EPSM). Model after Enerbäck & Strömberg.")}
           </p>
 
           <details style={{ marginBottom: 14, fontSize: 12, color: white(0.6), lineHeight: 1.6 }}>
-            <summary style={{ cursor: "pointer", color: "#B98BE8", fontWeight: 700 }}>How the optimisation works</summary>
+            <summary style={{ cursor: "pointer", color: "#B98BE8", fontWeight: 700 }}>{t("How the optimisation works")}</summary>
             <div style={{ padding: "8px 0 0 14px" }}>
               <p style={{ margin: "0 0 8px" }}>
-                <b>In short:</b> it tries every mix of the build-ups you saved and keeps the mixes where nothing else is
-                cheaper, lower-carbon <i>and</i> lower-energy at the same time. It is a quick estimate to narrow the choice —
-                simulate the winners in EnergyPlus to confirm them.
+                <b>{t("In short:")}</b> {t("it tries every mix of the build-ups you saved and keeps the mixes where nothing else is cheaper, lower-carbon and lower-energy at the same time. It is a quick estimate to narrow the choice — simulate the winners in EnergyPlus to confirm them.")}
               </p>
               <ol style={{ margin: "0 0 8px", paddingLeft: 18 }}>
                 <li style={{ marginBottom: 4 }}>
-                  <b>The choices.</b> Each component offers your saved build-ups plus a free “keep as-built” option, so the
-                  optimiser can decide a part is not worth touching. Each option carries a U-value, a cost (price per m² × the
-                  component’s area) and embodied carbon. Build-ups with no price, or that insulate worse than what is there
-                  now, are left out — and listed when that happens. Parts you have not designed anything for, and air
-                  leakage/ventilation, still count as heat loss, unchanged.
+                  <b>{t("The choices.")}</b> {t("Each component offers your saved build-ups plus a free “keep as-built” option, so the optimiser can decide a part is not worth touching. Each option carries a U-value, a cost (price per m² × the component’s area) and embodied carbon. Build-ups with no price, or that insulate worse than what is there now, are left out — and listed when that happens. Parts you have not designed anything for, and air leakage/ventilation, still count as heat loss, unchanged.")}
                 </li>
                 <li style={{ marginBottom: 4 }}>
-                  <b>Energy.</b> Heat loss = Σ area × U (W/K); yearly heating = heat loss × how cold the year is
-                  (degree-days{input ? <>, {Math.round((input.params.f_dh * 1000) / 24).toLocaleString()} here</> : null}).
-                  That simple formula ignores sun and internal heat, so it is <b>calibrated to your Step 3 EnergyPlus
-                  baseline</b>: “keep everything as-built” gives exactly the simulated heating. Only heating responds to
-                  better U-values; hot water and other loads stay fixed.
+                  <b>{t("Energy.")}</b> {t("Heat loss = Σ area × U (W/K); yearly heating = heat loss × how cold the year is")}
+                  {" "}({t("degree-days")}{input ? <>, {t("{n} here", { n: Math.round((input.params.f_dh * 1000) / 24).toLocaleString() })}</> : null}).
+                  {" "}{t("That simple formula ignores sun and internal heat, so it is ")}<b>{t("calibrated to your Step 3 EnergyPlus baseline")}</b>{t(": “keep everything as-built” gives exactly the simulated heating. Only heating responds to better U-values; hot water and other loads stay fixed.")}
                 </li>
                 <li style={{ marginBottom: 4 }}>
-                  <b>30-year cost</b> = material cost today + 30 years of energy bills
-                  {input ? <> at {input.params.energy_price} {currency}/kWh</> : null}, discounted at
-                  {" "}{input ? `${Math.round(input.params.discount_rate * 1000) / 10}%` : "3%"}/yr (money later is worth less than money now).
-                  {" "}<b>30-year carbon</b> = embodied carbon + 30 years of energy × the heat carbon factor
-                  {input ? <> ({input.params.carbon_factor_heat} kg CO₂e/kWh)</> : null}, not discounted.
+                  <b>{t("30-year cost")}</b> = {t("material cost today + 30 years of energy bills")}
+                  {input ? <> {t("at {price} {currency}/kWh", { price: input.params.energy_price, currency })}</> : null}, {t("discounted at {rate}/yr (money later is worth less than money now).", { rate: input ? `${Math.round(input.params.discount_rate * 1000) / 10}%` : "3%" })}
+                  {" "}<b>{t("30-year carbon")}</b> = {t("embodied carbon + 30 years of energy × the heat carbon factor")}
+                  {input ? <> ({input.params.carbon_factor_heat} kg CO₂e/kWh)</> : null}, {t("not discounted.")}
                 </li>
                 <li style={{ marginBottom: 4 }}>
-                  <b>Picking the winners.</b> A package is dropped when another one is at least as good on cost, carbon
-                  and energy and better on at least one. What remains is the trade-off curve. The cheapest, lowest-carbon
-                  and lowest-energy packages are tagged; at most 24 are shown, always keeping those three. “Do nothing”
-                  is never counted as a package.
+                  <b>{t("Picking the winners.")}</b> {t("A package is dropped when another one is at least as good on cost, carbon and energy and better on at least one. What remains is the trade-off curve. The cheapest, lowest-carbon and lowest-energy packages are tagged; at most 24 are shown, always keeping those three. “Do nothing” is never counted as a package.")}
                 </li>
                 <li>
-                  <b>Confirm in EnergyPlus.</b> Each package appears in the Results table as an “≈ estimate” until you
-                  press <b>Simulate</b>, which replaces it with the full simulation.
+                  <b>{t("Confirm in EnergyPlus.")}</b> {t("Each package appears in the Results table as an “≈ estimate” until you press ")}<b>{t("Simulate")}</b>{t(", which replaces it with the full simulation.")}
                 </li>
               </ol>
               <p style={{ margin: 0, color: white(0.5) }}>
-                <b>Keep in mind:</b> the estimate is still somewhat optimistic about savings, so simulate the packages you
-                care about. A new storey shows its cost and carbon but no energy effect here (EnergyPlus models it).
-                Replacing parts that wear out within 30 years is not counted yet. With several buildings, the
-                optimisation is done for one representative building and the same choices are applied to all.
+                <b>{t("Keep in mind:")}</b> {t("the estimate is still somewhat optimistic about savings, so simulate the packages you care about. A new storey shows its cost and carbon but no energy effect here (EnergyPlus models it). Replacing parts that wear out within 30 years is not counted yet. With several buildings, the optimisation is done for one representative building and the same choices are applied to all.")}
               </p>
             </div>
           </details>
@@ -213,9 +194,9 @@ export default function OptimizerPanel({
             {disabledReason && <span style={{ fontSize: 11.5, color: "#E8880C" }}>{disabledReason}</span>}
             {result && (
               <span style={{ fontSize: 11.5, color: white(0.45) }}>
-                {result.combinations_total.toLocaleString()} combinations evaluated · {result.pareto_count} Pareto-optimal
-                {result.truncated && " · search truncated (too many combinations — narrow the material list)"}
-                {scopeLabel && <> · figures for {scopeLabel}</>}
+                {t("{n} combinations evaluated · {m} Pareto-optimal", { n: result.combinations_total.toLocaleString(), m: result.pareto_count })}
+                {result.truncated && t(" · search truncated (too many combinations — narrow the material list)")}
+                {scopeLabel && <> · {t("figures for {scope}", { scope: scopeLabel })}</>}
               </span>
             )}
           </div>
@@ -225,15 +206,15 @@ export default function OptimizerPanel({
           )}
 
           {error && (
-            <div style={{ fontSize: 12, color: "#E2483B", marginBottom: 10 }}>Optimization failed: {error}</div>
+            <div style={{ fontSize: 12, color: "#E2483B", marginBottom: 10 }}>{t("Optimization failed: {error}", { error })}</div>
           )}
 
           {/* Empty / computing states so the panel isn't blank before any pick */}
           {!result && !error && !disabledReason && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: white(0.4), padding: "8px 0" }}>
               {loading
-                ? (<><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Computing trade-off curve…</>)
-                : "Pick one or more materials per component in the builder above — the curve appears here and updates as you go."}
+                ? (<><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> {t("Computing trade-off curve…")}</>)
+                : t("Pick one or more materials per component in the builder above — the curve appears here and updates as you go.")}
             </div>
           )}
 
@@ -243,27 +224,27 @@ export default function OptimizerPanel({
                   full-width view; the parallel-coordinates plot is an opt-in advanced
                   toggle, and the Pareto can be maximised to a fullscreen overlay. */}
               <div style={{ marginBottom: 6, fontSize: 11, color: white(0.45) }}>
-                Axes from your Step-1 KPIs: <b style={{ color: "#fff" }}>{OBJECTIVES[axes.x].label}</b> ×{" "}
-                <b style={{ color: "#fff" }}>{OBJECTIVES[axes.y].label}</b>, coloured by <b style={{ color: "#fff" }}>{OBJECTIVES[axes.color].label}</b>.
+                {t("Axes from your Step-1 KPIs:")} <b style={{ color: "#fff" }}>{t(OBJECTIVES[axes.x].label)}</b> ×{" "}
+                <b style={{ color: "#fff" }}>{t(OBJECTIVES[axes.y].label)}</b>, {t("coloured by")} <b style={{ color: "#fff" }}>{t(OBJECTIVES[axes.color].label)}</b>.
               </div>
               {/* Pareto frontier — full width. Parallel coordinates is an opt-in
                   advanced view (toggle); the Pareto can be maximised to fullscreen. */}
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: white(0.4), textTransform: "uppercase" }}>
-                    Pareto frontier
+                    {t("Pareto frontier")}
                   </div>
                   <div style={{ marginLeft: "auto", display: "flex", gap: 7 }}>
                     <button onClick={() => setShowParallel(v => !v)}
                       style={{ fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
                         border: `1px solid ${showParallel ? "#4ECDC4" : "rgba(255,255,255,0.14)"}`,
                         background: showParallel ? "#4ECDC4" : "transparent", color: showParallel ? "#0b1220" : white(0.6) }}>
-                      {showParallel ? "Hide parallel view" : "＋ Parallel view"}
+                      {showParallel ? t("Hide parallel view") : t("＋ Parallel view")}
                     </button>
-                    <button onClick={() => setMaximized(true)} title="Maximise the chart"
+                    <button onClick={() => setMaximized(true)} title={t("Maximise the chart")}
                       style={{ fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
                         border: "1px solid rgba(255,255,255,0.14)", background: "transparent", color: white(0.6) }}>
-                      ⤢ Maximise
+                      {t("⤢ Maximise")}
                     </button>
                   </div>
                 </div>
@@ -279,10 +260,10 @@ export default function OptimizerPanel({
               {showParallel && (
                 <div style={{ marginTop: 20 }}>
                   <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: white(0.4), textTransform: "uppercase", marginBottom: 4 }}>
-                    Parallel coordinates · materials → KPIs
+                    {t("Parallel coordinates · materials → KPIs")}
                   </div>
                   <div style={{ fontSize: 10.5, color: white(0.4), marginBottom: 8, lineHeight: 1.5, maxWidth: 720 }}>
-                    Each package is one line crossing every axis — the material choices and all three KPIs at once. Drag along an axis to filter. An advanced view for spotting patterns the 2-D Pareto can&apos;t show.
+                    {t("Each package is one line crossing every axis — the material choices and all three KPIs at once. Drag along an axis to filter. An advanced view for spotting patterns the 2-D Pareto can't show.")}
                   </div>
                   <ParallelCoordinates
                     pareto={pcPoints} currency={currency} colorBy={axes.color}
@@ -298,14 +279,14 @@ export default function OptimizerPanel({
                   <div onClick={e => e.stopPropagation()}
                     style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: "16px 20px", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Pareto frontier</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>{t("Pareto frontier")}</span>
                       <span style={{ fontSize: 11, color: white(0.45) }}>
-                        {OBJECTIVES[axes.x].label} × {OBJECTIVES[axes.y].label}, coloured by {OBJECTIVES[axes.color].label}
+                        {t(OBJECTIVES[axes.x].label)} × {t(OBJECTIVES[axes.y].label)}, {t("coloured by")} {t(OBJECTIVES[axes.color].label)}
                       </span>
                       <button onClick={() => setMaximized(false)}
                         style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 8, cursor: "pointer",
                           border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", color: "#fff" }}>
-                        ✕ Minimise
+                        {t("✕ Minimise")}
                       </button>
                     </div>
                     <div style={{ flex: 1, minHeight: 0 }}>
@@ -326,14 +307,12 @@ export default function OptimizerPanel({
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, padding: "10px 14px", borderRadius: 10,
                   background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: white(0.6), flex: 1, lineHeight: 1.5 }}>
-                    Every package — with cost, carbon, 30-year cost and carbon, heating and total energy — is in one
-                    table under <b style={{ color: "#fff" }}>Results &amp; comparison</b>: estimates until simulated, EnergyPlus figures after.
-                    Click a point above to simulate it.
+                    {t("Every package — with cost, carbon, 30-year cost and carbon, heating and total energy — is in one table under ")}<b style={{ color: "#fff" }}>{t("Results & comparison")}</b>{t(": estimates until simulated, EnergyPlus figures after. Click a point above to simulate it.")}
                   </span>
                   <button onClick={onOpenTable}
                     style={{ fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 8, cursor: "pointer",
                       border: "1px solid #4ECDC4", background: "rgba(78,205,196,0.14)", color: "#4ECDC4" }}>
-                    Open the packages table →
+                    {t("Open the packages table →")}
                   </button>
                 </div>
               ) : (<>
@@ -341,15 +320,15 @@ export default function OptimizerPanel({
                   a joining rule — one analysis, two read-outs. */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18 }}>
                 <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: white(0.4), textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                  Estimated packages · the points above
+                  {t("Estimated packages · the points above")}
                 </span>
                 <span style={{ flex: 1, height: 1, background: white(0.1) }} />
               </div>
               <div style={{ fontSize: 10.5, color: white(0.4), margin: "4px 0 0" }}>
-                Fast-model estimates to shortlist from — <b>Simulate</b> the promising ones; verified results appear in Simulation Results &amp; Comparison.
+                {t("Fast-model estimates to shortlist from — ")}<b>{t("Simulate")}</b>{t(" the promising ones; verified results appear in Simulation Results & Comparison.")}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, marginTop: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 11, color: white(0.4) }}>Sort by:</span>
+                <span style={{ fontSize: 11, color: white(0.4) }}>{t("Sort by:")}</span>
                 {/* "Cost" here is life-cycle, unlike the capex-only Cost in 4.3 —
                     the two answer different questions and can rank differently. */}
                 {([["energy_kwh_m2_yr", "Energy"], ["initial_cost", "Upfront cost"], ["total_cost", "30-yr cost"], ["total_carbon", "30-yr carbon"]] as const).map(([k, lbl]) => (
@@ -358,12 +337,12 @@ export default function OptimizerPanel({
                     border: `1px solid ${sort === k ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
                     background: sort === k ? "#4ECDC4" : "transparent",
                     color: sort === k ? "#0b1220" : white(0.55),
-                  }}>{lbl}</button>
+                  }}>{t(lbl)}</button>
                 ))}
                 {canShowAll && (
                   <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6, alignItems: "center" }}>
-                    <span style={{ fontSize: 11, color: white(0.4) }}>Show:</span>
-                    {([[false, `Pareto-optimal (${result.pareto.length})`], [true, `All packages (${result.all_points!.length})`]] as const).map(([v, lbl]) => (
+                    <span style={{ fontSize: 11, color: white(0.4) }}>{t("Show:")}</span>
+                    {([[false, t("Pareto-optimal ({n})", { n: result.pareto.length })], [true, t("All packages ({n})", { n: result.all_points!.length })]] as const).map(([v, lbl]) => (
                       <button key={String(v)} onClick={() => setShowAll(v)} style={{
                         fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
                         border: `1px solid ${showAll === v ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
@@ -376,8 +355,7 @@ export default function OptimizerPanel({
               </div>
               {showAll && canShowAll && (
                 <div style={{ fontSize: 10.5, color: white(0.35), marginBottom: 8 }}>
-                  Showing every evaluated package. Rows without a <span style={{ color: "#4ECDC4" }}>tag</span> are
-                  <b> dominated</b> — another package is better on cost, carbon <i>and</i> energy at once, so it's never the smart pick.
+                  {t("Showing every evaluated package. Rows without a ")}<span style={{ color: "#4ECDC4" }}>{t("tag")}</span>{t(" are ")}<b>{t("dominated")}</b>{t(" — another package is better on cost, carbon and energy at once, so it's never the smart pick.")}
                 </div>
               )}
 
@@ -385,20 +363,20 @@ export default function OptimizerPanel({
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                   <thead>
                     <tr style={{ color: white(0.45), textAlign: "left" }}>
-                      <th style={{ padding: "6px 8px", fontWeight: 600 }}>Package (selected options)</th>
-                      <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Energy</th>
-                      <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>Upfront cost</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 600 }}>{t("Package (selected options)")}</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>{t("Energy")}</th>
+                      <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>{t("Upfront cost")}</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}
-                          title="Upfront cost + 30 years of energy at today's price, discounted (energy × price × annuity factor)">30-yr cost (LCC)</th>
+                          title={t("Upfront cost + 30 years of energy at today's price, discounted (energy × price × annuity factor)")}>{t("30-yr cost (LCC)")}</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}
-                          title="Embodied carbon + 30 years of energy">30-yr carbon</th>
+                          title={t("Embodied carbon + 30 years of energy")}>{t("30-yr carbon")}</th>
                       <th />
                     </tr>
                   </thead>
                   <tbody>
                     {/* baseline reference row */}
                     <tr style={{ borderTop: `1px solid ${white(0.08)}`, color: white(0.55) }}>
-                      <td style={{ padding: "8px", fontStyle: "italic" }}>Baseline (as-built)</td>
+                      <td style={{ padding: "8px", fontStyle: "italic" }}>{t("Baseline (as-built)")}</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{result.baseline.energy_kwh_m2_yr} kWh/m²/yr</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>—</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{fmtMoney(result.baseline.total_cost)}</td>
@@ -414,20 +392,20 @@ export default function OptimizerPanel({
                         <tr key={i} style={{ borderTop: `1px solid ${white(0.06)}` }}>
                           <td style={{ padding: "8px", color: "#fff" }}>
                             <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: touched.length ? 4 : 0 }}>
-                              {(pt.tags ?? []).map((t) => {
-                                const s = TAG_STYLE[t];
+                              {(pt.tags ?? []).map((tag) => {
+                                const s = TAG_STYLE[tag];
                                 return s ? (
-                                  <span key={t} style={{ fontSize: 9.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, background: s.bg, color: s.fg }}>{s.label}</span>
+                                  <span key={tag} style={{ fontSize: 9.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, background: s.bg, color: s.fg }}>{t(s.label)}</span>
                                 ) : null;
                               })}
                             </div>
                             {touched.length === 0 ? (
-                              <span style={{ color: white(0.4), fontStyle: "italic" }}>Keep everything as-built</span>
+                              <span style={{ color: white(0.4), fontStyle: "italic" }}>{t("Keep everything as-built")}</span>
                             ) : (
                               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                                 {touched.map(([k, v]) => (
                                   <div key={k} style={{ fontSize: 11 }}>
-                                    <span style={{ color: white(0.45) }}>{k.replace("VertExt::", "")}:</span>{" "}
+                                    <span style={{ color: white(0.45) }}>{t(k.replace("VertExt::", ""))}:</span>{" "}
                                     <span style={{ color: white(0.85) }}>{v}</span>
                                   </div>
                                 ))}
@@ -437,7 +415,7 @@ export default function OptimizerPanel({
                           <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
                             <div style={{ color: "#fff", fontWeight: 700 }}>{pt.energy_kwh_m2_yr} kWh/m²/yr</div>
                             {deltaPct != null && deltaPct > 0 && (
-                              <div style={{ fontSize: 10.5, color: "#2FB477" }}>−{deltaPct}% vs baseline</div>
+                              <div style={{ fontSize: 10.5, color: "#2FB477" }}>{t("−{n}% vs baseline", { n: deltaPct })}</div>
                             )}
                           </td>
                           <td style={{ padding: "8px", whiteSpace: "nowrap", color: white(0.8) }}>{fmtMoney(pt.initial_cost)}</td>
@@ -446,25 +424,25 @@ export default function OptimizerPanel({
                           <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
                             {ptKey === "" ? null : runningKeys.has(ptKey) ? (
                               <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700, color: "#E8880C" }}>
-                                <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> Running in EnergyPlus…
+                                <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> {t("Running in EnergyPlus…")}
                               </span>
                             ) : simulated ? (
                               onShowResults ? (
-                                <button onClick={onShowResults} title="Open the Results step"
+                                <button onClick={onShowResults} title={t("Open the Results step")}
                                   style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700,
                                     padding: "5px 11px", borderRadius: 8, cursor: "pointer",
                                     border: "1px solid rgba(47,180,119,0.45)", background: "transparent", color: "#2FB477" }}>
-                                  ✓ Simulated — see results in the next step →
+                                  {t("✓ Simulated — see results in the next step →")}
                                 </button>
                               ) : (
-                                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2FB477" }}>✓ Simulated — see results in the next step</span>
+                                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2FB477" }}>{t("✓ Simulated — see results in the next step")}</span>
                               )
                             ) : (
                               <button onClick={() => onValidate(pt)}
                                 style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700,
                                   padding: "5px 11px", borderRadius: 8, cursor: "pointer",
                                   border: "1px solid rgba(47,180,119,0.45)", background: "rgba(47,180,119,0.14)", color: "#2FB477" }}>
-                                <Play size={11} /> Simulate in EnergyPlus
+                                <Play size={11} /> {t("Simulate in EnergyPlus")}
                               </button>
                             )}
                           </td>

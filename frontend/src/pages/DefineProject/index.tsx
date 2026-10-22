@@ -23,6 +23,7 @@ import {
 
 import LocationMap from "../../components/LocationMap";
 import { useWizardStepNav, setWizardCanNext, setWizardNextError } from "../../components/wizardNav";
+import { useT, translate } from "../../i18n";
 
 /* ── tiny reusable bits ─────────────────────────────────────────── */
 
@@ -86,11 +87,15 @@ const PROJECT_NAME_EXAMPLE: Record<string, string> = {
   Gent: "Gent Retrofit Study",
 };
 function projectNamePlaceholder(city: string | null | undefined): string {
-  if (!city) return "e.g. Neighbourhood Retrofit Study";
-  return `e.g. ${PROJECT_NAME_EXAMPLE[city] ?? `${city} Retrofit Study`}`;
+  if (!city) return translate("e.g. {name}", { name: translate("Neighbourhood Retrofit Study") });
+  const example = PROJECT_NAME_EXAMPLE[city];
+  return translate("e.g. {name}", {
+    name: example ? translate(example) : translate("{city} Retrofit Study", { city }),
+  });
 }
 
 export default function DefineProject() {
+  const t = useT();
   const { project, setProject, setStep } = useWizardStore();
   const navigate = useNavigate();
 
@@ -151,7 +156,7 @@ export default function DefineProject() {
   const selectedDistrictCount = selectedDistrict
     ? (districtExactCounts[selectedDistrict.name] ?? selectedDistrict.count)
     : null;
-  const districtTriggerLabel = selectedDistrict ? selectedDistrict.name : "Select a district";
+  const districtTriggerLabel = selectedDistrict ? selectedDistrict.name : t("Select a district");
 
   function pickDistrict(name: string) {
     setDistrictQuery("");
@@ -191,7 +196,7 @@ export default function DefineProject() {
         .filter(Boolean);
 
       if (rawLines.length === 0) {
-        setAddressUploadMessage("This file is empty — add one address per line or a single Address column.");
+        setAddressUploadMessage(t("This file is empty — add one address per line or a single Address column."));
         return;
       }
 
@@ -214,11 +219,11 @@ export default function DefineProject() {
 
       const uniqueAddresses = [...new Set(addresses.map((address) => address.trim()).filter((address) => address.length > 2))].slice(0, 200);
       if (uniqueAddresses.length === 0) {
-        setAddressUploadMessage("No valid addresses were found. Use a column called Address or one address per line.");
+        setAddressUploadMessage(t("No valid addresses were found. Use a column called Address or one address per line."));
         return;
       }
 
-      setAddressUploadMessage("Geocoding uploaded addresses…");
+      setAddressUploadMessage(t("Geocoding uploaded addresses…"));
       const settled = await Promise.allSettled(
         uniqueAddresses.map(async (address) => {
           const geo = await api.geocode(address, project.country);
@@ -228,7 +233,7 @@ export default function DefineProject() {
 
       const points = settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
       if (points.length === 0) {
-        setAddressUploadMessage("No uploaded addresses could be matched. Check the spelling or use full street addresses.");
+        setAddressUploadMessage(t("No uploaded addresses could be matched. Check the spelling or use full street addresses."));
         return;
       }
 
@@ -243,9 +248,11 @@ export default function DefineProject() {
       });
       setDistrictQuery("");
       setDistrictOpen(false);
-      setAddressUploadMessage(`Loaded ${points.length} address${points.length === 1 ? "" : "es"} from the CSV. They will appear in Step 2.`);
+      setAddressUploadMessage(points.length === 1
+        ? t("Loaded {n} address from the CSV. They will appear in Step 2.", { n: points.length })
+        : t("Loaded {n} addresses from the CSV. They will appear in Step 2.", { n: points.length }));
     } catch {
-      setAddressUploadMessage("The file could not be processed. Please use a plain CSV or text file with one address per row.");
+      setAddressUploadMessage(t("The file could not be processed. Please use a plain CSV or text file with one address per row."));
     }
   }
 
@@ -481,18 +488,20 @@ export default function DefineProject() {
   // stays clickable and lists what is still missing.
   const locationBlock: string | null =
     getMissing().length > 0 ? null
-    : !locationValid ?"Pick a location inside the covered area to continue."
-    : areaEmpty ? "No buildings found in the area you drew — redraw it over built-up streets."
-    : buildingLoading ? "Looking up buildings…"
-    : !hasBuildings ? "Select buildings on the map (an address, a box or a shape) to continue."
+    : !locationValid ?t("Pick a location inside the covered area to continue.")
+    : areaEmpty ? t("No buildings found in the area you drew — redraw it over built-up streets.")
+    : buildingLoading ? t("Looking up buildings…")
+    : !hasBuildings ? t("Select buildings on the map (an address, a box or a shape) to continue.")
     : null;
+  const missingMessage = (missing: string[]) =>
+    t("Add {items} to continue.", { items: missing.map((m) => t(m)).join(", ") });
 
   function handleContinue() {
     setTriedContinue(true);
     const missing = getMissing();
     if (missing.length) {
       setValidationErrors(missing);
-      setWizardNextError(`Add ${missing.join(", ")} to continue.`);
+      setWizardNextError(missingMessage(missing));
       return;
     }
     if (locationBlock) { setWizardNextError(locationBlock); return; }
@@ -512,7 +521,7 @@ export default function DefineProject() {
     if (!triedContinue) { setWizardNextError(null); return; }
     const missing = getMissing();
     setValidationErrors(missing);
-    setWizardNextError(missing.length ? `Add ${missing.join(", ")} to continue.` : null);
+    setWizardNextError(missing.length ? missingMessage(missing) : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationBlock, triedContinue, project.projectName, project.systemsInScope, project.explorationApproaches,
       project.selectedKpis, project.scale, project.ecEnergyFocus, project.renovationEnvelopeComponents, pt]);
@@ -634,7 +643,7 @@ export default function DefineProject() {
       {!HIDE_PROJECT_TYPE && <Card>
         {HIDE_PROJECT_TYPE ? (
           <div>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "1.4px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>Project type</div>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "1.4px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>{t("Project type")}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
               <svg width="34" height="34" viewBox="0 0 52 52" fill="none" style={{ flexShrink: 0 }}>
                 <rect x="10" y="18" width="32" height="26" rx="1" stroke="var(--brand-deep)" strokeWidth="1.5" fill="none"/>
@@ -643,11 +652,11 @@ export default function DefineProject() {
                 <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
                 <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
               </svg>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Renovation Planning</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{t("Renovation Planning")}</div>
             </div>
           </div>
         ) : (<>
-        <Label required>Project Type</Label>
+        <Label required>{t("Project Type")}</Label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
           {PROJECT_TYPES.map((t) => {
             const disabled = DISABLED_PROJECT_TYPES.has(t);
@@ -688,7 +697,7 @@ export default function DefineProject() {
                 key={t}
                 onClick={() => { if (!disabled) handleTypeChange(t); }}
                 disabled={disabled}
-                title={disabled ? "Coming soon — not available yet" : undefined}
+                title={disabled ? translate("Coming soon — not available yet") : undefined}
                 style={{
                   background: selected ? "#4ECDC4" : "rgba(13,17,40,0.85)",
                   border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.10)"}`,
@@ -720,7 +729,7 @@ export default function DefineProject() {
                     padding: "3px 8px", borderRadius: 999,
                     background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.55)",
                     border: "1px solid rgba(255,255,255,0.14)",
-                  }}>Soon</span>
+                  }}>{translate("Soon")}</span>
                 ) : (
                   <div style={{
                     position: "absolute", top: 12, right: 12,
@@ -747,13 +756,13 @@ export default function DefineProject() {
                     color: selected ? "#0b1220" : "rgba(255,255,255,0.85)",
                     marginBottom: 8, lineHeight: 1.3,
                   }}>
-                    {t}
+                    {translate(t)}
                   </div>
                   <p style={{
                     fontSize: 12, color: "rgba(255,255,255,0.45)",
                     lineHeight: 1.55, margin: 0,
                   }}>
-                    {PROJECT_TYPE_DESCRIPTIONS[t]}
+                    {translate(PROJECT_TYPE_DESCRIPTIONS[t])}
                   </p>
                 </div>
               </button>
@@ -768,7 +777,7 @@ export default function DefineProject() {
         const nameMissing = validationErrors.includes("a project name") && !project.projectName.trim();
         return (
           <Card className="animate-fadeIn">
-            <Label required>Project Name</Label>
+            <Label required>{t("Project Name")}</Label>
             <input
               type="text"
               value={project.projectName}
@@ -779,7 +788,7 @@ export default function DefineProject() {
             />
             {nameMissing && (
               <p className="mt-1 text-[11px]" style={{ color: "#fca5a5" }}>
-                A project name is required — it's used to label your project and any data you edit in Step 2.
+                {t("A project name is required — it's used to label your project and any data you edit in Step 2.")}
               </p>
             )}
           </Card>
@@ -789,7 +798,7 @@ export default function DefineProject() {
       {/* ── BUILDING DEVELOPMENT TYPE (EC + RE only) ── */}
       {showBuildingDevType && (
         <Card className="animate-fadeIn">
-          <Label required>Are the buildings existing or new development?</Label>
+          <Label required>{t("Are the buildings existing or new development?")}</Label>
           <div className="flex flex-wrap gap-2 mt-2">
             {BUILDING_DEVELOPMENT_OPTIONS.map((opt) => (
               <button
@@ -801,7 +810,7 @@ export default function DefineProject() {
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
                 }`}
               >
-                {opt.label}
+                {t(opt.label)}
               </button>
             ))}
           </div>
@@ -812,9 +821,9 @@ export default function DefineProject() {
       {showRenovationComponents && (
         <Card className="animate-fadeIn">
           <div style={{ marginBottom: 14 }}>
-            <Label required>Renovation components</Label>
+            <Label required>{t("Renovation components")}</Label>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.40)" }}>
-              Select the building elements included in your assessment.
+              {t("Select the building elements included in your assessment.")}
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
@@ -879,11 +888,11 @@ export default function DefineProject() {
                     {/* Text */}
                     <span>
                       <div style={{ fontSize: 13, fontWeight: 600, color: selected ? "#0b1220" : "rgba(255,255,255,0.80)", lineHeight: 1.2 }}>
-                        {displayName}
+                        {t(displayName)}
                       </div>
                       {meta.subtitle && (
                         <div style={{ fontSize: 10, color: selected ? "rgba(11,18,32,0.75)" : "rgba(255,255,255,0.35)", marginTop: 2 }}>
-                          {meta.subtitle}
+                          {t(meta.subtitle)}
                         </div>
                       )}
                     </span>
@@ -909,8 +918,8 @@ export default function DefineProject() {
         <Card className="animate-fadeIn">
           <Label required>
             {pt === "Energy Community Planning"
-              ? "Entities in Scope"
-              : "Systems in Scope"}
+              ? t("Entities in Scope")
+              : t("Systems in Scope")}
           </Label>
           <div className="flex flex-wrap gap-2 mt-2">
             {selectableSystems.map((sys) => (
@@ -923,13 +932,13 @@ export default function DefineProject() {
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
                 }`}
               >
-                {sys}
+                {t(sys)}
               </button>
             ))}
           </div>
           {disabledSystems.length > 0 && (
             <p className="text-xs text-gray-400 mt-2">
-              🔒 Coming soon: {disabledSystems.join(", ")}
+              🔒 {t("Coming soon: {items}", { items: disabledSystems.map((s) => t(s)).join(", ") })}
             </p>
           )}
 
@@ -940,8 +949,8 @@ export default function DefineProject() {
             const answer = project.followUpAnswers[fuSystem] ?? false;
             return (
               <div key={fuSystem} className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium">{cfg.question}</p>
-                <p className="text-xs text-gray-500 mb-2">{cfg.help}</p>
+                <p className="text-sm font-medium">{t(cfg.question)}</p>
+                <p className="text-xs text-gray-500 mb-2">{t(cfg.help)}</p>
                 <div className="flex gap-3">
                   {["Yes", "No"].map((opt) => (
                     <button
@@ -966,7 +975,7 @@ export default function DefineProject() {
                           : "bg-white border-gray-300"
                       }`}
                     >
-                      {opt}
+                      {t(opt)}
                     </button>
                   ))}
                 </div>
@@ -998,7 +1007,7 @@ export default function DefineProject() {
                             : "bg-white border-gray-300"
                         }`}
                       >
-                        {val ? "Yes" : "No"}
+                        {val ? t("Yes") : t("No")}
                       </button>
                     ))}
                   </div>
@@ -1023,7 +1032,7 @@ export default function DefineProject() {
                             : "bg-white border-gray-300"
                         }`}
                       >
-                        {val ? "Yes" : "No"}
+                        {val ? t("Yes") : t("No")}
                       </button>
                     ))}
                   </div>
@@ -1036,10 +1045,9 @@ export default function DefineProject() {
           {pt === "Renewable Energy Planning" && hasPvSelected && (
             <div className="mt-4">
               <SectionDivider />
-              <Label>What is your electricity target?</Label>
+              <Label>{t("What is your electricity target?")}</Label>
               <p className="text-xs text-gray-500 mb-2">
-                Energy balance — PV covers 100% of annual demand. Surplus — PV exceeds
-                demand. Partial coverage — PV covers a share.
+                {t("Energy balance — PV covers 100% of annual demand. Surplus — PV exceeds demand. Partial coverage — PV covers a share.")}
               </p>
               <div className="flex gap-2">
                 {RE_ELECTRICITY_THRESHOLDS.map((opt) => (
@@ -1054,7 +1062,7 @@ export default function DefineProject() {
                         : "bg-white border-gray-300"
                     }`}
                   >
-                    {opt}
+                    {t(opt)}
                   </button>
                 ))}
               </div>
@@ -1066,7 +1074,7 @@ export default function DefineProject() {
       {/* ── EC ENERGY FOCUS ── */}
       {showEcFocus && (
         <Card>
-          <Label required>Energy System in Scope</Label>
+          <Label required>{t("Energy System in Scope")}</Label>
           <div className="flex gap-2 mt-2">
             {EC_FOCUS_OPTIONS.map((opt) => (
               <button
@@ -1083,7 +1091,7 @@ export default function DefineProject() {
                     : "bg-white text-gray-600 border-gray-300"
                 }`}
               >
-                {opt}
+                {t(opt)}
               </button>
             ))}
           </div>
@@ -1095,17 +1103,17 @@ export default function DefineProject() {
         <Card className="animate-fadeIn">
           {pt === "Renovation Planning" && renovationComponentsChosen && (
             <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="text-[10px] font-bold uppercase tracking-[1.4px] text-white/45">Next step</div>
+              <div className="text-[10px] font-bold uppercase tracking-[1.4px] text-white/45">{t("Next step")}</div>
               <button
                 type="button"
                 onClick={() => setProject({ renovationEnvelopeComponents: [] })}
                 className="text-[11px] font-medium text-[#4ECDC4] hover:text-[#65f0e0]"
               >
-                Edit components
+                {t("Edit components")}
               </button>
             </div>
           )}
-          <Label required>How would you like to explore this?</Label>
+          <Label required>{t("How would you like to explore this?")}</Label>
           <div className="space-y-2 mt-2">
             {EXPLORATION_OPTIONS.map((approach) => {
               const cfg = EXPLORATION_CONSTRAINTS[approach];
@@ -1123,11 +1131,11 @@ export default function DefineProject() {
                 >
                   <div className="flex items-center gap-2">
                     <span className={`font-semibold text-sm ${selected ? "text-[#0b1220]" : "text-dark"}`}>
-                      {approach}
+                      {t(approach)}
                     </span>
                   </div>
                   <p className={`text-xs mt-1 ${selected ? "text-[#0b1220]/80" : "text-gray-500"}`}>
-                    {cfg.description}
+                    {t(cfg.description)}
                   </p>
                 </button>
               );
@@ -1139,7 +1147,7 @@ export default function DefineProject() {
       {/* ── KPIs ── */}
       {showKpis && (
         <Card className="animate-fadeIn">
-          <Label required>Key Performance Indicators</Label>
+          <Label required>{t("Key Performance Indicators")}</Label>
           <div className="flex flex-wrap gap-2 mt-2">
             {UNIVERSAL_KPIS.map((kpi) => (
               <button
@@ -1152,7 +1160,7 @@ export default function DefineProject() {
                 }`}
                 style={{ color: project.selectedKpis.includes(kpi) ? "#0b1220" : "rgba(255,255,255,0.80)" }}
               >
-                {kpi}
+                {t(kpi)}
               </button>
             ))}
           </div>
@@ -1161,10 +1169,10 @@ export default function DefineProject() {
 
       {/* ── SCALE ── */}
       {showScale && <Card className={`animate-fadeIn ${districtOpen ? "relative z-40" : ""}`}>
-        <Label required>Scale</Label>
+        <Label required>{t("Scale")}</Label>
         {pt === "Energy Community Planning" && (
           <p className="text-xs text-gray-500 mb-2">
-            Energy Community Planning is available at Districts, City, or Portfolio scale
+            {t("Energy Community Planning is available at Districts, City, or Portfolio scale")}
           </p>
         )}
         <div className="flex gap-3 mt-1">
@@ -1187,14 +1195,14 @@ export default function DefineProject() {
               <span className="inline-flex items-center gap-2">
                 <span>
                   {opt === "Building"
-                    ? "Building(s)"
+                    ? t("Building(s)")
                     : opt === "Neighborhood"
-                      ? "Districts"
-                      : opt}
+                      ? t("Districts")
+                      : t(opt)}
                 </span>
                 {comingSoonScales.has(opt) && (
                   <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                    Soon
+                    {t("Soon")}
                   </span>
                 )}
               </span>
@@ -1206,7 +1214,7 @@ export default function DefineProject() {
             so the user can pick from a list instead of typing and deleting text. */}
         {project.scale === "Neighborhood" && (
           <div className="mt-4">
-            <Label>District</Label>
+            <Label>{t("District")}</Label>
             {isSweden && districts.length > 0 ? (
               <div className="relative mt-1">
                 <button
@@ -1247,7 +1255,7 @@ export default function DefineProject() {
                         if (project.district) setProject({ district: null });
                       }}
                       onFocus={() => setDistrictOpen(true)}
-                      placeholder="Search district"
+                      placeholder={t("Search district")}
                       className="w-full rounded-lg border border-white/10 bg-[#0b1118] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-[#4ECDC4] focus:outline-none"
                     />
                     {districtMatches.length > 0 ? (
@@ -1260,26 +1268,26 @@ export default function DefineProject() {
                               className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10"
                             >
                               <span>{d.name}</span>
-                              <span className="text-xs text-white/40">{d.count.toLocaleString()} buildings</span>
+                              <span className="text-xs text-white/40">{t("{n} buildings", { n: d.count.toLocaleString() })}</span>
                             </button>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="mt-2 px-2 py-2 text-xs text-white/50">No matching districts found.</p>
+                      <p className="mt-2 px-2 py-2 text-xs text-white/50">{t("No matching districts found.")}</p>
                     )}
                   </div>
                 )}
                 {selectedDistrict ? (
                   <p className="text-xs text-emerald-700 mt-2">
-                    ✓ <span className="font-semibold">{selectedDistrict.name}</span> — all {(selectedDistrictCount ?? selectedDistrict.count).toLocaleString()} buildings will be loaded in Step 2.
+                    ✓ <span className="font-semibold">{selectedDistrict.name}</span> — {t("all {n} buildings will be loaded in Step 2.", { n: (selectedDistrictCount ?? selectedDistrict.count).toLocaleString() })}
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-500 mt-2">Pick a Gothenburg district to auto-select every building within it.</p>
+                  <p className="text-xs text-gray-500 mt-2">{t("Pick a Gothenburg district to auto-select every building within it.")}</p>
                 )}
 
                 <div className="mt-3 rounded-xl border border-white/10 bg-[#0b1118] p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Or upload a list of addresses</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">{t("Or upload a list of addresses")}</div>
                   <input
                     type="file"
                     accept=".csv,.txt,text/csv,text/plain"
@@ -1291,7 +1299,7 @@ export default function DefineProject() {
                     className="mt-2 block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border-0 file:bg-[#4ECDC4] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#0b1220] file:cursor-pointer"
                   />
                   <p className="mt-2 text-[11px] text-white/50">
-                    Use one column named <span className="font-mono text-emerald-300">Address</span> or put one address per line. Excel: save as CSV first.
+                    {t("Use one column named")} <span className="font-mono text-emerald-300">Address</span> {t("or put one address per line. Excel: save as CSV first.")}
                   </p>
                   <div className="mt-2 rounded-lg border border-white/10 bg-black/20 p-2 font-mono text-[10px] text-emerald-300 whitespace-pre-wrap">
                     Address
@@ -1309,10 +1317,10 @@ export default function DefineProject() {
                   type="text"
                   value={project.neighborhoodName}
                   onChange={(e) => setProject({ neighborhoodName: e.target.value })}
-                  placeholder={isSweden ? "e.g. Askim, Backa, Eriksberg" : isBE ? (project.city === "Liège" ? "e.g. Outremeuse, Saint-Léonard" : "e.g. Saint-Gilles, Schaerbeek") : "e.g. Eastwood, Kimberworth, Rawmarsh"}
+                  placeholder={t("e.g. {name}", { name: isSweden ? "Askim, Backa, Eriksberg" : isBE ? (project.city === "Liège" ? "Outremeuse, Saint-Léonard" : "Saint-Gilles, Schaerbeek") : "Eastwood, Kimberworth, Rawmarsh" })}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
                 />
-                <p className="text-xs text-gray-500 mt-1">Name the district or neighborhood this project covers.</p>
+                <p className="text-xs text-gray-500 mt-1">{t("Name the district or neighborhood this project covers.")}</p>
               </>
             )}
           </div>
@@ -1322,20 +1330,20 @@ export default function DefineProject() {
             now; the building→owner mapping is filled in later. */}
         {project.scale === "Portfolio" && (
           <div className="mt-4">
-            <Label>Property owner</Label>
+            <Label>{t("Property owner")}</Label>
             <select
               value={project.propertyOwner ?? ""}
               onChange={(e) => setProject({ propertyOwner: e.target.value || null })}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
               style={{ backgroundColor: "#11161d", color: "#fff" }}
             >
-              <option value="" style={{ backgroundColor: "#11161d", color: "#fff" }}>Property-owner portfolios coming soon…</option>
+              <option value="" style={{ backgroundColor: "#11161d", color: "#fff" }}>{t("Property-owner portfolios coming soon…")}</option>
               {PORTFOLIO_OWNERS.map((owner) => (
                 <option key={owner} value={owner} disabled style={{ backgroundColor: "#11161d", color: "#7c8597" }}>{owner}</option>
               ))}
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Coming soon — the portfolio owner list is visible for preview, but owner selection is not enabled yet.
+              {t("Coming soon — the portfolio owner list is visible for preview, but owner selection is not enabled yet.")}
             </p>
           </div>
         )}
@@ -1346,7 +1354,7 @@ export default function DefineProject() {
         const nameMissing = validationErrors.includes("a project name") && !project.projectName.trim();
         return (
           <Card className="animate-fadeIn">
-            <Label required>Project Name</Label>
+            <Label required>{t("Project Name")}</Label>
             <input
               type="text"
               value={project.projectName}
@@ -1357,7 +1365,7 @@ export default function DefineProject() {
             />
             {nameMissing && (
               <p className="mt-1 text-[11px]" style={{ color: "#fca5a5" }}>
-                A project name is required — it's used to label your project and any data you edit in Step 2.
+                {t("A project name is required — it's used to label your project and any data you edit in Step 2.")}
               </p>
             )}
           </Card>
@@ -1369,16 +1377,16 @@ export default function DefineProject() {
           the map visible so users can verify municipality + district boundary. */}
       {showLocation && project.scale === "Neighborhood" && (
         <Card className="animate-fadeIn">
-          <Label>Project Location</Label>
+          <Label>{t("Project Location")}</Label>
           <p className="text-sm text-white/65">
             {isSweden
-              ? "District scale uses the district selection above. The map below shows Gothenburg and the selected district boundary."
-              : "There is no named-district list for this city yet, so a district name can't load buildings on its own."}
+              ? t("District scale uses the district selection above. The map below shows Gothenburg and the selected district boundary.")
+              : t("There is no named-district list for this city yet, so a district name can't load buildings on its own.")}
           </p>
           <p className="text-xs text-white/45 mt-2">
             {isSweden
-              ? "Pick a Gothenburg district above to load its buildings in Step 2."
-              : "To analyse a whole area, switch the scale to Building and use \u201cDraw box\u201d or \u201cDraw shape\u201d on the map \u2014 every building inside is loaded in Step 2."}
+              ? t("Pick a Gothenburg district above to load its buildings in Step 2.")
+              : t("To analyse a whole area, switch the scale to Building and use \u201cDraw box\u201d or \u201cDraw shape\u201d on the map \u2014 every building inside is loaded in Step 2.")}
           </p>
           <div className="mt-3">
             <LocationMap
@@ -1398,7 +1406,7 @@ export default function DefineProject() {
 
       {showLocation && project.scale !== "Neighborhood" && !(project.scale === "Neighborhood" && isSweden && project.district) && (
         <Card className="animate-fadeIn">
-          <Label>Project Location</Label>
+          <Label>{t("Project Location")}</Label>
           <LocationMap
             scale={project.scale}
             country={project.country}
@@ -1422,9 +1430,9 @@ export default function DefineProject() {
               <span>
                 <span className="font-semibold">{locationMsg}</span>{" "}
                 {project.city && project.city !== "Gothenburg"
-                  ? <>Building data for <b>{project.city}</b> covers only the highlighted area —</>
-                  : <>This tool currently covers the <b>Gothenburg</b> municipality —</>}
-                {" "}pick a location inside the highlighted area to continue.
+                  ? <>{t("Building data for")} <b>{project.city}</b> {t("covers only the highlighted area —")}</>
+                  : <>{t("This tool currently covers the")} <b>{t("Gothenburg municipality")}</b> —</>}
+                {" "}{t("pick a location inside the highlighted area to continue.")}
               </span>
             </div>
           )}
@@ -1436,19 +1444,19 @@ export default function DefineProject() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
               </svg>
-              Looking up building data…
+              {t("Looking up building data…")}
             </div>
           )}
           {locationValid && !buildingLoading && project.lookedUpBuildings && project.lookedUpBuildings.length > 1 && (
             <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
               <span>✓</span>
-              <span><span className="font-semibold">{project.lookedUpBuildings.length} buildings found</span>. Full data shown in Step 2.</span>
+              <span><span className="font-semibold">{t("{n} buildings found", { n: project.lookedUpBuildings.length })}</span>. {t("Full data shown in Step 2.")}</span>
             </div>
           )}
           {locationValid && !buildingLoading && project.lookedUpBuilding && (!project.lookedUpBuildings || project.lookedUpBuildings.length <= 1) && (
             <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
               <span>✓</span>
-              <span>Building found — <span className="font-semibold">{project.lookedUpBuilding.address ?? "EUBUCCO match"}</span>. Full data shown in Step 2.</span>
+              <span>{t("Building found —")} <span className="font-semibold">{project.lookedUpBuilding.address ?? t("EUBUCCO match")}</span>. {t("Full data shown in Step 2.")}</span>
             </div>
           )}
           {locationValid && !buildingLoading && areaEmpty && (
@@ -1456,16 +1464,16 @@ export default function DefineProject() {
               style={{ color: "#fca5a5", background: "rgba(226,72,59,0.10)", border: "1px solid rgba(226,72,59,0.35)" }}>
               <span>⚠</span>
               <span>
-                <span className="font-semibold">No buildings found in the area you drew.</span>{" "}
-                {project.city ? <>Building data for <b>{project.city}</b> only covers part of the map.</> : null}{" "}
-                Redraw the shape over a built-up area (or use an address) to continue.
+                <span className="font-semibold">{t("No buildings found in the area you drew.")}</span>{" "}
+                {project.city ? <>{t("Building data for")} <b>{project.city}</b> {t("only covers part of the map.")}</> : null}{" "}
+                {t("Redraw the shape over a built-up area (or use an address) to continue.")}
               </span>
             </div>
           )}
           {locationValid && !buildingLoading && project.bboxStats && (
             <div className="theme-preserve mt-2 flex items-center gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
               <span>✓</span>
-              <span><span className="font-semibold">{project.bboxStats.count.toLocaleString()} buildings</span> found in area. Full data shown in Step 2.</span>
+              <span><span className="font-semibold">{t("{n} buildings", { n: project.bboxStats.count.toLocaleString() })}</span> {t("found in area.")} {t("Full data shown in Step 2.")}</span>
             </div>
           )}
         </Card>
@@ -1474,10 +1482,10 @@ export default function DefineProject() {
       {/* ── VALIDATION ERRORS ── */}
       {validationErrors.length > 0 && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <p className="font-semibold mb-1">Please complete the following:</p>
+          <p className="font-semibold mb-1">{t("Please complete the following:")}</p>
           <ul className="list-disc list-inside">
             {validationErrors.map((e) => (
-              <li key={e}>{e}</li>
+              <li key={e}>{t(e)}</li>
             ))}
           </ul>
         </div>

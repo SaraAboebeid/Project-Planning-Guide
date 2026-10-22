@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { api, type PvgisEstimate } from "../api/client";
 import { useNavigate } from "react-router-dom";
 import { useWizardStore, FACADE_ORIENTATIONS, type FacadeOrientation } from "../store/wizard";
@@ -17,6 +17,7 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell,
 } from "recharts";
+import { useT, useLang, translate } from "../i18n";
 
 /* Facade labels for the report. Kept here rather than imported from the Step 2
    panel so the report has no dependency on that component's UI internals. */
@@ -50,7 +51,7 @@ function chartLegend(keys: string[]): string {
   if (!items.length) return "";
   return '<div style="display:flex;gap:12px;flex-wrap:wrap;margin:4px 0 8px;font-size:8pt;color:#475569">'
     + items.map((e) =>
-        `<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${e.color};margin-right:4px"></span>${e.label}</span>`
+        `<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${e.color};margin-right:4px"></span>${translate(e.label)}</span>`
       ).join("")
     + "</div>";
 }
@@ -88,7 +89,7 @@ function svgStackedBars(
       + segs
       + `<text x="${(x + 6).toFixed(1)}" y="${y + rowH / 2 + 3.5}" font-size="9" font-weight="600" fill="${theme.value}">${totals[i]!.toFixed(1)}</text>`;
   }).join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="Energy use by end use, ${escHtml(unit)}">${body}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="${escHtml(translate("Energy use by end use, {unit}", { unit }))}">${body}</svg>`;
 }
 
 /** Plain horizontal bars — package totals against the baseline. */
@@ -114,14 +115,14 @@ function svgCompareBars(
       + `<rect x="${labelW}" y="${y}" width="${w.toFixed(1)}" height="${rowH}" fill="${fillOf(r)}" rx="2"/>`
       + `<text x="${(labelW + w + 6).toFixed(1)}" y="${y + rowH / 2 + 3.5}" font-size="9" font-weight="600" fill="${theme.value}">${r.value.toFixed(1)} ${escHtml(unit)}</text>`;
   }).join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="Total energy per package, ${escHtml(unit)}">${body}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="${escHtml(translate("Total energy per package, {unit}", { unit }))}">${body}</svg>`;
 }
 
 /** "3× Crack, 1× Corrosion" - or a dash when nothing was flagged. */
 function breakdownText(byClass: Record<string, number>): string {
   const parts = Object.entries(byClass ?? {})
     .sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => `${v}× ${FACADE_DEFECT_LABELS[k] ?? k}`);
+    .map(([k, v]) => `${v}× ${FACADE_DEFECT_LABELS[k] ? translate(FACADE_DEFECT_LABELS[k]!) : k}`);
   return parts.length ? parts.join(", ") : "—";
 }
 
@@ -164,9 +165,18 @@ const PV_ASSUMPTIONS = [
 
 /** "VertExt::Roof" → "New roof": the new storey's parts, in words. */
 const compLabel = (comp: string) =>
-  comp.startsWith("VertExt::") ? `New ${comp.slice("VertExt::".length).toLowerCase()}` : comp;
+  comp.startsWith("VertExt::") ? translate(`New ${comp.slice("VertExt::".length).toLowerCase()}`) : translate(comp);
 const compColor = (comp: string) =>
   comp.startsWith("VertExt::") ? COMP_COLORS["Vertical Extension (New Floor)"]! : (COMP_COLORS[comp] ?? "var(--brand)");
+
+/** Fill a translated sentence's {placeholders} with React nodes (e.g. <strong>
+ *  figures), so whole sentences are translated rather than word fragments. */
+function rich(text: string, parts: Record<string, React.ReactNode>): React.ReactNode[] {
+  return text.split(/(\{\w+\})/g).map((seg, i) => {
+    const key = /^\{(\w+)\}$/.exec(seg)?.[1];
+    return key != null && key in parts ? <Fragment key={i}>{parts[key]}</Fragment> : seg;
+  });
+}
 
 function kwh(n: number) { return `${Math.round(n)} kWh/m²·yr`; }
 // One decimal below 10: on Gothenburg's low-carbon heat a saving is ~1-2 kg/m²·yr.
@@ -204,6 +214,9 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
 export default function RenovationReport() {
   const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
+  const t = useT();
+  // Memoised labels below are built in the current language, so they recompute on a switch.
+  const lang = useLang();
   // UK projects are costed in GBP from UK sources; everything else is Swedish.
   const isUK = project.country === "United Kingdom";
   // Belgium: no cost data yet (packages carry no cost), numbers in en-GB style.
@@ -295,15 +308,15 @@ export default function RenovationReport() {
       if (pts.length) {
         const lon = pts.reduce((s, p) => s + p[0]!, 0) / pts.length;
         const lat = pts.reduce((s, p) => s + p[1]!, 0) / pts.length;
-        centre = { text: ll(lat, lon), what: "centre of drawn area" };
+        centre = { text: ll(lat, lon), what: t("centre of drawn area") };
       }
     }
     if (!centre && project.currentBbox) {
       const bb = project.currentBbox;
-      centre = { text: ll((bb.north + bb.south) / 2, (bb.east + bb.west) / 2), what: "centre of selected area" };
+      centre = { text: ll((bb.north + bb.south) / 2, (bb.east + bb.west) / 2), what: t("centre of selected area") };
     }
     if (!centre && project.lat != null && project.lon != null) {
-      centre = { text: ll(project.lat, project.lon), what: "project location" };
+      centre = { text: ll(project.lat, project.lon), what: t("project location") };
     }
 
     // A drawn rectangle/polygon has no name of its own — but every building it
@@ -319,7 +332,7 @@ export default function RenovationReport() {
       areas.forEach((a) => counts.set(a, (counts.get(a) ?? 0) + 1));
       const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
       fromBuildings = ranked.length > 1
-        ? `${ranked[0]![0]} +${ranked.length - 1} more`
+        ? t("{name} +{n} more", { name: ranked[0]![0], n: ranked.length - 1 })
         : ranked[0]![0];
     }
 
@@ -333,9 +346,9 @@ export default function RenovationReport() {
     if (name && centre) return `${name} (${centre.text})`;
     if (name) return name;
     if (centre) return `${centre.text} (${centre.what})`;
-    return "Unknown location";
+    return t("Unknown location");
   }, [project.district, project.neighborhoodName, project.selectionPolygon, project.bboxRows,
-      project.currentBbox, project.locationLabel, project.address, project.lat, project.lon]);
+      project.currentBbox, project.locationLabel, project.address, project.lat, project.lon, lang]);
 
   /* ── City climate target (Gothenburg: −30% by 2030) ────────────────────────
      Same helper Step 4 uses, so the report can't contradict what was shown when
@@ -353,9 +366,9 @@ export default function RenovationReport() {
     return assessAgainstGoal(
       climateGoal,
       climateBaselineEU,
-      simResults.map((r) => ({ label: `Package ${r.packageIndex}`, energyUse: r.energyUse })),
+      simResults.map((r) => ({ label: t("Package {n}", { n: r.packageIndex }), energyUse: r.energyUse })),
     );
-  }, [climateGoal, climateBaselineEU, simResults]);
+  }, [climateGoal, climateBaselineEU, simResults, lang]);
 
   // Per-building goal detail — each building's own target and how each package
   // lands against it. Uses the per-building results kept in renovationCalcPackages.
@@ -435,7 +448,7 @@ export default function RenovationReport() {
   const baselineChartHtml = (theme: ChartTheme) => {
     if (!baselines.length) return "";
     const rows = baselines.map((b) => ({
-      label: b.address || "Building",
+      label: b.address || t("Building"),
       parts: [
         { key: "heating", value: b.heating ?? 0 },
         { key: "dhw", value: b.dhw || Math.max(0, (b.energyUse ?? 0) - (b.heating ?? 0) - (b.cooling ?? 0) - (b.lighting ?? 0) - (b.equipment ?? 0)) },
@@ -455,8 +468,8 @@ export default function RenovationReport() {
   const packageChartHtml = (theme: ChartTheme) => {
     if (!simResults.length) return "";
     const rows = [
-      ...(climateBaselineEU ? [{ label: "Baseline (as-built)", value: climateBaselineEU, highlight: true }] : []),
-      ...simResults.map((r) => ({ label: `Package ${r.packageIndex}`, value: r.energyUse })),
+      ...(climateBaselineEU ? [{ label: t("Baseline (as-built)"), value: climateBaselineEU, highlight: true }] : []),
+      ...simResults.map((r) => ({ label: t("Package {n}", { n: r.packageIndex }), value: r.energyUse })),
     ];
     return svgCompareBars(rows, "kWh/m²·yr", theme);
   };
@@ -472,15 +485,15 @@ export default function RenovationReport() {
     // (Ranks 3+ used the pink brand tint, which read as neither.)
     const base = climateBaselineEU;
     return [
-      { name: "Baseline", energyUse: Math.round(base * 10) / 10, saving: 0, fill: "#94a3b8" },
+      { name: t("Baseline"), energyUse: Math.round(base * 10) / 10, saving: 0, fill: "#94a3b8" },
       ...top.map((r, i) => ({
-        name: `Pkg ${r.packageIndex}`,
+        name: t("Pkg {n}", { n: r.packageIndex }),
         energyUse: r.energyUse,
         saving: r.saving,
         fill: base && r.energyUse > base ? "#E2483B" : i === 0 ? "#2FB477" : "#4A90E2",
       })),
     ];
-  }, [simResults, climateBaselineEU]);
+  }, [simResults, climateBaselineEU, lang]);
 
   /* ── Printable report (→ Save as PDF) ──────────────────────────────────────
      Opens a self-contained, print-styled document and calls print(); the browser's
@@ -530,23 +543,23 @@ export default function RenovationReport() {
     const packagesTested = simResults.length;
 
     const funnelBlock = `
-  <h2>What was analysed</h2>
-  <table><thead><tr><th>Stage</th><th>Buildings / packages</th><th>What happened</th></tr></thead><tbody>
-    <tr><td>Step 2 — selection</td><td><b>${selectedCount}</b> building${selectedCount === 1 ? "" : "s"}</td>
-        <td>Selected on the map and reviewed against the available data.</td></tr>
-    ${prioritisedCount ? `<tr><td>Step 2 — prioritisation</td><td><b>${prioritisedCount}</b> flagged</td>
-        <td>Ranked by energy performance, façade condition and building characteristics.</td></tr>` : ""}
-    <tr><td>Step 3 — baseline</td><td><b>${simulatedCount}</b> simulated</td>
-        <td>As-built performance from EnergyPlus, the baseline everything is measured against.</td></tr>
-    <tr><td>Step 4 — packages</td><td><b>${packagesTested}</b> package${packagesTested === 1 ? "" : "s"}</td>
-        <td>Each renovation package simulated against that baseline for energy, cost and carbon.</td></tr>
+  <h2>${t("What was analysed")}</h2>
+  <table><thead><tr><th>${t("Stage")}</th><th>${t("Buildings / packages")}</th><th>${t("What happened")}</th></tr></thead><tbody>
+    <tr><td>${t("Step 2 — selection")}</td><td><b>${selectedCount}</b> ${selectedCount === 1 ? t("building") : t("buildings")}</td>
+        <td>${t("Selected on the map and reviewed against the available data.")}</td></tr>
+    ${prioritisedCount ? `<tr><td>${t("Step 2 — prioritisation")}</td><td>${t("<b>{n}</b> flagged", { n: prioritisedCount })}</td>
+        <td>${t("Ranked by energy performance, façade condition and building characteristics.")}</td></tr>` : ""}
+    <tr><td>${t("Step 3 — baseline")}</td><td>${t("<b>{n}</b> simulated", { n: simulatedCount })}</td>
+        <td>${t("As-built performance from EnergyPlus, the baseline everything is measured against.")}</td></tr>
+    <tr><td>${t("Step 4 — packages")}</td><td><b>${packagesTested}</b> ${packagesTested === 1 ? t("package") : t("packages")}</td>
+        <td>${t("Each renovation package simulated against that baseline for energy, cost and carbon.")}</td></tr>
   </tbody></table>`;
 
     const baselineChart = baselines.length
-      ? `<p class="sub">Energy use by end use, kWh/m²·yr.</p>${baselineChartHtml(PRINT_THEME)}`
+      ? `<p class="sub">${t("Energy use by end use, kWh/m²·yr.")}</p>${baselineChartHtml(PRINT_THEME)}`
       : "";
     const packageChart = simResults.length
-      ? `<p class="sub">Total energy after renovation, kWh/m²·yr — baseline in grey.</p>${packageChartHtml(PRINT_THEME)}`
+      ? `<p class="sub">${t("Total energy after renovation, kWh/m²·yr — baseline in grey.")}</p>${packageChartHtml(PRINT_THEME)}`
       : "";
 
     const facadeEntries = Object.entries(project.facadeDefects ?? {})
@@ -557,16 +570,16 @@ export default function RenovationReport() {
       project.facadeDefects?.[key]?.label || key;
 
     const facadeReport = facadeEntries.length === 0 ? "" : [
-      "<h2>Facade Defect Detection</h2>",
-      '<p class="sub">Facade photos analysed by the MBDD2025 defect detector with an AI vision second opinion. '
-        + "Boxes and labels are drawn on the images exactly as reviewed in Step 2. "
-        + "Detection is a screening aid, not a structural survey.</p>",
-      "<table><thead><tr><th>Building</th><th>Facade</th><th>Photos</th><th>Defects</th><th>Breakdown</th></tr></thead><tbody>",
+      "<h2>" + t("Facade Defect Detection") + "</h2>",
+      '<p class="sub">' + t("Facade photos analysed by the MBDD2025 defect detector with an AI vision second opinion.") + " "
+        + t("Boxes and labels are drawn on the images exactly as reviewed in Step 2.") + " "
+        + t("Detection is a screening aid, not a structural survey.") + "</p>",
+      "<table><thead><tr><th>" + t("Building") + "</th><th>" + t("Facade") + "</th><th>" + t("Photos") + "</th><th>" + t("Defects") + "</th><th>" + t("Breakdown") + "</th></tr></thead><tbody>",
       facadeEntries.map(([key, sum]) => {
         const label = buildingLabelFor(key);
         const orientations = FACADE_ORIENTATIONS.filter((o) => sum.byOrientation?.[o]?.imageCount);
         if (!orientations.length) {
-          return "<tr><td>" + esc(label) + '</td><td class="muted">not recorded per facade</td><td>'
+          return "<tr><td>" + esc(label) + '</td><td class="muted">' + t("not recorded per facade") + "</td><td>"
             + sum.imageCount + "</td><td>" + sum.defectCount + "</td><td>"
             + esc(breakdownText(sum.byClass)) + "</td></tr>";
         }
@@ -574,7 +587,7 @@ export default function RenovationReport() {
           const os = sum.byOrientation![o]!;
           return "<tr>"
             + (i === 0 ? '<td rowspan="' + orientations.length + '">' + esc(label) + "</td>" : "")
-            + "<td>" + FACADE_LABELS[o] + "</td><td>" + os.imageCount + "</td><td>" + os.defectCount + "</td><td>"
+            + "<td>" + t(FACADE_LABELS[o]) + "</td><td>" + os.imageCount + "</td><td>" + os.defectCount + "</td><td>"
             + esc(breakdownText(os.byClass)) + "</td></tr>";
         }).join("");
       }).join(""),
@@ -587,16 +600,16 @@ export default function RenovationReport() {
           + photos.map((ph) => {
               const dets = ph.detections ?? [];
               return '<div class="fac-card">'
-                + '<div class="fac-cap"><b>' + FACADE_LABELS[ph.orientation] + " facade</b> — " + esc(ph.name) + "</div>"
-                + '<img src="' + origin + ph.url + '" alt="' + esc(FACADE_LABELS[ph.orientation] + " facade of " + buildingLabelFor(key)) + '" />'
+                + '<div class="fac-cap"><b>' + t("{side} facade", { side: t(FACADE_LABELS[ph.orientation]) }) + "</b> — " + esc(ph.name) + "</div>"
+                + '<img src="' + origin + ph.url + '" alt="' + esc(t("{side} facade of {building}", { side: t(FACADE_LABELS[ph.orientation]), building: buildingLabelFor(key) })) + '" />'
                 + (dets.length
                     ? '<ol class="fac-list">' + dets.map((d) =>
-                        "<li>" + esc(FACADE_DEFECT_LABELS[d.label] ?? d.label)
-                        + " — " + Math.round(d.score * 100) + "% confidence"
-                        + (d.source === "ai" ? " (AI vision)" : " (ML model)")
+                        "<li>" + esc(FACADE_DEFECT_LABELS[d.label] ? t(FACADE_DEFECT_LABELS[d.label]!) : d.label)
+                        + " — " + t("{pct}% confidence", { pct: Math.round(d.score * 100) })
+                        + (d.source === "ai" ? " " + t("(AI vision)") : " " + t("(ML model)"))
                         + (d.note ? " — " + esc(d.note) : "")
                         + "</li>").join("") + "</ol>"
-                    : '<div class="fac-clean">No defects detected on this photo.</div>')
+                    : '<div class="fac-clean">' + t("No defects detected on this photo.") + "</div>")
                 + "</div>";
             }).join("")
           + "</div>";
@@ -610,26 +623,26 @@ export default function RenovationReport() {
       return `
       <div class="best">
         <div class="best-h">${esc(label)} <span class="why">${esc(why)}</span></div>
-        <div class="best-n">Package ${r.packageIndex}${r.buildingLabel ? ` · ${esc(r.buildingLabel)}` : " · all buildings"}</div>
+        <div class="best-n">${t("Package {n}", { n: r.packageIndex })}${r.buildingLabel ? ` · ${esc(r.buildingLabel)}` : ` · ${t("all buildings")}`}</div>
         <table class="mat">
-          <thead><tr><th>Component</th><th>Material / assembly</th><th>U-value</th></tr></thead>
+          <thead><tr><th>${t("Component")}</th><th>${t("Material / assembly")}</th><th>${t("U-value")}</th></tr></thead>
           <tbody>
             ${mats.length
-              ? mats.map((m) => `<tr><td>${esc(m.component)}</td><td>${esc(m.desc)}${m.buildup ? `<br><span class="buildup">${esc(m.buildup)}</span>` : ""}</td><td>${m.u != null ? m.u.toFixed(2) + " W/m²K" : "—"}</td></tr>`).join("")
-              : `<tr><td colspan="3" class="muted">No component detail recorded for this package.</td></tr>`}
+              ? mats.map((m) => `<tr><td>${esc(t(m.component))}</td><td>${esc(m.desc)}${m.buildup ? `<br><span class="buildup">${esc(m.buildup)}</span>` : ""}</td><td>${m.u != null ? m.u.toFixed(2) + " W/m²K" : "—"}</td></tr>`).join("")
+              : `<tr><td colspan="3" class="muted">${t("No component detail recorded for this package.")}</td></tr>`}
           </tbody>
         </table>
         <div class="kv">
           <span><b>${r.energyUse.toFixed(1)}</b> kWh/m²·yr</span>
-          <span>saves <b>${r.saving.toFixed(1)}</b> kWh/m²·yr</span>
+          <span>${t("saves <b>{n}</b> kWh/m²·yr", { n: r.saving.toFixed(1) })}</span>
           <span><b>${money(r.cost)}</b></span>
-          ${isBE ? "" : `<span><b>${Math.round(r.carbonSaving).toLocaleString(numLocale)}</b> kg CO₂e saved</span>`}
+          ${isBE ? "" : `<span><b>${Math.round(r.carbonSaving).toLocaleString(numLocale)}</b> ${t("kg CO₂e saved")}</span>`}
         </div>
       </div>`;
     };
 
-    const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>${esc(project.projectName || "Renovation Report")}</title>
+    const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">
+<title>${esc(project.projectName || t("Renovation Report"))}</title>
 <style>
   @page { size: A4; margin: 16mm; }
   * { box-sizing: border-box; }
@@ -670,7 +683,7 @@ export default function RenovationReport() {
 </style></head><body>
   <div class="no-print">
     <button onclick="window.print()" style="padding:9px 18px;font-size:13px;font-weight:700;border-radius:8px;border:1px solid #4ECDC4;background:#e6fffb;cursor:pointer">
-      Save as PDF
+      ${t("Save as PDF")}
     </button>
   </div>
 
@@ -679,44 +692,44 @@ export default function RenovationReport() {
       <img src="${origin}/CTH_new_logo_white.png" alt="Chalmers University of Technology" />
       <img src="${origin}/CNL_new_logo_white.png" alt="Chalmers Next Labs" />
     </div>
-    <div class="cover-kicker">Building Renovation Analysis</div>
-    <div class="cover-title">${esc(project.projectName || "Renovation Report")}</div>
-    <div class="cover-meta">${esc(locationText)} · ${buildings.length} building${buildings.length !== 1 ? "s" : ""} · ${esc(components.join(", ") || "no components")} · Generated ${new Date().toLocaleString(numLocale)}</div>
+    <div class="cover-kicker">${t("Building Renovation Analysis")}</div>
+    <div class="cover-title">${esc(project.projectName || t("Renovation Report"))}</div>
+    <div class="cover-meta">${esc(locationText)} · ${buildings.length} ${buildings.length !== 1 ? t("buildings") : t("building")} · ${esc(components.map((c) => t(c)).join(", ") || t("no components"))} · ${t("Generated")} ${new Date().toLocaleString(numLocale)}</div>
   </div>
-  <div class="prepared"><span class="lbl">Prepared by</span><b>Chalmers Next Labs</b> — ${esc(team)}</div>
+  <div class="prepared"><span class="lbl">${t("Prepared by")}</span><b>Chalmers Next Labs</b> — ${esc(team)}</div>
 
   ${funnelBlock}
 
-  <h2>Baseline (as-built)</h2>
-  <table><thead><tr><th>Building</th><th>Energy class</th><th>Energy use</th><th>Heating</th>${isUK ? "<th>Gas per home</th>" : ""}</tr></thead><tbody>
+  <h2>${t("Baseline (as-built)")}</h2>
+  <table><thead><tr><th>${t("Building")}</th><th>${t("Energy class")}</th><th>${t("Energy use")}</th><th>${t("Heating")}</th>${isUK ? `<th>${t("Gas per home")}</th>` : ""}</tr></thead><tbody>
   ${baselines.length ? baselines.map((b) => `<tr>
       <td>${esc(b.address)}</td><td>${esc(b.eClass ?? "—")}</td>
       <td>${b.energyUse.toFixed(1)} kWh/m²·yr</td><td>${b.heating.toFixed(1)} kWh/m²·yr</td>${isUK
         ? `<td>${b.totalGasKwh != null ? `${Math.round(b.totalGasKwh / Math.max(1, b.dwellings ?? 1)).toLocaleString("en-GB")} kWh/yr` : "—"}</td>` : ""}</tr>`).join("")
-    : `<tr><td colspan="${isUK ? 5 : 4}" class="muted">No baseline simulation recorded.</td></tr>`}
+    : `<tr><td colspan="${isUK ? 5 : 4}" class="muted">${t("No baseline simulation recorded.")}</td></tr>`}
   </tbody></table>
   ${baselineChart}
 
   ${pvOk.length ? `
-  <h2>Solar production potential (rooftop PV)</h2>
-  <p class="sub">About <b>${(pvTotalKwh / 1000).toLocaleString("sv-SE", { maximumFractionDigits: 1 })} MWh of electricity a year</b> from ${pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp on the roofs of ${pvOk.length} building${pvOk.length === 1 ? "" : "s"}.</p>
-  <table><thead><tr><th>Building</th><th>Roof covered</th><th>Panel area</th><th>System size</th><th>Annual production</th></tr></thead><tbody>
-  ${pvOk.map((r) => `<tr><td>${esc(r.address ?? "Building")}</td><td>${r.cov}%</td><td>${r.roof_area_m2?.toLocaleString("sv-SE")} m²</td><td>${r.kWp?.toLocaleString("sv-SE")} kWp</td><td><b>${Math.round(r.annual_kwh!).toLocaleString("sv-SE")} kWh/yr</b></td></tr>`).join("")}
-  ${pvOk.length > 1 ? `<tr><td><b>Total</b></td><td></td><td>${pvOk.reduce((s, r) => s + (r.roof_area_m2 ?? 0), 0).toLocaleString("sv-SE")} m²</td><td>${pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp</td><td><b>${Math.round(pvTotalKwh).toLocaleString("sv-SE")} kWh/yr</b></td></tr>` : ""}
+  <h2>${t("Solar production potential (rooftop PV)")}</h2>
+  <p class="sub">${t("About <b>{mwh} MWh of electricity a year</b> from {kwp} kWp on the roofs of {n} {buildings}.", { mwh: (pvTotalKwh / 1000).toLocaleString("sv-SE", { maximumFractionDigits: 1 }), kwp: pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 }), n: pvOk.length, buildings: pvOk.length === 1 ? t("building") : t("buildings") })}</p>
+  <table><thead><tr><th>${t("Building")}</th><th>${t("Roof covered")}</th><th>${t("Panel area")}</th><th>${t("System size")}</th><th>${t("Annual production")}</th></tr></thead><tbody>
+  ${pvOk.map((r) => `<tr><td>${esc(r.address ?? t("Building"))}</td><td>${r.cov}%</td><td>${r.roof_area_m2?.toLocaleString("sv-SE")} m²</td><td>${r.kWp?.toLocaleString("sv-SE")} kWp</td><td><b>${Math.round(r.annual_kwh!).toLocaleString("sv-SE")} kWh/yr</b></td></tr>`).join("")}
+  ${pvOk.length > 1 ? `<tr><td><b>${t("Total")}</b></td><td></td><td>${pvOk.reduce((s, r) => s + (r.roof_area_m2 ?? 0), 0).toLocaleString("sv-SE")} m²</td><td>${pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp</td><td><b>${Math.round(pvTotalKwh).toLocaleString("sv-SE")} kWh/yr</b></td></tr>` : ""}
   </tbody></table>
-  <p class="sub"><b>Assumptions</b></p>
-  <ul class="muted">${PV_ASSUMPTIONS.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
+  <p class="sub"><b>${t("Assumptions")}</b></p>
+  <ul class="muted">${PV_ASSUMPTIONS.map((a) => `<li>${esc(t(a))}</li>`).join("")}</ul>` : ""}
 
   ${facadeReport}
 
-  <h2>Renovation packages tested</h2>
-  <p class="sub">Every package below was simulated against the as-built baseline above, on the same buildings.</p>
+  <h2>${t("Renovation packages tested")}</h2>
+  <p class="sub">${t("Every package below was simulated against the as-built baseline above, on the same buildings.")}</p>
   ${packageChart}
 
   ${perBuildingPicks.length ? `
-  <h2>Chosen package per building</h2>
-  <p class="sub">Selected building by building in Step 4 — where a portfolio-wide pick would average over real differences between them.</p>
-  <table><thead><tr><th>Building</th><th>Chosen package</th><th>Baseline</th><th>After</th><th>Reduction</th></tr></thead><tbody>
+  <h2>${t("Chosen package per building")}</h2>
+  <p class="sub">${t("Selected building by building in Step 4 — where a portfolio-wide pick would average over real differences between them.")}</p>
+  <table><thead><tr><th>${t("Building")}</th><th>${t("Chosen package")}</th><th>${t("Baseline")}</th><th>${t("After")}</th><th>${t("Reduction")}</th></tr></thead><tbody>
   ${perBuildingPicks.map((r) => {
     const pct = r.after != null && r.baseline ? Math.round(((r.after - r.baseline) / r.baseline) * 100) : null;
     return `<tr><td>${esc(r.address)}</td><td>${esc(r.pkg)}</td>
@@ -724,45 +737,45 @@ export default function RenovationReport() {
       <td>${pct == null ? "—" : `${pct}%`}</td></tr>`;
   }).join("")}
   </tbody></table>
-  <p class="sub" style="margin-top:4px">Energy in kWh/m²·yr.</p>` : ""}
+  <p class="sub" style="margin-top:4px">${t("Energy in kWh/m²·yr.")}</p>` : ""}
 
-  <h2>Recommended packages — and what they are made of</h2>
-  ${bestBlock("Best energy saving", bestEnergy, "largest reduction in energy use")}
-  ${bestBlock("Lowest cost", bestCost, "cheapest to build")}
-  ${bestBlock("Lowest carbon", bestCarbon, "largest CO₂e saving")}
-  ${bestBlock("Best balanced", bestBalanced, "weighted 40% energy / 30% carbon / 30% cost")}
+  <h2>${t("Recommended packages — and what they are made of")}</h2>
+  ${bestBlock(t("Best energy saving"), bestEnergy, t("largest reduction in energy use"))}
+  ${bestBlock(t("Lowest cost"), bestCost, t("cheapest to build"))}
+  ${bestBlock(t("Lowest carbon"), bestCarbon, t("largest CO₂e saving"))}
+  ${bestBlock(t("Best balanced"), bestBalanced, t("weighted 40% energy / 30% carbon / 30% cost"))}
 
-  <h2>All simulated packages</h2>
-  <table><thead><tr><th>#</th><th>Building</th><th>Materials</th><th>Energy</th><th>Saving</th><th>Cost</th><th>CO₂e saved</th></tr></thead><tbody>
+  <h2>${t("All simulated packages")}</h2>
+  <table><thead><tr><th>#</th><th>${t("Building")}</th><th>${t("Materials")}</th><th>${t("Energy")}</th><th>${t("Saving")}</th><th>${t("Cost")}</th><th>${t("CO₂e saved")}</th></tr></thead><tbody>
   ${simResults.length ? simResults.map((r) => `<tr>
       <td>${r.packageIndex}</td>
-      <td>${esc(r.buildingLabel ?? "all buildings")}</td>
-      <td>${esc(materialsOf(r).map((m) => `${m.component}: ${m.buildup || m.desc}`).join("; ") || "—")}</td>
+      <td>${esc(r.buildingLabel ?? t("all buildings"))}</td>
+      <td>${esc(materialsOf(r).map((m) => `${t(m.component)}: ${m.buildup || m.desc}`).join("; ") || "—")}</td>
       <td>${r.energyUse.toFixed(1)}</td><td>${r.saving.toFixed(1)}</td>
       <td>${money(r.cost)}</td><td>${isBE ? "—" : Math.round(r.carbonSaving).toLocaleString(numLocale)}</td></tr>`).join("")
-    : `<tr><td colspan="7" class="muted">No packages simulated.</td></tr>`}
+    : `<tr><td colspan="7" class="muted">${t("No packages simulated.")}</td></tr>`}
   </tbody></table>
 
   ${goalAssessment ? `
   <h2>${esc(goalTitle(goalAssessment.goal))}</h2>
-  <p class="sub">${esc(goalStatement(goalAssessment.goal))} Official target: ${esc(goalAssessment.goal.basis)} Source: ${esc(goalAssessment.goal.source)}${goalAssessment.goal.sourceUrl ? ` (${esc(goalAssessment.goal.sourceUrl)})` : ""}.</p>
+  <p class="sub">${esc(goalStatement(goalAssessment.goal))} ${t("Official target:")} ${esc(t(goalAssessment.goal.basis))} ${t("Source:")} ${esc(goalAssessment.goal.source)}${goalAssessment.goal.sourceUrl ? ` (${esc(goalAssessment.goal.sourceUrl)})` : ""}.</p>
   <p style="font-weight:700;margin:2px 0 6px;color:${goalAssessment.achievers.length ? "#15803d" : "#b45309"}">
     ${goalAssessment.achievers.length
-      ? `✓ ${esc(goalAssessment.achievers[0]!.label)} reaches −${goalAssessment.achievers[0]!.reductionPct!.toFixed(0)}%, meeting the target${goalAssessment.achievers.length > 1 ? ` (${goalAssessment.achievers.length} packages meet it)` : ""}.`
+      ? `✓ ${t("{pkg} reaches −{pct}%, meeting the target", { pkg: esc(goalAssessment.achievers[0]!.label), pct: goalAssessment.achievers[0]!.reductionPct!.toFixed(0) })}${goalAssessment.achievers.length > 1 ? ` ${t("({n} packages meet it)", { n: goalAssessment.achievers.length })}` : ""}.`
       : goalAssessment.closest && goalAssessment.closest.reductionPct != null
-        ? `No package reaches the −${goalAssessment.goal.reductionPct}% target yet — closest is ${esc(goalAssessment.closest.label)} at ${goalAssessment.closest.reductionPct >= 0 ? "−" : "+"}${Math.abs(goalAssessment.closest.reductionPct).toFixed(0)}%${goalAssessment.closest.reductionPct < 0 ? " (worse than baseline)" : ""}.`
+        ? `${t("No package reaches the −{target}% target yet — closest is {pkg} at {pct}", { target: goalAssessment.goal.reductionPct, pkg: esc(goalAssessment.closest.label), pct: `${goalAssessment.closest.reductionPct >= 0 ? "−" : "+"}${Math.abs(goalAssessment.closest.reductionPct).toFixed(0)}%` })}${goalAssessment.closest.reductionPct < 0 ? ` ${t("(worse than baseline)")}` : ""}.`
         : ""}
   </p>
-  <table><thead><tr><th>Package</th><th>Energy use</th><th>Reduction vs baseline</th><th>Meets −${goalAssessment.goal.reductionPct}% target</th></tr></thead><tbody>
+  <table><thead><tr><th>${t("Package")}</th><th>${t("Energy use")}</th><th>${t("Reduction vs baseline")}</th><th>${t("Meets −{pct}% target", { pct: goalAssessment.goal.reductionPct })}</th></tr></thead><tbody>
   ${goalAssessment.rows.map((r) => `<tr>
       <td>${esc(r.label)}</td>
       <td>${r.energyUse.toFixed(1)} kWh/m²·yr</td>
       <td>${r.reductionPct == null ? "—" : `${r.reductionPct >= 0 ? "−" : "+"}${Math.abs(r.reductionPct).toFixed(0)}%`}</td>
-      <td>${r.meets ? "✓ Yes" : "No"}</td></tr>`).join("")}
+      <td>${r.meets ? `✓ ${t("Yes")}` : t("No")}</td></tr>`).join("")}
   </tbody></table>
   ${buildingGoal ? `
-  <h3 style="font-size:10.5pt;margin:14px 0 4px">Per-building goal — ${buildingGoal.goal.kind === "absolute" ? `every building to ≤ ${buildingGoal.goal.targetKwhM2} kWh/m²·yr` : `each building's own −${buildingGoal.goal.reductionPct}% target`}</h3>
-  <table><thead><tr><th>Building</th><th>Baseline</th><th>${buildingGoal.goal.kind === "absolute" ? `Goal ≤ ${buildingGoal.goal.targetKwhM2}` : `Goal −${buildingGoal.goal.reductionPct}%`}</th>${buildingGoal.columns.map((c) => `<th>${esc(c.label)}<br><span style="font-weight:400;color:#64748b">${c.met}/${c.total} meet</span></th>`).join("")}</tr></thead><tbody>
+  <h3 style="font-size:10.5pt;margin:14px 0 4px">${t("Per-building goal")} — ${buildingGoal.goal.kind === "absolute" ? t("every building to ≤ {kwh} kWh/m²·yr", { kwh: buildingGoal.goal.targetKwhM2 ?? "" }) : t("each building's own −{pct}% target", { pct: buildingGoal.goal.reductionPct })}</h3>
+  <table><thead><tr><th>${t("Building")}</th><th>${t("Baseline")}</th><th>${buildingGoal.goal.kind === "absolute" ? t("Goal ≤ {kwh}", { kwh: buildingGoal.goal.targetKwhM2 ?? "" }) : t("Goal −{pct}%", { pct: buildingGoal.goal.reductionPct })}</th>${buildingGoal.columns.map((c) => `<th>${esc(c.label)}<br><span style="font-weight:400;color:#64748b">${t("{met}/{total} meet", { met: c.met, total: c.total })}</span></th>`).join("")}</tr></thead><tbody>
   ${buildingGoal.rows.map((r) => `<tr>
       <td>${esc(r.address)}</td>
       <td>${r.baselineEnergy.toFixed(0)}</td>
@@ -772,47 +785,42 @@ export default function RenovationReport() {
         const col = met ? "#15803d" : cell.tier === "below" ? "#b45309" : cell.tier === "worse" ? "#b91c1c" : "#64748b";
         const pct = cell.reductionPct == null ? "—"
           : cell.tier === "worse" ? `+${Math.abs(Math.round(cell.reductionPct))}%`
-          : cell.tier === "below" ? `−${Math.round(cell.reductionPct)}% (${requiredPct(buildingGoal.goal, r.baselineEnergy) - Math.round(cell.reductionPct)}pp short)`
+          : cell.tier === "below" ? `−${Math.round(cell.reductionPct)}% (${t("{pp}pp short", { pp: requiredPct(buildingGoal.goal, r.baselineEnergy) - Math.round(cell.reductionPct) })})`
           : `−${Math.round(cell.reductionPct)}%`;
         return `<td style="color:${col}">${cell.energy == null ? "—" : cell.energy.toFixed(0)}${met ? " ✓" : ""}<br><span style="font-size:8pt">${pct}</span></td>`;
       }).join("")}</tr>`).join("")}
   </tbody></table>
-  <p class="sub" style="margin-top:4px">Values in kWh/m²·yr · pp = percentage points short of the building's target.</p>` : ""}` : ""}
+  <p class="sub" style="margin-top:4px">${t("Values in kWh/m²·yr · pp = percentage points short of the building's target.")}</p>` : ""}` : ""}
   ${climateGoal && !isScorable(climateGoal) ? `
   <h2>${esc(goalTitle(climateGoal))}</h2>
-  <p class="sub">${esc(goalStatement(climateGoal))} ${climateGoal.headline ? `Headline goal: ${esc(climateGoal.headline)}. ` : ""}Official target: ${esc(climateGoal.basis)} Source: ${esc(climateGoal.source)}${climateGoal.sourceUrl ? ` (${esc(climateGoal.sourceUrl)})` : ""}.</p>
+  <p class="sub">${esc(goalStatement(climateGoal))} ${climateGoal.headline ? `${t("Headline goal:")} ${esc(t(climateGoal.headline))}. ` : ""}${t("Official target:")} ${esc(t(climateGoal.basis))} ${t("Source:")} ${esc(climateGoal.source)}${climateGoal.sourceUrl ? ` (${esc(climateGoal.sourceUrl)})` : ""}.</p>
   ${ratingGoal ? `
-  <p style="font-weight:700;margin:2px 0 6px">Buildings at band ${esc(climateGoal.targetRating ?? "")} or better: ${ratingGoal.metToday}/${ratingGoal.rows.length} today${ratingGoal.columns.map((c) => ` · ${esc(c.label)}: ${c.met}/${c.total} (est.)`).join("")}</p>
-  <table><thead><tr><th>Building</th><th>Today (certificate)</th>${ratingGoal.columns.map((c) => `<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>
+  <p style="font-weight:700;margin:2px 0 6px">${t("Buildings at band {band} or better: {met}/{total} today", { band: esc(climateGoal.targetRating ?? ""), met: ratingGoal.metToday, total: ratingGoal.rows.length })}${ratingGoal.columns.map((c) => ` · ${esc(c.label)}: ${c.met}/${c.total} ${t("(est.)")}`).join("")}</p>
+  <table><thead><tr><th>${t("Building")}</th><th>${t("Today (certificate)")}</th>${ratingGoal.columns.map((c) => `<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>
   ${ratingGoal.rows.map((r) => `<tr><td>${esc(r.address)}${r.from === "band" ? " *" : ""}</td><td>${r.nowBand} (SAP ${r.nowSap})</td>${r.cells.map((c) =>
       `<td style="color:${c.meets ? "#15803d" : "#b45309"}">${c.band ? `${c.band} (SAP ${c.sap})${c.meets ? " ✓" : ""}` : "—"}</td>`).join("")}</tr>`).join("")}
   </tbody></table>
-  <p class="sub" style="margin-top:4px">Package bands are estimates: each building's certificate SAP, moved by the simulated change in fuel use (SAP 2012 energy-cost factor).${ratingGoal.rows.some((r) => r.from === "band") ? " * No certificate SAP — starts from the middle of its band." : ""}</p>` : ""}` : ""}
+  <p class="sub" style="margin-top:4px">${t("Package bands are estimates: each building's certificate SAP, moved by the simulated change in fuel use (SAP 2012 energy-cost factor).")}${ratingGoal.rows.some((r) => r.from === "band") ? ` * ${t("No certificate SAP — starts from the middle of its band.")}` : ""}</p>` : ""}` : ""}
 
   <div class="foot">
-    Energy from EnergyPlus (EPSM) single-zone shoebox simulation · ${isBE
-      ? `as-built and refurbished U-values from TABULA Belgium (VITO, EPISCOPE) · weather: ${isLiege ? "Liège-Bierset" : "Uccle"} TMYx ·
+    ${t("Energy from EnergyPlus (EPSM) single-zone shoebox simulation")} · ${isBE
+      ? `${t("as-built and refurbished U-values from TABULA Belgium (VITO, EPISCOPE)")} · ${t("weather: {station} TMYx", { station: isLiege ? "Liège-Bierset" : "Uccle" })} ·
     ${isLiege
-      ? "footprints from the PICC and heights from Bâtiments 3D LoD1 (SPW, CC BY 4.0), addresses from BeST (BOSA, CC BY 4.0)"
-      : "footprints and addresses from UrbIS (paradigm.brussels, CC0), heights from UrbIS 3D"}; construction period sampled from
-    Statbel's building stock unless OpenStreetMap records a year. Belgium publishes no open per-building EPCs, so there is
-    no baseline energy class. No open Belgian retrofit cost or carbon data is wired in yet, so packages are not costed.
-    Heating is ideal loads (heat delivered, not fuel); the model is not yet calibrated against Belgian EPB certificate statistics.`
+      ? t("footprints from the PICC and heights from Bâtiments 3D LoD1 (SPW, CC BY 4.0), addresses from BeST (BOSA, CC BY 4.0)")
+      : t("footprints and addresses from UrbIS (paradigm.brussels, CC0), heights from UrbIS 3D")}; ${t("construction period sampled from Statbel's building stock unless OpenStreetMap records a year.")}
+    ${t("Belgium publishes no open per-building EPCs, so there is no baseline energy class.")}
+    ${t("No open Belgian retrofit cost or carbon data is wired in yet, so packages are not costed.")}
+    ${t("Heating is ideal loads (heat delivered, not fuel); the model is not yet calibrated against Belgian EPB certificate statistics.")}`
       : isUK
-      ? `as-built and refurbished U-values from TABULA GB (BRE, EPISCOPE) · weather: Doncaster/Sheffield TMYx ·
+      ? `${t("as-built and refurbished U-values from TABULA GB (BRE, EPISCOPE)")} · ${t("weather: {station} TMYx", { station: "Doncaster/Sheffield" })} ·
     ${esc(UK_COST_CARBON_SOURCE_NOTE)}
-    Baseline energy class, SAP, floor area and heating from the MHCLG EPC register (OGL v3.0), matched to buildings via OS Open UPRN;
-    buildings without a certificate carry a band estimated from the English Housing Survey 2024-25.
-    Hot water uses the tool's Swedish Sveby draw profile, not a UK SAP assumption.`
-      : `U-values per EN ISO 6946 ·
-    cost from Wikells Sektionsfakta · embodied carbon A1–A5 (production, transport, installation incl. waste) from Boverket Klimatdatabas; replacements and end-of-life not included ·
-    ${project.supplierDiscountPct ? `All material costs are net of a ${project.supplierDiscountPct}% supplier discount entered in Step 4. ` : ""}Costs are installed capex (materials + labour); they exclude energy, maintenance and replacement.
-    baseline energy class from Boverket EPC. Homes use Sveby 2.0 standard use: hot water as reported in the
-    building's energy declaration, otherwise Sveby's 21 kWh/m²·yr. Household and
-    business electricity is simulated for its heat but, as in Swedish energy declarations, not counted in the
-    totals or shown.`} Cooling reads 0 because EPSM&#39;s end-use table
-    carries only electricity and district heating; the hourly trace does show ideal-loads
-    cooling, which a single-zone model with no openable windows overstates.
+    ${t("Baseline energy class, SAP, floor area and heating from the MHCLG EPC register (OGL v3.0), matched to buildings via OS Open UPRN; buildings without a certificate carry a band estimated from the English Housing Survey 2024-25.")}
+    ${t("Hot water uses the tool's Swedish Sveby draw profile, not a UK SAP assumption.")}`
+      : `${t("U-values per EN ISO 6946")} ·
+    ${t("cost from Wikells Sektionsfakta")} · ${t("embodied carbon A1–A5 (production, transport, installation incl. waste) from Boverket Klimatdatabas; replacements and end-of-life not included")} ·
+    ${project.supplierDiscountPct ? `${t("All material costs are net of a {pct}% supplier discount entered in Step 4.", { pct: project.supplierDiscountPct })} ` : ""}${t("Costs are installed capex (materials + labour); they exclude energy, maintenance and replacement.")}
+    ${t("baseline energy class from Boverket EPC.")} ${t("Homes use Sveby 2.0 standard use: hot water as reported in the building's energy declaration, otherwise Sveby's 21 kWh/m²·yr.")}
+    ${t("Household and business electricity is simulated for its heat but, as in Swedish energy declarations, not counted in the totals or shown.")}`} ${t("Cooling reads 0 because EPSM's end-use table carries only electricity and district heating; the hourly trace does show ideal-loads cooling, which a single-zone model with no openable windows overstates.")}
   </div>
   <script>window.addEventListener('load',function(){setTimeout(function(){try{window.print();}catch(e){}},400);});</script>
 </body></html>`;
@@ -823,7 +831,7 @@ export default function RenovationReport() {
     // it has loaded, and the "Save as PDF" button in the page is the fallback.
     const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
     const w = window.open(url, "_blank");
-    if (!w) { alert("Allow pop-ups for this site to generate the PDF."); URL.revokeObjectURL(url); return; }
+    if (!w) { alert(t("Allow pop-ups for this site to generate the PDF."));URL.revokeObjectURL(url); return; }
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
@@ -884,7 +892,7 @@ export default function RenovationReport() {
           {icon}
           <span style={{ fontSize: 11, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: 1 }}>{label}</span>
         </div>
-        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 8 }}>Package {result.packageIndex}</div>
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 8 }}>{t("Package {n}", { n: result.packageIndex })}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {Object.entries(result.components).map(([comp, item]) => (
             <div key={comp} style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
@@ -899,19 +907,19 @@ export default function RenovationReport() {
         </div>
         <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.07)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>Energy use</div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("Energy use")}</div>
             <div style={{ fontSize: 13, fontWeight: 800, color: "#E8880C" }}>{kwh(result.energyUse)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>Saving</div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("Saving")}</div>
             <div style={{ fontSize: 13, fontWeight: 800, color: "#2FB477" }}>−{kwh(result.saving)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>CO₂e saved</div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("CO₂e saved")}</div>
             <div style={{ fontSize: 13, fontWeight: 800, color: "#4A90E2" }}>{co2Saved(result.carbonSaving)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>Material cost</div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("Material cost")}</div>
             <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.7)" }}>{money(result.cost)}</div>
           </div>
         </div>
@@ -927,16 +935,16 @@ export default function RenovationReport() {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
-            Renovation Planning · Step 5
+            {t("Renovation Planning · Step 5")}
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 900, color: "#fff", margin: "0 0 6px" }}>
-            {project.projectName || "Renovation Report"}
+            {project.projectName || t("Renovation Report")}
           </h1>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
-            Everything from Steps 1-4, ready to share or save as PDF.
+            {t("Everything from Steps 1-4, ready to share or save as PDF.")}
           </p>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", margin: "4px 0 0" }}>
-            {locationText} · {buildings.length} building{buildings.length !== 1 ? "s" : ""} · {components.length} component{components.length !== 1 ? "s" : ""}
+            {locationText} · {buildings.length} {buildings.length !== 1 ? t("buildings") : t("building")} · {components.length} {components.length !== 1 ? t("components") : t("component")}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -949,11 +957,11 @@ export default function RenovationReport() {
               fontSize: 13, fontWeight: 800, cursor: "pointer",
             }}
           >
-            <Download size={14} /> Download PDF
+            <Download size={14} /> {t("Download PDF")}
           </button>
           <button
             onClick={downloadReport}
-            title="Raw data for further analysis"
+            title={t("Raw data for further analysis")}
             style={{
               display: "flex", alignItems: "center", gap: 8,
               padding: "10px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.15)",
@@ -971,23 +979,23 @@ export default function RenovationReport() {
         <div style={{ borderRadius: 12, padding: "16px 20px", background: "rgba(232,136,12,0.08)", border: "1px solid rgba(232,136,12,0.3)", display: "flex", gap: 10, alignItems: "flex-start" }}>
           <AlertTriangle size={16} color="#E8880C" style={{ flexShrink: 0, marginTop: 1 }} />
           <p style={{ fontSize: 12, color: "#E8880C", margin: 0 }}>
-            No simulation results yet. Go back to Step 4 and run "Send to Simulation" to generate package results.
+            {t("No simulation results yet. Go back to Step 4 and press \"Simulate\" on a package to generate its results.")}
           </p>
         </div>
       )}
 
       {/* ── 1. Project Summary ── */}
       <Card>
-        <SectionTitle icon={<FileText size={15} color="var(--brand)" />} title="Project Summary" />
+        <SectionTitle icon={<FileText size={15} color="var(--brand)" />} title={t("Project Summary")} />
         {/* The funnel, in the tool's own order — how many buildings were selected,
             how many were prioritised, how many simulated, how many packages tested.
             Without it the rest of the report is a pile of tables with no thread. */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           {[
-            { n: selectedCount, label: `building${selectedCount === 1 ? "" : "s"} selected`, step: "Step 2" },
-            ...(prioritisedCount ? [{ n: prioritisedCount, label: "flagged as priorities", step: "Step 2" }] : []),
-            { n: baselines.length, label: "baseline simulated", step: "Step 3" },
-            { n: simResults.length, label: `package${simResults.length === 1 ? "" : "s"} tested`, step: "Step 4" },
+            { n: selectedCount, label: selectedCount === 1 ? t("building selected") : t("buildings selected"), step: t("Step {n}", { n: 2 }) },
+            ...(prioritisedCount ? [{ n: prioritisedCount, label: t("flagged as priorities"), step: t("Step {n}", { n: 2 }) }] : []),
+            { n: baselines.length, label: t("baseline simulated"), step: t("Step {n}", { n: 3 }) },
+            { n: simResults.length, label: simResults.length === 1 ? t("package tested") : t("packages tested"), step: t("Step {n}", { n: 4 }) },
           ].map((f, i) => (
             <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {i > 0 && <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 14 }}>→</span>}
@@ -1001,12 +1009,12 @@ export default function RenovationReport() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
           {[
-            { label: "Project type",   value: project.projectType ?? "—" },
-            { label: "Scale",          value: project.scale ?? "—" },
-            { label: "Location",       value: locationText },
-            { label: "Components",     value: components.length > 0 ? components.join(", ") : "—" },
-            { label: "Systems in scope", value: project.systemsInScope.length > 0 ? project.systemsInScope.join(", ") : "—" },
-            { label: "KPIs",           value: project.selectedKpis.length > 0 ? project.selectedKpis.join(", ") : "—" },
+            { label: t("Project type"),   value: project.projectType ? t(project.projectType) : "—" },
+            { label: t("Scale"),          value: project.scale ? t(project.scale) : "—" },
+            { label: t("Location"),       value: locationText },
+            { label: t("Components"),     value: components.length > 0 ? components.map((c) => t(c)).join(", ") : "—" },
+            { label: t("Systems in scope"), value: project.systemsInScope.length > 0 ? project.systemsInScope.map((s) => t(s)).join(", ") : "—" },
+            { label: t("KPIs"),           value: project.selectedKpis.length > 0 ? project.selectedKpis.map((k) => t(k)).join(", ") : "—" },
           ].map(r => (
             <div key={r.label} style={{ borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
               <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>{r.label}</div>
@@ -1019,35 +1027,35 @@ export default function RenovationReport() {
       {/* ── 2. Buildings ── */}
       {buildings.length > 0 && (
         <Card>
-          <SectionTitle icon={<Building2 size={15} color="#4ECDC4" />} title="Buildings" />
+          <SectionTitle icon={<Building2 size={15} color="#4ECDC4" />} title={t("Buildings")} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {buildings.map((b, i) => {
               const bl = baselines[i];
               return (
                 <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr repeat(5, auto)", gap: 12, alignItems: "center", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{b.address ?? `Building ${i + 1}`}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{b.address ?? t("Building {n}", { n: i + 1 })}</div>
                     <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{project.country !== "Sweden" ? buildingUseLabel(b.use_cat) : (b.use_cat ?? "—")} · {b.year ?? "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>Area</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{t("Area")}</div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{b.area_atemp ? `${Math.round(b.area_atemp).toLocaleString(numLocale)} m²` : "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{isUK && !b.has_epc && b.eclass ? "Energy class (est.)" : "Energy class"}</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{isUK && !b.has_epc && b.eclass ? t("Energy class (est.)") : t("Energy class")}</div>
                     <div style={{ fontSize: 13, fontWeight: 900, color: "#E8880C" }}>{b.eclass ?? "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{b.energy_source === "tabula_estimate" ? "TABULA estimate" : "EPC energy"}</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{b.energy_source === "tabula_estimate" ? t("TABULA estimate") : t("EPC energy")}</div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{b.energy ? kwh(b.energy) : "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>EPSM baseline</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{t("EPSM baseline")}</div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: bl ? "#E8880C" : "rgba(255,255,255,0.25)" }}>{bl ? kwh(bl.energyUse) : "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>Baseline status</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: bl ? "#2FB477" : "rgba(255,255,255,0.25)" }}>{bl ? "✓ Done" : "Pending"}</div>
+                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{t("Baseline status")}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: bl ? "#2FB477" : "rgba(255,255,255,0.25)" }}>{bl ? `✓ ${t("Done")}` : t("Pending")}</div>
                   </div>
                 </div>
               );
@@ -1062,9 +1070,9 @@ export default function RenovationReport() {
           about what the report contained. */}
       {baselines.length > 0 && (
         <Card>
-          <SectionTitle icon={<Zap size={15} color="#E8880C" />} title="Baseline Energy Performance" />
+          <SectionTitle icon={<Zap size={15} color="#E8880C" />} title={t("Baseline Energy Performance")} />
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "0 0 12px" }}>
-            As-built energy use by end use, kWh/m²·yr — the baseline every package is measured against.
+            {t("As-built energy use by end use, kWh/m²·yr — the baseline every package is measured against.")}
           </p>
           <div dangerouslySetInnerHTML={{ __html: baselineChartHtml(SCREEN_THEME) }} />
         </Card>
@@ -1076,16 +1084,16 @@ export default function RenovationReport() {
           invisible here. */}
       {facadeEntries.length > 0 && (
         <Card>
-          <SectionTitle icon={<ScanSearch size={15} color="#B98BE8" />} title="Facade Condition" />
+          <SectionTitle icon={<ScanSearch size={15} color="#B98BE8" />} title={t("Facade Condition")} />
           <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 12px" }}>
-            Photos analysed by the MBDD2025 defect detector with an AI vision second opinion — a screening aid, not a structural survey.
+            {t("Photos analysed by the MBDD2025 defect detector with an AI vision second opinion — a screening aid, not a structural survey.")}
           </p>
           {facadeEntries.map(([key, sum]) => (
             <div key={key} style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>{sum.label || key}</span>
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
-                  {sum.imageCount} photo{sum.imageCount === 1 ? "" : "s"} · {sum.defectCount} defect{sum.defectCount === 1 ? "" : "s"}
+                  {sum.imageCount} {sum.imageCount === 1 ? t("photo") : t("photos")} · {sum.defectCount} {sum.defectCount === 1 ? t("defect") : t("defects")}
                 </span>
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{breakdownText(sum.byClass)}</span>
               </div>
@@ -1093,16 +1101,16 @@ export default function RenovationReport() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
                   {(sum.photos ?? []).map((ph) => (
                     <div key={ph.id} style={{ borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)" }}>
-                      <img src={ph.url} alt={`${FACADE_LABELS[ph.orientation]} facade of ${sum.label || key}`}
+                      <img src={ph.url} alt={t("{side} facade of {building}", { side: t(FACADE_LABELS[ph.orientation]), building: sum.label || key })}
                            style={{ display: "block", width: "100%", height: "auto" }} />
                       <div style={{ padding: "6px 9px" }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
-                          {FACADE_LABELS[ph.orientation]} facade
+                          {t("{side} facade", { side: t(FACADE_LABELS[ph.orientation]) })}
                         </div>
                         <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
                           {ph.detections.length
-                            ? ph.detections.map((d) => `${FACADE_DEFECT_LABELS[d.label] ?? d.label} ${Math.round(d.score * 100)}%`).join(" · ")
-                            : "No defects detected"}
+                            ? ph.detections.map((d) => `${FACADE_DEFECT_LABELS[d.label] ? t(FACADE_DEFECT_LABELS[d.label]!) : d.label} ${Math.round(d.score * 100)}%`).join(" · ")
+                            : t("No defects detected")}
                         </div>
                       </div>
                     </div>
@@ -1117,21 +1125,21 @@ export default function RenovationReport() {
       {/* ── 3. Materials selected ── */}
       {Object.keys(materials).length > 0 && (
         <Card>
-          <SectionTitle icon={<Package size={15} color="#E8880C" />} title="Materials Selected for Testing" />
+          <SectionTitle icon={<Package size={15} color="#E8880C" />} title={t("Materials Selected for Testing")} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {Object.entries(materials).filter(([, codes]) => codes.length > 0).map(([comp, codes]) => (
               <div key={comp} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: COMP_COLORS[comp] ?? "var(--brand)", flexShrink: 0 }} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)", minWidth: 140 }}>{comp}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)", minWidth: 140 }}>{t(comp)}</span>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 5, flex: 1 }}>
                   {codes.map(c => <Badge key={c} color={COMP_COLORS[comp] ?? "var(--brand)"}>{c}</Badge>)}
                 </div>
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{codes.length} option{codes.length !== 1 ? "s" : ""}</span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{codes.length} {codes.length !== 1 ? t("options") : t("option")}</span>
               </div>
             ))}
           </div>
           <p style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", margin: "10px 0 0" }}>
-            {simResults.length} package{simResults.length !== 1 ? "s" : ""} simulated (cartesian product of above selections)
+            {simResults.length} {simResults.length !== 1 ? t("packages") : t("package")} {t("simulated (cartesian product of above selections)")}
           </p>
         </Card>
       )}
@@ -1139,12 +1147,12 @@ export default function RenovationReport() {
       {/* ── 4. Energy chart ── */}
       {hasResults && (
         <Card>
-          <SectionTitle icon={<Zap size={15} color="#E8880C" />} title="Energy Use Comparison" />
+          <SectionTitle icon={<Zap size={15} color="#E8880C" />} title={t("Energy Use Comparison")} />
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "0 0 16px" }}>
-            Top {Math.min(simResults.length, 8)} packages vs as-built baseline ({kwh(Math.round(climateBaselineEU * 10) / 10)})
-            {" · "}<span style={{ color: "#2FB477" }}>■</span> best
-            {" "}<span style={{ color: "#4A90E2" }}>■</span> saves energy
-            {" "}<span style={{ color: "#E2483B" }}>■</span> uses more than today
+            {t("Top {n} packages vs as-built baseline ({kwh})", { n: Math.min(simResults.length, 8), kwh: kwh(Math.round(climateBaselineEU * 10) / 10) })}
+            {" · "}<span style={{ color: "#2FB477" }}>■</span> {t("best")}
+            {" "}<span style={{ color: "#4A90E2" }}>■</span> {t("saves energy")}
+            {" "}<span style={{ color: "#E2483B" }}>■</span> {t("uses more than today")}
           </p>
           {/* Every package, matching the printed report exactly; the interactive
               chart below shows the top few with tooltips. */}
@@ -1160,7 +1168,7 @@ export default function RenovationReport() {
                 itemStyle={{ color: "#fff" }}
                 formatter={(v: number) => [`${v} kWh/m²·yr`]}
               />
-              <ReferenceLine y={climateBaselineEU} stroke="rgba(226,72,59,0.5)" strokeDasharray="4 3" label={{ value: "Baseline", fill: "rgba(226,72,59,0.6)", fontSize: 10 }} />
+              <ReferenceLine y={climateBaselineEU} stroke="rgba(226,72,59,0.5)" strokeDasharray="4 3" label={{ value: t("Baseline"), fill: "rgba(226,72,59,0.6)", fontSize: 10 }} />
               <Bar dataKey="energyUse" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
               </Bar>
@@ -1173,9 +1181,9 @@ export default function RenovationReport() {
           so they come first when they exist. */}
       {perBuildingPicks.length > 0 && (
         <Card>
-          <SectionTitle icon={<Building2 size={15} color="#4ECDC4" />} title="Chosen Package per Building" />
+          <SectionTitle icon={<Building2 size={15} color="#4ECDC4" />} title={t("Chosen Package per Building")} />
           <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 10px" }}>
-            Selected building by building in Step 4 — a single portfolio-wide pick would average over real differences between them.
+            {t("Selected building by building in Step 4 — a single portfolio-wide pick would average over real differences between them.")}
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {perBuildingPicks.map((r) => {
@@ -1201,12 +1209,12 @@ export default function RenovationReport() {
       {/* ── 5. Recommendations ── */}
       {hasResults && (
         <div>
-          <SectionTitle icon={<Award size={15} color="#2FB477" />} title="Recommendations" />
+          <SectionTitle icon={<Award size={15} color="#2FB477" />} title={t("Recommendations")} />
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            {bestEnergy  && <PackageCard result={bestEnergy}   label="Best energy saving"  accent="#2FB477" icon={<Zap size={13} color="#2FB477" />} />}
-            {bestCarbon  && bestCarbon.packageIndex !== bestEnergy?.packageIndex  && <PackageCard result={bestCarbon}  label="Lowest carbon"      accent="#4A90E2" icon={<Leaf size={13} color="#4A90E2" />} />}
-            {bestCost    && bestCost.packageIndex !== bestEnergy?.packageIndex    && <PackageCard result={bestCost}    label="Lowest cost"        accent="#E8880C" icon={<DollarSign size={13} color="#E8880C" />} />}
-            {bestBalanced && bestBalanced.packageIndex !== bestEnergy?.packageIndex && <PackageCard result={bestBalanced} label="Best balanced"    accent="#c084fc" icon={<Award size={13} color="#c084fc" />} />}
+            {bestEnergy  && <PackageCard result={bestEnergy}   label={t("Best energy saving")}  accent="#2FB477" icon={<Zap size={13} color="#2FB477" />} />}
+            {bestCarbon  && bestCarbon.packageIndex !== bestEnergy?.packageIndex  && <PackageCard result={bestCarbon}  label={t("Lowest carbon")}      accent="#4A90E2" icon={<Leaf size={13} color="#4A90E2" />} />}
+            {bestCost    && bestCost.packageIndex !== bestEnergy?.packageIndex    && <PackageCard result={bestCost}    label={t("Lowest cost")}        accent="#E8880C" icon={<DollarSign size={13} color="#E8880C" />} />}
+            {bestBalanced && bestBalanced.packageIndex !== bestEnergy?.packageIndex && <PackageCard result={bestBalanced} label={t("Best balanced")}    accent="#c084fc" icon={<Award size={13} color="#c084fc" />} />}
           </div>
         </div>
       )}
@@ -1214,16 +1222,16 @@ export default function RenovationReport() {
       {/* ── 6. Full results table ── */}
       {hasResults && (
         <Card>
-          <SectionTitle icon={<TrendingDown size={15} color="#4ECDC4" />} title={`All ${simResults.length} Packages — Ranked by Energy Saving`} />
+          <SectionTitle icon={<TrendingDown size={15} color="#4ECDC4" />} title={t("All {n} Packages — Ranked by Energy Saving", { n: simResults.length })} />
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             <div style={{ display: "grid", gridTemplateColumns: "78px 1fr 130px 120px 120px 130px", gap: 10, padding: "3px 12px", marginBottom: 2 }}>
               {["Package", "Components", "Energy use", "Saving", "CO₂e saved", "Cost"].map((h, i) => (
-                <span key={i} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, textAlign: i > 1 ? "right" : "left" }}>{h}</span>
+                <span key={i} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, textAlign: i > 1 ? "right" : "left" }}>{t(h)}</span>
               ))}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "78px 1fr 130px 120px 120px 130px", gap: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", alignItems: "center" }}>
               <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>—</span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>Baseline</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{t("Baseline")}</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.4)", textAlign: "right" }}>{kwh(baselineEU)}</span>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
@@ -1239,14 +1247,14 @@ export default function RenovationReport() {
                 {/* The package's own number - the same one the chart and the cards use -
                     with ★ on the biggest saving (rows are ranked by saving). */}
                 <span style={{ fontSize: 11.5, fontWeight: 800, color: i === 0 ? "#2FB477" : "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}
-                  title={i === 0 ? "Biggest energy saving" : `Rank ${i + 1} by energy saving`}>
-                  {i === 0 ? "★ " : ""}Package {r.packageIndex}
+                  title={i === 0 ? t("Biggest energy saving") : t("Rank {n} by energy saving", { n: i + 1 })}>
+                  {i === 0 ? "★ " : ""}{t("Package {n}", { n: r.packageIndex })}
                 </span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {/* Which building this package is for — identical materials on
                       two buildings were otherwise indistinguishable here. */}
                   <span style={{ fontSize: 10, fontWeight: 700, color: r.buildingLabel ? "#4ECDC4" : "rgba(255,255,255,0.35)" }}>
-                    {r.buildingLabel ?? "All buildings"}
+                    {r.buildingLabel ?? t("All buildings")}
                   </span>
                   {Object.entries(r.components).map(([comp, item]) => (
                     <div key={comp} style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 5 }}>
@@ -1268,10 +1276,10 @@ export default function RenovationReport() {
             ))}
           </div>
           <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: "10px 0 0" }}>
-            * EnergyPlus (EPSM) results; packages are numbered as in Step 4, ★ marks the biggest energy saving.{" "}
+            * {t("EnergyPlus (EPSM) results; packages are numbered as in Step 4, ★ marks the biggest energy saving.")}{" "}
             {isBE
-              ? "Cost and CO₂e are not reported for Belgium: no open Belgian retrofit cost or carbon data is wired in yet."
-              : `CO₂e saved is operational, per m² a year, at the heating carbon factor used in Step 4${isUK ? "" : " (Gothenburg district heating, 0.022 kg CO₂e/kWh)"}. Cost is the package's total material cost.`}
+              ? t("Cost and CO₂e are not reported for Belgium: no open Belgian retrofit cost or carbon data is wired in yet.")
+              : `${t("CO₂e saved is operational, per m² a year, at the heating carbon factor used in Step 4")}${isUK ? "" : ` ${t("(Gothenburg district heating, 0.022 kg CO₂e/kWh)")}`}. ${t("Cost is the package's total material cost.")}`}
           </p>
         </Card>
       )}
@@ -1279,14 +1287,16 @@ export default function RenovationReport() {
       {/* ── 7. Recommendation summary text ── */}
       {hasResults && bestBalanced && (
         <Card accent="#2FB477">
-          <SectionTitle icon={<CheckCircle2 size={15} color="#2FB477" />} title="Summary & Recommendation" />
+          <SectionTitle icon={<CheckCircle2 size={15} color="#2FB477" />} title={t("Summary & Recommendation")} />
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.7, margin: "0 0 12px" }}>
-            Based on the EPSM simulation of <strong style={{ color: "#fff" }}>{simResults.length} renovation packages</strong> across{" "}
-            <strong style={{ color: "#fff" }}>{components.join(", ")}</strong>, the analysis identifies the following recommended strategy:
+            {rich(t("Based on the EPSM simulation of {packages} across {components}, the analysis identifies the following recommended strategy:"), {
+              packages: <strong style={{ color: "#fff" }}>{t("{n} renovation packages", { n: simResults.length })}</strong>,
+              components: <strong style={{ color: "#fff" }}>{components.map((c) => t(c)).join(", ")}</strong>,
+            })}
           </p>
           <div style={{ borderRadius: 10, padding: "14px 16px", background: "rgba(47,180,119,0.07)", border: "1px solid rgba(47,180,119,0.2)", marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: "#2FB477", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>
-              ★ Recommended Package #{bestBalanced.packageIndex} — Best Balance of Cost, Energy & Carbon
+              ★ {t("Recommended Package #{n} — Best Balance of Cost, Energy & Carbon", { n: bestBalanced.packageIndex })}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
               {Object.entries(bestBalanced.components).map(([comp, item]) => (
@@ -1296,27 +1306,39 @@ export default function RenovationReport() {
               ))}
             </div>
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.6 }}>
-              This package achieves a <strong style={{ color: "#2FB477" }}>{kwh(bestBalanced.saving)} reduction</strong> in annual energy use
-              (from {kwh(baselineEU)} to <strong style={{ color: "#E8880C" }}>{kwh(bestBalanced.energyUse)}</strong>),
-              {isBE ? (
-                <>. Cost and carbon are not assessed for Belgium yet, so this ranking is by energy alone.</>
-              ) : (<>
-              saving an estimated <strong style={{ color: "#4A90E2" }}>{kg(bestBalanced.carbonSaving)}</strong> of embodied carbon per year,
-              at a material cost of <strong style={{ color: "rgba(255,255,255,0.8)" }}>{money(bestBalanced.cost)}</strong>.
-              </>)}
+              {isBE ? (<>
+                {rich(t("This package achieves a {saving} reduction in annual energy use (from {from} to {to})."), {
+                  saving: <strong style={{ color: "#2FB477" }}>{kwh(bestBalanced.saving)}</strong>,
+                  from: kwh(baselineEU),
+                  to: <strong style={{ color: "#E8880C" }}>{kwh(bestBalanced.energyUse)}</strong>,
+                })}{" "}
+                {t("Cost and carbon are not assessed for Belgium yet, so this ranking is by energy alone.")}
+              </>) : (
+                rich(t("This package achieves a {saving} reduction in annual energy use (from {from} to {to}), saving an estimated {carbon} of operational carbon per year, at a material cost of {cost}."), {
+                  saving: <strong style={{ color: "#2FB477" }}>{kwh(bestBalanced.saving)}</strong>,
+                  from: kwh(baselineEU),
+                  to: <strong style={{ color: "#E8880C" }}>{kwh(bestBalanced.energyUse)}</strong>,
+                  carbon: <strong style={{ color: "#4A90E2" }}>{kg(bestBalanced.carbonSaving)}</strong>,
+                  cost: <strong style={{ color: "rgba(255,255,255,0.8)" }}>{money(bestBalanced.cost)}</strong>,
+                })
+              )}
             </p>
           </div>
           {!isBE && bestCost && bestCost.packageIndex !== bestBalanced.packageIndex && (
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6, margin: "0 0 6px" }}>
-              If cost is the primary constraint, <strong style={{ color: "#E8880C" }}>Package #{bestCost.packageIndex}</strong> offers the
-              lowest material cost at <strong style={{ color: "#E8880C" }}>{money(bestCost.cost)}</strong> while still saving{" "}
-              <strong style={{ color: "#2FB477" }}>{kwh(bestCost.saving)}</strong>.
+              {rich(t("If cost is the primary constraint, {pkg} offers the lowest material cost at {cost} while still saving {saving}."), {
+                pkg: <strong style={{ color: "#E8880C" }}>{t("Package #{n}", { n: bestCost.packageIndex })}</strong>,
+                cost: <strong style={{ color: "#E8880C" }}>{money(bestCost.cost)}</strong>,
+                saving: <strong style={{ color: "#2FB477" }}>{kwh(bestCost.saving)}</strong>,
+              })}
             </p>
           )}
           {!isBE && bestCarbon && bestCarbon.packageIndex !== bestBalanced.packageIndex && (
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6, margin: 0 }}>
-              For maximum carbon impact, <strong style={{ color: "#4A90E2" }}>Package #{bestCarbon.packageIndex}</strong> saves{" "}
-              <strong style={{ color: "#4A90E2" }}>{kg(bestCarbon.carbonSaving)}</strong> of CO₂e per year.
+              {rich(t("For maximum carbon impact, {pkg} saves {carbon} of CO₂e per year."), {
+                pkg: <strong style={{ color: "#4A90E2" }}>{t("Package #{n}", { n: bestCarbon.packageIndex })}</strong>,
+                carbon: <strong style={{ color: "#4A90E2" }}>{kg(bestCarbon.carbonSaving)}</strong>,
+              })}
             </p>
           )}
         </Card>
@@ -1325,24 +1347,24 @@ export default function RenovationReport() {
       {/* ── City climate target (moved here from Step 4) ── */}
       {ratingGoal && (
         <Card>
-          <SectionTitle icon={<Target size={15} color="#2FB477" />} title="City climate target" />
+          <SectionTitle icon={<Target size={15} color="#2FB477" />} title={t("City climate target")} />
           <ClimateGoalRatingPanel a={ratingGoal} />
         </Card>
       )}
       {climateGoal && (climateGoal.kind === "info" || (climateGoal.kind === "rating" && !ratingGoal)) && (
         <Card>
-          <SectionTitle icon={<Target size={15} color="#2FB477" />} title="City climate target" />
+          <SectionTitle icon={<Target size={15} color="#2FB477" />} title={t("City climate target")} />
           <ClimateGoalInfo goal={climateGoal} />
         </Card>
       )}
       {goalAssessment && (
         <Card>
-          <SectionTitle icon={<Target size={15} color="#2FB477" />} title="City climate target" />
+          <SectionTitle icon={<Target size={15} color="#2FB477" />} title={t("City climate target")} />
           <ClimateGoalPanel a={goalAssessment} />
           {buildingGoal && (
             <div style={{ marginTop: 18 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>
-                Per-building goal
+                {t("Per-building goal")}
               </div>
               <ClimateGoalBuildingTable a={buildingGoal} />
             </div>
@@ -1353,25 +1375,28 @@ export default function RenovationReport() {
       {/* ── Solar production potential (PVGIS) ── */}
       {(pvLoading || pvOk.length > 0 || (pv?.results.length ?? 0) > 0) && (
         <Card accent="#E8B10C">
-          <SectionTitle icon={<Sun size={15} color="#E8B10C" />} title="Solar Production Potential (Rooftop PV)" />
+          <SectionTitle icon={<Sun size={15} color="#E8B10C" />} title={t("Solar Production Potential (Rooftop PV)")} />
           {pvLoading && !pv ? (
-            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", margin: 0 }}>Fetching PVGIS estimates for the buildings…</p>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", margin: 0 }}>{t("Fetching PVGIS estimates for the buildings…")}</p>
           ) : (
             <>
               <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.65)", lineHeight: 1.6, margin: "0 0 10px" }}>
-                {pvOk.length > 0 && <>Panels on the roofs of the {pvOk.length} building{pvOk.length === 1 ? "" : "s"} could produce about{" "}
-                  <strong style={{ color: "#E8B10C" }}>{(pvTotalKwh / 1000).toLocaleString("sv-SE", { maximumFractionDigits: 1 })} MWh of electricity a year</strong>{" "}
-                  from {pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp installed.</>}
+                {pvOk.length > 0 && rich(t("Panels on the roofs of the {n} {buildings} could produce about {production} from {kwp} kWp installed.", {
+                  n: pvOk.length, buildings: pvOk.length === 1 ? t("building") : t("buildings"),
+                  kwp: pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 }),
+                }), {
+                  production: <strong style={{ color: "#E8B10C" }}>{t("{mwh} MWh of electricity a year", { mwh: (pvTotalKwh / 1000).toLocaleString("sv-SE", { maximumFractionDigits: 1 }) })}</strong>,
+                })}
               </p>
               {pvOk.length > 1 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px", fontSize: 11.5, color: "rgba(255,255,255,0.6)" }}>
-                  <span>Set all roofs to</span>
+                  <span>{t("Set all roofs to")}</span>
                   <input type="range" min={0} max={100} step={5}
                     value={pvRows[0]?.cov ?? PV_DEFAULT_COV}
                     onChange={(e) => { const v = Number(e.target.value); setPvCov(Object.fromEntries(pvRows.map((r) => [r.key, v]))); }}
                     style={{ width: 160, accentColor: "#E8B10C" }} />
                   <span style={{ color: "#E8B10C", fontWeight: 700, minWidth: 34 }}>{pvRows[0]?.cov ?? PV_DEFAULT_COV}%</span>
-                  <span style={{ color: "rgba(255,255,255,0.4)" }}>covered with panels — or adjust each building below</span>
+                  <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("covered with panels — or adjust each building below")}</span>
                 </div>
               )}
               <div style={{ overflowX: "auto" }}>
@@ -1379,7 +1404,7 @@ export default function RenovationReport() {
                   <thead>
                     <tr style={{ color: "rgba(255,255,255,0.45)" }}>
                       {["Building", "Roof covered with panels", "Panel area", "System size", "Annual production"].map((h, i) => (
-                        <th key={h} style={{ padding: "6px 8px", fontWeight: 600, textAlign: i ? "right" : "left", whiteSpace: "nowrap" }}>{h}</th>
+                        <th key={h} style={{ padding: "6px 8px", fontWeight: 600, textAlign: i ? "right" : "left", whiteSpace: "nowrap" }}>{t(h)}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1387,16 +1412,16 @@ export default function RenovationReport() {
                     {pvRows.map((r, i) => (
                       <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
                         <td style={{ padding: "6px 8px", color: "#fff" }}>
-                          {r.address ?? "Building"}
-                          {r.source === "saved" && <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 10.5 }}> · saved from the 3D viewer</span>}
+                          {r.address ?? t("Building")}
+                          {r.source === "saved" && <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 10.5 }}> · {t("saved from the 3D viewer")}</span>}
                         </td>
                         {r.annual_kwh == null ? (
-                          <td colSpan={4} style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>— {r.error ?? "no result"}</td>
+                          <td colSpan={4} style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>— {r.error ?? t("no result")}</td>
                         ) : (<>
                           <td style={{ padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
                             <input type="range" min={0} max={100} step={5} value={r.cov}
                               onChange={(e) => setPvCov((m) => ({ ...m, [r.key]: Number(e.target.value) }))}
-                              aria-label={`Share of ${r.address ?? "the"} roof covered with panels`}
+                              aria-label={r.address ? t("Share of {address} roof covered with panels", { address: r.address }) : t("Share of the roof covered with panels")}
                               style={{ width: 110, verticalAlign: "middle", accentColor: "#E8B10C" }} />
                             <span style={{ display: "inline-block", minWidth: 38, color: "#E8B10C", fontWeight: 700 }}>{r.cov}%</span>
                           </td>
@@ -1408,7 +1433,7 @@ export default function RenovationReport() {
                     ))}
                     {pvOk.length > 1 && (
                       <tr style={{ borderTop: "1px solid rgba(255,255,255,0.15)" }}>
-                        <td style={{ padding: "6px 8px", color: "#fff", fontWeight: 700 }}>Total</td>
+                        <td style={{ padding: "6px 8px", color: "#fff", fontWeight: 700 }}>{t("Total")}</td>
                         <td />
                         <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{pvOk.reduce((s, r) => s + (r.roof_area_m2 ?? 0), 0).toLocaleString("sv-SE")} m²</td>
                         <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp</td>
@@ -1420,9 +1445,9 @@ export default function RenovationReport() {
               </div>
               {/* Assumptions behind every row (same as the 3D viewer's Rooftop PV button). */}
               <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Assumptions</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>{t("Assumptions")}</div>
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
-                  {PV_ASSUMPTIONS.map((a) => <li key={a}>{a}</li>)}
+                  {PV_ASSUMPTIONS.map((a) => <li key={a}>{t(a)}</li>)}
                 </ul>
               </div>
             </>
@@ -1441,26 +1466,29 @@ export default function RenovationReport() {
         const td2: React.CSSProperties = { padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap", color: "rgba(255,255,255,0.8)" };
         return (
           <Card accent="#E8880C">
-            <SectionTitle icon={<Flame size={15} color="#E8880C" />} title="Heating System (HVAC)" />
+            <SectionTitle icon={<Flame size={15} color="#E8880C" />} title={t("Heating System (HVAC)")} />
             <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.65)", lineHeight: 1.7, margin: "0 0 12px" }}>
-              On the building's <strong style={{ color: "#fff" }}>{Math.round(ha.heatingDemandKwhM2Yr)} kWh/m²·yr</strong> heat demand, the chosen system is{" "}
-              <strong style={{ color: "#E8880C" }}>{sel.name}</strong>{sel.isBaseline ? " (the as-built baseline)" : ""} — delivering{" "}
-              <strong style={{ color: "#fff" }}>{sel.deliveredKwhM2Yr} kWh/m²·yr</strong> at{" "}
-              <strong style={{ color: "#fff" }}>{fsek(sel.operatingCostYrSek)} {hcur}/yr</strong> and{" "}
-              <strong style={{ color: "#4A90E2" }}>{fsek(sel.carbonYrKg)} kg CO₂e/yr</strong>
-              {sel.vsBaseline && !sel.isBaseline && <> ({sel.vsBaseline.opCostPct > 0 ? "+" : ""}{sel.vsBaseline.opCostPct}% cost, {sel.vsBaseline.carbonPct > 0 ? "+" : ""}{sel.vsBaseline.carbonPct}% carbon vs {hcur === "GBP" ? "the existing gas boiler" : "district heating"})</>}.
+              {rich(t("On the building's {demand} heat demand, the chosen system is {system}{note} — delivering {delivered} at {cost} and {carbon}"), {
+                demand: <strong style={{ color: "#fff" }}>{Math.round(ha.heatingDemandKwhM2Yr)} kWh/m²·yr</strong>,
+                system: <strong style={{ color: "#E8880C" }}>{sel.name}</strong>,
+                note: sel.isBaseline ? ` ${t("(the as-built baseline)")}` : "",
+                delivered: <strong style={{ color: "#fff" }}>{sel.deliveredKwhM2Yr} kWh/m²·yr</strong>,
+                cost: <strong style={{ color: "#fff" }}>{fsek(sel.operatingCostYrSek)} {hcur}/yr</strong>,
+                carbon: <strong style={{ color: "#4A90E2" }}>{fsek(sel.carbonYrKg)} kg CO₂e/yr</strong>,
+              })}
+              {sel.vsBaseline && !sel.isBaseline && <> ({t("{cost}% cost, {carbon}% carbon vs {ref}", { cost: `${sel.vsBaseline.opCostPct > 0 ? "+" : ""}${sel.vsBaseline.opCostPct}`, carbon: `${sel.vsBaseline.carbonPct > 0 ? "+" : ""}${sel.vsBaseline.carbonPct}`, ref: hcur === "GBP" ? t("the existing gas boiler") : t("district heating") })})</>}.
             </p>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr>
-                    <th style={{ ...th2, textAlign: "left" }}>System</th>
-                    <th style={th2}>SPF/eff.</th>
-                    <th style={th2}>Delivered<br /><span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>kWh/m²·yr</span></th>
-                    <th style={th2}>Op. cost/yr</th>
-                    <th style={th2}>Carbon/yr<br /><span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>kg CO₂e</span></th>
-                    <th style={th2}>Install</th>
-                    <th style={th2}>{ha.results[0] ? "30-yr LCC" : "LCC"}</th>
+                    <th style={{ ...th2, textAlign: "left" }}>{t("System")}</th>
+                    <th style={th2}>{t("SPF/eff.")}</th>
+                    <th style={th2}>{t("Delivered")}<br /><span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>kWh/m²·yr</span></th>
+                    <th style={th2}>{t("Op. cost/yr")}</th>
+                    <th style={th2}>{t("Carbon/yr")}<br /><span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>kg CO₂e</span></th>
+                    <th style={th2}>{t("Install")}</th>
+                    <th style={th2}>{ha.results[0] ? t("30-yr LCC") : t("LCC")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1471,7 +1499,7 @@ export default function RenovationReport() {
                         <td style={{ padding: "6px 8px", color: "#fff" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color }} />
-                            {s.shortName}{isSel && <span style={{ fontSize: 8.5, color: "#4ECDC4", fontWeight: 800 }}>✓ chosen</span>}{s.isBaseline && <span style={{ fontSize: 8.5, color: "#E8880C" }}>baseline</span>}
+                            {s.shortName}{isSel && <span style={{ fontSize: 8.5, color: "#4ECDC4", fontWeight: 800 }}>✓ {t("chosen")}</span>}{s.isBaseline && <span style={{ fontSize: 8.5, color: "#E8880C" }}>{t("baseline")}</span>}
                           </span>
                         </td>
                         <td style={td2}>{s.spf.toFixed(s.spf >= 1.5 ? 1 : 2)}</td>
@@ -1487,7 +1515,7 @@ export default function RenovationReport() {
               </table>
             </div>
             <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", marginTop: 10, lineHeight: 1.6 }}>
-              Heat demand from EnergyPlus (EPSM); system economics are a supply-side layer (delivered = demand ÷ SPF). Values are {hcur === "GBP" ? "UK defaults (Ofgem price cap, DESNZ carbon factors and install costs)" : "Swedish defaults"} — see the tool's Heating-system panel for sources.
+              {t("Heat demand from EnergyPlus (EPSM); system economics are a supply-side layer (delivered = demand ÷ SPF).")} {t("Values are {defaults} — see the tool's Heating-system panel for sources.", { defaults: hcur === "GBP" ? t("UK defaults (Ofgem price cap, DESNZ carbon factors and install costs)") : t("Swedish defaults") })}
             </p>
           </Card>
         );

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Scale } from "lucide-react";
 import PanelShell from "./PanelShell";
 import type { RegretResult } from "../utils/regretAnalysis";
+import { useT } from "../i18n";
 
 /* Interactive regret / robustness decision analysis for Step 4. Presentational —
  * the parent owns the α + scenario-price state and the computed result. */
@@ -48,6 +49,7 @@ export default function DecisionAnalysisPanel({
   prices: number[]; setPrices: (p: number[]) => void;
   currentPrice: number;
 }) {
+  const t = useT();
   const cur = result.currency ?? "SEK";
   /* "Worst miss vs best" is the column that answers the question people actually
      have — how bad can this look in hindsight — and it is the one minimax regret
@@ -67,21 +69,21 @@ export default function DecisionAnalysisPanel({
     <PanelShell
       icon={<Scale size={17} />}
       iconColor="#4ECDC4"
-      title="Compare renovation choices across future energy prices"
-      subtitle="The same options tested across low / medium / high energy-price futures"
+      title={t("Compare renovation choices across future energy prices")}
+      subtitle={t("The same options tested across low / medium / high energy-price futures")}
     >
       <p style={{ fontSize: 11.5, color: white(0.4), margin: "8px 0 14px", lineHeight: 1.6, maxWidth: 720 }}>
-        We cannot know future energy prices, so each option is tested in three possible futures: <b style={{ color: white(0.6) }}>Low</b> (cheap energy),
-        <b style={{ color: white(0.6) }}> Medium</b> (middle prices), and <b style={{ color: white(0.6) }}>High</b> (expensive energy).
-        Results show <b style={{ color: white(0.6) }}>{result.studyPeriodYr}-year net benefit</b> = energy savings value minus investment.
+        {t("We cannot know future energy prices, so each option is tested in three possible futures:")} <b style={{ color: white(0.6) }}>{t("Low")}</b> {t("(cheap energy),")}
+        <b style={{ color: white(0.6) }}> {t("Medium")}</b> {t("(middle prices), and")} <b style={{ color: white(0.6) }}>{t("High")}</b> {t("(expensive energy).")}
+        {" "}{t("Results show")} <b style={{ color: white(0.6) }}>{t("{n}-year net benefit", { n: result.studyPeriodYr })}</b> {t("= energy savings value minus investment.")}
       </p>
 
       {/* Scenario price controls + Hurwicz α */}
       <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, color: white(0.35), textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-            Energy-price assumptions ({cur}/kWh)
-            <span style={{ textTransform: "none", fontWeight: 400, letterSpacing: 0, color: "#B98BE8", marginLeft: 6 }}>· for comparison, today's price ≈ {currentPrice} {cur}/kWh</span>
+            {t("Energy-price assumptions ({cur}/kWh)", { cur })}
+            <span style={{ textTransform: "none", fontWeight: 400, letterSpacing: 0, color: "#B98BE8", marginLeft: 6 }}>{t("· for comparison, today's price ≈ {price} {cur}/kWh", { price: currentPrice, cur })}</span>
             {result.priceBasis && (
               <span style={{ display: "block", textTransform: "none", fontWeight: 400, letterSpacing: 0, color: white(0.35), marginTop: 3 }}>{result.priceBasis}</span>
             )}
@@ -89,8 +91,8 @@ export default function DecisionAnalysisPanel({
           <div style={{ display: "flex", gap: 8 }}>
             {scenarios.map((s, i) => (
               <label key={s.key} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10, color: white(0.4) }}>
-                {s.label}
-                <span style={{ fontSize: 9, color: white(0.3), marginTop: -2 }}>{scenarioHint(s.label, i)}</span>
+                {t(s.label)}
+                <span style={{ fontSize: 9, color: white(0.3), marginTop: -2 }}>{t(scenarioHint(s.label, i))}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <input type="number" min={0} step={cur === "GBP" ? 0.01 : 0.1} value={prices[i]}
                     onChange={(e) => { const p = [...prices]; p[i] = Math.max(0, Number(e.target.value)); setPrices(p); }}
@@ -109,16 +111,16 @@ export default function DecisionAnalysisPanel({
             onClick={() => setAdvancedOpen((o) => !o)}
             style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: 0, cursor: "pointer",
               fontSize: 10, fontWeight: 700, color: white(0.35), textTransform: "uppercase", letterSpacing: 1, padding: 0, marginBottom: 6 }}>
-            {advancedOpen ? "▾" : "▸"} Advanced — decision style (alpha) = <span style={{ color: "#B98BE8" }}>{alpha.toFixed(2)}</span>
+            {advancedOpen ? "▾" : "▸"} {t("Advanced — decision style (alpha) =")} <span style={{ color: "#B98BE8" }}>{alpha.toFixed(2)}</span>
           </button>
           {advancedOpen && (<>
           <input type="range" min={0} max={1} step={0.05} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))}
             style={{ width: "100%", accentColor: "#B98BE8" }} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9.5, color: white(0.3) }}>
-            <span>0 = cautious (focus on worst case)</span><span>1 = optimistic (focus on best case)</span>
+            <span>{t("0 = cautious (focus on worst case)")}</span><span>{t("1 = optimistic (focus on best case)")}</span>
           </div>
           <div style={{ fontSize: 9.5, color: white(0.32), marginTop: 4 }}>
-            This slider controls the "Balanced choice" score (also called Hurwicz). Use 0.5 if you are unsure.
+            {t("This slider controls the \"Balanced choice\" score (also called Hurwicz). Use 0.5 if you are unsure.")}
           </div>
           </>)}
         </div>
@@ -129,20 +131,20 @@ export default function DecisionAnalysisPanel({
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr>
-              <th style={{ ...th, textAlign: "left" }}>Retrofit option</th>
+              <th style={{ ...th, textAlign: "left" }}>{t("Retrofit option")}</th>
               {scenarios.map((s, i) => (
-                <th key={s.key} style={th} title={scenarioHint(s.label, i)}>
-                  {s.label}
+                <th key={s.key} style={th} title={t(scenarioHint(s.label, i))}>
+                  {t(s.label)}
                   <br />
-                  <span style={{ fontWeight: 400, color: white(0.3) }}>{scenarioHint(s.label, i)}</span>
+                  <span style={{ fontWeight: 400, color: white(0.3) }}>{t(scenarioHint(s.label, i))}</span>
                 </th>
               ))}
               {advancedOpen && (
-                <th style={th} title="Best minus worst across scenarios (sensitivity)">Outcome spread</th>
+                <th style={th} title={t("Best minus worst across scenarios (sensitivity)")}>{t("Outcome spread")}</th>
               )}
-              <th style={th} title="Worst-case regret vs the best option in each scenario">Worst miss vs best</th>
+              <th style={th} title={t("Worst-case regret vs the best option in each scenario")}>{t("Worst miss vs best")}</th>
               {advancedOpen && (
-                <th style={th} title="alpha x best + (1 - alpha) x worst">Balanced score</th>
+                <th style={th} title="alpha x best + (1 - alpha) x worst">{t("Balanced score")}</th>
               )}
             </tr>
           </thead>
@@ -154,15 +156,15 @@ export default function DecisionAnalysisPanel({
                 <tr key={o.id} style={{ borderTop: `1px solid ${white(0.07)}`, background: highlighted ? "rgba(255,255,255,0.03)" : undefined }}>
                   <td style={{ padding: "7px 8px", color: o.isBaseline ? white(0.5) : "#fff", fontStyle: o.isBaseline ? "italic" : undefined }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      <span style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>{o.label}</span>
-                      {tags.map((t) => {
-                        const style = PICK_STYLE[t] ?? { fg: "#fff", bg: "rgba(255,255,255,0.08)", label: t, tip: "" };
+                      <span style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>{t(o.label)}</span>
+                      {tags.map((tag) => {
+                        const style = PICK_STYLE[tag] ?? { fg: "#fff", bg: "rgba(255,255,255,0.08)", label: tag, tip: "" };
                         return (
-                          <button key={t} onClick={() => setOpenTag((cur) => (cur === t ? null : t))}
-                            title={style.tip}
+                          <button key={tag} onClick={() => setOpenTag((cur) => (cur === tag ? null : tag))}
+                            title={t(style.tip)}
                             style={{ fontSize: 8.5, fontWeight: 800, padding: "1px 6px", borderRadius: 99, color: style.fg,
-                              background: style.bg, border: `1px solid ${openTag === t ? style.fg : "transparent"}`, cursor: "pointer" }}>
-                            ★ {style.label}
+                              background: style.bg, border: `1px solid ${openTag === tag ? style.fg : "transparent"}`, cursor: "pointer" }}>
+                            ★ {t(style.label)}
                           </button>
                         );
                       })}
@@ -194,13 +196,13 @@ export default function DecisionAnalysisPanel({
         return (
           <div style={{ marginBottom: 12, padding: "11px 13px", borderRadius: 10, background: st.bg, border: `1px solid ${st.fg}44` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: st.fg, flex: 1 }}>★ {st.label}</span>
-              <span style={{ fontSize: 9.5, color: white(0.4) }}>{st.column}</span>
-              <button onClick={() => setOpenTag(null)} title="Close"
+              <span style={{ fontSize: 12, fontWeight: 800, color: st.fg, flex: 1 }}>★ {t(st.label)}</span>
+              <span style={{ fontSize: 9.5, color: white(0.4) }}>{t(st.column)}</span>
+              <button onClick={() => setOpenTag(null)} title={t("Close")}
                 style={{ background: "transparent", border: 0, cursor: "pointer", color: white(0.45), padding: 0, lineHeight: 1, fontSize: 13 }}>×</button>
             </div>
-            <div style={{ fontSize: 11, color: white(0.7), lineHeight: 1.55 }}>{st.what}</div>
-            <div style={{ fontSize: 10.5, color: white(0.45), lineHeight: 1.5, marginTop: 4 }}>{st.when}</div>
+            <div style={{ fontSize: 11, color: white(0.7), lineHeight: 1.55 }}>{t(st.what)}</div>
+            <div style={{ fontSize: 10.5, color: white(0.45), lineHeight: 1.5, marginTop: 4 }}>{t(st.when)}</div>
           </div>
         );
       })()}
@@ -208,13 +210,13 @@ export default function DecisionAnalysisPanel({
       {/* What the decision columns mean */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", marginTop: 10, fontSize: 10.5, color: white(0.4), lineHeight: 1.5 }}>
         {advancedOpen && (
-          <span><b style={{ color: white(0.6) }}>Outcome spread</b> — how much the benefit swings between the cheap and expensive futures (smaller = more stable).</span>
+          <span><b style={{ color: white(0.6) }}>{t("Outcome spread")}</b> {t("— how much the benefit swings between the cheap and expensive futures (smaller = more stable).")}</span>
         )}
-        <span><b style={{ color: white(0.6) }}>Worst miss vs best</b> — the biggest shortfall behind the best option in any future (smaller = safer).</span>
+        <span><b style={{ color: white(0.6) }}>{t("Worst miss vs best")}</b> {t("— the biggest shortfall behind the best option in any future (smaller = safer).")}</span>
         {advancedOpen && (
-          <span><b style={{ color: white(0.6) }}>Balanced score</b> — best &amp; worst case blended by your α slider (higher = better).</span>
+          <span><b style={{ color: white(0.6) }}>{t("Balanced score")}</b> {t("— best & worst case blended by your α slider (higher = better).")}</span>
         )}
-        <span style={{ color: white(0.3) }}>Click a ★ tag for what that pick means.</span>
+        <span style={{ color: white(0.3) }}>{t("Click a ★ tag for what that pick means.")}</span>
       </div>
 
       {/* Plain-language summary */}
@@ -223,8 +225,8 @@ export default function DecisionAnalysisPanel({
           const rec = options.find((o) => o.id === picks.minimaxRegret);
           return rec ? (
             <div style={{ fontSize: 12.5, color: white(0.8), marginBottom: 4, lineHeight: 1.5 }}>
-              If you are going to renovate, the most robust choice across all three price futures is{" "}
-              <b style={{ color: "#4ECDC4" }}>{rec.label}</b> — it leaves the least on the table if the future turns out badly.
+              {t("If you are going to renovate, the most robust choice across all three price futures is")}{" "}
+              <b style={{ color: "#4ECDC4" }}>{t(rec.label)}</b> {t("— it leaves the least on the table if the future turns out badly.")}
             </div>
           ) : null;
         })()}
@@ -234,16 +236,15 @@ export default function DecisionAnalysisPanel({
           if (!opt) return null;
           return (
             <div key={k} style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-              <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 7px", borderRadius: 99, color: style.fg, background: style.bg, whiteSpace: "nowrap" }}>★ {style.label}</span>
-              <span><b style={{ color: "#fff" }}>{opt.label}</b> - {style.tip}</span>
+              <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 7px", borderRadius: 99, color: style.fg, background: style.bg, whiteSpace: "nowrap" }}>★ {t(style.label)}</span>
+              <span><b style={{ color: "#fff" }}>{t(opt.label)}</b> - {t(style.tip)}</span>
             </div>
           );
         })}
         <div style={{ fontSize: 10.5, color: white(0.3), marginTop: 4, lineHeight: 1.6 }}>
-          Values are {result.studyPeriodYr}-yr net present benefit ({cur}, in millions) — a negative number means the investment
-          isn't repaid by energy savings alone under that scenario (deep retrofits are also done for the climate target, comfort and
-          asset value). <b style={{ color: white(0.45) }}>Green</b> = best retrofit in that future; <i>Keep as-built</i> is the
-          do-nothing <b style={{ color: white(0.45) }}>0 reference</b>, so retrofits are ranked among themselves. Saved to the Step 5 report.
+          {t("Values are {n}-yr net present benefit ({cur}, in millions) — a negative number means the investment isn't repaid by energy savings alone under that scenario (deep retrofits are also done for the climate target, comfort and asset value).", { n: result.studyPeriodYr, cur })}{" "}
+          <b style={{ color: white(0.45) }}>{t("Green")}</b> {t("= best retrofit in that future;")} <i>{t("Keep as-built")}</i> {t("is the do-nothing")}{" "}
+          <b style={{ color: white(0.45) }}>{t("0 reference")}</b>{t(", so retrofits are ranked among themselves. Saved to the Step 5 report.")}
         </div>
       </div>
     </PanelShell>

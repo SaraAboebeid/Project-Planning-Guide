@@ -4,12 +4,14 @@ import { computeHvac, type HvacResult } from "../utils/hvacAnalysis";
 import { SE_HVAC_CATALOGUE, type HvacCatalogue } from "../config/hvacSystems";
 import { useWizardStore, type HvacOverrides } from "../store/wizard";
 import { applyHvacOverrides, hasHvacOverrides } from "../utils/hvacOverrides";
+import { useT } from "../i18n";
 
 /** Number box that commits on blur/Enter; an emptied box (or the default
  *  value) clears the override. Edited values are highlighted. */
 function NumField({ value, def, step, width = 64, onCommit }: {
   value: number; def: number; step?: number; width?: number; onCommit: (v: number | undefined) => void;
 }) {
+  const t = useT();
   const [text, setText] = useState(String(value));
   useEffect(() => setText(String(value)), [value]);
   const edited = Math.abs(value - def) > 1e-9;
@@ -19,7 +21,7 @@ function NumField({ value, def, step, width = 64, onCommit }: {
     onCommit(Math.abs(v - def) < 1e-9 ? undefined : v);
   };
   return (
-    <input type="number" step={step ?? "any"} value={text} title={edited ? `Default ${def}` : "Default value"}
+    <input type="number" step={step ?? "any"} value={text} title={edited ? t("Default {v}", { v: def }) : t("Default value")}
       onChange={(e) => setText(e.target.value)} onBlur={commit}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
       style={{ width, padding: "3px 6px", borderRadius: 6, fontSize: 11, textAlign: "right",
@@ -68,6 +70,7 @@ export default function HeatingSystemPanel({
   discountRate?: number;
   catalogue?: HvacCatalogue;
 }) {
+  const t = useT();
   // The user's own values (Assumptions & sources) over the catalogue defaults,
   // kept per catalogue currency so Swedish and UK edits never mix.
   const overrides = useWizardStore((s) => s.project.hvacOverrides?.[baseCatalogue.currency]);
@@ -124,9 +127,9 @@ export default function HeatingSystemPanel({
         style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", background: "transparent", border: 0, cursor: "pointer", textAlign: "left" }}>
         <span style={{ padding: 6, borderRadius: 9, background: "rgba(232,136,12,0.16)", color: "#E8880C", display: "flex" }}><Flame size={16} /></span>
         <span style={{ flex: 1 }}>
-          <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#fff" }}>Heating system (HVAC)</span>
+          <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#fff" }}>{t("Heating system (HVAC)")}</span>
           <span style={{ display: "block", fontSize: 11, color: white(0.4) }}>
-            Compare &amp; choose the heating source — {selected ? <b style={{ color: "#E8880C" }}>selected: {selected.shortName}</b> : "energy, cost & carbon on the same heat demand"}.
+            {t("Compare & choose the heating source —")} {selected ? <b style={{ color: "#E8880C" }}>{t("selected:")} {selected.shortName}</b> : t("energy, cost & carbon on the same heat demand")}.
           </span>
         </span>
         {open ? <ChevronUp size={16} color={white(0.4)} /> : <ChevronDown size={16} color={white(0.4)} />}
@@ -135,24 +138,26 @@ export default function HeatingSystemPanel({
       {open && (
         <div style={{ padding: "0 18px 16px" }}>
           <p style={{ fontSize: 11.5, color: white(0.45), margin: "0 0 12px", lineHeight: 1.6, maxWidth: 760 }}>
-            The building's <b style={{ color: white(0.65) }}>{Math.round(heatingDemandKwhM2Yr)} kWh/m²·yr</b> of heat demand is fixed — each system
-            just converts it to delivered energy at its own efficiency (SPF). Values are {studyPeriodYr}-yr life-cycle at a {Math.round(discountRate * 100)}% discount rate.
-            The heat demand still comes from real EnergyPlus (EPSM); the system economics are a supply-side layer on top.
+            {t("The building's")} <b style={{ color: white(0.65) }}>{Math.round(heatingDemandKwhM2Yr)} kWh/m²·yr</b> {t("of heat demand is fixed — each system just converts it to delivered energy at its own efficiency (SPF). Values are {n}-yr life-cycle at a {r}% discount rate.", { n: studyPeriodYr, r: Math.round(discountRate * 100) })}
+            {" "}{t("The heat demand still comes from real EnergyPlus (EPSM); the system economics are a supply-side layer on top.")}
           </p>
 
           {selected && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12, padding: "9px 12px",
               borderRadius: 10, background: "rgba(78,205,196,0.08)", border: "1px solid rgba(78,205,196,0.3)" }}>
-              <span style={{ fontSize: 11.5, color: white(0.6) }}>Selected heating system:</span>
+              <span style={{ fontSize: 11.5, color: white(0.6) }}>{t("Selected heating system:")}</span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 800, color: "#fff" }}>
                 <span style={{ width: 9, height: 9, borderRadius: 2, background: selected.color }} /> {selected.shortName}
               </span>
               <span style={{ fontSize: 11.5, color: white(0.55) }}>
-                {selected.deliveredKwhM2Yr} kWh/m²·yr · {sek(selected.operatingCostYrSek)} {cur}/yr · {sek(selected.carbonYrKg)} kg CO₂e/yr · {sek(selected.lccSek)} {cur} life-cycle
+                {selected.deliveredKwhM2Yr} kWh/m²·yr · {sek(selected.operatingCostYrSek)} {cur}/yr · {sek(selected.carbonYrKg)} kg CO₂e/yr · {sek(selected.lccSek)} {cur} {t("life-cycle")}
               </span>
               {!selected.isBaseline && selected.vsBaseline && (
                 <span style={{ fontSize: 10.5, color: selected.vsBaseline.opCostPct < 0 ? "#2FB477" : "#E2483B" }}>
-                  ({selected.vsBaseline.opCostPct > 0 ? "+" : ""}{selected.vsBaseline.opCostPct}% cost, {selected.vsBaseline.carbonPct > 0 ? "+" : ""}{selected.vsBaseline.carbonPct}% carbon vs {catalogue.baselineLabel})
+                  ({t("{cost}% cost, {carbon}% carbon vs {base}", {
+                    cost: `${selected.vsBaseline.opCostPct > 0 ? "+" : ""}${selected.vsBaseline.opCostPct}`,
+                    carbon: `${selected.vsBaseline.carbonPct > 0 ? "+" : ""}${selected.vsBaseline.carbonPct}`,
+                    base: catalogue.baselineLabel })})
                 </span>
               )}
             </div>
@@ -163,13 +168,13 @@ export default function HeatingSystemPanel({
               <thead>
                 <tr>
                   <th style={{ ...th, width: 26 }}></th>
-                  <th style={{ ...th, textAlign: "left" }}>Heating system</th>
-                  <th style={th} title="Seasonal Performance Factor (heat pumps) or efficiency">SPF / eff.</th>
-                  <th style={th}>Delivered<br /><span style={{ fontWeight: 400, color: white(0.3) }}>kWh/m²·yr</span></th>
-                  <th style={th}>Op. cost<br /><span style={{ fontWeight: 400, color: white(0.3) }}>{cur}/yr</span></th>
-                  <th style={th}>Carbon<br /><span style={{ fontWeight: 400, color: white(0.3) }}>kg CO₂e/yr</span></th>
-                  <th style={th}>Install<br /><span style={{ fontWeight: 400, color: white(0.3) }}>capex {cur}</span></th>
-                  <th style={th}>{studyPeriodYr}-yr LCC<br /><span style={{ fontWeight: 400, color: white(0.3) }}>{cur}</span></th>
+                  <th style={{ ...th, textAlign: "left" }}>{t("Heating system")}</th>
+                  <th style={th} title={t("Seasonal Performance Factor (heat pumps) or efficiency")}>{t("SPF / eff.")}</th>
+                  <th style={th}>{t("Delivered")}<br /><span style={{ fontWeight: 400, color: white(0.3) }}>kWh/m²·yr</span></th>
+                  <th style={th}>{t("Op. cost")}<br /><span style={{ fontWeight: 400, color: white(0.3) }}>{cur}/{t("yr")}</span></th>
+                  <th style={th}>{t("Carbon")}<br /><span style={{ fontWeight: 400, color: white(0.3) }}>kg CO₂e/{t("yr")}</span></th>
+                  <th style={th}>{t("Install")}<br /><span style={{ fontWeight: 400, color: white(0.3) }}>{t("capex {cur}", { cur })}</span></th>
+                  <th style={th}>{t("{n}-yr LCC", { n: studyPeriodYr })}<br /><span style={{ fontWeight: 400, color: white(0.3) }}>{cur}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -177,7 +182,7 @@ export default function HeatingSystemPanel({
                   const tags = picksFor(s.id);
                   const isSel = s.id === selected?.id;
                   return (
-                    <tr key={s.id} onClick={() => selectSystem(s.id)} title="Click to select this heating system"
+                    <tr key={s.id} onClick={() => selectSystem(s.id)} title={t("Click to select this heating system")}
                       style={{ borderTop: `1px solid ${white(0.07)}`, cursor: "pointer",
                         boxShadow: isSel ? "inset 3px 0 0 #4ECDC4" : undefined,
                         background: isSel ? "rgba(78,205,196,0.10)" : s.isBaseline ? "rgba(232,136,12,0.05)" : tags.length ? "rgba(255,255,255,0.02)" : undefined }}>
@@ -193,10 +198,11 @@ export default function HeatingSystemPanel({
                           <span style={{ fontStyle: s.isBaseline ? "italic" : undefined, color: s.isBaseline ? white(0.7) : "#fff" }}>{s.shortName}</span>
                           {(() => {
                             const sys = catalogue.systems.find((x) => x.id === s.id);
-                            const what = SYSTEM_EXPLAIN[s.id] ?? sys?.name ?? s.shortName;
+                            const explain = SYSTEM_EXPLAIN[s.id];
+                            const what = explain ? t(explain) : sys?.name ?? s.shortName;
                             const eff = s.spf >= 1.5
-                              ? `SPF ${s.spf.toFixed(1)}: each kWh of energy bought gives about ${s.spf.toFixed(1)} kWh of heat.`
-                              : `Efficiency ${Math.round(s.spf * 100)}%: each kWh of energy bought gives about ${s.spf.toFixed(2)} kWh of heat.`;
+                              ? t("SPF {spf}: each kWh of energy bought gives about {spf} kWh of heat.", { spf: s.spf.toFixed(1) })
+                              : t("Efficiency {pct}%: each kWh of energy bought gives about {v} kWh of heat.", { pct: Math.round(s.spf * 100), v: s.spf.toFixed(2) });
                             const tip = [what, eff, sys?.note].filter(Boolean).join("\n\n");
                             return (
                               <span title={tip} aria-label={tip} tabIndex={0} onClick={(e) => e.stopPropagation()}
@@ -205,12 +211,12 @@ export default function HeatingSystemPanel({
                               </span>
                             );
                           })()}
-                          {s.isBaseline && <span style={{ fontSize: 8.5, color: "#E8880C" }}>baseline</span>}
-                          {tags.map((t) => {
-                            const p = PICKS[t];
+                          {s.isBaseline && <span style={{ fontSize: 8.5, color: "#E8880C" }}>{t("baseline")}</span>}
+                          {tags.map((tag) => {
+                            const p = PICKS[tag];
                             if (!p) return null;
                             return (
-                              <span key={t} style={{ fontSize: 8.5, fontWeight: 800, padding: "1px 6px", borderRadius: 99, color: p.fg, background: `${p.fg}22` }}>★ {p.label}</span>
+                              <span key={tag} style={{ fontSize: 8.5, fontWeight: 800, padding: "1px 6px", borderRadius: 99, color: p.fg, background: `${p.fg}22` }}>★ {t(p.label)}</span>
                             );
                           })}
                         </div>
@@ -231,14 +237,14 @@ export default function HeatingSystemPanel({
           {/* Assumptions & sources */}
           <button onClick={() => setShowSources((v) => !v)}
             style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: 0, color: white(0.5), cursor: "pointer", fontSize: 11 }}>
-            <Info size={13} /> Assumptions &amp; sources — edit values {showSources ? "▲" : "▼"}
+            <Info size={13} /> {t("Assumptions & sources — edit values")} {showSources ? "▲" : "▼"}
           </button>
           {edited && (
             <span style={{ marginLeft: 10, fontSize: 10.5, color: "#E8880C" }}>
-              Using your own values (orange boxes).{" "}
+              {t("Using your own values (orange boxes).")}{" "}
               <button onClick={() => setOverrides(() => ({}))}
                 style={{ background: "transparent", border: 0, padding: 0, cursor: "pointer", color: "#4ECDC4", fontSize: 10.5, textDecoration: "underline" }}>
-                Reset to defaults
+                {t("Reset to defaults")}
               </button>
             </span>
           )}
@@ -248,16 +254,16 @@ export default function HeatingSystemPanel({
             return (
             <div style={{ marginTop: 8, fontSize: 10.5, color: white(0.45), lineHeight: 1.6, display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ color: white(0.5) }}>
-                Change any value and press Enter (or click away) — the table above recalculates. Empty a box to go back to its default.
+                {t("Change any value and press Enter (or click away) — the table above recalculates. Empty a box to go back to its default.")}
               </div>
               <div>
-                <b style={{ color: white(0.6) }}>Energy carriers</b>
+                <b style={{ color: white(0.6) }}>{t("Energy carriers")}</b>
                 <table style={{ borderCollapse: "collapse", marginTop: 4 }}>
                   <thead><tr>
                     <th style={{ ...ths, textAlign: "left" }}></th>
-                    <th style={ths}>Price ({cur}/kWh)</th>
-                    <th style={ths}>Carbon (g CO₂e/kWh)</th>
-                    <th style={{ ...ths, textAlign: "left" }}>Source of the default</th>
+                    <th style={ths}>{t("Price ({cur}/kWh)", { cur })}</th>
+                    <th style={ths}>{t("Carbon (g CO₂e/kWh)")}</th>
+                    <th style={{ ...ths, textAlign: "left" }}>{t("Source of the default")}</th>
                   </tr></thead>
                   <tbody>
                     {Object.entries(baseCatalogue.carriers).filter(([, c]) => !!c).map(([key, def]) => {
@@ -276,15 +282,15 @@ export default function HeatingSystemPanel({
                 </table>
               </div>
               <div>
-                <b style={{ color: white(0.6) }}>Systems</b>
+                <b style={{ color: white(0.6) }}>{t("Systems")}</b>
                 <table style={{ borderCollapse: "collapse", marginTop: 4 }}>
                   <thead><tr>
                     <th style={{ ...ths, textAlign: "left" }}></th>
-                    <th style={ths} title="Seasonal performance factor (heat pumps) or efficiency. The low/high band used for robustness moves with it.">SPF / eff.</th>
-                    <th style={ths}>Install, fixed ({cur})</th>
-                    <th style={ths}>Install per kW ({cur}/kW)</th>
-                    <th style={ths}>Life (yr)</th>
-                    <th style={{ ...ths, textAlign: "left" }}>Source of the default</th>
+                    <th style={ths} title={t("Seasonal performance factor (heat pumps) or efficiency. The low/high band used for robustness moves with it.")}>{t("SPF / eff.")}</th>
+                    <th style={ths}>{t("Install, fixed ({cur})", { cur })}</th>
+                    <th style={ths}>{t("Install per kW ({cur}/kW)", { cur })}</th>
+                    <th style={ths}>{t("Life (yr)")}</th>
+                    <th style={{ ...ths, textAlign: "left" }}>{t("Source of the default")}</th>
                   </tr></thead>
                   <tbody>
                     {baseCatalogue.systems.map((def) => {
@@ -292,7 +298,7 @@ export default function HeatingSystemPanel({
                       return (
                         <tr key={def.id} style={{ borderTop: `1px solid ${white(0.06)}` }}>
                           <td style={{ ...tds, textAlign: "left", color: white(0.7), fontWeight: 700 }}>
-                            {def.shortName}{def.provisional ? <span style={{ fontWeight: 400, color: white(0.35) }}> (cost provisional)</span> : null}
+                            {def.shortName}{def.provisional ? <span style={{ fontWeight: 400, color: white(0.35) }}> {t("(cost provisional)")}</span> : null}
                           </td>
                           <td style={tds}><NumField value={s.spf.base} def={def.spf.base} step={0.1} width={56} onCommit={(v) => setSystem(def.id, "spfBase", v)} /></td>
                           <td style={tds}><NumField value={s.capexFixedSek} def={def.capexFixedSek} step={1000} width={84} onCommit={(v) => setSystem(def.id, "capexFixedSek", v)} /></td>
@@ -306,8 +312,8 @@ export default function HeatingSystemPanel({
                 </table>
               </div>
               <div style={{ color: white(0.4) }}>
-                Design-kW for capex uses {catalogue.eflhNote}. The low/high SPF band feeds the robustness analysis and moves
-                with the value you enter. Values marked "provisional" are ballpark figures — replace with real quotes as you validate.
+                {t("Design-kW for capex uses {note}.", { note: catalogue.eflhNote })}{" "}
+                {t("The low/high SPF band feeds the robustness analysis and moves with the value you enter. Values marked \"provisional\" are ballpark figures — replace with real quotes as you validate.")}
               </div>
             </div>
             );

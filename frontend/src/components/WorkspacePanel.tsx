@@ -9,6 +9,7 @@ import {
   Globe, MapPin, Users, User, Lock, Building2, ArrowRight,
   ChevronRight, Plus, Loader2, CheckCircle2, AlertTriangle,
 } from "lucide-react";
+import { useT, translate } from "../i18n";
 
 /* ── Home-page workspace panels ────────────────────────────────────────────────
    The toolbox selection (country, city, add a municipality, focus, access mode)
@@ -28,21 +29,22 @@ export function WorkspaceCard({ country, city, metrics, onCountry, onCity, onSta
   onStart: () => void;
 }) {
   const [accessMode, setAccessMode] = useState<"guest" | "chalmers" | "partner">("guest");
+  const t = useT();
   const def = COUNTRIES.find((c) => c.id === country)!;
   const enabledCountries = COUNTRIES.filter((c) => c.cities.some((n) => cityEnabled(c.id, n)));
   return (
     <div className="rounded-2xl p-5" style={{ background: "rgba(12,16,24,0.82)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(7px)" }}>
-      <SelectRow icon={Globe} label="Country">
+      <SelectRow icon={Globe} label={t("Country")}>
         <Select value={country} onChange={(v) => onCountry(v as CountryCode)}
-          options={enabledCountries.map((c) => ({ value: c.id, label: `${FLAG[c.id]}  ${c.name}` }))} />
+          options={enabledCountries.map((c) => ({ value: c.id, label: `${FLAG[c.id]}  ${t(c.name)}` }))} />
       </SelectRow>
 
-      <SelectRow icon={MapPin} label="City / Study Area">
+      <SelectRow icon={MapPin} label={t("City / Study Area")}>
         {def.cities.length ? (
           <Select value={city} onChange={onCity}
-            options={def.cities.filter((c) => cityEnabled(country, c)).map((c) => ({ value: c, label: `🏙  ${c}` }))} />
+            options={def.cities.filter((c) => cityEnabled(country, c)).map((c) => ({ value: c, label: `🏙  ${t(c)}` }))} />
         ) : (
-          <div className="text-sm text-white/40 px-1 py-2">No study areas available for {def.name} yet.</div>
+          <div className="text-sm text-white/40 px-1 py-2">{t("No study areas available for {country} yet.", { country: t(def.name) })}</div>
         )}
       </SelectRow>
 
@@ -52,14 +54,14 @@ export function WorkspaceCard({ country, city, metrics, onCountry, onCity, onSta
       <div className="flex items-start gap-3 mt-4">
         <span className="w-9 flex justify-center pt-2.5"><Users size={18} className="text-white/45" /></span>
         <div className="flex-1">
-          <div className="text-[13px] text-white/55 mb-2">Access mode</div>
+          <div className="text-[13px] text-white/55 mb-2">{t("Access mode")}</div>
           <div className="grid grid-cols-3 gap-2.5">
             <AccessCard active={accessMode === "guest"} onClick={() => setAccessMode("guest")}
-              icon={User} title="Guest Demo" sub="Explore as guest" />
+              icon={User} title={t("Guest Demo")} sub={t("Explore as guest")} />
             <AccessCard active={accessMode === "chalmers"} soon icon={Lock}
-              title="Chalmers Login" sub="Sign in with Chalmers" />
+              title={t("Chalmers Login")} sub={t("Sign in with Chalmers")} />
             <AccessCard active={accessMode === "partner"} soon icon={Building2}
-              title="Partner Login" sub="Sign in with partner" />
+              title={t("Partner Login")} sub={t("Sign in with partner")} />
           </div>
         </div>
       </div>
@@ -69,21 +71,21 @@ export function WorkspaceCard({ country, city, metrics, onCountry, onCity, onSta
         <button onClick={onStart}
           className="ppg-start-cta flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white transition hover:brightness-110"
           style={{ background: "linear-gradient(135deg, #6D28D9 0%, #8B5CF6 100%)", boxShadow: "0 6px 22px rgba(139,92,246,0.4)" }}>
-          Start Planning <ArrowRight size={16} />
+          {t("Start Planning")} <ArrowRight size={16} />
         </button>
       </div>
 
       {/* The selected city's dataset, in numbers */}
       {metrics.length > 0 && (
         <div className="mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-white/35 mb-2.5">{city} dataset</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-white/35 mb-2.5">{t("{city} dataset", { city: t(city) })}</div>
           <div className="grid grid-cols-3 gap-2">
             {metrics.map((m) => (
               <div key={m.label} className="flex items-center gap-2 px-3 py-2 rounded-lg"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.color, flexShrink: 0 }} />
                 <span className="text-[14px] font-bold text-white/90">{m.value}</span>
-                <span className="text-[11px] text-white/45 truncate">{m.label}</span>
+                <span className="text-[11px] text-white/45 truncate">{t(m.label)}</span>
               </div>
             ))}
           </div>
@@ -113,11 +115,12 @@ export function SeMunicipalityBuilder({ onBuilt }: { onBuilt: (name: string) => 
   const [query, setQuery] = useState("");
   const [job, setJob] = useState<{ code: string; status: BuildStatus } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const t = useT();
 
   useEffect(() => {
     fetch("/api/se/kommuner").then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d: { kommuner: Kommun[] }) => setKommuner(d.kommuner))
-      .catch(() => setErr("Municipality list unavailable (backend down?)"));
+      .catch(() => setErr(t("Municipality list unavailable (backend down?)")));
   }, []);
 
   const picked = kommuner.find((k) => k.name.toLowerCase() === query.trim().toLowerCase()) ?? null;
@@ -148,7 +151,7 @@ export function SeMunicipalityBuilder({ onBuilt }: { onBuilt: (name: string) => 
     const r = await fetch("/api/se/cities/build", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: picked.code }),
     });
-    if (!r.ok) { setErr(`Could not start the build (${r.status})`); return; }
+    if (!r.ok) { setErr(t("Could not start the build ({status})", { status: r.status })); return; }
     setJob({ code: picked.code, status: (await r.json()) as BuildStatus });
   }
 
@@ -160,15 +163,15 @@ export function SeMunicipalityBuilder({ onBuilt }: { onBuilt: (name: string) => 
   return (
     <div className="flex items-start gap-3 mb-3.5">
       <span className="w-9 flex justify-center pt-2.5"><Plus size={18} className="text-white/45" /></span>
-      <span className="w-28 text-[13px] text-white/55 flex-shrink-0 pt-2.5">Add municipality</span>
+      <span className="w-28 text-[13px] text-white/55 flex-shrink-0 pt-2.5">{t("Add municipality")}</span>
       <div className="flex-1">
         <div className="flex gap-2">
           <input list="se-kommuner" value={query} onChange={(e) => setQuery(e.target.value)} disabled={!!running}
-            placeholder="Any Swedish municipality, e.g. Ystad"
+            placeholder={t("Any Swedish municipality, e.g. Ystad")}
             className="flex-1 rounded-lg px-4 py-2.5 text-[14px] text-white focus:outline-none"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)" }} />
           <datalist id="se-kommuner">
-            {kommuner.map((k) => <option key={k.code} value={k.name}>{k.built ? "built" : `${k.epc_with_energy.toLocaleString("en-US")} EPCs`}</option>)}
+            {kommuner.map((k) => <option key={k.code} value={k.name}>{k.built ? t("built") : t("{n} EPCs", { n: k.epc_with_energy.toLocaleString("en-US") })}</option>)}
           </datalist>
           {picked?.built && !running ? (
             <button onClick={() => {
@@ -178,23 +181,23 @@ export function SeMunicipalityBuilder({ onBuilt }: { onBuilt: (name: string) => 
               }}
               className="px-4 rounded-lg text-[13px] font-semibold text-white/85"
               style={{ border: "1px solid rgba(78,205,196,0.5)", background: "rgba(78,205,196,0.10)" }}>
-              Select
+              {t("Select")}
             </button>
           ) : (
             <button onClick={build} disabled={!picked || !!running}
               className="px-4 rounded-lg text-[13px] font-bold text-white transition"
               style={{ background: picked && !running ? "linear-gradient(135deg, #6D28D9 0%, #8B5CF6 100%)" : "rgba(255,255,255,0.06)",
                        opacity: picked && !running ? 1 : 0.5, cursor: picked && !running ? "pointer" : "not-allowed" }}>
-              Build
+              {t("Build")}
             </button>
           )}
         </div>
         <div className="text-[11.5px] text-white/40 mt-1.5">
           {picked
             ? picked.built
-              ? `${picked.name} is already built.`
-              : `${picked.epc_with_energy.toLocaleString("en-US")} energy declarations. Downloads Lantmäteriet buildings, links EPCs, builds the data set and weather - about 2-5 minutes.`
-            : "Builds the buildings, energy declarations and weather for one municipality so Steps 1-5 work there."}
+              ? t("{name} is already built.", { name: picked.name })
+              : t("{n} energy declarations. Downloads Lantmäteriet buildings, links EPCs, builds the data set and weather - about 2-5 minutes.", { n: picked.epc_with_energy.toLocaleString("en-US") })
+            : t("Builds the buildings, energy declarations and weather for one municipality so Steps 1-5 work there.")}
         </div>
         {err && <div className="text-[12px] mt-2" style={{ color: "#E2483B" }}>{err}</div>}
         {st && (
@@ -204,9 +207,9 @@ export function SeMunicipalityBuilder({ onBuilt }: { onBuilt: (name: string) => 
                 : st.state === "failed" ? <AlertTriangle size={15} color="#E2483B" />
                 : <Loader2 size={15} className="animate-spin" color={ACCENT} />}
               {st.state === "done"
-                ? `${st.name} built: ${st.result?.buildings.toLocaleString("en-US")} buildings, ${st.result?.with_energy.toLocaleString("en-US")} with EPC energy`
-                : st.state === "failed" ? `Build failed: ${st.error}`
-                : (st.stage && st.stage_labels?.[st.stage]) || "Starting..."}
+                ? t("{name} built: {buildings} buildings, {withEnergy} with EPC energy", { name: st.name ?? "", buildings: st.result?.buildings.toLocaleString("en-US") ?? "", withEnergy: st.result?.with_energy.toLocaleString("en-US") ?? "" })
+                : st.state === "failed" ? t("Build failed: {error}", { error: st.error ?? "" })
+                : (st.stage && st.stage_labels?.[st.stage]) || t("Starting...")}
             </div>
             <div className="h-1.5 rounded-full overflow-hidden mt-2" style={{ background: "rgba(255,255,255,0.07)" }}>
               <div style={{ width: `${pct}%`, height: "100%", background: st.state === "failed" ? "#E2483B" : "#4ECDC4", transition: "width .5s" }} />
@@ -262,7 +265,7 @@ function AccessCard({ active, soon, icon: Icon, title, sub, onClick }: {
         opacity: soon ? 0.55 : 1, cursor: soon ? "not-allowed" : "pointer",
       }}>
       {active && <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white" style={{ background: ACCENT }}>✓</span>}
-      {soon && <span className="absolute top-1.5 right-1.5 text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}>Soon</span>}
+      {soon && <span className="absolute top-1.5 right-1.5 text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}>{translate("Soon")}</span>}
       <Icon size={17} className={active ? "" : "text-white/50"} color={active ? ACCENT : undefined} />
       <span className="text-[12px] font-semibold text-white/85">{title}</span>
       <span className="text-[10px] text-white/40 leading-tight">{sub}</span>

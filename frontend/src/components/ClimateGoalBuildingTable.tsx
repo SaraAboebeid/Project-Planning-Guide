@@ -1,5 +1,6 @@
 import { CheckCircle2 } from "lucide-react";
 import { type BuildingGoalAssessment, type GoalTier, requiredPct } from "../config/climateGoals";
+import { useT, translate } from "../i18n";
 
 /* Per-building view of the city target: every building's own goal (its baseline
  * cut by the target %), and how each package lands against it — met, how far
@@ -18,11 +19,12 @@ function cellText(reductionPct: number | null, tier: GoalTier | null, targetPct:
   if (tier === "worse") return `+${Math.abs(r)}%`;
   // how far short of the target, in percentage points
   const shortfall = targetPct - r;
-  if (tier === "below") return `−${r}% · ${shortfall}pp short`;
+  if (tier === "below") return `−${r}% · ${translate("{pp}pp short", { pp: shortfall })}`;
   return `−${r}%`;
 }
 
 export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessment }) {
+  const t = useT();
   const { goal, rows, columns } = a;
   const gray = "rgba(255,255,255,0.5)";
 
@@ -30,9 +32,8 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
     <div style={{ marginTop: 4 }}>
       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 10, lineHeight: 1.6 }}>
         {goal.kind === "absolute"
-          ? <>Every building must reach ≤ {goal.targetKwhM2} kWh/m²·yr, so each needs a different cut from its own baseline. A package "meets" the target for a building when that building gets there.</>
-          : <>Each building's own target is its baseline cut by {goal.reductionPct}%. A package "meets" the
-            target for a building when that building reaches its own −{goal.reductionPct}% line.</>}
+          ? <>{t("Every building must reach ≤ {kwh} kWh/m²·yr, so each needs a different cut from its own baseline. A package \"meets\" the target for a building when that building gets there.", { kwh: goal.targetKwhM2 ?? "" })}</>
+          : <>{t("Each building's own target is its baseline cut by {pct}%. A package \"meets\" the target for a building when that building reaches its own −{pct}% line.", { pct: goal.reductionPct })}</>}
       </div>
 
       {/* Wide matrix scrolls in its own container — never widens the page. */}
@@ -40,9 +41,9 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
         <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}>
           <thead>
             <tr>
-              <th style={thStyle("left")}>Building</th>
-              <th style={thStyle("right")}>Baseline</th>
-              <th style={thStyle("right")}>{goal.kind === "absolute" ? `Goal ≤ ${goal.targetKwhM2}` : `Goal −${goal.reductionPct}%`}</th>
+              <th style={thStyle("left")}>{t("Building")}</th>
+              <th style={thStyle("right")}>{t("Baseline")}</th>
+              <th style={thStyle("right")}>{goal.kind === "absolute" ? t("Goal ≤ {kwh}", { kwh: goal.targetKwhM2 ?? "" }) : t("Goal −{pct}%", { pct: goal.reductionPct })}</th>
               {/* "Package N" - the same numbering as the rest of the report (non-baseline
                   packages in Step 4 order); the full name is in the tooltip and the key
                   below, so a long material list never pushes the table sideways. */}
@@ -50,10 +51,10 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
                 <th key={c.label} style={thStyle("right")} title={c.label}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                     {c.color && <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color }} />}
-                    Package {i + 1}
+                    {t("Package {n}", { n: i + 1 })}
                   </span>
                   <div style={{ fontSize: 9, fontWeight: 600, color: c.met === c.total ? "#2FB477" : "rgba(255,255,255,0.35)", marginTop: 2 }}>
-                    {c.met}/{c.total} meet
+                    {t("{met}/{total} meet", { met: c.met, total: c.total })}
                   </div>
                 </th>
               ))}
@@ -95,7 +96,7 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
         {columns.map((c, i) => (
           <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }} title={c.label}>
             {c.color && <span style={{ width: 7, height: 7, borderRadius: "50%", background: c.color, flexShrink: 0 }} />}
-            <b style={{ color: "rgba(255,255,255,0.65)", flexShrink: 0 }}>Package {i + 1}</b>
+            <b style={{ color: "rgba(255,255,255,0.65)", flexShrink: 0 }}>{t("Package {n}", { n: i + 1 })}</b>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
           </div>
         ))}
@@ -103,10 +104,10 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
 
       {/* Legend */}
       <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
-        <Legend color="#2FB477" label={goal.kind === "absolute" ? `Meets target (≤ ${goal.targetKwhM2} kWh/m²·yr)` : `Meets target (≥ −${goal.reductionPct}%)`} />
-        <Legend color="#E8880C" label="Below target (reduces, not enough)" />
-        <Legend color="#E2483B" label="No reduction vs baseline" />
-        <span style={{ marginLeft: "auto", opacity: 0.7 }}>values in kWh/m²·yr · pp = percentage points short</span>
+        <Legend color="#2FB477" label={goal.kind === "absolute" ? t("Meets target (≤ {kwh} kWh/m²·yr)", { kwh: goal.targetKwhM2 ?? "" }) : t("Meets target (≥ −{pct}%)", { pct: goal.reductionPct })} />
+        <Legend color="#E8880C" label={t("Below target (reduces, not enough)")} />
+        <Legend color="#E2483B" label={t("No reduction vs baseline")} />
+        <span style={{ marginLeft: "auto", opacity: 0.7 }}>{t("values in kWh/m²·yr · pp = percentage points short")}</span>
       </div>
     </div>
   );

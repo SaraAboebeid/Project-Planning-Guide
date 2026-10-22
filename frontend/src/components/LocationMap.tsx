@@ -30,6 +30,7 @@ import type { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapPin, Search, Square, PenTool, X, Maximize2, Minimize2 } from "lucide-react";
 import { countryCodeFromName, mapCenterFor, seCityId } from "../config/countryNav";
+import { useT } from "../i18n";
 
 // ── Fix Leaflet default icon paths broken by Vite bundling ──────────────────
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -439,6 +440,7 @@ function AddressInput({
   placeholder?: string;
   countryCode?: string;
 }) {
+  const t = useT();
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<number | null>(null);
@@ -500,7 +502,7 @@ function AddressInput({
               setOpen(false);
             }
           }}
-          placeholder={placeholder ?? "Type an address in Sweden…"}
+          placeholder={placeholder ?? t("Type an address in Sweden…")}
           autoComplete="off"
           className="w-full rounded-lg border border-white/15 bg-white/5 text-white placeholder:text-white/40 pl-9 pr-9 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal"
         />
@@ -511,7 +513,7 @@ function AddressInput({
             type="button"
             onMouseDown={(e) => { e.preventDefault(); setQuery(""); onChange(""); setOpen(false); }}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            title="Clear"
+            title={t("Clear")}
           >
             <X size={15} />
           </button>
@@ -551,11 +553,11 @@ function AddressInput({
             </ul>
           ) : error ? (
             <div className="px-3 py-2.5 text-xs" style={{ color: "#b45309", background: "#fffbeb" }}>
-              Search is temporarily unavailable (rate-limited). Wait a moment and try again.
+              {t("Search is temporarily unavailable (rate-limited). Wait a moment and try again.")}
             </div>
           ) : loading ? null : (
             <div className="px-3 py-2.5 text-xs" style={{ color: "#6b7280" }}>
-              No matches for “{trimmed}”. Try a street or area name, or add the city.
+              {t("No matches for “{q}”. Try a street or area name, or add the city.", { q: trimmed })}
             </div>
           )}
         </div>
@@ -605,6 +607,7 @@ export default function LocationMap({
   buildingListCsvMessage,
   onLocationValidityChange,
 }: LocationMapProps) {
+  const t = useT();
   const isBuilding = scale === "Building";
   const countryCode = countryCodeFromName(country);
   const mapCenter = mapCenterFor(countryCode, city);
@@ -624,8 +627,8 @@ export default function LocationMap({
         ? `/api/${countryCode === "be" ? "be" : "uk"}/coverage?city=${encodeURIComponent(city)}`
         : null;
   const coverageName = isGothenburg
-    ? "the Gothenburg municipality"
-    : city === "Liège" ? "the Liège municipality" : `the ${city ?? ""} area with building data`;
+    ? t("the Gothenburg municipality")
+    : city === "Liège" ? t("the Liège municipality") : t("the {city} area with building data", { city: city ?? "" });
   const [boundary, setBoundary] = useState<BoundaryFeature | null>(null);
   const [districtBoundary, setDistrictBoundary] = useState<BoundaryFeature | null>(null);
 
@@ -782,10 +785,10 @@ export default function LocationMap({
     if (outside.length > 0) {
       const anyArea = outside.some((o) => o.kind === "area");
       const msg = anyArea
-        ? `The selected area is outside ${coverageName}.`
+        ? t("The selected area is outside {area}.", { area: coverageName })
         : addrPts.length > 1
-          ? `${outside.length} of ${addrPts.length} addresses are outside ${coverageName}.`
-          : `This address is outside ${coverageName}.`;
+          ? t("{n} of {total} addresses are outside {area}.", { n: outside.length, total: addrPts.length, area: coverageName })
+          : t("This address is outside {area}.", { area: coverageName });
       onLocationValidityChange?.(false, msg);
     } else {
       onLocationValidityChange?.(true, null);
@@ -954,29 +957,29 @@ export default function LocationMap({
                     }`}
                   >
                     <Icon size={15} className={active ? "text-purple-600" : ""} />
-                    {m.label}
+                    {t(m.label)}
                   </button>
                 );
               })}
             </div>
             <p className="text-xs text-gray-500 mt-1.5">
-              {LOCATION_MODES.find((m) => m.key === locationMode)?.desc}
+              {t(LOCATION_MODES.find((m) => m.key === locationMode)?.desc ?? "")}
             </p>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-[#0b1118] p-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Building list CSV</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">{t("Building list CSV")}</div>
               <div className="flex items-center gap-2 ml-auto">
               <button
                 type="button"
                 onClick={() => setCsvHelpOpen((v) => !v)}
                 className="text-[11px] text-white/45 hover:text-white/80 underline underline-offset-2"
               >
-                {csvHelpOpen ? "Hide format" : "File format"}
+                {csvHelpOpen ? t("Hide format") : t("File format")}
               </button>
               <label className="flex items-center gap-2 rounded-lg border border-[#4ECDC4]/50 bg-[#4ECDC4]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[#A8F3EA] hover:bg-[#4ECDC4]/20 cursor-pointer">
-                <span>Upload CSV</span>
+                <span>{t("Upload CSV")}</span>
                 <input
                   type="file"
                   accept=".csv,.txt,text/csv,text/plain"
@@ -996,10 +999,10 @@ export default function LocationMap({
             {csvHelpOpen && (
               <>
                 <p className="mt-2 text-[11px] text-white/50">
-                  One row per building. Use a column named <span className="font-mono text-emerald-300">Address</span> or put one address per line. Excel: save as CSV first.
+                  {t("One row per building. Use a column named")} <span className="font-mono text-emerald-300">Address</span> {t("or put one address per line. Excel: save as CSV first.")}
                 </p>
                 <div className="mt-2 text-[10.5px] text-white/60 rounded-md border border-white/10 bg-[#0d1117] p-2.5 leading-relaxed">
-                  <div><b className="text-white/75">CSV format:</b> <span className="font-mono text-emerald-300">Address,Name</span></div>
+                  <div><b className="text-white/75">{t("CSV format:")}</b> <span className="font-mono text-emerald-300">Address,Name</span></div>
                   <div className="mt-1 font-mono text-[10px] text-emerald-300/90 whitespace-pre">Address,Name
 Storgatan 1,Gothenburg
 Kungsgatan 10,Göteborg</div>
@@ -1022,12 +1025,12 @@ Kungsgatan 10,Göteborg</div>
             onGeocode={() => {}}
             onSelectResult={selectAreaFromResult}
             countryCode={countryCode}
-            placeholder="Search a street or area, e.g. Jättestensgatan or Lindholmen…"
+            placeholder={t("Search a street or area, e.g. Jättestensgatan or Lindholmen…")}
           />
           {areaLabel ? (
             <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 flex items-center gap-3 flex-wrap">
               <span>
-                ✓ <strong>{areaLabel}</strong> — every building inside its bounds is selected.
+                ✓ <strong>{areaLabel}</strong> — {t("every building inside its bounds is selected.")}
               </span>
               <button
                 onClick={() => {
@@ -1035,13 +1038,12 @@ Kungsgatan 10,Göteborg</div>
                 }}
                 className="ml-auto px-2.5 py-1 rounded-md border border-white/15 text-white/70 text-xs font-medium hover:border-white/30"
               >
-                Clear
+                {t("Clear")}
               </button>
             </div>
           ) : (
             <p className="text-xs text-white/50">
-              Picks the whole street or area, not a single building. Fine-tune afterwards by
-              unticking buildings in Step 2.
+              {t("Picks the whole street or area, not a single building. Fine-tune afterwards by unticking buildings in Step 2.")}
             </p>
           )}
         </div>
@@ -1067,8 +1069,8 @@ Kungsgatan 10,Göteborg</div>
                 countryCode={countryCode}
                 placeholder={
                   isBuilding
-                    ? `Address ${i + 1} in ${country ?? "Sweden"} — type to search`
-                    : `Address ${i + 1} — type to search`
+                    ? t("Address {n} in {country} — type to search", { n: i + 1, country: t(country ?? "Sweden") })
+                    : t("Address {n} — type to search", { n: i + 1 })
                 }
               />
               {addressInputs.length > 1 && (
@@ -1089,7 +1091,7 @@ Kungsgatan 10,Göteborg</div>
             }}
             className="text-sm text-teal hover:underline"
           >
-            + Add another building
+            + {t("Add another building")}
           </button>
         </div>
       )}
@@ -1100,8 +1102,8 @@ Kungsgatan 10,Göteborg</div>
           <span>🖱️</span>
           <span>
             {bboxDone
-              ? "Area drawn. Drag handles to resize, drag the center to move, or click Redraw to draw a new box."
-              : "Click and drag on the map to draw your area."}
+              ? t("Area drawn. Drag handles to resize, drag the center to move, or click Redraw to draw a new box.")
+              : t("Click and drag on the map to draw your area.")}
           </span>
           {bboxDone && (
             <>
@@ -1109,13 +1111,13 @@ Kungsgatan 10,Göteborg</div>
                 onClick={() => resetBbox(true)}
                 className="ml-auto text-xs text-teal hover:underline whitespace-nowrap"
               >
-                Redraw
+                {t("Redraw")}
               </button>
               <button
                 onClick={() => resetBbox(false)}
                 className="text-xs text-white/70 hover:underline whitespace-nowrap"
               >
-                Clear
+                {t("Clear")}
               </button>
             </>
           )}
@@ -1125,10 +1127,10 @@ Kungsgatan 10,Göteborg</div>
       {/* Bbox coordinates summary — only when finalized */}
       {isBuilding && locationMode === "bbox" && bboxDone && bbox && (
         <div className="grid grid-cols-2 gap-2 text-xs text-white/70 bg-white/5 border border-white/10 rounded-lg px-3 py-2.5">
-          <div><span className="font-medium">North:</span> {bbox.north.toFixed(5)}°</div>
-          <div><span className="font-medium">South:</span> {bbox.south.toFixed(5)}°</div>
-          <div><span className="font-medium">East:</span> {bbox.east.toFixed(5)}°</div>
-          <div><span className="font-medium">West:</span> {bbox.west.toFixed(5)}°</div>
+          <div><span className="font-medium">{t("North:")}</span> {bbox.north.toFixed(5)}°</div>
+          <div><span className="font-medium">{t("South:")}</span> {bbox.south.toFixed(5)}°</div>
+          <div><span className="font-medium">{t("East:")}</span> {bbox.east.toFixed(5)}°</div>
+          <div><span className="font-medium">{t("West:")}</span> {bbox.west.toFixed(5)}°</div>
         </div>
       )}
 
@@ -1144,7 +1146,7 @@ Kungsgatan 10,Göteborg</div>
         : "rounded-xl overflow-hidden border border-gray-200"}>
         {mapMaximized && (
           <div className="flex items-center gap-2 flex-wrap px-3 py-2 border-b border-white/10">
-            <span className="text-sm font-semibold text-white mr-1">Select your area</span>
+            <span className="text-sm font-semibold text-white mr-1">{t("Select your area")}</span>
             {isBuilding && LOCATION_MODES.filter((m) => m.key === "bbox" || m.key === "polygon").map((m) => {
               const active = locationMode === m.key;
               const Icon = m.icon;
@@ -1153,38 +1155,38 @@ Kungsgatan 10,Göteborg</div>
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition ${
                     active ? "bg-[var(--brand-deep)]/35 border-[var(--brand-deep)] text-white" : "border-white/15 text-white/65 hover:text-white hover:border-white/30"}`}>
                   <Icon size={13} />
-                  {m.label}
+                  {t(m.label)}
                 </button>
               );
             })}
             <span className="text-xs text-white/55">
               {!isBuilding
-                ? "Pan and zoom to explore the area."
+                ? t("Pan and zoom to explore the area.")
                 : locationMode === "bbox"
-                  ? (bboxDone ? "Area drawn. Drag the handles to resize or the centre to move." : "Click and drag on the map to draw your area.")
+                  ? (bboxDone ? t("Area drawn. Drag the handles to resize or the centre to move.") : t("Click and drag on the map to draw your area."))
                   : locationMode === "polygon"
-                    ? "Click on the map to drop each corner of your area."
-                    : "Choose Draw box or Draw shape to select an area."}
+                    ? t("Click on the map to drop each corner of your area.")
+                    : t("Choose Draw box or Draw shape to select an area.")}
             </span>
             {isBuilding && locationMode === "bbox" && bboxDone && (
               <span className="flex gap-3">
-                <button onClick={() => resetBbox(true)} className="text-xs text-teal hover:underline">Redraw</button>
-                <button onClick={() => resetBbox(false)} className="text-xs text-white/70 hover:underline">Clear</button>
+                <button onClick={() => resetBbox(true)} className="text-xs text-teal hover:underline">{t("Redraw")}</button>
+                <button onClick={() => resetBbox(false)} className="text-xs text-white/70 hover:underline">{t("Clear")}</button>
               </span>
             )}
             <button onClick={() => setMapMaximized(false)}
               className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-lg bg-teal text-white text-xs font-semibold hover:brightness-110">
               <Minimize2 size={13} />
-              Done
+              {t("Done")}
             </button>
           </div>
         )}
         <div className={mapMaximized ? "relative flex-1 min-h-0" : "relative h-64"}>
         {!mapMaximized && (
-          <button type="button" onClick={() => setMapMaximized(true)} title="Maximize the map"
+          <button type="button" onClick={() => setMapMaximized(true)} title={t("Maximize the map")}
             className="absolute top-2 right-2 z-[1000] flex items-center gap-1.5 px-3 py-1 rounded-lg bg-teal text-white text-xs font-semibold shadow hover:brightness-110">
             <Maximize2 size={13} />
-            Maximize
+            {t("Maximize")}
           </button>
         )}
         <MapContainer
@@ -1306,20 +1308,24 @@ Kungsgatan 10,Göteborg</div>
           <div className="border-t border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 flex items-center gap-3 flex-wrap">
             <span>
               {polyDone
-                ? `✓ Shape with ${polyVerts.length} points — buildings inside are selected.`
+                ? t("✓ Shape with {n} points — buildings inside are selected.", { n: polyVerts.length })
                 : polyVerts.length === 0
-                ? "Click on the map to drop each corner of your area."
-                : `${polyVerts.length} point${polyVerts.length > 1 ? "s" : ""} added${polyVerts.length >= 3 ? " — click “Finish shape” to close it." : " (need at least 3)."}`}
+                ? t("Click on the map to drop each corner of your area.")
+                : polyVerts.length >= 3
+                  ? t("{n} points added — click “Finish shape” to close it.", { n: polyVerts.length })
+                  : polyVerts.length > 1
+                    ? t("{n} points added (need at least 3).", { n: polyVerts.length })
+                    : t("{n} point added (need at least 3).", { n: polyVerts.length })}
             </span>
             <span className="flex gap-2 ml-auto">
               {!polyDone && polyVerts.length >= 3 && (
                 <button onClick={finishPolygon} className="px-2.5 py-1 rounded-md bg-teal text-white text-xs font-semibold hover:brightness-110">
-                  Finish shape
+                  {t("Finish shape")}
                 </button>
               )}
               {polyVerts.length > 0 && (
                 <button onClick={clearPolygon} className="px-2.5 py-1 rounded-md border border-white/15 text-white/70 text-xs font-medium hover:border-white/30">
-                  Clear
+                  {t("Clear")}
                 </button>
               )}
             </span>

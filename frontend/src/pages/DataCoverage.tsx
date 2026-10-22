@@ -9,6 +9,7 @@ import RetrofitPriorityPanel from "../components/RetrofitPriorityPanel";
 import ModelScopeNotice from "../components/ModelScopeNotice";
 import { buildingUseLabel } from "../utils/useLabels";
 import { makeBuildingKeys, type PriorityInput } from "../utils/retrofitPriority";
+import { useT, translate } from "../i18n";
 import {
   ChevronUp, ChevronDown,
   Download, Upload, Plus, Pencil, MapPin, Building2, Loader2, Layers, Globe2, Database,
@@ -804,6 +805,7 @@ const SINGLE_NUMERIC = new Set<string>(["year", "floors", "height", "footprint_m
    is forgiving (many header aliases, any subset of columns), so this shows the
    common shape rather than a rigid schema. */
 function ImportFormatGuide() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const cell = "font-mono text-[10px] text-emerald-300/90 bg-black/40 rounded p-2 overflow-x-auto whitespace-pre";
   return (
@@ -812,33 +814,32 @@ function ImportFormatGuide() {
         onClick={() => setOpen(o => !o)}
         className="text-[10.5px] font-semibold text-violet-300 hover:text-violet-200 transition"
       >
-        {open ? "▾" : "▸"} How should my CSV or JSON look?
+        {open ? "▾" : "▸"} {t("How should my CSV or JSON look?")}
       </button>
       {open && (
         <div className="mt-1.5 rounded-md border border-white/10 bg-[#0d1117] p-2.5 text-[10.5px] text-white/60 space-y-2.5 leading-relaxed">
           <div>
-            <b className="text-white/75">One row per building.</b> Include only the columns you actually have — any you leave
-            out just stay as they are. Rows are matched to a building by its <b className="text-white/75">Address</b>; for a
-            single building, the first row is used if no address matches. Values overwrite what&apos;s shown; a blank cell is ignored.
+            <b className="text-white/75">{t("One row per building.")}</b> {t("Include only the columns you actually have — any you leave out just stay as they are. Rows are matched to a building by its")} <b className="text-white/75">Address</b>{t("; for a single building, the first row is used if no address matches. Values overwrite what's shown; a blank cell is ignored.")}
           </div>
           <div>
-            <div className="text-white/45 font-semibold mb-1">Column headers it understands (use any subset):</div>
+            <div className="text-white/45 font-semibold mb-1">{t("Column headers it understands (use any subset):")}</div>
             <div className="font-mono text-[10px] text-white/70">
               Address · Use · Year · Floors · Height (m) · Footprint (m²) · Energy class · Energy (kWh/m²) · U-wall · U-window
             </div>
-            <div className="text-white/35 mt-1">Header matching is flexible — <span className="font-mono">energy</span>, <span className="font-mono">energy_kwh_m2</span> and <span className="font-mono">Energy (kWh/m²)</span> all work.</div>
+            <div className="text-white/35 mt-1">{t("Header matching is flexible —")} <span className="font-mono">energy</span>, <span className="font-mono">energy_kwh_m2</span> {t("and")} <span className="font-mono">Energy (kWh/m²)</span> {t("all work.")}</div>
           </div>
           <div>
-            <div className="text-white/45 font-semibold mb-1">CSV example</div>
+            <div className="text-white/45 font-semibold mb-1">{t("CSV example")}</div>
             <div className={cell}>{`Address,Year,Energy (kWh/m²),U-wall,Floors
 Storgatan 1,1965,142,0.45,4`}</div>
           </div>
           <div>
-            <div className="text-white/45 font-semibold mb-1">JSON example (one object, or an array of them)</div>
+            <div className="text-white/45 font-semibold mb-1">{t("JSON example (one object, or an array of them)")}</div>
             <div className={cell}>{`{ "year": 1965, "energy": 142, "tabula_u_wall": 0.45, "floors": 4 }`}</div>
           </div>
           <div className="text-white/40">
-            <b className="text-white/60">Excel?</b> Use <b className="text-white/60">File → Save As → CSV (.csv)</b>, then import that file — spreadsheets (.xlsx) can&apos;t be read directly in the browser.
+            <b className="text-white/60">{t("Excel?")}</b> {t("Use {path}, then import that file — spreadsheets (.xlsx) can't be read directly in the browser.").split("{path}").map((part, i) =>
+              i === 0 ? <span key={i}>{part}</span> : <span key={i}><b className="text-white/60">{t("File → Save As → CSV (.csv)")}</b>{part}</span>)}
           </div>
         </div>
       )}
@@ -1003,6 +1004,7 @@ function BboxDataBanner({
   onRowsChange?: (rows: BuildingRecord[]) => void;
   onSelectionChange?: (selected: Set<number>) => void;
 }) {
+  const t = useT();
   const [loading, setLoading]         = useState(false);
   const [rows, setRows]               = useState<BuildingRecord[] | null>(null);
   const [viewOpen, setViewOpen]       = useState(false);
@@ -1186,7 +1188,7 @@ function BboxDataBanner({
   function applyImportText(text: string, sourceName: string) {
     try {
       const trimmed = text.trim();
-      if (!trimmed) { setImportMsg("Nothing to apply — paste CSV/JSON or choose a file."); return; }
+      if (!trimmed) { setImportMsg(t("Nothing to apply — paste CSV/JSON or choose a file.")); return; }
       let records: Record<string, unknown>[];
       if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
         const j = JSON.parse(text);
@@ -1196,9 +1198,9 @@ function BboxDataBanner({
       } else {
         records = parseCSV(text);
       }
-      if (!records.length) { setImportMsg("No rows found."); return; }
+      if (!records.length) { setImportMsg(t("No rows found.")); return; }
       const { byKey, fields } = normalizeImport(records);
-      if (!byKey.size) { setImportMsg("No usable rows — need an Address (or Cadastral ID) column plus data columns (e.g. Energy, Year, U-Wall)."); return; }
+      if (!byKey.size) { setImportMsg(t("No usable rows — need an Address (or Cadastral ID) column plus data columns (e.g. Energy, Year, U-Wall).")); return; }
       let matched = 0, changed = 0;
       setRows(prev => {
         if (!prev) return prev;
@@ -1219,17 +1221,17 @@ function BboxDataBanner({
       });
       const dataFields = [...fields].filter(f => f !== "address" && f !== "cadastral_id");
       setImportMsg(matched === 0
-        ? `⚠ ${sourceName}: matched 0 buildings — check that the Address / Cadastral ID values match the table.`
-        : `✓ ${sourceName}: matched ${matched} building${matched === 1 ? "" : "s"}, ${changed} value${changed === 1 ? "" : "s"} ${fillMissingOnly ? "filled" : "updated"}${dataFields.length ? " (" + dataFields.join(", ") + ")" : ""}.`);
+        ? `⚠ ${t("{src}: matched 0 buildings — check that the Address / Cadastral ID values match the table.", { src: sourceName })}`
+        : `✓ ${sourceName}: ${t(matched === 1 ? "matched {n} building" : "matched {n} buildings", { n: matched })}, ${t(changed === 1 ? "{n} value" : "{n} values", { n: changed })} ${fillMissingOnly ? t("filled") : t("updated")}${dataFields.length ? " (" + dataFields.join(", ") + ")" : ""}.`);
     } catch (e) {
-      setImportMsg("Import failed: " + (e as Error).message);
+      setImportMsg(t("Import failed") + ": " + (e as Error).message);
     }
   }
 
   async function handleImportFile(file: File) {
-    setImportMsg("Reading…");
+    setImportMsg(t("Reading…"));
     try { applyImportText(await file.text(), `"${file.name}"`); }
-    catch (e) { setImportMsg("Import failed: " + (e as Error).message); }
+    catch (e) { setImportMsg(t("Import failed") + ": " + (e as Error).message); }
   }
 
   function downloadTemplateCsv() {
@@ -1260,7 +1262,7 @@ function BboxDataBanner({
     if (editDraftRows) setRows(editDraftRows);
     setEditing(false);
     setEditDraftRows(null);
-    setImportMsg("✓ Table edits saved for this session.");
+    setImportMsg("✓ " + t("Table edits saved for this session."));
   }
 
   // Inline table editing: write one cell back into its row (numeric fields coerced,
@@ -1366,11 +1368,11 @@ function BboxDataBanner({
         <div className="flex items-center gap-3 min-w-0">
           <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
           <div>
-            <span className="text-sm font-bold text-white/85">{bboxStats.count.toLocaleString()} buildings</span>
-            <span className="text-xs text-white/35 ml-2">Bounding box</span>
+            <span className="text-sm font-bold text-white/85">{t("{n} buildings", { n: bboxStats.count.toLocaleString() })}</span>
+            <span className="text-xs text-white/35 ml-2">{t("Bounding box")}</span>
             {addrProgress && addrProgress.done < addrProgress.total && (
               <span className="text-[11px] text-white/45 ml-3">
-                Looking up addresses from OpenStreetMap… {addrProgress.done}/{addrProgress.total}
+                {t("Looking up addresses from OpenStreetMap…")} {addrProgress.done}/{addrProgress.total}
               </span>
             )}
           </div>
@@ -1381,48 +1383,48 @@ function BboxDataBanner({
             disabled={loading || !bbox}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
-            {loading ? "Loading…" : viewOpen ? <><ChevronUp className="w-3 h-3" /> Hide</> : "Buildings"}
+            {loading ? t("Loading…") : viewOpen ? <><ChevronUp className="w-3 h-3" /> {t("Hide")}</> : t("Buildings")}
           </button>
           <button
             onClick={rows ? handleDownload : handleLoadAndDownload}
             disabled={loading || !bbox}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
-            <Download className="w-3 h-3" /> Export
+            <Download className="w-3 h-3" /> {t("Export")}
           </button>
           {/* Selection drives what carries into Steps 3-4, so the two bulk
               actions belong next to Export rather than only inside the table. */}
           <button
             onClick={selectAllRows}
             disabled={!rows || !rows.length}
-            title="Select every loaded building"
+            title={t("Select every loaded building")}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
-            Select all
+            {t("Select all")}
           </button>
           <button
             onClick={clearSelection}
             disabled={selected.size === 0}
-            title="Clear the current selection"
+            title={t("Clear the current selection")}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
-            Clear
+            {t("Clear")}
           </button>
           <button
             onClick={() => setAddOpen(o => !o)}
-            title="Open guided add-data panel: template, upload, paste, and formatting help"
+            title={t("Open guided add-data panel: template, upload, paste, and formatting help")}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 whitespace-nowrap transition"
           >
-            <Plus className="w-3.5 h-3.5" /> Add Data
+            <Plus className="w-3.5 h-3.5" /> {t("Add Data")}
           </button>
           {!editing ? (
             <button
               onClick={startEditMode}
               disabled={!rows || loading}
-              title="Edit the current table values and save them for this session"
+              title={t("Edit the current table values and save them for this session")}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/60 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
             >
-              <Pencil className="w-3 h-3" /> Edit Table
+              <Pencil className="w-3 h-3" /> {t("Edit Table")}
             </button>
           ) : (
             <>
@@ -1430,30 +1432,32 @@ function BboxDataBanner({
                 onClick={saveEditMode}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold bg-emerald-700/30 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-700/45 whitespace-nowrap transition"
               >
-                Save changes
+                {t("Save changes")}
               </button>
               <button
                 onClick={cancelEditMode}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 whitespace-nowrap transition"
               >
-                Cancel
+                {t("Cancel")}
               </button>
             </>
           )}
           <a
             href={viewer3dUrl}
             target="_blank" rel="noopener noreferrer"
-            title={selected.size > 0 ? `Open the 3D viewer on the ${selected.size} selected building${selected.size === 1 ? "" : "s"}` : "Open the 3D viewer on this selection"}
+            title={selected.size > 0
+              ? (selected.size === 1 ? t("Open the 3D viewer on the {n} selected building", { n: selected.size }) : t("Open the 3D viewer on the {n} selected buildings", { n: selected.size }))
+              : t("Open the 3D viewer on this selection")}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-purple-400 hover:bg-purple-900/30 whitespace-nowrap transition"
           >
-            <Globe2 className="w-3 h-3" /> 3D view
+            <Globe2 className="w-3 h-3" /> {t("3D view")}
           </a>
         </div>
       </div>
 
       {importMsg && (
         <div className="px-4 py-2 border-t border-white/8 text-[11px]">
-          <span className={`${importMsg.startsWith("✓") ? "text-emerald-400" : importMsg.startsWith("⚠") ? "text-amber-400" : importMsg.startsWith("Import failed") ? "text-red-400" : "text-white/40"}`}>
+          <span className={`${importMsg.startsWith("✓") ? "text-emerald-400" : importMsg.startsWith("⚠") ? "text-amber-400" : importMsg.startsWith(t("Import failed")) ? "text-red-400" : "text-white/40"}`}>
             {importMsg}
           </span>
         </div>
@@ -1465,13 +1469,13 @@ function BboxDataBanner({
           <div className="w-full max-w-3xl rounded-xl border border-white/12 bg-[#0d1117] shadow-2xl shadow-black/60">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
               <div>
-                <div className="text-sm font-semibold text-white/90">Add Data</div>
-                <div className="text-[11px] text-white/45">Import CSV/JSON with a clear guided flow</div>
+                <div className="text-sm font-semibold text-white/90">{t("Add Data")}</div>
+                <div className="text-[11px] text-white/45">{t("Import CSV/JSON with a clear guided flow")}</div>
               </div>
               <button
                 onClick={() => setAddOpen(false)}
                 className="px-2 py-1 rounded text-white/45 hover:text-white/80 hover:bg-white/10 transition"
-                title="Close"
+                title={t("Close")}
               >
                 ×
               </button>
@@ -1479,15 +1483,13 @@ function BboxDataBanner({
 
             <div className="px-4 py-3 space-y-3">
               <div className="text-[10px] text-white/40 bg-violet-950/20 border border-violet-800/30 rounded-md px-2.5 py-1.5 leading-relaxed">
-                <b className="text-violet-300">Where do my edits go?</b> Changes are kept in <b className="text-white/60">your browser session</b> and
-                become the numbers Steps 3–4 (simulation &amp; results) use. They are <b className="text-white/60">not written back</b> to the
-                cadastral / EUBUCCO / EPC source data, and don&apos;t affect other users. Closing the tab clears them.
+                <b className="text-violet-300">{t("Where do my edits go?")}</b> {t("Changes are kept in")} <b className="text-white/60">{t("your browser session")}</b> {t("and become the numbers Steps 3–4 (simulation & results) use. They are")} <b className="text-white/60">{t("not written back")}</b> {t("to the cadastral / EUBUCCO / EPC source data, and don't affect other users. Closing the tab clears them.")}
               </div>
 
               <div className="text-[11px] text-white/65">
-                1. Download a template or open the format guide.
-                2. Import your CSV/JSON file.
-                3. Use Edit Table outside this dialog if you prefer direct cell editing.
+                {t("1. Download a template or open the format guide.")}
+                {" "}{t("2. Import your CSV/JSON file.")}
+                {" "}{t("3. Use Edit Table outside this dialog if you prefer direct cell editing.")}
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
@@ -1495,13 +1497,13 @@ function BboxDataBanner({
                   onClick={downloadTemplateCsv}
                   className="px-3 py-1.5 rounded-md text-[11px] font-semibold bg-white/8 text-white/75 hover:bg-white/12 transition"
                 >
-                  Download CSV template
+                  {t("Download CSV template")}
                 </button>
                 <label
-                  title="Upload your own CSV or JSON to overwrite or fill missing data — matched by Address or Cadastral ID"
+                  title={t("Upload your own CSV or JSON to overwrite or fill missing data — matched by Address or Cadastral ID")}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold text-violet-200 bg-violet-600/20 ring-1 ring-violet-500/60 hover:bg-violet-600/35 hover:text-white whitespace-nowrap transition cursor-pointer"
                 >
-                  <Upload className="w-3 h-3" /> Drop / choose file
+                  <Upload className="w-3 h-3" /> {t("Drop / choose file")}
                   <input
                     type="file" accept=".csv,.json,text/csv,application/json"
                     style={{ display: "none" }}
@@ -1515,14 +1517,14 @@ function BboxDataBanner({
                   onClick={() => setShowPaste(v => !v)}
                   className="text-[11px] font-medium text-violet-300 hover:text-violet-200 transition"
                 >
-                  {showPaste ? "Hide manual paste" : "Paste data manually"}
+                  {showPaste ? t("Hide manual paste") : t("Paste data manually")}
                 </button>
                 <ImportFormatGuide />
               </div>
 
               {showPaste && (
                 <>
-                  <div className="text-[10px] text-white/35">Paste CSV / JSON (same columns as Export; rows matched by Address / Cadastral ID):</div>
+                  <div className="text-[10px] text-white/35">{t("Paste CSV / JSON (same columns as Export; rows matched by Address / Cadastral ID):")}</div>
                   <textarea
                     value={pasteText}
                     onChange={e => setPasteText(e.target.value)}
@@ -1532,11 +1534,11 @@ function BboxDataBanner({
                   />
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
-                      onClick={() => applyImportText(pasteText, "pasted data")}
+                      onClick={() => applyImportText(pasteText, t("pasted data"))}
                       disabled={!pasteText.trim()}
                       className="px-3 py-1.5 rounded-md text-[11px] font-semibold bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition"
-                    >Apply pasted data</button>
-                    <button onClick={() => setPasteText("")} className="px-3 py-1.5 rounded-md text-[11px] text-white/45 hover:bg-white/8 transition">Clear</button>
+                    >{t("Apply pasted data")}</button>
+                    <button onClick={() => setPasteText("")} className="px-3 py-1.5 rounded-md text-[11px] text-white/45 hover:bg-white/8 transition">{t("Clear")}</button>
                   </div>
                 </>
               )}
@@ -1546,7 +1548,7 @@ function BboxDataBanner({
                   onClick={() => setAddOpen(false)}
                   className="px-3 py-1.5 rounded-md text-[11px] font-medium text-white/60 hover:bg-white/8 transition"
                 >
-                  Done
+                  {t("Done")}
                 </button>
               </div>
             </div>
@@ -1555,17 +1557,17 @@ function BboxDataBanner({
                 onClick={selectAllRows}
                 disabled={!rows || allRowsChecked}
                 className="px-3 py-1.5 rounded-md border border-white/10 text-[11px] font-medium text-white/70 hover:bg-white/8 disabled:opacity-35 disabled:hover:bg-transparent transition"
-                title="Select every building in the table"
+                title={t("Select every building in the table")}
               >
-                Select all
+                {t("Select all")}
               </button>
               <button
                 onClick={clearSelection}
                 disabled={selected.size === 0}
                 className="px-3 py-1.5 rounded-md border border-white/10 text-[11px] font-medium text-white/70 hover:bg-white/8 disabled:opacity-35 disabled:hover:bg-transparent transition"
-                title="Clear the current selection"
+                title={t("Clear the current selection")}
               >
-                Clear
+                {t("Clear")}
               </button>
             </div>
           </div>
@@ -1576,8 +1578,8 @@ function BboxDataBanner({
       {loading && !rows && (
         <div className="border-t border-white/10 flex flex-col items-center justify-center gap-3 py-12">
           <Loader2 className="w-9 h-9 text-purple-400 animate-spin" />
-          <div className="text-sm font-semibold text-white/70">Loading buildings…</div>
-          <div className="text-xs text-white/35">Fetching {bboxStats.count.toLocaleString()} buildings in the selected area</div>
+          <div className="text-sm font-semibold text-white/70">{t("Loading buildings…")}</div>
+          <div className="text-xs text-white/35">{t("Fetching {n} buildings in the selected area", { n: bboxStats.count.toLocaleString() })}</div>
         </div>
       )}
 
@@ -1586,9 +1588,9 @@ function BboxDataBanner({
         <div className="border-t border-white/10">
           {/* Row count */}
           <div className="flex items-center gap-2 px-4 pt-2 pb-1 text-[10px] text-white/40">
-            <span className="text-white/45">↕ Tip: click a column header to sort — click again to flip high ↔ low.</span>
+            <span className="text-white/45">{t("↕ Tip: click a column header to sort — click again to flip high ↔ low.")}</span>
             <span className="ml-auto text-gray-400">
-              Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)} of {rows.length}
+              {t("Showing {a}–{b} of {n}", { a: page * PAGE_SIZE + 1, b: Math.min((page + 1) * PAGE_SIZE, rows.length), n: rows.length })}
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -1603,7 +1605,7 @@ function BboxDataBanner({
                       ref={(el: HTMLInputElement | null) => { if (el) el.indeterminate = pagePartial; }}
                       onChange={togglePageAll}
                       className="w-3 h-3 cursor-pointer accent-violet-600"
-                      title="Select / deselect all on this page"
+                      title={t("Select / deselect all on this page")}
                     />
                   </th>
                   {BBOX_CSV_COLS.map(c => {
@@ -1611,9 +1613,9 @@ function BboxDataBanner({
                     return (
                       <th key={c.key}
                           onClick={() => toggleSort(c.key)}
-                          title="Sort by this column (click again to flip high ↔ low)"
+                          title={t("Sort by this column (click again to flip high ↔ low)")}
                           className={`px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap cursor-pointer select-none transition-colors hover:bg-white/10 hover:text-white ${active ? "text-white" : "text-white/60"}`}>
-                        {c.label}
+                        {t(c.label)}
                         <span className="ml-1 text-[9px]" style={{ opacity: active ? 1 : 0.55 }}>
                           {active ? (tableSort!.asc ? "▲" : "▼") : "↕"}
                         </span>
@@ -1624,13 +1626,13 @@ function BboxDataBanner({
                     <th
                       key={col.key}
                       className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60"
-                      title={col.title}
+                      title={t(col.title)}
                     >
-                      {col.label}
+                      {t(col.label)}
                     </th>
                   ))}
-                  <th className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60" title="Current heating system, inferred from the Boverket EPC (energideklaration)">
-                    Current heating
+                  <th className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60" title={t("Current heating system, inferred from the Boverket EPC (energideklaration)")}>
+                    {t("Current heating")}
                   </th>
                 </tr>
               </thead>
@@ -1663,11 +1665,11 @@ function BboxDataBanner({
                         const yearEstimated = r.year_source === "statbel_prior";
                         const estimateNote =
                           c.key === "energy_kwh_m2" && r.energy_source === "tabula_estimate"
-                            ? "No energy certificate for this building — typical value of its TABULA archetype (type × era), not a measurement."
+                            ? t("No energy certificate for this building — typical value of its TABULA archetype (type × era), not a measurement.")
                           : c.key === "year_built" && yearEstimated
-                            ? "No recorded construction year — drawn from Statbel's construction-period mix for this commune and building type. Indicative only."
+                            ? t("No recorded construction year — drawn from Statbel's construction-period mix for this commune and building type. Indicative only.")
                           : (c.key === "tabula_period" || c.key === "u_wall" || c.key === "u_window" || c.key === "u_roof") && yearEstimated
-                            ? "TABULA archetype value for an ESTIMATED construction era (the year is sampled from Statbel), not measured for this building."
+                            ? t("TABULA archetype value for an ESTIMATED construction era (the year is sampled from Statbel), not measured for this building.")
                           : null;
                         const estimated = present && !!estimateNote;
                         const cell = isSelected
@@ -1713,11 +1715,11 @@ function BboxDataBanner({
                           <td
                             key={col.key}
                             className={`px-2 py-1 whitespace-nowrap ${isSelected ? "" : tone}`}
-                            title={col.key === "expires" && status === "expired" ? "This certificate has expired — its energy figure may be out of date."
-                              : col.key === "expires" && status === "soon" ? "Expires within 12 months." : col.title}
+                            title={col.key === "expires" && status === "expired" ? t("This certificate has expired — its energy figure may be out of date.")
+                              : col.key === "expires" && status === "soon" ? t("Expires within 12 months.") : t(col.title)}
                             onClick={editing ? (ev => ev.stopPropagation()) : undefined}
                           >
-                            {val ?? "—"}{col.key === "expires" && status === "expired" ? " · expired" : ""}
+                            {val ?? "—"}{col.key === "expires" && status === "expired" ? ` · ${t("expired")}` : ""}
                           </td>
                         );
                       })}
@@ -1744,25 +1746,25 @@ function BboxDataBanner({
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
                 className="px-2 py-0.5 rounded border border-white/15 text-white/50 disabled:opacity-30 hover:bg-white/8"
-              >← Prev</button>
-              <span className="text-white/35">Page {page + 1} / {totalPages}</span>
+              >← {t("Prev")}</button>
+              <span className="text-white/35">{t("Page {p} / {n}", { p: page + 1, n: totalPages })}</span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                 disabled={page === totalPages - 1}
                 className="px-2 py-0.5 rounded border border-white/15 text-white/50 disabled:opacity-30 hover:bg-white/8"
-              >Next →</button>
+              >{t("Next")} →</button>
             </div>
           )}
           {/* Selection actions — shown after table rows. */}
           {selected.size > 0 && (
             <div className="flex items-center justify-end gap-3 px-4 py-2 border-t border-white/10 text-[10px]">
-              <span className="text-white/40">{selected.size} selected</span>
+              <span className="text-white/40">{t("{n} selected", { n: selected.size })}</span>
               <button
                 onClick={clearSelection}
                 className="text-gray-400 hover:text-red-500 transition"
-                title="Clear selection"
+                title={t("Clear selection")}
               >
-                ✕ Clear
+                ✕ {t("Clear")}
               </button>
             </div>
           )}
@@ -1775,15 +1777,15 @@ function BboxDataBanner({
           {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-2.5 bg-purple-900/20 border-b border-purple-700/30">
             <span className="text-xs font-bold text-purple-300">
-              Comparing {selectedRows.length} buildings — ranked best to worst
+              {t("Comparing {n} buildings — ranked best to worst", { n: selectedRows.length })}
             </span>
             <div className="flex items-center gap-3">
               <button
                 onClick={saveSelectedCsv}
                 className="flex items-center gap-1.5 text-[11px] font-medium text-purple-400 hover:text-purple-300"
-                title="Download selected buildings as CSV"
+                title={t("Download selected buildings as CSV")}
               >
-                <Download className="w-3 h-3" /> Export
+                <Download className="w-3 h-3" /> {t("Export")}
               </button>
               <button
                 onClick={() => setCompareOpen(false)}
@@ -1794,22 +1796,22 @@ function BboxDataBanner({
 
           {/* Sort-by category pills */}
           <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-purple-700/20 bg-purple-900/10">
-            <span className="text-[10px] text-white/40 mr-1">Sort by:</span>
+            <span className="text-[10px] text-white/40 mr-1">{t("Sort by:")}</span>
             {COMPARE_COLS.map(c => (
               <button
                 key={c.key}
                 onClick={() => setSortCol(c.key)}
-                title={c.betterLabel}
+                title={t(c.betterLabel)}
                 className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition ${
                   sortCol === c.key
                     ? "bg-violet-600 text-white border-violet-600 shadow-sm"
                     : "bg-white/5 text-white/50 border-white/15 hover:border-purple-500 hover:text-purple-300"
                 }`}
               >
-                {c.label}
+                {t(c.label)}
               </button>
             ))}
-            <span className="ml-1 text-[10px] text-gray-400 italic">({cfg.betterLabel})</span>
+            <span className="ml-1 text-[10px] text-gray-400 italic">({t(cfg.betterLabel)})</span>
           </div>
 
           {/* Ranked table */}
@@ -1817,19 +1819,19 @@ function BboxDataBanner({
             <table className="w-full text-[11px] border-collapse rounded-lg overflow-hidden border border-purple-700/30">
               <thead>
                 <tr className="bg-purple-900/30">
-                  <th className="px-2 py-1.5 text-left font-semibold text-purple-300 border-b border-purple-700/30 whitespace-nowrap">Address</th>
+                  <th className="px-2 py-1.5 text-left font-semibold text-purple-300 border-b border-purple-700/30 whitespace-nowrap">{t("Address")}</th>
                   {COMPARE_COLS.map(c => (
                     <th
                       key={c.key}
                       onClick={() => setSortCol(c.key)}
-                      title={c.betterLabel}
+                      title={t(c.betterLabel)}
                       className={`px-2 py-1.5 text-left font-semibold border-b border-purple-700/30 whitespace-nowrap cursor-pointer select-none transition ${
                         sortCol === c.key
                           ? "text-purple-300 bg-purple-900/40"
                           : "text-purple-400/70 hover:text-purple-300 hover:bg-purple-900/20"
                       }`}
                     >
-                      <div className="leading-tight">{c.label}{sortCol === c.key ? " ▲" : ""}</div>
+                      <div className="leading-tight">{t(c.label)}{sortCol === c.key ? " ▲" : ""}</div>
                       {c.unit && <div className="text-[8px] font-normal text-gray-400">{c.unit}</div>}
                     </th>
                   ))}
@@ -1893,6 +1895,7 @@ const BUILDING_CRITICAL: Record<string, Set<keyof BuildingLookup>> = {
 function FieldChip({
   label, value, critical,
 }: { label: string; value: string | number | null | undefined; critical: boolean }) {
+  const t = useT();
   const hasVal = value !== null && value !== undefined;
   const base = "flex flex-col px-2.5 py-2 rounded-lg border text-[11px]";
   const colors = hasVal
@@ -1903,7 +1906,7 @@ function FieldChip({
   return (
     <div className={`${base} ${colors}`}>
       <span className="font-semibold leading-tight">{hasVal ? String(value) : "—"}</span>
-      <span className="text-[10px] opacity-70 mt-0.5">{label}{critical && " ★"}</span>
+      <span className="text-[10px] opacity-70 mt-0.5">{t(label)}{critical && " ★"}</span>
     </div>
   );
 }
@@ -1915,6 +1918,7 @@ function BuildingDataBanner({
   building: BuildingLookup;
   projectType: string | null;
 }) {
+  const t = useT();
   const setProject      = useWizardStore(s => s.setProject);
   const storeBuildings  = useWizardStore(s => s.project.lookedUpBuildings);
   const [editing, setEditing] = useState(false);
@@ -1997,7 +2001,7 @@ function BuildingDataBanner({
   const applySingleImport = (text: string, sourceName: string) => {
     try {
       const trimmed = text.trim();
-      if (!trimmed) { setImportMsg("Nothing to apply — paste CSV/JSON or choose a file."); return; }
+      if (!trimmed) { setImportMsg(t("Nothing to apply — paste CSV/JSON or choose a file.")); return; }
       let records: Record<string, unknown>[];
       if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
         const j = JSON.parse(text);
@@ -2005,7 +2009,7 @@ function BuildingDataBanner({
       } else {
         records = parseCSV(text);
       }
-      if (!records.length) { setImportMsg("No rows found."); return; }
+      if (!records.length) { setImportMsg(t("No rows found.")); return; }
       // One building: prefer a row whose Address matches, else take the first row.
       const bKey = _normKey(String(building.address ?? ""));
       const pick = records.find(r => {
@@ -2022,20 +2026,20 @@ function BuildingDataBanner({
         if (SINGLE_NUMERIC.has(field)) { const n = Number(v); if (Number.isFinite(n)) val = n; }
         patch[field] = val; changed++;
       }
-      if (!changed) { setImportMsg("No usable columns — headers should match the field labels above (Year, Energy (kWh/m²), U-wall, Floors, …)."); return; }
+      if (!changed) { setImportMsg(t("No usable columns — headers should match the field labels above (Year, Energy (kWh/m²), U-wall, Floors, …).")); return; }
       const nextSingle = { ...building, ...patch } as BuildingLookup;
       const list = (storeBuildings ?? []).slice();
       if (list.length) list[0] = { ...list[0], ...patch };
       setProject({ lookedUpBuilding: nextSingle, lookedUpBuildings: list });
-      setImportMsg(`✓ ${sourceName}: applied ${changed} value${changed === 1 ? "" : "s"} to this building.`);
+      setImportMsg(`✓ ${sourceName}: ${t(changed === 1 ? "applied {n} value to this building." : "applied {n} values to this building.", { n: changed })}`);
     } catch (e) {
-      setImportMsg("Import failed: " + (e as Error).message);
+      setImportMsg(t("Import failed") + ": " + (e as Error).message);
     }
   };
   const handleSingleFile = async (file: File) => {
-    setImportMsg("Reading…");
+    setImportMsg(t("Reading…"));
     try { applySingleImport(await file.text(), `"${file.name}"`); }
-    catch (e) { setImportMsg("Import failed: " + (e as Error).message); }
+    catch (e) { setImportMsg(t("Import failed") + ": " + (e as Error).message); }
   };
 
   return (
@@ -2044,10 +2048,10 @@ function BuildingDataBanner({
       <div className="flex items-center justify-between px-4 py-2.5 bg-purple-900/25 border-b border-purple-700/30">
         <div className="flex items-center gap-2">
           <span className="text-base">🏗️</span>
-          <span className="text-xs font-semibold text-purple-300">Data Available</span>
+          <span className="text-xs font-semibold text-purple-300">{t("Data Available")}</span>
           <span className="px-1.5 py-0.5 rounded-full bg-purple-900/50 text-purple-300 text-[9px] font-bold border border-purple-600/50">{isUK ? "OSM + EUBUCCO" : isBE ? "UrbIS 3D + TABULA BE" : "EUBUCCO"}</span>
           {building.has_epc && (
-            <span title={isUK && building.epc_latest_date ? `EPC register - newest certificate ${building.epc_latest_date}` : undefined}
+            <span title={isUK && building.epc_latest_date ? t("EPC register - newest certificate {d}", { d: building.epc_latest_date }) : undefined}
               className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span>
           )}
         </div>
@@ -2055,11 +2059,11 @@ function BuildingDataBanner({
           {building.address && !isCadastralId(building.address) && <span className="text-[10px] text-purple-400/70 truncate max-w-[160px]">{formatAddress(building.address)}</span>}
           <button
             onClick={() => setEditing(e => !e)}
-            title="Add or correct this building's data — overrides feed Steps 3-4 (stored for this session only, never written back to the source data)."
+            title={t("Add or correct this building's data — overrides feed Steps 3-4 (stored for this session only, never written back to the source data).")}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition ring-1 ${editing
               ? "bg-violet-600/30 text-violet-200 ring-violet-500/60"
               : "bg-white/5 text-white/70 ring-white/15 hover:bg-white/10 hover:text-white"}`}>
-            <Plus className="w-3.5 h-3.5" /> {editing ? "Done" : "Add / Edit"}
+            <Plus className="w-3.5 h-3.5" /> {editing ? t("Done") : t("Add / Edit")}
           </button>
         </div>
       </div>
@@ -2067,25 +2071,25 @@ function BuildingDataBanner({
       {editing && (
         <div className="mx-3 mt-3 -mb-1 space-y-2.5">
           <div className="rounded-lg bg-violet-900/20 border border-violet-700/30 px-3 py-2 text-[10.5px] text-violet-200/80">
-            Editing overrides for <b className="text-violet-100">this session only</b> — they feed the simulation and prioritisation in Steps 3-4 and are never written back to the source datasets. Edit the fields below, or import your own file. Leave a field blank to clear it.
+            {t("Editing overrides for")} <b className="text-violet-100">{t("this session only")}</b> {t("— they feed the simulation and prioritisation in Steps 3-4 and are never written back to the source datasets. Edit the fields below, or import your own file. Leave a field blank to clear it.")}
           </div>
           {/* Import the user's own data onto this one building */}
           <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
             <div className="flex items-center gap-2 flex-wrap">
               <label
-                title="Upload a CSV or JSON file to fill in this building's data. Excel: save the sheet as .csv first."
+                title={t("Upload a CSV or JSON file to fill in this building's data. Excel: save the sheet as .csv first.")}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-violet-200 bg-violet-600/20 ring-1 ring-violet-500/60 hover:bg-violet-600/35 hover:text-white whitespace-nowrap transition cursor-pointer"
               >
-                <Upload className="w-3.5 h-3.5" /> Import CSV / JSON file
+                <Upload className="w-3.5 h-3.5" /> {t("Import CSV / JSON file")}
                 <input
                   type="file" accept=".csv,.json,text/csv,application/json"
                   style={{ display: "none" }}
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleSingleFile(f); e.currentTarget.value = ""; }}
                 />
               </label>
-              <span className="text-[10px] text-white/35">Excel? Save it as <b className="text-white/55">.csv</b> first.</span>
+              <span className="text-[10px] text-white/35">{t("Excel? Save it as")} <b className="text-white/55">.csv</b> {t("first.")}</span>
             </div>
-            <div className="text-[10px] text-white/35 mt-2">Or paste CSV / JSON — column headers should match the field labels below (Year, Energy (kWh/m²), U-wall, Floors, …):</div>
+            <div className="text-[10px] text-white/35 mt-2">{t("Or paste CSV / JSON — column headers should match the field labels below (Year, Energy (kWh/m²), U-wall, Floors, …):")}</div>
             <textarea
               value={pasteText}
               onChange={e => setPasteText(e.target.value)}
@@ -2095,11 +2099,11 @@ function BuildingDataBanner({
             />
             <div className="flex items-center gap-3 mt-2">
               <button
-                onClick={() => applySingleImport(pasteText, "pasted data")}
+                onClick={() => applySingleImport(pasteText, t("pasted data"))}
                 disabled={!pasteText.trim()}
                 className="px-3 py-1 rounded-md text-[11px] font-semibold bg-violet-600/25 text-violet-200 ring-1 ring-violet-500/60 hover:bg-violet-600/40 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >Apply pasted data</button>
-              {importMsg && <span className="text-[10.5px]" style={{ color: importMsg.startsWith("✓") ? "#2FB477" : importMsg.startsWith("⚠") || importMsg.startsWith("Import failed") ? "#E2483B" : "rgba(255,255,255,0.5)" }}>{importMsg}</span>}
+              >{t("Apply pasted data")}</button>
+              {importMsg && <span className="text-[10.5px]" style={{ color: importMsg.startsWith("✓") ? "#2FB477" : importMsg.startsWith("⚠") || importMsg.startsWith(t("Import failed")) ? "#E2483B" : "rgba(255,255,255,0.5)" }}>{importMsg}</span>}
             </div>
             <ImportFormatGuide />
           </div>
@@ -2138,26 +2142,26 @@ function BuildingDataBanner({
         {/* Current heating system — inferred from the EPC, read-only */}
         <div className={`flex flex-col px-2.5 py-2 rounded-lg border text-[11px] ${heating ? "bg-sky-900/25 border-sky-700/50 text-sky-300" : "bg-white/5 border-white/10 text-white/30"}`}>
           <span className="font-semibold leading-tight">{heating?.system ?? "—"}</span>
-          <span className="text-[10px] opacity-70 mt-0.5">Current heating</span>
+          <span className="text-[10px] opacity-70 mt-0.5">{t("Current heating")}</span>
         </div>
       </div>
 
       {/* UK: which area is simulated, and how old the certificates are */}
       {isUK && building.heated_area_m2 != null && (
         <div className="mx-3 mb-2 rounded-lg border border-sky-700/30 bg-sky-900/10 px-3 py-2 text-[11px] text-white/70 space-y-1">
-          <div title="Footprint = OSM outline (may cover a semi pair or terrace row). Heated area = the floor area the energy model simulates, from the homes' EPC total floor areas.">
-            <b className="text-sky-300">Areas:</b>{" "}
-            footprint {Math.round(building.footprint_m2 ?? 0).toLocaleString("en-GB")} m² (OSM outline)
-            {building.gross_floor_area_m2 != null && <> · gross {Math.round(building.gross_floor_area_m2).toLocaleString("en-GB")} m² (footprint × floors)</>}
-            {" · "}<b className="text-white/85">heated {Math.round(building.heated_area_m2).toLocaleString("en-GB")} m²</b>
-            {" "}({HEATED_AREA_SOURCE_LABEL[building.heated_area_source ?? ""] ?? "source unknown"})
-            {building.dwellings_est ? <> · {building.dwellings_est} home{building.dwellings_est === 1 ? "" : "s"}</> : null}
+          <div title={t("Footprint = OSM outline (may cover a semi pair or terrace row). Heated area = the floor area the energy model simulates, from the homes' EPC total floor areas.")}>
+            <b className="text-sky-300">{t("Areas:")}</b>{" "}
+            {t("footprint {a} m² (OSM outline)", { a: Math.round(building.footprint_m2 ?? 0).toLocaleString("en-GB") })}
+            {building.gross_floor_area_m2 != null && <> · {t("gross {a} m² (footprint × floors)", { a: Math.round(building.gross_floor_area_m2).toLocaleString("en-GB") })}</>}
+            {" · "}<b className="text-white/85">{t("heated {a} m²", { a: Math.round(building.heated_area_m2).toLocaleString("en-GB") })}</b>
+            {" "}({t(HEATED_AREA_SOURCE_LABEL[building.heated_area_source ?? ""] ?? "source unknown")})
+            {building.dwellings_est ? <> · {building.dwellings_est === 1 ? t("{n} home", { n: building.dwellings_est }) : t("{n} homes", { n: building.dwellings_est })}</> : null}
           </div>
           {(building.epc_median_year != null || building.boiler_efficiency_epc != null) && (
             <div>
-              {building.epc_median_year != null && <>Certificates from {building.epc_median_year}
-                {building.epc_stale && <span className="text-amber-300"> — older than 2016, fabric and heating may predate later upgrades</span>}</>}
-              {building.boiler_efficiency_epc != null && <>{building.epc_median_year != null ? " · " : ""}gas boiler efficiency {Math.round(building.boiler_efficiency_epc * 100)}% (from the EPC heating rating, approximate)</>}
+              {building.epc_median_year != null && <>{t("Certificates from {y}", { y: building.epc_median_year })}
+                {building.epc_stale && <span className="text-amber-300"> {t("— older than 2016, fabric and heating may predate later upgrades")}</span>}</>}
+              {building.boiler_efficiency_epc != null && <>{building.epc_median_year != null ? " · " : ""}{t("gas boiler efficiency {p}% (from the EPC heating rating, approximate)", { p: Math.round(building.boiler_efficiency_epc * 100) })}</>}
             </div>
           )}
         </div>
@@ -2167,20 +2171,20 @@ function BuildingDataBanner({
           address, so this is a municipality reference, not this building's certificate */}
       {isBE && building.peb_ref_n != null && (
         <div className="mx-3 mb-2 rounded-lg border border-emerald-700/30 bg-emerald-900/10 px-3 py-2 text-[11px] text-white/70 space-y-1"
-          title="Open Data Wallonie-Bruxelles EPB certificates (CC BY 4.0). E_spec is the certificate's primary energy per heated m² per year — a calculated rating, not metered use.">
+          title={t("Open Data Wallonie-Bruxelles EPB certificates (CC BY 4.0). E_spec is the certificate's primary energy per heated m² per year — a calculated rating, not metered use.")}>
           <div>
-            <b className="text-emerald-300">EPB certificates of similar homes in {building.peb_ref_scope}:</b>{" "}
-            median E_spec <b className="text-white/85">{building.peb_ref_e_spec_median} kWh/m²·yr</b>
-            {" "}(middle half {building.peb_ref_e_spec_p25}–{building.peb_ref_e_spec_p75}, most common label {building.peb_ref_label_mode},
-            {" "}{building.peb_ref_n.toLocaleString("en-GB")} certificates, {PEB_GROUP_LABEL[building.peb_ref_group ?? ""] ?? building.peb_ref_group})
+            <b className="text-emerald-300">{t("EPB certificates of similar homes in {scope}:", { scope: building.peb_ref_scope ?? "" })}</b>{" "}
+            {t("median E_spec")} <b className="text-white/85">{building.peb_ref_e_spec_median} kWh/m²·yr</b>
+            {" "}({t("middle half {a}–{b}, most common label {l},", { a: building.peb_ref_e_spec_p25 ?? "", b: building.peb_ref_e_spec_p75 ?? "", l: building.peb_ref_label_mode ?? "" })}
+            {" "}{t("{n} certificates", { n: building.peb_ref_n.toLocaleString("en-GB") })}, {PEB_GROUP_LABEL[building.peb_ref_group ?? ""] ? t(PEB_GROUP_LABEL[building.peb_ref_group ?? ""]!) : building.peb_ref_group})
           </div>
           {building.peb_period_e_spec_median != null && (
             <div>
-              Same construction period: median {building.peb_period_e_spec_median} ({building.peb_period_n?.toLocaleString("en-GB")} certificates)
-              {building.year_source !== "osm" && <span className="text-amber-300"> — this building's period is estimated from Statbel, so indicative only</span>}
+              {t("Same construction period: median {m} ({n} certificates)", { m: building.peb_period_e_spec_median, n: building.peb_period_n?.toLocaleString("en-GB") ?? "" })}
+              {building.year_source !== "osm" && <span className="text-amber-300"> {t("— this building's period is estimated from Statbel, so indicative only")}</span>}
             </div>
           )}
-          <div className="text-white/45">Not this building's own certificate: the open register has no addresses. Primary energy, so higher than the delivered heat the model reports.</div>
+          <div className="text-white/45">{t("Not this building's own certificate: the open register has no addresses. Primary energy, so higher than the delivered heat the model reports.")}</div>
         </div>
       )}
 
@@ -2188,31 +2192,31 @@ function BuildingDataBanner({
       {isUK && (building.desnz_gas_median_kwh != null || building.desnz_electricity_median_kwh != null || building.dec_band || building.nd_epc_band) && (
         <div className="mx-3 mb-3 rounded-lg border border-emerald-700/30 bg-emerald-900/10 px-3 py-2 text-[11px] text-white/70 space-y-1">
           {(building.desnz_gas_median_kwh != null || building.desnz_electricity_median_kwh != null) && (
-            <div title="DESNZ postcode-level domestic gas and electricity statistics (OGL v3.0). Median metered annual use per meter in this postcode — a neighbourhood figure, not this building's own meter.">
-              <b className="text-emerald-300">Metered use, postcode {building.desnz_postcode} ({building.desnz_year}):</b>{" "}
-              {building.desnz_gas_median_kwh != null && <>gas {Math.round(building.desnz_gas_median_kwh).toLocaleString("en-GB")} kWh/yr per meter ({building.desnz_gas_meters} meters)</>}
+            <div title={t("DESNZ postcode-level domestic gas and electricity statistics (OGL v3.0). Median metered annual use per meter in this postcode — a neighbourhood figure, not this building's own meter.")}>
+              <b className="text-emerald-300">{t("Metered use, postcode {pc} ({y}):", { pc: building.desnz_postcode ?? "", y: building.desnz_year ?? "" })}</b>{" "}
+              {building.desnz_gas_median_kwh != null && <>{t("gas {v} kWh/yr per meter ({n} meters)", { v: Math.round(building.desnz_gas_median_kwh).toLocaleString("en-GB"), n: building.desnz_gas_meters ?? "" })}</>}
               {building.desnz_gas_median_kwh != null && building.desnz_electricity_median_kwh != null && " · "}
-              {building.desnz_electricity_median_kwh != null && <>electricity {Math.round(building.desnz_electricity_median_kwh).toLocaleString("en-GB")} kWh/yr per meter ({building.desnz_electricity_meters} meters)</>}
-              <span className="text-white/40"> — DESNZ median, not this building's own meter</span>
+              {building.desnz_electricity_median_kwh != null && <>{t("electricity {v} kWh/yr per meter ({n} meters)", { v: Math.round(building.desnz_electricity_median_kwh).toLocaleString("en-GB"), n: building.desnz_electricity_meters ?? "" })}</>}
+              <span className="text-white/40"> {t("— DESNZ median, not this building's own meter")}</span>
             </div>
           )}
           {building.dec_band && (
             <div>
-              <b className="text-emerald-300">Display Energy Certificate:</b> band {building.dec_band}
+              <b className="text-emerald-300">{t("Display Energy Certificate:")}</b> {t("band {b}", { b: building.dec_band })}
               {building.dec_name ? ` · ${building.dec_name}` : ""}
               {building.dec_property_type ? ` · ${building.dec_property_type}` : ""}
               {building.dec_metered_kwh && Object.keys(building.dec_metered_kwh).length > 0 && (
-                <> · metered {Object.entries(building.dec_metered_kwh).map(([f, v]) => `${f.replace(/_/g, " ")} ${Math.round(v).toLocaleString("en-GB")} kWh`).join(", ")}
-                  {building.dec_period?.[0] ? ` (${building.dec_period[0]} to ${building.dec_period[1]})` : ""}</>
+                <> · {t("metered")} {Object.entries(building.dec_metered_kwh).map(([f, v]) => `${f.replace(/_/g, " ")} ${Math.round(v).toLocaleString("en-GB")} kWh`).join(", ")}
+                  {building.dec_period?.[0] ? ` (${t("{a} to {b}", { a: building.dec_period[0], b: building.dec_period[1] ?? "" })})` : ""}</>
               )}
             </div>
           )}
           {building.nd_epc_band && (
             <div>
-              <b className="text-emerald-300">Non-domestic EPC:</b> band {building.nd_epc_band}
+              <b className="text-emerald-300">{t("Non-domestic EPC:")}</b> {t("band {b}", { b: building.nd_epc_band })}
               {building.nd_property_type ? ` · ${building.nd_property_type}` : ""}
               {building.nd_floor_area_m2 ? ` · ${Math.round(building.nd_floor_area_m2).toLocaleString("en-GB")} m²` : ""}
-              {building.nd_energy_kwh_m2_yr ? ` · modelled ${Math.round(building.nd_energy_kwh_m2_yr)} kWh/m²/yr` : ""}
+              {building.nd_energy_kwh_m2_yr ? ` · ${t("modelled {v} kWh/m²/yr", { v: Math.round(building.nd_energy_kwh_m2_yr) })}` : ""}
             </div>
           )}
         </div>
@@ -2223,9 +2227,9 @@ function BuildingDataBanner({
         <div className="mx-3 mb-3 flex items-start gap-2 rounded-lg bg-red-900/30 border border-red-700/40 px-3 py-2 text-xs text-red-400">
           <span className="text-sm mt-0.5">⚠️</span>
           <span>
-            <span className="font-semibold">Missing critical data for {projectType}:</span>{" "}
-            {missingCritical.map(f => f.label).join(", ")}.
-            {" "}Click <b>Add / Edit</b> above to fill these in, or check the starred (★) rows below for fallback options.
+            <span className="font-semibold">{t("Missing critical data for {p}:", { p: t(projectType ?? "") })}</span>{" "}
+            {missingCritical.map(f => t(f.label)).join(", ")}.
+            {" "}{t("Click")} <b>{t("Add / Edit")}</b> {t("above to fill these in, or check the starred (★) rows below for fallback options.")}
           </span>
         </div>
       )}
@@ -2234,7 +2238,7 @@ function BuildingDataBanner({
       <div className="px-3 pb-3">
         <a href={viewerUrl} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-400 hover:text-purple-300 underline underline-offset-2">
-          📷 {isUK ? "Open UK 3D viewer" : isBE ? `Open ${projectCity === "Liège" ? "Liège" : "Brussels"} 3D viewer` : "Open Gothenburg 3D"} →
+          📷 {isUK ? t("Open UK 3D viewer") : isBE ? t("Open {city} 3D viewer", { city: projectCity === "Liège" ? "Liège" : "Brussels" }) : t("Open Gothenburg 3D")} →
         </a>
       </div>
     </div>
@@ -2245,6 +2249,7 @@ function BuildingDataBanner({
 function EditableChip({
   label, value, critical, onChange,
 }: { label: string; value: string | number | null | undefined; critical: boolean; onChange: (v: string) => void }) {
+  const t = useT();
   const hasVal = value !== null && value !== undefined;
   return (
     <div className={`flex flex-col px-2.5 py-2 rounded-lg border text-[11px] ${
@@ -2255,7 +2260,7 @@ function EditableChip({
         placeholder="—"
         className="w-full bg-[#0d1117] border border-white/12 rounded px-1 py-0.5 text-[11px] text-white/90 focus:outline-none focus:border-violet-500/60"
       />
-      <span className="text-[10px] opacity-70 mt-1 text-white/50">{label}{critical && " ★"}</span>
+      <span className="text-[10px] opacity-70 mt-1 text-white/50">{t(label)}{critical && " ★"}</span>
     </div>
   );
 }
@@ -2270,6 +2275,7 @@ function MultiBuildingDataBanner({
   buildings: BuildingLookup[];
   projectType: string | null;
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const withEpc = buildings.filter(b => b.has_epc).length;
   const shownBuildings = expanded ? buildings : buildings.slice(0, 3);
@@ -2297,7 +2303,7 @@ function MultiBuildingDataBanner({
         <div className="flex items-center gap-2">
           <span className="text-base">🏗️</span>
           <span className="text-xs font-semibold text-purple-300">
-            Data Available — {buildings.length} buildings
+            {t("Data Available — {n} buildings", { n: buildings.length })}
           </span>
           <span className="px-1.5 py-0.5 rounded-full bg-purple-900/50 text-purple-300 text-[9px] font-bold border border-purple-600/50">EUBUCCO</span>
           {withEpc > 0 && (
@@ -2306,7 +2312,7 @@ function MultiBuildingDataBanner({
             </span>
           )}
         </div>
-        <span className="text-[10px] text-purple-400/70">{projectType}</span>
+        <span className="text-[10px] text-purple-400/70">{projectType ? t(projectType) : projectType}</span>
       </div>
 
       {/* Building list */}
@@ -2315,13 +2321,13 @@ function MultiBuildingDataBanner({
           <div key={i} className="flex items-start gap-2 px-3 py-2">
             <span className="text-[10px] text-white/25 font-mono mt-0.5 w-4 flex-shrink-0">{i + 1}</span>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-white/75 truncate">{isCadastralId(b.address) ? "EUBUCCO building" : (formatAddress(b.address) ?? "EUBUCCO building")}</div>
+              <div className="text-xs font-medium text-white/75 truncate">{isCadastralId(b.address) ? t("EUBUCCO building") : (formatAddress(b.address) ?? t("EUBUCCO building"))}</div>
               <div className="flex flex-wrap gap-x-3 mt-0.5 text-[10px] text-white/40">
                 {b.use_cat    && <span>{b.country === "gb" || b.country === "be" ? buildingUseLabel(b.use_cat) : b.use_cat}</span>}
-                {b.year       && <span>Built {b.year}</span>}
-                {b.floors     && <span>{b.floors} floors</span>}
-                {b.eclass     && <span>Class {b.eclass}</span>}
-                {b.tabula_u_wall && <span>U-wall {b.tabula_u_wall} W/m²K</span>}
+                {b.year       && <span>{t("Built {y}", { y: b.year })}</span>}
+                {b.floors     && <span>{t("{n} floors", { n: b.floors })}</span>}
+                {b.eclass     && <span>{t("Class {c}", { c: b.eclass })}</span>}
+                {b.tabula_u_wall && <span>{t("U-wall")} {b.tabula_u_wall} W/m²K</span>}
                 {b.address && heating[b.address]?.system && (
                   <span className="text-sky-300">🔥 {heating[b.address]!.system}</span>
                 )}
@@ -2339,7 +2345,7 @@ function MultiBuildingDataBanner({
           onClick={() => setExpanded(e => !e)}
           className="w-full text-[11px] font-medium text-purple-400 hover:text-purple-300 py-2 border-t border-purple-700/30 hover:bg-purple-900/20 transition-colors"
         >
-          {expanded ? `Show less ▲` : `Show all ${buildings.length} buildings ▼`}
+          {expanded ? `${t("Show less")} ▲` : `${t("Show all {n} buildings", { n: buildings.length })} ▼`}
         </button>
       )}
     </div>
@@ -2350,6 +2356,7 @@ function MultiBuildingDataBanner({
    Component
 ───────────────────────────────────────────── */
 export default function DataCoverage() {
+  const t = useT();
   const { project, setProject } = useWizardStore();
   const building   = project.lookedUpBuilding ?? null;
   const buildings  = project.lookedUpBuildings ?? [];
@@ -2427,7 +2434,7 @@ export default function DataCoverage() {
   const hasBuildings = bboxRows.length > 0 || buildings.length > 0 || !!building;
   useEffect(() => {
     setWizardCanNext(hasBuildings);
-    setWizardNextError(hasBuildings ? null : "No buildings loaded yet — select an area or addresses in Step 1.");
+    setWizardNextError(hasBuildings ? null : translate("No buildings loaded yet — select an area or addresses in Step 1."));
   }, [hasBuildings]);
   useEffect(() => () => { setWizardCanNext(true); setWizardNextError(null); }, []);
 
@@ -2458,7 +2465,7 @@ export default function DataCoverage() {
     const country = project.country === "United Kingdom" ? "gb" : project.country === "Belgium" ? "be" : "se";
     return src.map((b, i) => {
       const nice = isCadastralId(b.address, b.cadastral_id) ? null : formatAddress(b.address);
-      return { key: keys[i]!, label: nice || `Building ${i + 1}`, lat: b.lat ?? null, lon: b.lon ?? null, country };
+      return { key: keys[i]!, label: nice || t("Building {n}", { n: i + 1 }), lat: b.lat ?? null, lon: b.lon ?? null, country };
     });
   }, [activeCovRows, bboxRows, buildings, project.country]);
 
@@ -2469,7 +2476,7 @@ export default function DataCoverage() {
     return source.map((row, i) => ({
       row,
       key: facadeBuildings[i]?.key ?? `bldg-${i}`,
-      label: facadeBuildings[i]?.label ?? `Building ${i + 1}`,
+      label: facadeBuildings[i]?.label ?? t("Building {n}", { n: i + 1 }),
     }));
   }, [activeCovRows, bboxRows, facadeBuildings]);
 
@@ -2591,12 +2598,11 @@ export default function DataCoverage() {
 
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-white">Building Data &amp; Prioritisation</h2>
+        <h2 className="text-2xl font-bold text-white">{t("Building Data & Prioritisation")}</h2>
         <p className="text-sm text-white/45 mt-1">
           {/* A brief, not a walkthrough — each numbered section below carries its
               own subtitle explaining what it does. */}
-          Review each building's data, fill any gaps, and choose which buildings carry forward.
-          Your edits stay in this session and never change the source data.
+          {t("Review each building's data, fill any gaps, and choose which buildings carry forward. Your edits stay in this session and never change the source data.")}
         </p>
       </div>
 
@@ -2604,17 +2610,17 @@ export default function DataCoverage() {
       <div className="flex flex-wrap gap-2">
         {project.projectType && (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-900/30 text-purple-300 text-xs font-semibold border border-purple-700/40">
-            <Layers className="w-3 h-3" /> {project.projectType}
+            <Layers className="w-3 h-3" /> {t(project.projectType)}
           </span>
         )}
         {project.scale && (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-900/30 text-emerald-400 text-xs font-semibold border border-emerald-700/40">
-            <Database className="w-3 h-3" /> {project.scale} scale
+            <Database className="w-3 h-3" /> {t("{s} scale", { s: t(project.scale) })}
           </span>
         )}
         {project.country && (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 text-white/50 text-xs font-semibold border border-white/10">
-            <MapPin className="w-3 h-3" /> {project.country}
+            <MapPin className="w-3 h-3" /> {t(project.country)}
           </span>
         )}
       </div>
@@ -2642,8 +2648,10 @@ export default function DataCoverage() {
           style={{ color: "#fca5a5", background: "rgba(226,72,59,0.10)", border: "1px solid rgba(226,72,59,0.35)" }}>
           <span>⚠</span>
           <span>
-            <span className="font-semibold">No buildings loaded.</span>{" "}
-            Go back to Step 1 and draw an area over built-up streets{project.city ? ` in ${project.city}` : ""}, or add addresses — then they will appear here.
+            <span className="font-semibold">{t("No buildings loaded.")}</span>{" "}
+            {project.city
+              ? t("Go back to Step 1 and draw an area over built-up streets in {city}, or add addresses — then they will appear here.", { city: t(project.city) })
+              : t("Go back to Step 1 and draw an area over built-up streets, or add addresses — then they will appear here.")}
           </span>
         </div>
       )}
@@ -2653,22 +2661,22 @@ export default function DataCoverage() {
         <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#0d1117] px-4 py-2.5">
           <Globe2 className="w-4 h-4 text-violet-400 shrink-0" />
           <div className="flex-1 min-w-0 text-xs">
-            <span className="font-semibold text-white/80">{isCadastralId(viewerSelection.address) ? "No street address" : (formatAddress(viewerSelection.address) || "Unknown address")}</span>
+            <span className="font-semibold text-white/80">{isCadastralId(viewerSelection.address) ? t("No street address") : (formatAddress(viewerSelection.address) || t("Unknown address"))}</span>
             <span className="text-white/20 mx-2">|</span>
             <span className="text-white/40 space-x-3">
               {viewerSelection.use_cat && <span>{useWizardStore.getState().project.country !== "Sweden" ? buildingUseLabel(viewerSelection.use_cat) : viewerSelection.use_cat}</span>}
-              {viewerSelection.year    && <span>Built {viewerSelection.year}</span>}
+              {viewerSelection.year    && <span>{t("Built {y}", { y: viewerSelection.year })}</span>}
               {viewerSelection.height  && <span>{viewerSelection.height} m</span>}
-              {viewerSelection.floors  && <span>{viewerSelection.floors} fl</span>}
+              {viewerSelection.floors  && <span>{t("{n} fl", { n: viewerSelection.floors })}</span>}
               {viewerSelection.energy  && <span>{viewerSelection.energy} kWh/m²</span>}
-              {viewerSelection.eclass  && <span>EPC {viewerSelection.eclass}</span>}
+              {viewerSelection.eclass  && <span>{t("Class {c}", { c: viewerSelection.eclass })}</span>}
             </span>
           </div>
-          <span className="text-[10px] font-medium text-violet-400 bg-purple-900/30 px-2 py-0.5 rounded shrink-0">3D Viewer</span>
+          <span className="text-[10px] font-medium text-violet-400 bg-purple-900/30 px-2 py-0.5 rounded shrink-0">{t("3D Viewer")}</span>
           <button
             onClick={() => { setViewerSelection(null); try { localStorage.removeItem('ppg_selected_building'); } catch { /**/ } }}
             className="text-white/25 hover:text-white/60 shrink-0 text-sm leading-none ml-1"
-            title="Dismiss"
+            title={t("Dismiss")}
           >×</button>
         </div>
       )}
@@ -2715,6 +2723,7 @@ function Step2Sections({
    *  produced one yet, in which case the section is not shown at all. */
   overview?: React.ReactNode;
 }) {
+  const t = useT();
   // Single-open accordion. Numbering is derived from which sections are
   // actually visible, so hiding one (facade needs walls in scope) renumbers the
   // rest rather than leaving a gap.
@@ -2795,9 +2804,9 @@ function Step2Sections({
         {/* Labels */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: isOpen ? "#fff" : "rgba(255,255,255,0.55)" }}>
-            {label}
+            {t(label)}
           </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>{subtitle}</div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>{t(subtitle)}</div>
         </div>
         {/* Chevron */}
         {isOpen

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import type { OptimizePoint } from "../api/client";
 import { OBJECTIVES, type ObjKey } from "./ParetoChart";
+import { useT } from "../i18n";
 
 /* Parallel-coordinates view of the optimiser's Pareto set. Each package is one
  * line threading through its chosen material per component (categorical axes),
@@ -36,6 +37,7 @@ export default function ParallelCoordinates({
   validatedKeys?: Set<string>;
   pointKey?: (pt: OptimizePoint) => string;
 }) {
+  const t = useT();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [w, setW] = useState(560);
   useEffect(() => {
@@ -79,7 +81,7 @@ export default function ParallelCoordinates({
 
   if (!pareto.length || axes.length < 2) {
     return <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", padding: "20px 0", textAlign: "center" }}>
-      Not enough variation across packages to plot.
+      {t("Not enough variation across packages to plot.")}
     </div>;
   }
 
@@ -166,7 +168,7 @@ export default function ParallelCoordinates({
               <g key={ax.kind + ax.key}>
                 <line x1={x} y1={plotTop} x2={x} y2={plotBot} stroke="rgba(255,255,255,0.22)" strokeWidth={1} />
                 <text x={x} y={plotTop - 12} fill="rgba(255,255,255,0.75)" fontSize={10} fontWeight={700} textAnchor="middle">
-                  {isNum ? ax.title : ax.title.length > 16 ? ax.title.slice(0, 15) + "…" : ax.title}
+                  {(() => { const title = t(ax.title); return isNum ? title : title.length > 16 ? title.slice(0, 15) + "…" : title; })()}
                 </text>
                 {isNum && ranges[ax.key] && (
                   <>
@@ -178,7 +180,7 @@ export default function ParallelCoordinates({
                 {ax.kind === "cat" && ax.values.map((v) => (
                   <text key={v} x={x + (i === 0 ? 5 : i === axes.length - 1 ? -5 : 5)} y={catY(ax, v) + 3}
                     fill="rgba(255,255,255,0.4)" fontSize={8} textAnchor={i === axes.length - 1 ? "end" : "start"}>
-                    {v.length > 15 ? v.slice(0, 14) + "…" : v}
+                    {(() => { const lbl = v === "Keep as-built" ? t(v) : v; return lbl.length > 15 ? lbl.slice(0, 14) + "…" : lbl; })()}
                   </text>
                 ))}
                 {/* brush handle for numeric axes */}
@@ -239,19 +241,19 @@ export default function ParallelCoordinates({
             <span style={{ color: "#2FB477" }}>{fmt("cost", pareto[hover]!.total_cost)}</span>
           </div>
           {Object.entries(pareto[hover]!.selection_labels).filter(([, v]) => v !== "Keep as-built").map(([k, v]) => (
-            <div key={k} style={{ color: "rgba(255,255,255,0.55)" }}><span style={{ color: "rgba(255,255,255,0.35)" }}>{k}:</span> {v}</div>
+            <div key={k} style={{ color: "rgba(255,255,255,0.55)" }}><span style={{ color: "rgba(255,255,255,0.35)" }}>{t(k.replace("VertExt::", ""))}:</span> {v}</div>
           ))}
         </div>
       )}
 
       {/* footer: filter hint / clear */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, fontSize: 10, color: "rgba(255,255,255,0.35)" }}>
-        <span>Drag on Energy / GWP / Cost axes to filter · hover a line for details</span>
+        <span>{t("Drag on Energy / GWP / Cost axes to filter · hover a line for details")}</span>
         {anyBrush && (
           <button onClick={() => setBrush({})} style={{
             marginLeft: "auto", fontSize: 10, color: "#B98BE8", background: "transparent",
             border: "1px solid rgba(185,139,232,0.4)", borderRadius: 6, padding: "1px 8px", cursor: "pointer",
-          }}>Clear filters</button>
+          }}>{t("Clear filters")}</button>
         )}
       </div>
     </div>

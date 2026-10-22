@@ -5,6 +5,7 @@ import TopBar, { HOME_TABS_RIGHT_OFFSET } from "../components/TopBar";
 import { COUNTRIES, CITY_COORDS, countryCodeFromName, defaultCityFor, cityEnabled, seCityId, type CountryCode } from "../config/countryNav";
 import ChatWidget from "../components/ChatWidget";
 import { WorkspaceCard } from "../components/WorkspacePanel";
+import { useT } from "../i18n";
 
 // ── Inline SVG icon set ────────────────────────────────────────────────────
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
@@ -117,6 +118,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const reset = useWizardStore((s) => s.reset);
   const setProject = useWizardStore((s) => s.setProject);
+  const t = useT();
 
   // Seeded from the shared selection so a country/city picked on any other page
   // is still selected here — the top bar is one control, not one per page.
@@ -279,7 +281,7 @@ export default function LandingPage() {
             key={`${selectedCountry}:${selectedCity}`}
             src={bgUrlFor(selectedCountry, selectedCity)}
             className="absolute inset-0 w-full h-full border-0 pointer-events-none"
-            title={`${selectedCity || country.name} 3D View`}
+            title={t("{place} 3D View", { place: t(selectedCity || country.name) })}
           />
 
           {/* Gradient overlay: strong left, fade to transparent right */}
@@ -313,30 +315,28 @@ export default function LandingPage() {
                 <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-white/90
                                  bg-[var(--brand)]/40 border border-[var(--brand)]/50 backdrop-blur-sm
                                  px-2.5 py-1 rounded-md pointer-events-none select-none no-hover-shadow">
-                  {(selectedCity || country.name)} 3D Viewer
+                  {t("{place} 3D Viewer", { place: t(selectedCity || country.name) })}
                 </span>
                 <span className="flex items-center gap-1.5 text-[10px] text-white/60">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#2FB477] animate-pulse" />
-                  Live data
+                  {t("Live data")}
                 </span>
               </div>
 
               {/* Main heading */}
               <h1 className="text-[2.6rem] font-black text-white leading-[1.08] tracking-tight mb-2">
-                Renovation Planning Toolbox + EPBD
+                {t("Renovation Planning Toolbox + EPBD")}
                 <span className="ml-2 align-top relative top-[0.35em] text-[10px] font-bold tracking-[0.14em] uppercase
                                  text-white/80 border border-white/30 px-1.5 py-[1px] rounded
                                  select-none whitespace-nowrap">
-                  Beta
+                  {t("Beta")}
                 </span>
               </h1>
               <div className="text-[15px] font-semibold mb-3" style={{ color: "#B98BE8" }}>
-                Digital Twin Decision Support
+                {t("Digital Twin Decision Support")}
               </div>
               <p className="text-[13px] text-white/50 leading-relaxed mb-6 max-w-[400px]">
-                A decision-support tool for building renovation planning — explore
-                real building and energy data and compare renovation packages by
-                energy, cost, and carbon.
+                {t("A decision-support tool for building renovation planning — explore real building and energy data and compare renovation packages by energy, cost, and carbon.")}
               </p>
 
 
@@ -364,9 +364,9 @@ export default function LandingPage() {
                       {step.n}
                     </span>
                     <span style={{ color: "#8FF0E8" }}><Icon d={step.icon} size={15} /></span>
-                    <span className="text-[11px] font-semibold text-white">{step.name}</span>
+                    <span className="text-[11px] font-semibold text-white">{t(step.name)}</span>
                   </div>
-                  <p className="text-[10px] leading-relaxed text-white/60">{step.desc}</p>
+                  <p className="text-[10px] leading-relaxed text-white/60">{t(step.desc)}</p>
                 </div>
               );
             })}

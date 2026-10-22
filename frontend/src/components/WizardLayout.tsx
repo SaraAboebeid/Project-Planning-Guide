@@ -6,6 +6,7 @@ import SettingsModal from "./SettingsModal";
 import { countryCodeFromName } from "../config/countryNav";
 import TopBar from "./TopBar";
 import ThemeToggle from "./ThemeToggle";
+import { useT } from "../i18n";
 
 // ── Confetti ─────────────────────────────────────────────────────────────────
 // Tiny self-contained canvas burst (no dependency) fired once when the user
@@ -183,6 +184,7 @@ export default function WizardLayout() {
   const location = useLocation();
   const { steps, project, currentStep, setStep } = useWizardStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const t = useT();
 
   const stepIndex = steps.findIndex((s) => s.path === location.pathname);
   const safeIndex = stepIndex < 0 ? 0 : stepIndex;
@@ -226,7 +228,7 @@ export default function WizardLayout() {
   const componentsCount = project.renovationEnvelopeComponents?.length ?? 0;
   const dataReadiness   = hasBuilding ? 78 : 42;
   const modelConfidence = hasBuilding ? 72 : 38;
-  const nextStepLabel   = safeIndex < steps.length - 1 ? steps[safeIndex + 1]!.label : "Complete";
+  const nextStepLabel   = safeIndex < steps.length - 1 ? t(steps[safeIndex + 1]!.label) : t("Complete");
   // One plain-language line about what the NEXT step does, keyed by the current
   // step number — shown in the footer so the user knows what Continue leads to.
   // Kept in step with each page's own brief, so the promise made here matches
@@ -237,7 +239,7 @@ export default function WizardLayout() {
     3: "design renovation packages and simulate each against the baseline for energy, cost and carbon.",
     4: "compile everything into a shareable report.",
   };
-  const nextHint = NEXT_STEP_HINT[activeStep.number];
+  const nextHint = NEXT_STEP_HINT[activeStep.number] ? t(NEXT_STEP_HINT[activeStep.number]!) : undefined;
 
   const goBack = () => {
     if (safeIndex > 0) navigate(steps[safeIndex - 1]!.path);
@@ -279,13 +281,13 @@ export default function WizardLayout() {
         }}>
           <div style={{ animation: "splashIn 0.7s cubic-bezier(0.16,1,0.3,1) both" }}>
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, textTransform: "uppercase", color: "#B98BE8", marginBottom: 16 }}>
-              Step {activeStep.number} · {activeStep.label}
+              {t("Step {n} · {label}", { n: activeStep.number, label: t(activeStep.label) })}
             </div>
             <div style={{ fontSize: 46, fontWeight: 900, color: "#fff", lineHeight: 1.1, marginBottom: 14 }}>
-              You've reached the final step 🎉
+              {t("You've reached the final step 🎉")}
             </div>
             <div style={{ fontSize: 16, color: "rgba(255,255,255,0.62)", maxWidth: 540, lineHeight: 1.6, margin: "0 auto" }}>
-              Your renovation plan is ready — review the report, download it, and share.
+              {t("Your renovation plan is ready — review the report, download it, and share.")}
             </div>
           </div>
           <style>{`@keyframes splashIn{from{opacity:0;transform:translateY(18px) scale(0.96)}to{opacity:1;transform:none}}`}</style>
@@ -306,8 +308,8 @@ export default function WizardLayout() {
           <SideNavItem
             key={step.path}
             iconD={STEP_ICONS[i] ?? IC.project}
-            label={`Step ${step.number}`}
-            title={step.label}
+            label={t("Step {n}", { n: step.number })}
+            title={t(step.label)}
             active={location.pathname === step.path}
             onClick={step.number <= highestUnlockedStep ? () => goToStep(step.number, step.path) : undefined}
           />
@@ -315,7 +317,7 @@ export default function WizardLayout() {
 
         <div className="flex-1" />
         <ThemeToggle />
-        <SideNavItem iconD={IC.settings} label="Settings" className="sidebar-theme-icon" onClick={() => setSettingsOpen(true)} />
+        <SideNavItem iconD={IC.settings} label={t("Settings")} className="sidebar-theme-icon" onClick={() => setSettingsOpen(true)} />
       </aside>
 
       {/* ── MAIN COLUMN ─────────────────────────────────────────────────── */}
@@ -354,7 +356,7 @@ export default function WizardLayout() {
             background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)",
             cursor: "pointer", transition: "all 0.15s",
           }}>
-            <Icon d={IC.arrowL} size={16} /> Back
+            <Icon d={IC.arrowL} size={16} /> {t("Back")}
           </button>
           {/* A validation message ("Add X to continue") takes over the centre when
               the step blocks Continue; otherwise a preview of the next step. */}
@@ -366,7 +368,7 @@ export default function WizardLayout() {
                 </div>
               ) : (
                 <div style={{ maxWidth: 620, fontSize: 11.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.45, textAlign: "center" }}>
-                  <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginRight: 7 }}>Next</span>
+                  <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginRight: 7 }}>{t("Next")}</span>
                   <b style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>{wizardNav.nextInfo?.label ?? nextStepLabel}</b>
                   {(wizardNav.nextInfo?.hint ?? nextHint) ? <span style={{ color: "rgba(255,255,255,0.42)" }}> — {wizardNav.nextInfo?.hint ?? nextHint}</span> : null}
                 </div>
@@ -378,7 +380,7 @@ export default function WizardLayout() {
             <button
               onClick={() => { if (canNext) (wizardNav.onNext ? wizardNav.onNext() : goNext()); }}
               disabled={!canNext}
-              title={canNext ? undefined : "Fix the highlighted issue to continue"}
+              title={canNext ? undefined : t("Fix the highlighted issue to continue")}
               className="no-hover-shadow theme-preserve"
               style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "8px 24px",
@@ -388,7 +390,7 @@ export default function WizardLayout() {
                 cursor: canNext ? "pointer" : "not-allowed",
                 opacity: canNext ? 1 : 0.55, transition: "all 0.15s",
               }}>
-              Continue <Icon d={IC.arrowR} size={16} />
+              {t("Continue")} <Icon d={IC.arrowR} size={16} />
             </button>
           )}
         </footer>
