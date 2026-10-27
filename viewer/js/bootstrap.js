@@ -36,7 +36,20 @@
 
   const params = new URLSearchParams(window.location.search);
   const wanted = (params.get('city') || '').toLowerCase();
-  const city = profile.cities.find(c => c.id === wanted) || profile.cities[0];
+  let city = profile.cities.find(c => c.id === wanted);
+  // Municipalities built from the home page ("Add municipality") are not in the
+  // build-time profile; look them up in the backend's city registry instead.
+  if (!city && wanted && profile.country === 'se') {
+    try {
+      const r = await fetch('/api/se/cities');
+      const hit = r.ok && (await r.json()).cities.find(c => c.id === wanted && c.built && c.center);
+      if (hit) {
+        city = { id: hit.id, name: hit.name, lat: hit.center[0], lon: hit.center[1], camera_height: 800, data_file: `buildings_${hit.id}.json` };
+        profile.cities.push(city);
+      }
+    } catch (_) { /* backend unreachable: fall back to the default city */ }
+  }
+  city = city || profile.cities[0];
 
   window.VIEWER_PROFILE = profile;
   window.VIEWER_COUNTRY = profile.country;

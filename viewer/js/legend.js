@@ -58,7 +58,8 @@ const PERIOD_CSS = (window.VIEWER_PROFILE && window.VIEWER_PROFILE.period_colors
 //     carries the era the archetype was actually matched on)
 const _useCounts = {}, _eclassCounts = {}, _periodCounts = {};
 const _byUse = {}, _byEclass = {}, _byPeriod = {};
-for (const b of DATA) {
+for (let i = 0; i < DATA.length; i++) {
+  const b = DATA[i];
   const energy = (b.energy != null ? b.energy : b.tabula_kwh_m2_yr);
   const period = b.tabula_period || b.tabula_period_used || null;
   _useCounts[b.use_cat] = (_useCounts[b.use_cat] || 0) + 1;
@@ -67,7 +68,7 @@ for (const b of DATA) {
 
   if (energy != null) {
     const card = {
-      addr: b.address || '(no address)', energy: Math.round(energy),
+      idx: i, addr: b.address || '(no address)', energy: Math.round(energy),
       eclass: b.eclass || null, year: b.year || null,
       area: b.footprint_m2 ? Math.round(b.footprint_m2) : null, period,
     };
@@ -77,6 +78,13 @@ for (const b of DATA) {
     if (period)   { if (!_byPeriod[period])   _byPeriod[period]   = []; _byPeriod[period].push(card); }
   }
 }
+
+// Buildings outside every bucket are painted grey on the map (cesium.js
+// getBuildingColor); the legend lists them too so the key accounts for every building.
+const _sumCounts = (c) => Object.values(c).reduce((a, n) => a + n, 0);
+const _NONE_CSS = 'rgba(60,60,70,0.55)';
+const _noEclass = DATA.length - _sumCounts(_eclassCounts);
+const _noPeriod = DATA.length - _sumCounts(_periodCounts);
 
 function _bestWorst(list, n = 15) {
   const sorted = [...list].sort((a, b) => a.energy - b.energy);
@@ -118,6 +126,7 @@ function updateLegend(mode) {
       const cards = _ECLASS_CARDS[key];
       return { key, lbl, color: ECLASS_CSS[key], cnt, hasCards: cards && (cards.best.length || cards.worst.length) };
     });
+    if (_noEclass > 0) rows.push({ key: '_none', lbl: 'Unknown – no energy class', color: _NONE_CSS, cnt: _noEclass, hasCards: false });
     container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Energy class (A–G)</div>';
 
   } else { // year/period
@@ -128,6 +137,7 @@ function updateLegend(mode) {
       const sub = st.median_kwh ? ' · ' + st.median_kwh + ' kWh/m²' : '';
       return { key, lbl: PERIOD_LABELS_JS[key] + sub, color: PERIOD_CSS[key], cnt, hasCards: cards && (cards.best.length || cards.worst.length) };
     });
+    if (_noPeriod > 0) rows.push({ key: '_none', lbl: 'Unknown – no construction year', color: _NONE_CSS, cnt: _noPeriod, hasCards: false });
     container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Construction era</div>';
   }
 
@@ -169,10 +179,33 @@ let _perfMode = null, _perfKey = null;
 let _sortMode  = 'energy';
 let _compareSet = new Set();
 let _perfList   = [];
+let _perfLocated = null;   // DATA index of the card last shown on the map
+
+// Fly to a listed building and select it exactly as a click on the map would
+// (highlight, roof pin, info card), so the best/worst list can be read in place.
+function _perfLocate(idx) {
+  const b = DATA[idx];
+  const ring = b && b.coordinates && b.coordinates[0];
+  if (!ring || !ring.length) return;
+  let lon = 0, lat = 0;
+  for (const [lo, la] of ring) { lon += lo; lat += la; }
+  lon /= ring.length; lat /= ring.length;
+  const baseH = (typeof window.getBuildingBaseOffset === 'function') ? window.getBuildingBaseOffset(lon, lat) : 0;
+  const centre = Cesium.Cartesian3.fromDegrees(lon, lat, baseH + (b.height || 6) / 2);
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(centre, 25), {
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-40), 220),
+    duration: 1.5,
+  });
+  showInfoPanel(b, idx);
+  if (window.isPhotoMode && window.isPhotoMode()) window.setSelectedBuilding(idx);
+  _perfLocated = idx;
+  renderPerfList();
+}
 
 function showPerfCards(mode, key) {
   _perfMode = mode; _perfKey = key;
   _compareSet.clear();
+  _perfLocated = null;
 
   if (mode === 'use') {
     const entry = _USE_CARDS[key];
@@ -221,11 +254,11 @@ function renderPerfList() {
     const minE = Math.min(...sel.map(b=>b.energy||999));
     const maxE = Math.max(...sel.map(b=>b.energy||0));
     cmpHtml = '<div style="background:#7c3aed22;border:1px solid #7c3aed55;border-radius:8px;padding:10px;margin-bottom:8px">';
-    cmpHtml += '<div style="font-weight:600;color:#a78bfa;font-size:11px;margin-bottom:8px">⚖ Compare ('+_compareSet.size+')</div>';
+    cmpHtml += '<div style="font-weight:600;color:#6d28d9;font-size:11px;margin-bottom:8px">⚖ Compare ('+_compareSet.size+')</div>';
     for (const b of sel) {
       const span = maxE > minE ? (b.energy - minE)/(maxE - minE) : 0.5;
       const pct  = Math.round(span * 100);
-      const barC = pct < 33 ? '#22c55e' : pct < 66 ? '#f59e0b' : '#ef4444';
+      const barC = pct < 33 ? '#15803d' : pct < 66 ? '#b45309' : '#dc2626';
       const badge = b.eclass ? '<span style="background:'+(ECLASS_BADGE[b.eclass]||'#555')+';color:'+(ECLASS_TEXT[b.eclass]||'#fff')+';border-radius:3px;padding:0 4px;font-size:9px">'+b.eclass+'</span>' : '';
       cmpHtml += '<div style="margin-bottom:7px">';
       cmpHtml +=   '<div style="display:flex;align-items:center;gap:5px"><span style="flex:1;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+b.addr+'</span>'+badge+'</div>';
@@ -243,8 +276,9 @@ function renderPerfList() {
   let rows = '';
   for (const b of sorted) {
     const inCmp = _compareSet.has(b.addr);
+    const isLoc = b.idx === _perfLocated;
     const ec    = b.energy || 0;
-    const eColor = ec < 100 ? '#22c55e' : ec < 200 ? '#f59e0b' : '#ef4444';
+    const eColor = ec < 100 ? '#15803d' : ec < 200 ? '#b45309' : '#dc2626';
     const badge = b.eclass
       ? '<span style="background:'+(ECLASS_BADGE[b.eclass]||'#555')+';color:'+(ECLASS_TEXT[b.eclass]||'#fff')+';border-radius:3px;padding:1px 5px;font-size:10px">'+b.eclass+'</span>'
       : '<span style="color:var(--faint);font-size:10px">–</span>';
@@ -253,12 +287,15 @@ function renderPerfList() {
       : '';
     const meta = [b.year?'Built '+b.year:'', b.area?b.area+' m²':''].filter(Boolean).join(' · ');
     const safeAddr = (b.addr||'').replace(/"/g,'&quot;');
-    rows += '<div data-addr="'+safeAddr+'" class="pr"'
+    rows += '<div data-addr="'+safeAddr+'" data-idx="'+b.idx+'" class="pr"'
       + ' style="background:'+(inCmp?'rgba(124,58,237,0.18)':'rgba(0,0,0,0.04)')+';border-radius:8px;padding:8px 10px;margin:4px 0;cursor:pointer;'
-      + 'border:1px solid '+(inCmp?'#7c3aed':'transparent')+';transition:all .15s">';
+      + 'border:1px solid '+(inCmp?'#7c3aed':'transparent')+';'+(isLoc?'box-shadow:inset 3px 0 0 #7c3aed;':'')+'transition:all .15s">';
     rows +=   '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
             + '<span style="flex:1;font-size:11px;font-weight:600;line-height:1.3">'+b.addr+'</span>'
             + badge + ' ' + perBadge
+            + '<button class="pr-loc" title="Show on map" aria-label="Show '+safeAddr+' on map"'
+            + ' style="border:1px solid '+(isLoc?'#7c3aed':'rgba(15,23,42,0.15)')+';background:'+(isLoc?'#7c3aed':'#fff')+';color:'+(isLoc?'#fff':'#475569')+';'
+            + 'border-radius:6px;padding:1px 6px;font-size:11px;line-height:16px;cursor:pointer;font-family:inherit">📍</button>'
             + '</div>';
     rows +=   '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
             + '<span style="font-size:13px;font-weight:700;color:'+eColor+'">'+b.energy+'</span>'
@@ -268,7 +305,7 @@ function renderPerfList() {
     rows += '</div>';
   }
 
-  const hint = '<div style="text-align:center;font-size:10px;color:var(--faint);padding:8px 0">Tap a card to add to compare (max 3)</div>';
+  const hint = '<div style="text-align:center;font-size:10px;color:var(--muted);padding:8px 0">📍 shows the building on the map · tap a card to compare (max 3)</div>';
 
   document.getElementById('perf-content').innerHTML =
     '<div style="display:flex;gap:4px;margin-bottom:10px">'+tabs+'</div>'
@@ -277,6 +314,10 @@ function renderPerfList() {
   document.querySelectorAll('#perf-content .pr').forEach(el => {
     const addr = el.getAttribute('data-addr');
     el.addEventListener('click', () => toggleCompare(addr));
+    el.querySelector('.pr-loc').addEventListener('click', (e) => {
+      e.stopPropagation();   // locating is separate from adding to compare
+      _perfLocate(Number(el.getAttribute('data-idx')));
+    });
     el.addEventListener('mouseenter', () => { el.style.background = 'rgba(0,0,0,0.08)'; });
     el.addEventListener('mouseleave', () => { el.style.background = _compareSet.has(addr) ? 'rgba(124,58,237,0.18)' : 'rgba(0,0,0,0.04)'; });
   });
@@ -291,4 +332,6 @@ function toggleCompare(addr) {
 
 document.getElementById('perf-close').addEventListener('click', () => {
   document.getElementById('perf-panel').style.display = 'none';
+  // The selection card made room for the list; give it its corner back.
+  if (typeof selCard !== 'undefined' && selCard) selCard.style.right = '';
 });

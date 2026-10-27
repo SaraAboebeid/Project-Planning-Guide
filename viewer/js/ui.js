@@ -674,6 +674,10 @@ function showSelectionCard(b, idx) {
     `<div class="sc-body"><div>${rows.join('')}</div>` +
     `<div><div class="sc-photo"><div class="sc-msg sc-loading">Loading street view…</div></div><div class="sc-credit"></div></div></div>`;
   selCard.querySelector('.sc-close').onclick = hideInfoPanel;
+  // The legend's best/worst list sits in the same corner; keep the card clear of it.
+  // Divided by 0.8 because the card's CSS zoom scales its own `right` too.
+  const perf = document.getElementById('perf-panel');
+  selCard.style.right = perf && perf.style.display !== 'none' ? Math.round((perf.offsetWidth + 32) / 0.8) + 'px' : '';
   selCard.style.display = 'block';
 
   // Street-level photo, fetched once per building per session.

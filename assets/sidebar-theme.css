@@ -6,8 +6,8 @@
 
 /* LIGHT SIDEBAR.
    The tokens below drive the left sidebar, which is now a white surface. The
-   hover card, Facade Inspector and WWR panel are white too (section 7a at the
-   bottom). The transit, parking, token and performance panels still float dark
+   hover card, Facade Inspector, WWR and performance panels are white too
+   (sections 7a/7b at the bottom). The transit, parking and token panels still float dark
    over the 3D scene (section 7b) - they share these tokens, so they are
    re-asserted there with literal colours, or they would get dark text on
    their dark backgrounds.
@@ -421,7 +421,6 @@
 #vt-disr-panel,
 #vt-park-panel,
 #token-panel,
-#perf-panel,
 #wwr-panel,
 #facade-panel {
   background: rgba(13, 17, 23, 0.96) !important;
@@ -435,7 +434,6 @@
 #vt-disr-panel h2,
 #vt-park-panel h2,
 #token-panel h2,
-#perf-panel h2,
 #wwr-panel h2,
 #facade-panel h2 {
   color: #fff !important;
@@ -445,7 +443,6 @@
 #vt-disr-panel .sub,
 #vt-park-panel .sub,
 #token-panel .sub,
-#perf-panel .sub,
 #wwr-panel .sub,
 #facade-panel .sub,
 #vt-panel-title,
@@ -842,15 +839,14 @@ a[href]:hover,
   color: #9F1239 !important;
 }
 
-/* 7b. Transit, parking, token and performance panels still float dark. Their
-   JS-built contents have not been checked against a white background yet, so
-   they are left as they were. They read the same --sb-* tokens as the light
-   sidebar, so they are re-asserted here with literal, token-free colours. */
+/* 7b. Transit, parking and token panels still float dark. Their JS-built
+   contents have not been checked against a white background yet, so they are
+   left as they were. They read the same --sb-* tokens as the light sidebar, so
+   they are re-asserted here with literal, token-free colours. */
 #vt-panel,
 #vt-disr-panel,
 #vt-park-panel,
-#token-panel,
-#perf-panel {
+#token-panel {
   background: rgba(13, 17, 23, 0.96) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   color: rgba(255, 255, 255, 0.88) !important;
@@ -860,19 +856,30 @@ a[href]:hover,
 #vt-panel *,
 #vt-disr-panel *,
 #vt-park-panel *,
-#token-panel *,
-#perf-panel * {
+#token-panel * {
   border-bottom-color: rgba(255, 255, 255, 0.07) !important;
 }
 
 #vt-panel .vt-dest,
-#vt-disr-panel .vt-disr-title,
-#perf-panel .result-item {
+#vt-disr-panel .vt-disr-title {
   color: rgba(255, 255, 255, 0.88) !important;
 }
 
+/* The performance panel (legend → best/worst buildings) is white; its JS-built
+   rows use dark-on-light colours (legend.js renderPerfList). */
+#perf-panel {
+  background: #fff !important;
+  border: 1px solid rgba(15, 23, 42, 0.1) !important;
+  color: #0f172a !important;
+  box-shadow: 0 20px 46px rgba(15, 23, 42, 0.18) !important;
+}
+#perf-panel h2 { color: #0f172a !important; }
+#perf-panel .sub { color: #64748b !important; }
+#perf-panel .close-btn { background: transparent !important; border: none !important; color: #64748b !important; }
+#perf-panel .close-btn:hover { color: #0f172a !important; }
+
 #vt-panel .sub, #vt-disr-panel .sub, #vt-park-panel .sub,
-#token-panel .sub, #perf-panel .sub,
+#token-panel .sub,
 #vt-panel-title, #vt-disr-count, #vt-park-title,
 #token-panel div {
   color: rgba(255, 255, 255, 0.56) !important;

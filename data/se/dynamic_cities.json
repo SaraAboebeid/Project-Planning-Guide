@@ -130,5 +130,38 @@
    56.04786,
    12.96298
   ]
+ },
+ "nacka": {
+  "name": "Nacka",
+  "nuts2": "SE11",
+  "bbox4326": [
+   18.10009,
+   59.24687,
+   18.39704,
+   59.36426
+  ],
+  "slug": "nacka",
+  "eubucco": "data/eubucco/nacka.gpkg",
+  "kommun": "Nacka",
+  "region_kommuns": [
+   "Nacka"
+  ],
+  "kommun_codes": {
+   "Nacka": "0182"
+  },
+  "kommun_code": "0182",
+  "clip_to_footprints": true,
+  "on_demand": true,
+  "built": true,
+  "epw": "SWE_ST_Stockholm.024850_TMYx.2011-2025.epw",
+  "stats": {
+   "buildings": 30243,
+   "with_energy": 10029,
+   "epw": "SWE_ST_Stockholm.024850_TMYx.2011-2025.epw"
+  },
+  "center": [
+   59.30557,
+   18.24856
+  ]
  }
 }
