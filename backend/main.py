@@ -20,6 +20,7 @@ except ImportError:
     pass
 # ────────────────────────────────────────────────────────────────────────────
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -30,8 +31,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.idf.generate_idf import build_shoebox_idf
 from backend import simdb
+from backend import accounts
+from backend import pv_optimizer
 
 app = FastAPI(title="Project Planning Guide API", version="0.1.0")
+# Email sign-in + saved projects (backend/accounts.py).
+app.include_router(accounts.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -3413,6 +3418,139 @@ async def pvgis_proxy(
         return r.json()
 
 
+# ── PV optimiser: size rooftop PV against the building's hourly demand ──────
+# Model in backend/pv_optimizer.py. This endpoint gathers its inputs: the
+# hourly electricity use from the building's baseline run, the building's own
+# property electricity from its energy certificate, and hourly solar output
+# from PVGIS.
+
+_PVGIS_HOURLY_CACHE: dict[tuple, list[float]] = {}
+# Göteborg median property electricity for apartment buildings, EPC EgiFastighet
+# / Atemp over 7,632 certificates (national register): fallback when the
+# building's own certificate gives none.
+_PROPERTY_EL_FALLBACK_KWH_M2 = 7.0
+
+
+async def _pvgis_hourly_per_kwp(lat: float, lon: float, angle: float, aspect: float) -> list[float]:
+    import httpx
+    key = (round(lat, 3), round(lon, 3), round(angle), round(aspect))
+    if key not in _PVGIS_HOURLY_CACHE:
+        async with httpx.AsyncClient(timeout=60) as client:
+            r = await client.get("https://re.jrc.ec.europa.eu/api/v5_3/seriescalc", params={
+                "lat": key[0], "lon": key[1], "pvcalculation": 1, "peakpower": 1, "loss": 14,
+                "angle": angle, "aspect": aspect, "startyear": 2019, "endyear": 2019, "outputformat": "json"})
+            r.raise_for_status()
+            hourly = (r.json().get("outputs") or {}).get("hourly") or []
+        if len(hourly) != pv_optimizer.HOURS:
+            raise ValueError(f"PVGIS returned {len(hourly)} hours")
+        # W for a 1 kWp system → kWh per hour
+        _PVGIS_HOURLY_CACHE[key] = pv_optimizer.utc_to_local_standard([float(h.get("P") or 0) / 1000 for h in hourly])
+    return _PVGIS_HOURLY_CACHE[key]
+
+
+def _epc_property_electricity(address: Optional[str], kommun: str) -> Optional[dict]:
+    """Yearly property electricity (kWh) and Atemp from the newest certificate."""
+    if not address:
+        return None
+    addr = address.split("|")[0].strip()
+    con = _epc_con()
+    try:
+        row = con.execute("""
+            SELECT ANY_VALUE(EgiFastighet), ANY_VALUE(EgenAtemp), MAX(Godkand) AS d
+            FROM epc WHERE IdKommun = ? AND lower(IdAdr) = lower(?) AND EgiFastighet > 0
+            GROUP BY FormularId ORDER BY d DESC LIMIT 1""", [kommun, addr]).fetchone()
+    finally:
+        con.close()
+    return {"kwh": float(row[0]), "atemp": float(row[1]) if row[1] else None} if row else None
+
+
+class PvOptimizeRequest(BaseModel):
+    lat: float
+    lon: float
+    address: Optional[str] = None
+    city_id: str = "gothenburg"
+    footprint_m2: float
+    include_households: bool = True
+    angle: float = 35
+    aspect: float = 0            # PVGIS convention: 0 = south
+    buy_sek_kwh: float
+    sell_sek_kwh: float
+    capex_small_sek_kwp: float
+    capex_large_sek_kwp: float
+    vat_on_capex: bool = True
+    discount_rate: float = 0.03
+    lifetime_yr: int = 25
+    degradation: float = 0.005
+    om_pct_capex: float = 0.01
+
+
+@app.post("/api/pv/optimize")
+async def pv_optimize(req: PvOptimizeRequest):
+    """Best rooftop PV size for one building: NPV over the panel life for every
+    size up to what the roof fits, from hourly self-use against its own demand."""
+    run = simdb.latest_done_near(req.lat, req.lon, 25, "baseline")
+    if run is None:
+        raise HTTPException(409, "This building has no finished baseline simulation yet — run the baseline (Step 3) first; the optimiser needs its hourly electricity use.")
+    raw = simdb.get_raw_by_epsm_id(run["batch_id"], run["idf_idx"]).get(run["idf_idx"])
+    series = _timeseries_from_raw(raw, "hourly") or {}
+    if not series:
+        raise HTTPException(409, "The baseline run for this building predates hourly output — re-run the baseline to use the PV optimiser.")
+
+    households = [0.0] * pv_optimizer.HOURS
+    if req.include_households:
+        for end_use in ("lighting", "equipment"):
+            for i, v in enumerate((series.get(end_use) or [])[:pv_optimizer.HOURS]):
+                households[i] += v
+
+    kommun = (_se_cities().get(req.city_id) or {}).get("kommun") or "Göteborg"
+    try:
+        epc_el = await run_in_threadpool(_epc_property_electricity, req.address, kommun)
+    except FileNotFoundError:
+        epc_el = None
+    area = run.get("total_floor_area_m2") or (epc_el or {}).get("atemp")
+    if epc_el:
+        prop_kwh, prop_source = epc_el["kwh"], "the building's energy certificate"
+    elif area:
+        prop_kwh, prop_source = _PROPERTY_EL_FALLBACK_KWH_M2 * area, f"Göteborg median {_PROPERTY_EL_FALLBACK_KWH_M2:g} kWh/m² (no figure on this building's certificate)"
+    else:
+        prop_kwh, prop_source = 0.0, "unknown (no certificate figure and no floor area)"
+    demand = [h + prop_kwh / pv_optimizer.HOURS for h in households]
+
+    try:
+        pv = await _pvgis_hourly_per_kwp(req.lat, req.lon, req.angle, req.aspect)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"PVGIS (EU solar data) is unavailable right now ({type(exc).__name__}). Try again shortly.")
+
+    max_kwp = round(req.footprint_m2 * _PV_ROOF_COVERAGE * _PV_KWP_PER_M2, 1)
+    econ = pv_optimizer.PvEconomics(
+        buy_sek_kwh=req.buy_sek_kwh, sell_sek_kwh=req.sell_sek_kwh,
+        capex_small_sek_kwp=req.capex_small_sek_kwp, capex_large_sek_kwp=req.capex_large_sek_kwp,
+        vat_on_capex=req.vat_on_capex, discount_rate=req.discount_rate, lifetime_yr=req.lifetime_yr,
+        degradation=req.degradation, om_pct_capex=req.om_pct_capex)
+    points = pv_optimizer.sweep(pv, demand, max_kwp, econ)
+    best = max(points, key=lambda p: p.npv_sek) if points else None
+    best_prod = [p * best.kwp for p in pv] if best else [0.0] * pv_optimizer.HOURS
+    return {
+        "max_kwp": max_kwp,
+        "min_kwp": pv_optimizer.MIN_KWP,
+        "roof_usable_m2": round(req.footprint_m2 * _PV_ROOF_COVERAGE),
+        "demand": {"households_kwh": round(sum(households)), "property_kwh": round(prop_kwh),
+                   "property_source": prop_source, "total_kwh": round(sum(demand))},
+        "specific_yield_kwh_kwp": round(sum(pv)),
+        "points": [p.__dict__ for p in points],
+        "best": best.__dict__ if best else None,
+        "profitable": bool(best and best.npv_sek > 0),
+        "monthly": {"demand_kwh": pv_optimizer.monthly(demand), "production_kwh": pv_optimizer.monthly(best_prod),
+                    "self_used_kwh": pv_optimizer.monthly([min(p, d) for p, d in zip(best_prod, demand)])},
+        "assumptions": {
+            "solar": "PVGIS v5.3 hourly series, 2019 (SARAH3), crystalline silicon, 14 % system loss",
+            "tilt_deg": req.angle, "azimuth_from_south_deg": req.aspect,
+            "roof_coverage": _PV_ROOF_COVERAGE, "kwp_per_m2": _PV_KWP_PER_M2,
+            "baseline_batch": run["batch_id"],
+        },
+    }
+
+
 # ── Energy simulation (EPSM) ─────────────────────────────────────────────────
 # Self-hosted EnergyPlus runner (see docker-compose.epsm.yml, tools/idf/) -
 # EPSM_BASE_URL defaults to the port docker-compose.epsm.yml maps its Django
@@ -3651,10 +3789,10 @@ def _envelope_overrides(building: dict, country: str, req) -> dict:
     # UI flags it. Only ADDED insulation and the TABULA tiers are clamped, because
     # adding material can never make a component worse.
     replaced = {c.lower() for c in (getattr(req, "replace_components", None) or [])}
-    for key, comp, fields in (("u_wall_override", "wall", ("u_wall_epc", "tabula_u_wall")),
-                              ("u_roof_override", "roof", ("u_roof_epc", "tabula_u_roof")),
-                              ("u_win_override", "window", ("u_win_epc", "tabula_u_win")),
-                              ("u_floor_override", "floor", ("u_floor_epc", "tabula_u_floor"))):
+    for key, comp, fields in (("u_wall_override", "wall", ("u_wall_recorded", "u_wall_epc", "tabula_u_wall")),
+                              ("u_roof_override", "roof", ("u_roof_recorded", "u_roof_epc", "tabula_u_roof")),
+                              ("u_win_override", "window", ("u_win_recorded", "u_win_epc", "tabula_u_win")),
+                              ("u_floor_override", "floor", ("u_floor_recorded", "u_floor_epc", "tabula_u_floor"))):
         if comp in replaced:
             continue
         current = next((building.get(f) for f in fields if building.get(f) is not None), None)
@@ -3765,6 +3903,85 @@ class BatchBuildingSpec(BaseModel):
     # fractions). Per building, because it comes from that building's own facade
     # photos. Directions not supplied keep the shared/default ratio.
     wwr_by_orientation: Optional[dict[str, float]] = None
+    # U-values (W/m²K) the user recorded for past renovations in Step 2, keys
+    # "wall" / "roof" / "win" / "floor". They describe the building as it is
+    # today, so they replace the as-built values for the baseline AND for every
+    # package that leaves that part alone. See _with_recorded_u.
+    recorded_u: Optional[dict[str, float]] = None
+    # Cells the user changed in the Step 2 table (table field names, e.g.
+    # floors / height_m / u_wall). See _with_user_edits.
+    edits: Optional[dict[str, Any]] = None
+
+
+# Step 2 table fields that change the energy model, → the building-record key
+# the IDF generator reads. Year, energy, EPC class and TABULA period are shown in
+# the table but are not model inputs (the U-values carry the era's effect).
+_EDITABLE_MODEL_FIELDS = {
+    "floors": "floors", "height_m": "height", "building_use": "use_cat",
+    "u_wall": "u_wall_recorded", "u_window": "u_win_recorded", "u_roof": "u_roof_recorded",
+}
+
+
+def _with_user_edits(building: dict, edits: Optional[dict[str, Any]]) -> dict:
+    """Apply what the user corrected in the Step 2 table. Edited U-values count
+    as today's fabric (a recorded renovation, applied after this, still wins).
+    A new footprint scales the real outline evenly about its centre, so walls,
+    roof and floor area all follow and the per-m² figures use the same area."""
+    if not edits:
+        return building
+    b = dict(building)
+    applied: dict[str, Any] = {}
+    for field, key in _EDITABLE_MODEL_FIELDS.items():
+        v = edits.get(field)
+        if v is None or v == "":
+            continue
+        try:
+            if key == "use_cat":
+                b[key] = str(v)
+            elif key == "floors":
+                b[key] = max(1, int(round(float(v))))
+            else:
+                fv = float(v)
+                if fv <= 0:
+                    continue
+                b[key] = fv
+        except (TypeError, ValueError):
+            continue
+        applied[field] = b[key]
+    fp_new = edits.get("footprint_m2")
+    try:
+        fp_new = float(fp_new) if fp_new not in (None, "") else None
+    except (TypeError, ValueError):
+        fp_new = None
+    fp_old = b.get("footprint_m2")
+    if fp_new and fp_new > 0 and fp_old and b.get("coordinates"):
+        s = math.sqrt(fp_new / float(fp_old))
+        ring = b["coordinates"][0]
+        cx = sum(p[0] for p in ring) / len(ring)
+        cy = sum(p[1] for p in ring) / len(ring)
+        b["coordinates"] = [[[cx + (p[0] - cx) * s, cy + (p[1] - cy) * s, *p[2:]] for p in ring], *b["coordinates"][1:]]
+        b["footprint_m2"] = fp_new
+        applied["footprint_m2"] = fp_new
+    if applied:
+        b["user_edits_applied"] = applied
+    return b
+
+
+def _with_user_edits_then_fix(building: dict, edits: Optional[dict[str, Any]], country: str, city_id: Optional[str]) -> dict:
+    b = _with_user_edits(_with_epc_dhw(building, country, city_id), edits)
+    # The height fix guesses which of floors/height is wrong when they disagree;
+    # if the user set either one, that IS the answer, so don't override it.
+    if edits and any(edits.get(k) not in (None, "") for k in ("floors", "height_m")):
+        return b
+    return _with_height_fix(b, country)
+
+
+def _with_recorded_u(building: dict, recorded: Optional[dict[str, float]]) -> dict:
+    if not recorded:
+        return building
+    extra = {f"u_{part}_recorded": float(u) for part, u in recorded.items()
+             if part in ("wall", "roof", "win", "floor") and u is not None and 0 < float(u) < 10}
+    return {**building, **extra} if extra else building
 
 
 class SimulationBatchSubmitRequest(BaseModel):
@@ -3976,7 +4193,10 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
                 raise HTTPException(404, f"No building with real geometry found near building {i} ({b.lat}, {b.lon})")
             building = min(candidates, key=_dist)
         extended, ext_kwargs = _with_extension(
-            _with_height_fix(_with_epc_dhw(building, req.country, city_id), req.country), req)
+            # Order matters: the height fix must see the user's own floors/height
+            # (an explicit edit is not "storeys that don't fit" to second-guess),
+            # and a recorded renovation's U beats a table U.
+            _with_recorded_u(_with_user_edits_then_fix(building, b.edits, req.country, city_id), b.recorded_u), req)
         resolved.append({"lat": b.lat, "lon": b.lon, "address": b.address,
                          "building": extended, "ext_kwargs": ext_kwargs,
                          "wwr_by_orientation": b.wwr_by_orientation})
@@ -4271,6 +4491,82 @@ async def simulation_timeseries(
         "unit": "kWh",
         "labels": _MONTH_LABELS if resolution == "monthly" else list(range(8760)),
         "buildings": buildings,
+    }
+
+
+# ── Peak demand from the hourly results ─────────────────────────────────────
+#
+# Heat = space heating + hot water (what a district-heating substation
+# delivers); electricity = lighting + equipment (households). An EnergyPlus
+# hour is an hourly MEAN, so the true instantaneous peak is somewhat higher;
+# the weather is a typical year (TMYx), not a design-cold year. The highest
+# DAILY average is reported too, because many Swedish district-heating power
+# charges are set on daily mean power rather than a single hour.
+
+def _peak_stats(hourly: list[float], area_m2: Optional[float]) -> dict:
+    if not hourly or max(hourly) <= 0:
+        return {"peak_kw": 0.0}
+    peak = max(hourly)
+    at = hourly.index(peak)
+    days = [sum(hourly[d * 24:(d + 1) * 24]) / 24 for d in range(len(hourly) // 24)]
+    peak_day = max(days)
+    annual = sum(hourly)
+    ranked = sorted(hourly, reverse=True)
+    # ~120 points are plenty for a smooth duration curve.
+    step = max(1, len(ranked) // 120)
+    return {
+        "peak_kw": round(peak, 1), "peak_hour": at,
+        "peak_w_m2": round(peak * 1000 / area_m2, 1) if area_m2 else None,
+        "peak_daily_avg_kw": round(peak_day, 1), "peak_day": days.index(peak_day),
+        "annual_kwh": round(annual),
+        # Equivalent full-load hours: annual energy / peak. Low = a spiky load.
+        "full_load_hours": round(annual / peak) if peak else None,
+        "hours_above_80pct": sum(1 for v in hourly if v >= 0.8 * peak),
+        "duration_curve": [{"hours": i, "kw": round(ranked[i], 2)} for i in range(0, len(ranked), step)] + [{"hours": len(ranked) - 1, "kw": round(ranked[-1], 2)}],
+    }
+
+
+@app.get("/api/simulation-peaks/{batch_id}")
+async def simulation_peaks(batch_id: str, points: Optional[str] = Query(None, description="Only these buildings: 'lat,lon;lat,lon' (matched within 25 m).")):
+    """Peak heat and electricity demand per building of a batch, plus the
+    combined peak of all of them (summed hour by hour, so buildings peaking at
+    different times are not double counted)."""
+    rows = simdb.get_by_epsm_id(batch_id)
+    if not rows:
+        raise HTTPException(404, "Unknown batch_id")
+    if points:
+        wanted = [tuple(float(x) for x in p.split(",")) for p in points.split(";") if "," in p]
+        rows = [r for r in rows if any(_haversine_m(r["lat"], r["lon"], la, lo) <= 25 for la, lo in wanted)]
+    raw_by_idx = await run_in_threadpool(simdb.get_raw_by_epsm_id, batch_id)
+    hours = 8760
+    total_heat, total_el, total_area = [0.0] * hours, [0.0] * hours, 0.0
+    buildings, missing = [], 0
+    for r in rows:
+        series = _timeseries_from_raw(raw_by_idx.get(r["idf_idx"]), "hourly") or {}
+        if not series:
+            missing += 1
+            continue
+        def _sum(keys):
+            out = [0.0] * hours
+            for k in keys:
+                for i, v in enumerate((series.get(k) or [])[:hours]):
+                    out[i] += v
+            return out
+        heat, el = _sum(("heating", "dhw")), _sum(("lighting", "equipment"))
+        area = (r.get("results") or {}).get("total_floor_area_m2")
+        for i in range(hours):
+            total_heat[i] += heat[i]
+            total_el[i] += el[i]
+        total_area += area or 0
+        buildings.append({"idf_idx": r["idf_idx"], "address": r["address"], "lat": r["lat"], "lon": r["lon"],
+                          "floor_area_m2": area, "heat": _peak_stats(heat, area), "electricity": _peak_stats(el, area)})
+    return {
+        "batch_id": batch_id,
+        "buildings": buildings,
+        "total": {"buildings": len(buildings), "floor_area_m2": round(total_area) or None,
+                  "heat": _peak_stats(total_heat, total_area or None),
+                  "electricity": _peak_stats(total_el, total_area or None)} if buildings else None,
+        "without_hourly_data": missing,
     }
 
 
@@ -4898,6 +5194,129 @@ def _epc_cols_rows():
         finally:
             con.close()
     return _EPC_COLS_CACHE, _EPC_ROWS_CACHE
+
+
+# ── Compare a building with similar buildings in its municipality ───────────
+#
+# "Similar" = same EPC building category and construction era, same kommun.
+# Compared on specific energy use (EgiSpecifikEnergianvandning) — the field
+# buildings.json's energy_kwh_m2 comes from, so like is compared with like.
+# The register has one row per address entrance and keeps old certificates, so
+# rows collapse to one per certificate (FormularId) and then to the newest
+# certificate (Godkand) per building (IdFastBet + IdHusnr).
+
+# Step 2 building_use → EPC EgenByggnadsKat. Ancillary/industrial uses have no
+# certificate category to compare with.
+_USE_TO_EPC_KAT = {
+    "bostad_flerfamilj": "Flerbostadshus",
+    "bostad_enfamilj": "En- och tvåbostadshus",
+    "verksamhet": "Lokalbyggnader",
+    "samhalle": "Lokalbyggnader",
+}
+_KAT_LABEL = {"Flerbostadshus": "apartment buildings", "En- och tvåbostadshus": "one- and two-family houses",
+              "Lokalbyggnader": "non-residential buildings"}
+# Construction eras as used in Swedish building-stock statistics (e.g. the
+# "miljonprogram" years 1961–1975 as one band), so an era is a real cohort.
+_ERAS = [(0, 1930), (1931, 1945), (1946, 1960), (1961, 1975), (1976, 1985),
+         (1986, 1995), (1996, 2005), (2006, 2015), (2016, 2100)]
+_MIN_PEERS = 20
+_PEER_CACHE: dict[str, list[tuple[str, int, float]]] = {}
+
+
+def _era_of(year: int) -> tuple[int, int] | None:
+    return next((e for e in _ERAS if e[0] <= year <= e[1]), None)
+
+
+def _era_label(era: tuple[int, int]) -> str:
+    lo, hi = era
+    return f"before {hi + 1}" if lo == 0 else f"built {lo} or later" if hi >= 2100 else f"built {lo}–{hi}"
+
+
+def _kommun_certificates(kommun: str) -> list[tuple[str, int, float]]:
+    """(category, year, kWh/m²) for every building in the kommun, newest certificate each."""
+    if kommun not in _PEER_CACHE:
+        con = _epc_con()
+        try:
+            rows = con.execute("""
+                WITH cert AS (
+                  SELECT FormularId,
+                         ANY_VALUE(IdFastBet) AS fb, ANY_VALUE(IdHusnr) AS hus,
+                         TRIM(ANY_VALUE(EgenByggnadsKat)) AS kat, MIN(EgenNybyggAr) AS yr,
+                         MIN(EgiSpecifikEnergianvandning) AS e, MAX(Godkand) AS d
+                  FROM epc
+                  WHERE IdKommun = ? AND EgiSpecifikEnergianvandning BETWEEN 1 AND 1000
+                  GROUP BY FormularId
+                ), newest AS (
+                  SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY COALESCE(fb, CAST(FormularId AS VARCHAR)), hus ORDER BY d DESC) AS rn
+                  FROM cert
+                )
+                SELECT kat, yr, e FROM newest WHERE rn = 1 AND kat IS NOT NULL AND yr IS NOT NULL
+            """, [kommun]).fetchall()
+        finally:
+            con.close()
+        _PEER_CACHE[kommun] = [(k, int(y), float(e)) for k, y, e in rows]
+    return _PEER_CACHE[kommun]
+
+
+def _quantile(sorted_vals: list[float], q: float) -> float:
+    i = (len(sorted_vals) - 1) * q
+    lo = int(i)
+    hi = min(lo + 1, len(sorted_vals) - 1)
+    return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * (i - lo)
+
+
+class PeerBuilding(BaseModel):
+    key: str
+    building_use: Optional[str] = None
+    year: Optional[int] = None
+    energy_kwh_m2: Optional[float] = None
+
+
+class PeerRequest(BaseModel):
+    city_id: str = "gothenburg"
+    buildings: list[PeerBuilding]
+
+
+@app.post("/api/benchmark/epc-peers")
+async def epc_peers(req: PeerRequest):
+    """Where each building's energy use falls among similar buildings in its
+    municipality (same EPC category and construction era). Per building: the
+    group, its size, quartiles, and the share of the group using MORE energy
+    per m² than this building. A building that can't be compared says why."""
+    kommun = (_se_cities().get(req.city_id) or {}).get("kommun") or "Göteborg"
+    try:
+        certs = await run_in_threadpool(_kommun_certificates, kommun)
+    except FileNotFoundError as exc:
+        raise HTTPException(503, str(exc))
+
+    out = []
+    for b in req.buildings:
+        kat = _USE_TO_EPC_KAT.get(b.building_use or "")
+        era = _era_of(b.year) if b.year else None
+        base = {"key": b.key}
+        if b.energy_kwh_m2 is None:
+            out.append({**base, "reason": "no_energy"}); continue
+        if not kat:
+            out.append({**base, "reason": "no_category"}); continue
+        if not era:
+            out.append({**base, "reason": "no_year"}); continue
+        peers = sorted(e for k, y, e in certs if k == kat and era[0] <= y <= era[1])
+        group = {"kommun": kommun, "category": kat, "category_label": _KAT_LABEL[kat],
+                 "era": list(era), "era_label": _era_label(era)}
+        if len(peers) < _MIN_PEERS:
+            out.append({**base, "reason": "too_few_peers", "group": group, "n": len(peers)}); continue
+        e = b.energy_kwh_m2
+        higher = sum(1 for v in peers if v > e)
+        ties = sum(1 for v in peers if v == e)
+        out.append({**base, "group": group, "n": len(peers),
+                    "p10": round(_quantile(peers, 0.10), 1), "p25": round(_quantile(peers, 0.25), 1),
+                    "median": round(_quantile(peers, 0.5), 1), "p75": round(_quantile(peers, 0.75), 1),
+                    "p90": round(_quantile(peers, 0.90), 1),
+                    # Half the ties count as "using more", so equal values sit mid-way.
+                    "share_using_more_pct": round(100 * (higher + ties / 2) / len(peers))})
+    return {"source": "Boverket energy performance certificates (national register), newest certificate per building",
+            "metric": "specific energy use, kWh/m² Atemp per year", "kommun": kommun, "results": out}
 
 
 # Current heating system per building, inferred from the EPC's delivered-energy-

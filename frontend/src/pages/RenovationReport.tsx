@@ -854,7 +854,6 @@ export default function RenovationReport() {
         area_m2: b.area_atemp,
         use: b.use_cat,
         energyClass: b.eclass,
-        currentEnergyUse_kWh_m2_yr: b.energy,
       })),
       baseline: baselines,
       materialsSelected: materials,
@@ -1032,7 +1031,7 @@ export default function RenovationReport() {
             {buildings.map((b, i) => {
               const bl = baselines[i];
               return (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr repeat(5, auto)", gap: 12, alignItems: "center", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, auto)", gap: 12, alignItems: "center", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{b.address ?? t("Building {n}", { n: i + 1 })}</div>
                     <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{project.country !== "Sweden" ? buildingUseLabel(b.use_cat) : (b.use_cat ?? "—")} · {b.year ?? "—"}</div>
@@ -1044,10 +1043,6 @@ export default function RenovationReport() {
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{isUK && !b.has_epc && b.eclass ? t("Energy class (est.)") : t("Energy class")}</div>
                     <div style={{ fontSize: 13, fontWeight: 900, color: "#E8880C" }}>{b.eclass ?? "—"}</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{b.energy_source === "tabula_estimate" ? t("TABULA estimate") : t("EPC energy")}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{b.energy ? kwh(b.energy) : "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{t("EPSM baseline")}</div>

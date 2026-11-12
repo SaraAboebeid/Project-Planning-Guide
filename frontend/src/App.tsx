@@ -24,6 +24,9 @@ import BEMapViewer from "./pages/BEMapViewer";
 import UKDataExplorer from "./pages/UKDataExplorer";
 import BEDataExplorer from "./pages/BEDataExplorer";
 import { useWizardStore } from "./store/wizard";
+import { useAuth } from "./store/auth";
+import { LoginPage, LoginVerifyPage } from "./pages/Login";
+import Projects from "./pages/Projects";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -62,11 +65,16 @@ function Step5Router() {
  *  5 – Results & Budget      (deliverables, timeline, CAPEX pre-filled from scenarios)
  */
 export default function App() {
+  const refreshAuth = useAuth((s) => s.refresh);
+  useEffect(() => { refreshAuth(); }, [refreshAuth]);
   return (
     <>
       <ScrollToTop />
       <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/login"        element={<DataLayout title="Sign in" accentColor="var(--brand)" accentBadge="Account"><LoginPage /></DataLayout>} />
+      <Route path="/login/verify" element={<DataLayout title="Sign in" accentColor="var(--brand)" accentBadge="Account"><LoginVerifyPage /></DataLayout>} />
+      <Route path="/projects"     element={<DataLayout title="My projects" accentColor="var(--brand)" accentBadge="Account"><Projects /></DataLayout>} />
       {/* The workspace/toolbox selection now lives on the home page itself. */}
       <Route path="/workspace" element={<Navigate to="/" replace />} />
       <Route path="/data"      element={<DataLayout><DataExplorer /></DataLayout>} />

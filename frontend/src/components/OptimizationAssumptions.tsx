@@ -33,7 +33,10 @@ function AssumptionRow({ a, liveText }: { a: Assumption; liveText?: string | nul
         </div>
       )}
       {a.note && <div style={{ fontSize: 11, color: white(0.42), marginTop: 4 }}>{a.note}</div>}
-      <a href={a.sourceUrl} target="_blank" rel="noreferrer" style={{ fontSize: 10.5, color: "#9B7FD4", textDecoration: "none", marginTop: 4, display: "inline-block" }}>Source: {a.source} ↗</a>
+      {/* An assumption with no published source says so instead of linking somewhere unrelated. */}
+      {a.sourceUrl
+        ? <a href={a.sourceUrl} target="_blank" rel="noreferrer" style={{ fontSize: 10.5, color: "#9B7FD4", textDecoration: "none", marginTop: 4, display: "inline-block" }}>Source: {a.source} ↗</a>
+        : <span style={{ fontSize: 10.5, color: white(0.42), marginTop: 4, display: "inline-block" }}>Source: {a.source}</span>}
     </div>
   );
 }

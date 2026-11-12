@@ -267,6 +267,10 @@ export const api = {
       lat: number; lon: number; address?: string | null; building?: Record<string, unknown>;
       /** This building's own glazed share per facade, as fractions. */
       wwr_by_orientation?: Record<string, number>;
+      /** U-values recorded for past renovations (Step 2): wall / roof / win / floor. */
+      recorded_u?: Record<string, number>;
+      /** Cells the user changed in the Step 2 table (table field names). */
+      edits?: Record<string, unknown>;
     }>;
     wwr_override?: number;
     u_wall_override?: number; u_roof_override?: number; u_win_override?: number; u_floor_override?: number;

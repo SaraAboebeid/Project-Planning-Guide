@@ -9,7 +9,10 @@ import {
   Globe, MapPin, Users, User, Lock, Building2, ArrowRight,
   ChevronRight, Plus, Loader2, CheckCircle2, AlertTriangle,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useT, translate } from "../i18n";
+import { useAuth } from "../store/auth";
+import { RETURN_KEY } from "../pages/Login";
 
 /* ── Home-page workspace panels ────────────────────────────────────────────────
    The toolbox selection (country, city, add a municipality, focus, access mode)
@@ -23,13 +26,30 @@ const ACCENT = "#8B5CF6";
 /* ── Selection card ──────────────────────────────────────────────────────────── */
 export interface DatasetMetric { label: string; value: string; color: string }
 
+/** Chalmers accounts get the Chalmers card; every other allowed domain
+ *  (Framtiden, Poseidon, Nacka, HSB …) is a partner. */
+function isChalmersEmail(email: string): boolean {
+  const domain = email.split("@")[1]?.toLowerCase() ?? "";
+  return domain === "chalmers.se" || domain.endsWith(".chalmers.se");
+}
+
 export function WorkspaceCard({ country, city, metrics, onCountry, onCity, onStart }: {
   country: CountryCode; city: string; metrics: DatasetMetric[];
   onCountry: (c: CountryCode) => void; onCity: (c: string) => void;
   onStart: () => void;
 }) {
-  const [accessMode, setAccessMode] = useState<"guest" | "chalmers" | "partner">("guest");
+  const navigate = useNavigate();
+  const email = useAuth((s) => s.email);
+  const signOut = useAuth((s) => s.signOut);
+  // Signed in, the access mode IS the account: it is shown, not chosen.
+  const accessMode: "guest" | "chalmers" | "partner" = !email ? "guest" : isChalmersEmail(email) ? "chalmers" : "partner";
   const t = useT();
+  // Both logins use the same email-link sign-in (backend/accounts.py); the
+  // allowed domains decide who gets in. Come back here afterwards.
+  const goSignIn = () => {
+    try { sessionStorage.setItem(RETURN_KEY, "/"); } catch { /* storage blocked */ }
+    navigate("/login");
+  };
   const def = COUNTRIES.find((c) => c.id === country)!;
   const enabledCountries = COUNTRIES.filter((c) => c.cities.some((n) => cityEnabled(c.id, n)));
   return (
@@ -56,13 +76,19 @@ export function WorkspaceCard({ country, city, metrics, onCountry, onCity, onSta
         <div className="flex-1">
           <div className="text-[13px] text-white/55 mb-2">{t("Access mode")}</div>
           <div className="grid grid-cols-3 gap-2.5">
-            <AccessCard active={accessMode === "guest"} onClick={() => setAccessMode("guest")}
-              icon={User} title={t("Guest Demo")} sub={t("Explore as guest")} />
-            <AccessCard active={accessMode === "chalmers"} soon icon={Lock}
-              title={t("Chalmers Login")} sub={t("Sign in with Chalmers")} />
-            <AccessCard active={accessMode === "partner"} soon icon={Building2}
-              title={t("Partner Login")} sub={t("Sign in with partner")} />
+            <AccessCard active={accessMode === "guest"} onClick={email ? () => signOut() : undefined}
+              icon={User} title={t("Guest Demo")} sub={email ? t("Sign out and explore as guest") : t("Explore as guest")} />
+            <AccessCard active={accessMode === "chalmers"} onClick={accessMode === "chalmers" ? undefined : goSignIn} icon={Lock}
+              title={t("Chalmers Login")} sub={accessMode === "chalmers" ? email! : t("Sign in with Chalmers")} />
+            <AccessCard active={accessMode === "partner"} onClick={accessMode === "partner" ? undefined : goSignIn} icon={Building2}
+              title={t("Partner Login")} sub={accessMode === "partner" ? email! : t("Sign in with partner")} />
           </div>
+          {email && (
+            <div className="text-[11.5px] text-white/45 mt-2">
+              {t("Signed in — your projects are saved to your account.")}{" "}
+              <button onClick={() => navigate("/projects")} className="font-semibold" style={{ color: "#4ECDC4" }}>{t("My projects")}</button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -268,7 +294,7 @@ function AccessCard({ active, soon, icon: Icon, title, sub, onClick }: {
       {soon && <span className="absolute top-1.5 right-1.5 text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}>{translate("Soon")}</span>}
       <Icon size={17} className={active ? "" : "text-white/50"} color={active ? ACCENT : undefined} />
       <span className="text-[12px] font-semibold text-white/85">{title}</span>
-      <span className="text-[10px] text-white/40 leading-tight">{sub}</span>
+      <span className="text-[10px] text-white/40 leading-tight max-w-full truncate" title={sub}>{sub}</span>
     </button>
   );
 }

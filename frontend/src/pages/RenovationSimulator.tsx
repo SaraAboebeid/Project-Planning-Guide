@@ -23,6 +23,10 @@ import { useWizardStepNav, setWizardNextInfo } from "../components/wizardNav";
 import OptimizerPanel from "../components/OptimizerPanel";
 import ComponentValuePanel from "../components/ComponentValuePanel";
 import AssemblyBuilder from "../components/AssemblyBuilder";
+import RecommendedMeasuresPanel from "../components/RecommendedMeasuresPanel";
+import PvOptimizerPanel from "../components/PvOptimizerPanel";
+import PeakDemandPanel from "../components/PeakDemandPanel";
+import { recommendComponents, effectiveScope, recordedUForSimulation, type RecBuilding } from "../utils/renovationRecommendations";
 import { ASSUMPTIONS, MODEL_ASSUMPTIONS } from "../config/optimizationAssumptions";
 import { computeAssemblyU, MATERIAL_BY_ID, type AssemblyLayer, type ComponentKind } from "../config/assemblyLayers";
 import { computeAssemblyCarbon, nearestWikellsAssembly } from "../utils/assemblyCosting";
@@ -793,20 +797,6 @@ export default function RenovationSimulator() {
   const COUNTRY = isUK ? "gb" : isBE ? "be" : "se";
   MONEY = isUK ? "GBP" : isBE ? "EUR" : "SEK";   // what fmtSEK prints for this project
 
-  const components = project.renovationEnvelopeComponents.length > 0
-    ? project.renovationEnvelopeComponents
-    : ["Walls", "Roof", "Windows"];
-  const lineItems = useMemo(() => lineItemsFor(components), [components]);
-
-  /* What's actually in scope decides which Step-4 sections render. "Heating
-     system" has no envelope line item, so a heating-only scope has an empty
-     lineItems — in that case we hide the whole envelope flow (design configs,
-     packages, Pareto optimizer, results) and show only the HVAC comparison.
-     Conversely the HVAC panel appears only when heating is in scope (whether
-     picked in Step 1 or added here in Step 4). */
-  const hasEnvelope = lineItems.length > 0;
-  const hasHeating  = components.includes("Heating system");
-
   /* Every building selected in Step 2 - not just the first one. For a bbox /
      neighbourhood selection they are ordered by MCDA retrofit priority (energy +
      façade condition + characteristics + potential) so EPSM runs — and results
@@ -835,9 +825,97 @@ export default function RenovationSimulator() {
     [buildings, project.renovationBaselineResults],
   );
 
+  /* The component scope is no longer asked in Step 1: it is recommended here
+     from each building's age, recorded renovations, façade defects and U-values,
+     and the user's include/exclude choices override it. Keys must match the
+     ones Step 2 stored facadeDefects / buildingHistory under, so they are made
+     over the same list in the same order (bboxRows, else the address lookups). */
+  const recBuildings = useMemo<RecBuilding[]>(() => {
+    const lookups = project.lookedUpBuildings.length > 0 ? project.lookedUpBuildings
+      : project.lookedUpBuilding ? [project.lookedUpBuilding] : [];
+    const source: (BuildingLookup | BuildingRecord)[] = lookups.length ? lookups : project.bboxRows;
+    const keys = makeBuildingKeys(lookups.length
+      ? lookups.map((b) => ({ address: b.address, lat: b.lat, lon: b.lon }))
+      : project.bboxRows);
+    const keyOf = new Map<object, string>(source.map((b, i) => [b, keys[i]!]));
+    return shortlisted.map((b, i) => {
+      const rec = "year_built" in b ? b : null;
+      const look = rec ? null : (b as BuildingLookup);
+      return {
+        key: keyOf.get(b) ?? `bldg-${i}`,
+        label: b.address || t("Building {n}", { n: i + 1 }),
+        yearBuilt: rec ? rec.year_built : look!.year,
+        floors: b.floors ?? null,
+        heightM: rec ? rec.height_m : look!.height,
+        u: rec
+          ? { Walls: rec.u_wall_epc ?? rec.u_wall, Roof: rec.u_roof_epc ?? rec.u_roof, Windows: rec.u_win_epc ?? rec.u_window, Floor: rec.u_floor_epc ?? rec.u_floor ?? null }
+          : { Walls: look!.tabula_u_wall, Roof: look!.tabula_u_roof, Windows: look!.tabula_u_win },
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shortlisted, project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows]);
+
+  // Geometry → Step 2 key, for anything keyed per building (recorded U-values).
+  const recKeyByLatLon = useMemo(
+    () => new Map(shortlisted.map((b, i) => [`${b.lat},${b.lon}`, recBuildings[i]?.key ?? ""])),
+    [shortlisted, recBuildings],
+  );
+
+  const editsByLatLon = useMemo(
+    () => new Map(shortlisted.flatMap((b) => {
+      const e = (b as BuildingRecord).user_edits;
+      return e ? [[`${b.lat},${b.lon}`, e] as const] : [];
+    })),
+    [shortlisted],
+  );
+
+  const componentRecs = useMemo(
+    () => recommendComponents(recBuildings, project.facadeDefects ?? {}, project.buildingHistory ?? {},
+      { useBbrTargets: project.country === "Sweden" || project.country == null }),
+    [recBuildings, project.facadeDefects, project.buildingHistory, project.country],
+  );
+  const scopeOverrides = project.renovationScopeOverrides ?? {};
+  const components = useMemo(
+    () => effectiveScope(componentRecs, scopeOverrides),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [componentRecs, JSON.stringify(scopeOverrides)],
+  );
+  // Steps 2, 5 and the report still read the scope from the store.
+  useEffect(() => {
+    if (components.join("|") !== project.renovationEnvelopeComponents.join("|")) {
+      setProject({ renovationEnvelopeComponents: components });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [components]);
+  const lineItems = useMemo(() => lineItemsFor(components), [components]);
+
+  /* What's actually in scope decides which Step-4 sections render. "Heating
+     system" has no envelope line item, so a heating-only scope has an empty
+     lineItems — in that case we hide the whole envelope flow (design configs,
+     packages, Pareto optimizer, results) and show only the HVAC comparison.
+     Conversely the HVAC panel appears only when heating is in scope. */
+  const hasEnvelope = lineItems.length > 0;
+  const hasHeating  = components.includes("Heating system");
+
+  // A U-value recorded for a past renovation (Step 2) is today's value, so it
+  // replaces the era-typical one everywhere Step 4 reads "current U": the
+  // optimiser's starting point, "add to existing" build-ups and the hints.
   const geometries = useMemo(
-    () => shortlisted.map((b) => resolveBuildingGeometry(b)).filter((g): g is ResolvedBuildingGeometry => g !== null),
-    [shortlisted]
+    () => shortlisted.map((b) => {
+      const g = resolveBuildingGeometry(b);
+      if (!g) return null;
+      const key = recKeyByLatLon.get(`${b.lat},${b.lon}`);
+      const rec = key ? recordedUForSimulation(project.buildingHistory?.[key]) : undefined;
+      if (!rec) return g;
+      const cur = g.currentU ?? { wall: null, roof: null, win: null, floor: null };
+      return {
+        ...g,
+        tabulaUWall: rec.wall ?? g.tabulaUWall, tabulaURoof: rec.roof ?? g.tabulaURoof,
+        tabulaUWin: rec.win ?? g.tabulaUWin, tabulaUFloor: rec.floor ?? g.tabulaUFloor,
+        currentU: { wall: rec.wall ?? cur.wall, roof: rec.roof ?? cur.roof, win: rec.win ?? cur.win, floor: rec.floor ?? cur.floor },
+      };
+    }).filter((g): g is ResolvedBuildingGeometry => g !== null),
+    [shortlisted, recKeyByLatLon, project.buildingHistory]
   );
 
   const [wwrByIndex, setWwrByIndex] = useState<Record<number, WWRRecord | null>>({});
@@ -1022,7 +1100,16 @@ export default function RenovationSimulator() {
       const { batch_id } = await api.simulationBatchSubmit({
         country: COUNTRY,
         ...(isUK || isBE ? {} : { city_id: seCityId(project.city) }),
-        buildings: entries.map(({ g }) => ({ lat: g.lat, lon: g.lon, address: g.address })),
+        // Recorded renovations describe the building today, so every package is
+        // simulated on top of them (the backend applies a package's own U last).
+        buildings: entries.map(({ g }) => {
+          const key = recKeyByLatLon.get(`${g.lat},${g.lon}`);
+          const recorded = key ? recordedUForSimulation(useWizardStore.getState().project.buildingHistory?.[key]) : undefined;
+          // Step 2 table corrections (floors, height, U-values …) for this building.
+          const edits = editsByLatLon.get(`${g.lat},${g.lon}`);
+          return { lat: g.lat, lon: g.lon, address: g.address,
+            ...(recorded ? { recorded_u: recorded } : {}), ...(edits ? { edits } : {}) };
+        }),
         package_id: packageId, package_label: packageLabel ?? null,
         ...overrides,
         ...(replace.length ? { replace_components: replace } : {}),
@@ -2302,7 +2389,9 @@ export default function RenovationSimulator() {
   // Inside a Step 4 view, the footer's Continue walks to the next view
   // (Materials → Optimisation → Results → Systems) and Back walks back through
   // them; only past the last / first view does it leave Step 4.
-  const systemsAvailable = hasHeating && !isBE && baselineAgg?.avgHeatingKwhM2Yr != null;
+  // Systems = heating-system comparison and, in Sweden, rooftop solar — so in
+  // Sweden it is worth opening even when heating is not in scope.
+  const systemsAvailable = (hasHeating || (!isUK && !isBE)) && !isBE && baselineAgg?.avgHeatingKwhM2Yr != null;
   const VIEW_NEXT: Record<number, { n: number; label: string; hint: string } | null> = {
     1: hasEnvelope ? { n: 2, label: t("Optimisation & Screening"), hint: t("evaluate every combination with the fast model and shortlist packages to simulate.") }
                    : { n: 3, label: t("Simulation Results & Comparison"), hint: t("simulate your packages in EnergyPlus and compare the verified outcomes.") },
@@ -2349,6 +2438,21 @@ export default function RenovationSimulator() {
         </div>
       )}
 
+      {/* Decides the scope everything below designs for, so it sits above the
+          views — shown on the first view (or when nothing envelope-wise is in
+          scope, so the user can always get back to it). */}
+      {geometries.length > 0 && (openStage == null || openStage === 1 || !hasEnvelope) && (
+        <RecommendedMeasuresPanel
+          recs={componentRecs}
+          scope={components}
+          overrides={scopeOverrides}
+          buildingCount={recBuildings.length}
+          showBbr={project.country === "Sweden" || project.country == null}
+          onToggle={(c, include) => setProject({ renovationScopeOverrides: { ...(useWizardStore.getState().project.renovationScopeOverrides ?? {}), [c]: include } })}
+          onReset={() => setProject({ renovationScopeOverrides: {} })}
+        />
+      )}
+
       {geometries.length > 0 && (
         <>
           <div ref={(el) => { stageRefs.current[1] = el; }} style={{ scrollMarginTop: 80 }} />
@@ -2369,18 +2473,20 @@ export default function RenovationSimulator() {
                     : t("As-built {base} kWh/m²·yr · pick materials per component", { base }) },
                 { n: 2, title: t("Optimisation & Screening"), desc: t("All combinations on the fast model — shortlist for simulation"), icon: <ScatterChart size={19} />,
                   disabled: !hasEnvelope || !!optimizerInput.disabledReason,
-                  status: !hasEnvelope ? t("No envelope components selected in Step 1")
+                  status: !hasEnvelope ? t("No envelope components ticked under Recommended measures")
                     : optimizerInput.disabledReason ?? t("{n} components · trade-offs over every combination", { n: optimizerInput.input?.components.length ?? 0 }) },
                 { n: 3, title: t("Simulation Results & Comparison"), desc: t("EnergyPlus-verified outcomes of simulated packages"), icon: <BarChart3 size={19} />,
                   disabled: designed.length === 0,
                   status: running ? t("Simulations running — results fill in automatically")
                     : done.length ? `${t(done.length === 1 ? "{n} package vs baseline" : "{n} packages vs baseline", { n: done.length })}${best > -Infinity ? ` · ${t("best −{pct}% energy", { pct: best })}` : ""}`
                     : t("Run a package to compare it with the baseline") },
-                { n: 4, title: t("Systems"), desc: t("Heating-system alternatives for the selected scenarios"), icon: <SlidersHorizontal size={19} />,
-                  disabled: !hasHeating || isBE || base == null,
+                { n: 4, title: t("Systems"), desc: t(isUK ? "Heating-system alternatives for the selected scenarios" : "Heating-system alternatives and rooftop solar"), icon: <SlidersHorizontal size={19} />,
+                  disabled: isBE || base == null || (isUK && !hasHeating),
                   status: isBE ? t("Not available for Belgium yet")
-                    : !hasHeating ? t("Add “Heating system” to the components in Step 1")
-                    : base == null ? t("Needs the baseline") : t("Compare heating systems on this building's demand") },
+                    : base == null ? t("Needs the baseline")
+                    : isUK && !hasHeating ? t("Tick “Heating system” under Recommended measures")
+                    : !hasHeating ? t("Size rooftop solar · tick “Heating system” to also compare heating")
+                    : isUK ? t("Compare heating systems on this building's demand") : t("Compare heating systems and size rooftop solar") },
               ];
             })()}
           />
@@ -2536,7 +2642,7 @@ export default function RenovationSimulator() {
               })()}
               {lineItems.length === 0 && (
                 <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>
-                  {t("No components selected. Go back to Step 1.")}
+                  {t("No components ticked. Choose them under Recommended measures above.")}
                 </p>
               )}
             </div>
@@ -3304,6 +3410,33 @@ export default function RenovationSimulator() {
               floorAreaM2={totalFloorAreaM2}
               discountRate={assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03}
               catalogue={ukHvac}
+            />
+          )}
+
+          {/* Peak demand, baseline vs every finished package (Results view).
+              Climate-scenario copies (`__<scenario>`) run on other weather and
+              would not be a like-for-like comparison, so they are left out. */}
+          {openStage === 3 && (() => {
+            const baseBatch = packages.find((p) => p.isBaseline && p.batchId)?.batchId ?? project.baselineBatchId;
+            const done = packages.filter((p) => !p.isBaseline && p.batchId && !p.id.includes("__")
+              && p.buildings.length > 0 && p.buildings.every((b) => b.status === "completed"));
+            if (!baseBatch || done.length === 0) return null;
+            return (
+              <PeakDemandPanel
+                scenarios={[{ label: t("Baseline"), batchId: baseBatch }, ...done.map((p) => ({ label: p.name, batchId: p.batchId! }))]}
+                points={geometries.map((g) => ({ lat: g.lat, lon: g.lon }))}
+              />
+            );
+          })()}
+
+          {/* Rooftop PV — Sweden only: the prices, tax rules and EPC property
+              electricity it rests on are Swedish. Independent of the heating
+              system, so it shows whether or not heating is in scope. */}
+          {openStage === 4 && !isUK && !isBE && baselineAgg?.avgTotalKwhM2Yr != null && (
+            <PvOptimizerPanel
+              buildings={geometries.map((g) => ({ address: g.address, lat: g.lat, lon: g.lon, footprintM2: g.footprintM2 }))}
+              cityId={seCityId(project.city)}
+              discountRate={assumptionValue("SE", "discount_rate") ?? 0.03}
             />
           )}
 

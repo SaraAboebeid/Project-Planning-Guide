@@ -130,6 +130,9 @@ export interface BuildingRecord {
   u_roof_epc?: number | null;
   u_win_epc?: number | null;
   u_floor_epc?: number | null;
+  /** Cells the user changed in the Step 2 table (field → new value), carried
+   *  with the row so Steps 3–4 send them to the simulation. */
+  user_edits?: Record<string, unknown>;
 }
 
 /** Saved AI WWR record from the local database */

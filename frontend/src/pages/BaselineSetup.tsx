@@ -9,8 +9,10 @@ import {
 } from "recharts";
 import { Building2, Zap, Loader2, BarChart2, Thermometer, Droplets, Download, Lightbulb, Cpu } from "lucide-react";
 import BaselineLoadProfile from "../components/BaselineLoadProfile";
+import PeakDemandPanel from "../components/PeakDemandPanel";
 import ModelScopeNotice from "../components/ModelScopeNotice";
 import { makeBuildingKeys } from "../utils/retrofitPriority";
+import { recordedUForSimulation } from "../utils/renovationRecommendations";
 import { excludesHouseholdElectricity, reportedTotalKwhM2 } from "../utils/energyTotals";
 import { useT } from "../i18n";
 
@@ -145,6 +147,13 @@ export default function BaselineSetup() {
   );
   /** Same keys the Step 2 façade panel stored its photos and glazing under. */
   const runKeys = useMemo(() => makeBuildingKeys(runList), [runList]);
+  /** The Step 2 table edits of each building in runList (same order), sent with
+   *  it so the model is built from the corrected data, not the server's copy. */
+  const runEdits = useMemo(() => {
+    const fromTable = project.lookedUpBuildings.length === 0 && !project.lookedUpBuilding;
+    return buildings.flatMap((_, i) => effectiveSelected.has(i)
+      ? [fromTable ? project.bboxRows[i]?.user_edits : undefined] : []);
+  }, [buildings, effectiveSelected, project.bboxRows, project.lookedUpBuildings, project.lookedUpBuilding]);
 
   function applySelection(nextSet: Set<number>, mode: "step2" | "all" | "custom") {
     setSelected(nextSet);
@@ -292,9 +301,13 @@ export default function BaselineSetup() {
           const byOrientation = Object.fromEntries(
             Object.entries(measured ?? {}).map(([dir, v]) => [dir, v!.wwr]),
           );
+          // U-values the user recorded for past renovations (Step 2).
+          const recorded = recordedUForSimulation(project.buildingHistory?.[runKeys[i]!]);
           return {
             lat: b.lat, lon: b.lon, address: b.address,
             ...(Object.keys(byOrientation).length ? { wwr_by_orientation: byOrientation } : {}),
+            ...(recorded ? { recorded_u: recorded } : {}),
+            ...(runEdits[i] ? { edits: runEdits[i] } : {}),
           };
         }),
         package_id: "baseline",
@@ -855,6 +868,9 @@ export default function BaselineSetup() {
                 batchId={project.baselineBatchId}
                 addresses={results.map((r, i) => r.address || t("Building {n}", { n: i + 1 }))}
               />
+            )}
+            {project.baselineBatchId && (
+              <PeakDemandPanel scenarios={[{ label: t("Baseline"), batchId: project.baselineBatchId }]} />
             )}
             {project.country === "Belgium" ? (
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>

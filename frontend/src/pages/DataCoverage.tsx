@@ -1,10 +1,12 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { Fragment, useState, useMemo, useEffect, useRef } from "react";
 import { useWizardStore } from "../store/wizard";
 import { api } from "../api/client";
 import { ukViewerCityId, beViewerCityId, seCityId } from "../config/countryNav";
 import { setWizardCanNext, setWizardNextError } from "../components/wizardNav";
 import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import FacadeDefectPanel, { type FacadeBuilding } from "../components/FacadeDefectPanel";
+import BuildingHistoryPanel, { OwnerCell, RenovationsCell, OwnerSuggestions, type HistoryBuilding } from "../components/BuildingHistoryPanel";
+import PeerComparisonPanel, { type PeerBuildingRow } from "../components/PeerComparisonPanel";
 import RetrofitPriorityPanel from "../components/RetrofitPriorityPanel";
 import ModelScopeNotice from "../components/ModelScopeNotice";
 import { buildingUseLabel } from "../utils/useLabels";
@@ -730,6 +732,9 @@ const BBOX_CSV_COLS: { key: keyof BuildingRecord; label: string }[] = [
   { key: "u_wall",                      label: "U-Wall" },
   { key: "u_window",                    label: "U-Window" },
 ];
+// On screen the cadastral id gives way to Owner + Past renovations (it stays in
+// the CSV export, where it is the join key people need).
+const BBOX_TABLE_COLS = BBOX_CSV_COLS.filter((c) => c.key !== "cadastral_id");
 
 /** What the per-address EPC lookup returns: current heating plus the newest
  *  certificate's issue date and its expiry (issue + 10 years). */
@@ -1007,6 +1012,35 @@ function BboxDataBanner({
   const t = useT();
   const [loading, setLoading]         = useState(false);
   const [rows, setRows]               = useState<BuildingRecord[] | null>(null);
+  // Each row's key, fixed when the rows are LOADED: an edited address must not
+  // re-key a building and orphan its edits, renovations or façade results.
+  const [rowKeys, setRowKeys] = useState<string[]>([]);
+  // Owner + past renovations are kept per building under the same keys the
+  // façade panel and Step 4 use (makeBuildingKeys over the table's rows).
+  const historyKeys = useMemo(() => (rowKeys.length === (rows?.length ?? 0) ? rowKeys : makeBuildingKeys(rows ?? [])), [rows, rowKeys]);
+
+  /* Table edits must reach the simulation and survive a reload of the rows.
+     Every changed cell is written to project.buildingEdits (per row key) and
+     onto the row as `user_edits`, which Steps 3–4 send to the backend. */
+  function recordEdits(prev: BuildingRecord[], next: BuildingRecord[]) {
+    const all = { ...(useWizardStore.getState().project.buildingEdits ?? {}) };
+    const out = next.map((r, i) => {
+      const p = prev[i];
+      if (!p || p === r) return r;
+      const changed: Record<string, unknown> = {};
+      for (const f of Object.keys(r) as (keyof BuildingRecord)[]) {
+        if (f === "user_edits") continue;
+        if (r[f] !== p[f]) changed[f] = r[f];
+      }
+      if (!Object.keys(changed).length) return r;
+      const key = historyKeys[i] ?? `bldg-${i}`;
+      all[key] = { ...(all[key] ?? {}), ...changed };
+      return { ...r, user_edits: all[key] };
+    });
+    useWizardStore.getState().setProject({ buildingEdits: all });
+    return out;
+  }
+  const buildingHistory = useWizardStore((s) => s.project.buildingHistory) ?? {};
   const [viewOpen, setViewOpen]       = useState(false);
   const [page, setPage]               = useState(0);
   const [selected, setSelected]       = useState<Set<number>>(new Set());
@@ -1109,9 +1143,17 @@ function BboxDataBanner({
     if (!bbox && !district) return;
     setLoading(true);
     try {
-      const data = district
+      const fresh = district
         ? await api.buildingsByDistrict(district)
         : await api.buildingsBboxList(bbox!.north, bbox!.south, bbox!.east, bbox!.west, polygon ?? undefined, country);
+      // Re-apply the user's earlier table edits on top of the server's rows.
+      const keys = makeBuildingKeys(fresh);
+      const saved = useWizardStore.getState().project.buildingEdits ?? {};
+      const data = fresh.map((r, i) => {
+        const e = saved[keys[i]!];
+        return e ? ({ ...r, ...e, user_edits: e } as BuildingRecord) : r;
+      });
+      setRowKeys(keys);
       setRows(data);
       // Auto-select the whole selection (district or drawn shape) so Steps 3-4
       // simulate all of it (the user can still uncheck buildings to narrow).
@@ -1202,8 +1244,9 @@ function BboxDataBanner({
       const { byKey, fields } = normalizeImport(records);
       if (!byKey.size) { setImportMsg(t("No usable rows — need an Address (or Cadastral ID) column plus data columns (e.g. Energy, Year, U-Wall).")); return; }
       let matched = 0, changed = 0;
-      setRows(prev => {
-        if (!prev) return prev;
+      if (!rows) return;
+      setRows(recordEdits(rows, (() => {
+        const prev = rows;
         return prev.map(r => {
           const keys = [_normKey(String(r.address ?? "")), _normKey(String(r.cadastral_id ?? ""))].filter(Boolean);
           const upd = keys.map(k => byKey.get(k)).find(Boolean);
@@ -1218,7 +1261,7 @@ function BboxDataBanner({
           }
           return merged as unknown as BuildingRecord;
         });
-      });
+      })()));
       const dataFields = [...fields].filter(f => f !== "address" && f !== "cadastral_id");
       setImportMsg(matched === 0
         ? `⚠ ${t("{src}: matched 0 buildings — check that the Address / Cadastral ID values match the table.", { src: sourceName })}`
@@ -1259,7 +1302,7 @@ function BboxDataBanner({
   }
 
   function saveEditMode() {
-    if (editDraftRows) setRows(editDraftRows);
+    if (editDraftRows && rows) setRows(recordEdits(rows, editDraftRows));
     setEditing(false);
     setEditDraftRows(null);
     setImportMsg("✓ " + t("Table edits saved for this session."));
@@ -1587,14 +1630,15 @@ function BboxDataBanner({
       {viewOpen && rows && (
         <div className="border-t border-white/10">
           {/* Row count */}
-          <div className="flex items-center gap-2 px-4 pt-2 pb-1 text-[10px] text-white/40">
+          <div className="flex items-center gap-2 px-4 pt-2 pb-1 text-[11.5px] text-white/40">
             <span className="text-white/45">{t("↕ Tip: click a column header to sort — click again to flip high ↔ low.")}</span>
             <span className="ml-auto text-gray-400">
               {t("Showing {a}–{b} of {n}", { a: page * PAGE_SIZE + 1, b: Math.min((page + 1) * PAGE_SIZE, rows.length), n: rows.length })}
             </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-[10px] border-collapse">
+            <OwnerSuggestions />
+            <table className="w-full text-[12.5px] border-collapse">
               <thead>
                 <tr className="bg-white/8">
                   {/* Select-all checkbox */}
@@ -1608,18 +1652,20 @@ function BboxDataBanner({
                       title={t("Select / deselect all on this page")}
                     />
                   </th>
-                  {BBOX_CSV_COLS.map(c => {
+                  {BBOX_TABLE_COLS.map(c => {
                     const active = tableSort?.key === c.key;
                     return (
-                      <th key={c.key}
+                      <Fragment key={c.key}>
+                      <th
                           onClick={() => toggleSort(c.key)}
                           title={t("Sort by this column (click again to flip high ↔ low)")}
                           className={`px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap cursor-pointer select-none transition-colors hover:bg-white/10 hover:text-white ${active ? "text-white" : "text-white/60"}`}>
                         {t(c.label)}
-                        <span className="ml-1 text-[9px]" style={{ opacity: active ? 1 : 0.55 }}>
+                        <span className="ml-1 text-[10px]" style={{ opacity: active ? 1 : 0.55 }}>
                           {active ? (tableSort!.asc ? "▲" : "▼") : "↕"}
                         </span>
                       </th>
+                      </Fragment>
                     );
                   })}
                   {EPC_DATE_COLS.map(col => (
@@ -1633,6 +1679,14 @@ function BboxDataBanner({
                   ))}
                   <th className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60" title={t("Current heating system, inferred from the Boverket EPC (energideklaration)")}>
                     {t("Current heating")}
+                  </th>
+                  {/* What no dataset records — entered here, used by Step 4's
+                      recommendations and every simulation (BuildingHistoryPanel). */}
+                  <th className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60"
+                      title={t("Who owns the building — no dataset records it")}>{t("Owner")}</th>
+                  <th className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60"
+                      title={t("If you know the U-value after the renovation, add it too: the energy simulations in Steps 3 and 4 then use it instead of the value typical for the building's era (re-run the baseline if it has already run).")}>
+                    {t("Past renovations")}
                   </th>
                 </tr>
               </thead>
@@ -1655,7 +1709,7 @@ function BboxDataBanner({
                           className="w-3 h-3 cursor-pointer accent-violet-600"
                         />
                       </td>
-                      {BBOX_CSV_COLS.map(c => {
+                      {BBOX_TABLE_COLS.map(c => {
                         const val     = r[c.key];
                         const present = val !== null && val !== undefined;
                         const isBoplats = (c.key as string).startsWith("boplats_");
@@ -1686,17 +1740,19 @@ function BboxDataBanner({
                             ? buildingUseLabel(val as string)
                           : present ? `${estimated ? "≈ " : ""}${String(val)}` : "—";
                         return (
-                          <td key={c.key} title={estimated ? estimateNote! : undefined}
+                          <Fragment key={c.key}>
+                          <td title={estimated ? estimateNote! : undefined}
                               className={`px-2 py-1 ${editing ? "" : cell} whitespace-nowrap`}
                               onClick={editing ? (e => e.stopPropagation()) : undefined}>
                             {editing ? (
                               <input
                                 value={present ? String(val) : ""}
                                 onChange={e => updateCell(globalIdx, c.key, e.target.value)}
-                                className="w-full min-w-[64px] bg-[#0d1117] border border-white/12 rounded px-1 py-0.5 text-[10px] text-white/85 focus:outline-none focus:border-violet-500/60"
+                                className="w-full min-w-[64px] bg-[#0d1117] border border-white/12 rounded px-1.5 py-0.5 text-[12px] text-white/85 focus:outline-none focus:border-violet-500/60"
                               />
                             ) : display}
                           </td>
+                          </Fragment>
                         );
                       })}
                       {EPC_DATE_COLS.map(col => {
@@ -1733,6 +1789,19 @@ function BboxDataBanner({
                           </td>
                         );
                       })()}
+                      {(() => {
+                        const addr = r.address && !isCadastralId(r.address, r.cadastral_id) ? formatAddress(r.address) : null;
+                        const hb = { key: historyKeys[globalIdx] ?? `bldg-${globalIdx}`, label: addr || t("Building {n}", { n: globalIdx + 1 }), yearBuilt: r.year_built };
+                        return (<>
+                          {/* Typing here must not toggle the row's selection. */}
+                          <td className="px-2 py-1" onClick={e => e.stopPropagation()}>
+                            <OwnerCell b={hb} owner={buildingHistory[hb.key]?.owner} width={150} />
+                          </td>
+                          <td className="px-2 py-1" onClick={e => e.stopPropagation()}>
+                            <RenovationsCell b={hb} renovations={buildingHistory[hb.key]?.renovations ?? []} />
+                          </td>
+                        </>);
+                      })()}
                     </tr>
                   );
                 })}
@@ -1757,7 +1826,7 @@ function BboxDataBanner({
           )}
           {/* Selection actions — shown after table rows. */}
           {selected.size > 0 && (
-            <div className="flex items-center justify-end gap-3 px-4 py-2 border-t border-white/10 text-[10px]">
+            <div className="flex items-center justify-end gap-3 px-4 py-2 border-t border-white/10 text-[11.5px]">
               <span className="text-white/40">{t("{n} selected", { n: selected.size })}</span>
               <button
                 onClick={clearSelection}
@@ -2364,14 +2433,6 @@ export default function DataCoverage() {
   const isMulti    = buildings.length > 1;
 
 
-  // Façade defect detection is only shown when the walls are part of the
-  // renovation scope picked in Step 1 (defects live on the wall surface). With
-  // no components chosen yet, the default scope includes walls — mirrors Step 4.
-  const scopeComponents = project.renovationEnvelopeComponents.length > 0
-    ? project.renovationEnvelopeComponents
-    : ["Walls", "Roof", "Windows"];
-  const wallsInScope = scopeComponents.includes("Walls");
-
 
   /* ── Auto-retry: if building lookups are missing (backend was down when step 1
      ran) re-run them as soon as DataCoverage mounts. ── */
@@ -2468,6 +2529,25 @@ export default function DataCoverage() {
       return { key: keys[i]!, label: nice || t("Building {n}", { n: i + 1 }), lat: b.lat ?? null, lon: b.lon ?? null, country };
     });
   }, [activeCovRows, bboxRows, buildings, project.country]);
+
+  // Same buildings and keys as the façade panel, plus the construction year the
+  // renovation dates are checked against.
+  const historyBuildings = useMemo<HistoryBuilding[]>(() => {
+    const rows = activeCovRows.length ? activeCovRows : bboxRows;
+    return facadeBuildings.map((fb, i) => ({
+      key: fb.key, label: fb.label,
+      yearBuilt: rows.length ? rows[i]?.year_built ?? null : buildings[i]?.year ?? null,
+    }));
+  }, [facadeBuildings, activeCovRows, bboxRows, buildings]);
+
+  // Comparison with similar buildings needs the Swedish EPC register.
+  const peerBuildings = useMemo<PeerBuildingRow[]>(() => {
+    if (project.country !== "Sweden") return [];
+    const rows = activeCovRows.length ? activeCovRows : bboxRows;
+    return facadeBuildings.map((fb, i) => rows.length
+      ? { key: fb.key, label: fb.label, building_use: rows[i]?.building_use ?? null, year: rows[i]?.year_built ?? null, energy_kwh_m2: rows[i]?.energy_kwh_m2 ?? null }
+      : { key: fb.key, label: fb.label, building_use: buildings[i]?.use_cat ?? null, year: buildings[i]?.year ?? null, energy_kwh_m2: buildings[i]?.energy ?? null });
+  }, [facadeBuildings, activeCovRows, bboxRows, buildings, project.country]);
 
   // Retrofit prioritization operates on the real building rows (bbox / neighborhood
   // selection), aligned 1:1 with facadeBuildings so façade summaries map by key.
@@ -2681,17 +2761,18 @@ export default function DataCoverage() {
         </div>
       )}
 
-      {/* Facade defect detection on user-uploaded facade photos.
-          Only when the walls are in the renovation scope (Step 1); otherwise
-          prioritisation runs on building performance alone. */}
-
-      {/* Step 2 sequential accordion: Facade Detection → Renovation Prioritisation.
-          Only one section is open at a time; each section auto-scrolls into view
-          when it opens. The Facade section is shown only when Walls are in scope. */}
+      {/* Step 2 sequential accordion: Overview → History → Facade Detection →
+          Renovation Prioritisation. Only one section is open at a time; each
+          section auto-scrolls into view when it opens. Façade condition is
+          always asked for: Step 4 recommends the scope from it, so there is no
+          earlier scope choice to hide it behind. */}
       {(() => {
         return <Step2Sections
-          showFacade={wallsInScope && facadeBuildings.length > 0}
+          showFacade={facadeBuildings.length > 0}
           facadeBuildings={facadeBuildings}
+          historyBuildings={historyBuildings}
+          peerBuildings={peerBuildings}
+          cityId={seCityId(project.city)}
           priorityItems={priorityItems}
           overview={(bboxStats || project.district) ? (
             <BboxDataBanner
@@ -2711,13 +2792,16 @@ export default function DataCoverage() {
 }
 
 /* ── Step2Sections ──────────────────────────────────────────────── */
-type Sec2Id = "overview" | "facade" | "priority";
+type Sec2Id = "overview" | "peers" | "history" | "facade" | "priority";
 
 function Step2Sections({
-  showFacade, facadeBuildings, priorityItems, overview,
+  showFacade, facadeBuildings, historyBuildings, peerBuildings, cityId, priorityItems, overview,
 }: {
   showFacade: boolean;
   facadeBuildings: FacadeBuilding[];
+  historyBuildings: HistoryBuilding[];
+  peerBuildings: PeerBuildingRow[];
+  cityId: string;
   priorityItems: PriorityInput[];
   /** The buildings table, rendered as section 2.1. Null when no selection has
    *  produced one yet, in which case the section is not shown at all. */
@@ -2729,6 +2813,10 @@ function Step2Sections({
   // rest rather than leaving a gap.
   const visibleSections: Sec2Id[] = [
     ...(overview ? ["overview" as Sec2Id] : []),
+    ...(peerBuildings.length ? ["peers" as Sec2Id] : []),
+    // Owner + renovations are columns of the buildings table; this section is
+    // only for address selections, which have no table to put them in.
+    ...(historyBuildings.length && !overview ? ["history" as Sec2Id] : []),
     ...(showFacade ? ["facade" as Sec2Id] : []),
     "priority",
   ];
@@ -2747,6 +2835,8 @@ function Step2Sections({
   useEffect(() => { if (openSec === "facade") setFacadeEverOpened(true); }, [openSec]);
   const prevOpen = useRef<string | null>(firstSection);
   const overviewRef = useRef<HTMLDivElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const peersRef = useRef<HTMLDivElement>(null);
   const facadeRef = useRef<HTMLDivElement>(null);
   const priorityRef = useRef<HTMLDivElement>(null);
 
@@ -2768,6 +2858,8 @@ function Step2Sections({
     // Nothing to scroll to when a section was just collapsed.
     if (openSec === null) return;
     const el = openSec === "overview" ? overviewRef.current
+             : openSec === "history" ? historyRef.current
+             : openSec === "peers" ? peersRef.current
              : openSec === "facade" ? facadeRef.current
              : priorityRef.current;
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2837,6 +2929,52 @@ function Step2Sections({
           />
           {openSec === "overview" && (
             <div style={{ padding: "0 18px 18px" }}>{overview}</div>
+          )}
+        </div>
+      )}
+
+      {/* ─ Compared with similar buildings ─ */}
+      {peerBuildings.length > 0 && (
+        <div
+          ref={peersRef}
+          style={{
+            borderRadius: 14,
+            border: `1px solid ${openSec === "peers" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            background: "rgba(255,255,255,0.02)",
+            overflow: "hidden",
+            transition: "border-color 0.18s",
+          }}
+        >
+          <SectionHeader
+            id="peers"
+            label="Compared with Similar Buildings"
+            subtitle="Energy use against buildings of the same type and era in the municipality"
+          />
+          {openSec === "peers" && (
+            <div style={{ padding: "0 18px 18px" }}><PeerComparisonPanel buildings={peerBuildings} cityId={cityId} /></div>
+          )}
+        </div>
+      )}
+
+      {/* ─ Owner & renovation history (address selections only, see above) ─ */}
+      {historyBuildings.length > 0 && !overview && (
+        <div
+          ref={historyRef}
+          style={{
+            borderRadius: 14,
+            border: `1px solid ${openSec === "history" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            background: "rgba(255,255,255,0.02)",
+            overflow: "hidden",
+            transition: "border-color 0.18s",
+          }}
+        >
+          <SectionHeader
+            id="history"
+            label="Owner & Renovation History"
+            subtitle="Who owns each building and which parts have already been renovated"
+          />
+          {openSec === "history" && (
+            <div style={{ padding: "0 18px 18px" }}><BuildingHistoryPanel buildings={historyBuildings} /></div>
           )}
         </div>
       )}

@@ -12,10 +12,13 @@ import {
   type CountryCode,
 } from "../config/countryNav";
 import { useWizardStore } from "../store/wizard";
-import { Building2, Settings as SettingsIcon, Check } from "lucide-react";
+import { Building2, Settings as SettingsIcon, Check, FolderOpen, LogIn, LogOut, User } from "lucide-react";
 import { useState } from "react";
 import { useT, useLang, setLang, LANGS } from "../i18n";
 import SettingsModal from "./SettingsModal";
+import ProjectSaveControl from "./ProjectSaveControl";
+import { useAuth, initialsOf } from "../store/auth";
+import { RETURN_KEY } from "../pages/Login";
 
 /** Distance from the window's right edge to the right edge of the home-page
  *  tabs: bar padding (20) + gap (12) + avatar block (4 margin + 28 + 6 + 12).
@@ -68,6 +71,8 @@ export default function TopBar({
   const lang = useLang();
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const email = useAuth((s) => s.email);
+  const signOut = useAuth((s) => s.signOut);
 
   // Uncontrolled: the URL is the source of truth for country, so the bar always
   // matches what's on screen even after a hard refresh or a direct link to
@@ -145,8 +150,14 @@ export default function TopBar({
     </div>
   );
 
-  // Avatar = account menu: language switch + Settings, available on every page
-  // (the home page has no sidebar, so this is its way into Settings).
+  const menuItem: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 8px", borderRadius: 8, border: 0, cursor: "pointer",
+    fontSize: 12.5, fontWeight: 600, textAlign: "left", background: "transparent", color: "rgba(255,255,255,0.8)",
+  };
+
+  // Avatar = account menu: sign in/out, saved projects, language and Settings,
+  // available on every page (the home page has no sidebar, so this is its way
+  // into Settings).
   const avatar = (
     <div style={{ position: "relative", marginLeft: 4, flexShrink: 0 }}>
     <button onClick={() => setMenuOpen((o) => !o)} title={t("Account and settings")} aria-haspopup="menu" aria-expanded={menuOpen}
@@ -165,7 +176,7 @@ export default function TopBar({
           fontWeight: 700,
         }}
       >
-        SA
+        {email ? initialsOf(email) : <User size={14} />}
       </div>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="rgba(255,255,255,0.3)">
         <path d="M7 10l5 5 5-5z" />
@@ -173,8 +184,25 @@ export default function TopBar({
     </button>
     {menuOpen && (<>
       <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-      <div role="menu" style={{ position: "absolute", right: 0, top: 36, zIndex: 41, width: 200, padding: 8, borderRadius: 12,
+      <div role="menu" style={{ position: "absolute", right: 0, top: 36, zIndex: 41, width: 230, padding: 8, borderRadius: 12,
         background: "#0d1117", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 12px 32px rgba(0,0,0,0.5)" }}>
+        {email ? (<>
+          <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)", padding: "4px 8px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={email}>
+            {email}
+          </div>
+          <button role="menuitem" onClick={() => { setMenuOpen(false); navigate("/projects"); }} style={menuItem}>
+            <FolderOpen size={14} /> {t("My projects")}
+          </button>
+          <button role="menuitem" onClick={() => { setMenuOpen(false); signOut(); }} style={menuItem}>
+            <LogOut size={14} /> {t("Sign out")}
+          </button>
+        </>) : (
+          <button role="menuitem" style={menuItem}
+            onClick={() => { setMenuOpen(false); try { sessionStorage.setItem(RETURN_KEY, location.pathname); } catch { /**/ } navigate("/login"); }}>
+            <LogIn size={14} /> {t("Sign in")}
+          </button>
+        )}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "6px 0" }} />
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.8, textTransform: "uppercase", color: "rgba(255,255,255,0.4)", padding: "4px 8px 6px" }}>
           {t("Language")}
         </div>
@@ -188,9 +216,7 @@ export default function TopBar({
           </button>
         ))}
         <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "6px 0" }} />
-        <button role="menuitem" onClick={() => { setMenuOpen(false); setSettingsOpen(true); }}
-          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 8px", borderRadius: 8, border: 0, cursor: "pointer",
-            fontSize: 12.5, fontWeight: 600, textAlign: "left", background: "transparent", color: "rgba(255,255,255,0.8)" }}>
+        <button role="menuitem" onClick={() => { setMenuOpen(false); setSettingsOpen(true); }} style={menuItem}>
           <SettingsIcon size={14} /> {t("Settings")}
         </button>
       </div>
@@ -329,6 +355,9 @@ export default function TopBar({
           </>
         )}
       </div>}
+
+      {/* Saving belongs to the wizard, where there is a project to save. */}
+      {step && <ProjectSaveControl />}
 
       {tabsRightWidth ? <>{tabs}{avatar}</> : avatar}
     </header>

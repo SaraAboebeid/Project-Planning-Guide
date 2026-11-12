@@ -77,3 +77,6 @@ data/sensitivity/archive/
 # EUBUCCO local datasets and generated maps (too large for normal Git)
 data/eubucco/
 !data/eubucco/.gitkeep
+
+# Login accounts, sessions and saved projects (personal data) - never commit
+data/accounts.sqlite3*

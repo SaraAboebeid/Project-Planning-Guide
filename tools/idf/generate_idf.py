@@ -300,20 +300,23 @@ def build_shoebox_idf(
     se_home = (D.SE_HOME_LOADS == "sveby2"
                and (country or "").lower() == "se" and use_cat in ("bostad_enfamilj", "bostad_flerfamilj"))
 
-    # u_*_epc (UK only) come from the certificates' own fabric descriptions
-    # (tools/uk/epc_fabric.py) and describe the building as it is today;
-    # tabula_u_* are uninsulated as-built archetype values.
-    u_wall = u_wall_override if u_wall_override is not None else (building.get("u_wall_epc") or building.get("tabula_u_wall") or D.DEFAULT_U_WALL)
-    u_roof = u_roof_override if u_roof_override is not None else (building.get("u_roof_epc") or building.get("tabula_u_roof") or D.DEFAULT_U_ROOF)
-    u_win = u_win_override if u_win_override is not None else (building.get("u_win_epc") or building.get("tabula_u_win") or D.DEFAULT_U_WIN)
+    # Today's fabric, best source first: u_*_recorded = the U the user entered
+    # for a past renovation (Step 2), u_*_epc (UK only) = the certificates' own
+    # fabric descriptions (tools/uk/epc_fabric.py), tabula_u_* = uninsulated
+    # as-built archetype values. An override (a package's measure) beats all.
+    def _today(part: str, default: float) -> float:
+        return building.get(f"u_{part}_recorded") or building.get(f"u_{part}_epc") or building.get(f"tabula_u_{part}") or default
+    u_wall = u_wall_override if u_wall_override is not None else _today("wall", D.DEFAULT_U_WALL)
+    u_roof = u_roof_override if u_roof_override is not None else _today("roof", D.DEFAULT_U_ROOF)
+    u_win = u_win_override if u_win_override is not None else _today("win", D.DEFAULT_U_WIN)
     # Only the UK payload carries tabula_u_floor (TABULA GB publishes it); Sweden keeps the default.
-    u_floor = u_floor_override if u_floor_override is not None else (building.get("u_floor_epc") or building.get("tabula_u_floor") or D.DEFAULT_U_FLOOR)
+    u_floor = u_floor_override if u_floor_override is not None else _today("floor", D.DEFAULT_U_FLOOR)
     uk_home = (country or "").lower() == "gb" and use_cat in ("bostad_enfamilj", "bostad_flerfamilj")
     # An uninsulated wall's U-value is a generic certificate default, not a
     # measurement; see defaults.UK_UNINSULATED_WALL_FACTOR. Overrides (retrofit
-    # tiers) already state a measure's own U and are left alone.
-    uninsulated_wall = bool(uk_home and u_wall_override is None and building.get("u_wall_epc")
-                            and u_wall >= D.UK_UNINSULATED_WALL_U_THRESHOLD)
+    # tiers) and recorded renovations state a real U and are left alone.
+    uninsulated_wall = bool(uk_home and u_wall_override is None and building.get("u_wall_recorded") is None
+                            and building.get("u_wall_epc") and u_wall >= D.UK_UNINSULATED_WALL_U_THRESHOLD)
     if uninsulated_wall:
         u_wall *= D.UK_UNINSULATED_WALL_FACTOR
     # Vertical extension: `building` already includes the added storey(s) (the
@@ -739,6 +742,8 @@ def build_shoebox_idf(
         "party_walls": party_walls,
         "heating_schedule": "SAP 10.2 intermittent" if uk_home else f"continuous {D.HEATING_SETPOINT_C} C",
         "fabric_source": "epc_description" if building.get("u_wall_epc") else "tabula_or_default",
+        "recorded_renovation_u": {p: building[f"u_{p}_recorded"] for p in ("wall", "roof", "win", "floor")
+                                  if building.get(f"u_{p}_recorded") is not None},
         "heating_system": heating_system,
         "heated_area_m2": round(total_floor_area, 1),
         "footprint_area_scale": round(area_scale, 3),

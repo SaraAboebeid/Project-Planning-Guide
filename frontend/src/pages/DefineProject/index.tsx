@@ -10,7 +10,6 @@ import {
   FOLLOW_UP_SYSTEMS,
   EC_FOLLOW_UP_QUESTIONS,
   EC_FOCUS_OPTIONS,
-  ENVELOPE_COMPONENTS,
   UNIVERSAL_KPIS,
   EXPLORATION_OPTIONS,
   EXPLORATION_CONSTRAINTS,
@@ -68,7 +67,7 @@ const DISABLED_PROJECT_TYPES = new Set<string>([
    ════════════════════════════════════════════════════════════════════ */
 
 // Temporarily hide the Project Type selector and lock the tool to Renovation
-// Planning, so Step 1 starts at Project name → Renovation components. The
+// Planning, so Step 1 starts at Project name → exploration approach. The
 // selector markup below is kept (behind this flag) so it can be re-enabled.
 const HIDE_PROJECT_TYPE = true;
 
@@ -442,13 +441,6 @@ export default function DefineProject() {
     setProject({ explorationApproaches: next });
   }
 
-  function toggleEnvelopeComponent(comp: string) {
-    const next = project.renovationEnvelopeComponents.includes(comp)
-      ? project.renovationEnvelopeComponents.filter((c) => c !== comp)
-      : [...project.renovationEnvelopeComponents, comp];
-    setProject({ renovationEnvelopeComponents: next });
-  }
-
   function toggleBuildingUse(use: string) {
     const next = project.buildingUses.includes(use)
       ? project.buildingUses.filter((u) => u !== use)
@@ -461,9 +453,8 @@ export default function DefineProject() {
     const missing: string[] = [];
     if (!project.projectName.trim()) missing.push("a project name");
     if (!pt) missing.push("a project type");
-    if (pt === "Renovation Planning") {
-      if (!project.renovationEnvelopeComponents.length) missing.push("at least one renovation component");
-    } else if (!project.systemsInScope.length) {
+    // Renovation has no scope question: Step 4 recommends the components.
+    if (pt !== "Renovation Planning" && !project.systemsInScope.length) {
       missing.push("at least one system in scope");
     }
     if (!project.explorationApproaches.length) missing.push("at least one exploration approach");
@@ -524,7 +515,7 @@ export default function DefineProject() {
     setWizardNextError(missing.length ? missingMessage(missing) : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationBlock, triedContinue, project.projectName, project.systemsInScope, project.explorationApproaches,
-      project.selectedKpis, project.scale, project.ecEnergyFocus, project.renovationEnvelopeComponents, pt]);
+      project.selectedKpis, project.scale, project.ecEnergyFocus, pt]);
 
   // The wizard footer's Continue runs this page's validation + advance.
   useWizardStepNav({ onNext: handleContinue });
@@ -542,31 +533,33 @@ export default function DefineProject() {
 
   /* ── strict single-open stage conditions ──────────────────────── */
   // For Renovation Planning, Building Envelope is always in scope — auto-select it
-  if (pt === "Renovation Planning" && !systemsSet.has("Building Envelope (Windows, Roof, Walls, Floors)")) {
-    setProject({ systemsInScope: ["Building Envelope (Windows, Roof, Walls, Floors)"] });
-  }
+  // In an effect: setting store state during render warned in every component
+  // subscribed to the store (top bar, save control).
+  const envelopeMissing = pt === "Renovation Planning" && !systemsSet.has("Building Envelope (Windows, Roof, Walls, Floors)");
+  useEffect(() => {
+    if (envelopeMissing) setProject({ systemsInScope: ["Building Envelope (Windows, Roof, Walls, Floors)"] });
+  }, [envelopeMissing, setProject]);
 
   const needsBuildingDevType = pt === "Energy Community Planning" || pt === "Renewable Energy Planning";
   const projectTypeReady = !!pt;
   const projectNameReady = !!project.projectName.trim();
   const buildingTypeReady = !needsBuildingDevType || !!project.buildingDevelopmentType;
-  const renovationComponentsChosen = pt === "Renovation Planning" && project.renovationEnvelopeComponents.length > 0;
-  const systemsChosen = pt === "Renovation Planning"
-    ? renovationComponentsChosen
-    : project.systemsInScope.length > 0;
+  // Renovation skips the scope question entirely — the components are
+  // recommended in Step 4 from what Steps 1–2 learn about the buildings.
+  const systemsChosen = pt === "Renovation Planning" || project.systemsInScope.length > 0;
   const ecFocusReady = pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0;
   const explorationReady = project.explorationApproaches.length > 0;
   const kpisReady = project.selectedKpis.length > 0;
   const scaleReady = !!project.scale;
   const locationReady = !!project.address.trim();
 
-  type Step1Stage = "projectType" | "projectName" | "buildingType" | "components" | "systems" | "ecFocus" | "exploration" | "kpis" | "scale" | "location" | "complete";
+  type Step1Stage = "projectType" | "projectName" | "buildingType" | "systems" | "ecFocus" | "exploration" | "kpis" | "scale" | "location" | "complete";
 
   let activeStage: Step1Stage = "complete";
   if (!HIDE_PROJECT_TYPE && !projectTypeReady) activeStage = "projectType";
   else if (!projectNameReady) activeStage = "projectName";
   else if (needsBuildingDevType && !buildingTypeReady) activeStage = "buildingType";
-  else if (!systemsChosen) activeStage = pt === "Renovation Planning" ? "components" : "systems";
+  else if (!systemsChosen) activeStage = "systems";
   else if (pt === "Energy Community Planning" && !ecFocusReady) activeStage = "ecFocus";
   else if (!explorationReady) activeStage = "exploration";
   else if (!kpisReady) activeStage = "kpis";
@@ -578,7 +571,7 @@ export default function DefineProject() {
     ...(HIDE_PROJECT_TYPE ? [] : ["projectType"] as Step1Stage[]),
     "projectName",
     ...(needsBuildingDevType ? ["buildingType"] as Step1Stage[] : []),
-    ...(pt === "Renovation Planning" ? ["components"] as Step1Stage[] : ["systems"] as Step1Stage[]),
+    ...(pt === "Renovation Planning" ? [] : ["systems"] as Step1Stage[]),
     ...(pt === "Energy Community Planning" ? ["ecFocus"] as Step1Stage[] : []),
     "exploration",
     "kpis",
@@ -610,7 +603,6 @@ export default function DefineProject() {
 
   const showProjectName = reached("projectName");
   const showBuildingDevType = reached("buildingType");
-  const showRenovationComponents = reached("components");
   const showSystems = reached("systems");
   const showEcFocus = reached("ecFocus");
   const showExploration = reached("exploration");
@@ -817,102 +809,6 @@ export default function DefineProject() {
         </Card>
       )}
 
-      {/* ── RENOVATION ENVELOPE COMPONENTS ── */}
-      {showRenovationComponents && (
-        <Card className="animate-fadeIn">
-          <div style={{ marginBottom: 14 }}>
-            <Label required>{t("Renovation components")}</Label>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.40)" }}>
-              {t("Select the building elements included in your assessment.")}
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-            {(() => {
-              const COMP_META: Record<string, { subtitle?: string; icon: React.ReactNode }> = {
-                "Walls": {
-                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="5" width="22" height="18" rx="1" stroke="currentColor" strokeWidth="1.5"/><line x1="3" y1="11" x2="25" y2="11" stroke="currentColor" strokeWidth="1.5"/><line x1="3" y1="17" x2="25" y2="17" stroke="currentColor" strokeWidth="1.5"/><line x1="10" y1="5" x2="10" y2="11" stroke="currentColor" strokeWidth="1.5"/><line x1="18" y1="11" x2="18" y2="17" stroke="currentColor" strokeWidth="1.5"/><line x1="10" y1="17" x2="10" y2="23" stroke="currentColor" strokeWidth="1.5"/></svg>
-                },
-                "Windows": {
-                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="4" width="20" height="20" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><line x1="14" y1="4" x2="14" y2="24" stroke="currentColor" strokeWidth="1.5"/><line x1="4" y1="14" x2="24" y2="14" stroke="currentColor" strokeWidth="1.5"/></svg>
-                },
-                "Roof": {
-                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M4 14L14 4l10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><rect x="7" y="14" width="14" height="10" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><line x1="14" y1="14" x2="14" y2="24" stroke="currentColor" strokeWidth="1.5"/></svg>
-                },
-                "Heating system": {
-                  subtitle: "HVAC",
-                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 4c1.8 2 2 3.6 1 5.2-1.1 1.8-1 3.2.2 4.8 1.6-1 2.4-2.6 2.2-4.6 1.8 1.4 2.9 3.6 2.9 6.1a6.3 6.3 0 11-12.6 0c0-3 1.6-5.7 4.1-7.4-.3 1.6.1 2.8 1.1 3.6.8-2.4.7-5-1-7.7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>
-                },
-                "Floor": {
-                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="8" width="20" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="4" y="14" width="20" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><rect x="4" y="20" width="20" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>
-                },
-                "Doors": {
-                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="7" y="4" width="14" height="20" rx="1" stroke="currentColor" strokeWidth="1.5"/><circle cx="18" cy="14" r="1.2" fill="currentColor"/><line x1="7" y1="24" x2="3" y2="24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="21" y1="24" x2="25" y2="24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                },
-                "Balcony": {
-                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="12" width="20" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><line x1="8" y1="15" x2="8" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="14" y1="15" x2="14" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="20" y1="15" x2="20" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><line x1="4" y1="22" x2="24" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><rect x="8" y="6" width="12" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>
-                },
-                "Vertical Extension (New Floor)": {
-                  subtitle: "New Floor",
-                  icon: <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="5" y="14" width="18" height="9" rx="0.5" stroke="currentColor" strokeWidth="1.5"/><path d="M5 14l4-5h10l4 5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M14 5v4M11 7l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                },
-              };
-              return ENVELOPE_COMPONENTS.map((comp) => {
-                const meta = COMP_META[comp] ?? { icon: null };
-                const selected = project.renovationEnvelopeComponents.includes(comp);
-                const displayName = meta.subtitle
-                  ? comp.replace(/ \(.*\)/, "")
-                  : comp;
-                return (
-                  <button
-                    key={comp}
-                    onClick={() => toggleEnvelopeComponent(comp)}
-                    style={{
-                      background: selected ? "#4ECDC4" : "rgba(13,17,40,0.80)",
-                      border: `1.5px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.10)"}`,
-                      borderRadius: 10,
-                      padding: "12px 12px",
-                      cursor: "pointer",
-                      position: "relative",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      textAlign: "left",
-                      transition: "all 0.15s",
-                      color: selected ? "#0b1220" : "rgba(255,255,255,0.55)",
-                    }}
-                    onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(78,205,196,0.35)"; }}
-                    onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.10)"; }}
-                  >
-                    {/* Icon */}
-                    <span style={{ flexShrink: 0 }}>{meta.icon}</span>
-                    {/* Text */}
-                    <span>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: selected ? "#0b1220" : "rgba(255,255,255,0.80)", lineHeight: 1.2 }}>
-                        {t(displayName)}
-                      </div>
-                      {meta.subtitle && (
-                        <div style={{ fontSize: 10, color: selected ? "rgba(11,18,32,0.75)" : "rgba(255,255,255,0.35)", marginTop: 2 }}>
-                          {t(meta.subtitle)}
-                        </div>
-                      )}
-                    </span>
-                    {/* Indicator */}
-                    <div style={{
-                      position: "absolute", top: 8, right: 8,
-                      width: 20, height: 20, borderRadius: "50%",
-                      border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.25)"}`,
-                      background: selected ? "#4ECDC4" : "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                    }}>
-                    </div>
-                  </button>
-                );
-              });
-            })()}
-          </div>
-        </Card>
-      )}
-
       {/* ── SYSTEMS IN SCOPE ── */}
       {showSystems && (
         <Card className="animate-fadeIn">
@@ -1101,18 +997,6 @@ export default function DefineProject() {
       {/* ── EXPLORATION APPROACHES ── */}
       {showExploration && (
         <Card className="animate-fadeIn">
-          {pt === "Renovation Planning" && renovationComponentsChosen && (
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="text-[10px] font-bold uppercase tracking-[1.4px] text-white/45">{t("Next step")}</div>
-              <button
-                type="button"
-                onClick={() => setProject({ renovationEnvelopeComponents: [] })}
-                className="text-[11px] font-medium text-[#4ECDC4] hover:text-[#65f0e0]"
-              >
-                {t("Edit components")}
-              </button>
-            </div>
-          )}
           <Label required>{t("How would you like to explore this?")}</Label>
           <div className="space-y-2 mt-2">
             {EXPLORATION_OPTIONS.map((approach) => {

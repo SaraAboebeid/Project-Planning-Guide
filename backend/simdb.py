@@ -277,6 +277,30 @@ def latest_batch_near(lat: float, lon: float, radius_m: float, package_id: str) 
         con.close()
 
 
+def latest_done_near(lat: float, lon: float, radius_m: float, package_id: str = "baseline") -> Optional[dict]:
+    """The newest COMPLETED run for this building: batch id + its idf_idx,
+    which is what the hourly trace is keyed by. Light columns only."""
+    con = _connect()
+    try:
+        lo_lat, hi_lat, lo_lon, hi_lon = _bbox(lat, lon, radius_m)
+        rows = con.execute(
+            """SELECT lat, lon, epsm_simulation_id, idf_idx, results
+               FROM simulations
+               WHERE package_id = ? AND status = 'completed' AND epsm_simulation_id IS NOT NULL
+                 AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?
+               ORDER BY submitted_at DESC""",
+            (package_id, lo_lat, hi_lat, lo_lon, hi_lon),
+        ).fetchall()
+        for r in rows:
+            if _haversine_m(r["lat"], r["lon"], lat, lon) <= radius_m:
+                res = json.loads(r["results"] or "{}")
+                return {"batch_id": r["epsm_simulation_id"], "idf_idx": r["idf_idx"],
+                        "total_floor_area_m2": res.get("total_floor_area_m2")}
+        return None
+    finally:
+        con.close()
+
+
 def get_raw_by_epsm_id(epsm_simulation_id: str, idf_idx: Optional[int] = None) -> dict[int, dict]:
     """The bulk EPSM item per building (hourly traces), keyed by idf_idx.
 

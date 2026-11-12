@@ -245,6 +245,19 @@ interface ProjectState {
   facadeWwr: Record<string, Partial<Record<FacadeOrientation, {
     wwr: number; confidence: string; source?: string; at: string;
   }>>>;
+  /* Step 2 — what the user knows that no dataset records: who owns each building
+     and which parts were renovated when. Keyed like facadeDefects. A recorded
+     renovation restarts that component's age in the Step 4 recommendations;
+     without one, the construction year is all we have. */
+  buildingHistory: Record<string, BuildingHistory>;
+  /* Step 2 — cells the user corrected in the buildings table, per building key
+     (makeBuildingKeys over the rows as loaded). Kept apart from the rows because
+     Step 2 reloads its rows from the server; the edits are re-applied on top. */
+  buildingEdits: Record<string, Record<string, unknown>>;
+  /* Step 4 — the user's include/exclude choice per component, overriding the
+     recommendation. A component absent here follows the recommendation, so the
+     scope keeps up with new defect or renovation data until the user decides. */
+  renovationScopeOverrides: Record<string, boolean>;
     /* Step 2 — prioritized shortlist carried to Step 3 baseline preselection.
       Indices are relative to the Step-2 active building list order. */
     prioritizedBuildingIndices: number[];
@@ -323,6 +336,23 @@ export interface FacadeOrientationSummary {
   byClass: Record<string, number>;
 }
 
+/** One past renovation the user knows about, e.g. windows replaced in 2004. */
+export interface RenovationRecord {
+  id: string;
+  component: string;   // an ENVELOPE_COMPONENTS label ("Windows", "Heating system", …)
+  year: number;
+  /** U-value achieved (W/m²K), when known — envelope parts only. Replaces the
+   *  era-typical value in the recommendations and in every simulation. */
+  uValue?: number;
+  note?: string;
+}
+
+export interface BuildingHistory {
+  label?: string;      // building name, saved for the report (as in FacadeDefectSummary)
+  owner?: string;
+  renovations: RenovationRecord[];
+}
+
 export interface FacadeDefectSummary {
   /** Human-readable building name, saved with the summary so the Step 5 report
    *  never has to reverse-engineer a label out of the (cadastral) key. */
@@ -349,6 +379,13 @@ export interface FacadeDefectSummary {
   photos?: FacadePhotoRecord[];
 }
 
+/** The saved project (server copy) this tab is editing, if any. */
+export interface SavedProjectRef {
+  id: string;
+  name: string;
+  savedAt: string;
+}
+
 interface WizardState {
   project: ProjectState;
   setProject: (partial: Partial<ProjectState>) => void;
@@ -356,6 +393,10 @@ interface WizardState {
   steps: StepDef[];
   setStep: (n: number) => void;
   reset: () => void;
+  savedProject: SavedProjectRef | null;
+  setSavedProject: (ref: SavedProjectRef | null) => void;
+  /** Replace the whole wizard state with a saved project. */
+  loadProject: (project: Partial<ProjectState>, step: number, ref: SavedProjectRef) => void;
 }
 
 const DEFAULT_PROJECT: ProjectState = {
@@ -410,6 +451,7 @@ const DEFAULT_PROJECT: ProjectState = {
   baselineBatchId: null,
   renovationSimResults: [],
   facadeDefects: {}, facadeWwr: {},
+  buildingHistory: {}, renovationScopeOverrides: {}, buildingEdits: {},
   prioritizedBuildingIndices: [],
   prioritizedBuildingCount: 0,
   regretAnalysis: null,
@@ -430,6 +472,7 @@ export const LOCATION_SCOPED_RESET: Partial<ProjectState> = {
   renovationCalcPackages: [], supplementaryData: {},
   baselineStatus: "idle", renovationBaselineResults: [], baselineBatchId: null,
   renovationSimResults: [], facadeDefects: {}, facadeWwr: {},
+  buildingHistory: {}, renovationScopeOverrides: {}, buildingEdits: {},
   prioritizedBuildingIndices: [], prioritizedBuildingCount: 0,
   regretAnalysis: null, regretInputs: null, renovationConfigs: {}, selectedPackageByBuilding: {}, heatingAnalysis: null,
 };
@@ -471,14 +514,21 @@ export const useWizardStore = create<WizardState>()(
           project: { ...DEFAULT_PROJECT },
           currentStep: 1,
           steps: STEPS,
+          savedProject: null,
         }),
+
+      savedProject: null,
+      setSavedProject: (ref) => set({ savedProject: ref }),
+      // Defaults first, so a project saved before a field existed still gets it.
+      loadProject: (project, step, ref) =>
+        set({ project: { ...DEFAULT_PROJECT, ...project }, currentStep: step || 1, savedProject: ref }),
     }),
     {
       name: "ppg-wizard-v1",
       storage: createJSONStorage(() => safeSessionStorage),
       // Persist only the wizard data — never the action functions or the static
       // STEPS list (those come from the initializer on every load).
-      partialize: (s) => ({ project: s.project, currentStep: s.currentStep }),
+      partialize: (s) => ({ project: s.project, currentStep: s.currentStep, savedProject: s.savedProject }),
     }
   )
 );

@@ -107,16 +107,15 @@ The facade analysis uses AI vision models to assess condition and WWR:
 
 **Windows (PowerShell):**
 ```powershell
-# Set ANTHROPIC_API_KEY and OPENAI_API_KEY in your shell session.
-# Example:
-#   [System.Environment]::SetEnvironmentVariable("OPENAI_API_KEY", "<your key>", "Process")
+$env:ANTHROPIC_API_KEY = "your-api-key-here"
+$env:OPENAI_API_KEY = "your-openai-key-here"
 python launch.py
 ```
 
 **Linux/Mac:**
 ```bash
-# Set ANTHROPIC_API_KEY and OPENAI_API_KEY in your shell session,
-# then run:
+export ANTHROPIC_API_KEY="your-api-key-here"
+export OPENAI_API_KEY="your-openai-key-here"
 python launch.py
 ```
 

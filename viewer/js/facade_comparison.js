@@ -340,10 +340,7 @@ function captureFacadeForComparison(building, direction) {
   const center = getBuildingCenter(building);
   const radius = getBuildingRadius(building);
   const bldH = Math.max(5, building.height || 10);
-  // Ground reference = where the building is really drawn. Prefer _groundH (set by the
-  // facade inspector by sampling the Google mesh on photoreal); else the calibrated base.
-  const terrainBase = building._groundH
-    ?? (window.getBuildingBaseOffset ? window.getBuildingBaseOffset(center.lon, center.lat) : 0);
+  const terrainBase = building._groundH || building._terrainH || 0;
   
   const DIR_HEADINGS = { N:0, E:90, S:180, W:270 };
   const dist = Math.max(bldH * 1.1, radius * 1.4);
@@ -550,81 +547,86 @@ async function captureAllFacadesComparison(building) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Detect facade defects via the ML model endpoint (/api/facade-defects).
-// The facade-defect ML model (crack/leakage/abscission/corrosion/bulge) is
-// trained separately and connected to the backend via FACADE_MODEL_URL;
-// until then the endpoint returns model_connected=false and this surfaces a
-// clear "not connected yet" message rather than failing silently. (This
-// replaces the old call to /api/analyze-facade, which never existed.)
+// Analyze facades using AI
 // ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-analyze-ai')?.addEventListener('click', async () => {
   const statusEl = document.getElementById('comparison-status');
-  const btn = document.getElementById('btn-analyze-ai');
-  statusEl.textContent = 'Detecting facade defects…';
+  statusEl.textContent = 'Analyzing facades with AI...';
   statusEl.style.color = '#7c3aed';
+
+  const btn = document.getElementById('btn-analyze-ai');
   btn.disabled = true;
-  btn.textContent = 'Detecting…';
-
-  // Every captured facade image across all comparison buildings.
-  const jobs = [];
-  for (const building of comparisonBuildings) {
-    const buildingId = getBuildingId(building);
-    const facadeData = comparisonData[buildingId] || {};
-    for (const key of ['N', 'E', 'S', 'W', 'manual']) {
-      if (facadeData[key]?.captured && facadeData[key].imageData) {
-        jobs.push({ building, buildingId, key, facadeData });
-      }
-    }
-  }
-
-  if (jobs.length === 0) {
-    statusEl.textContent = 'Capture at least one facade first';
-    statusEl.style.color = '#d97706';
-    btn.disabled = false;
-    btn.textContent = '🔍 Detect Defects';
-    return;
-  }
+  btn.textContent = 'Analyzing...';
 
   try {
-    let modelConnected = null;
-    let totalDefects = 0;
-    for (const { building, buildingId, key, facadeData } of jobs) {
-      const imageBase64 = facadeData[key].imageData.split(',')[1];
-      const response = await fetch('/api/facade-defects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_base64: imageBase64,
-          direction: key,
-          building_info: {
-            address: building.address, year: building.year,
-            use: building.use_cat, eclass: building.eclass,
-          },
-        }),
-      });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      const result = await response.json();
-      modelConnected = result.model_connected;
-      facadeData[key] = { ...facadeData[key], defects: result.defects || [] };
-      totalDefects += (result.defects || []).length;
+    for (const building of comparisonBuildings) {
+      const buildingId = getBuildingId(building);
+      const facadeData = comparisonData[buildingId] || {};
+
+      // Analyze cardinal directions
+      for (const dir of ['N','E','S','W']) {
+        if (facadeData[dir]?.captured) {
+          // Call backend API for AI analysis
+          const imageBase64 = facadeData[dir].imageData.split(',')[1];
+          const response = await fetch('http://localhost:8000/api/analyze-facade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image_base64: imageBase64,
+              direction: dir,
+              building_info: {
+                address: building.address,
+                year: building.year,
+                use: building.use_cat,
+                eclass: building.eclass
+              }
+            })
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            facadeData[dir] = { ...facadeData[dir], ...result };
+          }
+        }
+      }
+
+      // Analyze manual capture if exists
+      if (facadeData['manual']?.captured) {
+        const imageBase64 = facadeData['manual'].imageData.split(',')[1];
+        const response = await fetch('http://localhost:8000/api/analyze-facade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image_base64: imageBase64,
+            direction: 'Manual',
+            building_info: {
+              address: building.address,
+              year: building.year,
+              use: building.use_cat,
+              eclass: building.eclass
+            }
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          facadeData['manual'] = { ...facadeData['manual'], ...result };
+        }
+      }
+
       comparisonData[buildingId] = facadeData;
     }
 
-    if (modelConnected === false) {
-      statusEl.textContent = '⏳ Facade-defect ML model not connected yet — placeholder wired, 0 defects returned.';
-      statusEl.style.color = '#d97706';
-    } else {
-      statusEl.textContent = `✓ Defect detection complete — ${totalDefects} defect(s) found`;
-      statusEl.style.color = '#4ade80';
-    }
+    statusEl.textContent = '✓ AI analysis complete';
+    statusEl.style.color = '#4ade80';
     updateComparisonUI();
   } catch (error) {
-    console.error('Defect detection failed:', error);
-    statusEl.textContent = '✗ Defect detection failed (backend offline?)';
+    console.error('AI analysis failed:', error);
+    statusEl.textContent = '✗ AI analysis failed — using manual scoring';
     statusEl.style.color = '#f87171';
   } finally {
     btn.disabled = false;
-    btn.textContent = '🔍 Detect Defects';
+    btn.textContent = '🤖 AI Analyze';
   }
 });
 
