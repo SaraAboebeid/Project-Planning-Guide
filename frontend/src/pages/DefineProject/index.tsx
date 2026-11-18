@@ -71,6 +71,12 @@ const DISABLED_PROJECT_TYPES = new Set<string>([
 // selector markup below is kept (behind this flag) so it can be re-enabled.
 const HIDE_PROJECT_TYPE = true;
 
+// "How would you like to explore this?" is hidden for now. Every approach is
+// recorded as chosen (Steps 3–5 offer all three anyway; only the report lists
+// them), and the question markup stays behind this flag to bring it back.
+const HIDE_EXPLORATION = true;
+const ALL_EXPLORATION = ["Baseline Assessment", "Comparison of Renovation Packages", "Multi-objective Optimization"];
+
 /** Example project name that follows the selected city, so the hint never names
  *  somewhere other than where the user is planning. */
 const PROJECT_NAME_EXAMPLE: Record<string, string> = {
@@ -457,7 +463,7 @@ export default function DefineProject() {
     if (pt !== "Renovation Planning" && !project.systemsInScope.length) {
       missing.push("at least one system in scope");
     }
-    if (!project.explorationApproaches.length) missing.push("at least one exploration approach");
+    if (!HIDE_EXPLORATION && !project.explorationApproaches.length) missing.push("at least one exploration approach");
     if (!project.selectedKpis.length) missing.push("at least one KPI");
     if (!project.scale) missing.push("a project scale");
     if (pt === "Energy Community Planning" && !project.ecEnergyFocus.length) {
@@ -548,7 +554,10 @@ export default function DefineProject() {
   // recommended in Step 4 from what Steps 1–2 learn about the buildings.
   const systemsChosen = pt === "Renovation Planning" || project.systemsInScope.length > 0;
   const ecFocusReady = pt !== "Energy Community Planning" || project.ecEnergyFocus.length > 0;
-  const explorationReady = project.explorationApproaches.length > 0;
+  const explorationReady = HIDE_EXPLORATION || project.explorationApproaches.length > 0;
+  useEffect(() => {
+    if (HIDE_EXPLORATION && project.explorationApproaches.length === 0) setProject({ explorationApproaches: ALL_EXPLORATION });
+  }, [project.explorationApproaches.length, setProject]);
   const kpisReady = project.selectedKpis.length > 0;
   const scaleReady = !!project.scale;
   const locationReady = !!project.address.trim();
@@ -573,7 +582,7 @@ export default function DefineProject() {
     ...(needsBuildingDevType ? ["buildingType"] as Step1Stage[] : []),
     ...(pt === "Renovation Planning" ? [] : ["systems"] as Step1Stage[]),
     ...(pt === "Energy Community Planning" ? ["ecFocus"] as Step1Stage[] : []),
-    "exploration",
+    ...(HIDE_EXPLORATION ? [] : ["exploration"] as Step1Stage[]),
     "kpis",
     "scale",
     "location",

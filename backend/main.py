@@ -149,6 +149,33 @@ def _se_buildings_at(lat: float, lon: float) -> list:
     return _se_buildings(_se_city_at(lat, lon))
 
 
+@app.on_event("startup")
+def _warm_caches() -> None:
+    """Load the big lookups in the background as soon as the server starts.
+    Cold, Gothenburg's 93k buildings take ~8 s to parse, and that used to land
+    on whoever clicked first after a restart (a 1-building simulation took 22 s
+    instead of ~7). Runs in a thread so startup itself is not delayed."""
+    import threading
+
+    def warm() -> None:
+        try:
+            _se_cities()
+            recs = _se_buildings("gothenburg")
+            # The energy-declaration lookup opens its database on first use.
+            home = next((b for b in recs if b.get("use_cat") == "bostad_flerfamilj" and b.get("address")), None)
+            if home:
+                _with_epc_dhw(home, "se", "gothenburg")
+            _centroids_of(recs)
+            # The RC model's solar series for the weather file (~4 s, once).
+            from backend import rc_engine
+            rc_engine._weather(str(EPW_DIR / CITY_TO_EPW["gothenburg"]))
+            print(f"[warm] buildings ready: {len(recs)} in Gothenburg")
+        except Exception as exc:  # noqa: BLE001 — warming is best-effort
+            print(f"[warm] skipped: {exc}")
+
+    threading.Thread(target=warm, name="warm-caches", daemon=True).start()
+
+
 @app.get("/api/se/cities")
 def se_cities_built():
     """Swedish cities with a built building payload (Gothenburg always)."""
@@ -3984,6 +4011,203 @@ def _with_recorded_u(building: dict, recorded: Optional[dict[str, float]]) -> di
     return {**building, **extra} if extra else building
 
 
+# ── Fast RC energy model (backend/rc_engine.py, epsm_rc 5R1C) ───────────────
+# Same building inputs as the EnergyPlus shoebox; ~0.2 s per building, so it
+# can screen whole selections — and whole cities (tools/rc/screen_city.py).
+# Calibrated against the current EnergyPlus model: median RC/E+ 1.01 over 63
+# Gothenburg buildings of all types, 97 % within ±15 %.
+
+_RC_DIR = PROJECT_ROOT / "data" / "rc"
+_RC_CITY_CACHE: dict[str, tuple[float, dict]] = {}   # city → (file mtime, parsed result)
+_RC_PROCS: dict[str, "subprocess.Popen"] = {}
+
+
+RC_REUSE_CITY_SCREENING = False
+
+
+def _rc_city_result(city_id: str) -> Optional[dict]:
+    path = _RC_DIR / f"city_{city_id}.json"
+    if not path.exists():
+        return None
+    mtime = path.stat().st_mtime
+    hit = _RC_CITY_CACHE.get(city_id)
+    if not hit or hit[0] != mtime:
+        _RC_CITY_CACHE[city_id] = (mtime, json.loads(path.read_text(encoding="utf-8")))
+    return _RC_CITY_CACHE[city_id][1]
+
+
+def _resolve_sim_building(country: str, city_id: Optional[str], lat: float, lon: float, building: Optional[dict]) -> dict:
+    """The building record a simulation of (lat, lon) uses — same lookup as
+    /api/simulation-batch-submit (nearest real outline within 150 m)."""
+    if building and building.get("coordinates"):
+        return building
+    source = _get_uk_buildings_list(city_id, _district_cc(country)) if _district_cc(country) else _se_buildings(city_id)
+    def _dist(cand: dict) -> float:
+        c_lat, c_lon = _polygon_centroid(cand.get("coordinates") or [])
+        return _haversine_m(lat, lon, c_lat, c_lon)
+    candidates = [c for c in source if _dist(c) <= 150]
+    if not candidates:
+        raise HTTPException(404, f"No building with real geometry found near ({lat}, {lon})")
+    return min(candidates, key=_dist)
+
+
+class RcSimulateRequest(BaseModel):
+    country: str = "se"
+    city_id: Optional[str] = None
+    buildings: list[BatchBuildingSpec]
+    u_wall_override: Optional[float] = None
+    u_roof_override: Optional[float] = None
+    u_win_override: Optional[float] = None
+    u_floor_override: Optional[float] = None
+    hourly: bool = False
+    # An actual calendar year from SMHI observations (backend/weather_years.py)
+    # instead of the typical year; Swedish cities only. Compiled on first use (~20 s).
+    weather_year: Optional[int] = None
+
+
+def _se_city_point(city_id: str) -> tuple[float, float, str]:
+    c = _se_cities().get(city_id) or {}
+    if c.get("bbox4326"):
+        lo, la, LO, LA = c["bbox4326"]
+        return (la + LA) / 2, (lo + LO) / 2, c.get("name") or city_id
+    if city_id == "gothenburg":
+        return 57.7089, 11.9746, "Gothenburg"
+    raise HTTPException(400, f"No location known for city '{city_id}'")
+
+
+@app.post("/api/rc/simulate")
+async def rc_simulate(req: RcSimulateRequest):
+    """Fast hourly heating for a set of buildings (as-is, or with a package's
+    U-values). Unchanged buildings come straight from the city screening when
+    one exists; edited, renovated or package runs are computed here."""
+    from backend import rc_engine
+    if len(req.buildings) > 2000:
+        raise HTTPException(413, "At most 2000 buildings per request — screen a whole city with /api/rc/city instead.")
+    country = (req.country or "se").lower()
+    city_id = req.city_id or ("gothenburg" if country == "se" else None)
+    if _district_cc(country) and not req.city_id and req.buildings:
+        city_id = _resolve_uk_city_id(req.buildings[0].lat, req.buildings[0].lon, _district_cc(country))
+    _se_cities()
+    epw_name = CITY_TO_EPW.get(city_id or "")
+    if not epw_name:
+        raise HTTPException(400, f"No weather file mapped for city_id '{city_id}'")
+    epw = str(EPW_DIR / epw_name)
+    if req.weather_year:
+        if country != "se":
+            raise HTTPException(400, "Actual weather years come from SMHI and are only available for Swedish cities.")
+        from backend import weather_years
+        lat0, lon0, cname = _se_city_point(city_id)
+        try:
+            epw = str(await run_in_threadpool(weather_years.compile_year, city_id, int(req.weather_year), lat0, lon0, cname))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(502, f"Could not build the {req.weather_year} weather file from SMHI data: {exc}")
+        epw_name = Path(epw).name
+    overrides = {k: v for k, v in {"u_wall_override": req.u_wall_override, "u_roof_override": req.u_roof_override,
+                                    "u_win_override": req.u_win_override, "u_floor_override": req.u_floor_override}.items() if v is not None}
+    # Reusing the city screening is off while we work building by building: the
+    # saved Gothenburg screening predates the EPSM archetypes for 2006+ buildings
+    # (2026-11-14), so its numbers are stale. Each building is computed fresh
+    # (~0.2 s). Turn back on after the city is re-screened.
+    city = (_rc_city_result(city_id) if (RC_REUSE_CITY_SCREENING and country == "se" and not overrides
+                                         and not req.hourly and not req.weather_year) else None)
+    city_rows = city["rows"] if city else []
+
+    def run_one(b: BatchBuildingSpec) -> dict:
+        plain = not b.edits and not b.recorded_u and not b.wwr_by_orientation
+        if plain and city_rows:
+            near = min(city_rows, key=lambda r: abs(r["lat"] - b.lat) + abs(r["lon"] - b.lon))
+            if _haversine_m(near["lat"], near["lon"], b.lat, b.lon) <= 15:
+                return {"address": b.address, "lat": b.lat, "lon": b.lon, "source": "city screening",
+                        "floor_area_m2": near["area_m2"], "heating_kwh_m2_yr": near["heat_kwh_m2"],
+                        "heating_kwh": near["heat_kwh"], "peak_heating_kw": near["peak_kw"], "peak_heating_w_m2": near["peak_w_m2"]}
+        building = _resolve_sim_building(country, city_id, b.lat, b.lon, b.building)
+        building = _with_recorded_u(_with_user_edits_then_fix(building, b.edits, country, city_id), b.recorded_u)
+        ov = dict(overrides)
+        if b.wwr_by_orientation:
+            ov["wwr_by_orientation"] = b.wwr_by_orientation
+        r = rc_engine.simulate(building, country, epw, ov, hourly=req.hourly)
+        r.pop("inputs", None)
+        r.pop("hourly", None)        # numpy arrays; the hourly_* lists carry what this endpoint returns
+        return {"address": b.address, "lat": b.lat, "lon": b.lon, "source": "computed", **r}
+
+    def run_all() -> list[dict]:
+        out = []
+        for b in req.buildings:
+            try:
+                out.append(run_one(b))
+            except HTTPException as exc:
+                out.append({"address": b.address, "lat": b.lat, "lon": b.lon, "error": exc.detail})
+            except Exception as exc:  # noqa: BLE001
+                out.append({"address": b.address, "lat": b.lat, "lon": b.lon, "error": f"{type(exc).__name__}: {exc}"})
+        return out
+
+    results = await run_in_threadpool(run_all)
+    return {"engine": "epsm_rc 5R1C (fast hourly model)", "weather": epw_name, "results": results,
+            "calibration": "Median 1.01 × EnergyPlus over 63 Gothenburg buildings of all types; 97 % within ±15 %."}
+
+
+@app.get("/api/weather/years/{city_id}")
+async def weather_year_list(city_id: str):
+    """Actual weather years that can be used for a Swedish city (SMHI, smhi2epw)."""
+    from backend import weather_years
+    ready = weather_years.available(city_id)
+    return {"city_id": city_id, "first_year": weather_years.FIRST_YEAR, "last_year": weather_years.last_complete_year(),
+            "ready": [{"year": y, **(weather_years.summary(city_id, y) or {})} for y in ready],
+            "suggested": weather_years.notable_years(),
+            "typical": CITY_TO_EPW.get(city_id)}
+
+
+@app.get("/api/rc/city/{city_id}")
+async def rc_city(city_id: str):
+    """City screening status and summary (no per-building rows)."""
+    status_path = _RC_DIR / f"city_{city_id}.status.json"
+    status = json.loads(status_path.read_text(encoding="utf-8")) if status_path.exists() else None
+    proc = _RC_PROCS.get(city_id)
+    if status and status.get("state") == "running" and proc is not None and proc.poll() is not None:
+        status["state"] = "failed"     # the run died without writing "done"
+    res = _rc_city_result(city_id)
+    summary = None
+    if res:
+        summary = {k: v for k, v in res.items() if k != "rows"}
+        # Percentiles 0..100 of heating per m² across the city — lets the UI say
+        # where a building ranks without shipping 58,000 rows.
+        vals = sorted(r["heat_kwh_m2"] for r in res["rows"] if r.get("heat_kwh_m2") is not None)
+        if vals:
+            summary["heat_kwh_m2_percentiles"] = [round(vals[min(len(vals) - 1, int(p / 100 * (len(vals) - 1)))], 1) for p in range(101)]
+    return {"city_id": city_id, "status": status, "result": summary}
+
+
+@app.get("/api/rc/city/{city_id}/buildings")
+async def rc_city_buildings(city_id: str, sort: str = Query("heat_kwh_m2"), limit: int = Query(200, le=100000)):
+    """Per-building screening results, highest first (for lists, maps, CSV)."""
+    res = _rc_city_result(city_id)
+    if not res:
+        raise HTTPException(404, "No screening for this city yet.")
+    key = sort if sort in ("heat_kwh_m2", "heat_kwh", "peak_kw", "peak_w_m2", "area_m2") else "heat_kwh_m2"
+    rows = sorted(res["rows"], key=lambda r: -(r.get(key) or 0))[:limit]
+    return {"city_id": city_id, "total": len(res["rows"]), "rows": rows}
+
+
+@app.post("/api/rc/city/{city_id}/run")
+async def rc_city_run(city_id: str):
+    """Start (or report) a whole-city screening run in the background."""
+    import subprocess
+    proc = _RC_PROCS.get(city_id)
+    if proc is not None and proc.poll() is None:
+        return {"started": False, "reason": "already running"}
+    _se_cities()
+    if city_id not in CITY_TO_EPW:
+        raise HTTPException(400, f"Unknown or unbuilt city '{city_id}'")
+    _RC_DIR.mkdir(parents=True, exist_ok=True)
+    log = open(_RC_DIR / f"city_{city_id}.log", "w", encoding="utf-8")
+    _RC_PROCS[city_id] = subprocess.Popen(
+        [sys.executable, str(PROJECT_ROOT / "tools" / "rc" / "screen_city.py"), "--city", city_id],
+        cwd=str(PROJECT_ROOT), stdout=log, stderr=subprocess.STDOUT)
+    return {"started": True}
+
+
 class SimulationBatchSubmitRequest(BaseModel):
     country: str  # "se" | "gb"
     city_id: Optional[str] = None  # gb: auto-resolved from the first building if omitted
@@ -4003,6 +4227,100 @@ class SimulationBatchSubmitRequest(BaseModel):
     package_label: Optional[str] = None
     # "ideal" | "gas_boiler"; None = gas boiler for gas-heated UK homes, ideal loads otherwise.
     heating_system: Optional[str] = None
+
+
+# ── Simulation engine ───────────────────────────────────────────────────────
+# Swedish buildings run on EPSM's RC model (backend/rc_engine.py, epsm_rc 5R1C,
+# calibrated against our EnergyPlus shoebox: median 1.01×) - ~0.3 s per building
+# in-process, instead of ~5 s each through the EPSM 0.3.0 service (a fresh
+# EnergyPlus container per building, which Docker Desktop starts one at a time).
+# Results are stored completed at submit, in the same shape EnergyPlus results
+# use (incl. an 8760-hour trace under the same series names), so the status /
+# results / timeseries / peaks endpoints and the UI work unchanged.
+# SIM_ENGINE=epsm sends Swedish buildings to EnergyPlus again. UK and Belgium
+# always use EnergyPlus: their gas-boiler plant and metered-gas calibration need it.
+SIM_ENGINE = os.environ.get("SIM_ENGINE", "rc").strip().lower()
+_RC_ID_PREFIX = "rc-"
+_RC_SERIES_KEYS = {
+    "heating": "RC_Zone_Ideal_Loads_Supply_Air_Total_Heating_Energy_J",
+    "cooling": "RC_Zone_Ideal_Loads_Supply_Air_Total_Cooling_Energy_J",
+    "lighting": "RC_Zone_Lights_Electricity_Energy_J",
+    "equipment": "RC_Zone_Electric_Equipment_Electricity_Energy_J",
+    "dhw": "RC_Water_Heater_Heating_Energy_J",
+}
+
+
+_CENTROIDS: dict[int, tuple[list, list]] = {}
+
+
+def _centroids_of(source: list) -> list:
+    """Centroid of every outline in a building list, computed once per list."""
+    hit = _CENTROIDS.get(id(source))
+    if hit is None or hit[0] is not source:
+        hit = (source, [_polygon_centroid(b.get("coordinates") or []) for b in source])
+        _CENTROIDS[id(source)] = hit
+    return hit[1]
+
+
+def _use_rc(country: Optional[str]) -> bool:
+    return SIM_ENGINE == "rc" and (country or "").lower() == "se"
+
+
+def _rc_result(building: dict, country: str, epw_path: Path, wwr_override: Optional[float],
+               wwr_by_orientation: Optional[dict], envelope: dict, ext_kwargs: dict) -> dict:
+    """One building on the RC model, as a stored simulation result."""
+    from backend import rc_engine
+    ov: dict[str, Any] = {k: v for k, v in envelope.items() if v is not None}
+    if wwr_override:
+        ov["wwr_override"] = wwr_override
+    if wwr_by_orientation:
+        ov["wwr_by_orientation"] = wwr_by_orientation
+    ov.update({k: v for k, v in (ext_kwargs or {}).items() if v is not None})
+    r = rc_engine.simulate(building, country, str(epw_path), ov, hourly=True)
+    # Cooling stays out of the headline totals, as with EnergyPlus results (EPSM
+    # drops the district-cooling column): the one-zone model, with no openable
+    # windows, overheats far more than the real building. It remains in the
+    # hourly trace, where the Step 3 load profile shows it with that caveat.
+    energy = {"Heating": {"total": r["heating_kwh"]}, "Cooling": {"total": 0.0},
+              "Interior Lighting": {"total": r["lighting_kwh"]}, "Interior Equipment": {"total": r["equipment_kwh"]},
+              "Water Systems": {"total": r["dhw_kwh"]}}
+    result = _normalize_energy(energy, None, building, None)
+    result["engine"] = "rc"
+    series = {key: [round(v * 3.6e6, 1) for v in r["hourly"][end_use].tolist()]
+              for end_use, key in _RC_SERIES_KEYS.items()}
+    result["raw"] = {"engine": r["engine"], "inputs": r["inputs"],
+                     "hourly_timeseries": {"is_hourly": True, "rows": 8760, "series": series}}
+    return result
+
+
+def _rc_store(rows: list[dict], country: str, city_id: Optional[str], package_id: str,
+              package_label: Optional[str], epw_path: Path, wwr_override: Optional[float],
+              req: Any, batch: bool) -> str:
+    """Run every building on the RC model and store each as a finished record.
+    Each row: lat, lon, address, building, ext_kwargs, wwr_by_orientation."""
+    import uuid
+    sim_id = _RC_ID_PREFIX + uuid.uuid4().hex
+    now = datetime.datetime.utcnow().isoformat() + "Z"
+    for rb in rows:
+        simdb.evict_queued(rb["lat"], rb["lon"], package_id)
+    for i, rb in enumerate(rows):
+        simdb.insert({
+            "lat": rb["lat"], "lon": rb["lon"], "address": rb["address"], "country": country,
+            "city_id": city_id, "building_info": rb["building"], "package_id": package_id,
+            "package_label": package_label, "batch_id": sim_id if batch else None, "idf_idx": i,
+            "epsm_simulation_id": sim_id, "epsm_task_id": None,
+            "status": "queued", "submitted_at": now, "completed_at": None, "results": None, "error": None,
+        })
+        try:
+            res = _rc_result(rb["building"], country, epw_path, wwr_override, rb.get("wwr_by_orientation"),
+                             _envelope_overrides(rb["building"], country, req), rb.get("ext_kwargs") or {})
+            simdb.update_by_epsm_id(sim_id, idf_idx=i, status="completed",
+                                    completed_at=datetime.datetime.utcnow().isoformat() + "Z", results=res)
+        except Exception as exc:  # noqa: BLE001 — one odd outline must not sink the batch
+            simdb.update_by_epsm_id(sim_id, idf_idx=i, status="failed",
+                                    completed_at=datetime.datetime.utcnow().isoformat() + "Z",
+                                    error=f"RC model failed for this building: {exc}")
+    return sim_id
 
 
 @app.post("/api/simulation-submit")
@@ -4033,8 +4351,7 @@ async def submit_simulation(req: SimulationSubmitRequest):
         # client-reconstructed building dict for something as physical as geometry.
         cc = _district_cc(req.country)
         source = _get_uk_buildings_list(city_id, cc) if cc else _se_buildings(city_id)
-        cents = (_district_centroids(city_id, cc) if cc
-                 else [_polygon_centroid(b.get("coordinates") or []) for b in source])
+        cents = _district_centroids(city_id, cc) if cc else _centroids_of(source)
         dlat, dlon = 0.0015, 0.0015 / max(0.2, math.cos(math.radians(req.lat)))
         scored = [(_haversine_m(req.lat, req.lon, c[0], c[1]), b) for b, c in zip(source, cents)
                   if abs(c[0] - req.lat) <= dlat and abs(c[1] - req.lon) <= dlon]
@@ -4044,6 +4361,13 @@ async def submit_simulation(req: SimulationSubmitRequest):
         building = min(candidates, key=lambda t: t[0])[1]
     building = _with_height_fix(_with_epc_dhw(building, req.country, city_id), req.country)
     building, ext_kwargs = _with_extension(building, req)
+
+    if _use_rc(req.country):
+        rows = [{"lat": req.lat, "lon": req.lon, "address": req.address, "building": building,
+                 "ext_kwargs": ext_kwargs, "wwr_by_orientation": req.wwr_by_orientation}]
+        sim_id = await run_in_threadpool(_rc_store, rows, req.country, city_id, req.package_id,
+                                         req.package_label, epw_path, req.wwr_override, req, False)
+        return {"simulation_id": sim_id, "task_id": None, "status": "completed", "engine": "rc"}
 
     try:
         idf_text = build_shoebox_idf(
@@ -4103,6 +4427,14 @@ async def simulation_status(simulation_id: str):
     """Proxy EPSM's own status endpoint. On first observing 'completed', also
     fetches + normalizes results and folds them into the cached record."""
     import httpx
+
+    if simulation_id.startswith(_RC_ID_PREFIX):            # finished at submit
+        records = simdb.get_by_epsm_id(simulation_id)
+        if not records:
+            raise HTTPException(404, "Unknown simulation_id")
+        rec = records[0]
+        return {"status": rec["status"], "progress": 100, "simulationId": simulation_id,
+                "error": rec.get("error"), "error_message": rec.get("error")}
 
     async with httpx.AsyncClient(timeout=15) as client:
         try:
@@ -4179,19 +4511,20 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
         raise HTTPException(500, f"Weather file missing on server: {epw_path.name}")
 
     source = _get_uk_buildings_list(city_id, _district_cc(req.country)) if _district_cc(req.country) else _se_buildings(city_id)
+    cents = _centroids_of(source)
 
     resolved: list[dict] = []
     for i, b in enumerate(req.buildings):
         building = b.building
         if not building or not building.get("coordinates"):
-            def _dist(cand: dict, _lat=b.lat, _lon=b.lon) -> float:
-                c_lat, c_lon = _polygon_centroid(cand.get("coordinates") or [])
-                return _haversine_m(_lat, _lon, c_lat, c_lon)
-
-            candidates = [c for c in source if _dist(c) <= 150]
+            # Cheap box filter on cached centroids, then exact distance.
+            dlat, dlon = 0.0015, 0.0015 / max(0.2, math.cos(math.radians(b.lat)))
+            scored = [(_haversine_m(b.lat, b.lon, c[0], c[1]), cand) for cand, c in zip(source, cents)
+                      if abs(c[0] - b.lat) <= dlat and abs(c[1] - b.lon) <= dlon]
+            candidates = [(d, cand) for d, cand in scored if d <= 150]
             if not candidates:
                 raise HTTPException(404, f"No building with real geometry found near building {i} ({b.lat}, {b.lon})")
-            building = min(candidates, key=_dist)
+            building = min(candidates, key=lambda t: t[0])[1]
         extended, ext_kwargs = _with_extension(
             # Order matters: the height fix must see the user's own floors/height
             # (an explicit edit is not "storeys that don't fit" to second-guess),
@@ -4200,6 +4533,11 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
         resolved.append({"lat": b.lat, "lon": b.lon, "address": b.address,
                          "building": extended, "ext_kwargs": ext_kwargs,
                          "wwr_by_orientation": b.wwr_by_orientation})
+
+    if _use_rc(req.country):
+        batch_id = await run_in_threadpool(_rc_store, resolved, req.country, city_id, req.package_id,
+                                           req.package_label, epw_path, req.wwr_override, req, True)
+        return {"batch_id": batch_id, "task_id": None, "total": len(resolved), "status": "completed", "engine": "rc"}
 
     idf_payload: list[tuple[str, bytes, str]] = []
     for i, rb in enumerate(resolved):
@@ -4257,12 +4595,44 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
 async def simulation_batch_status(batch_id: str):
     """Aggregate status for every building in a batch. Once EPSM's own status
     for the shared simulation_id is 'completed', fetches /parallel-results/
-    ONCE and matches each result back to its building via idf_idx."""
-    import httpx
-
+    ONCE and matches each result back to its building via idf_idx. RC batches
+    (ids starting "rc-") were finished at submit and are read straight back."""
     rows = simdb.get_by_epsm_id(batch_id)
     if not rows:
         raise HTTPException(404, "Unknown batch_id")
+
+    if batch_id.startswith(_RC_ID_PREFIX):                 # RC batches finish at submit
+        overall_status = "failed" if all(r["status"] == "failed" for r in rows) else "completed"
+        overall_progress = 100
+    else:
+        overall_status, overall_progress = await _epsm_batch_status(batch_id, rows)
+        rows = simdb.get_by_epsm_id(batch_id)
+
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row["status"]] = counts.get(row["status"], 0) + 1
+
+    return {
+        "batch_id": batch_id,
+        "total": len(rows),
+        "counts": counts,
+        "overall_status": overall_status,
+        "overall_progress": overall_progress,
+        "buildings": [
+            {
+                "idf_idx": row["idf_idx"], "lat": row["lat"], "lon": row["lon"], "address": row["address"],
+                "package_id": row["package_id"], "package_label": row["package_label"],
+                "status": row["status"], "results": _slim_results(row["results"]), "error": row["error"],
+            }
+            for row in rows
+        ],
+    }
+
+
+async def _epsm_batch_status(batch_id: str, rows: list[dict]) -> tuple[Optional[str], Any]:
+    """EPSM batch: read its status and, once completed, reconcile every
+    building's result into the database (see simulation_batch_status)."""
+    import httpx
 
     async with httpx.AsyncClient(timeout=15) as client:
         try:
@@ -4335,27 +4705,7 @@ async def simulation_batch_status(batch_id: str):
                     batch_id, idf_idx=row["idf_idx"],
                     status="failed", completed_at=now, error="EPSM batch failed",
                 )
-        rows = simdb.get_by_epsm_id(batch_id)
-
-    counts: dict[str, int] = {}
-    for row in rows:
-        counts[row["status"]] = counts.get(row["status"], 0) + 1
-
-    return {
-        "batch_id": batch_id,
-        "total": len(rows),
-        "counts": counts,
-        "overall_status": overall_status,
-        "overall_progress": overall_progress,
-        "buildings": [
-            {
-                "idf_idx": row["idf_idx"], "lat": row["lat"], "lon": row["lon"], "address": row["address"],
-                "package_id": row["package_id"], "package_label": row["package_label"],
-                "status": row["status"], "results": _slim_results(row["results"]), "error": row["error"],
-            }
-            for row in rows
-        ],
-    }
+    return overall_status, overall_progress
 
 
 # ── Baseline load profiles (monthly / hourly) ───────────────────────────────
@@ -4614,6 +4964,37 @@ class OptimizeOption(BaseModel):
     u_value: float                    # W/(m²·K) this option imposes on its component
     cost: float = 0.0                 # total initial cost over the component area (SEK/GBP)
     carbon: float = 0.0               # total embodied carbon over the component area (kg CO₂e)
+    # Replacement interval (years, IVL service lives). None = outlasts the study
+    # period. Drives the B4 replacements in total_cost / total_carbon.
+    service_life_yr: Optional[float] = None
+
+
+def _measure_life_yr(component: str, description: str) -> Optional[float]:
+    """IVL service life of a renovation measure — same rules as the frontend's
+    measureLifeYears (frontend/src/config/serviceLifeSE.ts); keep them in step."""
+    part = component.replace("VertExt::", "")
+    d = (description or "").lower()
+    if part == "Windows":
+        return None if ("alu" in d) else 40.0
+    if part == "Doors":
+        return 40.0
+    if part == "Roof":
+        if "sedum" in d:
+            return 20.0
+        if any(w in d for w in ("papp", "felt", "bitumen", "asfalt", "membran", "shingel", "shingle")):
+            return 30.0
+        if any(w in d for w in ("plåt", "metal", "steel", "sheet", "zink", "koppar")):
+            return 40.0
+    return None
+
+
+def _replacement_years(period: int, life: Optional[float]) -> list[float]:
+    """B4 per EN 15978 (as EPSM's LCA counts it): replaced ceil(N/L) − 1 times,
+    at years L, 2L, …; existing parts are never replaced here."""
+    if not life or life <= 0:
+        return []
+    n = max(0, math.ceil(period / life) - 1)
+    return [life * (k + 1) for k in range(n)]
 
 
 class OptimizeComponent(BaseModel):
@@ -4721,12 +5102,20 @@ async def optimize_renovation(req: OptimizeRequest):
         init_carbon = sum(opt.carbon for _, opt in combo)
         op_cost = q_total * p.energy_price * annuity
         op_carbon = q_total * p.carbon_factor_heat * N
+        # Replacements within the period: cost discounted to today, carbon not.
+        b4_cost = b4_carbon = 0.0
+        for _, opt in combo:
+            years = _replacement_years(N, opt.service_life_yr)
+            b4_cost += sum(opt.cost / (1.0 + r) ** y for y in years)
+            b4_carbon += opt.carbon * len(years)
         return {
             "energy_kwh_m2_yr": round(energy_m2, 1),
-            "total_cost": round(init_cost + op_cost),
-            "total_carbon": round(init_carbon + op_carbon),
+            "total_cost": round(init_cost + b4_cost + op_cost),
+            "total_carbon": round(init_carbon + b4_carbon + op_carbon),
             "initial_cost": round(init_cost),
             "initial_carbon": round(init_carbon),
+            "replacement_cost": round(b4_cost),
+            "replacement_carbon": round(b4_carbon),
             "htr_w_per_k": round(htr, 1),
             "selections": {comp.key: opt.code for comp, opt in combo},
             "selection_labels": {comp.key: (opt.label or opt.code) for comp, opt in combo},
@@ -4958,7 +5347,8 @@ async def _recommend_retrofit_impl(address: str, validate_epsm: bool = True) -> 
             if it["u_value"] > base_u[comp]:
                 continue  # only options that actually IMPROVE the component
             opts.append(OptimizeOption(code=f"{comp}:{it['code']}", label=it["description"][:60],
-                                       u_value=it["u_value"], cost=round(it["cost_sek_m2"] * areas[comp]), carbon=0.0))
+                                       u_value=it["u_value"], cost=round(it["cost_sek_m2"] * areas[comp]), carbon=0.0,
+                                       service_life_yr=_measure_life_yr(comp, it["description"])))
         if opts:
             components.append(OptimizeComponent(key=comp, area_m2=round(areas[comp]),
                                                 baseline_u=float(base_u[comp]), options=opts))
@@ -4966,7 +5356,7 @@ async def _recommend_retrofit_impl(address: str, validate_epsm: bool = True) -> 
         return {"error": f"'{address}' already meets or beats the catalogue U-values on every component."}
 
     params = OptimizeParams(f_dh=24 * 3300 / 1000, energy_price=0.8, carbon_factor_heat=0.022,
-                            discount_rate=0.03, study_period_yr=30,
+                            discount_rate=0.03, study_period_yr=50,
                             floor_area_m2=round(heated_floor, 1), baseline_total_kwh_m2_yr=round(baseline_energy, 1))
     opt = await optimize_renovation(OptimizeRequest(components=components, params=params, max_results=40))
     front = opt.get("pareto") or []

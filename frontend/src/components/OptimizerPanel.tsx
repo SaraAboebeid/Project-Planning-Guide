@@ -15,7 +15,7 @@ type SortKey = "energy_kwh_m2_yr" | "total_cost" | "total_carbon" | "initial_cos
 
 const TAG_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
   // "cheapest" is the lowest LIFE-CYCLE cost (total_cost), so say that.
-  "cheapest":       { bg: "rgba(185,139,232,0.18)", fg: "#9B6BD6", label: "Lowest 30-yr cost" },
+  "cheapest":       { bg: "rgba(185,139,232,0.18)", fg: "#9B6BD6", label: "Lowest 50-yr cost" },
   "lowest-carbon":  { bg: "rgba(78,205,196,0.16)",  fg: "#4ECDC4", label: "Lowest carbon" },
   "lowest-energy":  { bg: "rgba(74,144,226,0.16)",  fg: "#4A90E2", label: "Lowest energy" },
 };
@@ -153,7 +153,7 @@ export default function OptimizerPanel({
       {open && (
         <div style={{ padding: "0 18px 18px" }}>
           <p style={{ fontSize: 12, color: white(0.5), margin: "0 0 12px", lineHeight: 1.6 }}>
-            {t("As you pick materials, this scores ")}<b>{t("every combination")}</b>{t(" of your picks on the fast degree-day physics (no EnergyPlus) and plots the ")}<b>{t("Pareto-optimal")}</b>{t(" set live — the packages where you can't improve one objective without sacrificing another. Cost is ")}<b>{t("life-cycle over 30 years")}</b>{t(": material cost today plus the energy bill (at the energy price below, discounted) over the study period. Shortlist the promising ones: click a chart point or ")}<b>{t("Simulate")}</b>{t(" in the table below to verify that package in EnergyPlus (EPSM). Model after Enerbäck & Strömberg.")}
+            {t("As you pick materials, this scores ")}<b>{t("every combination")}</b>{t(" of your picks on the fast degree-day physics (no EnergyPlus) and plots the ")}<b>{t("Pareto-optimal")}</b>{t(" set live — the packages where you can't improve one objective without sacrificing another. Cost is ")}<b>{t("life-cycle over 50 years")}</b>{t(": material cost today plus the energy bill (at the energy price below, discounted) over the study period. Shortlist the promising ones: click a chart point or ")}<b>{t("Simulate")}</b>{t(" in the table below to verify that package in EnergyPlus (EPSM). Model after Enerbäck & Strömberg.")}
           </p>
 
           <details style={{ marginBottom: 14, fontSize: 12, color: white(0.6), lineHeight: 1.6 }}>
@@ -172,9 +172,9 @@ export default function OptimizerPanel({
                   {" "}{t("That simple formula ignores sun and internal heat, so it is ")}<b>{t("calibrated to your Step 3 EnergyPlus baseline")}</b>{t(": “keep everything as-built” gives exactly the simulated heating. Only heating responds to better U-values; hot water and other loads stay fixed.")}
                 </li>
                 <li style={{ marginBottom: 4 }}>
-                  <b>{t("30-year cost")}</b> = {t("material cost today + 30 years of energy bills")}
+                  <b>{t("50-year cost")}</b> = {t("material cost today + replacements + 50 years of energy bills")}
                   {input ? <> {t("at {price} {currency}/kWh", { price: input.params.energy_price, currency })}</> : null}, {t("discounted at {rate}/yr (money later is worth less than money now).", { rate: input ? `${Math.round(input.params.discount_rate * 1000) / 10}%` : "3%" })}
-                  {" "}<b>{t("30-year carbon")}</b> = {t("embodied carbon + 30 years of energy × the heat carbon factor")}
+                  {" "}<b>{t("50-year carbon")}</b> = {t("embodied carbon + replacements + 50 years of energy × the heat carbon factor")}
                   {input ? <> ({input.params.carbon_factor_heat} kg CO₂e/kWh)</> : null}, {t("not discounted.")}
                 </li>
                 <li style={{ marginBottom: 4 }}>
@@ -185,7 +185,7 @@ export default function OptimizerPanel({
                 </li>
               </ol>
               <p style={{ margin: 0, color: white(0.5) }}>
-                <b>{t("Keep in mind:")}</b> {t("the estimate is still somewhat optimistic about savings, so simulate the packages you care about. A new storey shows its cost and carbon but no energy effect here (EnergyPlus models it). Replacing parts that wear out within 30 years is not counted yet. With several buildings, the optimisation is done for one representative building and the same choices are applied to all.")}
+                <b>{t("Keep in mind:")}</b> {t("the estimate is still somewhat optimistic about savings, so simulate the packages you care about. A new storey shows its cost and carbon but no energy effect here (EnergyPlus models it). Parts that wear out within 50 years are replaced in the totals (IVL service lives). With several buildings, the optimisation is done for one representative building and the same choices are applied to all.")}
               </p>
             </div>
           </details>
@@ -307,7 +307,7 @@ export default function OptimizerPanel({
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, padding: "10px 14px", borderRadius: 10,
                   background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: white(0.6), flex: 1, lineHeight: 1.5 }}>
-                    {t("Every package — with cost, carbon, 30-year cost and carbon, heating and total energy — is in one table under ")}<b style={{ color: "#fff" }}>{t("Results & comparison")}</b>{t(": estimates until simulated, EnergyPlus figures after. Click a point above to simulate it.")}
+                    {t("Every package — with cost, carbon, 50-year cost and carbon, heating and total energy — is in one table under ")}<b style={{ color: "#fff" }}>{t("Results & comparison")}</b>{t(": estimates until simulated, EnergyPlus figures after. Click a point above to simulate it.")}
                   </span>
                   <button onClick={onOpenTable}
                     style={{ fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 8, cursor: "pointer",
@@ -331,7 +331,7 @@ export default function OptimizerPanel({
                 <span style={{ fontSize: 11, color: white(0.4) }}>{t("Sort by:")}</span>
                 {/* "Cost" here is life-cycle, unlike the capex-only Cost in 4.3 —
                     the two answer different questions and can rank differently. */}
-                {([["energy_kwh_m2_yr", "Energy"], ["initial_cost", "Upfront cost"], ["total_cost", "30-yr cost"], ["total_carbon", "30-yr carbon"]] as const).map(([k, lbl]) => (
+                {([["energy_kwh_m2_yr", "Energy"], ["initial_cost", "Upfront cost"], ["total_cost", "50-yr cost"], ["total_carbon", "50-yr carbon"]] as const).map(([k, lbl]) => (
                   <button key={k} onClick={() => setSort(k)} style={{
                     fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
                     border: `1px solid ${sort === k ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
@@ -367,9 +367,9 @@ export default function OptimizerPanel({
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>{t("Energy")}</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}>{t("Upfront cost")}</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}
-                          title={t("Upfront cost + 30 years of energy at today's price, discounted (energy × price × annuity factor)")}>{t("30-yr cost (LCC)")}</th>
+                          title={t("Upfront cost + replacements + 50 years of energy at today's price, discounted (energy × price × annuity factor)")}>{t("50-yr cost (LCC)")}</th>
                       <th style={{ padding: "6px 8px", fontWeight: 600, whiteSpace: "nowrap" }}
-                          title={t("Embodied carbon + 30 years of energy")}>{t("30-yr carbon")}</th>
+                          title={t("Embodied carbon + replacements + 50 years of energy")}>{t("50-yr carbon")}</th>
                       <th />
                     </tr>
                   </thead>

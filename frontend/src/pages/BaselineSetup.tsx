@@ -374,7 +374,8 @@ export default function BaselineSetup() {
           }, 150);
           return;
         }
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        // 1 s: a building takes ~5 s in EPSM, so a 3 s poll added up to 60 % on top.
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     } catch (err) {
       setSimError((err as Error).message);
@@ -614,7 +615,9 @@ export default function BaselineSetup() {
         {simRunning && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{t("Running EnergyPlus for each building…")}</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{project.country === "United Kingdom" || project.country === "Belgium"
+                ? t("Running EnergyPlus for each building…")
+                : t("Running the EPSM RC model for each building…")}</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: "#2FB477" }}>{simProgress}%</span>
             </div>
             <div style={{ height: 6, borderRadius: 4, background: "rgba(255,255,255,0.08)" }}>
@@ -882,7 +885,7 @@ export default function BaselineSetup() {
             </p>
             ) : (
             <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
-              {t("* Real EnergyPlus (EPSM) output. Homes use Sveby 2.0 (2024) standard use. Hot water is what the building's own energy declaration reports where it gives a figure, otherwise Sveby's 21 kWh/m²·yr, played back through EnergyPlus as given. Household and business electricity (appliances and lighting; 21 kWh/m²·yr in homes, of which 70% warms the building) is simulated because its heat lowers the heating need, but — as in Swedish energy declarations — it is not part of the total and not shown. Office, shop and school lighting is dimmed by daylight near the windows. Infiltration is modelled too, but EnergyPlus reports it inside heating rather than as its own end use. Proceed to Step 4 to test renovation packages against this baseline.")}
+              {t("* EPSM RC model output (ISO 13790 5R1C, hourly, a typical weather year), calibrated against our EnergyPlus model (median 1.01×). Non-flats built 2006 or later use EPSM's archetype constructions, air change and window share. Homes use Sveby 2.0 (2024) standard use. Hot water is what the building's own energy declaration reports where it gives a figure, otherwise Sveby's 21 kWh/m²·yr, added as given. Household and business electricity (appliances and lighting; 21 kWh/m²·yr in homes, of which 70% warms the building) is simulated because its heat lowers the heating need, but — as in Swedish energy declarations — it is not part of the total and not shown. Office, shop and school lighting is dimmed by daylight near the windows. Infiltration is modelled too and counted inside heating rather than as its own end use. Proceed to Step 4 to test renovation packages against this baseline.")}
             </p>
             )}
           </div>

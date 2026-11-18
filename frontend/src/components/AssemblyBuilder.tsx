@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import {
   LAYER_MATERIALS, SURFACE_RESISTANCE, PRESETS,
-  computeAssemblyU, type AssemblyLayer, type ComponentKind, type LayerCategory, type LayerMaterial,
+  computeAssemblyU, solveForTargetU, type AssemblyLayer, type ComponentKind, type LayerCategory, type LayerMaterial,
 } from "../config/assemblyLayers";
-import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle, Target } from "lucide-react";
+import { BBR_RENOVATION_U } from "../config/serviceLifeSE";
 import { useT } from "../i18n";
 
 /* Compose a wall / roof / floor from its real layers and read the U-value off
@@ -23,7 +24,7 @@ const CAT_LABEL: Record<LayerCategory, string> = {
 };
 
 export default function AssemblyBuilder({
-  kind, layers, onChange, materials, presets, layerNote,
+  kind, layers, onChange, materials, presets, layerNote, defaultTargetU,
 }: {
   kind: ComponentKind;
   layers: AssemblyLayer[];
@@ -33,6 +34,8 @@ export default function AssemblyBuilder({
   presets?: { label: string; layers: AssemblyLayer[] }[];
   /** Per-layer annotation, e.g. its catalogue price and carbon. */
   layerNote?: (layer: AssemblyLayer) => string | null;
+  /** Starting value of the "reach a target U" box; defaults to the BBR renovation guidance. */
+  defaultTargetU?: number;
 }) {
   const t = useT();
   const LAYER_LIST = materials ?? LAYER_MATERIALS;
@@ -41,6 +44,22 @@ export default function AssemblyBuilder({
     [LAYER_LIST]);
   const PRESET_LIST = presets ?? PRESETS[kind];
   const [addOpen, setAddOpen] = useState(false);
+  const bbrU = BBR_RENOVATION_U[kind === "wall" ? "Walls" : kind === "roof" ? "Roof" : "Floor"];
+  const [targetU, setTargetU] = useState<number>(defaultTargetU ?? bbrU ?? 0.18);
+  const [solved, setSolved] = useState<string | null>(null);
+  const sizeInsulation = () => {
+    const sol = solveForTargetU(layers, kind, targetU, MATERIAL_BY_ID);
+    if (!sol) { setSolved(t("No insulation material available to size.")); return; }
+    if (sol.alreadyMet) { setSolved(t("This build-up already reaches U {u} — nothing to add.", { u: (sol.achievedU ?? 0).toFixed(3) })); return; }
+    onChange(sol.layers);
+    const name = MATERIAL_BY_ID[sol.layers[sol.index]!.materialId]?.label ?? "";
+    const what = sol.added
+      ? t("Added {mm} mm {name} as a continuous layer.", { mm: sol.thicknessMm, name })
+      : t("Set {name} to {mm} mm.", { mm: sol.thicknessMm, name });
+    setSolved(sol.reachable
+      ? `${what} ${t("U is now {u} W/m²·K (target {target}).", { u: (sol.achievedU ?? 0).toFixed(3), target: targetU })}`
+      : `${what} ${t("That is the thickest this material comes in, and U is still {u} — choose a better-insulating material (lower λ) or add another layer.", { u: (sol.achievedU ?? 0).toFixed(3) })}`);
+  };
   const result = useMemo(() => computeAssemblyU(layers, kind, MATERIAL_BY_ID), [layers, kind, MATERIAL_BY_ID]);
   const white = (o: number) => `rgba(255,255,255,${o})`;
   const sr = SURFACE_RESISTANCE[kind];
@@ -102,6 +121,25 @@ export default function AssemblyBuilder({
           </span>
         )}
       </div>
+
+      {/* Reach a target U: solve the insulation thickness */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 11.5, color: white(0.7) }}>
+        <Target size={13} color="#4ECDC4" />
+        <span>{t("Reach a U-value of")}</span>
+        <input type="number" step={0.01} min={0.05} max={2} value={targetU} aria-label={t("Target U-value")}
+          onChange={(e) => { setTargetU(Number(e.target.value) || 0); setSolved(null); }}
+          style={{ width: 64, background: "#11161d", color: "#fff", border: `1px solid ${white(0.15)}`, borderRadius: 6, padding: "3px 6px", fontSize: 11.5 }} />
+        <span style={{ color: white(0.45) }}>W/m²·K</span>
+        <button onClick={sizeInsulation} disabled={!(targetU > 0)}
+          style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
+            background: "rgba(78,205,196,0.12)", border: "1px solid rgba(78,205,196,0.4)", color: "#4ECDC4" }}>
+          {t("Size the insulation")}
+        </button>
+        {!defaultTargetU && bbrU != null && !materials && (
+          <span style={{ fontSize: 10.5, color: white(0.4) }}>{t("BBR guidance when renovating: {u}", { u: bbrU })}</span>
+        )}
+      </div>
+      {solved && <div role="status" style={{ fontSize: 11, color: white(0.7), lineHeight: 1.5, marginTop: -4 }}>{solved}</div>}
 
       {/* Resistance share bar */}
       {result.layers.length > 0 && result.rTotal > 0 && (

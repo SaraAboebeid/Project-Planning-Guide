@@ -1483,7 +1483,7 @@ export default function RenovationReport() {
                     <th style={th2}>{t("Op. cost/yr")}</th>
                     <th style={th2}>{t("Carbon/yr")}<br /><span style={{ fontWeight: 400, color: "rgba(255,255,255,0.3)" }}>kg CO₂e</span></th>
                     <th style={th2}>{t("Install")}</th>
-                    <th style={th2}>{ha.results[0] ? t("30-yr LCC") : t("LCC")}</th>
+                    <th style={th2}>{ha.results[0] ? t("50-yr LCC") : t("LCC")}</th>
                   </tr>
                 </thead>
                 <tbody>

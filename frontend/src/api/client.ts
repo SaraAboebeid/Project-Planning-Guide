@@ -41,7 +41,9 @@ export interface PvgisEstimate {
   kWp?: number; annual_kwh?: number; specific_kwh_kwp?: number; roof_area_m2?: number;
   source?: "saved" | "computed"; saved_at?: string; error?: string;
 }
-export interface OptimizeOption { code: string; label?: string; u_value: number; cost: number; carbon: number; }
+export interface OptimizeOption { code: string; label?: string; u_value: number; cost: number; carbon: number;
+  /** Replacement interval (IVL); null/absent = outlasts the study period. */
+  service_life_yr?: number | null; }
 export interface OptimizeComponentInput { key: string; area_m2: number; baseline_u: number; options: OptimizeOption[]; }
 export interface OptimizeParams {
   f_dh: number; energy_price: number; carbon_factor_heat: number; discount_rate: number;
@@ -53,6 +55,8 @@ export interface OptimizeRequestBody {
 export interface OptimizePoint {
   energy_kwh_m2_yr: number; total_cost: number; total_carbon: number;
   initial_cost: number; initial_carbon: number; htr_w_per_k: number;
+  /** B4: discounted cost / carbon of replacing measures within the study period. */
+  replacement_cost?: number; replacement_carbon?: number;
   selections: Record<string, string>; selection_labels: Record<string, string>; tags?: string[];
 }
 export interface OptimizeCloudPoint { energy_kwh_m2_yr: number; total_cost: number; total_carbon: number; }

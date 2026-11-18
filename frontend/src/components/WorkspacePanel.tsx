@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { useT, translate } from "../i18n";
 import { useAuth } from "../store/auth";
 import { RETURN_KEY } from "../pages/Login";
+import { LOGIN_ENABLED } from "../config/features";
 
 /* ── Home-page workspace panels ────────────────────────────────────────────────
    The toolbox selection (country, city, add a municipality, focus, access mode)
@@ -39,7 +40,8 @@ export function WorkspaceCard({ country, city, metrics, onCountry, onCity, onSta
   onStart: () => void;
 }) {
   const navigate = useNavigate();
-  const email = useAuth((s) => s.email);
+  // With sign-in switched off everyone is a guest, whatever session lingers.
+  const email = useAuth((s) => (LOGIN_ENABLED ? s.email : null));
   const signOut = useAuth((s) => s.signOut);
   // Signed in, the access mode IS the account: it is shown, not chosen.
   const accessMode: "guest" | "chalmers" | "partner" = !email ? "guest" : isChalmersEmail(email) ? "chalmers" : "partner";
@@ -78,12 +80,12 @@ export function WorkspaceCard({ country, city, metrics, onCountry, onCity, onSta
           <div className="grid grid-cols-3 gap-2.5">
             <AccessCard active={accessMode === "guest"} onClick={email ? () => signOut() : undefined}
               icon={User} title={t("Guest Demo")} sub={email ? t("Sign out and explore as guest") : t("Explore as guest")} />
-            <AccessCard active={accessMode === "chalmers"} onClick={accessMode === "chalmers" ? undefined : goSignIn} icon={Lock}
+            <AccessCard active={accessMode === "chalmers"} soon={!LOGIN_ENABLED} onClick={accessMode === "chalmers" ? undefined : goSignIn} icon={Lock}
               title={t("Chalmers Login")} sub={accessMode === "chalmers" ? email! : t("Sign in with Chalmers")} />
-            <AccessCard active={accessMode === "partner"} onClick={accessMode === "partner" ? undefined : goSignIn} icon={Building2}
+            <AccessCard active={accessMode === "partner"} soon={!LOGIN_ENABLED} onClick={accessMode === "partner" ? undefined : goSignIn} icon={Building2}
               title={t("Partner Login")} sub={accessMode === "partner" ? email! : t("Sign in with partner")} />
           </div>
-          {email && (
+          {email && LOGIN_ENABLED && (
             <div className="text-[11.5px] text-white/45 mt-2">
               {t("Signed in — your projects are saved to your account.")}{" "}
               <button onClick={() => navigate("/projects")} className="font-semibold" style={{ color: "#4ECDC4" }}>{t("My projects")}</button>

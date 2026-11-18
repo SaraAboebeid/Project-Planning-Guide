@@ -24,5 +24,12 @@ httpx==0.28.1
 Jinja2==3.1.6
 pythermalcomfort==2.10.0
 
+# Fast hourly RC heating model (backend/rc_engine.py, tools/rc/screen_city.py)
+# and the SMHI weather-year builder (backend/weather_years.py) come from
+# SB-Chalmers/epsm (MIT) and are not on PyPI: install the wheels in
+# vendor/wheels/ — `pip install vendor/wheels/*.whl` (the Docker image does).
+# epsm_rc 0.9.0 is the last pure-Python release; 0.11 is Linux cp311-only.
+pvlib==0.16.1
+
 # Note: Install all dependencies with:
 # pip install -r requirements.txt

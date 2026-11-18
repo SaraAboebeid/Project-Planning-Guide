@@ -19,6 +19,7 @@ import SettingsModal from "./SettingsModal";
 import ProjectSaveControl from "./ProjectSaveControl";
 import { useAuth, initialsOf } from "../store/auth";
 import { RETURN_KEY } from "../pages/Login";
+import { LOGIN_ENABLED } from "../config/features";
 
 /** Distance from the window's right edge to the right edge of the home-page
  *  tabs: bar padding (20) + gap (12) + avatar block (4 margin + 28 + 6 + 12).
@@ -71,7 +72,8 @@ export default function TopBar({
   const lang = useLang();
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const email = useAuth((s) => s.email);
+  // With sign-in switched off, a leftover session must not show as signed in.
+  const email = useAuth((s) => (LOGIN_ENABLED ? s.email : null));
   const signOut = useAuth((s) => s.signOut);
 
   // Uncontrolled: the URL is the source of truth for country, so the bar always
@@ -186,7 +188,7 @@ export default function TopBar({
       <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
       <div role="menu" style={{ position: "absolute", right: 0, top: 36, zIndex: 41, width: 230, padding: 8, borderRadius: 12,
         background: "#0d1117", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 12px 32px rgba(0,0,0,0.5)" }}>
-        {email ? (<>
+        {!LOGIN_ENABLED ? null : email ? (<>
           <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)", padding: "4px 8px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={email}>
             {email}
           </div>
@@ -202,7 +204,7 @@ export default function TopBar({
             <LogIn size={14} /> {t("Sign in")}
           </button>
         )}
-        <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "6px 0" }} />
+        {LOGIN_ENABLED && <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "6px 0" }} />}
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.8, textTransform: "uppercase", color: "rgba(255,255,255,0.4)", padding: "4px 8px 6px" }}>
           {t("Language")}
         </div>
@@ -357,7 +359,7 @@ export default function TopBar({
       </div>}
 
       {/* Saving belongs to the wizard, where there is a project to save. */}
-      {step && <ProjectSaveControl />}
+      {step && LOGIN_ENABLED && <ProjectSaveControl />}
 
       {tabsRightWidth ? <>{tabs}{avatar}</> : avatar}
     </header>

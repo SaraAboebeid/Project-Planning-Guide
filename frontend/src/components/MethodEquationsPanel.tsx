@@ -51,7 +51,7 @@ const METHODS: Method[] = [
     sources: [
       { label: "Energy price — today's reference (SE3, Gothenburg)", cite: "Nord Pool day-ahead spot, fetched live via elprisetjustnu.se (spot only, excl. VAT / grid fee / energy tax); 0.8 SEK/kWh fallback if the feed is down. Low/Medium/High are user-set scenarios around it.", url: "https://www.elprisetjustnu.se" },
       { label: "Real discount rate — 3%", cite: "EU cost-optimal framework (Delegated Reg. 244/2012), societal real rate used by Boverket for building energy LCC", url: "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32012R0244" },
-      { label: "Study period — 30 years", cite: "Net-present-value horizon; annuity factor = Σ 1/(1+r)^t over the period" },
+      { label: "Study period — 50 years", cite: "Net-present-value horizon; annuity factor = Σ 1/(1+r)^t over the period" },
     ],
   },
 ];

@@ -200,7 +200,7 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       source: "Ofgem energy price cap, 1 Oct–31 Dec 2026, Yorkshire region, Direct Debit: 7.90 p/kWh + 29.77 p/day standing charge (incl. 5% VAT); fetched live via the Octopus Energy API",
       sourceUrl: "https://www.ofgem.gov.uk/information-consumers/energy-advice-households/get-energy-price-cap-standing-charges-and-unit-rates-region",
       note: "THE energy price of the UK optimiser: 91% of matched Rotherham certificates heat with mains gas. Divided by the boiler efficiency below to price useful heat (7.90 p ÷ 0.85 ≈ 9.3 p per kWh of heat). 0.079 is the fallback if the feed is down. Update quarterly.",
-      usedIn: "Step 4 optimiser and 30-yr cost · Step 4 Systems · Step 4 price scenarios",
+      usedIn: "Step 4 optimiser and 50-yr cost · Step 4 Systems · Step 4 price scenarios",
     },
     {
       key: "boiler_efficiency",
@@ -227,7 +227,7 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       source: "HM Treasury Green Book supplementary guidance: discounting (Feb 2026), 3.5% for years 1–30, 3.0% for 31–75",
       sourceUrl: "https://www.gov.uk/government/publications/green-book-supplementary-guidance-discounting",
       note: "An independent review (Jun 2026) recommends 3.0% for years 0–30; not adopted by HM Treasury — use as a sensitivity only.",
-      usedIn: "Step 4 optimiser and 30-yr cost · Step 4 price scenarios",
+      usedIn: "Step 4 optimiser and 50-yr cost · Step 4 price scenarios",
     },
     {
       key: "carbon_factor_heat",
@@ -236,7 +236,7 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       source: "DESNZ GHG Conversion Factors 2025, natural gas, kWh (gross CV): scope 1 combustion 0.18296 + well-to-tank 0.03021 (OGL v3.0)",
       sourceUrl: "https://www.gov.uk/government/collections/government-conversion-factors-for-company-reporting",
       note: "Life-cycle (combustion + upstream), like the Swedish district-heating factor. Divided by the boiler efficiency for heat delivered. The 2026 set gives 0.18231 for combustion.",
-      usedIn: "Step 4 optimiser and 30-yr carbon · Step 4 Systems",
+      usedIn: "Step 4 optimiser and 50-yr carbon · Step 4 Systems",
     },
     {
       key: "electricity_price",
@@ -265,7 +265,7 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       source: "Belgian average residential natural-gas price, September 2025, all taxes and fees included (GlobalPetrolPrices, from CREG data)",
       sourceUrl: "https://www.globalpetrolprices.com/Belgium/natural_gas_prices/",
       note: "THE energy price of the Belgian optimiser — most Belgian homes heat with gas. Divided by the boiler efficiency below to price useful heat (0.078 ÷ 0.85 ≈ 0.092 €/kWh of heat). Not live: refresh from CREG's monthly price report.",
-      usedIn: "Step 4 optimiser and 30-yr cost",
+      usedIn: "Step 4 optimiser and 50-yr cost",
     },
     {
       key: "boiler_efficiency",
@@ -291,7 +291,7 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       value: 0.03, unit: "fraction/yr (real)",
       source: "EU cost-optimal framework (Delegated Reg. 244/2012), societal real rate",
       sourceUrl: "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32012R0244",
-      usedIn: "Step 4 optimiser and 30-yr cost",
+      usedIn: "Step 4 optimiser and 50-yr cost",
     },
     {
       key: "carbon_factor_heat",
@@ -300,7 +300,7 @@ export const ASSUMPTIONS: Record<Country, Assumption[]> = {
       source: "IPCC 2006 Guidelines default for natural gas, 56.1 t CO₂/TJ (combustion, net CV)",
       sourceUrl: "https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html",
       note: "Combustion only (the UK factor includes well-to-tank, so BE is ~10–20% lower by method, not by fact). Divided by the boiler efficiency for heat delivered.",
-      usedIn: "Step 4 optimiser and 30-yr carbon",
+      usedIn: "Step 4 optimiser and 50-yr carbon",
     },
   ],
 };
@@ -312,11 +312,11 @@ export const MODEL_ASSUMPTIONS: Assumption[] = [
   {
     key: "study_period",
     label: "Study period",
-    value: 30, unit: "years",
-    source: "Modelling choice; typical LCC horizon for envelope measures (EU cost-optimal framework uses 30 years for residential buildings)",
-    sourceUrl: "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32012R0244",
-    note: "Energy use, price and carbon factor are held constant over the period (no price escalation, no grid decarbonisation, no component replacements) — the Step 4 price scenarios test other price futures.",
-    usedIn: "Optimiser · 30-yr cost and carbon · Step 5",
+    value: 50, unit: "years",
+    source: "50-year calculation period of IVL's LCA guidance (Anvisningar för LCA-beräkning av byggprojekt, v. 2024-06) and of Boverket's proposed whole-life climate declaration (rapport 2023:20)",
+    sourceUrl: "https://www.boverket.se/globalassets/publikationer/dokument/2023/slutrapport-gransvarde-for-byggnaders-klimatpaverkan.pdf",
+    note: "Long enough for replacements (B4) to matter: windows (40 yr), felt roofs and heating substations (30 yr) are replaced once within it, using the same IVL service lives as the Step 4 recommendations. Energy use, price and carbon factor are held constant (no price escalation, no grid decarbonisation) — the Step 4 price scenarios test other price futures.",
+    usedIn: "Optimiser · 50-yr cost and carbon · Step 4 Systems · price scenarios · Step 5",
   },
   {
     key: "air_change",
@@ -393,21 +393,29 @@ export const EQUATIONS: EquationDoc[] = [
     explain: "Gas-heated homes pay for (and emit from) the gas burned, not the heat delivered, so both are divided by the boiler's seasonal efficiency η (0.85). Sweden uses the district-heating price and factor directly.",
   },
   {
-    name: "Annuity factor (present value of 30 years)",
-    latexish: "AF = Σ_{y=1..N} 1/(1 + r)^y      (N = 30, r = 3 % → AF ≈ 19.6)",
+    name: "Annuity factor (present value of 50 years)",
+    latexish: "AF = Σ_{y=1..N} 1/(1 + r)^y      (N = 50, r = 3 % → AF ≈ 25.7)",
     explain: "A cost that recurs every year for N years is worth AF × one year's cost today, at the real discount rate r.",
   },
   {
-    name: "30-year cost (LCC, KPI)",
-    latexish: "total_cost = Σ upfront_cost + Q_b · price_heat · AF",
-    explain: "Upfront cost of the chosen options plus the discounted energy bill over the study period. Component replacements within the period (service life) are NOT modelled yet — the original formulation includes them; for envelope insulation (service life ≥ 30 yr) the effect is small, for windows it is not.",
+    name: "Replacements within the period (B4)",
+    latexish: "n_o = ⌈N / L_o⌉ − 1 ,  at years L_o, 2L_o, …     PV_B4 = Σ_k upfront_cost_o / (1 + r)^(k·L_o) ,   C_B4 = n_o · embodied_o",
+    explain: "A measure with service life L is installed again n times within the study period (EN 15978, the rule EPSM's LCA package uses). Each replacement repeats its cost — discounted to today — and its embodied carbon (not discounted). Service lives: IVL v. 2024-06 appendix S5. Existing parts of the building are not replaced (their remaining life is unknown), and removal (C) and maintenance (B2) are not counted.",
   },
   {
-    name: "30-year carbon (KPI)",
-    latexish: "total_carbon = Σ embodied_A1–A5 + Q_b · cf_heat · N",
-    explain: "Embodied carbon of the chosen options (Sweden: production, transport and installation, A1–A5; UK/Belgium: production only, A1–A3) plus 30 years of operational carbon (not discounted). Replacement embodied carbon is not modelled yet (as above).",
+    name: "50-year cost (LCC, KPI)",
+    latexish: "total_cost = Σ upfront_cost + PV_B4 + Q_b · price_heat · AF",
+    explain: "Upfront cost of the chosen options, plus their discounted replacements within the period, plus the discounted energy bill over the study period.",
+  },
+  {
+    name: "50-year carbon (KPI)",
+    latexish: "total_carbon = Σ embodied_A1–A5 + C_B4 + Q_b · cf_heat · N",
+    explain: "Embodied carbon of the chosen options (Sweden: production, transport and installation, A1–A5; UK/Belgium: production only, A1–A3), plus the same again for each replacement (B4), plus 50 years of operational carbon (not discounted).",
   },
 ];
+
+/** The study period of every life-cycle figure in the tool (years). */
+export const STUDY_PERIOD_YR: number = MODEL_ASSUMPTIONS.find((a) => a.key === "study_period")?.value ?? 50;
 
 export function assumptionsFor(country: Country): Assumption[] {
   return ASSUMPTIONS[country];

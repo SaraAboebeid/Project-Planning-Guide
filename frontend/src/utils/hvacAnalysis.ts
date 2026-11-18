@@ -3,7 +3,7 @@
  *
  * Takes the building's useful HEAT DEMAND (from the EPSM baseline) and, for each
  * candidate system, computes delivered energy, annual cost & carbon, capex, and
- * the 30-year life-cycle cost — the demand is fixed, only the converter changes:
+ * the life-cycle cost over the study period — the demand is fixed, only the converter changes:
  *
  *   delivered = demand / efficiency(SPF)
  *   op-cost   = delivered × carrier tariff
@@ -12,12 +12,13 @@
  *   LCC       = capex + annuity·(op-cost + O&M) + PV(replacements)
  */
 import { SE_HVAC_CATALOGUE, type HvacCatalogue } from "../config/hvacSystems";
+import { STUDY_PERIOD_YR } from "../config/optimizationAssumptions";
 
 export interface HvacInput {
   heatingDemandKwhM2Yr: number;   // useful heat demand per m²·yr (EPSM baseline heating)
   floorAreaM2: number;
   eflh?: number;                  // equivalent full-load hours (design-kW sizing)
-  studyPeriodYr?: number;         // default 30
+  studyPeriodYr?: number;         // default: the tool's study period
   discountRate?: number;          // default 0.03
   catalogue?: HvacCatalogue;      // default Sweden/Gothenburg
 }
@@ -47,7 +48,7 @@ export function annuity(discountRate: number, years: number): number {
 export function computeHvac(input: HvacInput): HvacOutcome {
   const cat = input.catalogue ?? SE_HVAC_CATALOGUE;
   const eflh = input.eflh ?? cat.eflh;
-  const N = input.studyPeriodYr ?? 30;
+  const N = input.studyPeriodYr ?? STUDY_PERIOD_YR;
   const r = input.discountRate ?? 0.03;
   const af = annuity(r, N);
   const area = Math.max(1, input.floorAreaM2);

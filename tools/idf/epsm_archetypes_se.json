@@ -1,0 +1,1666 @@
+{
+ "source": "epsm_data 0.7.0 (SB-Chalmers/epsm, MIT) — datasets/lod2/catalogue.json + profiles/",
+ "built": "2026-11-14",
+ "method": "U by EN ISO 6946 (combined method for framed layers); ground parts are nominal layer U",
+ "eras": {
+  "SE.01": [
+   1,
+   1960
+  ],
+  "SE.02": [
+   1961,
+   1975
+  ],
+  "SE.03": [
+   1976,
+   1985
+  ],
+  "SE.04": [
+   1986,
+   1995
+  ],
+  "SE.05": [
+   1996,
+   2005
+  ],
+  "SE.06": [
+   2006,
+   2021
+  ],
+  "SE.07": [
+   2022,
+   null
+  ]
+ },
+ "category_by_use": {
+  "bostad_enfamilj": "single_family",
+  "bostad_flerfamilj": "multi_family",
+  "verksamhet": "office",
+  "samhalle": "school",
+  "industri": "generic",
+  "ovrigt": "generic"
+ },
+ "generic_fabric_donor": "multi_family",
+ "archetypes": {
+  "mf_se01": {
+   "category": "multi_family",
+   "era": "SE.01",
+   "name": "Multi-family SE.01",
+   "states": {
+    "advanced": {
+     "construction_year": 1943,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.093,
+     "u_roof": 0.066,
+     "u_floor": 0.417,
+     "u_win": 0.76,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Historic AAC wall with TABULA advanced exterior package",
+     "roof": "Historic attic ceiling with TABULA advanced loose-wool addition",
+     "window": "TABULA advanced replacement window"
+    },
+    "existing": {
+     "construction_year": 1943,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.688,
+     "u_roof": 0.364,
+     "u_floor": 0.886,
+     "u_win": 2.22,
+     "shgc": 0.56,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.2,
+     "infiltration_basis": "Atemp",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "TABULA original two-pane timber window"
+    },
+    "standard": {
+     "construction_year": 1943,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.315,
+     "u_roof": 0.129,
+     "u_floor": 0.443,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Historic AAC wall with TABULA standard exterior package",
+     "roof": "Historic attic ceiling with TABULA standard loose-wool addition",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "mf_se02": {
+   "category": "multi_family",
+   "era": "SE.02",
+   "name": "Multi-family SE.02",
+   "states": {
+    "advanced": {
+     "construction_year": 1965,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.084,
+     "u_roof": 0.057,
+     "u_floor": 0.35,
+     "u_win": 0.76,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Wall with TABULA brick facing and 300 mm insulation",
+     "roof": "Cold-attic ceiling with TABULA 500 mm addition",
+     "window": "TABULA advanced replacement window"
+    },
+    "existing": {
+     "construction_year": 1965,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.408,
+     "u_roof": 0.201,
+     "u_floor": 0.633,
+     "u_win": 2.22,
+     "shgc": 0.56,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.2,
+     "infiltration_basis": "Atemp",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "TABULA original two-pane timber window"
+    },
+    "standard": {
+     "construction_year": 1965,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.235,
+     "u_roof": 0.1,
+     "u_floor": 0.368,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Wall with TABULA brick facing and 50 mm insulation",
+     "roof": "Cold-attic ceiling with TABULA 200 mm addition",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "mf_se03": {
+   "category": "multi_family",
+   "era": "SE.03",
+   "name": "Multi-family SE.03",
+   "states": {
+    "advanced": {
+     "construction_year": 1978,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.081,
+     "u_roof": 0.055,
+     "u_floor": 0.348,
+     "u_win": 0.76,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.05,
+     "infiltration_basis": "Atemp",
+     "wall": "Wall with TABULA brick facing and 300 mm insulation",
+     "roof": "Cold-attic ceiling with TABULA 500 mm addition",
+     "window": "TABULA advanced replacement window"
+    },
+    "existing": {
+     "construction_year": 1978,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.328,
+     "u_roof": 0.173,
+     "u_floor": 0.626,
+     "u_win": 2.04,
+     "shgc": 0.49,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Timber window, TABULA original, U=2.04 W/(m² K)"
+    },
+    "standard": {
+     "construction_year": 1978,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.21,
+     "u_roof": 0.093,
+     "u_floor": 0.365,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Wall with TABULA brick facing and 50 mm insulation",
+     "roof": "Cold-attic ceiling with TABULA 200 mm addition",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "mf_se04": {
+   "category": "multi_family",
+   "era": "SE.04",
+   "name": "Multi-family SE.04",
+   "states": {
+    "advanced": {
+     "construction_year": 1988,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.073,
+     "u_roof": 0.053,
+     "u_floor": 0.293,
+     "u_win": 0.76,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.05,
+     "infiltration_basis": "Atemp",
+     "wall": "Wall with TABULA brick facing and 300 mm insulation",
+     "roof": "Cold-attic ceiling with TABULA 500 mm addition",
+     "window": "TABULA advanced replacement window"
+    },
+    "existing": {
+     "construction_year": 1988,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.225,
+     "u_roof": 0.158,
+     "u_floor": 0.468,
+     "u_win": 1.8,
+     "shgc": 0.49,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Timber window, TABULA original, U=1.80 W/(m² K)"
+    },
+    "standard": {
+     "construction_year": 1988,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.162,
+     "u_roof": 0.088,
+     "u_floor": 0.305,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Wall with TABULA brick facing and 50 mm insulation",
+     "roof": "Cold-attic ceiling with TABULA 200 mm addition",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "mf_se05": {
+   "category": "multi_family",
+   "era": "SE.05",
+   "name": "Multi-family SE.05",
+   "states": {
+    "advanced": {
+     "construction_year": 2000,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.07,
+     "u_roof": 0.049,
+     "u_floor": 0.237,
+     "u_win": 0.76,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.025,
+     "infiltration_basis": "Atemp",
+     "wall": "Wall with TABULA brick facing and 300 mm insulation",
+     "roof": "Cold-attic ceiling with TABULA 500 mm addition",
+     "window": "TABULA advanced replacement window"
+    },
+    "existing": {
+     "construction_year": 2000,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.2,
+     "u_roof": 0.13,
+     "u_floor": 0.339,
+     "u_win": 1.97,
+     "shgc": 0.49,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "TABULA original timber window"
+    },
+    "standard": {
+     "construction_year": 2000,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.149,
+     "u_roof": 0.079,
+     "u_floor": 0.245,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Wall with TABULA brick facing and 50 mm insulation",
+     "roof": "Cold-attic ceiling with TABULA 200 mm addition",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "mf_se06": {
+   "category": "multi_family",
+   "era": "SE.06",
+   "name": "Multi-family SE.06",
+   "states": {
+    "advanced": {
+     "construction_year": 2015,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.115,
+     "u_roof": 0.087,
+     "u_floor": 0.175,
+     "u_win": 0.85,
+     "shgc": 0.371,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.025,
+     "infiltration_basis": "Atemp",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "existing": {
+     "construction_year": 2015,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.156,
+     "u_roof": 0.117,
+     "u_floor": 0.175,
+     "u_win": 1.5,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 2015,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.156,
+     "u_roof": 0.103,
+     "u_floor": 0.175,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.1,
+     "infiltration_basis": "Atemp",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  },
+  "mf_se07": {
+   "category": "multi_family",
+   "era": "SE.07",
+   "name": "Multi-family SE.07",
+   "states": {
+    "default": {
+     "construction_year": 2022,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.115,
+     "u_roof": 0.087,
+     "u_floor": 0.175,
+     "u_win": 0.85,
+     "shgc": 0.371,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": null,
+     "infiltration_l_s_m2": 0.025,
+     "infiltration_basis": "Atemp",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  },
+  "office_se01": {
+   "category": "office",
+   "era": "SE.01",
+   "name": "Office SE.01",
+   "states": {
+    "advanced": {
+     "construction_year": 1935,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.254,
+     "u_roof": 0.208,
+     "u_floor": 0.42,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.1,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Attic thermal ceiling",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 1935,
+     "roof_topology": "cold_attic",
+     "u_wall": 1.098,
+     "u_roof": 0.631,
+     "u_floor": 0.47,
+     "u_win": 2.8,
+     "shgc": 0.486,
+     "thermal_bridge_delta_u": 0.15,
+     "infiltration_ach": 0.4,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 1935,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.395,
+     "u_roof": 0.326,
+     "u_floor": 0.47,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.15,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  },
+  "office_se02": {
+   "category": "office",
+   "era": "SE.02",
+   "name": "Office SE.02",
+   "states": {
+    "advanced": {
+     "construction_year": 1965,
+     "roof_topology": "compact",
+     "u_wall": 0.24,
+     "u_roof": 0.208,
+     "u_floor": 0.706,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.1,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 1965,
+     "roof_topology": "compact",
+     "u_wall": 0.751,
+     "u_roof": 0.518,
+     "u_floor": 0.756,
+     "u_win": 2.8,
+     "shgc": 0.486,
+     "thermal_bridge_delta_u": 0.15,
+     "infiltration_ach": 0.4,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 1965,
+     "roof_topology": "compact",
+     "u_wall": 0.363,
+     "u_roof": 0.3,
+     "u_floor": 0.756,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.15,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "Window"
+    }
+   }
+  },
+  "office_se03": {
+   "category": "office",
+   "era": "SE.03",
+   "name": "Office SE.03",
+   "states": {
+    "advanced": {
+     "construction_year": 1978,
+     "roof_topology": "compact",
+     "u_wall": 0.226,
+     "u_roof": 0.206,
+     "u_floor": 0.706,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.1,
+     "infiltration_ach": 0.1,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 1978,
+     "roof_topology": "compact",
+     "u_wall": 0.5,
+     "u_roof": 0.396,
+     "u_floor": 0.706,
+     "u_win": 2.8,
+     "shgc": 0.486,
+     "thermal_bridge_delta_u": 0.1,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 1978,
+     "roof_topology": "compact",
+     "u_wall": 0.281,
+     "u_roof": 0.237,
+     "u_floor": 0.706,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.1,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "Window"
+    }
+   }
+  },
+  "office_se04": {
+   "category": "office",
+   "era": "SE.04",
+   "name": "Office SE.04",
+   "states": {
+    "advanced": {
+     "construction_year": 1988,
+     "roof_topology": "compact",
+     "u_wall": 0.219,
+     "u_roof": 0.206,
+     "u_floor": 0.506,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.1,
+     "infiltration_ach": 0.1,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 1988,
+     "roof_topology": "compact",
+     "u_wall": 0.442,
+     "u_roof": 0.34,
+     "u_floor": 0.506,
+     "u_win": 2.359,
+     "shgc": 0.486,
+     "thermal_bridge_delta_u": 0.1,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 1988,
+     "roof_topology": "compact",
+     "u_wall": 0.268,
+     "u_roof": 0.223,
+     "u_floor": 0.506,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.1,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "Window"
+    }
+   }
+  },
+  "office_se05": {
+   "category": "office",
+   "era": "SE.05",
+   "name": "Office SE.05",
+   "states": {
+    "advanced": {
+     "construction_year": 1998,
+     "roof_topology": "compact",
+     "u_wall": 0.151,
+     "u_roof": 0.143,
+     "u_floor": 0.373,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.05,
+     "infiltration_ach": 0.05,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 1998,
+     "roof_topology": "compact",
+     "u_wall": 0.325,
+     "u_roof": 0.282,
+     "u_floor": 0.423,
+     "u_win": 1.988,
+     "shgc": 0.486,
+     "thermal_bridge_delta_u": 0.1,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 1998,
+     "roof_topology": "compact",
+     "u_wall": 0.234,
+     "u_roof": 0.206,
+     "u_floor": 0.423,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.1,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "Window"
+    }
+   }
+  },
+  "office_se06": {
+   "category": "office",
+   "era": "SE.06",
+   "name": "Office SE.06",
+   "states": {
+    "advanced": {
+     "construction_year": 2015,
+     "roof_topology": "compact",
+     "u_wall": 0.14,
+     "u_roof": 0.133,
+     "u_floor": 0.225,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.05,
+     "infiltration_ach": 0.05,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 2015,
+     "roof_topology": "compact",
+     "u_wall": 0.225,
+     "u_roof": 0.197,
+     "u_floor": 0.225,
+     "u_win": 1.3,
+     "shgc": 0.486,
+     "thermal_bridge_delta_u": 0.05,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 2015,
+     "roof_topology": "compact",
+     "u_wall": 0.164,
+     "u_roof": 0.143,
+     "u_floor": 0.225,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.05,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "Window"
+    }
+   }
+  },
+  "office_se07": {
+   "category": "office",
+   "era": "SE.07",
+   "name": "Office SE.07",
+   "states": {
+    "default": {
+     "construction_year": 2022,
+     "roof_topology": "compact",
+     "u_wall": 0.14,
+     "u_roof": 0.133,
+     "u_floor": 0.225,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.05,
+     "infiltration_ach": 0.05,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Roof",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "school_se01": {
+   "category": "school",
+   "era": "SE.01",
+   "name": "School SE.01",
+   "states": {
+    "advanced": {
+     "construction_year": 1935,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.145,
+     "u_roof": 0.146,
+     "u_floor": 0.32,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 1935,
+     "roof_topology": "cold_attic",
+     "u_wall": 1.193,
+     "u_roof": 0.481,
+     "u_floor": 0.32,
+     "u_win": 2.8,
+     "shgc": 0.56,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.4,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 1935,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.258,
+     "u_roof": 0.176,
+     "u_floor": 0.32,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  },
+  "school_se02": {
+   "category": "school",
+   "era": "SE.02",
+   "name": "School SE.02",
+   "states": {
+    "advanced": {
+     "construction_year": 1965,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.12,
+     "u_roof": 0.123,
+     "u_floor": 0.606,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 1965,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.468,
+     "u_roof": 0.31,
+     "u_floor": 0.606,
+     "u_win": 2.7,
+     "shgc": 0.56,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.4,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 1965,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.19,
+     "u_roof": 0.144,
+     "u_floor": 0.606,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  },
+  "school_se03": {
+   "category": "school",
+   "era": "SE.03",
+   "name": "School SE.03",
+   "states": {
+    "advanced": {
+     "construction_year": 1978,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.108,
+     "u_roof": 0.109,
+     "u_floor": 0.456,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.1,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 1978,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.336,
+     "u_roof": 0.24,
+     "u_floor": 0.456,
+     "u_win": 2.25,
+     "shgc": 0.56,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 1978,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.162,
+     "u_roof": 0.126,
+     "u_floor": 0.456,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  },
+  "school_se04": {
+   "category": "school",
+   "era": "SE.04",
+   "name": "School SE.04",
+   "states": {
+    "advanced": {
+     "construction_year": 1988,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.103,
+     "u_roof": 0.096,
+     "u_floor": 0.333,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.1,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 1988,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.29,
+     "u_roof": 0.181,
+     "u_floor": 0.333,
+     "u_win": 1.9,
+     "shgc": 0.49,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 1988,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.15,
+     "u_roof": 0.109,
+     "u_floor": 0.333,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  },
+  "school_se05": {
+   "category": "school",
+   "era": "SE.05",
+   "name": "School SE.05",
+   "states": {
+    "advanced": {
+     "construction_year": 2000,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.098,
+     "u_roof": 0.086,
+     "u_floor": 0.23,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.05,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 2000,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.255,
+     "u_roof": 0.147,
+     "u_floor": 0.23,
+     "u_win": 1.6,
+     "shgc": 0.49,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 2000,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.14,
+     "u_roof": 0.096,
+     "u_floor": 0.23,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  },
+  "school_se06": {
+   "category": "school",
+   "era": "SE.06",
+   "name": "School SE.06",
+   "states": {
+    "advanced": {
+     "construction_year": 2015,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.086,
+     "u_roof": 0.066,
+     "u_floor": 0.142,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.05,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "TABULA standard replacement window"
+    },
+    "existing": {
+     "construction_year": 2015,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.193,
+     "u_roof": 0.097,
+     "u_floor": 0.142,
+     "u_win": 1.143,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 2015,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.118,
+     "u_roof": 0.072,
+     "u_floor": 0.142,
+     "u_win": 1.08,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  },
+  "school_se07": {
+   "category": "school",
+   "era": "SE.07",
+   "name": "School SE.07",
+   "states": {
+    "default": {
+     "construction_year": 2022,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.086,
+     "u_roof": 0.066,
+     "u_floor": 0.142,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.05,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "sf_se01": {
+   "category": "single_family",
+   "era": "SE.01",
+   "name": "Single-family SE.01",
+   "states": {
+    "advanced": {
+     "construction_year": 1950,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.267,
+     "u_roof": 0.063,
+     "u_floor": 0.648,
+     "u_win": 0.76,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Aerated-concrete wall with TABULA 70 mm panelled insulation",
+     "roof": "Timber cold-attic ceiling with 250 mm original shavings and TABULA advanced addition",
+     "window": "TABULA advanced replacement window"
+    },
+    "existing": {
+     "construction_year": 1950,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.688,
+     "u_roof": 0.301,
+     "u_floor": 3.801,
+     "u_win": 2.34,
+     "shgc": 0.56,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.4,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Timber cold-attic ceiling with 250 mm original shavings",
+     "window": "Timber window,TABULA original,U=2.34 W/(m²K)"
+    },
+    "standard": {
+     "construction_year": 1950,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.335,
+     "u_roof": 0.12,
+     "u_floor": 0.712,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Aerated-concrete wall with TABULA 45 mm panelled insulation",
+     "roof": "Timber cold-attic ceiling with 250 mm original shavings and TABULA standard addition",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "sf_se02": {
+   "category": "single_family",
+   "era": "SE.02",
+   "name": "Single-family SE.02",
+   "states": {
+    "advanced": {
+     "construction_year": 1970,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.174,
+     "u_roof": 0.059,
+     "u_floor": 0.348,
+     "u_win": 0.76,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Timber cross-frame wall with TABULA advanced panelled insulation",
+     "roof": "Timber cold-attic ceiling with180mm original wool and TABULA advanced addition",
+     "window": "TABULA advanced replacement window"
+    },
+    "existing": {
+     "construction_year": 1970,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.299,
+     "u_roof": 0.223,
+     "u_floor": 0.626,
+     "u_win": 2.3,
+     "shgc": 0.56,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.4,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Timber cross-frame wall",
+     "roof": "Timber cold-attic ceiling with180mm original wool",
+     "window": "Timber window, TABULA original, U=2.30 W/(m² K)"
+    },
+    "standard": {
+     "construction_year": 1970,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.201,
+     "u_roof": 0.105,
+     "u_floor": 0.365,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Timber cross-frame wall with TABULA standard panelled insulation",
+     "roof": "Timber cold-attic ceiling with180mm original wool and TABULA standard addition",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "sf_se03": {
+   "category": "single_family",
+   "era": "SE.03",
+   "name": "Single-family SE.03",
+   "states": {
+    "advanced": {
+     "construction_year": 1978,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.151,
+     "u_roof": 0.054,
+     "u_floor": 0.293,
+     "u_win": 0.76,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.1,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Timber cross-frame wall, 145 + 50 mm with TABULA advanced insulation",
+     "roof": "Timber cold-attic ceiling, 250 mm original wool with TABULA advanced addition",
+     "window": "TABULA advanced replacement window"
+    },
+    "existing": {
+     "construction_year": 1978,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.239,
+     "u_roof": 0.164,
+     "u_floor": 0.468,
+     "u_win": 2.01,
+     "shgc": 0.49,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Timber cross-frame wall, 145 + 50 mm",
+     "roof": "Timber cold-attic ceiling, 250 mm original wool",
+     "window": "Timber window, TABULA original, U=2.01 W/(m² K)"
+    },
+    "standard": {
+     "construction_year": 1978,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.172,
+     "u_roof": 0.09,
+     "u_floor": 0.305,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Timber cross-frame wall, 145 + 50 mm with TABULA standard insulation",
+     "roof": "Timber cold-attic ceiling, 250 mm original wool with TABULA standard addition",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "sf_se04": {
+   "category": "single_family",
+   "era": "SE.04",
+   "name": "Single-family SE.04",
+   "states": {
+    "advanced": {
+     "construction_year": 1988,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.134,
+     "u_roof": 0.05,
+     "u_floor": 0.237,
+     "u_win": 0.76,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.1,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Representative 1988 timber wall, advanced",
+     "roof": "Timber cold-attic ceiling, 300 mm original wool, advanced",
+     "window": "TABULA advanced replacement window"
+    },
+    "existing": {
+     "construction_year": 1988,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.199,
+     "u_roof": 0.136,
+     "u_floor": 0.339,
+     "u_win": 1.94,
+     "shgc": 0.49,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Representative 1988 timber wall, existing",
+     "roof": "Timber cold-attic ceiling, 300 mm original wool, existing",
+     "window": "TABULA original timber window"
+    },
+    "standard": {
+     "construction_year": 1988,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.149,
+     "u_roof": 0.081,
+     "u_floor": 0.245,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Representative 1988 timber wall, standard",
+     "roof": "Timber cold-attic ceiling, 300 mm original wool, standard",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "sf_se05": {
+   "category": "single_family",
+   "era": "SE.05",
+   "name": "Single-family SE.05",
+   "states": {
+    "advanced": {
+     "construction_year": 2000,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.126,
+     "u_roof": 0.05,
+     "u_floor": 0.179,
+     "u_win": 0.76,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.05,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Representative 2000 timber wall, advanced",
+     "roof": "Timber cold-attic ceiling, 300 mm original wool, advanced",
+     "window": "TABULA advanced replacement window"
+    },
+    "existing": {
+     "construction_year": 2000,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.182,
+     "u_roof": 0.136,
+     "u_floor": 0.233,
+     "u_win": 1.87,
+     "shgc": 0.49,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Representative 2000 timber wall, existing",
+     "roof": "Timber cold-attic ceiling, 300 mm original wool, existing",
+     "window": "TABULA original timber window"
+    },
+    "standard": {
+     "construction_year": 2000,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.14,
+     "u_roof": 0.081,
+     "u_floor": 0.184,
+     "u_win": 0.9,
+     "shgc": 0.35,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Representative 2000 timber wall, standard",
+     "roof": "Timber cold-attic ceiling, 300 mm original wool, standard",
+     "window": "TABULA standard replacement window"
+    }
+   }
+  },
+  "sf_se06": {
+   "category": "single_family",
+   "era": "SE.06",
+   "name": "Single-family SE.06",
+   "states": {
+    "advanced": {
+     "construction_year": 2015,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.133,
+     "u_roof": 0.072,
+     "u_floor": 0.142,
+     "u_win": 0.8,
+     "shgc": 0.371,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.05,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "existing": {
+     "construction_year": 2015,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.193,
+     "u_roof": 0.097,
+     "u_floor": 0.142,
+     "u_win": 1.3,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    },
+    "standard": {
+     "construction_year": 2015,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.161,
+     "u_roof": 0.092,
+     "u_floor": 0.142,
+     "u_win": 1.22,
+     "shgc": 0.42,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.2,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  },
+  "sf_se07": {
+   "category": "single_family",
+   "era": "SE.07",
+   "name": "Single-family SE.07",
+   "states": {
+    "default": {
+     "construction_year": 2022,
+     "roof_topology": "cold_attic",
+     "u_wall": 0.133,
+     "u_roof": 0.072,
+     "u_floor": 0.142,
+     "u_win": 0.8,
+     "shgc": 0.371,
+     "thermal_bridge_delta_u": 0.0,
+     "infiltration_ach": 0.05,
+     "infiltration_l_s_m2": null,
+     "infiltration_basis": "tabula_reference_volume",
+     "wall": "Ext Wall",
+     "roof": "Top Floor",
+     "window": "Window"
+    }
+   }
+  }
+ },
+ "tabula_reference_existing_zone3": {
+  "mf_se01": {
+   "GROUND_FLOOR": 0.325,
+   "THERMAL_TOP": 0.36,
+   "EXT_WALL": 0.58,
+   "TABULA_WALL_2": 0.702,
+   "WINDOW": 2.22
+  },
+  "mf_se02": {
+   "GROUND_FLOOR": 0.258,
+   "THERMAL_TOP": 0.2,
+   "EXT_WALL": 0.41,
+   "TABULA_WALL_2": 0.702,
+   "WINDOW": 2.22
+  },
+  "mf_se03": {
+   "GROUND_FLOOR": 0.267,
+   "THERMAL_TOP": 0.17,
+   "EXT_WALL": 0.33,
+   "TABULA_WALL_2": 0.702,
+   "WINDOW": 2.04
+  },
+  "mf_se04": {
+   "GROUND_FLOOR": 0.241,
+   "THERMAL_TOP": 0.15,
+   "EXT_WALL": 0.22,
+   "TABULA_WALL_2": 0.702,
+   "WINDOW": 1.8
+  },
+  "mf_se05": {
+   "GROUND_FLOOR": 0.206,
+   "THERMAL_TOP": 0.13,
+   "EXT_WALL": 0.2,
+   "TABULA_WALL_2": 0.702,
+   "WINDOW": 1.97
+  },
+  "sf_se01": {
+   "GROUND_FLOOR": 0.28,
+   "THERMAL_TOP": 0.29,
+   "EXT_WALL": 0.6,
+   "WINDOW": 2.34
+  },
+  "sf_se02": {
+   "GROUND_FLOOR": 0.32,
+   "THERMAL_TOP": 0.21,
+   "EXT_WALL": 0.31,
+   "WINDOW": 2.3
+  },
+  "sf_se03": {
+   "GROUND_FLOOR": 0.27,
+   "THERMAL_TOP": 0.15,
+   "EXT_WALL": 0.21,
+   "WINDOW": 2.01
+  },
+  "sf_se04": {
+   "GROUND_FLOOR": 0.24,
+   "THERMAL_TOP": 0.12,
+   "EXT_WALL": 0.17,
+   "WINDOW": 1.94
+  },
+  "sf_se05": {
+   "GROUND_FLOOR": 0.18,
+   "THERMAL_TOP": 0.12,
+   "EXT_WALL": 0.2,
+   "WINDOW": 1.87
+  }
+ },
+ "wwr_by_orientation": {
+  "single_family": {
+   "default": 0.18,
+   "N": 0.12,
+   "E": 0.17,
+   "S": 0.26,
+   "W": 0.17
+  },
+  "multi_family": {
+   "default": 0.24,
+   "N": 0.22,
+   "E": 0.23,
+   "S": 0.28,
+   "W": 0.23
+  },
+  "office": {
+   "default": 0.3,
+   "N": 0.3,
+   "E": 0.3,
+   "S": 0.3,
+   "W": 0.3
+  },
+  "school": {
+   "default": 0.25,
+   "N": 0.25,
+   "E": 0.25,
+   "S": 0.25,
+   "W": 0.25
+  }
+ },
+ "setpoint_c": {
+  "single_family": 21.0,
+  "multi_family_by_era": {
+   "SE.01": 22.2,
+   "SE.02": 22.6,
+   "SE.03": 22.5,
+   "SE.04": 22.4,
+   "SE.05": 23.0,
+   "SE.06": 23.0,
+   "SE.07": 23.0
+  },
+  "office": 21,
+  "school": 22,
+  "generic": 21
+ },
+ "ventilation": {
+  "default_by_era": {
+   "single_family": {
+    "SE.01": "S",
+    "SE.02": "S",
+    "SE.03": "F",
+    "SE.04": "F",
+    "SE.05": "F",
+    "SE.06": "FTX_075",
+    "SE.07": "FTX_080"
+   },
+   "multi_family": {
+    "SE.01": "S",
+    "SE.02": "F",
+    "SE.03": "F",
+    "SE.04": "F",
+    "SE.05": "F",
+    "SE.06": "FTX_075",
+    "SE.07": "FTX_080"
+   },
+   "office": {
+    "SE.01": "S",
+    "SE.02": "FT",
+    "SE.03": "FT",
+    "SE.04": "FTX_060",
+    "SE.05": "FTX_060",
+    "SE.06": "FTX_075",
+    "SE.07": "FTX_080"
+   },
+   "school": {
+    "SE.01": "S",
+    "SE.02": "F",
+    "SE.03": "FT",
+    "SE.04": "FTX_060",
+    "SE.05": "FTX_060",
+    "SE.06": "FTX_075",
+    "SE.07": "FTX_080"
+   }
+  },
+  "templates": {
+   "S": {
+    "topology": "S",
+    "mechanical_vent_l_s_m2": 0,
+    "natural_exchange_ach": 0.5,
+    "sensible_recovery_effectiveness": 0
+   },
+   "F": {
+    "topology": "F",
+    "sensible_recovery_effectiveness": 0
+   },
+   "FT": {
+    "topology": "FT",
+    "sensible_recovery_effectiveness": 0
+   },
+   "FTX_060": {
+    "topology": "FTX",
+    "sensible_recovery_effectiveness": 0.6
+   },
+   "FTX_075": {
+    "topology": "FTX",
+    "sensible_recovery_effectiveness": 0.75
+   },
+   "FTX_080": {
+    "topology": "FTX",
+    "sensible_recovery_effectiveness": 0.8
+   }
+  },
+  "mf_self_draught_total_ach": 0.39,
+  "flow": {
+   "single_family": {
+    "l_s_m2": 0.35,
+    "hours": 24,
+    "days": 365
+   },
+   "multi_family": {
+    "l_s_m2": 0.35,
+    "hours": 24,
+    "days": 365
+   },
+   "office": {
+    "l_s_m2": 1.3,
+    "hours": 12,
+    "days": 225
+   },
+   "school": {
+    "l_s_m2": 3.0,
+    "hours": 10,
+    "days": 220
+   },
+   "generic": {
+    "l_s_m2": 0.7,
+    "hours": 10,
+    "days": 250
+   }
+  }
+ }
+}

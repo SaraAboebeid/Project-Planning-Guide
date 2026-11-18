@@ -434,4 +434,7 @@ export const SV_STEP5: Record<string, string> = {
   "Liège: −55% CO₂ by 2030 vs 2005 (Covenant of Mayors)": "Liège: −55 % CO₂ till 2030 jämfört med 2005 (Borgmästaravtalet)",
   "Flanders: every home at EPC label A by 2050; buyers of E/F homes must reach label D within 6 years. Ghent has no kWh target of its own, and the label-A threshold is not verified here, so it is not scored.": "Flandern: alla bostäder i energiklass A till 2050; köpare av bostäder i klass E/F måste nå klass D inom 6 år. Gent har inget eget kWh-mål och gränsen för klass A är inte verifierad här, så målet bedöms inte.",
   "−40% CO₂ by 2030 vs 2007; climate-neutral by 2050": "−40 % CO₂ till 2030 jämfört med 2007; klimatneutralt till 2050",
+
+  // ── 50-year study period ──
+  "50-yr LCC": "LCC 50 år",
 };

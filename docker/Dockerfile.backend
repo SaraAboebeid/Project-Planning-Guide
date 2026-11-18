@@ -17,6 +17,9 @@ WORKDIR /app
 # Install Python deps first so this layer caches across code changes.
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+# EPSM pieces not published on PyPI (fast RC model, SMHI weather builder).
+COPY vendor/wheels /tmp/wheels
+RUN pip install --no-cache-dir /tmp/wheels/*.whl && rm -rf /tmp/wheels
 
 EXPOSE 8000
 # Overridden by docker-compose, but sensible as a standalone default.

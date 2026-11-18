@@ -247,13 +247,27 @@ function MapFitBounds({
 
 // Fit the view to the municipality boundary (once it loads, before any address
 // is picked) so the highlighted area is visible on first render.
+// It waits until the map has a real size: Step 1 reveals the map card with an
+// animation, and fitting into a still-0px box zoomed all the way in to street
+// level instead of showing the whole municipality.
 function FitToBoundary({ boundary }: { boundary: BoundaryFeature }) {
   const map = useMap();
   useEffect(() => {
-    try {
-      const b = L.geoJSON(boundary as never).getBounds();
-      if (b.isValid()) map.fitBounds(b, { padding: [16, 16] });
-    } catch { /* ignore */ }
+    let bounds: L.LatLngBounds;
+    try { bounds = L.geoJSON(boundary as never).getBounds(); } catch { return; }
+    if (!bounds.isValid()) return;
+    const el = map.getContainer();
+    let done = false;
+    const fit = () => {
+      if (done || el.clientWidth < 50 || el.clientHeight < 50) return;
+      done = true;
+      map.invalidateSize();
+      map.fitBounds(bounds, { padding: [16, 16] });
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [boundary, map]);
   return null;
 }
@@ -1194,6 +1208,10 @@ Kungsgatan 10,Göteborg</div>
           zoom={mapCenter.zoom}
           className="h-full w-full"
           scrollWheelZoom
+          // Quarter steps let the municipality fill the wide, low map box; the
+          // +/− buttons still move a whole level (zoomDelta).
+          zoomSnap={0.25}
+          zoomDelta={1}
         >
           <MapResizeOnToggle trigger={mapMaximized} />
           <TileLayer
