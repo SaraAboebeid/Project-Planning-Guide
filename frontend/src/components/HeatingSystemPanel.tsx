@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Flame, ChevronDown, ChevronUp, Info, Check } from "lucide-react";
 import { computeHvac, type HvacResult } from "../utils/hvacAnalysis";
 import { SE_HVAC_CATALOGUE, type HvacCatalogue } from "../config/hvacSystems";
+import { STUDY_PERIOD_YR } from "../config/optimizationAssumptions";
 import { useWizardStore, type HvacOverrides } from "../store/wizard";
 import { applyHvacOverrides, hasHvacOverrides } from "../utils/hvacOverrides";
 import { useT } from "../i18n";
@@ -55,14 +56,14 @@ const SYSTEM_EXPLAIN: Record<string, string> = {
 };
 
 const PICKS: Record<string, { fg: string; label: string }> = {
-  lowestLcc: { fg: "#2FB477", label: "Lowest 30-yr cost" },
+  lowestLcc: { fg: "#2FB477", label: "Lowest 50-yr cost" },
   lowestCarbon: { fg: "#4ECDC4", label: "Lowest carbon" },
   lowestEnergy: { fg: "#4A90E2", label: "Lowest energy" },
   lowestOpCost: { fg: "#B98BE8", label: "Cheapest to run" },
 };
 
 export default function HeatingSystemPanel({
-  heatingDemandKwhM2Yr, floorAreaM2, studyPeriodYr = 30, discountRate = 0.03, catalogue: baseCatalogue = SE_HVAC_CATALOGUE,
+  heatingDemandKwhM2Yr, floorAreaM2, studyPeriodYr = STUDY_PERIOD_YR, discountRate = 0.03, catalogue: baseCatalogue = SE_HVAC_CATALOGUE,
 }: {
   heatingDemandKwhM2Yr: number;
   floorAreaM2: number;

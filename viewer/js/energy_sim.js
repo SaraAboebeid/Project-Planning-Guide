@@ -68,7 +68,7 @@ async function submitSimulation(b) {
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
     }
     const data = await res.json();
-    el.innerHTML = '<span style="color:#94a3b8">Simulation running… may take 1-3 min</span>';
+    el.innerHTML = '<span style="color:#94a3b8">Simulation running…</span>';
     _pollSimulation(data.simulation_id, b);
   } catch (e) {
     const netErr = (e instanceof TypeError) || (e.message || '').toLowerCase().includes('fetch');
@@ -107,7 +107,7 @@ function _pollSimulation(simulationId, b) {
   };
 
   tick();
-  simPollHandle = setInterval(tick, 4000);
+  simPollHandle = setInterval(tick, 1000);   // Swedish runs (RC model) finish at submit; UK/BE EnergyPlus ~5 s
 }
 
 function _renderResults(results, b) {
@@ -125,7 +125,7 @@ function _renderResults(results, b) {
   else if (b.tabula_kwh_m2_yr) grid += R('TABULA est.',    b.tabula_kwh_m2_yr, 'kWh/m²');
 
   el.innerHTML =
-    '<div class="ar-head">&#9889; EnergyPlus Simulation' +
+    '<div class="ar-head">&#9889; ' + (results.engine === 'rc' ? 'EPSM RC Simulation' : 'EnergyPlus Simulation') +
     '<button class="ar-close" title="Close" onclick="closeAnalysis(\'sim-result\')">&#x2715;</button></div>' +
     '<div class="ar-grid">' + grid + '</div>' +
     '<div class="ar-note">Total = heating + cooling + lighting + equipment. The recorded EPC ' +
@@ -149,7 +149,7 @@ function renderSimulationRecord(record) {
   } else if (record.status === 'queued' || record.status === 'running') {
     const el = document.getElementById('sim-result');
     el.style.display = 'block';
-    el.innerHTML = '<span style="color:#94a3b8">Simulation running… may take 1-3 min</span>';
+    el.innerHTML = '<span style="color:#94a3b8">Simulation running…</span>';
     _pollSimulation(record.epsm_simulation_id, selectedBuilding);
   } else if (record.status === 'failed') {
     const el = document.getElementById('sim-result');

@@ -290,6 +290,16 @@ UK_SAP_WEEKEND_HEATING: list[tuple[str, float]] = [
 ACTIVITY_LEVEL_W_PER_PERSON = 120.0
 INFILTRATION_ACH = 0.5  # generic natural-infiltration default; no per-building airtightness data exists
 
+# EPSM archetypes (backend/epsm_archetypes.py, epsm_data 0.7.0) replace our
+# defaults where TABULA has nothing: Swedish buildings built 2006 or later.
+# Tested 2026-11-14 against Gothenburg EPCs (median model÷EPC per m²): houses
+# 2.11→1.01, offices 1.84→0.92, public 1.78→0.89. Flats are left out: they
+# fell to 0.62 (today 1.13). Before 2006 EPSM made every type worse than
+# TABULA, so it is not used there. RC model only — EnergyPlus not yet.
+EPSM_ARCHETYPE_MIN_YEAR = 2006
+EPSM_ARCHETYPE_EXCLUDE_USES = ("bostad_flerfamilj",)
+EPSM_ARCHETYPE_PARTS = ("fabric", "ground", "air", "wwr", "setpoint")
+
 # Output block copied verbatim (object types + Output:Variable names) from
 # EPSM's own real building fixture (frontend/public/idf/test.idf in its
 # repo) so its results parser - which keys off these exact names - recognizes

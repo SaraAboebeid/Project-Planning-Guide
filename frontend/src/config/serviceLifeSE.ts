@@ -99,6 +99,39 @@ export const COMPONENT_LIFE: Record<string, ComponentLife> = {
     basis: "Floor and insulation are not in the IVL table; treated as lasting more than 50 years." },
 };
 
+/** Replacement interval of a renovation MEASURE (what is installed), for the
+ *  B4 replacements in the life-cycle cost and carbon. Read from the part and
+ *  the build-up's own description; null = lasts beyond 50 years per IVL, so it
+ *  is never replaced within the study period. Maintenance (B2: repainting,
+ *  render repair) is a different module and not counted. */
+export function measureLifeYears(componentKey: string, description: string): { years: number | null; basis: string } {
+  const part = componentKey.replace(/^VertExt::/, "");
+  const d = description.toLowerCase();
+  if (part === "Windows") {
+    return /alu|alumin/.test(d)
+      ? { years: null, basis: "Wood/aluminium or aluminium window: more than 50 years (IVL)." }
+      : { years: 40, basis: "Window: 40 years (IVL, wood frame; PVC frames are not in the IVL table and are given the same)." };
+  }
+  if (part === "Doors") return { years: 40, basis: "Door: 40 years (IVL)." };
+  if (part === "Roof") {
+    if (/sedum/.test(d)) return { years: 20, basis: "Sedum roof: 20 years (IVL)." };
+    if (/papp|felt|bitumen|asfalt|membran/.test(d)) return { years: 30, basis: "Felt / bitumen roof covering: 30 years (IVL)." };
+    if (/shingel|shingle/.test(d)) return { years: 30, basis: "Asphalt shingle: 30 years (IVL)." };
+    if (/plåt|plat\b|metal|steel|sheet|zink|koppar/.test(d)) return { years: 40, basis: "Sheet-metal roof covering: 40 years (IVL)." };
+    return { years: null, basis: "Roof insulation or tiles: more than 50 years (IVL)." };
+  }
+  return { years: null, basis: `${part}: insulation and cladding last more than 50 years (IVL).` };
+}
+
+/** B4 replacements within a study period (EN 15978, as EPSM LCA counts them):
+ *  replaced ceil(period / life) − 1 times, at years L, 2L, …  The cost of each
+ *  replacement is discounted to today; carbon is not discounted. */
+export function replacementsWithin(periodYr: number, lifeYr: number | null): number[] {
+  if (!lifeYr || lifeYr <= 0) return [];
+  const n = Math.ceil(periodYr / lifeYr) - 1;
+  return Array.from({ length: Math.max(0, n) }, (_, k) => (k + 1) * lifeYr);
+}
+
 /** BBR 9:92 — U-values to aim for when a part of the envelope is altered. */
 export const BBR_RENOVATION_U: Record<string, number> = {
   Roof: 0.13,

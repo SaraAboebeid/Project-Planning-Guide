@@ -27,7 +27,8 @@ import RecommendedMeasuresPanel from "../components/RecommendedMeasuresPanel";
 import PvOptimizerPanel from "../components/PvOptimizerPanel";
 import PeakDemandPanel from "../components/PeakDemandPanel";
 import { recommendComponents, effectiveScope, recordedUForSimulation, type RecBuilding } from "../utils/renovationRecommendations";
-import { ASSUMPTIONS, MODEL_ASSUMPTIONS } from "../config/optimizationAssumptions";
+import { ASSUMPTIONS, MODEL_ASSUMPTIONS, STUDY_PERIOD_YR } from "../config/optimizationAssumptions";
+import { measureLifeYears, replacementsWithin } from "../config/serviceLifeSE";
 import { computeAssemblyU, MATERIAL_BY_ID, type AssemblyLayer, type ComponentKind } from "../config/assemblyLayers";
 import { computeAssemblyCarbon, nearestWikellsAssembly } from "../utils/assemblyCosting";
 import { parseAssemblyParts } from "../config/materialProperties";
@@ -89,7 +90,7 @@ function fmtSEK(n: number): string {
 /* Comparison-table layout. Cooling is deliberately absent: the single-zone
    shoebox never reaches the 25 °C setpoint, so it always reports 0 and a column
    of zeros just reads as a broken number. */
-// expand · package · cost · carbon · 30-yr cost · 30-yr carbon · heating · total · status
+// expand · package · cost · carbon · 50-yr cost · 50-yr carbon · heating · total · status
 const TABLE_COLS     = "24px 1.5fr 92px 92px 96px 96px 84px 110px 118px";
 const BREAKDOWN_COLS = "1.5fr 92px 92px 96px 96px 84px 110px 118px";
 
@@ -99,11 +100,13 @@ type EstRow = {
   parts: [string, string][];
   cost: number | null; carbon: number | null;
   total: number | null; heat: number | null; pareto: boolean;
+  /** B4 replacements within the study period (cost discounted, carbon not). */
+  repl: { cost: number; carbon: number };
 };
 
 const ROW_TAG_STYLE: Record<string, { bg: string; fg: string }> = {
   "Cheapest":          { bg: "rgba(47,180,119,0.16)", fg: "#2FB477" },
-  "Lowest 30-yr cost": { bg: "rgba(185,139,232,0.18)", fg: "#9B6BD6" },
+  "Lowest 50-yr cost": { bg: "rgba(185,139,232,0.18)", fg: "#9B6BD6" },
   "Lowest carbon":     { bg: "rgba(78,205,196,0.16)", fg: "#2BA59C" },
   "Lowest energy":     { bg: "rgba(74,144,226,0.16)", fg: "#4A90E2" },
 };
@@ -1087,7 +1090,7 @@ export default function RenovationSimulator() {
       }
     };
     tick();
-    pollHandles.current[packageId] = setInterval(tick, 4000);
+    pollHandles.current[packageId] = setInterval(tick, 1000);   // was 4 s, on a ~5 s run
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopPoll]);
 
@@ -1797,7 +1800,7 @@ export default function RenovationSimulator() {
   // simulated here - see config/climateGoals.ts.
 
   /* ── Regret / robustness decision analysis (shown in the Results view) ───────
-     Score each package + the do-nothing baseline by its 30-yr net benefit under
+     Score each package + the do-nothing baseline by its study-period net benefit under
      Low/Medium/High energy-price scenarios, then rank by minimax regret, range
      and Hurwicz. Uncertain future prices → no single "best"; these rules help. */
   // Start from the prices / decision style the user last chose (saved in the store).
@@ -1836,10 +1839,14 @@ export default function RenovationSimulator() {
       if (agg.avgTotalKwhM2Yr == null) continue; // only options that have an energy result
       // Per baseline m² (a vertical extension's rate covers more floor area).
       const scale = agg.floorAreaM2 && baselineAgg?.floorAreaM2 ? agg.floorAreaM2 / baselineAgg.floorAreaM2 : 1;
-      opts.push({ id: p.id, label: p.name, energyKwhM2: agg.avgTotalKwhM2Yr * scale, investmentSek: agg.totalCostSEK ?? 0 });
+      // Investment over the study period = upfront + discounted replacements (B4).
+      const idx = p.buildings.map((b) => geometries.findIndex((g) => g.lat === b.lat && g.lon === b.lon)).filter((i) => i >= 0);
+      opts.push({ id: p.id, label: p.name, energyKwhM2: agg.avgTotalKwhM2Yr * scale,
+        investmentSek: (agg.totalCostSEK ?? 0) + replacementsOf(p.selections, idx).cost });
     }
     return opts;
-  }, [packages, baselineAgg?.avgTotalKwhM2Yr, baselineAgg?.floorAreaM2]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packages, baselineAgg?.avgTotalKwhM2Yr, baselineAgg?.floorAreaM2, geometries, configs, lineItems]);
   const regretResult = useMemo(() => {
     if (regretOptions.length < 2 || baselineAgg?.avgTotalKwhM2Yr == null || totalFloorAreaM2 <= 0) return null;
     if (isUK && !ukBlend) return null;
@@ -1849,9 +1856,9 @@ export default function RenovationSimulator() {
       { key: "med", label: t("Medium"), priceSek: regretPrices[1]! },
       { key: "high", label: t("High"), priceSek: regretPrices[2]! },
     ];
-    const af = annuityFactor(assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03, 30);
+    const af = annuityFactor(assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03, STUDY_PERIOD_YR);
     const res = computeRegret(regretOptions, scenarios,
-      { baselineEnergyKwhM2: baselineAgg.avgTotalKwhM2Yr, totalFloorAreaM2, annuityFactor: af }, regretAlpha, 30, "");
+      { baselineEnergyKwhM2: baselineAgg.avgTotalKwhM2Yr, totalFloorAreaM2, annuityFactor: af }, regretAlpha, STUDY_PERIOD_YR, "");
     if (!isUK || !ukBlend) return res;
     return {
       ...res, currency: "GBP" as const,
@@ -1865,7 +1872,7 @@ export default function RenovationSimulator() {
   const regretSigRef = useRef<string>("");
   useEffect(() => {
     if (!regretResult) return;
-    const af = annuityFactor(assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03, 30);
+    const af = annuityFactor(assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03, STUDY_PERIOD_YR);
     const inputs = {
       options: regretOptions,
       config: { baselineEnergyKwhM2: baselineAgg?.avgTotalKwhM2Yr ?? 0, totalFloorAreaM2, annuityFactor: af },
@@ -1873,7 +1880,7 @@ export default function RenovationSimulator() {
       currentPrice: regretCurrentPrice,
       currency: (isUK ? "GBP" : "SEK") as "SEK" | "GBP",
       priceBasis: regretResult.priceBasis,
-      studyPeriodYr: 30,
+      studyPeriodYr: STUDY_PERIOD_YR,
       settings: { prices: regretPrices, alpha: regretAlpha },
     };
     const sig = JSON.stringify(inputs);
@@ -1913,7 +1920,8 @@ export default function RenovationSimulator() {
         .filter((k) => (opts[k] ?? []).length > 0 && areas[k] > 0)
         .map((k) => ({
           key: k, area_m2: Math.round(areas[k]), baseline_u: baseU[k]!,
-          options: opts[k]!.map((o) => ({ code: `uk:${o.code}`, label: o.label, u_value: o.uValue, cost: o.costGbp, carbon: o.carbonKgCo2e })),
+          options: opts[k]!.map((o) => ({ code: `uk:${o.code}`, label: o.label, u_value: o.uValue, cost: o.costGbp, carbon: o.carbonKgCo2e,
+            service_life_yr: measureLifeYears(k, o.label).years })),
         }));
       if (comps.length === 0) return { input: null, disabledReason: t("This building's certificates already describe insulated fabric - no measure would lower its U-values.") };
       // The optimiser values USEFUL heat: a gas-heated home pays gas / boiler efficiency per kWh of heat.
@@ -1924,7 +1932,7 @@ export default function RenovationSimulator() {
         energy_price: Math.round(((gas?.tariffSek ?? assumptionValue("UK", "gas_price") ?? 0.079) / eff) * 1000) / 1000,
         carbon_factor_heat: Math.round(((gas?.carbonKgPerKwh ?? assumptionValue("UK", "carbon_factor_heat") ?? 0.213) / eff) * 1000) / 1000,
         discount_rate: assumptionValue("UK", "discount_rate") ?? 0.035,
-        study_period_yr: 30,
+        study_period_yr: STUDY_PERIOD_YR,
         floor_area_m2: Math.round(areas.heated),
         baseline_total_kwh_m2_yr: baseTotal,
         baseline_heating_kwh_m2_yr: baselinePkg?.buildings[repIdx]?.heatingKwhM2Yr ?? undefined,
@@ -1969,6 +1977,8 @@ export default function RenovationSimulator() {
         u_value: isExt ? 0 : c.uValue!,
         cost: Math.round((c.costPerM2 ?? 0) * area),
         carbon: Math.round((c.carbonPerM2 ?? 0) * area),
+        // IVL life of what this build-up installs → B4 replacements in the totals.
+        service_life_yr: measureLifeYears(li.key, `${c.name} ${c.wikellsCode ? itemByCode[c.wikellsCode]?.description ?? "" : ""}`).years,
       }));
       if (isExt) hasExtension = true;
       comps.push({ key: li.key, area_m2: Math.round(area), baseline_u: baseU, options });
@@ -2016,7 +2026,7 @@ export default function RenovationSimulator() {
       energy_price: Math.round(((ukGas?.tariffSek ?? assumptionValue("UK", "gas_price") ?? 0.079) / eff) * 1000) / 1000,
       carbon_factor_heat: Math.round(((ukGas?.carbonKgPerKwh ?? assumptionValue("UK", "carbon_factor_heat") ?? 0.183) / eff) * 1000) / 1000,
       discount_rate: assumptionValue("UK", "discount_rate") ?? 0.035,
-      study_period_yr: 30,
+      study_period_yr: STUDY_PERIOD_YR,
       floor_area_m2: Math.round(repGeo.heatedAreaM2 ?? floorArea),
       baseline_total_kwh_m2_yr: baseTotal,
       baseline_heating_kwh_m2_yr: baselinePkg?.buildings[repIdx]?.heatingKwhM2Yr ?? undefined,
@@ -2025,7 +2035,7 @@ export default function RenovationSimulator() {
       energy_price: Math.round(((assumptionValue("BE", "energy_price") ?? 0.078) / eff) * 1000) / 1000,
       carbon_factor_heat: Math.round(((assumptionValue("BE", "carbon_factor_heat") ?? 0.202) / eff) * 1000) / 1000,
       discount_rate: assumptionValue("BE", "discount_rate") ?? 0.03,
-      study_period_yr: 30,
+      study_period_yr: STUDY_PERIOD_YR,
       floor_area_m2: Math.round(repGeo.heatedAreaM2 ?? floorArea),
       baseline_total_kwh_m2_yr: baseTotal,
       baseline_heating_kwh_m2_yr: baselinePkg?.buildings[repIdx]?.heatingKwhM2Yr ?? undefined,
@@ -2034,7 +2044,7 @@ export default function RenovationSimulator() {
       energy_price: livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8,
       carbon_factor_heat: assumptionValue("SE", "carbon_factor_heat") ?? 0.022,
       discount_rate: assumptionValue("SE", "discount_rate") ?? 0.03,
-      study_period_yr: 30,
+      study_period_yr: STUDY_PERIOD_YR,
       floor_area_m2: Math.round(floorArea),
       baseline_total_kwh_m2_yr: baseTotal,
       baseline_heating_kwh_m2_yr: baselinePkg?.buildings[repIdx]?.heatingKwhM2Yr ?? undefined,
@@ -2042,16 +2052,17 @@ export default function RenovationSimulator() {
     return { input: { components: comps, params }, note: unpricedNote };
   }, [isUK, isBE, project.city, ukHvac, targetIdx, geometries, baselinePkg, lineItems, configs, wwrByIndex, manualOverrides, boverketAll, livePriceSek]);
 
-  // 30-year life-cycle cost for the Results table, on the SAME energy price and
+  // Life-cycle cost for the Results table (STUDY_PERIOD_YR), on the SAME energy price and
   // discount rate as the optimizer: material cost today + the simulated energy
-  // bill over 30 years, discounted (annuity factor). The price scenarios in the Results view vary it.
+  // bill over the study period, discounted (annuity factor), plus B4 replacements. The price scenarios vary the price.
   const lccPrice: number | null = optimizerInput.input?.params.energy_price
     ?? (isUK ? (ukBlend?.price ?? null)
       : isBE ? (assumptionValue("BE", "energy_price") ?? 0.078) / (assumptionValue("BE", "boiler_efficiency") ?? 0.85)
       : (livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8));
-  const lccAF = annuityFactor(optimizerInput.input?.params.discount_rate
-    ?? assumptionValue(isUK ? "UK" : isBE ? "BE" : "SE", "discount_rate") ?? 0.03, 30);
-  // 30-year carbon on the optimizer's own factor: embodied + 30 years of energy.
+  const lccRate = optimizerInput.input?.params.discount_rate
+    ?? assumptionValue(isUK ? "UK" : isBE ? "BE" : "SE", "discount_rate") ?? 0.03;
+  const lccAF = annuityFactor(lccRate, STUDY_PERIOD_YR);
+  // Life-cycle carbon on the optimizer's own factor: embodied + the period's energy.
   const lcCarbonFactor: number | null = optimizerInput.input?.params.carbon_factor_heat
     ?? (isUK ? (assumptionValue("UK", "carbon_factor_heat") ?? 0.213) / (assumptionValue("UK", "boiler_efficiency") ?? 0.85)
       : isBE ? (assumptionValue("BE", "carbon_factor_heat") ?? 0.202) / (assumptionValue("BE", "boiler_efficiency") ?? 0.85)
@@ -2059,7 +2070,7 @@ export default function RenovationSimulator() {
   const lcCarbon30 = (embodied: number | null, kwhM2: number | null): number | null =>
     embodied == null || kwhM2 == null || lcCarbonFactor == null || totalFloorAreaM2 <= 0
       ? null
-      : Math.round(embodied + kwhM2 * totalFloorAreaM2 * lcCarbonFactor * 30);
+      : Math.round(embodied + kwhM2 * totalFloorAreaM2 * lcCarbonFactor * STUDY_PERIOD_YR);
 
   // The optimizer runs here (not inside the chart panel) so the Results table
   // can list every not-yet-simulated package with its estimate, whichever view
@@ -2089,6 +2100,47 @@ export default function RenovationSimulator() {
     costNow == null || kwhM2 == null || lccPrice == null || totalFloorAreaM2 <= 0
       ? null
       : Math.round(costNow + kwhM2 * totalFloorAreaM2 * lccPrice * lccAF);
+
+  /** B4: what re-installing a package's measures within the study period adds —
+   *  cost discounted to today, carbon not (EN 15978, as EPSM's LCA counts it).
+   *  Each measure's life comes from IVL by part + material (measureLifeYears);
+   *  insulation and cladding outlast 50 years and add nothing. Existing parts of
+   *  the building are never replaced here (their remaining life is unknown). */
+  function replacementsOf(
+    selections: Record<string, { configId?: string; wikellsCode?: string; customLabel?: string }>,
+    buildingIdx: number[],
+  ): { cost: number; carbon: number } {
+    // Read here, not from lccRate: the price scenarios call this earlier in render.
+    const rate = assumptionValue(isUK ? "UK" : isBE ? "BE" : "SE", "discount_rate") ?? 0.03;
+    let cost = 0, carbon = 0;
+    for (const [key, sel] of Object.entries(selections)) {
+      const li = lineItems.find((l) => l.key === key);
+      if (!li) continue;
+      const cfg = sel.configId ? configs.find((c) => c.id === sel.configId) : undefined;
+      const item = !cfg && sel.wikellsCode ? itemByCode[sel.wikellsCode] : undefined;
+      const years = replacementsWithin(STUDY_PERIOD_YR,
+        measureLifeYears(key, `${sel.customLabel ?? ""} ${cfg?.name ?? ""} ${item?.description ?? ""}`).years);
+      if (!years.length) continue;
+      const pv = years.reduce((s, y) => s + 1 / Math.pow(1 + rate, y), 0);
+      for (const i of buildingIdx) {
+        const g = geometries[i];
+        if (!g) continue;
+        let c = 0, co2 = 0;
+        if (sel.wikellsCode?.startsWith("uk:")) {
+          const m = (ukOptionsFor(g, wwrByIndex[i] ?? null)[key] ?? []).find((x) => `uk:${x.code}` === sel.wikellsCode);
+          if (m) { c = m.costGbp; co2 = m.carbonKgCo2e; }
+        } else {
+          const qty = computeAreaForLineItem(li, g, wwrByIndex[i] ?? null, manualOverrides);
+          if (qty == null) continue;
+          if (cfg) { c = (cfg.costPerM2 ?? 0) * qty; co2 = (cfg.carbonPerM2 ?? 0) * qty; }
+          else if (item) { c = item.costSEK * qty; co2 = estimateCarbon(item, boverketAll).value * qty; }
+        }
+        cost += c * pv;
+        carbon += co2 * years.length;
+      }
+    }
+    return { cost: Math.round(cost), carbon: Math.round(carbon) };
+  }
 
   // Which optimizer picks are already validated (as a package) — keyed by the
   // touched (non-"keep") component→material selections, matching the panel.
@@ -2237,7 +2289,7 @@ export default function RenovationSimulator() {
         const baseTotal = baselineAgg?.avgTotalKwhM2Yr ?? total;
         const saving = Math.max(0, Math.round(baseTotal - total));
         // Operational CO2e saved per m² a year, on the same heat carbon factor as
-        // the 30-yr carbon column (Gothenburg district heating 0.022 kg/kWh) - it
+        // the 50-yr carbon column (Gothenburg district heating 0.022 kg/kWh) - it
         // was a flat 0.2, ~9x too high for Gothenburg.
         const carbonSaving = agg.totalCarbonKgCO2e != null && baselineAgg?.totalCarbonKgCO2e != null
           ? Math.max(0, Math.round(baselineAgg.totalCarbonKgCO2e - agg.totalCarbonKgCO2e))
@@ -2287,7 +2339,7 @@ export default function RenovationSimulator() {
   /* ── One table for every package ─────────────────────────────────────────
      Simulated packages (EnergyPlus figures) and every designed package that
      hasn't run yet (the optimizer's degree-day estimate, marked "≈"), with the
-     same columns: cost, carbon, 30-yr cost, 30-yr carbon, heating, total. */
+     same columns: cost, carbon, 50-yr cost, 50-yr carbon, heating, total. */
   const optPointKey = (pt: OptimizePoint) =>
     Object.entries(pt.selections).filter(([, v]) => v !== "__keep__").sort().map(([k, v]) => `${k}=${v}`).join("|");
   const estimateRows: EstRow[] = useMemo(() => {
@@ -2333,6 +2385,8 @@ export default function RenovationSimulator() {
         parts: touched.map(([k]) => [k.replace("VertExt::", ""), pt.selection_labels[k] ?? k] as [string, string]),
         cost: cost == null ? null : Math.round(cost), carbon: carbon == null ? null : Math.round(carbon),
         total, heat, pareto: paretoKeys.has(key),
+        repl: replacementsOf(Object.fromEntries(touched.map(([k, c]) => [k, c.startsWith("uk:") ? { wikellsCode: c } : { configId: c }])),
+          targetEntries.map((e) => e.idx)),
       });
     }
     return out;
@@ -2345,8 +2399,13 @@ export default function RenovationSimulator() {
   const [includeEstimates, setIncludeEstimates] = useState(false);
   const shownEstimates = includeEstimates ? estimateRows : [];
   type PkgRow = { kind: "pkg"; id: string; pkg: RenovationCalcPackage };
+  // Life-cycle figures include the B4 replacements of the package's own measures.
+  const plus = (v: number | null, add: number) => (v == null ? null : v + add);
+  const pkgReplacements = (pkg: RenovationCalcPackage) => replacementsOf(pkg.selections,
+    pkg.buildings.map((b) => geometries.findIndex((g) => g.lat === b.lat && g.lon === b.lon)).filter((i) => i >= 0));
   const rowMetrics = (r: PkgRow | EstRow) => {
-    if (r.kind === "est") return { cost: r.cost, carbon: r.carbon, total: r.total, lcc: lcc30(r.cost, r.total), lcc_c: lcCarbon30(r.carbon, r.total) };
+    if (r.kind === "est") return { cost: r.cost, carbon: r.carbon, total: r.total, repl: r.repl,
+      lcc: plus(lcc30(r.cost, r.total), r.repl.cost), lcc_c: plus(lcCarbon30(r.carbon, r.total), r.repl.carbon) };
     const a = pkgAggregate(r.pkg);
     const cost = r.pkg.isBaseline ? 0 : a.totalCostSEK;
     const carbon = r.pkg.isBaseline ? 0 : a.totalCarbonKgCO2e;
@@ -2355,7 +2414,10 @@ export default function RenovationSimulator() {
     const areaScale = !r.pkg.isBaseline && a.floorAreaM2 && baselineAgg?.floorAreaM2
       ? a.floorAreaM2 / baselineAgg.floorAreaM2 : 1;
     const kwhEq = a.avgTotalKwhM2Yr == null ? null : a.avgTotalKwhM2Yr * areaScale;
-    return { cost, carbon, total: a.avgTotalKwhM2Yr, lcc: lcc30(cost, kwhEq), lcc_c: lcCarbon30(carbon, kwhEq) };
+    // The baseline keeps its existing parts — nothing of it is "replaced" here.
+    const repl = r.pkg.isBaseline ? { cost: 0, carbon: 0 } : pkgReplacements(r.pkg);
+    return { cost, carbon, total: a.avgTotalKwhM2Yr, repl,
+      lcc: plus(lcc30(cost, kwhEq), repl.cost), lcc_c: plus(lcCarbon30(carbon, kwhEq), repl.carbon) };
   };
   const tableRows: (PkgRow | EstRow)[] = (() => {
     const base = packages.filter((p) => p.isBaseline).map((pkg): PkgRow => ({ kind: "pkg", id: pkg.id, pkg }));
@@ -2380,7 +2442,7 @@ export default function RenovationSimulator() {
       }
       if (best && cands.length > 1) (out[best.id] ??= []).push(label);
     };
-    tag("cost", "Cheapest"); tag("lcc", "Lowest 30-yr cost"); tag("lcc_c", "Lowest carbon"); tag("total", "Lowest energy");
+    tag("cost", "Cheapest"); tag("lcc", "Lowest 50-yr cost"); tag("lcc_c", "Lowest carbon"); tag("total", "Lowest energy");
     return out;
   })();
 
@@ -2996,7 +3058,7 @@ export default function RenovationSimulator() {
               <span style={{ flex: 1 }}>
                 <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#fff" }}>{t("Simulated packages · EnergyPlus")}</span>
                 <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
-                  {t("Verified outcomes against the as-built baseline: heating and total energy per package and building, cost and carbon upfront and over 30 years.")}
+                  {t("Verified outcomes against the as-built baseline: heating and total energy per package and building, cost and carbon upfront and over 50 years.")}
                 </span>
               </span>
             </div>
@@ -3017,7 +3079,7 @@ export default function RenovationSimulator() {
             <>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{t("Sort by:")}</span>
-              {([["default", "Simulated first"], ["energy", "Energy"], ["cost", "Cost"], ["lcc", "30-yr cost"], ["lcCarbon", "30-yr carbon"]] as const).map(([k, lbl]) => (
+              {([["default", "Simulated first"], ["energy", "Energy"], ["cost", "Cost"], ["lcc", "50-yr cost"], ["lcCarbon", "50-yr carbon"]] as const).map(([k, lbl]) => (
                 <button key={k} onClick={() => setResultSort(k)} style={{
                   fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
                   border: `1px solid ${resultSort === k ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
@@ -3058,10 +3120,10 @@ export default function RenovationSimulator() {
                   info: isUK || isBE
                     ? t("The emissions from making the new materials (the production stage, A1–A3), released once when you renovate. Doing nothing emits 0 here.")
                     : t("The emissions caused by the renovation itself, released once: making the new materials (A1–A3), transporting them to the site (A4), and installing them, including the material wasted on site (A5). Values from Boverket's climate database. Demolition of removed layers and later replacements are not included. Doing nothing emits 0 here.") },
-                { k: "lcc", l: t("30-yr cost"), sub: t("cost + 30 yrs of energy at today's price, discounted"),
-                  info: t("The upfront cost PLUS 30 years of energy bills at today's energy price. Later bills are discounted by {rate}% a year, because money spent in the future counts for less than money spent today. Compare with the baseline: if a package's 30-year cost is higher, its energy savings do not pay back what it costs.", { rate }) },
-                { k: "lcco2", l: t("30-yr carbon"), sub: t("embodied + 30 yrs of energy"),
-                  info: t("The material emissions PLUS 30 years of emissions from the energy the building uses ({cf}). Compare with the baseline: if a package's 30-year carbon is higher, making its materials emits more than its energy savings avoid in 30 years.", { cf }) },
+                { k: "lcc", l: t("50-yr cost"), sub: t("cost + replacements + 50 yrs of energy at today's price, discounted"),
+                  info: t("The upfront cost, PLUS replacing parts that wear out within 50 years (e.g. windows after 40), PLUS 50 years of energy bills at today's energy price. Later costs are discounted by {rate}% a year, because money spent in the future counts for less than money spent today. Compare with the baseline: if a package's 50-year cost is higher, its energy savings do not pay back what it costs.", { rate }) },
+                { k: "lcco2", l: t("50-yr carbon"), sub: t("embodied + replacements + 50 yrs of energy"),
+                  info: t("The material emissions, PLUS the materials of replacements within 50 years, PLUS 50 years of emissions from the energy the building uses ({cf}). Compare with the baseline: if a package's 50-year carbon is higher, making its materials emits more than its energy savings avoid in 50 years.", { cf }) },
                 { k: "heat", l: t("Heating"), sub: "kWh/m²·yr",
                   info: t("The heat the building needs per m² of heated floor area per year, from the EnergyPlus simulation.") },
                 { k: "total", l: t("Total energy"), sub: isUK || isBE
@@ -3115,8 +3177,12 @@ export default function RenovationSimulator() {
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{m.cost == null ? "—" : fmtSEK(m.cost)}</span>
                     <span style={{ fontSize: 12, color: "#4A90E2" }}>{m.carbon == null ? "—" : `${m.carbon.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
-                    <span style={{ fontSize: 12, color: "#B98BE8" }}>{m.lcc == null ? "—" : `≈ ${fmtSEK(m.lcc)}`}</span>
-                    <span style={{ fontSize: 12, color: "#4A90E2" }}>{m.lcc_c == null ? "—" : `≈ ${m.lcc_c.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
+                    <span style={{ fontSize: 12, color: "#B98BE8" }}>{m.lcc == null ? "—" : `≈ ${fmtSEK(m.lcc)}`}
+                      {m.lcc != null && m.repl.cost > 0 && <span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>{t("incl. {v} replacements", { v: fmtSEK(m.repl.cost) })}</span>}
+                    </span>
+                    <span style={{ fontSize: 12, color: "#4A90E2" }}>{m.lcc_c == null ? "—" : `≈ ${m.lcc_c.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}
+                      {m.lcc_c != null && m.repl.carbon > 0 && <span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>{t("incl. {v} kg replacements", { v: m.repl.carbon.toLocaleString(isUK ? "en-GB" : "sv-SE") })}</span>}
+                    </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{row.heat == null ? "—" : `≈ ${row.heat}`}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>
                       {row.total == null ? "—" : `≈ ${row.total}`}
@@ -3222,12 +3288,22 @@ export default function RenovationSimulator() {
                       const m = rowMetrics(row);
                       return (<>
                         <span style={{ fontSize: 12, color: "#B98BE8", fontWeight: 600 }}
-                          title={t("Cost today + 30 years of energy at {price} per kWh, discounted (same price and rate as the optimiser). The future energy prices panel below tests other prices.", { price: lccPrice?.toFixed(3) ?? "—" })}>
+                          title={t("Cost today + replacements within 50 years + 50 years of energy at {price} per kWh, discounted (same price and rate as the optimiser). The future energy prices panel below tests other prices.", { price: lccPrice?.toFixed(3) ?? "—" })}>
                           {m.lcc == null ? "—" : fmtSEK(m.lcc)}
+                          {m.lcc != null && m.repl.cost > 0 && (
+                            <span style={{ display: "block", fontSize: 10, fontWeight: 500, color: "rgba(255,255,255,0.45)" }}>
+                              {t("incl. {v} replacements", { v: fmtSEK(m.repl.cost) })}
+                            </span>
+                          )}
                         </span>
                         <span style={{ fontSize: 12, color: "#4A90E2" }}
-                          title={t("Embodied carbon + 30 years of energy at {v} kg CO₂e per kWh", { v: lcCarbonFactor?.toFixed(3) ?? "—" })}>
+                          title={t("Embodied carbon + replacements + 50 years of energy at {v} kg CO₂e per kWh", { v: lcCarbonFactor?.toFixed(3) ?? "—" })}>
                           {m.lcc_c == null ? "—" : `${m.lcc_c.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}
+                          {m.lcc_c != null && m.repl.carbon > 0 && (
+                            <span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
+                              {t("incl. {v} kg replacements", { v: m.repl.carbon.toLocaleString(isUK ? "en-GB" : "sv-SE") })}
+                            </span>
+                          )}
                         </span>
                       </>);
                     })()}

@@ -76,7 +76,7 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
 
   return (
     <div style={{ marginTop: 10 }}>
-      <CollapsibleCard title="Optimization Model" subtitle="Step 4 optimisation & 30-year cost/carbon — every input, where it comes from, where it is used" color="#B98BE8" badge={pill}>
+      <CollapsibleCard title="Optimization Model" subtitle="Step 4 optimisation & 50-year cost/carbon — every input, where it comes from, where it is used" color="#B98BE8" badge={pill}>
         {/* Country economy/climate data */}
         <SubHead>Energy, climate &amp; economy — {countryName}</SubHead>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

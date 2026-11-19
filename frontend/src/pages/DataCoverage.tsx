@@ -7,6 +7,7 @@ import type { BuildingLookup, BboxStats, BuildingRecord } from "../types";
 import FacadeDefectPanel, { type FacadeBuilding } from "../components/FacadeDefectPanel";
 import BuildingHistoryPanel, { OwnerCell, RenovationsCell, OwnerSuggestions, type HistoryBuilding } from "../components/BuildingHistoryPanel";
 import PeerComparisonPanel, { type PeerBuildingRow } from "../components/PeerComparisonPanel";
+import FastHeatModelPanel from "../components/FastHeatModelPanel";
 import RetrofitPriorityPanel from "../components/RetrofitPriorityPanel";
 import ModelScopeNotice from "../components/ModelScopeNotice";
 import { buildingUseLabel } from "../utils/useLabels";
@@ -2792,7 +2793,12 @@ export default function DataCoverage() {
 }
 
 /* ── Step2Sections ──────────────────────────────────────────────── */
-type Sec2Id = "overview" | "peers" | "history" | "facade" | "priority";
+type Sec2Id = "overview" | "peers" | "heat" | "history" | "facade" | "priority";
+// Hidden for now (2026-11-14, user request): "Compared with Similar Buildings"
+// and "Heat Need — Quick Estimate". Flip to true to bring them back; the
+// panels and their endpoints are unchanged.
+const SHOW_PEER_SECTION = false;
+const SHOW_HEAT_SECTION = false;
 
 function Step2Sections({
   showFacade, facadeBuildings, historyBuildings, peerBuildings, cityId, priorityItems, overview,
@@ -2811,9 +2817,13 @@ function Step2Sections({
   // Single-open accordion. Numbering is derived from which sections are
   // actually visible, so hiding one (facade needs walls in scope) renumbers the
   // rest rather than leaving a gap.
+  const showPeers = SHOW_PEER_SECTION && peerBuildings.length > 0;
+  // The fast heat model needs Swedish buildings (same rule as the peers).
+  const showHeat = SHOW_HEAT_SECTION && peerBuildings.length > 0;
   const visibleSections: Sec2Id[] = [
     ...(overview ? ["overview" as Sec2Id] : []),
-    ...(peerBuildings.length ? ["peers" as Sec2Id] : []),
+    ...(showPeers ? ["peers" as Sec2Id] : []),
+    ...(showHeat ? ["heat" as Sec2Id] : []),
     // Owner + renovations are columns of the buildings table; this section is
     // only for address selections, which have no table to put them in.
     ...(historyBuildings.length && !overview ? ["history" as Sec2Id] : []),
@@ -2837,6 +2847,7 @@ function Step2Sections({
   const overviewRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
   const peersRef = useRef<HTMLDivElement>(null);
+  const heatRef = useRef<HTMLDivElement>(null);
   const facadeRef = useRef<HTMLDivElement>(null);
   const priorityRef = useRef<HTMLDivElement>(null);
 
@@ -2860,6 +2871,7 @@ function Step2Sections({
     const el = openSec === "overview" ? overviewRef.current
              : openSec === "history" ? historyRef.current
              : openSec === "peers" ? peersRef.current
+             : openSec === "heat" ? heatRef.current
              : openSec === "facade" ? facadeRef.current
              : priorityRef.current;
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2934,7 +2946,7 @@ function Step2Sections({
       )}
 
       {/* ─ Compared with similar buildings ─ */}
-      {peerBuildings.length > 0 && (
+      {showPeers && (
         <div
           ref={peersRef}
           style={{
@@ -2948,10 +2960,33 @@ function Step2Sections({
           <SectionHeader
             id="peers"
             label="Compared with Similar Buildings"
-            subtitle="Energy use against buildings of the same type and era in the municipality"
+            subtitle="Does each building use more or less energy than others like it?"
           />
           {openSec === "peers" && (
             <div style={{ padding: "0 18px 18px" }}><PeerComparisonPanel buildings={peerBuildings} cityId={cityId} /></div>
+          )}
+        </div>
+      )}
+
+      {/* ─ Heat need from the fast hourly model, selection + whole city ─ */}
+      {showHeat && (
+        <div
+          ref={heatRef}
+          style={{
+            borderRadius: 14,
+            border: `1px solid ${openSec === "heat" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            background: "rgba(255,255,255,0.02)",
+            overflow: "hidden",
+            transition: "border-color 0.18s",
+          }}
+        >
+          <SectionHeader
+            id="heat"
+            label="Heat Need — Quick Estimate"
+            subtitle="How much heat each building needs, and how it ranks in the whole city"
+          />
+          {openSec === "heat" && (
+            <div style={{ padding: "0 18px 18px" }}><FastHeatModelPanel buildings={facadeBuildings} cityId={cityId} /></div>
           )}
         </div>
       )}

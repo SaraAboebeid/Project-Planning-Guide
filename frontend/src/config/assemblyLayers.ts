@@ -186,6 +186,88 @@ export function computeAssemblyU(
   return { uValue, rTotal, rsi, rse, layers: out, framingApplied, warnings };
 }
 
+/* ── Insulation thickness for a target U-value ───────────────────────────────
+   The inverse of computeAssemblyU: given the other layers, how thick must the
+   insulation be to reach a target U? Solved numerically on computeAssemblyU
+   itself (bisection; U falls monotonically with thickness), so the framing
+   correction and fixed-R layers are respected exactly — the same idea as
+   EPSM Core's solve_element_insulation, without needing the EPSM platform.
+
+   Which layer grows: a continuous insulation layer if the build-up has one. In
+   a framed build-up the insulation between the studs is tied to the stud depth,
+   so rather than deepen the studs on paper we add a continuous layer on the
+   outside (behind any cladding). Thickness is rounded UP to whole 10 mm — the
+   step products come in — so the result always meets the target. */
+
+export interface TargetUSolution {
+  layers: AssemblyLayer[];
+  /** Index of the layer that was resized or added. */
+  index: number;
+  added: boolean;
+  thicknessMm: number;
+  achievedU: number | null;
+  /** False when even the material's maximum thickness can't reach the target. */
+  reachable: boolean;
+  /** True when the build-up already meets the target and nothing changed. */
+  alreadyMet: boolean;
+}
+
+const CONTINUOUS_PREFERENCE: Record<ComponentKind, string[]> = {
+  wall: ["wood_fibre", "mw_batt", "eps"],
+  roof: ["mw_blown_st", "mw_loft", "cellulose", "mw_batt"],
+  floor: ["eps", "xps", "mw_batt"],
+};
+
+export function solveForTargetU(
+  layers: AssemblyLayer[], kind: ComponentKind, targetU: number,
+  byId: Record<string, LayerMaterial> = MATERIAL_BY_ID,
+): TargetUSolution | null {
+  if (!(targetU > 0)) return null;
+  const now = computeAssemblyU(layers, kind, byId).uValue;
+  const cat = (l: AssemblyLayer) => byId[l.materialId]?.category;
+  if (layers.length && now != null && now <= targetU) {
+    return { layers, index: -1, added: false, thicknessMm: 0, achievedU: now, reachable: true, alreadyMet: true };
+  }
+  const framed = layers.some((l) => (byId[l.materialId]?.framingFraction ?? 0) > 0);
+  const insIdx = layers.map((l, i) => (cat(l) === "insulation" ? i : -1)).filter((i) => i >= 0);
+  // computeAssemblyU couples the FIRST insulation layer to the framing.
+  const continuous = framed ? insIdx.slice(1) : insIdx;
+
+  let work = layers.map((l) => ({ ...l }));
+  let index: number;
+  let added = false;
+  if (continuous.length) {
+    index = continuous[continuous.length - 1]!;
+  } else {
+    const all = Object.values(byId);
+    const pick = CONTINUOUS_PREFERENCE[kind].map((id) => byId[id]).find(Boolean)
+      ?? all.filter((m) => m.category === "insulation" && m.lambda != null).sort((a, b) => a.lambda! - b.lambda!)[0];
+    if (!pick) return null;
+    // Outermost position behind cladding / ventilated cavity (list is outside → inside).
+    let at = 0;
+    while (at < work.length && (cat(work[at]!) === "cladding" || cat(work[at]!) === "cavity")) at++;
+    work.splice(at, 0, { materialId: pick.id, thicknessMm: pick.minMm });
+    index = at;
+    added = true;
+  }
+  const m = byId[work[index]!.materialId]!;
+  const uAt = (mm: number) => {
+    const trial = work.map((l, i) => (i === index ? { ...l, thicknessMm: mm } : l));
+    return computeAssemblyU(trial, kind, byId).uValue ?? Infinity;
+  };
+  let lo = m.minMm, hi = m.maxMm;
+  let mm: number;
+  let reachable = true;
+  if (uAt(hi) > targetU) { mm = hi; reachable = false; }
+  else if (uAt(lo) <= targetU) mm = lo;
+  else {
+    for (let k = 0; k < 40; k++) { const mid = (lo + hi) / 2; if (uAt(mid) > targetU) lo = mid; else hi = mid; }
+    mm = Math.min(m.maxMm, Math.ceil(hi / 10) * 10);
+  }
+  work = work.map((l, i) => (i === index ? { ...l, thicknessMm: mm } : l));
+  return { layers: work, index, added, thicknessMm: mm, achievedU: computeAssemblyU(work, kind, byId).uValue, reachable, alreadyMet: false };
+}
+
 /** Sensible starting stacks so the builder opens with something real. */
 export const PRESETS: Record<ComponentKind, { label: string; layers: AssemblyLayer[] }[]> = {
   wall: [
