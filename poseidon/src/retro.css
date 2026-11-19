@@ -1,0 +1,305 @@
+/* Poseidon planner: 90s desktop look.
+   Every bevel is the same four-line recipe (outer dark / outer light / inner
+   dark / inner light), so all chrome is built from the tokens below. */
+
+:root {
+  /* Poseidon brand teal #00505A drives the desktop, title bars and selection. */
+  --brand: #00505a;
+  --desktop: #1f6f76;
+  --face: #c0c0c0;
+  --hilite: #ffffff;
+  --light: #dfdfdf;
+  --shadow: #808080;
+  --dark: #0a0a0a;
+  --field: #ffffff;
+  --text: #000000;
+  --select: var(--brand);
+  --select-text: #ffffff;
+  --title-a: var(--brand);
+  --title-b: #3a9aa3;
+  --title-off-a: #808080;
+  --title-off-b: #b5b5b5;
+  --tooltip: #ffffe1;
+  --bsod: #0000aa;
+  --good: #008000;
+  --bad: #c00000;
+  --warn: #b07800;
+
+  --raised: inset -1px -1px var(--dark), inset 1px 1px var(--hilite),
+            inset -2px -2px var(--shadow), inset 2px 2px var(--light);
+  --pressed: inset -1px -1px var(--hilite), inset 1px 1px var(--dark),
+             inset -2px -2px var(--light), inset 2px 2px var(--shadow);
+  --sunken: inset -1px -1px var(--hilite), inset 1px 1px var(--shadow),
+            inset -2px -2px var(--light), inset 2px 2px var(--dark);
+  --groove: inset -1px -1px var(--hilite), inset 1px 1px var(--shadow),
+            inset -2px -2px var(--shadow), inset 2px 2px var(--hilite);
+
+  --ui: Tahoma, "MS Sans Serif", "Segoe UI", Arial, sans-serif;
+  --pixel: "Pixelify Sans", Tahoma, sans-serif;
+  --mono: "VT323", "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--desktop);
+  overflow: hidden;
+  -webkit-font-smoothing: none;
+  user-select: none;
+}
+img.px, svg.px { image-rendering: pixelated; shape-rendering: crispEdges; }
+
+/* ── Desktop ─────────────────────────────────────────────── */
+.desktop {
+  position: fixed; inset: 0 0 30px 0;
+  background: var(--desktop);
+  overflow: hidden;
+}
+.desktop-icons {
+  position: absolute; top: 8px; left: 8px; bottom: 8px;
+  display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start;
+  gap: 6px 4px;
+}
+.desk-icon {
+  width: 84px; padding: 4px 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: none; border: 0; cursor: default; font: inherit; color: #fff;
+}
+.desk-icon span {
+  padding: 1px 3px; text-align: center; line-height: 1.25;
+  text-shadow: 1px 1px 0 #000;
+}
+.desk-icon:focus { outline: none; }
+.desk-icon:focus span { background: var(--select); outline: 1px dotted #fff; text-shadow: none; }
+.desk-icon:focus .px { filter: brightness(0.6) sepia(1) hue-rotate(190deg) saturate(4); }
+
+.wallpaper-mark {
+  position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  color: rgba(255,255,255,0.8); font-family: var(--pixel); pointer-events: none;
+}
+/* The logo turned white and slightly see-through, like a wallpaper. */
+.wallpaper-mark img { width: min(340px, 60vw); filter: brightness(0) invert(1); opacity: 0.55; }
+.wallpaper-mark .small { font-size: 18px; letter-spacing: 1px; }
+
+/* ── Windows ─────────────────────────────────────────────── */
+.window {
+  position: absolute;
+  isolation: isolate;   /* keep sticky headers/tabs inside their own window's stack */
+  background: var(--face);
+  box-shadow: var(--raised);
+  padding: 3px;
+  display: flex; flex-direction: column;
+  min-width: 220px; min-height: 120px;
+}
+.window.maximized { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; }
+.title-bar {
+  height: 20px; flex: none;
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 2px 0 3px;
+  background: linear-gradient(90deg, var(--title-off-a), var(--title-off-b));
+  color: #dcdcdc; font-weight: bold;
+}
+.window.active > .title-bar { background: linear-gradient(90deg, var(--title-a), var(--title-b)); color: #fff; }
+.title-bar .title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.title-btns { display: flex; gap: 2px; }
+.title-btn {
+  width: 16px; height: 14px; padding: 0;
+  background: var(--face); box-shadow: var(--raised); border: 0;
+  display: grid; place-items: center; cursor: default;
+}
+.title-btn:active { box-shadow: var(--pressed); }
+.title-btn + .title-btn.close { margin-left: 2px; }
+
+.menu-bar { display: flex; flex: none; padding: 1px 0; }
+.menu-bar > button {
+  font: inherit; background: none; border: 0; padding: 2px 7px; cursor: default; position: relative;
+}
+.menu-bar > button:hover, .menu-bar > button.open { box-shadow: var(--raised); }
+.menu-bar u { text-decoration: underline; }
+
+.window-body { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 4px 3px 3px; overflow: auto; }
+.window-body.flush { margin: 2px 0 0; }
+.status-bar { display: flex; gap: 2px; margin-top: 2px; flex: none; }
+.status-bar > div { box-shadow: var(--sunken); padding: 2px 4px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status-bar > div.fixed { flex: none; min-width: 90px; }
+.resize-grip {
+  position: absolute; right: 2px; bottom: 2px; width: 12px; height: 12px; cursor: nwse-resize;
+  background:
+    linear-gradient(135deg, transparent 0 45%, var(--hilite) 45% 52%, var(--shadow) 52% 62%, transparent 62% 70%,
+      var(--hilite) 70% 77%, var(--shadow) 77% 87%, transparent 87%);
+}
+
+/* ── Controls ────────────────────────────────────────────── */
+button.btn {
+  font: inherit; color: var(--text);
+  min-width: 75px; min-height: 23px; padding: 0 12px;
+  background: var(--face); border: 0; box-shadow: var(--raised); cursor: default;
+}
+button.btn:active:not(:disabled) { box-shadow: var(--pressed); padding: 1px 11px 0 13px; }
+button.btn:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
+button.btn.default { box-shadow: inset 0 0 0 1px var(--dark), var(--raised); }
+button.btn:disabled { color: var(--shadow); text-shadow: 1px 1px 0 var(--hilite); }
+
+input.field, select.field, textarea.field {
+  font: inherit; color: var(--text);
+  background: var(--field); border: 0; box-shadow: var(--sunken);
+  padding: 3px 4px; min-height: 21px; outline: none; user-select: text;
+}
+input.field:disabled { background: var(--face); }
+
+fieldset.group { border: 0; box-shadow: var(--groove); padding: 10px 10px 8px; margin: 8px 0 0; }
+fieldset.group > legend { padding: 0 3px; }
+
+.sunken-panel { background: var(--field); box-shadow: var(--sunken); padding: 2px; overflow: auto; }
+.hr { height: 2px; box-shadow: var(--groove); margin: 6px 0; }
+.row { display: flex; gap: 6px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 6px; }
+.grow { flex: 1; min-width: 0; }
+.right { margin-left: auto; }
+.muted { color: #444; }
+.small { font-size: 11px; }
+.pixel-heading { font-family: var(--pixel); font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+
+/* Explorer-style list view */
+table.list { border-collapse: collapse; width: 100%; background: var(--field); }
+table.list th {
+  position: sticky; top: 0; z-index: 1; text-align: left; font-weight: normal;
+  background: var(--face); box-shadow: var(--raised); padding: 2px 6px; white-space: nowrap;
+}
+table.list td { padding: 2px 6px; white-space: nowrap; }
+table.list tr.sel td { background: var(--select); color: var(--select-text); }
+table.list td.num, table.list th.num { text-align: right; }
+
+/* Tabs */
+.tabs { display: flex; padding-left: 4px; position: relative; z-index: 1; }
+.tab {
+  font: inherit; background: var(--face); border: 0; cursor: default;
+  padding: 3px 10px; margin-right: -1px;
+  box-shadow: inset 1px 1px var(--hilite), inset -1px 0 var(--dark), inset -2px 0 var(--shadow), inset 2px 2px var(--light);
+  position: relative; top: 2px;
+}
+.tab.on { top: 0; padding-bottom: 5px; z-index: 2; }
+.tab-panel { box-shadow: var(--raised); padding: 10px; flex: 1; min-height: 0; overflow: auto; }
+
+/* Progress bar (chunky blocks) */
+.progress { height: 18px; box-shadow: var(--sunken); padding: 3px; background: var(--field); }
+.progress > div {
+  height: 100%;
+  background: repeating-linear-gradient(90deg, var(--select) 0 8px, transparent 8px 10px);
+}
+
+/* EPC energy-class chip: letter in a bevelled square */
+.epc { display: inline-grid; place-items: center; width: 18px; height: 16px; font-weight: bold; color: #fff; box-shadow: var(--raised); }
+
+/* ── Taskbar ─────────────────────────────────────────────── */
+.taskbar {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 30px; z-index: 10000;
+  background: var(--face); box-shadow: inset 0 1px var(--light), inset 0 2px var(--hilite);
+  display: flex; align-items: center; gap: 4px; padding: 3px 2px 2px;
+}
+.start-btn {
+  font: inherit; font-weight: bold; font-size: 13px;
+  height: 22px; padding: 0 6px 0 3px; display: flex; align-items: center; gap: 4px;
+  background: var(--face); border: 0; box-shadow: var(--raised); cursor: default;
+}
+.start-btn.open { box-shadow: var(--pressed); }
+.start-btn img { width: 18px; height: 18px; object-fit: contain; }
+.task-sep { width: 2px; align-self: stretch; margin: 1px 2px; box-shadow: var(--groove); }
+.task-items { flex: 1; display: flex; gap: 3px; min-width: 0; }
+.task-item {
+  font: inherit; height: 22px; width: 160px; min-width: 40px; flex-shrink: 1;
+  display: flex; align-items: center; gap: 4px; padding: 0 4px;
+  background: var(--face); border: 0; box-shadow: var(--raised); cursor: default;
+  white-space: nowrap; overflow: hidden;
+}
+.task-item span { overflow: hidden; text-overflow: ellipsis; }
+.task-item.on {
+  box-shadow: var(--pressed); font-weight: bold;
+  background-image: repeating-conic-gradient(var(--hilite) 0 25%, var(--face) 0 50%);
+  background-size: 2px 2px;
+}
+.lang-btn {
+  font: inherit; font-size: 10px; font-weight: bold; color: #fff; background: var(--select);
+  border: 0; padding: 1px 3px; cursor: default; line-height: 1.2;
+}
+.start-menu li button:hover .lang-btn { outline: 1px solid #fff; }
+.tray { box-shadow: var(--sunken); height: 22px; padding: 0 8px; display: flex; align-items: center; gap: 6px; }
+
+/* Start menu */
+.start-menu {
+  position: fixed; left: 2px; bottom: 28px; z-index: 10001;
+  background: var(--face); box-shadow: var(--raised); padding: 3px; display: flex;
+}
+.start-menu .banner {
+  width: 24px; background: linear-gradient(0deg, var(--title-a), var(--title-b));
+  color: #fff; writing-mode: vertical-rl; transform: rotate(180deg);
+  font-family: var(--pixel); font-size: 17px; padding: 8px 0; white-space: nowrap;
+}
+.start-menu .banner b { font-weight: 600; }
+/* The banner is rotated 180°; turn the logo back upright. */
+.start-menu .banner-mark { display: inline-block; transform: rotate(180deg); margin-bottom: 8px; }
+.start-menu ul { list-style: none; margin: 0; padding: 0; min-width: 210px; }
+.start-menu li button {
+  font: inherit; width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 5px 10px 5px 6px; background: none; border: 0; cursor: default; text-align: left;
+}
+.start-menu li button:hover { background: var(--select); color: #fff; }
+.start-menu li.sep { height: 2px; margin: 3px 2px; box-shadow: var(--groove); }
+
+/* Message box */
+.msgbox-body { display: flex; gap: 14px; padding: 12px 10px 6px; align-items: flex-start; }
+.msgbox-btns { display: flex; justify-content: center; gap: 6px; padding: 8px 0 6px; }
+.modal-shade { position: fixed; inset: 0; z-index: 20000; }
+
+/* Wizard (installer layout) */
+.wizard { display: flex; flex: 1; min-height: 0; gap: 0; }
+.wizard-side {
+  width: 150px; flex: none; padding: 12px 10px; color: #fff;
+  background: linear-gradient(180deg, var(--brand) 0%, #13636b 60%, #2f858d 100%);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.wizard-side .step { display: flex; gap: 6px; align-items: baseline; opacity: 0.7; }
+.wizard-side .step.on { opacity: 1; font-weight: bold; }
+.wizard-side .step.done { opacity: 0.95; }
+.wizard-main { flex: 1; padding: 12px 14px; overflow: auto; min-width: 0; }
+.wizard-foot { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 4px 2px; flex: none; }
+
+/* Notepad */
+.notepad { flex: 1; font-family: "Lucida Console", "Courier New", monospace; font-size: 12px; padding: 4px 6px; white-space: pre-wrap; user-select: text; line-height: 1.4; }
+
+/* Under construction stripe */
+.construction {
+  height: 14px; margin: 8px 0;
+  background: repeating-linear-gradient(-45deg, #f4c400 0 10px, #000 10px 20px);
+  box-shadow: var(--sunken);
+}
+
+.bsod { background: var(--bsod); color: #fff; font-family: var(--mono); font-size: 18px; padding: 10px 14px; line-height: 1.15; }
+
+/* Tooltip-yellow hint */
+.hint { background: var(--tooltip); border: 1px solid #000; padding: 4px 6px; }
+
+/* Leaflet in retro chrome */
+.leaflet-container { font: inherit; background: #dfdfdf; }
+.leaflet-bar { border: 0 !important; box-shadow: var(--raised) !important; border-radius: 0 !important; }
+.leaflet-bar a {
+  background: var(--face) !important; color: #000 !important; border-radius: 0 !important;
+  border-bottom: 1px solid var(--shadow) !important; font: bold 16px/26px var(--ui) !important;
+}
+.leaflet-bar a:active { box-shadow: var(--pressed); }
+.leaflet-tooltip.retro-tip {
+  background: var(--tooltip); border: 1px solid #000; border-radius: 0; box-shadow: none;
+  font: 11px var(--ui); padding: 2px 5px; color: #000;
+}
+.leaflet-tooltip.retro-tip::before { display: none; }
+.leaflet-control-attribution { font-size: 10px; }
+
+@media (max-width: 640px) {
+  .window { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; }
+  .task-item { width: 44px; }
+  .task-item span { display: none; }
+}

@@ -33,10 +33,13 @@ from tools.idf.generate_idf import build_shoebox_idf
 from backend import simdb
 from backend import accounts
 from backend import pv_optimizer
+from backend import poseidon_stock
 
 app = FastAPI(title="Project Planning Guide API", version="0.1.0")
 # Email sign-in + saved projects (backend/accounts.py).
 app.include_router(accounts.router)
+# Poseidon app: manual corrections to the Poseidon building list (backend/poseidon_stock.py).
+app.include_router(poseidon_stock.router)
 
 app.add_middleware(
     CORSMiddleware,

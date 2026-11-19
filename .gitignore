@@ -80,3 +80,8 @@ data/eubucco/
 
 # Login accounts, sessions and saved projects (personal data) - never commit
 data/accounts.sqlite3*
+
+# Poseidon building list corrections: the .sqlite3 itself is meant to be shared,
+# only SQLite's write-ahead side files stay out
+data/poseidon_stock.sqlite3-wal
+data/poseidon_stock.sqlite3-shm
