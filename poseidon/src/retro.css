@@ -174,6 +174,17 @@ table.list td { padding: 2px 6px; white-space: nowrap; }
 table.list tr.sel td { background: var(--select); color: var(--select-text); }
 table.list td.num, table.list th.num { text-align: right; }
 
+/* Spreadsheet look for the building table: grid lines + grey row numbers */
+table.sheet td { border-right: 1px solid #d8d8d8; border-bottom: 1px solid #d8d8d8; }
+table.sheet th { cursor: default; user-select: none; }
+table.sheet th:hover { background: var(--light); }
+table.sheet .rownum {
+  position: sticky; left: 0; z-index: 1; background: var(--face); color: #000;
+  text-align: right; min-width: 34px; box-shadow: var(--raised); font-size: 11px;
+}
+table.sheet th.rownum { z-index: 2; }
+table.sheet tr.sel td:not(.rownum) { background: var(--select); color: var(--select-text); }
+
 /* Tabs */
 .tabs { display: flex; padding-left: 4px; position: relative; z-index: 1; }
 .tab {

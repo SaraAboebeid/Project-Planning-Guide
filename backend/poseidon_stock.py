@@ -90,7 +90,51 @@ def _replace(body: EditSet) -> dict:
     return _read()
 
 
+class AddressList(BaseModel):
+    addresses: list[str] = Field(default_factory=list, max_length=20000)
+
+
+def _epc_details(addresses: list[str]) -> dict:
+    """Per address: heating system + certificate issue/expiry (the planner's own
+    /api/epc/heating logic) and the property designation (fastighetsbeteckning,
+    IdFastBet) from the Boverket EPC register. Gothenburg only."""
+    import re
+    from backend import main as m   # lazy: main imports this module
+
+    heat = m.epc_heating(m.EpcHeatingRequest(addresses=addresses, city_id="gothenburg"))
+    out = {a: dict(v) if v else {} for a, v in heat.get("results", {}).items()}
+    if not heat.get("available", True):
+        return {"results": out, "available": False}
+
+    norm = lambda s: re.sub(r"\s+", "", (s or "").lower())
+    wanted = {norm(a): a for a in addresses if norm(a)}
+    if wanted:
+        con = m._epc_con()
+        try:
+            keys = list(wanted)
+            ph = ", ".join(["?"] * len(keys))
+            rows = con.execute(
+                "SELECT lower(regexp_replace(IdAdr, '\\s+', '', 'g')) AS k, IdFastBet, CAST(Godkand AS VARCHAR) "
+                f"FROM epc WHERE IdKommun = ? AND lower(regexp_replace(IdAdr, '\\s+', '', 'g')) IN ({ph})",
+                ["Göteborg", *keys],
+            ).fetchall()
+        finally:
+            con.close()
+        newest: dict[str, tuple[str, str]] = {}
+        for k, fast, god in rows:
+            if fast and (k not in newest or (god or "") > newest[k][1]):
+                newest[k] = (fast, god or "")
+        for k, (fast, _) in newest.items():
+            out.setdefault(wanted[k], {})["property"] = fast
+    return {"results": out, "available": True}
+
+
 router = APIRouter(prefix="/api/poseidon")
+
+
+@router.post("/epc-details")
+async def epc_details(body: AddressList):
+    return await run_in_threadpool(_epc_details, body.addresses)
 
 
 @router.get("/stock-edits")

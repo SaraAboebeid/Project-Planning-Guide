@@ -6,16 +6,20 @@ import { locale, setLang, useLang } from "../i18n";
 import { APPS, openApp } from "../apps/launch";
 import Portfolio from "../apps/Portfolio";
 import StockMap from "../apps/StockMap";
+import StockTable from "../apps/StockTable";
+import CsvImport from "../apps/CsvImport";
 import Properties from "../apps/Properties";
 import Wizard from "../apps/Wizard";
 import { About, ReadMe, Reports, Viewer3D } from "../apps/Small";
 
-const DESKTOP_ICONS = ["stockmap", "portfolio", "wizard", "viewer", "reports", "readme"] as const;
+const DESKTOP_ICONS = ["stockmap", "stocktable", "portfolio", "wizard", "viewer", "reports", "readme"] as const;
 
 function renderApp(win: Win): ReactNode {
   switch (win.app) {
     case "portfolio": return <div className="window-body flush"><Portfolio /></div>;
     case "stockmap": return <div className="window-body flush"><StockMap /></div>;
+    case "stocktable": return <div className="window-body flush"><StockTable /></div>;
+    case "csvimport": return <CsvImport />;
     case "properties": return <Properties win={win} />;
     case "wizard": return <Wizard win={win} />;
     case "viewer": return <Viewer3D />;
@@ -74,6 +78,8 @@ function StartMenu({ onClose }: { onClose: () => void }) {
       </div>
       <ul>
         {item("stockmap")}
+        {item("stocktable")}
+        {item("csvimport")}
         {item("wizard")}
         {item("portfolio")}
         {item("viewer", "3D Map")}

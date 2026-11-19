@@ -23,6 +23,17 @@ export interface MapBuilding {
   seen?: string;
   match?: "address" | "geocoded";  // how the listing address found this outline
   listing_addrs?: string[];
+  // table columns (assets/buildings.json + Boplats rents, see tools/poseidon/build_poseidon_map.py)
+  height?: number | null;
+  footprint?: number | null;
+  has_epc?: boolean | null;
+  period?: string | null;
+  u_wall?: number | null;
+  u_roof?: number | null;
+  u_win?: number | null;
+  bp_listings?: number;
+  bp_rent?: number | null;
+  bp_rent_m2?: number | null;
 }
 
 export interface MapData {
@@ -92,6 +103,26 @@ export function toggle(b: MapBuilding) {
   else if (s === "removed") save({ ...edits, removed: edits.removed.filter((x) => x !== b.id) });
   else if (s === "added") save({ ...edits, added: edits.added.filter((x) => x !== b.id) });
   else save({ ...edits, added: [...edits.added, b.id] });
+}
+
+/** Mark many buildings as Poseidon at once (CSV import). Returns how many changed. */
+export function addMany(bs: MapBuilding[]): number {
+  const add = new Set(edits.added), rem = new Set(edits.removed);
+  let n = 0;
+  for (const b of bs) {
+    const s = statusOf(b);
+    if (s === "other") { add.add(b.id); n++; }
+    else if (s === "removed") { rem.delete(b.id); n++; }
+  }
+  if (n) save({ added: [...add], removed: [...rem] });
+  return n;
+}
+
+/** Every building currently counted as Poseidon's, with where that came from. */
+export function poseidonBuildings(data: MapData, e: Edits = edits) {
+  return data.buildings
+    .map((b) => ({ b, s: statusOf(b, e) }))
+    .filter((x) => x.s === "boplats" || x.s === "added");
 }
 
 /** Throw away unsaved changes: go back to what is saved on the server. */

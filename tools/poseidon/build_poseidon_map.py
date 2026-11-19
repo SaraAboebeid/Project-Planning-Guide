@@ -158,6 +158,27 @@ def main():
             GEOCODE_CACHE.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
     GEOCODE_CACHE.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
 
+    # Boplats rents per address (every listing, any landlord) for the table.
+    import sqlite3
+    rents: dict[str, list] = defaultdict(list)
+    con = sqlite3.connect(f"file:{REPO / 'boplats_apartments.db'}?mode=ro", uri=True)
+    for a, rent, size in con.execute("SELECT address, rent_sek, size_m2 FROM apartments WHERE address IS NOT NULL"):
+        rents[norm(a)].append((rent, size))
+    con.close()
+
+    def rent_for(addr, addrs):
+        keys = {norm(addr)} | {norm(x) for x in str(addrs or "").split("|")}
+        ls = [r for k in keys - {""} for r in rents.get(k, [])]
+        if not ls:
+            return None
+        r_sek = [r for r, _ in ls if r]
+        r_m2 = [r / s for r, s in ls if r and s]
+        return {
+            "bp_listings": len(ls),
+            "bp_rent": round(sum(r_sek) / len(r_sek)) if r_sek else None,
+            "bp_rent_m2": round(sum(r_m2) / len(r_m2), 1) if r_m2 else None,
+        }
+
     out = []
     for i, b in enumerate(buildings):
         is_pos = i in hit
@@ -174,8 +195,15 @@ def main():
             "addrs": b.get("all_addresses"),
             "year": b.get("year"), "floors": b.get("floors"), "atemp": b.get("area"),
             "energy": b.get("energy"), "eclass": b.get("eclass"), "use": b.get("use_cat"),
+            # extra columns for the building table (same fields as Step 2's table)
+            "height": b.get("height"), "footprint": b.get("footprint_m2"), "has_epc": b.get("has_epc"),
+            "period": b.get("tabula_period"),
+            "u_wall": b.get("tabula_u_wall"), "u_roof": b.get("tabula_u_roof"), "u_win": b.get("tabula_u_win"),
             "poly": poly,
         }
+        rent = rent_for(rec["addr"], rec["addrs"])
+        if rent:
+            rec.update(rent)
         if is_pos:
             ls = hit[i]
             rec["poseidon"] = True

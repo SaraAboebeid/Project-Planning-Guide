@@ -9,6 +9,7 @@ import { useLang, buildingUse } from "../i18n";
 import { PixelIcon } from "../icons/PixelIcon";
 import { useWM } from "../desktop/wm";
 import { EpcChip, fmt } from "./Portfolio";
+import { openApp } from "./launch";
 import {
   exportEdits, loadMapData, loadServerEdits, revertEdits, saveEdits, statusOf, toggle, useEdits, useSync,
   type MapBuilding, type MapData, type Status,
@@ -181,6 +182,8 @@ export default function StockMap() {
         </button>
         <button className="btn" disabled={sync !== "unsaved"} onClick={revert}>{t("Undo changes")}</button>
         <button className="btn" disabled={!data || !(edits.added.length || edits.removed.length)} onClick={() => data && exportEdits(data)}>{t("Export…")}</button>
+        <button className="btn" onClick={() => openApp(wm, "stocktable")}>{t("Table…")}</button>
+        <button className="btn" onClick={() => openApp(wm, "csvimport")}>{t("Import CSV…")}</button>
       </div>
       <div className="row grow" style={{ alignItems: "stretch", gap: 4, padding: "0 2px", minHeight: 0 }}>
         <div className="sunken-panel grow" style={{ padding: 2, position: "relative" }}>

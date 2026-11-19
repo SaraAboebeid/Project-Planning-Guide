@@ -8,7 +8,7 @@ import { t, useLang } from "../i18n";
 /** A window's title in the current language. */
 export const winTitle = (w: Win) => t(w.title) + (w.titleArg ? ` ${w.titleArg}` : "");
 
-export type AppId = "portfolio" | "stockmap" | "wizard" | "viewer" | "readme" | "about" | "properties" | "reports";
+export type AppId = "portfolio" | "stockmap" | "stocktable" | "csvimport" | "wizard" | "viewer" | "readme" | "about" | "properties" | "reports";
 
 export interface Win {
   id: string;
