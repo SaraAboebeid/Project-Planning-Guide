@@ -8,7 +8,7 @@ import "leaflet/dist/leaflet.css";
 import { useLang, buildingUse } from "../i18n";
 import { PixelIcon } from "../icons/PixelIcon";
 import { useWM } from "../desktop/wm";
-import { EpcChip, fmt } from "./Portfolio";
+import { EpcChip, fmt } from "../ui";
 import { openApp } from "./launch";
 import {
   exportEdits, loadMapData, loadServerEdits, revertEdits, saveEdits, statusOf, toggle, useEdits, useSync,

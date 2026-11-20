@@ -57,6 +57,10 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: true,
+    // Native file events were missed on this Windows setup (an edited module kept
+    // being served stale while its neighbours updated). Polling is cheap for an
+    // app this size and never misses a change.
+    watch: { usePolling: true, interval: 400 },
     fs: { strict: false },
     proxy: {
       "/api": { target: API, changeOrigin: true },

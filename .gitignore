@@ -85,3 +85,5 @@ data/accounts.sqlite3*
 # only SQLite's write-ahead side files stay out
 data/poseidon_stock.sqlite3-wal
 data/poseidon_stock.sqlite3-shm
+# Supplier API keys for the Poseidon catalogue: never shared (backend/poseidon_catalogue.py)
+data/poseidon_secrets.sqlite3*

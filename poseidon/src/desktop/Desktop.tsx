@@ -4,27 +4,32 @@ import { useWM, WindowFrame, MessageBoxes, winTitle, type Win } from "./wm";
 import { BrandMark, PixelIcon } from "../icons/PixelIcon";
 import { locale, setLang, useLang } from "../i18n";
 import { APPS, openApp } from "../apps/launch";
-import Portfolio from "../apps/Portfolio";
 import StockMap from "../apps/StockMap";
 import StockTable from "../apps/StockTable";
 import CsvImport from "../apps/CsvImport";
-import Properties from "../apps/Properties";
 import Wizard from "../apps/Wizard";
-import { About, ReadMe, Reports, Viewer3D } from "../apps/Small";
+import HistoryEditor from "../apps/HistoryEditor";
+import FacadeInspector from "../apps/FacadeInspector";
+import { About, ReadMe } from "../apps/Small";
+import Viewer3D from "../apps/Viewer3D";
+import { ReportView, ReportsFolder } from "../apps/ReportsApps";
+import { CatalogueWindow } from "../apps/Catalogue";
 
-const DESKTOP_ICONS = ["stockmap", "stocktable", "portfolio", "wizard", "viewer", "reports", "readme"] as const;
+const DESKTOP_ICONS = ["stockmap", "stocktable", "wizard", "catalogue", "reports", "viewer", "readme"] as const;
 
 function renderApp(win: Win): ReactNode {
   switch (win.app) {
-    case "portfolio": return <div className="window-body flush"><Portfolio /></div>;
     case "stockmap": return <div className="window-body flush"><StockMap /></div>;
-    case "stocktable": return <div className="window-body flush"><StockTable /></div>;
+    case "stocktable": return <div className="window-body flush"><StockTable win={win} /></div>;
     case "csvimport": return <CsvImport />;
-    case "properties": return <Properties win={win} />;
-    case "wizard": return <Wizard win={win} />;
+    case "wizard": return <Wizard />;
+    case "history": return <HistoryEditor win={win} />;
+    case "facade": return <FacadeInspector win={win} />;
+    case "report": return <ReportView win={win} />;
+    case "catalogue": return <CatalogueWindow />;
     case "viewer": return <Viewer3D />;
     case "readme": return <ReadMe />;
-    case "reports": return <Reports />;
+    case "reports": return <ReportsFolder />;
     case "about": return <About win={win} />;
   }
 }
@@ -81,8 +86,8 @@ function StartMenu({ onClose }: { onClose: () => void }) {
         {item("stocktable")}
         {item("csvimport")}
         {item("wizard")}
-        {item("portfolio")}
         {item("viewer", "3D Map")}
+        {item("catalogue")}
         {item("reports")}
         <li className="sep" />
         {item("readme", "Help (README)")}

@@ -1,0 +1,290 @@
+/**
+ * Retrofit prioritization — hybrid expert-rule + MCDA (Multi-Criteria Decision Analysis).
+ *
+ * Each building is scored 0–100 (higher = higher retrofit priority) under three
+ * criterion groups, then combined into one weighted priority score:
+ *
+ *     P = wE·E + wF·F + wC·C      (weights normalised to sum 1)
+ *
+ *   E  Energy performance     — energy use / EPC class (worse ⇒ higher priority)
+ *   F  Façade / envelope      — ML defect load (only once inspected)
+ *   C  Building characteristics— vintage + heated size (older/larger ⇒ higher)
+ *
+ * A fourth "renovation potential" criterion was removed (2026-10-15): it was 60 %
+ * the same energy figure as E, 25 % a wall U-value that comes from the building's
+ * age group (already in C) and 15 % size (already in C) - so it double-counted,
+ * and was the hardest part to explain.
+ *
+ * Sub-scores are expert rules (transparent, benchmarked thresholds). Weights are
+ * either set directly or derived from expert pairwise judgements via AHP. Every
+ * sub-score carries a confidence (data availability) so uncertainty is explicit.
+ *
+ * All maths is intentionally light so it runs instantly over hundreds/thousands
+ * of buildings on the client, and each number is explainable back to the user.
+ */
+// Poseidon copy of frontend/src/utils/retrofitPriority.ts (see ./types.ts).
+import type { BuildingRecord, FacadeDefectSummary } from "./types";
+
+export type CriterionKey = "E" | "F" | "C";
+export interface CriterionWeights { E: number; F: number; C: number; }
+
+// The former potential weight (0.20) spread over the rest in proportion.
+export const DEFAULT_WEIGHTS: CriterionWeights = { E: 0.45, F: 0.35, C: 0.20 };
+export const WEIGHT_PRESETS: Record<string, CriterionWeights> = {
+  "Balanced (default)": { E: 0.45, F: 0.35, C: 0.20 },
+  "Energy-first":       { E: 0.70, F: 0.15, C: 0.15 },
+  "Condition-first":    { E: 0.25, F: 0.60, C: 0.15 },
+  "Building-first":     { E: 0.30, F: 0.20, C: 0.50 },
+};
+
+export const CRITERION_LABELS: Record<CriterionKey, string> = {
+  E: "Energy performance",
+  F: "Façade / envelope condition",
+  C: "Building characteristics",
+};
+export const CRITERION_COLORS: Record<CriterionKey, string> = {
+  E: "#E8880C", F: "#E2483B", C: "#4A90E2",
+};
+
+export interface SubScore { value: number; confidence: number; note: string; available: boolean; }
+export interface PriorityResult {
+  key: string;
+  label: string;
+  row: BuildingRecord;
+  P: number;                              // 0–100 composite priority
+  scores: Record<CriterionKey, SubScore>;
+  confidence: number;                     // 0–1 weighted data confidence
+  drivers: string[];                      // top human-readable reasons
+}
+
+/* ── helpers ───────────────────────────────────────────────────────────────── */
+const num = (v: unknown): number | null =>
+  (typeof v === "number" && isFinite(v)) ? v : null;
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+const lin = (x: number, lo: number, hi: number) => clamp01((x - lo) / (hi - lo)) * 100;
+
+/** Heated floor area proxy (Atemp preferred, else footprint × floors). */
+export function heatedArea(b: BuildingRecord): number | null {
+  const a = num(b.atemp);
+  if (a && a > 0) return a;
+  const fp = num(b.footprint_m2);
+  const fl = num(b.floors) ?? 1;
+  return fp && fp > 0 ? fp * Math.max(1, fl) : null;
+}
+
+/* ── criterion sub-scores (expert rules) ───────────────────────────────────── */
+
+/** POSEIDON CHANGE: the energy scale is a parameter. The planner scores the
+ *  certificate's total energy (60 → 250 kWh/m², its default here); Poseidon
+ *  scores EPSM RC space heating, which runs lower, so it passes its own scale.
+ *  `confidence`/`suffix` let the caller say how sure the figure is. */
+export interface EnergyScale { lo: number; hi: number; suffix?: string; confidenceOf?: (b: BuildingRecord) => number }
+const PLANNER_ENERGY_SCALE: EnergyScale = { lo: 60, hi: 250 };
+
+/** E — worse energy performance ⇒ higher priority. */
+function scoreEnergy(b: BuildingRecord, scale: EnergyScale = PLANNER_ENERGY_SCALE): SubScore {
+  const e = num(b.energy_kwh_m2);
+  if (e != null) {
+    // Planner default: Swedish residential rule of thumb, ≤60 excellent, ≥250 very poor.
+    return { value: lin(e, scale.lo, scale.hi), confidence: scale.confidenceOf ? scale.confidenceOf(b) : 1,
+             note: `${Math.round(e)} kWh/m²·yr${scale.suffix ?? ""}`, available: true };
+  }
+  const c = (b.epc_class || "").trim().toUpperCase()[0];
+  const map: Record<string, number> = { A: 8, B: 22, C: 35, D: 50, E: 66, F: 83, G: 100 };
+  if (c && c in map) return { value: map[c]!, confidence: 0.7, note: `EPC ${c} (no metered kWh)`, available: true };
+  return { value: 50, confidence: 0, note: "no energy data", available: true };
+}
+
+// Structural defects (crack/bulge) weigh more than surface issues.
+const DEFECT_SEVERITY: Record<string, number> = {
+  crack: 1.0, bulge: 1.0, corrosion: 0.75, abscission: 0.75, leakage: 0.6,
+};
+
+/** F — poorer envelope condition ⇒ higher priority. Available ONLY once a building
+ *  has been inspected (façade photos analysed). Before that F is left out of the
+ *  score entirely and the other criteria are re-weighted (per user preference). */
+function scoreFacade(summary: FacadeDefectSummary | undefined): SubScore {
+  if (summary && summary.imageCount > 0) {
+    // A defect the ML detector boxed counts in full. One that only the general AI
+    // model reported counts half: its boxes are the less reliable of the two (it
+    // can mark sky or shadow), and it was asked to keep looking for more.
+    let load = 0, aiOnly = 0;
+    for (const [k, c] of Object.entries(summary.byClass)) {
+      const ai = Math.min(c, summary.aiByClass?.[k] ?? 0);
+      aiOnly += ai;
+      load += (DEFECT_SEVERITY[k] ?? 0.75) * ((c - ai) + 0.5 * ai);
+    }
+    // Saturating curve: a handful of severe defects already means "bad".
+    const value = (1 - Math.exp(-load / 4)) * 100;
+    const photos = `${summary.imageCount} photo${summary.imageCount === 1 ? "" : "s"}`;
+    if (summary.defectCount > 0) {
+      // Name WHAT was found, worst first - "5 defects" alone does not tell a planner
+      // whether the wall has hairline staining or structural cracking.
+      const breakdown = Object.entries(summary.byClass)
+        .sort((a, b) => (DEFECT_SEVERITY[b[0]] ?? 0.75) * b[1] - (DEFECT_SEVERITY[a[0]] ?? 0.75) * a[1])
+        .map(([k, c]) => `${c} ${k}`).join(", ");
+      return { value, confidence: summary.streetviewOnly ? 0.8 : 1, available: true,
+               note: `${breakdown} (${photos}${aiOnly ? `, ${aiOnly} AI-only` : ""})` };
+    }
+    // "Nothing found" is only as strong as the photo it was found in. Street
+    // imagery is shot from the road, so fine cracking is not resolvable, and
+    // where the only panorama is distant and sharply angled the wall arrives too
+    // coarse to show anything at all. A clean result from such a photo is not
+    // evidence: drop it back to "not inspected" so the other criteria carry the
+    // score, rather than crediting the building with a sound facade.
+    if (summary.lowDetail === true) {
+      return { value: 0, confidence: 0, available: false,
+               note: "street imagery too coarse to judge — upload a photo" };
+    }
+    const streetOnly = summary.streetviewOnly === true;
+    return {
+      value, available: true,
+      confidence: streetOnly ? 0.4 : 1,
+      note: streetOnly
+        ? `no defects seen, but from street imagery only (${photos}) — upload close-ups to confirm`
+        : `inspected — no defects (${photos})`,
+    };
+  }
+  return { value: 0, confidence: 0, note: "not inspected — add façade photos", available: false };
+}
+
+const ageScoreOf = (y: number) => (y < 1945 ? 85 : y < 1976 ? 78 : y < 1991 ? 55 : y < 2006 ? 32 : 15);
+
+/** C — older + larger buildings score higher (more impact / more likely dated). */
+function scoreBuilding(b: BuildingRecord, sizePct: number | null): SubScore {
+  const y = num(b.year_built);
+  const ageS = y != null ? ageScoreOf(y) : 50;
+  const sizeS = sizePct != null ? sizePct * 100 : 50;
+  const value = 0.6 * ageS + 0.4 * sizeS;
+  const confidence = (y != null ? 0.5 : 0) + (sizePct != null ? 0.5 : 0);
+  const bits: string[] = [];
+  if (y != null) bits.push(`built ${y}`);
+  // "size p100" read as a statistical percentile, which it is not - it is this
+  // building's position between the smallest and largest in the CURRENT
+  // selection. Say that in words, and show the area it is derived from.
+  if (sizePct != null) {
+    const a = heatedArea(b);
+    const where = sizePct >= 0.99 ? "largest here"
+                : sizePct <= 0.01 ? "smallest here"
+                : `${Math.round(sizePct * 100)}% of the size range here`;
+    bits.push(a != null ? `${Math.round(a).toLocaleString("sv-SE")} m² (${where})` : `size: ${where}`);
+  }
+  return { value, confidence, note: bits.join(", ") || "characteristics n/a", available: true };
+}
+
+/* ── composite ranking ─────────────────────────────────────────────────────── */
+export function normalizeWeights(w: CriterionWeights): CriterionWeights {
+  const s = (w.E + w.F + w.C) || 1;
+  return { E: w.E / s, F: w.F / s, C: w.C / s };
+}
+
+export interface PriorityInput { key: string; label: string; row: BuildingRecord; }
+
+/** Stable per-building key (cadastral id, else normalised address, else index),
+ *  de-duplicated. MUST match the key the façade panel writes `facadeDefects` under
+ *  so the F criterion picks up each building's inspection. */
+export function makeBuildingKeys(rows: {
+  address: string | null; cadastral_id?: string | null;
+  lat?: number | null; lon?: number | null; address_source?: string | null;
+}[]): string[] {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const seen = new Set<string>();
+  return rows.map((b, i) => {
+    // An address that was looked up from OpenStreetMap AFTER the building was
+    // listed must not become its key: the key would change mid-session and orphan
+    // the façade photos and results already stored under the old one. Such
+    // buildings (and ones with no address at all) key on their position instead.
+    const own = b.address_source?.startsWith("osm") ? "" : norm(b.address ?? "");
+    const pos = b.lat != null && b.lon != null ? `ll${b.lat.toFixed(5)}_${b.lon.toFixed(5)}` : "";
+    let key = (b.cadastral_id && b.cadastral_id.trim()) || own || pos || `bldg-${i}`;
+    while (seen.has(key)) key = `${key}-${i}`;
+    seen.add(key);
+    return key;
+  });
+}
+
+export function computePriorities(
+  items: PriorityInput[],
+  facadeDefects: Record<string, FacadeDefectSummary>,
+  weightsRaw: CriterionWeights,
+  energyScale?: EnergyScale,   // POSEIDON CHANGE (see EnergyScale)
+): PriorityResult[] {
+  const w = normalizeWeights(weightsRaw);
+
+  // Size percentile across the current selection (min–max over available areas).
+  const areas = items.map(it => heatedArea(it.row));
+  const known = areas.filter((a): a is number => a != null);
+  const lo = known.length ? Math.min(...known) : 0;
+  const hi = known.length ? Math.max(...known) : 1;
+  const sizePctOf = (a: number | null) => (a == null ? null : (hi > lo ? (a - lo) / (hi - lo) : 0.5));
+
+  const results = items.map((it, i) => {
+    const sizePct = sizePctOf(areas[i]!);
+    const scores: Record<CriterionKey, SubScore> = {
+      E: scoreEnergy(it.row, energyScale),
+      F: scoreFacade(facadeDefects[it.key]),
+      C: scoreBuilding(it.row, sizePct),
+    };
+
+    // Only criteria with data contribute; their weights are re-normalised so the
+    // composite stays comparable (e.g. an un-inspected building drops F and its
+    // weight is spread across E/C).
+    const availKeys = (["E", "F", "C"] as CriterionKey[]).filter(k => scores[k].available);
+    const wSum = availKeys.reduce((a, k) => a + w[k], 0) || 1;
+    const eff: Record<CriterionKey, number> = { E: 0, F: 0, C: 0 };
+    availKeys.forEach(k => { eff[k] = w[k] / wSum; });
+
+    const P = availKeys.reduce((a, k) => a + eff[k] * scores[k].value, 0);
+    const confidence = availKeys.reduce((a, k) => a + eff[k] * scores[k].confidence, 0);
+
+    // Drivers = available criteria with the biggest weighted contribution to P.
+    const contrib = availKeys
+      .map(k => ({ k, c: eff[k] * scores[k].value }))
+      .sort((a, b) => b.c - a.c);
+    const top = contrib.slice(0, 2).filter(d => d.c > 0);
+    // Detected façade defects are always worth stating as a reason, even when the
+    // energy criteria outweigh them in the score.
+    if (scores.F.available && scores.F.value >= 30 && !top.some(d => d.k === "F")) {
+      top.push({ k: "F", c: eff.F * scores.F.value });
+    }
+    const drivers = top.map(d => `${CRITERION_LABELS[d.k]}: ${scores[d.k].note}`);
+
+    return { key: it.key, label: it.label, row: it.row, P, scores, confidence, drivers };
+  });
+
+  results.sort((a, b) => b.P - a.P);
+  return results;
+}
+
+/* ── AHP: derive weights from pairwise expert judgements ───────────────────── */
+// Saaty 1–9 scale. `pair[a>b]` holds how many times more important a is than b
+// (reciprocal implied for the mirror). Geometric-mean priority + consistency ratio.
+const AHP_ORDER: CriterionKey[] = ["E", "F", "C"];
+const RI_N3 = 0.58; // Saaty random consistency index for a 3×3 matrix
+
+export interface AhpResult { weights: CriterionWeights; lambdaMax: number; CI: number; CR: number; consistent: boolean; }
+
+/** pairs: keyed `${i}>${j}` for i before j in AHP_ORDER, value on Saaty scale
+ *  (>1 ⇒ i more important than j, <1 ⇒ j more important). */
+export function ahpWeights(pairs: Record<string, number>): AhpResult {
+  const n = AHP_ORDER.length;
+  const A: number[][] = AHP_ORDER.map((ri, i) =>
+    AHP_ORDER.map((rj, j) => {
+      if (i === j) return 1;
+      if (i < j) return pairs[`${ri}>${rj}`] ?? 1;
+      return 1 / (pairs[`${rj}>${ri}`] ?? 1);
+    }),
+  );
+  const gm = A.map(row => Math.pow(row.reduce((p, x) => p * x, 1), 1 / n));
+  const gsum = gm.reduce((a, b) => a + b, 0) || 1;
+  const wv = gm.map(x => x / gsum);
+  // λmax from A·w ./ w
+  const Aw = A.map(row => row.reduce((acc, x, j) => acc + x * wv[j]!, 0));
+  const lambdaMax = Aw.reduce((acc, x, i) => acc + x / wv[i]!, 0) / n;
+  const CI = (lambdaMax - n) / (n - 1);
+  const CR = CI / RI_N3;
+  return {
+    weights: { E: wv[0]!, F: wv[1]!, C: wv[2]! },
+    lambdaMax, CI, CR, consistent: CR <= 0.1,
+  };
+}

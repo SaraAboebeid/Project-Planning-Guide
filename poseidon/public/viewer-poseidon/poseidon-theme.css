@@ -1,0 +1,167 @@
+/* Poseidon look for the shared 3D viewer.
+   Injected ONLY by the Poseidon app (src/apps/Viewer3D.tsx) into the viewer it
+   embeds, and every rule is scoped to body.poseidon (set by poseidon-bridge.js),
+   so the main planner's viewer is never affected. Same bevel recipe and tokens
+   as poseidon/src/retro.css. */
+
+body.poseidon {
+  --pz-face: #c0c0c0; --pz-hi: #ffffff; --pz-light: #dfdfdf; --pz-shadow: #808080; --pz-dark: #0a0a0a;
+  --pz-brand: #00505a; --pz-brand-2: #3a9aa3;
+  --pz-raised: inset -1px -1px var(--pz-dark), inset 1px 1px var(--pz-hi), inset -2px -2px var(--pz-shadow), inset 2px 2px var(--pz-light);
+  --pz-pressed: inset -1px -1px var(--pz-hi), inset 1px 1px var(--pz-dark), inset -2px -2px var(--pz-light), inset 2px 2px var(--pz-shadow);
+  --pz-sunken: inset -1px -1px var(--pz-hi), inset 1px 1px var(--pz-shadow), inset -2px -2px var(--pz-light), inset 2px 2px var(--pz-dark);
+  --pz-ui: Tahoma, "MS Sans Serif", "Segoe UI", Arial, sans-serif;
+}
+
+/* ── left panel: a grey window ── */
+body.poseidon #left-panel {
+  background: var(--pz-face) !important; color: #000 !important;
+  border: 0 !important; border-radius: 0 !important; box-shadow: var(--pz-raised) !important;
+  padding: 3px !important; font-family: var(--pz-ui) !important; font-size: 12px !important;
+  backdrop-filter: none !important;
+}
+body.poseidon #left-panel * { font-family: var(--pz-ui) !important; border-radius: 0 !important; }
+body.poseidon #lp-header {
+  background: linear-gradient(90deg, var(--pz-brand), var(--pz-brand-2)) !important;
+  border-radius: 0 !important; padding: 5px 8px 6px 34px !important; position: relative;
+}
+body.poseidon #lp-header::before {   /* Poseidon mark in the title bar */
+  content: ""; position: absolute; left: 7px; top: 50%; width: 22px; height: 22px; transform: translateY(-50%);
+  background: url("/logo-white.png") center / contain no-repeat;
+}
+body.poseidon #lp-header .lp-title { color: #fff !important; font-weight: bold !important; font-size: 13px !important; }
+body.poseidon #lp-header .lp-sub { color: #e6f2f3 !important; font-size: 11px !important; }
+
+body.poseidon #lp-fixed-top, body.poseidon #lp-scroll, body.poseidon #lp-footer,
+body.poseidon .collapse-content, body.poseidon .collapse-head { background: transparent !important; color: #000 !important; }
+body.poseidon #lp-scroll { scrollbar-color: var(--pz-shadow) var(--pz-light); }
+body.poseidon .lp-divider { height: 2px !important; background: none !important; border: 0 !important;
+  box-shadow: inset 0 1px var(--pz-shadow), inset 0 -1px var(--pz-hi) !important; margin: 4px 0 !important; }
+
+/* text that the planner's sidebar sets in light colours on its own background */
+body.poseidon #left-panel [style*="color:rgba(255,255,255"],
+body.poseidon #left-panel [style*="color: rgba(255,255,255"],
+body.poseidon #left-panel .bm-label, body.poseidon #left-panel .base-name,
+body.poseidon #left-panel .collapse-label, body.poseidon #left-panel .stat-lbl,
+body.poseidon #left-panel .analysis-note, body.poseidon #left-panel .overlay-group-label,
+body.poseidon #left-panel label, body.poseidon #left-panel p, body.poseidon #left-panel span:not(.sec-num):not(.layer-pill):not(.sec-badge):not(.lp-title):not(.lp-sub):not(.pz-chip) {
+  color: #000 !important;
+}
+
+/* inputs: white, sunken */
+body.poseidon #left-panel input[type="text"], body.poseidon #left-panel input:not([type]),
+body.poseidon #left-panel input[type="number"], body.poseidon #left-panel select, body.poseidon .ctrl-select {
+  background: #fff !important; color: #000 !important; border: 0 !important; box-shadow: var(--pz-sunken) !important;
+  padding: 3px 5px !important; min-height: 21px;
+}
+
+/* every kind of button: raised grey */
+body.poseidon #left-panel .btn, body.poseidon #left-panel .tool-btn, body.poseidon #left-panel .base-btn,
+body.poseidon #left-panel .overlay-btn, body.poseidon #left-panel .lp-tab, body.poseidon #left-panel .close-btn,
+body.poseidon #left-panel button.collapse-toggle, body.poseidon #left-panel .info-btn,
+body.poseidon .map-nav-btn, body.poseidon #lp-footer button {
+  background: var(--pz-face) !important; color: #000 !important; border: 0 !important;
+  box-shadow: var(--pz-raised) !important; text-shadow: none !important;
+}
+body.poseidon #left-panel .btn:active, body.poseidon #left-panel .tool-btn:active, body.poseidon #left-panel .overlay-btn:active,
+body.poseidon .map-nav-btn:active, body.poseidon #left-panel button.collapse-toggle:active { box-shadow: var(--pz-pressed) !important; }
+body.poseidon #left-panel .btn:disabled, body.poseidon #left-panel .tool-btn:disabled { color: var(--pz-shadow) !important; text-shadow: 1px 1px 0 var(--pz-hi) !important; }
+body.poseidon #left-panel .overlay-btn.active, body.poseidon #left-panel .base-btn.active, body.poseidon #left-panel .lp-tab.active,
+body.poseidon #left-panel .btn.active { box-shadow: var(--pz-pressed) !important; background: var(--pz-light) !important; font-weight: bold; }
+body.poseidon #left-panel button.collapse-toggle { margin: 1px 0 !important; }
+body.poseidon #left-panel button.collapse-toggle[aria-expanded="true"] {
+  background: linear-gradient(90deg, var(--pz-brand), var(--pz-brand-2)) !important; box-shadow: none !important;
+}
+body.poseidon #left-panel button.collapse-toggle[aria-expanded="true"] .collapse-label,
+body.poseidon #left-panel button.collapse-toggle[aria-expanded="true"] .collapse-chevron,
+body.poseidon #left-panel button.collapse-toggle[aria-expanded="true"] .sec-icon { color: #fff !important; }
+body.poseidon .overlay-check { border-radius: 0 !important; background: #fff !important; box-shadow: var(--pz-sunken) !important; border: 0 !important; }
+
+/* section number badges, pills, counters */
+body.poseidon .sec-num { background: var(--pz-brand) !important; border: 0 !important; color: #fff !important; }
+body.poseidon .sec-icon { color: var(--pz-brand) !important; }
+body.poseidon .layer-pill, body.poseidon .sec-badge {
+  background: var(--pz-brand) !important; color: #fff !important; border: 0 !important; font-weight: bold;
+}
+
+/* the two stat boxes: sunken white */
+body.poseidon .stat-box { background: #fff !important; border: 0 !important; box-shadow: var(--pz-sunken) !important; }
+body.poseidon .stat-num { color: var(--pz-brand) !important; }
+body.poseidon .stat-num-2 { color: #2e7d32 !important; }
+
+/* base-map thumbnails */
+body.poseidon .bm-thumb-img { border: 0 !important; box-shadow: var(--pz-raised) !important; }
+body.poseidon .bm-thumb.active .bm-thumb-img { box-shadow: var(--pz-pressed), 0 0 0 2px var(--pz-brand) !important; }
+body.poseidon .bm-check { background: var(--pz-brand) !important; border-radius: 0 !important; }
+
+/* panels inside the sidebar (selected-building card, results) */
+body.poseidon #left-panel .panel, body.poseidon #info-panel, body.poseidon #left-panel .analysis-result {
+  background: var(--pz-face) !important; color: #000 !important; border: 0 !important;
+  box-shadow: var(--pz-raised) !important; border-radius: 0 !important;
+}
+body.poseidon #info-panel table td, body.poseidon #info-panel table th { color: #000 !important; }
+
+/* search results list */
+body.poseidon #search-results { background: #fff !important; box-shadow: var(--pz-sunken) !important; border: 0 !important; }
+body.poseidon #search-results > * { color: #000 !important; }
+body.poseidon #search-results > *:hover { background: var(--pz-brand) !important; color: #fff !important; }
+
+/* map buttons (top right) and loading screen */
+body.poseidon .map-nav-btn { width: 30px; height: 30px; }
+body.poseidon .map-nav-btn svg { color: #000 !important; fill: currentColor; }
+body.poseidon #loading { background: #1f6f76 !important; color: #fff !important; font-family: var(--pz-ui) !important; }
+body.poseidon #loading .spinner { border-radius: 0 !important; border-color: #c0c0c0 #c0c0c0 #c0c0c0 var(--pz-brand) !important; }
+body.poseidon #loading h1, body.poseidon #loading h2, body.poseidon #loading #loading-status,
+body.poseidon #loading * { font-family: var(--pz-ui) !important; color: #fff !important; -webkit-text-fill-color: #fff !important; background-image: none !important; }
+
+/* city-wide EPC / TABULA match counters mean nothing to a Poseidon user */
+body.poseidon #lp-stats { display: none !important; }
+
+/* hover tooltip over the map (#hover-card) and the info "i" tooltip: classic yellow tooltip */
+body.poseidon #hover-card, body.poseidon #info-tooltip {
+  background: #ffffe1 !important; color: #000 !important; border: 1px solid #000 !important; border-radius: 0 !important;
+  font-family: var(--pz-ui) !important; box-shadow: 2px 2px 0 rgba(0,0,0,.35) !important; backdrop-filter: none !important;
+}
+body.poseidon #hover-card *, body.poseidon #info-tooltip * { color: #000 !important; font-family: var(--pz-ui) !important; }
+
+/* floating selection card (ui.js .sel-card): a retro window with a teal title bar */
+body.poseidon .sel-card {
+  background: var(--pz-face) !important; color: #000 !important; border-radius: 0 !important;
+  box-shadow: var(--pz-raised), 3px 3px 0 rgba(0,0,0,.3) !important; font-family: var(--pz-ui) !important; padding: 3px;
+}
+body.poseidon .sel-card .sc-head { background: linear-gradient(90deg, #0b4d54, var(--pz-brand)); padding: 6px 8px; align-items: center; }
+body.poseidon .sel-card h3 { color: #fff !important; font-size: 18px; font-family: var(--pz-ui); }
+body.poseidon .sel-card .sc-sub { color: #dff !important; }
+body.poseidon .sel-card .sc-sub svg { stroke: #dff !important; }
+body.poseidon .sel-card .sc-badge b { border-radius: 0 !important; box-shadow: var(--pz-raised); }
+body.poseidon .sel-card .sc-badge span { color: #fff !important; }
+body.poseidon .sel-card .sc-close {
+  background: var(--pz-face) !important; color: #000 !important; box-shadow: var(--pz-raised);
+  width: 22px; height: 20px; padding: 0 !important; font-size: 12px !important; font-weight: bold;
+}
+body.poseidon .sel-card .sc-body { background: #fff; box-shadow: var(--pz-sunken); margin: 4px 0 0; padding: 8px 12px 10px; }
+body.poseidon .sel-card .sc-lbl, body.poseidon .sel-card .sc-credit, body.poseidon .sel-card .sc-val small { color: #444 !important; }
+body.poseidon .sel-card .sc-val { color: #000 !important; }
+body.poseidon .sel-card .sc-row svg { stroke: var(--pz-brand) !important; }
+body.poseidon .sel-card .sc-photo { border-radius: 0 !important; box-shadow: var(--pz-sunken); background: #d4d0c8 !important; }
+body.poseidon .sel-card .sc-photo .sc-msg { color: #444 !important; }
+
+/* ── the Poseidon section and the Poseidon card (poseidon-bridge.js) ── */
+#pz-section { padding: 6px 8px 8px; margin: 2px 0; box-shadow: var(--pz-raised); background: var(--pz-face); }
+#pz-section .pz-title { display: flex; align-items: center; gap: 6px; font-weight: bold; margin-bottom: 6px; }
+#pz-section .pz-title img { width: 18px; height: 18px; object-fit: contain; }
+#pz-section .pz-modes { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 6px; }
+#pz-section .pz-sub { font-size: 11px; color: #444; margin: 2px 0 2px; }
+#pz-section .pz-modes button, #pz-section .pz-zoom, #pz-card button {
+  font: 12px var(--pz-ui); background: var(--pz-face); color: #000; border: 0; box-shadow: var(--pz-raised);
+  padding: 3px 8px; cursor: default; min-height: 22px;
+}
+#pz-section .pz-modes button.on { box-shadow: var(--pz-pressed); background: var(--pz-light); font-weight: bold; }
+#pz-section .pz-legend { display: flex; flex-direction: column; gap: 2px; font-size: 11px; margin-bottom: 6px; }
+#pz-section .pz-sw { display: inline-block; width: 14px; height: 10px; margin-right: 5px; vertical-align: middle; border: 1px solid #404040; }
+#pz-section .pz-ramp { height: 10px; border: 1px solid #404040; background: linear-gradient(90deg, #2e7d32, #e6a000, #c00000); }
+#pz-section .pz-note { font-size: 11px; color: #404040 !important; margin-top: 4px; }
+#pz-card { margin: 0 0 8px; padding: 6px 8px; background: #fff; box-shadow: var(--pz-sunken); font: 12px var(--pz-ui); color: #000; }
+#pz-card .pz-status { font-weight: bold; margin-bottom: 4px; }
+#pz-card .pz-actions { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
+#pz-card .pz-chip { display: inline-block; color: #fff !important; font-size: 10px; font-weight: bold; padding: 0 4px; }

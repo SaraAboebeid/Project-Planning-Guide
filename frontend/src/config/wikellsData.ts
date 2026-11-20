@@ -50,6 +50,41 @@ export interface WikellsSubGroup {
   items: WikellsItem[];
 }
 
+/* ─── Chapter 6 – Basement Exterior Walls (Ytterväggar källare, "YVK") ────────
+   Added 2026-11-20 from Wikells Sektionsfakta screenshots supplied by the user.
+   Below-ground U-values are Wikells' figures for a wall against sand, gravel or
+   moraine ("U-värde, sand, grus, morän"); above-ground ones are ordinary U. */
+const CH6_ABOVE_GROUND: WikellsItem[] = [
+  { code: "6.001", description: "BW AAC masonry 250, above ground",                                  costSEK: 2417.35, unit: "SEK/m²", weightKgM2: 144, uValue: 0.42 },
+  { code: "6.002", description: "BW AAC masonry 300, above ground",                                  costSEK: 2583.57, unit: "SEK/m²", weightKgM2: 165, uValue: 0.35 },
+  { code: "6.003", description: "BW AAC masonry 365, above ground",                                  costSEK: 2763.48, unit: "SEK/m²", weightKgM2: 193, uValue: 0.28 },
+  { code: "6.004", description: "BW lightweight clinker masonry 350, above ground",                  costSEK: 2870.18, unit: "SEK/m²", weightKgM2: 293, uValue: 0.60 },
+  { code: "6.005", description: "BW Leca insulating block masonry 380, above ground",               costSEK: 4273.48, unit: "SEK/m²", weightKgM2: 281, uValue: 0.15 },
+  { code: "6.006", description: "BW concrete sandwich wall 200+70, above ground",                    costSEK: 5005.17, unit: "SEK/m²", weightKgM2: 675, uValue: 0.33 },
+  { code: "6.007", description: "BW concrete sandwich wall 150+150, above ground",                   costSEK: 4978.28, unit: "SEK/m²", weightKgM2: 736, uValue: 0.33 },
+  { code: "6.008", description: "BW concrete 200 + internal wood-wool board, above ground",          costSEK: 3365.15, unit: "SEK/m²", weightKgM2: 525, uValue: 0.58 },
+  { code: "6.009", description: "BW concrete 200 + internal timber stud wall, above ground",         costSEK: 3131.50, unit: "SEK/m²", weightKgM2: 513, uValue: 0.45 },
+];
+
+const CH6_BELOW_GROUND: WikellsItem[] = [
+  { code: "6.010", description: "BW AAC masonry 250 + 100 Isodrän board",                            costSEK: 1979.35, unit: "SEK/m²", weightKgM2: 119, uValue: 0.15 },
+  { code: "6.011", description: "BW AAC masonry 300 + Platon membrane",                              costSEK: 1843.07, unit: "SEK/m²", weightKgM2: 139, uValue: 0.19 },
+  { code: "6.012", description: "BW AAC masonry 300 + 100 EPS",                                      costSEK: 1917.06, unit: "SEK/m²", weightKgM2: 141, uValue: 0.16 },
+  { code: "6.013", description: "BW AAC masonry 365 + 100 XPS",                                      costSEK: 2070.47, unit: "SEK/m²", weightKgM2: 169, uValue: 0.14 },
+  { code: "6.014", description: "BW lightweight clinker masonry 250 + 70 EPS",                       costSEK: 2418.36, unit: "SEK/m²", weightKgM2: 225, uValue: 0.17 },
+  // Description truncated in the source screenshot ("…och 45 minera"); "mineral wool" assumed.
+  { code: "6.015", description: "BW lightweight clinker masonry 250 + 70 Pordrän board + 45 mineral wool", costSEK: 2921.82, unit: "SEK/m²", weightKgM2: 210, uValue: 0.16 },
+  { code: "6.016", description: "BW lightweight clinker masonry 250 + 100 XPS",                      costSEK: 2392.66, unit: "SEK/m²", weightKgM2: 226, uValue: 0.16 },
+  { code: "6.017", description: "BW lightweight clinker masonry 300 + Platon membrane",              costSEK: 2496.58, unit: "SEK/m²", weightKgM2: 243, uValue: 0.26 },
+  { code: "6.018", description: "BW lightweight clinker masonry 300 + 50 Perimate",                  costSEK: 2562.08, unit: "SEK/m²", weightKgM2: 245, uValue: 0.19 },
+  { code: "6.019", description: "BW lightweight clinker masonry 300 + 100 EPS",                      costSEK: 2570.58, unit: "SEK/m²", weightKgM2: 246, uValue: 0.16 },
+  { code: "6.020", description: "BW Thermomur 250X + 100 Thermodrän",                                costSEK: 2480.54, unit: "SEK/m²", weightKgM2: 374, uValue: 0.14 },
+  { code: "6.021", description: "BW Thermomur 350 + 100 Thermodrän",                                 costSEK: 2654.54, unit: "SEK/m²", weightKgM2: 380, uValue: 0.12 },
+  { code: "6.022", description: "BW concrete 200 + 200 lightweight clinker + Platon membrane",       costSEK: 3598.48, unit: "SEK/m²", weightKgM2: 648, uValue: 0.28 },
+  { code: "6.023", description: "BW concrete 200 + 80 mineral wool + 150 lightweight clinker",       costSEK: 4482.50, unit: "SEK/m²", weightKgM2: 625, uValue: 0.17 },
+  { code: "6.024", description: "Available building component",                                     costSEK: 0.00,    unit: "SEK/st" },
+];
+
 /* ─── Chapter 7 – Exterior Walls ────────────────────────────────────────────── */
 const CH7_TIMBER: WikellsItem[] = [
   { code: "7.001", description: "EW timber stud 95 M0 with plywood",                               costSEK: 1088.35, unit: "SEK/m²", weightKgM2: 13, uValue: 1.75 },
@@ -434,6 +469,16 @@ const CH11_SPECIAL_ITEMS: WikellsItem[] = [
 ];
 /* ─── Exported catalogue ────────────────────────────────────────────────────── */
 export const WIKELLS_CHAPTERS: WikellsChapter[] = [
+  {
+    id:       "ch6",
+    chapter:  "6",
+    titleSV:  "YTTERVÄGGAR KÄLLARE",
+    titleEN:  "Basement Exterior Walls",
+    subGroups: [
+      { label: "Above ground",                                 items: CH6_ABOVE_GROUND },
+      { label: "Below ground (U against sand, gravel, moraine)", items: CH6_BELOW_GROUND },
+    ],
+  },
   {
     id:       "ch7",
     chapter:  "7",

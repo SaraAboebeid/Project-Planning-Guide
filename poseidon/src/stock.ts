@@ -34,6 +34,8 @@ export interface MapBuilding {
   bp_listings?: number;
   bp_rent?: number | null;
   bp_rent_m2?: number | null;
+  /** Neighbourhood (Göteborgs Stad primärområde). */
+  area?: string | null;
 }
 
 export interface MapData {

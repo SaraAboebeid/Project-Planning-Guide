@@ -179,6 +179,26 @@ def main():
             "bp_rent_m2": round(sum(r_m2) / len(r_m2), 1) if r_m2 else None,
         }
 
+    # Neighbourhood (Göteborgs Stad primärområde, 96 polygons) for filtering in
+    # the wizard — same source and centroid rule as tools/se/ingest_districts.py.
+    from shapely.geometry import Point, shape
+    from shapely.strtree import STRtree
+    gj = json.loads((REPO / "data" / "districts" / "gbg_primaromraden.geojson").read_text(encoding="utf-8"))
+    area_polys, area_names = [], []
+    for f in gj["features"]:
+        name = (f.get("properties") or {}).get("PRIMÄRNAMN")
+        if name and f.get("geometry"):
+            area_polys.append(shape(f["geometry"]))
+            area_names.append(str(name).strip())
+    area_tree = STRtree(area_polys)
+
+    def area_of(lat: float, lon: float):
+        pt = Point(lon, lat)
+        for idx in area_tree.query(pt):
+            if area_polys[idx].contains(pt):
+                return area_names[idx]
+        return None
+
     out = []
     for i, b in enumerate(buildings):
         is_pos = i in hit
@@ -199,6 +219,7 @@ def main():
             "height": b.get("height"), "footprint": b.get("footprint_m2"), "has_epc": b.get("has_epc"),
             "period": b.get("tabula_period"),
             "u_wall": b.get("tabula_u_wall"), "u_roof": b.get("tabula_u_roof"), "u_win": b.get("tabula_u_win"),
+            "area": area_of(lat, lon),
             "poly": poly,
         }
         rent = rent_for(rec["addr"], rec["addrs"])
