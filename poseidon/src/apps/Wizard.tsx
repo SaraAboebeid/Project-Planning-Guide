@@ -13,7 +13,7 @@
    service life (IVL), façade defects, U-value vs BBR.
 
    Everything recomputes live: new history, photos, edits or weights. */
-import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { useWM } from "../desktop/wm";
 import { useLang, buildingUse, locale } from "../i18n";
 import { PixelIcon } from "../icons/PixelIcon";
@@ -32,6 +32,7 @@ import { rcRun, rowResult, type RcBody, type RcRes, type USource } from "../rc";
 import { MEASURE_BY_CODE, MEASURE_COMPONENTS, U_FIELD, recommendedMeasure, type Measure, type MeasureComponent } from "../catalogue";
 import { BBR_RENOVATION_U } from "../planner/serviceLifeSE";
 import { useCatalogueVersion } from "../catalogueStore";
+import { price as hvacPrice, setCarrier, useHvacVersion } from "../hvacStore";
 import {
   ASSUMPTIONS, BASE_SYSTEM, CARBON, DEFAULT_PRICES, HEATING_SYSTEMS, PRICE_SCENARIOS, annuityFactor, baselineEval, buildingModel, climateCheck,
   evaluate, measureOptions, optimise, pickFromFront, stageItems, stageTimeline, stageValue, type StageBuilding, type StageItem, type StageSettings, regretMatrix, scaled, type BuildingModel, type Envelope, type OptPoint, type OptRule, type Package, type Prices,
@@ -194,16 +195,19 @@ export default function Wizard() {
 
   /* ── measures for the flagged buildings ─────────────────────────────────── */
   // Energy prices: district heating (the old "heat-price" setting) and electricity.
-  const [heatPrice, setHeatPrice] = useState(DEFAULT_PRICES.district_heating);
-  const [elPrice, setElPrice] = useState(DEFAULT_PRICES.electricity);
+  // Energy prices and heating-system assumptions: shared with the Catalogue window (hvacStore.ts).
+  const hvacVer = useHvacVersion();
+  const heatPrice = hvacPrice("district_heating"), elPrice = hvacPrice("electricity");
+  const setHeatPrice = (v: number) => setCarrier("prices", "district_heating", v);
+  const setElPrice = (v: number) => setCarrier("prices", "electricity", v);
   type ChoiceKey = MeasureComponent | "Heating";
   const [choices, setChoices] = useState<Record<string, Partial<Record<ChoiceKey, string>>>>({});
   useEffect(() => {
-    getSetting<number>("heat-price").then((v) => v != null && setHeatPrice(v));
-    getSetting<number>("el-price").then((v) => v != null && setElPrice(v));
     getSetting<typeof choices>("measures").then((v) => v && setChoices(v));
   }, []);
-  const prices: Prices = useMemo(() => ({ ...DEFAULT_PRICES, district_heating: heatPrice, electricity: elPrice }), [heatPrice, elPrice]);
+  const prices: Prices = useMemo(() => ({ district_heating: heatPrice, electricity: elPrice, biomass: hvacPrice("biomass") }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [heatPrice, elPrice, hvacVer]);
   const measureRows = useMemo(() => ranked.filter(({ r }) => flagged.has(r.id)).map(({ r }) => r), [ranked, flagged]);
   const catVer = useCatalogueVersion();
   /** The catalogue's suggestion (cheapest meeting BBR) for parts the ranking says need work; heating kept. */
@@ -959,10 +963,10 @@ export default function Wizard() {
                 <span className="grow" />
                 <label title={t("District heating price (Göteborg Energi 2024–25 by default) — enter Poseidon's own tariff.")}>{t("District heating (SEK/kWh):")}</label>
                 <input className="field" style={{ width: 58 }} type="number" step={0.05} value={heatPrice}
-                  onChange={(e) => { const v = Number(e.target.value); setHeatPrice(v); void putSetting("heat-price", v).catch(() => {}); }} />
+                  onChange={(e) => setHeatPrice(Number(e.target.value))} />
                 <label title={t("Retail electricity price, SE3 (spot + grid + tax + VAT) — used for heat pumps.")}>{t("Electricity:")}</label>
                 <input className="field" style={{ width: 58 }} type="number" step={0.05} value={elPrice}
-                  onChange={(e) => { const v = Number(e.target.value); setElPrice(v); void putSetting("el-price", v).catch(() => {}); }} />
+                  onChange={(e) => setElPrice(Number(e.target.value))} />
               </div>
               <fieldset className="group" style={{ marginTop: 0 }}>
                 <legend>{t("Optimiser")}</legend>
@@ -1454,8 +1458,36 @@ function CompareDialog({ row, bm, bodies, prices, initial, onUse, onClose }: {
   };
   const B = (on: boolean) => (on && evals.length > 1 ? { fontWeight: "bold" as const, background: "#e6f4e6" } : undefined);
   const first = variants[0]?.pkg ?? { envelope: {}, heating: BASE_SYSTEM };
+  // Options browser: every catalogue option for one part, with what it gives on this building
+  // (combined with the other parts of the first row), ticked → compared as variants.
+  const [browse, setBrowse] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useState<"group" | "u" | "price" | "money" | "co2" | "heat">("group");
   const g = measureOptions(tryPart, bm.u0[tryPart], recommendedMeasure(tryPart)?.code);
-  const tryList = [g.suggested, ...g.recommended].filter(Boolean) as Measure[];
+  const GROUPS: [string, Measure[], boolean][] = [
+    [t("★ Suggested"), g.suggested ? [g.suggested] : [], false],
+    [t("Recommended"), g.recommended, false],
+    [t("Meets the building regulations, but a cheaper option is as good"), g.other, false],
+    [t("Not recommended: misses the building regulations' requirement"), g.weak, false],
+    [t("Not selectable: no better than today's U-value"), g.worse, true],
+  ];
+  const optionRows = GROUPS.flatMap(([group, ms, disabled], gi) => ms.map((m) => {
+    const e = evaluate(bm, { envelope: { ...first.envelope, [tryPart]: m.code }, heating: first.heating }, prices);
+    return { m, group, gi, disabled, partCost: m.costPerM2 * bm.partArea[tryPart], heat: (bm.heat0 - e.heatKwh) / 1000,
+      money: base.lcc - e.lcc, co2: (base.lifeCarbonKg - e.lifeCarbonKg) / 1000, climate: climateCheck(bm, e) };
+  }));
+  const sorted = [...optionRows].sort((a, b) => sortKey === "group" ? a.gi - b.gi || a.m.u - b.m.u
+    : sortKey === "u" ? a.m.u - b.m.u : sortKey === "price" ? a.partCost - b.partCost
+    : sortKey === "money" ? b.money - a.money : sortKey === "co2" ? b.co2 - a.co2 : b.heat - a.heat);
+  const togglePick = (code: string) => setPicked((s) => { const n = new Set(s); if (n.has(code)) n.delete(code); else n.add(code); return n; });
+  const comparePicked = () => {
+    for (const r of optionRows.filter((x) => picked.has(x.m.code)))
+      add(`${t(tryPart)}: U ${r.m.u} · ${r.m.label.slice(0, 28)}`, { envelope: { ...first.envelope, [tryPart]: r.m.code }, heating: first.heating });
+    setPicked(new Set()); setBrowse(false);
+  };
+  const SortTh = ({ k, children, num = true }: { k: typeof sortKey; children: ReactNode; num?: boolean }) =>
+    <th className={num ? "num" : undefined} style={{ cursor: "pointer", fontWeight: sortKey === k ? "bold" : undefined }} onClick={() => setSortKey(k)}
+      title={t("Sort by this column")}>{children}{sortKey === k ? " ▼" : ""}</th>;
 
   return (
     <div className="modal-shade">
@@ -1468,17 +1500,60 @@ function CompareDialog({ row, bm, bodies, prices, initial, onUse, onClose }: {
           <div className="row" style={{ flexWrap: "wrap" }}>
             <button className="btn" onClick={() => add(`${t("Variant")} ${variants.length + 1}`, { envelope: { ...first.envelope }, heating: first.heating })}>{t("Add variant")}</button>
             <span className="task-sep" style={{ height: 20 }} />
-            <span>{t("Try every recommended option for")}</span>
-            <select className="field" value={tryPart} onChange={(e) => setTryPart(e.target.value as MeasureComponent)}>
+            <span>{t("Browse options for")}</span>
+            <select className="field" value={tryPart} onChange={(e) => { setTryPart(e.target.value as MeasureComponent); setPicked(new Set()); }}>
               {MEASURE_COMPONENTS.map((c) => <option key={c} value={c}>{t(c)}</option>)}
             </select>
-            <button className="btn" disabled={!tryList.length} onClick={() => tryList.forEach((m) =>
-              add(`${t(tryPart)}: U ${m.u}`, { envelope: { ...first.envelope, [tryPart]: m.code }, heating: first.heating }))}>
-              {t("Add {n} variants", { n: tryList.length })}</button>
+            <button className={`btn${browse ? " pressed" : ""}`} onClick={() => setBrowse((b) => !b)}>{browse ? t("Hide options") : t("Show all options")}</button>
             <span className="small muted">{t("(the other parts as in the first row)")}</span>
             <span className="grow" />
             <button className="btn default" onClick={simulate}>{t("Simulate all with the energy model")}</button>
           </div>
+          {browse && (
+            <fieldset className="group" style={{ marginTop: 0 }}>
+              <legend>{t("All options for {p} on this building", { p: t(tryPart) })} ({optionRows.length})</legend>
+              <div className="row" style={{ marginBottom: 4, flexWrap: "wrap" }}>
+                <button className="btn mini" style={{ padding: "0 6px" }} onClick={() => setPicked(new Set(optionRows.filter((r) => r.gi <= 1).map((r) => r.m.code)))}>{t("Tick suggested + recommended")}</button>
+                <button className="btn mini" style={{ padding: "0 6px" }} disabled={!picked.size} onClick={() => setPicked(new Set())}>{t("Clear ticks")}</button>
+                <span className="grow" />
+                <span className="small muted">{t("Figures: this option together with the other parts of the first row, against doing nothing (estimate; simulate after comparing). Click a column title to sort.")}</span>
+                <button className="btn default" disabled={!picked.size} onClick={comparePicked}>{t("Compare selected ({n})", { n: picked.size })}</button>
+              </div>
+              <div className="sunken-panel" style={{ padding: 0, maxHeight: 260, overflow: "auto" }}>
+                <table className="list sheet wrap-head">
+                  <thead><tr>
+                    <th />
+                    <SortTh k="group" num={false}>{t("Group")}</SortTh>
+                    <th>{t("Description")}</th>
+                    <SortTh k="u">{t("U-value after")}</SortTh>
+                    <th className="num">{t("Price (SEK/m²)")}</th>
+                    <SortTh k="price">{t("This part's cost")}</SortTh>
+                    <SortTh k="heat">{t("Heat saved per year")}</SortTh>
+                    <SortTh k="money">{t("Money saved vs doing nothing ({n} yr)", { n: ASSUMPTIONS.studyPeriodYr.value })}</SortTh>
+                    <SortTh k="co2">{t("CO₂ saved vs doing nothing (t, {n} yr)", { n: ASSUMPTIONS.studyPeriodYr.value })}</SortTh>
+                    <th className="num">{t("Climate goal: primary energy ≤ {g}", { g: ASSUMPTIONS.petGoal.value })}</th>
+                  </tr></thead>
+                  <tbody>
+                    {sorted.map((r) => (
+                      <tr key={r.m.code} style={r.disabled ? { color: "#888" } : picked.has(r.m.code) ? { background: "#e6f2f3" } : undefined}
+                        onClick={() => !r.disabled && togglePick(r.m.code)}>
+                        <td><input type="checkbox" disabled={r.disabled} checked={picked.has(r.m.code)} onChange={() => togglePick(r.m.code)} onClick={(e) => e.stopPropagation()} /></td>
+                        <td className="small" style={{ whiteSpace: "normal", maxWidth: 170 }}>{r.group}</td>
+                        <td style={{ whiteSpace: "normal", minWidth: 220 }}>{r.m.code} {r.m.label}</td>
+                        <td className="num">{nf(r.m.u, 2)}</td>
+                        <td className="num">{nf(r.m.costPerM2)}</td>
+                        <td className="num">{sek(r.partCost)}</td>
+                        <td className="num">{nf(r.heat, 1)} MWh</td>
+                        <td className="num" style={{ color: r.money < 0 ? "#a00000" : undefined }}>{sek(r.money)}</td>
+                        <td className="num">{nf(r.co2)}</td>
+                        <td className="num" style={{ color: r.climate.meetsPet ? "var(--good)" : "#a00000" }}>{nf(r.climate.pet)} {r.climate.meetsPet ? "≤" : ">"} {ASSUMPTIONS.petGoal.value} {r.climate.meetsPet ? "✓" : "✗"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </fieldset>
+          )}
           <div className="sunken-panel" style={{ padding: 0, minHeight: 0, overflow: "auto" }}>
             <table className="list sheet wrap-head">
               <thead><tr>

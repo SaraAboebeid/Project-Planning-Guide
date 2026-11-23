@@ -25,7 +25,8 @@
    portfolio strategies under energy-price scenarios (the main planner's
    regretAnalysis.ts decision rules, generalised to mixed energy carriers).
    Every assumption is listed in ASSUMPTIONS with its source. */
-import { CARRIERS, GOTHENBURG_EFLH, HVAC_SYSTEMS, type HvacSystem } from "./planner/hvacSystems";
+import { CARRIERS, GOTHENBURG_EFLH, type HvacSystem } from "./planner/hvacSystems";
+import { carbon as hvacCarbon, subscribeHvac, systems as hvacSystems } from "./hvacStore";
 import { measureLifeYears, replacementsWithin } from "./planner/serviceLifeSE";
 import { CATALOGUE, MEASURE_BY_CODE, MEASURE_COMPONENTS, type Measure, type MeasureComponent } from "./catalogue";
 import type { RcRes } from "./rc";
@@ -54,12 +55,14 @@ export const DEFAULT_PRICES: Prices = {
   electricity: CARRIERS.electricity.tariffSek,
   biomass: CARRIERS.biomass.tariffSek,
 };
-export const CARBON: Record<CarrierKey, number> = {
-  district_heating: CARRIERS.district_heating.carbonKgPerKwh,
-  electricity: CARRIERS.electricity.carbonKgPerKwh,
-  biomass: CARRIERS.biomass.carbonKgPerKwh,
-};
-export const HEATING_SYSTEMS: HvacSystem[] = HVAC_SYSTEMS;
+/* Heating systems and CO2 factors: the planner's defaults with the user's
+   adjustments (hvacStore.ts, Catalogue → Heating systems). Live bindings —
+   importers always see the current values. */
+const carbonNow = (): Record<CarrierKey, number> =>
+  ({ district_heating: hvacCarbon("district_heating"), electricity: hvacCarbon("electricity"), biomass: hvacCarbon("biomass") });
+export let CARBON: Record<CarrierKey, number> = carbonNow();
+export let HEATING_SYSTEMS: HvacSystem[] = hvacSystems();
+subscribeHvac(() => { CARBON = carbonNow(); HEATING_SYSTEMS = hvacSystems(); });
 export const BASE_SYSTEM = "dh_keep";
 
 /** Energy-price futures for the regret analysis: the main planner's Low / Medium /

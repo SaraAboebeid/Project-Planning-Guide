@@ -14,6 +14,11 @@ import {
   saveConnector, setCell, syncConnector, uploadCatalogue, useCatalogueState, type Connector, type Part, type Source,
 } from "../catalogueStore";
 import { guessMapping, readTable, type Table } from "../readTable";
+import { CARRIERS, GOTHENBURG_EFLH } from "../planner/hvacSystems";
+import {
+  CARRIER_KEYS, SYSTEM_FIELDS, carbon as hvacCarbon, defaultCarbon, defaultField, defaultPrice, isEditedCarrier, isEditedSystem, price as hvacPrice,
+  resetSystem, setCarrier, setSystemField, systems as hvacSystems, useHvacVersion, type CarrierKey, type SystemField,
+} from "../hvacStore";
 
 const fmt = (v: number | null | undefined, d = 0) =>
   v == null ? "–" : new Intl.NumberFormat(locale(), { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
@@ -59,7 +64,7 @@ function chapterRows(chapters: SdChapter[], q: string, added: ReturnType<typeof 
 }
 
 /* ── window ─────────────────────────────────────────────────────────────── */
-type Section = "reno" | "new" | "suppliers";
+type Section = "reno" | "new" | "heating" | "suppliers";
 type DialogKind = null | { kind: "row" } | { kind: "column" } | { kind: "upload" } | { kind: "connect"; source?: Source };
 
 export function CatalogueWindow() {
@@ -91,7 +96,7 @@ export function CatalogueWindow() {
         {st.error && <span className="small" style={{ color: "#a00000" }}>{st.error}</span>}
       </div>
       <div className="tabs" role="tablist" style={{ marginTop: 4 }}>
-        {([["reno", "Renovation planning"], ["new", "New buildings"], ["suppliers", "Supplier catalogues"]] as [Section, string][]).map(([k, label]) => (
+        {([["reno", "Renovation planning"], ["new", "New buildings"], ["heating", "Heating systems"], ["suppliers", "Supplier catalogues"]] as [Section, string][]).map(([k, label]) => (
           <button key={k} role="tab" aria-selected={section === k} className={`tab${section === k ? " on" : ""}`} onClick={() => setSection(k)}>
             {t(label)}{k === "suppliers" && st.sources.length ? ` (${st.sources.length})` : ""}
           </button>
@@ -100,6 +105,7 @@ export function CatalogueWindow() {
       <div className="tab-panel" style={{ padding: 4, display: "flex", flexDirection: "column", gap: 4 }}>
         {section === "reno" && <SdSection chapters={RENO_CHAPTERS} pick={renoPick} setPick={setRenoPick} edit={edit} withGroups />}
         {section === "new" && <SdSection chapters={NEW_CHAPTERS} pick={newPick} setPick={setNewPick} edit={edit} withAll />}
+        {section === "heating" && <HeatingSection />}
         {section === "suppliers" && <SupplierSection pick={srcPick} setPick={setSrcPick} edit={edit}
           onUpload={() => setDialog({ kind: "upload" })} onConnect={(s) => setDialog({ kind: "connect", source: s })} />}
       </div>
@@ -249,6 +255,81 @@ function ItemTable({ rows, edit, showGroupCol, showTech = true, extraCols = [] }
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* ── heating systems: every assumption editable ────────────────────────── */
+/** A number field that saves on Enter / leaving it; empty = back to the default. */
+function NumInput({ value, edited, onSave, width = 80, step, title }: { value: number; edited: boolean; onSave: (v: number | null) => void; width?: number; step?: number; title?: string }) {
+  const start = String(Math.round(value * 1000) / 1000);
+  return <input className={`field cell-input${edited ? " cat-edited" : ""}`} type="number" step={step} defaultValue={start} key={start}
+    style={{ width, textAlign: "right" }} title={title}
+    onBlur={(e) => { if (e.target.value !== start) onSave(e.target.value.trim() === "" ? null : Number(e.target.value.replace(",", "."))); }}
+    onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />;
+}
+
+function HeatingSection() {
+  const [, t] = useLang();
+  useHvacVersion();
+  const sys = hvacSystems();
+  const dflt = (id: string, f: SystemField) => `${t("Default")}: ${defaultField(id, f)}`;
+  const carriers: { k: CarrierKey; label: string; source: string }[] = CARRIER_KEYS.map((k) => ({ k, label: CARRIERS[k].label, source: CARRIERS[k].source }));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, minHeight: 0, overflow: "auto" }}>
+      <div className="hint small">{t("These values are used everywhere in the Renovation Wizard: measures, optimiser, price futures and the staged plan. The defaults come from the main planner's heating catalogue; values marked * are provisional there. Change any value (Enter to save); a changed value is highlighted, and clearing it or Reset brings back the default. Hover a row for its source.")}</div>
+      <div className="sunken-panel" style={{ padding: 0, flexShrink: 0 }}>
+        <table className="list sheet wrap-head">
+          <thead><tr>
+            <th>{t("Heating system")}</th>
+            <th className="num" title={t("Heat delivered per kWh of energy bought, over a year (for heat pumps: the seasonal performance factor)")}>{t("Seasonal efficiency (heat per kWh bought)")}</th>
+            <th className="num">{t("Fixed installation cost (SEK)")}</th>
+            <th className="num">{t("Installation cost per kW (SEK/kW)")}</th>
+            <th className="num" title={t("Borehole drilling for ground-source heat pumps; lasts longer than the heat pump, so it is not replaced")}>{t("Ground loop per kW (SEK/kW)")}</th>
+            <th className="num">{t("Upkeep per year (% of installation cost)")}</th>
+            <th className="num">{t("Service life (years)")}</th>
+            <th />
+          </tr></thead>
+          <tbody>
+            {sys.map((s) => {
+              const any = SYSTEM_FIELDS.some((f) => isEditedSystem(s.id, f));
+              return (
+                <tr key={s.id} title={`${t(s.note)}\n${t("Source")}: ${s.source}${s.provisional ? `\n${t("Provisional value — check against real quotes.")}` : ""}`}>
+                  <td style={{ whiteSpace: "normal", minWidth: 180 }}>{t(s.name)}{s.provisional ? " *" : ""}</td>
+                  <td className="num"><NumInput value={s.spf.base} step={0.05} edited={isEditedSystem(s.id, "spf")} title={dflt(s.id, "spf")} onSave={(v) => setSystemField(s.id, "spf", v)} /></td>
+                  <td className="num"><NumInput value={s.capexFixedSek} step={1000} width={90} edited={isEditedSystem(s.id, "capexFixedSek")} title={dflt(s.id, "capexFixedSek")} onSave={(v) => setSystemField(s.id, "capexFixedSek", v)} /></td>
+                  <td className="num"><NumInput value={s.capexPerKwSek} step={500} edited={isEditedSystem(s.id, "capexPerKwSek")} title={dflt(s.id, "capexPerKwSek")} onSave={(v) => setSystemField(s.id, "capexPerKwSek", v)} /></td>
+                  <td className="num">{s.id === "gshp" || s.groundLoopPerKwSek
+                    ? <NumInput value={s.groundLoopPerKwSek ?? 0} step={500} edited={isEditedSystem(s.id, "groundLoopPerKwSek")} title={dflt(s.id, "groundLoopPerKwSek")} onSave={(v) => setSystemField(s.id, "groundLoopPerKwSek", v)} />
+                    : <span className="muted">–</span>}</td>
+                  <td className="num"><NumInput value={s.omFractionYr * 100} step={0.1} width={60} edited={isEditedSystem(s.id, "omFractionYr")} title={`${t("Default")}: ${defaultField(s.id, "omFractionYr") * 100}`}
+                    onSave={(v) => setSystemField(s.id, "omFractionYr", v == null ? null : v / 100)} /></td>
+                  <td className="num"><NumInput value={s.lifetimeYr} step={1} width={56} edited={isEditedSystem(s.id, "lifetimeYr")} title={dflt(s.id, "lifetimeYr")} onSave={(v) => setSystemField(s.id, "lifetimeYr", v)} /></td>
+                  <td>{any && <button className="btn mini" onClick={() => resetSystem(s.id)}>{t("Reset")}</button>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="sunken-panel" style={{ padding: 0, flexShrink: 0 }}>
+        <table className="list sheet wrap-head">
+          <thead><tr><th>{t("Energy")}</th><th className="num">{t("Price (SEK per kWh delivered)")}</th><th className="num">{t("Climate impact (kg CO₂e per kWh)")}</th><th>{t("Source")}</th><th /></tr></thead>
+          <tbody>
+            {carriers.map(({ k, label, source }) => (
+              <tr key={k}>
+                <td>{t(label)}</td>
+                <td className="num"><NumInput value={hvacPrice(k)} step={0.05} edited={isEditedCarrier("prices", k)} title={`${t("Default")}: ${defaultPrice(k)}`} onSave={(v) => setCarrier("prices", k, v)} /></td>
+                <td className="num"><NumInput value={hvacCarbon(k)} step={0.001} edited={isEditedCarrier("carbon", k)} title={`${t("Default")}: ${defaultCarbon(k)}`} onSave={(v) => setCarrier("carbon", k, v)} /></td>
+                <td className="small" style={{ whiteSpace: "normal", maxWidth: 520 }}>{source}</td>
+                <td>{(isEditedCarrier("prices", k) || isEditedCarrier("carbon", k)) &&
+                  <button className="btn mini" onClick={() => { setCarrier("prices", k, null); setCarrier("carbon", k, null); }}>{t("Reset")}</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="small muted">{t("Heat pumps are sized on the heat demand after the envelope measures ({h} full-load hours a year). District heating needs no new plant, so its installation cost is zero.", { h: GOTHENBURG_EFLH })}</div>
     </div>
   );
 }
