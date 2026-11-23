@@ -13,6 +13,7 @@ import Scenarios from "./pages/Scenarios";
 import StepScenarios from "./pages/StepScenarios";
 import ResultsBudget from "./pages/ResultsBudget";
 import RenovationReport from "./pages/RenovationReport";
+import StagedPlan from "./pages/StagedPlan";
 import DataExplorer from "./pages/DataExplorer";
 import Budget from "./pages/Budget";
 import AnalysisTools from "./pages/AnalysisTools";
@@ -51,7 +52,13 @@ function Step4Router() {
   return isEcOrRe(projectType) ? <StepScenarios /> : <RenovationSimulator />;
 }
 
+/** Renovation: the staged plan (timing within a budget) comes right before the report. */
 function Step5Router() {
+  const projectType = useWizardStore(s => s.project.projectType);
+  return isEcOrRe(projectType) ? <ResultsBudget /> : <StagedPlan />;
+}
+
+function Step6Router() {
   const projectType = useWizardStore(s => s.project.projectType);
   return isEcOrRe(projectType) ? <ResultsBudget /> : <RenovationReport />;
 }
@@ -95,6 +102,7 @@ export default function App() {
         <Route path="/step/3" element={<Step3Router />} />
         <Route path="/step/4" element={<Step4Router />} />
         <Route path="/step/5" element={<Step5Router />} />
+        <Route path="/step/6" element={<Step6Router />} />
       </Route>
       </Routes>
     </>

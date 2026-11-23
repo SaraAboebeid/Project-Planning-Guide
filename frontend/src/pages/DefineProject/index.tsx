@@ -23,6 +23,11 @@ import {
 import LocationMap from "../../components/LocationMap";
 import { useWizardStepNav, setWizardCanNext, setWizardNextError } from "../../components/wizardNav";
 import { useT, translate } from "../../i18n";
+import { geocodeQuery, parseBuildingCsv, type CsvBuildingRow } from "../../utils/buildingCsv";
+import { seCityId } from "../../config/countryNav";
+
+/** Most buildings one building-list CSV may hold. */
+const MAX_CSV_BUILDINGS = 500;
 
 /* ── tiny reusable bits ─────────────────────────────────────────── */
 
@@ -193,50 +198,52 @@ export default function DefineProject() {
     if (!file) return;
 
     try {
-      const text = await file.text();
-      const rawLines = text
-        .replace(/\r/g, "")
-        .split(/\n+/)
-        .map((line) => line.trim())
-        .filter(Boolean);
-
-      if (rawLines.length === 0) {
-        setAddressUploadMessage(t("This file is empty — add one address per line or a single Address column."));
+      // One row per building: Address (or property designation), optional Postcode/City,
+      // optional Lat/Lon, optional Name — see utils/buildingCsv.ts and the example file.
+      const { rows } = parseBuildingCsv(await file.text());
+      if (rows.length === 0) {
+        setAddressUploadMessage(t("No buildings found in the file. Use a column called Address (or Lat and Lon), or one address per line."));
         return;
       }
+      const seen = new Set<string>();
+      const list = rows.filter((r) => {
+        const k = r.lat != null && r.lon != null ? `${r.lat.toFixed(5)},${r.lon.toFixed(5)}` : (r.address ?? "").toLowerCase();
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      }).slice(0, MAX_CSV_BUILDINGS);
+      const label = (r: CsvBuildingRow, fallback: string) => r.name && r.address ? `${r.name} – ${r.address}` : r.name ?? r.address ?? fallback;
 
-      const header = rawLines[0].toLowerCase();
-      let addresses: string[] = rawLines.slice(1);
-      if (header.includes("address") || header.includes("street") || header.includes("name")) {
-        addresses = rawLines
-          .slice(1)
-          .map((line) => {
-            const cells = line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, ""));
-            return cells[0] || line;
-          })
-          .filter(Boolean);
-      } else {
-        addresses = rawLines.flatMap((line) => {
-          const cells = line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, ""));
-          return cells.filter(Boolean);
-        });
+      const points: { lat: number; lon: number; label: string }[] = [];
+      const notFound: string[] = [];
+      // 1) rows with coordinates need no lookup
+      for (const r of list) if (r.lat != null && r.lon != null) points.push({ lat: r.lat, lon: r.lon, label: label(r, `${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}`) });
+      let todo = list.filter((r) => !(r.lat != null && r.lon != null) && r.address);
+      // 2) Sweden: match against the city's own building data (instant, also property designations)
+      if (todo.length && project.country === "Sweden") {
+        setAddressUploadMessage(t("Matching {n} addresses with the building data…", { n: todo.length }));
+        try {
+          const m = await api.matchAddresses(todo.map((r) => r.address!), seCityId(project.city));
+          const left: CsvBuildingRow[] = [];
+          todo.forEach((r, i) => {
+            const hit = m.results[i];
+            if (hit && hit.lat != null && hit.lon != null) points.push({ lat: hit.lat, lon: hit.lon, label: label(r, hit.address ?? r.address!) });
+            else left.push(r);
+          });
+          todo = left;
+        } catch { /* fall back to the geocoder for everything */ }
+      }
+      // 3) the rest through the public geocoder, one at a time (its limit is one request a second)
+      for (let i = 0; i < todo.length; i++) {
+        const r = todo[i]!;
+        setAddressUploadMessage(t("Looking up address {i} of {n} on the map…", { i: i + 1, n: todo.length }));
+        try {
+          const geo = await api.geocode(geocodeQuery(r), project.country);
+          points.push({ lat: geo.lat, lon: geo.lon, label: label(r, r.address!) });
+        } catch { notFound.push(`${r.address} (${t("row")} ${r.line})`); }
+        if (i < todo.length - 1) await new Promise((res) => setTimeout(res, 1100));
       }
 
-      const uniqueAddresses = [...new Set(addresses.map((address) => address.trim()).filter((address) => address.length > 2))].slice(0, 200);
-      if (uniqueAddresses.length === 0) {
-        setAddressUploadMessage(t("No valid addresses were found. Use a column called Address or one address per line."));
-        return;
-      }
-
-      setAddressUploadMessage(t("Geocoding uploaded addresses…"));
-      const settled = await Promise.allSettled(
-        uniqueAddresses.map(async (address) => {
-          const geo = await api.geocode(address, project.country);
-          return { lat: geo.lat, lon: geo.lon, label: address };
-        })
-      );
-
-      const points = settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
       if (points.length === 0) {
         setAddressUploadMessage(t("No uploaded addresses could be matched. Check the spelling or use full street addresses."));
         return;
@@ -253,9 +260,13 @@ export default function DefineProject() {
       });
       setDistrictQuery("");
       setDistrictOpen(false);
-      setAddressUploadMessage(points.length === 1
+      const loaded = points.length === 1
         ? t("Loaded {n} address from the CSV. They will appear in Step 2.", { n: points.length })
-        : t("Loaded {n} addresses from the CSV. They will appear in Step 2.", { n: points.length }));
+        : t("Loaded {n} addresses from the CSV. They will appear in Step 2.", { n: points.length });
+      const capped = rows.length > MAX_CSV_BUILDINGS ? ` ${t("Only the first {n} rows were read.", { n: MAX_CSV_BUILDINGS })}` : "";
+      setAddressUploadMessage(notFound.length
+        ? `${loaded}${capped} ${t("Not found ({n}):", { n: notFound.length })} ${notFound.join("; ")}`
+        : `${loaded}${capped}`);
     } catch {
       setAddressUploadMessage(t("The file could not be processed. Please use a plain CSV or text file with one address per row."));
     }

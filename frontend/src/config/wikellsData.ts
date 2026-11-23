@@ -1,8 +1,10 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   Wikells Sektionsfakta — Renovation material cost database
-   Source: Wikells Byggberäkningar AB
-   Unit: SEK/m²  (section cost, installed)
-   Translated to English from Swedish
+   Wikells Sektionsdata — renovation material cost and carbon database
+   Source: Wikells Byggberäkningar AB. Since 2026-11 the exported catalogue
+   (WIKELLS_CHAPTERS, bottom of this file) is built from the full Sektionsdata
+   export: current prices + kg CO2e per item. The hand-typed lists below are
+   the older (2025) price list, kept for computed U-values and old codes.
+   Unit: SEK/m² or SEK/st  (section cost incl. overheads, installed)
 
    NOTE ON U-VALUES
    ----------------
@@ -25,6 +27,8 @@
    carry a correctly high (bare-deck) U. Computed values are rounded to 2 decimals.
    ───────────────────────────────────────────────────────────────────────────── */
 
+import sektionsdata from "../data/wikells_sektionsdata.json";
+
 export interface WikellsItem {
   code: string;
   description: string;
@@ -35,6 +39,13 @@ export interface WikellsItem {
   uValue?: number;    // W/(m²·K)
   soundRw?: number;   // dB  airborne sound (R'w)
   impactLnw?: number; // dB  impact sound (L'n,w) — lower is better
+  /** Wikells Sektionsdata kg CO2e per unit (A1–A3, weight × typical factor);
+   *  absent when Wikells gives none — then Boverket is used (estimateCarbon). */
+  co2KgPerUnit?: number;
+  /** Where the U-value comes from: Wikells, or computed per EN ISO 6946 (see note above). */
+  uSource?: "wikells" | "iso6946";
+  /** Only in the older hand-typed price list (code not in the current Sektionsdata export). */
+  legacyOnly?: boolean;
 }
 
 export interface WikellsChapter {
@@ -432,8 +443,11 @@ const CH11_SPECIAL_ITEMS: WikellsItem[] = [
   { code: "11.097", description: "Roof safety equipment",                                        costSEK: 6069.40, unit: "SEK/st" },
   { code: "11.098", description: "Available building component",                                 costSEK: 0.00,    unit: "SEK/st" },
 ];
-/* ─── Exported catalogue ────────────────────────────────────────────────────── */
-export const WIKELLS_CHAPTERS: WikellsChapter[] = [
+/* ─── The older hand-typed price list (2025 screenshots) ─────────────────────
+   Kept for two things only: the EN ISO 6946 U-values computed where Wikells
+   gives none, and codes the current export no longer has (so saved packages
+   still resolve). Prices, descriptions and carbon come from Sektionsdata below. */
+const LEGACY_CHAPTERS: WikellsChapter[] = [
   {
     id:       "ch7",
     chapter:  "7",
@@ -537,6 +551,54 @@ export const WIKELLS_CHAPTERS: WikellsChapter[] = [
     ],
   },
 ];
+
+/* ─── Exported catalogue: Wikells Sektionsdata ──────────────────────────────
+   The full export (frontend/src/data/wikells_sektionsdata.json, built by
+   tools/catalog/build_wikells_sektionsdata.py from the Wikells workbook) gives
+   current prices incl. overheads, descriptions, weight, fire class, sound and
+   kg CO2e (A1–A3) per item. U-values: Wikells' own where given, otherwise the
+   EN ISO 6946 value computed for the same code in the older list. Units follow
+   the planner's convention ("SEK/st" for pieces). */
+interface SdItem {
+  id: string; desc: string; cost: number | null; unit: string; tech: string | null; u: number | null;
+  weight: number | null; co2: number | null;
+}
+interface SdChapter { no: number; name: string; groups: { name: string; items: SdItem[] }[] }
+const SD = sektionsdata as unknown as { source: string; chapters: SdChapter[] };
+export const WIKELLS_SOURCE = SD.source;
+
+const LEGACY_BY_CODE = new Map(LEGACY_CHAPTERS.flatMap((c) => c.subGroups.flatMap((g) => g.items)).map((i) => [i.code, i]));
+const techNum = (tech: string | null, re: RegExp) => { const m = tech ? re.exec(tech) : null; return m ? Number(m[1].replace(",", ".")) : undefined; };
+
+function fromSd(i: SdItem): WikellsItem {
+  const legacy = LEGACY_BY_CODE.get(i.id);
+  const unit = i.unit === "SEK/pcs" ? "SEK/st" : i.unit;
+  const fire = i.tech ? /Fire class ([A-Z]{1,3} ?\d+)/.exec(i.tech)?.[1] : undefined;
+  const u = i.u ?? legacy?.uValue;
+  return {
+    code: i.id, description: i.desc, costSEK: i.cost ?? 0, unit,
+    ...(unit === "SEK/m²" && i.weight ? { weightKgM2: i.weight } : legacy?.weightKgM2 ? { weightKgM2: legacy.weightKgM2 } : {}),
+    ...(fire ?? legacy?.fireClass ? { fireClass: fire ?? legacy?.fireClass } : {}),
+    ...(u != null ? { uValue: u, uSource: i.u != null ? "wikells" as const : "iso6946" as const } : {}),
+    ...((techNum(i.tech, /R'w = (\d+)/) ?? legacy?.soundRw) != null ? { soundRw: techNum(i.tech, /R'w = (\d+)/) ?? legacy?.soundRw } : {}),
+    ...((techNum(i.tech, /L'n,w = (\d+)/) ?? legacy?.impactLnw) != null ? { impactLnw: techNum(i.tech, /L'n,w = (\d+)/) ?? legacy?.impactLnw } : {}),
+    ...(i.co2 != null && i.co2 > 0 ? { co2KgPerUnit: i.co2 } : {}),
+  };
+}
+
+/** The chapters the planner prices measures from, in the older list's order and titles. */
+export const WIKELLS_CHAPTERS: WikellsChapter[] = LEGACY_CHAPTERS.map((lc) => {
+  const sd = SD.chapters.find((c) => String(c.no) === lc.chapter);
+  if (!sd) return lc;
+  const groups: WikellsSubGroup[] = sd.groups
+    .map((g) => ({ label: g.name || lc.titleEN, items: g.items.filter((i) => !/^spare component/i.test(i.desc) && (i.cost ?? 0) > 0).map(fromSd) }))
+    .filter((g) => g.items.length);
+  const have = new Set(groups.flatMap((g) => g.items.map((i) => i.code)));
+  const older = lc.subGroups.flatMap((g) => g.items).filter((i) => !have.has(i.code) && i.costSEK > 0)
+    .map((i) => ({ ...i, legacyOnly: true, ...(i.uValue != null ? { uSource: "iso6946" as const } : {}) }));
+  if (older.length) groups.push({ label: "Older price list (not in the current Wikells export)", items: older });
+  return { ...lc, subGroups: groups };
+});
 
 /* ─── Quick stats helper ─────────────────────────────────────────────────────── */
 export function wikellsStats() {

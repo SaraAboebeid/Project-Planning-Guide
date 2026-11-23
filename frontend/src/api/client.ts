@@ -85,6 +85,12 @@ export const api = {
       ...(country === "United Kingdom" ? { country: "gb" } : country === "Sweden" ? { country: "se" } : country === "Belgium" ? { country: "be" } : {}),
     }),
 
+  /** Match a list of addresses / property designations against the city's own
+   *  building data (Sweden) — instant; unmatched rows have lat = null. */
+  matchAddresses: (addresses: string[], cityId?: string | null) =>
+    post<{ results: { input: string; lat: number | null; lon: number | null; address?: string; how?: string }[]; matched: number }>(
+      "/buildings/match-addresses", { addresses, city_id: cityId ?? null }),
+
   /** Fetch nearby EPC snapshot */
   epcSnapshot: (lat: number, lon: number, radiusM: number) =>
     get<EpcSnapshot>("/epc/snapshot", {

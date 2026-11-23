@@ -12,8 +12,14 @@ import type { BuildingLookup, BuildingRecord } from "../types";
 import { fmtGBP, UK_COST_CARBON_SOURCE_NOTE } from "../config/ukCostCarbon";
 import {
   Building2, Leaf, DollarSign, Zap, CheckCircle2, Download, ScanSearch,
-  Award, TrendingDown, Package, FileText, AlertTriangle, Target, Flame, Sun,
+  Award, TrendingDown, Package, FileText, AlertTriangle, Target, Flame, Sun, CalendarClock,
 } from "lucide-react";
+
+/* Money in the staged plan's own currency (k / M for large sums). */
+const stagedMoney = (v: number, cur: string) => {
+  const f = (x: number, d = 0) => new Intl.NumberFormat(undefined, { maximumFractionDigits: d, minimumFractionDigits: d }).format(x);
+  return Math.abs(v) >= 1e6 ? `${f(v / 1e6, 1)} M${cur}` : Math.abs(v) >= 1e4 ? `${f(v / 1e3)} k${cur}` : `${f(v)} ${cur}`;
+};
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell,
 } from "recharts";
@@ -354,6 +360,8 @@ export default function RenovationReport() {
      Same helper Step 4 uses, so the report can't contradict what was shown when
      the packages were simulated. */
   const climateGoal = useMemo(() => climateGoalFor(project.city, project.country), [project.city, project.country]);
+  const staged = project.stagedPlan?.result ?? null;
+  const stagedSettings = project.stagedPlan?.settings ?? null;
   // simResults[].energyUse is a PORTFOLIO AVERAGE across buildings, so the goal
   // panel must measure it against the portfolio-average baseline — not
   // baselines[0] (one building), which made the panel disagree with the
@@ -801,6 +809,15 @@ export default function RenovationReport() {
       `<td style="color:${c.meets ? "#15803d" : "#b45309"}">${c.band ? `${c.band} (SAP ${c.sap})${c.meets ? " ✓" : ""}` : "—"}</td>`).join("")}</tr>`).join("")}
   </tbody></table>
   <p class="sub" style="margin-top:4px">${t("Package bands are estimates: each building's certificate SAP, moved by the simulated change in fuel use (SAP 2012 energy-cost factor).")}${ratingGoal.rows.some((r) => r.from === "band") ? ` * ${t("No certificate SAP — starts from the middle of its band.")}` : ""}</p>` : ""}` : ""}
+  ${staged ? `
+  <h2>${t("Staged plan")}</h2>
+  <p class="sub">${t("{y} years from {s}, budget {b}. {f} of {m} measures fit ({c} of {p}).", { y: stagedSettings!.years, s: stagedSettings!.startYear, b: stagedMoney(stagedSettings!.budget, staged.currency), f: staged.fitted, m: staged.measures, c: stagedMoney(staged.fittedCost, staged.currency), p: stagedMoney(staged.planCost, staged.currency) })}${staged.robustness ? ` ${esc(staged.robustness)}` : ""}</p>
+  ${staged.milestones.length ? `<ul style="margin:2px 0 8px;padding-left:18px">${staged.milestones.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>` : ""}
+  <table><thead><tr><th>${t("Year")}</th><th>${t("Spend")}</th><th>${t("Spent so far / budget released")}</th><th>${t("Measures done this year")}</th><th>${t("Energy bills per year")}</th><th>${t("CO₂ per year (t)")}</th></tr></thead><tbody>
+  ${staged.rows.map((r) => `<tr${r.final ? ' style="font-weight:700"' : ""}><td>${r.final ? `${r.year} (${t("after the plan")})` : r.year}</td><td>${r.spend ? stagedMoney(r.spend, staged.currency) : "–"}</td><td>${r.final ? "" : `${stagedMoney(r.cum, staged.currency)} / ${stagedMoney(r.budgetCum, staged.currency)}`}</td><td>${esc(r.done)}</td><td>${stagedMoney(r.bill, staged.currency)}</td><td>${r.co2T.toFixed(1)}</td></tr>`).join("")}
+  </tbody></table>
+  ${staged.unscheduled.length ? `<p class="sub" style="color:#b91c1c">${t("Does not fit in the budget")}: ${esc(staged.unscheduled.join(" · "))}</p>` : ""}
+  ${staged.done.length ? `<p class="sub">${t("Already done (kept fixed)")}: ${esc(staged.done.join(" · "))}</p>` : ""}` : ""}
 
   <div class="foot">
     ${t("Energy from EnergyPlus (EPSM) single-zone shoebox simulation")} · ${isBE
@@ -934,13 +951,13 @@ export default function RenovationReport() {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
-            {t("Renovation Planning · Step 5")}
+            {t("Renovation Planning · Step 6")}
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 900, color: "#fff", margin: "0 0 6px" }}>
             {project.projectName || t("Renovation Report")}
           </h1>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
-            {t("Everything from Steps 1-4, ready to share or save as PDF.")}
+            {t("Everything from Steps 1-5, ready to share or save as PDF.")}
           </p>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", margin: "4px 0 0" }}>
             {locationText} · {buildings.length} {buildings.length !== 1 ? t("buildings") : t("building")} · {components.length} {components.length !== 1 ? t("components") : t("component")}
@@ -1364,6 +1381,43 @@ export default function RenovationReport() {
               <ClimateGoalBuildingTable a={buildingGoal} />
             </div>
           )}
+        </Card>
+      )}
+
+      {/* ── Staged plan (Step 5) ── */}
+      {staged && stagedSettings && (
+        <Card accent="#B98BE8">
+          <SectionTitle icon={<CalendarClock size={15} color="#B98BE8" />} title={t("Staged plan")} />
+          <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.7)", margin: "0 0 8px" }}>
+            {t("{y} years from {s}, budget {b}. {f} of {m} measures fit ({c} of {p}).", { y: stagedSettings.years, s: stagedSettings.startYear, b: stagedMoney(stagedSettings.budget, staged.currency), f: staged.fitted, m: staged.measures, c: stagedMoney(staged.fittedCost, staged.currency), p: stagedMoney(staged.planCost, staged.currency) })}
+            {staged.robustness ? ` ${staged.robustness}` : ""}
+          </p>
+          {staged.milestones.length > 0 && (
+            <ul style={{ margin: "0 0 10px", paddingLeft: 18, fontSize: 12.5, color: "rgba(255,255,255,0.8)" }}>
+              {staged.milestones.map((m) => <li key={m} style={{ color: m.startsWith("✓") ? "#2FB477" : "#F87171" }}>{m}</li>)}
+            </ul>
+          )}
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
+              <thead><tr style={{ color: "rgba(255,255,255,0.5)" }}>
+                <th style={{ textAlign: "left", padding: 6 }}>{t("Year")}</th><th style={{ textAlign: "right", padding: 6 }}>{t("Spend")}</th>
+                <th style={{ textAlign: "left", padding: 6 }}>{t("Measures done this year")}</th>
+                <th style={{ textAlign: "right", padding: 6 }}>{t("Energy bills per year")}</th><th style={{ textAlign: "right", padding: 6 }}>{t("CO₂ per year (t)")}</th>
+              </tr></thead>
+              <tbody>
+                {staged.rows.map((r) => (
+                  <tr key={r.year} style={{ borderTop: "1px solid rgba(255,255,255,0.06)", fontWeight: r.final ? 700 : undefined }}>
+                    <td style={{ padding: 6 }}>{r.final ? `${r.year} (${t("after the plan")})` : r.year}</td>
+                    <td style={{ padding: 6, textAlign: "right" }}>{r.spend ? stagedMoney(r.spend, staged.currency) : "–"}</td>
+                    <td style={{ padding: 6 }}>{r.done}</td>
+                    <td style={{ padding: 6, textAlign: "right" }}>{stagedMoney(r.bill, staged.currency)}</td>
+                    <td style={{ padding: 6, textAlign: "right" }}>{r.co2T.toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {staged.unscheduled.length > 0 && <p style={{ fontSize: 12, color: "#FCA5A5", margin: "8px 0 0" }}>{t("Does not fit in the budget")}: {staged.unscheduled.join(" · ")}</p>}
         </Card>
       )}
 

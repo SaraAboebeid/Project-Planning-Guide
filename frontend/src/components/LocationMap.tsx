@@ -1013,13 +1013,20 @@ export default function LocationMap({
             {csvHelpOpen && (
               <>
                 <p className="mt-2 text-[11px] text-white/50">
-                  {t("One row per building. Use a column named")} <span className="font-mono text-emerald-300">Address</span> {t("or put one address per line. Excel: save as CSV first.")}
+                  {t("One row per building, first row = column names (English or Swedish). Each row needs an")} <span className="font-mono text-emerald-300">Address</span> {t("(street address or property designation, e.g. JÄRNBROTT 155:1) or")} <span className="font-mono text-emerald-300">Lat</span>+<span className="font-mono text-emerald-300">Lon</span>. {t("Optional:")} <span className="font-mono text-emerald-300">Name</span>, <span className="font-mono text-emerald-300">Postcode</span>, <span className="font-mono text-emerald-300">City</span>.
                 </p>
                 <div className="mt-2 text-[10.5px] text-white/60 rounded-md border border-white/10 bg-[#0d1117] p-2.5 leading-relaxed">
-                  <div><b className="text-white/75">{t("CSV format:")}</b> <span className="font-mono text-emerald-300">Address,Name</span></div>
-                  <div className="mt-1 font-mono text-[10px] text-emerald-300/90 whitespace-pre">Address,Name
-Storgatan 1,Gothenburg
-Kungsgatan 10,Göteborg</div>
+                  <div className="flex items-center gap-2"><b className="text-white/75">{t("Example:")}</b>
+                    <a href="/examples/building_list_example.csv" download className="ml-auto text-[#A8F3EA] underline underline-offset-2">{t("Download example CSV")}</a></div>
+                  <div className="mt-1 font-mono text-[10px] text-emerald-300/90 whitespace-pre overflow-x-auto">Name,Address,Postcode,City,Lat,Lon
+Building A,Tunnlandsgatan 13,,Göteborg,,
+Property,JÄRNBROTT 155:1,,Göteborg,,
+By coordinates,,,,57.66578,11.92047</div>
+                  <ul className="mt-2 list-disc pl-4 space-y-0.5">
+                    <li>{t("Excel: File → Save as → CSV. Swedish Excel saves with semicolons (;) and decimal commas — that works too.")}</li>
+                    <li>{t("Swedish addresses are first matched against the planner's own building data (instant); only the rest are looked up on the map, about one per second.")}</li>
+                    <li>{t("With Lat and Lon (WGS84, e.g. 57.66578) no lookup is needed. Up to 500 buildings per file.")}</li>
+                  </ul>
                 </div>
               </>
             )}

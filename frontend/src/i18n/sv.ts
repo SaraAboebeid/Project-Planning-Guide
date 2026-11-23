@@ -9,6 +9,7 @@ import { SV_STEP2 } from "./sv/step2";
 import { SV_STEP3 } from "./sv/step3";
 import { SV_STEP4 } from "./sv/step4";
 import { SV_STEP5 } from "./sv/step5";
+import { SV_STAGED } from "./sv/stagedPlan";
 
 /** Shared text (home page, top bar, settings, wizard frame); each step's own text lives in ./sv/stepN.ts. */
 const CORE: Record<string, string> = {
@@ -204,4 +205,4 @@ const CORE: Record<string, string> = {
   "Loading…": "Laddar…",
 };
 
-export const SV: Record<string, string> = { ...SV_STEP1, ...SV_STEP2, ...SV_STEP3, ...SV_STEP4, ...SV_STEP5, ...CORE };
+export const SV: Record<string, string> = { ...SV_STEP1, ...SV_STEP2, ...SV_STEP3, ...SV_STEP4, ...SV_STEP5, ...SV_STAGED, ...CORE };

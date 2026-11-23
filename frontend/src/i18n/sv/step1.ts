@@ -121,6 +121,24 @@ export const SV_STEP1: Record<string, string> = {
     "{n} adresser lästes in från CSV-filen. De visas i steg 2.",
   "The file could not be processed. Please use a plain CSV or text file with one address per row.":
     "Filen kunde inte läsas. Använd en vanlig CSV- eller textfil med en adress per rad.",
+  "No buildings found in the file. Use a column called Address (or Lat and Lon), or one address per line.":
+    "Inga byggnader hittades i filen. Använd en kolumn med namnet Address (eller Lat och Lon), eller en adress per rad.",
+  "Matching {n} addresses with the building data…": "Matchar {n} adresser mot byggnadsdatan …",
+  "Looking up address {i} of {n} on the map…": "Söker adress {i} av {n} på kartan …",
+  "row": "rad",
+  "Only the first {n} rows were read.": "Bara de första {n} raderna lästes in.",
+  "Not found ({n}):": "Hittades inte ({n}):",
+  "One row per building, first row = column names (English or Swedish). Each row needs an": "En rad per byggnad, första raden = kolumnnamn (engelska eller svenska). Varje rad behöver en",
+  "(street address or property designation, e.g. JÄRNBROTT 155:1) or": "(gatuadress eller fastighetsbeteckning, t.ex. JÄRNBROTT 155:1) eller",
+  "Optional:": "Valfritt:",
+  "Example:": "Exempel:",
+  "Download example CSV": "Ladda ner exempelfil (CSV)",
+  "Excel: File → Save as → CSV. Swedish Excel saves with semicolons (;) and decimal commas — that works too.":
+    "Excel: Arkiv → Spara som → CSV. Svensk Excel sparar med semikolon (;) och decimalkomma – det fungerar också.",
+  "Swedish addresses are first matched against the planner's own building data (instant); only the rest are looked up on the map, about one per second.":
+    "Svenska adresser matchas först mot planerarens egen byggnadsdata (direkt); bara resten söks upp på kartan, ungefär en per sekund.",
+  "With Lat and Lon (WGS84, e.g. 57.66578) no lookup is needed. Up to 500 buildings per file.":
+    "Med Lat och Lon (WGS84, t.ex. 57.66578) behövs ingen sökning. Upp till 500 byggnader per fil.",
 
   // ── Validation / Continue ──
   "Pick a location inside the covered area to continue.": "Välj en plats inom det täckta området för att fortsätta.",

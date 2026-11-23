@@ -95,18 +95,26 @@ const FLOW_DATA: Record<string, {
         n: 4, label: "Calculator", color: "#E8880C", isHere: true,
         subNodes: [
           { label: "Build packages (catalogue + layers)", type: "input" },
-          { label: "Cost (Wikells) + carbon (Boverket)", type: "db" },
+          { label: "Cost + carbon (Wikells; Boverket where Wikells has none)", type: "db" },
           { label: "Multi-objective optimizer — Pareto + parallel coords", type: "engine" },
           { label: "Energy simulation per package (EPSM)", type: "engine" },
           { label: "Regret / robustness decision analysis", type: "output" },
         ],
       },
       {
-        n: 5, label: "Report", color: "#2FB477",
+        n: 5, label: "Staged plan", color: "#B98BE8",
+        subNodes: [
+          { label: "Years + budget", type: "input" },
+          { label: "Timing optimiser (budget, order, climate milestones)", type: "engine" },
+          { label: "Robust timing under energy prices (regret)", type: "output" },
+        ],
+      },
+      {
+        n: 6, label: "Report", color: "#2FB477",
         subNodes: [
           { label: "Recommended packages + climate target", type: "output" },
           { label: "Energy, cost & carbon savings", type: "output" },
-          { label: "Decision under uncertainty (regret)", type: "output" },
+          { label: "Staged plan timeline", type: "output" },
           { label: "Renovation Report (PDF)", type: "output" },
         ],
       },

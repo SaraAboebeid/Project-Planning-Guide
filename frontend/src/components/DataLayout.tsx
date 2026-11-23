@@ -26,6 +26,7 @@ const STEP_ITEMS = [
   { iconD: IC.database, label: "Step 3", path: "/step/3" },
   { iconD: IC.layers, label: "Step 4", path: "/step/4" },
   { iconD: IC.timeline, label: "Step 5", path: "/step/5" },
+  { iconD: IC.report, label: "Step 6", path: "/step/6" },
 ];
 
 export default function DataLayout({

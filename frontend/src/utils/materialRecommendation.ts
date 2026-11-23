@@ -86,7 +86,7 @@ export function a4a5Share(label: string, rows: BoverketResource[]): { share: num
   return { share: 0, basis: "A1–A3 only (Boverket data not loaded)" };
 }
 
-export type CarbonConfidence = "legacy" | "catalogue" | "boverket-estimate" | "fallback";
+export type CarbonConfidence = "wikells" | "legacy" | "catalogue" | "boverket-estimate" | "fallback";
 
 /** UK/BE material-catalogue options carry their own carbon (materialCatalogue.ts). */
 const ownCarbon = (item: WikellsItem): number | null => {
@@ -126,6 +126,9 @@ export function estimateCarbon(
     return { value: Math.round((a1a3 + a4a5) * 10) / 10, confidence,
              a1a3: Math.round(a1a3 * 10) / 10, a4a5: Math.round(a4a5 * 10) / 10, basis };
   };
+  // 1) Wikells' own figure for the assembly (Sektionsdata, A1–A3 from weight ×
+  //    typical factor); 2) the curated Boverket-derived figures; 3) Boverket estimate.
+  if (item.co2KgPerUnit != null && item.co2KgPerUnit > 0) return withA4A5(item.co2KgPerUnit, item.description, "wikells");
   const legacy = WIKELLS_CARBON_MAP[item.code];
   if (legacy) return withA4A5(legacy.kgCO2ePerM2, `${legacy.primaryMaterial} ${item.description}`, "legacy");
 

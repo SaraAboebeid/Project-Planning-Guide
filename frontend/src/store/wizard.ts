@@ -20,7 +20,8 @@ const STEPS: StepDef[] = [
   { number: 2, label: "Building Data & Prioritisation", path: "/step/2" },
   { number: 3, label: "Select & Baseline",    path: "/step/3" },
   { number: 4, label: "Renovation Calculator", path: "/step/4" },
-  { number: 5, label: "Report",               path: "/step/5" },
+  { number: 5, label: "Staged Plan",          path: "/step/5" },
+  { number: 6, label: "Report",               path: "/step/6" },
 ];
 
 /* ── Renovation simulation result types ── */
@@ -297,6 +298,23 @@ interface ProjectState {
   /* Step 4 — the user's own values over the heating-system catalogue defaults,
      keyed by catalogue currency ("SEK" Gothenburg, "GBP" UK). Absent = defaults. */
   hvacOverrides?: Record<string, HvacOverrides>;
+  /* Step 5 — the staged plan: the user's settings and the last result (a
+     snapshot the Step 6 report prints). See pages/StagedPlan.tsx. */
+  stagedPlan?: StagedPlanState | null;
+}
+
+export interface StagedMilestone { id: string; year: number; kind: "building-pct" | "building-level" | "portfolio-pct"; value: number | null; enabled: boolean }
+export interface StagedPlanState {
+  settings: {
+    startYear: number; years: number; budget: number; carbonPriceSekT: number; costGrowthPct: number;
+    maxBuildingsPerYear: number | null; scenario: string; milestones: StagedMilestone[];
+    done: Record<string, number>;          // step id → year it was carried out (rolling re-plan)
+  };
+  result?: {
+    computedAt: string; currency: string; fitted: number; measures: number; fittedCost: number; planCost: number;
+    unscheduled: string[]; milestones: string[]; done: string[]; robustness: string | null;
+    rows: { year: number; spend: number; cum: number; budgetCum: number; done: string; bill: number; co2T: number; final?: boolean }[];
+  } | null;
 }
 
 export interface HvacOverrides {
@@ -475,6 +493,7 @@ export const LOCATION_SCOPED_RESET: Partial<ProjectState> = {
   buildingHistory: {}, renovationScopeOverrides: {}, buildingEdits: {},
   prioritizedBuildingIndices: [], prioritizedBuildingCount: 0,
   regretAnalysis: null, regretInputs: null, renovationConfigs: {}, selectedPackageByBuilding: {}, heatingAnalysis: null,
+  stagedPlan: null,
 };
 
 /* sessionStorage wrapper that never throws — if storage is disabled or over

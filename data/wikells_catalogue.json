@@ -3,578 +3,1492 @@
   {
    "code": "7.001",
    "description": "EW timber stud 95 M0 with plywood",
-   "cost_sek_m2": 1088.35,
-   "u_value": 1.75
+   "cost_sek_m2": 1072.58,
+   "u_value": 1.75,
+   "co2_kg_m2": 2.56
   },
   {
    "code": "7.002",
-   "description": "EW timber stud 95 M0 with log panel",
-   "cost_sek_m2": 1196.05,
-   "u_value": 1.75
+   "description": "EW timber stud 95 M0 with lap siding",
+   "cost_sek_m2": 1177.3,
+   "u_value": 1.75,
+   "co2_kg_m2": 0.97
   },
   {
    "code": "7.003",
-   "description": "EW timber stud 95 M0 with batten panel",
-   "cost_sek_m2": 1366.95,
-   "u_value": 1.75
+   "description": "EW timber stud 95 M0 with board-and-batten cladding",
+   "cost_sek_m2": 1341.36,
+   "u_value": 1.75,
+   "co2_kg_m2": 1.22
   },
   {
    "code": "7.004",
-   "description": "EW timber stud 95 M95 with batten panel",
-   "cost_sek_m2": 2705.55,
-   "u_value": 0.43
+   "description": "EW timber stud 95 M95 with board-and-batten cladding",
+   "cost_sek_m2": 2666.4,
+   "u_value": 0.43,
+   "co2_kg_m2": 15.71
   },
   {
    "code": "7.005",
    "description": "EW timber stud 120 M0 with fibre cement",
-   "cost_sek_m2": 2246.57,
-   "u_value": 1.75
+   "cost_sek_m2": 2218.15,
+   "u_value": 1.75,
+   "co2_kg_m2": 18.39
   },
   {
    "code": "7.006",
-   "description": "EW timber stud 120 M0 with trapezoidal sheet TRP 20",
-   "cost_sek_m2": 843.25,
-   "u_value": 1.75
+   "description": "EW timber stud 120 M0 with TRP 20",
+   "cost_sek_m2": 836.43,
+   "u_value": 1.75,
+   "co2_kg_m2": 15.65
   },
   {
    "code": "7.007",
-   "description": "EW timber stud 45+120 M165 with batten panel",
-   "cost_sek_m2": 2715.05,
-   "u_value": 0.26
+   "description": "EW timber stud 45+120 M165 with board-and-batten cladding",
+   "cost_sek_m2": 2677.68,
+   "u_value": 0.26,
+   "co2_kg_m2": 13.23
   },
   {
    "code": "7.008",
-   "description": "EW timber stud 120+120 M240 braced wall",
-   "cost_sek_m2": 1908.88,
-   "u_value": 0.2
+   "description": "EW timber stud 120+120 M240 strut-braced wall",
+   "cost_sek_m2": 1878.87,
+   "u_value": 0.2,
+   "co2_kg_m2": 17.09
   },
   {
    "code": "7.009",
-   "description": "EW timber stud 120+120 M360 with batten panel",
-   "cost_sek_m2": 3237.0,
-   "u_value": 0.12
+   "description": "EW timber stud 120+120 M360 with board-and-batten cladding",
+   "cost_sek_m2": 3187.2,
+   "u_value": 0.12,
+   "co2_kg_m2": 20.91
   },
   {
    "code": "7.010",
-   "description": "EW timber stud 145 M145 with log panel",
-   "cost_sek_m2": 2197.2,
-   "u_value": 0.33
+   "description": "EW timber stud 145 M145 with lap siding",
+   "cost_sek_m2": 2171.77,
+   "u_value": 0.33,
+   "co2_kg_m2": 12.86
   },
   {
    "code": "7.011",
    "description": "EW timber stud 145 M145 with fibre cement",
-   "cost_sek_m2": 2610.97,
-   "u_value": 0.33
+   "cost_sek_m2": 2589.56,
+   "u_value": 0.33,
+   "co2_kg_m2": 24.98
   },
   {
    "code": "7.012",
    "description": "EW timber stud 145 M145 with TRP 45",
-   "cost_sek_m2": 1618.85,
-   "u_value": 0.31
+   "cost_sek_m2": 1607.96,
+   "u_value": 0.31,
+   "co2_kg_m2": 27.69
   },
   {
    "code": "7.013",
    "description": "EW timber stud 145+45 M190+70 climate board with brick facade",
-   "cost_sek_m2": 3907.42,
-   "u_value": 0.16
+   "cost_sek_m2": 4013.07,
+   "u_value": 0.16,
+   "co2_kg_m2": 72.17
+  },
+  {
+   "code": "7.014",
+   "description": "EW timber stud 145+45 M190+70 climate board with rendered LECA facade",
+   "cost_sek_m2": 4006.8,
+   "u_value": 0.17,
+   "co2_kg_m2": 49.42
+  },
+  {
+   "code": "7.015",
+   "description": "EW timber stud 145+70 M215+70 climate board with rendered brick facade",
+   "cost_sek_m2": 4759.48,
+   "u_value": 0.17,
+   "co2_kg_m2": 68.48
+  },
+  {
+   "code": "7.016",
+   "description": "EW timber stud 145+95 M385 with board-and-batten cladding",
+   "cost_sek_m2": 3408.47,
+   "u_value": 0.1,
+   "co2_kg_m2": 21.94
   },
   {
    "code": "7.017",
-   "description": "EW timber stud 145+145 — 300 blown glass wool + boarding",
-   "cost_sek_m2": 2957.53,
-   "u_value": 0.12
+   "description": "EW timber stud 145+145 with 300 blown glass wool and T&G cladding",
+   "cost_sek_m2": 2908.56,
+   "u_value": 0.12,
+   "co2_kg_m2": 15.91
   },
   {
    "code": "7.018",
-   "description": "EW timber stud 145+145 — 300 blown rock wool + batten cladding",
-   "cost_sek_m2": 3127.13,
-   "u_value": 0.12
+   "description": "EW timber stud 145+145 with 300 blown stone wool and batten-on-board cladding",
+   "cost_sek_m2": 3075.18,
+   "u_value": 0.12,
+   "co2_kg_m2": 28.79
   },
   {
    "code": "7.019",
-   "description": "EW timber stud 145+145 — 300 blown cellulose + batten cladding",
-   "cost_sek_m2": 3278.73,
-   "u_value": 0.15
+   "description": "EW timber stud 145+145 with 300 blown cellulose and board-and-batten cladding",
+   "cost_sek_m2": 3220.83,
+   "u_value": 0.15,
+   "co2_kg_m2": 14.05
   },
   {
    "code": "7.020",
    "description": "EW timber stud 170 M170+70 climate board with brick facade",
-   "cost_sek_m2": 4019.0,
-   "u_value": 0.19
+   "cost_sek_m2": 4125.75,
+   "u_value": 0.19,
+   "co2_kg_m2": 73.11
+  },
+  {
+   "code": "7.021",
+   "description": "EW timber stud 170+45 M215+45 climate board with board-and-batten cladding",
+   "cost_sek_m2": 3145.24,
+   "u_value": 0.16,
+   "co2_kg_m2": 20.02
+  },
+  {
+   "code": "7.022",
+   "description": "EW timber stud 170+45 M215+45 climate board with vertical T&G cladding",
+   "cost_sek_m2": 2996.69,
+   "u_value": 0.16,
+   "co2_kg_m2": 19.91
+  },
+  {
+   "code": "7.023",
+   "description": "EW timber stud 170+45 M335 with facade render",
+   "cost_sek_m2": 4749.96,
+   "u_value": 0.16,
+   "co2_kg_m2": 16.75
+  },
+  {
+   "code": "7.024",
+   "description": "EW timber stud 170+70 M240+30 climate board with ventilated facade render",
+   "cost_sek_m2": 4007.0,
+   "u_value": 0.17,
+   "co2_kg_m2": 19.08
+  },
+  {
+   "code": "7.025",
+   "description": "EW timber stud 170+95 M265 with brick facade",
+   "cost_sek_m2": 4159.98,
+   "u_value": 0.19,
+   "co2_kg_m2": 68.41
+  },
+  {
+   "code": "7.026",
+   "description": "EW timber stud 170+120 M290 with batten-on-board cladding",
+   "cost_sek_m2": 3050.15,
+   "u_value": 0.16,
+   "co2_kg_m2": 16.55
+  },
+  {
+   "code": "7.027",
+   "description": "EW timber stud 170+120 M290 with brick facade",
+   "cost_sek_m2": 4210.78,
+   "u_value": 0.18,
+   "co2_kg_m2": 69.49
+  },
+  {
+   "code": "7.028",
+   "description": "EW timber stud 170+120 M290+70 climate board with brick facade",
+   "cost_sek_m2": 4359.89,
+   "u_value": 0.13,
+   "co2_kg_m2": 75.7
+  },
+  {
+   "code": "7.029",
+   "description": "EW timber stud 170+170 with 350 blown cellulose and batten-on-board cladding",
+   "cost_sek_m2": 3173.08,
+   "u_value": 0.13,
+   "co2_kg_m2": 15.33
+  },
+  {
+   "code": "7.030",
+   "description": "EW timber stud 170+170 with 350 blown wood fibre and T&G cladding",
+   "cost_sek_m2": 3019.26,
+   "u_value": 0.11,
+   "co2_kg_m2": 11.16
+  },
+  {
+   "code": "7.031",
+   "description": "EW timber stud 45+170+70 M285 with board-and-batten cladding",
+   "cost_sek_m2": 3286.97,
+   "u_value": 0.16,
+   "co2_kg_m2": 18.4
+  },
+  {
+   "code": "7.032",
+   "description": "EW timber stud 45+170+70 M285 with T&G cladding",
+   "cost_sek_m2": 3051.5,
+   "u_value": 0.16,
+   "co2_kg_m2": 16.01
+  },
+  {
+   "code": "7.033",
+   "description": "EW timber stud 45+170+95 M310 with Steni panels",
+   "cost_sek_m2": 4109.99,
+   "u_value": 0.15,
+   "co2_kg_m2": 38.65
+  },
+  {
+   "code": "7.034",
+   "description": "EW timber stud 195 M195 with board-and-batten cladding",
+   "cost_sek_m2": 2772.37,
+   "u_value": 0.26,
+   "co2_kg_m2": 13.09
+  },
+  {
+   "code": "7.035",
+   "description": "EW timber stud 195 M195 with TRP 45",
+   "cost_sek_m2": 1867.17,
+   "u_value": 0.25,
+   "co2_kg_m2": 42.94
+  },
+  {
+   "code": "7.036",
+   "description": "EW timber stud 195 M195+70 climate board with T&G cladding",
+   "cost_sek_m2": 2841.65,
+   "u_value": 0.16,
+   "co2_kg_m2": 19.34
+  },
+  {
+   "code": "7.037",
+   "description": "EW timber stud 195 M195+80 facade board with T&G cladding",
+   "cost_sek_m2": 2731.61,
+   "u_value": 0.14,
+   "co2_kg_m2": 18.73
   },
   {
    "code": "7.038",
-   "description": "EW timber stud 195 M195+95 with T&G panel",
-   "cost_sek_m2": 3100.17,
-   "u_value": 0.14
+   "description": "EW timber stud 195 M195+95 with T&G cladding",
+   "cost_sek_m2": 3065.91,
+   "u_value": 0.14,
+   "co2_kg_m2": 20.97
   },
   {
    "code": "7.039",
-   "description": "EW timber stud 195 M195+100 EPS facade board with batten panel",
-   "cost_sek_m2": 2897.4,
-   "u_value": 0.15
+   "description": "EW timber stud 195 M195+100 EPS facade board with board-and-batten cladding",
+   "cost_sek_m2": 2865.19,
+   "u_value": 0.15,
+   "co2_kg_m2": 20.58
   },
   {
    "code": "7.040",
-   "description": "EW timber stud 195 M195+100 EPS facade board with brick",
-   "cost_sek_m2": 3696.7,
-   "u_value": 0.15
+   "description": "EW timber stud 195 M195+100 EPS facade board with brick facade",
+   "cost_sek_m2": 3777.31,
+   "u_value": 0.15,
+   "co2_kg_m2": 71.28
   },
   {
    "code": "7.041",
-   "description": "EW timber stud 195+45 — 240 wood fibre insulation + T&G panel",
-   "cost_sek_m2": 2667.37,
-   "u_value": 0.16
+   "description": "EW timber stud 195+45 with 240 wood-fibre insulation and T&G cladding",
+   "cost_sek_m2": 2612.94,
+   "u_value": 0.16,
+   "co2_kg_m2": 11.77
+  },
+  {
+   "code": "7.042",
+   "description": "EW timber stud 195+45 M240+50 facade board with T&G cladding",
+   "cost_sek_m2": 2895.87,
+   "u_value": 0.16,
+   "co2_kg_m2": 19.1
+  },
+  {
+   "code": "7.043",
+   "description": "EW timber stud 195+70 M410+70 climate board with T&G cladding",
+   "cost_sek_m2": 3157.49,
+   "u_value": 0.09,
+   "co2_kg_m2": 27.17
+  },
+  {
+   "code": "7.044",
+   "description": "EW timber stud 195+95 M290+70 climate board with board-and-batten cladding",
+   "cost_sek_m2": 3495.18,
+   "u_value": 0.12,
+   "co2_kg_m2": 24.99
+  },
+  {
+   "code": "7.045",
+   "description": "EW timber stud 195+95 M290 with brick facade",
+   "cost_sek_m2": 4591.54,
+   "u_value": 0.16,
+   "co2_kg_m2": 68.12
+  },
+  {
+   "code": "7.046",
+   "description": "EW timber stud 195+95 M290 with brick facade",
+   "cost_sek_m2": 4476.92,
+   "u_value": 0.16,
+   "co2_kg_m2": 71.98
+  },
+  {
+   "code": "7.047",
+   "description": "EW timber stud 195+95 M290 with ventilated facade render",
+   "cost_sek_m2": 3895.48,
+   "u_value": 0.17,
+   "co2_kg_m2": 17.75
+  },
+  {
+   "code": "7.048",
+   "description": "EW timber stud 45+195+45 M285 with board-and-batten cladding",
+   "cost_sek_m2": 3333.87,
+   "u_value": 0.16,
+   "co2_kg_m2": 21.27
+  },
+  {
+   "code": "7.049",
+   "description": "EW timber stud 45+195+45 M285 with vertical T&G cladding",
+   "cost_sek_m2": 3110.22,
+   "u_value": 0.16,
+   "co2_kg_m2": 21.13
+  },
+  {
+   "code": "7.050",
+   "description": "EW timber stud 220+45 M265+70 climate board with T&G cladding",
+   "cost_sek_m2": 3087.84,
+   "u_value": 0.13,
+   "co2_kg_m2": 24.74
+  },
+  {
+   "code": "7.051",
+   "description": "EW Masonite stud 200 M240 with board-and-batten cladding",
+   "cost_sek_m2": 3043.16,
+   "u_value": 0.17,
+   "co2_kg_m2": 20.28
+  },
+  {
+   "code": "7.052",
+   "description": "EW Masonite stud 240 with 240 blown cellulose and board-and-batten cladding",
+   "cost_sek_m2": 2817.06,
+   "u_value": 0.17,
+   "co2_kg_m2": 15.67
+  },
+  {
+   "code": "7.053",
+   "description": "EW Masonite stud 300 with 300 blown cellulose and board-and-batten cladding",
+   "cost_sek_m2": 2922.36,
+   "u_value": 0.14,
+   "co2_kg_m2": 17.27
+  },
+  {
+   "code": "7.054",
+   "description": "EW Masonite stud 400 with 400 blown cellulose and board-and-batten cladding",
+   "cost_sek_m2": 3323.05,
+   "u_value": 0.11,
+   "co2_kg_m2": 21.04
+  },
+  {
+   "code": "7.055",
+   "description": "EW timber lightweight element V204 incl. fixings, flashings, seals",
+   "cost_sek_m2": 2480.66,
+   "u_value": 0.2,
+   "co2_kg_m2": 15.48
   },
   {
    "code": "7.063",
-   "description": "EW CLT 100 M402 with Steni cladding boards",
-   "cost_sek_m2": 4925.5,
-   "u_value": 0.09
+   "description": "EW CLT 100 M402 with Steni panels",
+   "cost_sek_m2": 4760.08,
+   "u_value": 0.09,
+   "co2_kg_m2": 46.65
   },
   {
    "code": "7.064",
-   "description": "EW CLT 120 M120+100 facade board with profiled T&G panel",
-   "cost_sek_m2": 3757.6,
-   "u_value": 0.13
+   "description": "EW CLT 120 M120+100 facade board with profiled T&G panelling",
+   "cost_sek_m2": 3655.77,
+   "u_value": 0.13,
+   "co2_kg_m2": 18.56
   },
   {
    "code": "7.065",
-   "description": "EW CLT 120 — 220 Isover Plus+ with T&G panel",
-   "cost_sek_m2": 3554.03,
-   "u_value": 0.13
+   "description": "EW CLT 120 with 220 Isover Plus+ and T&G panelling",
+   "cost_sek_m2": 3412.2,
+   "u_value": 0.13,
+   "co2_kg_m2": 14.05
+  },
+  {
+   "code": "7.066",
+   "description": "EW steel stud 170+70 M240+45 climate board with brick facade",
+   "cost_sek_m2": 4766.62,
+   "u_value": 0.17,
+   "co2_kg_m2": 97.1
+  },
+  {
+   "code": "7.067",
+   "description": "EW steel stud 195 M195+150 Sto-Innodrain with facade render",
+   "cost_sek_m2": 4084.85,
+   "u_value": 0.15,
+   "co2_kg_m2": 39.51
+  },
+  {
+   "code": "7.068",
+   "description": "EW steel stud 70+170+70 M310 with rainscreen stone",
+   "cost_sek_m2": 3466.46,
+   "u_value": 0.11,
+   "co2_kg_m2": 41.9
+  },
+  {
+   "code": "7.069",
+   "description": "EW steel stud 195+70 M265 with rainscreen tiles",
+   "cost_sek_m2": 4070.59,
+   "u_value": 0.29,
+   "co2_kg_m2": 46.46
+  },
+  {
+   "code": "7.070",
+   "description": "EW steel stud 195+95 M290+45 climate board with ventilated facade render",
+   "cost_sek_m2": 4492.7,
+   "u_value": 0.19,
+   "co2_kg_m2": 50.46
+  },
+  {
+   "code": "7.073",
+   "description": "EW light-gauge steel beam 150 M145 with TRP 20",
+   "cost_sek_m2": 1806.36,
+   "u_value": 0.45,
+   "co2_kg_m2": 48.05
+  },
+  {
+   "code": "7.074",
+   "description": "EW light-gauge steel beam 150 M162 with TRP 20",
+   "cost_sek_m2": 2018.97,
+   "u_value": 0.29,
+   "co2_kg_m2": 48.4
+  },
+  {
+   "code": "7.075",
+   "description": "EW light-gauge steel beam 150 M145 with TRP 45",
+   "cost_sek_m2": 1858.36,
+   "u_value": 0.46,
+   "co2_kg_m2": 52.2
+  },
+  {
+   "code": "7.076",
+   "description": "EW light-gauge steel beam 200 M215 with TRP 20",
+   "cost_sek_m2": 2005.16,
+   "u_value": 0.3,
+   "co2_kg_m2": 59.54
+  },
+  {
+   "code": "7.077",
+   "description": "EW light-gauge steel beam 200 M240 with TRP 20",
+   "cost_sek_m2": 2252.74,
+   "u_value": 0.26,
+   "co2_kg_m2": 52.59
+  },
+  {
+   "code": "7.078",
+   "description": "EW light-gauge steel beam 200 M282 with TRP 45",
+   "cost_sek_m2": 2299.11,
+   "u_value": 0.25,
+   "co2_kg_m2": 56.24
+  },
+  {
+   "code": "7.079",
+   "description": "EW light-gauge steel beam 200 M212 with brick facade",
+   "cost_sek_m2": 3790.38,
+   "u_value": 0.35,
+   "co2_kg_m2": 97.54
+  },
+  {
+   "code": "7.080",
+   "description": "EW laid aerated concrete 150 with 180 perlite granulate and facing brick",
+   "cost_sek_m2": 4721.15,
+   "u_value": 0.19,
+   "co2_kg_m2": 89.92
+  },
+  {
+   "code": "7.081",
+   "description": "EW laid aerated concrete 200 with 150 cavity wall board and brick facade",
+   "cost_sek_m2": 3995.91,
+   "u_value": 0.16,
+   "co2_kg_m2": 105.1
+  },
+  {
+   "code": "7.082",
+   "description": "EW laid aerated concrete 200 M150 with facade render",
+   "cost_sek_m2": 3511.84,
+   "u_value": 0.21,
+   "co2_kg_m2": 49.56
+  },
+  {
+   "code": "7.083",
+   "description": "EW laid aerated concrete 200 with 150 Sto-Innodrain and facade render",
+   "cost_sek_m2": 3360.81,
+   "u_value": 0.18,
+   "co2_kg_m2": 49.56
+  },
+  {
+   "code": "7.084",
+   "description": "EW laid aerated concrete 365 with facade render",
+   "cost_sek_m2": 2876.33,
+   "u_value": 0.28,
+   "co2_kg_m2": 67.24
+  },
+  {
+   "code": "7.085",
+   "description": "EW laid aerated concrete 365 M95 with facade render",
+   "cost_sek_m2": 3960.24,
+   "u_value": 0.23,
+   "co2_kg_m2": 73.4
+  },
+  {
+   "code": "7.086",
+   "description": "EW laid aerated concrete 500 with facade render",
+   "cost_sek_m2": 3340.67,
+   "u_value": 0.17,
+   "co2_kg_m2": 70.68
+  },
+  {
+   "code": "7.087",
+   "description": "EW laid aerated concrete thermal block 400 with facade render",
+   "cost_sek_m2": 3209.73,
+   "u_value": 0.13,
+   "co2_kg_m2": null
+  },
+  {
+   "code": "7.088",
+   "description": "EW vertical aerated concrete element 150 with 150 cavity wall board and brick facade",
+   "cost_sek_m2": 3574.61,
+   "u_value": 0.17,
+   "co2_kg_m2": 55.54
+  },
+  {
+   "code": "7.089",
+   "description": "EW vertical aerated concrete element 300 with facade render",
+   "cost_sek_m2": 1950.93,
+   "u_value": 0.39,
+   "co2_kg_m2": null
+  },
+  {
+   "code": "7.090",
+   "description": "EW vertical aerated concrete element 365 with facade render",
+   "cost_sek_m2": 2694.73,
+   "u_value": 0.28,
+   "co2_kg_m2": null
+  },
+  {
+   "code": "7.091",
+   "description": "EW laid LECA 200 with 150 cavity wall board and brick facade",
+   "cost_sek_m2": 4453.1,
+   "u_value": 0.19,
+   "co2_kg_m2": 96.06
+  },
+  {
+   "code": "7.092",
+   "description": "EW laid LECA 300 with facade render",
+   "cost_sek_m2": 2696.23,
+   "u_value": 0.71,
+   "co2_kg_m2": 53.57
+  },
+  {
+   "code": "7.093",
+   "description": "EW laid Leca insulating block wall 380 with facade render",
+   "cost_sek_m2": 4324.35,
+   "u_value": 0.15,
+   "co2_kg_m2": 56.06
+  },
+  {
+   "code": "7.094",
+   "description": "EW laid Exakt insulating block wall 290 with facade render",
+   "cost_sek_m2": 3711.69,
+   "u_value": 0.22,
+   "co2_kg_m2": 35.22
+  },
+  {
+   "code": "7.095",
+   "description": "EW laid Exakt insulating block wall 350 with facade render",
+   "cost_sek_m2": 4040.11,
+   "u_value": 0.16,
+   "co2_kg_m2": 35.35
+  },
+  {
+   "code": "7.097",
+   "description": "EW Thermomur 350 with facade render",
+   "cost_sek_m2": 3495.91,
+   "u_value": 0.17,
+   "co2_kg_m2": 39.96
+  },
+  {
+   "code": "7.098",
+   "description": "EW Thermomur 450 with facade render",
+   "cost_sek_m2": 3648.91,
+   "u_value": 0.11,
+   "co2_kg_m2": 39.96
+  },
+  {
+   "code": "7.099",
+   "description": "EW concrete 150 with 150 cavity wall board and brick facade",
+   "cost_sek_m2": 5326.3,
+   "u_value": 0.22,
+   "co2_kg_m2": 97.15
+  },
+  {
+   "code": "7.100",
+   "description": "EW concrete 150 M170 with facade render",
+   "cost_sek_m2": 4323.9,
+   "u_value": 0.18,
+   "co2_kg_m2": 41.61
+  },
+  {
+   "code": "7.101",
+   "description": "EW concrete 180 with 200 cavity wall board and brick facade",
+   "cost_sek_m2": 4853.76,
+   "u_value": 0.15,
+   "co2_kg_m2": 111.38
+  },
+  {
+   "code": "7.102",
+   "description": "EW concrete 200 with 200 Sto Top 31 and facade render",
+   "cost_sek_m2": 4957.0,
+   "u_value": 0.15,
+   "co2_kg_m2": 53.97
+  },
+  {
+   "code": "7.103",
+   "description": "EW concrete sandwich element 270",
+   "cost_sek_m2": 2717.0,
+   "u_value": 0.29,
+   "co2_kg_m2": 87.38
+  },
+  {
+   "code": "7.104",
+   "description": "EW concrete sandwich element 420",
+   "cost_sek_m2": 2948.0,
+   "u_value": 0.19,
+   "co2_kg_m2": 128.15
+  },
+  {
+   "code": "7.105",
+   "description": "EW brick cavity wall 120+120 M120+45 climate board",
+   "cost_sek_m2": 5775.17,
+   "u_value": 0.21,
+   "co2_kg_m2": 114.71
+  },
+  {
+   "code": "7.106",
+   "description": "EW brick cavity wall 108+108 with 150 cavity wall board",
+   "cost_sek_m2": 5034.78,
+   "u_value": 0.2,
+   "co2_kg_m2": 102.63
+  },
+  {
+   "code": "7.107",
+   "description": "EW sheet-metal sandwich panel 200 incl. fixings, flashings, seals",
+   "cost_sek_m2": 855.06,
+   "u_value": 0.19,
+   "co2_kg_m2": null
+  },
+  {
+   "code": "7.108",
+   "description": "EW sheet-metal sandwich panel 200 incl. fixings, flashings, seals, security class 2",
+   "cost_sek_m2": 915.06,
+   "u_value": 0.19,
+   "co2_kg_m2": null
   }
  ],
  "Floor": [
   {
    "code": "9.048",
-   "description": "Ground floor (torparbjälklag) timber beams 220 + 95 mineral wool",
-   "cost_sek_m2": 2240.21,
-   "u_value": 0.39
+   "description": "Crawl-space floor structure with timber joists 220 + 95 mineral wool",
+   "cost_sek_m2": 2214.99,
+   "u_value": 0.39,
+   "co2_kg_m2": 34.31
   },
   {
    "code": "9.050",
-   "description": "Ground floor (torparbjälklag) kerto beams 260 + 95 mineral wool",
-   "cost_sek_m2": 2576.9,
-   "u_value": 0.39
+   "description": "Crawl-space floor structure with Kerto LVL beams 260 + 95 mineral wool",
+   "cost_sek_m2": 2551.68,
+   "u_value": 0.39,
+   "co2_kg_m2": 37.24
   },
   {
    "code": "9.051",
-   "description": "Terrace slab with concrete surface",
-   "cost_sek_m2": 2632.1,
-   "u_value": 0.68
+   "description": "Terrace deck with concrete surface",
+   "cost_sek_m2": 2607.86,
+   "u_value": 0.68,
+   "co2_kg_m2": 89.44
   },
   {
    "code": "9.052",
-   "description": "Terrace slab with concrete paving slabs",
-   "cost_sek_m2": 3837.4,
-   "u_value": 0.55
+   "description": "Terrace deck with concrete slabs",
+   "cost_sek_m2": 3974.24,
+   "u_value": 0.55,
+   "co2_kg_m2": 77.55
   },
   {
    "code": "9.053",
-   "description": "Terrace slab with concrete paving slabs (variant A)",
-   "cost_sek_m2": 4054.3,
-   "u_value": 0.66
+   "description": "Terrace deck with concrete slabs",
+   "cost_sek_m2": 4130.16,
+   "u_value": 0.66,
+   "co2_kg_m2": 91.18
   },
   {
    "code": "9.054",
-   "description": "Terrace slab with concrete paving slabs (variant B)",
-   "cost_sek_m2": 3830.4,
-   "u_value": 0.3
+   "description": "Terrace deck with concrete slabs",
+   "cost_sek_m2": 3912.99,
+   "u_value": 0.3,
+   "co2_kg_m2": 66.74
   },
   {
    "code": "9.055",
-   "description": "Terrace slab with concrete paving slabs (variant C)",
-   "cost_sek_m2": 3683.5,
-   "u_value": 0.48
+   "description": "Terrace deck with concrete slabs",
+   "cost_sek_m2": 3699.63,
+   "u_value": 0.48,
+   "co2_kg_m2": 111.99
   },
   {
    "code": "9.056",
-   "description": "Terrace slab with paving stones",
-   "cost_sek_m2": 3802.9,
-   "u_value": 0.2
+   "description": "Terrace deck with pavers",
+   "cost_sek_m2": 3805.4,
+   "u_value": 0.2,
+   "co2_kg_m2": 124.74
   },
   {
    "code": "9.057",
-   "description": "Terrace slab with deck flooring",
-   "cost_sek_m2": 5688.75,
-   "u_value": 0.18
+   "description": "Terrace deck with decking",
+   "cost_sek_m2": 6129.49,
+   "u_value": 0.18,
+   "co2_kg_m2": 110.61
+  },
+  {
+   "code": "9.058",
+   "description": "Terrace deck with asphalt surface",
+   "cost_sek_m2": 2760.38,
+   "u_value": 0.91,
+   "co2_kg_m2": 72.11
+  },
+  {
+   "code": "9.059",
+   "description": "Terrace deck with asphalt surface",
+   "cost_sek_m2": 3653.02,
+   "u_value": 3.97,
+   "co2_kg_m2": 113.66
+  },
+  {
+   "code": "9.060",
+   "description": "Terrace deck with planting area",
+   "cost_sek_m2": 4260.97,
+   "u_value": 0.18,
+   "co2_kg_m2": 104.81
   },
   {
    "code": "9.061",
-   "description": "Attic floor timber + 195 mineral wool, fibre cement",
-   "cost_sek_m2": 1164.25,
-   "u_value": 0.19
+   "description": "Timber loft floor + 195 mineral wool, fibre cement",
+   "cost_sek_m2": 1161.81,
+   "u_value": 0.19,
+   "co2_kg_m2": 15.16
   },
   {
    "code": "9.062",
-   "description": "Attic floor timber + 245 mineral wool, gypsum boards",
-   "cost_sek_m2": 894.0,
-   "u_value": 0.15
+   "description": "Timber loft floor + 245 mineral wool, plasterboard",
+   "cost_sek_m2": 895.25,
+   "u_value": 0.15,
+   "co2_kg_m2": 11.65
   },
   {
    "code": "9.063",
-   "description": "Attic floor timber + 245 mineral wool, lightweight gypsum",
-   "cost_sek_m2": 913.26,
-   "u_value": 0.15
+   "description": "Timber loft floor + 245 mineral wool, lightweight plasterboard",
+   "cost_sek_m2": 914.51,
+   "u_value": 0.15,
+   "co2_kg_m2": 11.22
   },
   {
    "code": "9.064",
-   "description": "Attic floor timber + 270 mineral wool, gypsum short plank",
-   "cost_sek_m2": 925.16,
-   "u_value": 0.14
+   "description": "Timber loft floor + 270 mineral wool, plasterboard plank",
+   "cost_sek_m2": 934.9,
+   "u_value": 0.14,
+   "co2_kg_m2": 12.6
+  },
+  {
+   "code": "9.065",
+   "description": "Timber loft floor + 295 mineral wool, white-painted pine panelling",
+   "cost_sek_m2": 1387.7,
+   "u_value": 0.13,
+   "co2_kg_m2": 11.8
   },
   {
    "code": "9.066",
-   "description": "Attic floor timber + 320 mineral wool, gypsum boards",
-   "cost_sek_m2": 946.9,
-   "u_value": 0.12
+   "description": "Timber loft floor + 320 mineral wool, plasterboard",
+   "cost_sek_m2": 960.15,
+   "u_value": 0.12,
+   "co2_kg_m2": 14.37
   },
   {
    "code": "9.067",
-   "description": "Attic floor timber + 490 mineral wool, lightweight gypsum",
-   "cost_sek_m2": 1171.66,
-   "u_value": 0.08
+   "description": "Timber loft floor + 490 mineral wool, lightweight plasterboard",
+   "cost_sek_m2": 1196.33,
+   "u_value": 0.08,
+   "co2_kg_m2": 20.26
   },
   {
    "code": "9.068",
-   "description": "Attic floor timber + 400 loose glass wool, gypsum boards",
-   "cost_sek_m2": 731.6,
-   "u_value": 0.11
+   "description": "Timber loft floor + 400 blown glass wool, plasterboard",
+   "cost_sek_m2": 720.22,
+   "u_value": 0.11,
+   "co2_kg_m2": 8.38
   },
   {
    "code": "9.069",
-   "description": "Attic floor timber + 400 loose stone wool, gypsum boards",
-   "cost_sek_m2": 755.8,
-   "u_value": 0.1
+   "description": "Timber loft floor + 400 blown stone wool, plasterboard",
+   "cost_sek_m2": 744.42,
+   "u_value": 0.11,
+   "co2_kg_m2": 16.44
+  },
+  {
+   "code": "9.070",
+   "description": "Timber loft floor + 400 blown glass wool, fire-rated plasterboard",
+   "cost_sek_m2": 1014.63,
+   "u_value": 0.11,
+   "co2_kg_m2": 11.71
+  },
+  {
+   "code": "9.071",
+   "description": "Timber loft floor + 500 blown glass wool, fire-rated plasterboard",
+   "cost_sek_m2": 1037.67,
+   "u_value": 0.09,
+   "co2_kg_m2": 13.07
+  },
+  {
+   "code": "9.072",
+   "description": "Timber loft floor + 500 blown glass wool, Fermacell boards",
+   "cost_sek_m2": 887.29,
+   "u_value": 0.09,
+   "co2_kg_m2": 7.86
   },
   {
    "code": "9.073",
-   "description": "Attic floor timber + 500 loose cellulose, gypsum boards",
-   "cost_sek_m2": 760.3,
-   "u_value": 0.08
+   "description": "Timber loft floor + 500 blown cellulose, plasterboard",
+   "cost_sek_m2": 747.5,
+   "u_value": 0.08,
+   "co2_kg_m2": 8.3
   },
   {
    "code": "9.074",
-   "description": "Attic floor timber + 500 loose wood fibre, gypsum boards",
-   "cost_sek_m2": 783.4,
-   "u_value": 0.07
+   "description": "Timber loft floor + 500 blown wood fibre, plasterboard",
+   "cost_sek_m2": 770.6,
+   "u_value": 0.07,
+   "co2_kg_m2": 5.4
   },
   {
    "code": "9.075",
-   "description": "Attic floor 160 concrete + 320 mineral wool",
-   "cost_sek_m2": 1717.8,
-   "u_value": 0.11
+   "description": "Loft floor with 160 concrete + 320 mineral wool",
+   "cost_sek_m2": 1735.52,
+   "u_value": 0.11,
+   "co2_kg_m2": 57.73
   },
   {
    "code": "9.076",
-   "description": "Attic floor 200 concrete + 320 mineral wool",
-   "cost_sek_m2": 1974.2,
-   "u_value": 0.11
+   "description": "Loft floor with 200 concrete + 320 mineral wool",
+   "cost_sek_m2": 1986.74,
+   "u_value": 0.11,
+   "co2_kg_m2": 67.61
   },
   {
    "code": "9.077",
-   "description": "Attic floor 200 concrete + 390 mineral wool",
-   "cost_sek_m2": 2138.2,
-   "u_value": 0.09
+   "description": "Loft floor with 200 concrete + 390 mineral wool",
+   "cost_sek_m2": 2155.57,
+   "u_value": 0.09,
+   "co2_kg_m2": 70.82
   },
   {
    "code": "9.078",
-   "description": "Attic floor 160 concrete + 400 loose glass wool",
-   "cost_sek_m2": 1508.9,
-   "u_value": 0.11
+   "description": "Loft floor with 160 concrete + 400 blown glass wool",
+   "cost_sek_m2": 1501.98,
+   "u_value": 0.11,
+   "co2_kg_m2": 56.73
+  },
+  {
+   "code": "9.079",
+   "description": "Loft floor with 160 concrete + 500 blown glass wool",
+   "cost_sek_m2": 1368.44,
+   "u_value": 0.09,
+   "co2_kg_m2": 51.12
+  },
+  {
+   "code": "9.080",
+   "description": "Loft floor with 200 concrete + 400 blown glass wool",
+   "cost_sek_m2": 1754.81,
+   "u_value": 0.11,
+   "co2_kg_m2": 67.86
+  },
+  {
+   "code": "9.081",
+   "description": "Loft floor with 200 concrete + 500 blown glass wool",
+   "cost_sek_m2": 1693.9,
+   "u_value": 0.09,
+   "co2_kg_m2": 69.9
+  },
+  {
+   "code": "9.082",
+   "description": "Loft floor with 200 concrete + 400 blown cellulose",
+   "cost_sek_m2": 1695.1,
+   "u_value": 0.1,
+   "co2_kg_m2": 61.1
+  },
+  {
+   "code": "9.083",
+   "description": "Loft floor with 200 concrete + 500 blown cellulose",
+   "cost_sek_m2": 1878.42,
+   "u_value": 0.08,
+   "co2_kg_m2": 68.5
+  },
+  {
+   "code": "9.084",
+   "description": "Loft floor with precast concrete planks + 120 concrete + 320 mineral wool",
+   "cost_sek_m2": 1545.25,
+   "u_value": 0.11,
+   "co2_kg_m2": 66.34
+  },
+  {
+   "code": "9.085",
+   "description": "Loft floor with precast concrete planks + 120 concrete + 400 blown glass wool",
+   "cost_sek_m2": 1323.32,
+   "u_value": 0.11,
+   "co2_kg_m2": 60.35
+  },
+  {
+   "code": "9.086",
+   "description": "Loft floor with 265 hollow-core slab + 500 blown glass wool",
+   "cost_sek_m2": 1403.6,
+   "u_value": 0.09,
+   "co2_kg_m2": 59.25
   }
  ],
  "Roof": [
   {
    "code": "11.001",
-   "description": "Felt roof with timber support studs",
-   "cost_sek_m2": 1430.37,
-   "u_value": 2.86
+   "description": "Felt roof with timber firring",
+   "cost_sek_m2": 1515.47,
+   "u_value": 2.86,
+   "co2_kg_m2": 7.96
   },
   {
    "code": "11.002",
-   "description": "Plastic membrane roof with timber support studs",
-   "cost_sek_m2": 1234.47,
-   "u_value": 2.86
+   "description": "Plastic membrane roof with timber firring",
+   "cost_sek_m2": 1295.65,
+   "u_value": 2.86,
+   "co2_kg_m2": 28.52
   },
   {
    "code": "11.003",
-   "description": "Standing seam metal roof with timber support studs",
-   "cost_sek_m2": 2583.47,
-   "u_value": 2.86
+   "description": "Standing-seam sheet roofing with timber firring",
+   "cost_sek_m2": 2568.37,
+   "u_value": 2.86,
+   "co2_kg_m2": 23.55
   },
   {
    "code": "11.004",
-   "description": "TRP roof with timber support studs",
-   "cost_sek_m2": 777.57,
-   "u_value": 2.86
+   "description": "TRP roof with timber firring",
+   "cost_sek_m2": 750.25,
+   "u_value": 2.86,
+   "co2_kg_m2": 15.4
   },
   {
    "code": "11.005",
-   "description": "Concrete tiles with timber support studs",
-   "cost_sek_m2": 1303.27,
-   "u_value": 2.86
+   "description": "Concrete roof tiles with timber firring",
+   "cost_sek_m2": 1283.33,
+   "u_value": 2.86,
+   "co2_kg_m2": 8.93
   },
   {
    "code": "11.006",
-   "description": "2-course clay tiles with timber support studs",
-   "cost_sek_m2": 1447.17,
-   "u_value": 2.86
+   "description": "Double-roll clay tiles with timber firring",
+   "cost_sek_m2": 1426.04,
+   "u_value": 2.86,
+   "co2_kg_m2": 9.26
   },
   {
    "code": "11.007",
-   "description": "Felt roof on rough boards with timber truss",
-   "cost_sek_m2": 1532.74,
-   "u_value": 2.86
+   "description": "Felt roof on rough T&G boarding with timber trusses",
+   "cost_sek_m2": 1618.56,
+   "u_value": 2.86,
+   "co2_kg_m2": 8.28
   },
   {
    "code": "11.008",
-   "description": "Felt roof on rough boards with timber truss",
-   "cost_sek_m2": 1267.54,
-   "u_value": 2.86
+   "description": "Felt roof on rough T&G boarding with timber trusses",
+   "cost_sek_m2": 1199.68,
+   "u_value": 2.86,
+   "co2_kg_m2": 5.63
   },
   {
    "code": "11.009",
-   "description": "Plastic membrane roof on rough board hatches with timber truss",
-   "cost_sek_m2": 1290.34,
-   "u_value": 2.86
+   "description": "Plastic membrane roof on rough T&G panels with timber trusses",
+   "cost_sek_m2": 1344.95,
+   "u_value": 2.86,
+   "co2_kg_m2": 27.97
   },
   {
    "code": "11.011",
-   "description": "Regal metal roof on battens with timber truss",
-   "cost_sek_m2": 1224.4,
-   "u_value": 2.86
+   "description": "Regal metal roof on battens with timber trusses",
+   "cost_sek_m2": 1224.9,
+   "u_value": 2.86,
+   "co2_kg_m2": 12.6
   },
   {
    "code": "11.012",
-   "description": "Fiber cement panels on battens with timber truss",
-   "cost_sek_m2": 1119.21,
-   "u_value": 2.86
+   "description": "Fibre cement sheets on battens with timber trusses",
+   "cost_sek_m2": 1112.61,
+   "u_value": 2.86,
+   "co2_kg_m2": 26.25
   },
   {
    "code": "11.030",
-   "description": "Concrete tiles on combined battens with prefab timber truss",
-   "cost_sek_m2": 1104.3,
-   "u_value": 2.86
+   "description": "Concrete roof tiles on combi battens with prefab timber trusses",
+   "cost_sek_m2": 1098.02,
+   "u_value": 2.86,
+   "co2_kg_m2": 11.73
   },
   {
    "code": "11.031",
-   "description": "1-course clay tiles on battens with prefab timber truss",
-   "cost_sek_m2": 1541.8,
-   "u_value": 2.86
+   "description": "Single-roll clay tiles on battens and counter-battens with prefab timber trusses",
+   "cost_sek_m2": 1532.55,
+   "u_value": 2.86,
+   "co2_kg_m2": 12.17
   },
   {
    "code": "11.033",
-   "description": "Concrete tiles with ventilated sloped roof, 315 mineral wool",
-   "cost_sek_m2": 2199.6,
-   "u_value": 0.13
+   "description": "Concrete roof tiles, unventilated pitched roof, 315 mineral wool",
+   "cost_sek_m2": 2191.05,
+   "u_value": 0.13,
+   "co2_kg_m2": 16.15
+  },
+  {
+   "code": "11.034",
+   "description": "Concrete roof tiles, ventilated pitched roof, 315 mineral wool",
+   "cost_sek_m2": 2327.07,
+   "u_value": 0.13,
+   "co2_kg_m2": 25.03
+  },
+  {
+   "code": "11.035",
+   "description": "Concrete roof tiles, ventilated pitched roof, 315 mineral wool",
+   "cost_sek_m2": 2393.96,
+   "u_value": 0.13,
+   "co2_kg_m2": 24.85
+  },
+  {
+   "code": "11.036",
+   "description": "Concrete roof tiles, ventilated pitched roof, 265 blown glass wool",
+   "cost_sek_m2": 1992.41,
+   "u_value": 0.15,
+   "co2_kg_m2": 19.22
+  },
+  {
+   "code": "11.037",
+   "description": "Concrete roof tiles, ventilated pitched roof, 450 blown glass wool",
+   "cost_sek_m2": 2116.29,
+   "u_value": 0.09,
+   "co2_kg_m2": 24.24
+  },
+  {
+   "code": "11.038",
+   "description": "Concrete roof tiles, ventilated pitched roof, 450 blown stone wool",
+   "cost_sek_m2": 2145.99,
+   "u_value": 0.09,
+   "co2_kg_m2": 40.61
+  },
+  {
+   "code": "11.039",
+   "description": "Tile-profile sheet, ventilated pitched roof, 450 blown glass wool",
+   "cost_sek_m2": 2186.27,
+   "u_value": 0.09,
+   "co2_kg_m2": 18.15
+  },
+  {
+   "code": "11.040",
+   "description": "Sheet-metal roofing, ventilated pitched roof, 450 blown cellulose",
+   "cost_sek_m2": 3563.03,
+   "u_value": 0.09,
+   "co2_kg_m2": 36.84
+  },
+  {
+   "code": "11.041",
+   "description": "Sheet-metal roofing, ventilated pitched roof, 450 blown stone wool",
+   "cost_sek_m2": 4058.88,
+   "u_value": 0.07,
+   "co2_kg_m2": 58.49
+  },
+  {
+   "code": "11.042",
+   "description": "Additional sloping-roof insulation, 215 mineral wool",
+   "cost_sek_m2": 1370.01,
+   "u_value": 0.18,
+   "co2_kg_m2": 6.31
+  },
+  {
+   "code": "11.043",
+   "description": "Additional sloping-roof insulation, 265 mineral wool",
+   "cost_sek_m2": 1610.14,
+   "u_value": 0.15,
+   "co2_kg_m2": 7.82
+  },
+  {
+   "code": "11.044",
+   "description": "Additional sloping-roof insulation, 265 mineral wool",
+   "cost_sek_m2": 1480.67,
+   "u_value": 0.15,
+   "co2_kg_m2": 14.52
+  },
+  {
+   "code": "11.045",
+   "description": "Additional sloping-roof insulation, 265 blown glass wool",
+   "cost_sek_m2": 1018.07,
+   "u_value": 0.16,
+   "co2_kg_m2": 10.39
+  },
+  {
+   "code": "11.046",
+   "description": "Additional sloping-roof insulation, 240 blown cellulose",
+   "cost_sek_m2": 1019.17,
+   "u_value": 0.18,
+   "co2_kg_m2": 8.74
+  },
+  {
+   "code": "11.047",
+   "description": "Additional sloping-roof insulation, 240 blown wood fibre",
+   "cost_sek_m2": 1027.97,
+   "u_value": 0.16,
+   "co2_kg_m2": 6.27
   },
   {
    "code": "11.048",
-   "description": "Felt roof on timber joists, uninsulated",
-   "cost_sek_m2": 1323.5,
-   "u_value": 2.86
+   "description": "Felt roof on timber purlins, uninsulated",
+   "cost_sek_m2": 1411.32,
+   "u_value": 2.86,
+   "co2_kg_m2": 8.19
   },
   {
    "code": "11.049",
-   "description": "Felt roof on timber joists with 170 mineral wool",
-   "cost_sek_m2": 2083.86,
-   "u_value": 0.25
+   "description": "Felt roof on timber purlins with 170 mineral wool",
+   "cost_sek_m2": 2166.62,
+   "u_value": 0.25,
+   "co2_kg_m2": 17.54
   },
   {
    "code": "11.050",
-   "description": "Felt roof on timber joists with 220 mineral wool",
-   "cost_sek_m2": 2525.76,
-   "u_value": 0.19
+   "description": "Felt roof on timber purlins with 220 mineral wool",
+   "cost_sek_m2": 2619.69,
+   "u_value": 0.19,
+   "co2_kg_m2": 19.29
   },
   {
    "code": "11.051",
-   "description": "Felt roof with cant strips on Kerto beams with 365 mineral wool",
-   "cost_sek_m2": 3399.88,
-   "u_value": 0.11
+   "description": "Felt roof with triangular fillet on Kerto LVL beams with 365 mineral wool",
+   "cost_sek_m2": 3575.69,
+   "u_value": 0.11,
+   "co2_kg_m2": 26.82
   },
   {
    "code": "11.052",
-   "description": "TRP roof on masonite beams, uninsulated",
-   "cost_sek_m2": 903.1,
-   "u_value": 3.37
+   "description": "TRP roof on Masonite beams, uninsulated",
+   "cost_sek_m2": 531.66,
+   "u_value": 3.37,
+   "co2_kg_m2": 16.29
   },
   {
    "code": "11.053",
-   "description": "TRP roof on lightweight beams with 195 mineral wool",
-   "cost_sek_m2": 1239.9,
-   "u_value": 0.25
+   "description": "TRP roof on light-gauge beams with 195 mineral wool",
+   "cost_sek_m2": 1289.85,
+   "u_value": 0.25,
+   "co2_kg_m2": 48.62
   },
   {
    "code": "11.054",
-   "description": "TRP metal with sedum covering, uninsulated",
-   "cost_sek_m2": 1562.3,
-   "u_value": 3.37
+   "description": "TRP decking with sedum covering, uninsulated",
+   "cost_sek_m2": 1684.24,
+   "u_value": 3.37,
+   "co2_kg_m2": 54.76
   },
   {
    "code": "11.055",
-   "description": "TRP metal with felt covering on 120 insulation (fan room)",
-   "cost_sek_m2": 1732.6,
-   "u_value": 0.29
+   "description": "TRP decking with felt roofing on 120 insulation (plant room)",
+   "cost_sek_m2": 1923.03,
+   "u_value": 0.29,
+   "co2_kg_m2": 55.44
   },
   {
    "code": "11.056",
-   "description": "TRP metal with felt covering on 180 insulation",
-   "cost_sek_m2": 1522.7,
-   "u_value": 0.2
+   "description": "TRP decking with felt roofing on 180 insulation",
+   "cost_sek_m2": 1734.84,
+   "u_value": 0.2,
+   "co2_kg_m2": 56.56
   },
   {
    "code": "11.057",
-   "description": "TRP metal with Derbigum on 190 insulation",
-   "cost_sek_m2": 1360.9,
-   "u_value": 0.18
+   "description": "TRP decking with Derbigum on 190 insulation",
+   "cost_sek_m2": 1555.34,
+   "u_value": 0.19,
+   "co2_kg_m2": 51.41
+  },
+  {
+   "code": "11.058",
+   "description": "TRP decking with felt roofing on 220 insulation",
+   "cost_sek_m2": 1808.24,
+   "u_value": 0.16,
+   "co2_kg_m2": 64.79
+  },
+  {
+   "code": "11.059",
+   "description": "TRP decking with plastic membrane on 220 insulation",
+   "cost_sek_m2": 1508.24,
+   "u_value": 0.16,
+   "co2_kg_m2": 69.64
+  },
+  {
+   "code": "11.060",
+   "description": "TRP decking with plastic membrane on 240 insulation",
+   "cost_sek_m2": 1577.54,
+   "u_value": 0.15,
+   "co2_kg_m2": 70.24
+  },
+  {
+   "code": "11.061",
+   "description": "TRP decking with plastic membrane on 270 insulation",
+   "cost_sek_m2": 1622.64,
+   "u_value": 0.13,
+   "co2_kg_m2": 72.36
   },
   {
    "code": "11.062",
-   "description": "TRP metal with felt covering on 230+50 insulation",
-   "cost_sek_m2": 1995.4,
-   "u_value": 0.13
+   "description": "TRP decking with felt roofing on 230+50 insulation",
+   "cost_sek_m2": 2241.64,
+   "u_value": 0.13,
+   "co2_kg_m2": 66.13
   },
   {
    "code": "11.063",
-   "description": "TRP metal with felt covering on 330 insulation",
-   "cost_sek_m2": 1820.8,
-   "u_value": 0.11
+   "description": "TRP decking with felt roofing on 330 insulation",
+   "cost_sek_m2": 2072.54,
+   "u_value": 0.11,
+   "co2_kg_m2": 76.72
   },
   {
    "code": "11.064",
-   "description": "TRP metal with Derbigum on 340 insulation",
-   "cost_sek_m2": 1607.8,
-   "u_value": 0.11
+   "description": "TRP decking with Derbigum on 340 insulation",
+   "cost_sek_m2": 1825.34,
+   "u_value": 0.11,
+   "co2_kg_m2": 61.97
   },
   {
    "code": "11.065",
-   "description": "Double-metal roof with 260 insulation",
-   "cost_sek_m2": 1651.02,
-   "u_value": 0.13
+   "description": "Timber lightweight element A404 incl. felt roofing, fixings, flashings, seals",
+   "cost_sek_m2": 1757.02,
+   "u_value": 0.1,
+   "co2_kg_m2": null
+  },
+  {
+   "code": "11.066",
+   "description": "TT units with plastic membrane on 320 insulation",
+   "cost_sek_m2": 2582.8,
+   "u_value": 0.11,
+   "co2_kg_m2": 91.94
   }
  ],
  "Windows": [
   {
    "code": "16.001",
-   "description": "Window 9x13 wood, fixed",
-   "cost_sek_m2": 9620.46,
-   "u_value": 1.0
+   "description": "Window 9x13 timber, fixed",
+   "cost_sek_m2": 8427.87,
+   "u_value": 1.0,
+   "co2_kg_m2": 63.28
   },
   {
    "code": "16.002",
-   "description": "Window 6x6 wood, horizontal-hung",
-   "cost_sek_m2": 7831.42,
-   "u_value": 1.0
+   "description": "Window 6x6 timber, horizontal pivot",
+   "cost_sek_m2": 22476.44,
+   "u_value": 1.0,
+   "co2_kg_m2": 98.64
   },
   {
    "code": "16.003",
-   "description": "Window 9x5 wood, horizontal-hung",
-   "cost_sek_m2": 8848.96,
-   "u_value": 1.0
+   "description": "Window 9x5 timber, horizontal pivot",
+   "cost_sek_m2": 20280.06,
+   "u_value": 1.0,
+   "co2_kg_m2": 101.77
   },
   {
    "code": "16.004",
-   "description": "Window 9x13 wood, horizontal-hung",
-   "cost_sek_m2": 13852.36,
-   "u_value": 1.0
+   "description": "Window 9x13 timber, horizontal pivot",
+   "cost_sek_m2": 12158.66,
+   "u_value": 1.0,
+   "co2_kg_m2": 88.67
   },
   {
    "code": "16.005",
-   "description": "Window 9x12 wood, outward-opening side-hung",
-   "cost_sek_m2": 10627.46,
-   "u_value": 1.0
+   "description": "Window 9x12 timber, outward-opening side-hung",
+   "cost_sek_m2": 10171.59,
+   "u_value": 1.0,
+   "co2_kg_m2": 85.59
   },
   {
    "code": "16.006",
-   "description": "Window 9x16 wood, outward-opening side-hung, safety glass",
-   "cost_sek_m2": 15756.06,
-   "u_value": 1.0
+   "description": "Window 9x16 timber, outward-opening side-hung, safety-glazed",
+   "cost_sek_m2": 12113.06,
+   "u_value": 1.0,
+   "co2_kg_m2": 83.22
   },
   {
    "code": "16.007",
-   "description": "Window 14x13 wood, outward-opening side-hung, 2-section",
-   "cost_sek_m2": 18400.86,
-   "u_value": 1.0
+   "description": "Window 14x13 timber, outward-opening side-hung, 2-light",
+   "cost_sek_m2": 12004.47,
+   "u_value": 1.0,
+   "co2_kg_m2": 84.63
   },
   {
    "code": "16.008",
-   "description": "Window 9x4 aluminum clad wood, fixed",
-   "cost_sek_m2": 6707.85,
-   "u_value": 1.0
+   "description": "Window 9x4 aluminium-clad timber, fixed",
+   "cost_sek_m2": 18997.34,
+   "u_value": 1.0,
+   "co2_kg_m2": 68.12
   },
   {
    "code": "16.009",
-   "description": "Window 9x12 aluminum clad wood, fixed",
-   "cost_sek_m2": 9953.85,
-   "u_value": 1.0
+   "description": "Window 9x12 aluminium-clad timber, fixed",
+   "cost_sek_m2": 9401.56,
+   "u_value": 1.0,
+   "co2_kg_m2": 61.58
   },
   {
    "code": "16.010",
-   "description": "Window 6x21 aluminum clad wood, fixed, safety glass",
-   "cost_sek_m2": 12760.18,
-   "u_value": 1.0
+   "description": "Window 6x21 aluminium-clad timber, fixed, safety-glazed",
+   "cost_sek_m2": 10988.64,
+   "u_value": 1.0,
+   "co2_kg_m2": 60.34
   },
   {
    "code": "16.011",
-   "description": "Window 10x21 aluminum clad wood, fixed, safety glass",
-   "cost_sek_m2": 17296.74,
-   "u_value": 1.0
+   "description": "Window 10x21 aluminium-clad timber, fixed, safety-glazed",
+   "cost_sek_m2": 9101.74,
+   "u_value": 1.0,
+   "co2_kg_m2": 60.02
+  },
+  {
+   "code": "16.012",
+   "description": "Window 6x6 aluminium-clad timber, horizontal pivot",
+   "cost_sek_m2": 24785.52,
+   "u_value": 1.0,
+   "co2_kg_m2": 91.31
+  },
+  {
+   "code": "16.013",
+   "description": "Window 9x12 aluminium-clad timber, horizontal pivot",
+   "cost_sek_m2": 12430.31,
+   "u_value": 1.0,
+   "co2_kg_m2": 87.63
   },
   {
    "code": "16.014",
-   "description": "Window 12x12 aluminum clad wood, horizontal-hung",
-   "cost_sek_m2": 14930.02,
-   "u_value": 1.0
+   "description": "Window 12x12 aluminium-clad timber, horizontal pivot",
+   "cost_sek_m2": 10847.71,
+   "u_value": 1.0,
+   "co2_kg_m2": 87.33
   },
   {
    "code": "16.015",
-   "description": "Window 9x12 aluminum clad wood, horizontal-hung, low-e",
-   "cost_sek_m2": 13602.85,
-   "u_value": 0.81
+   "description": "Window 9x12 aluminium-clad timber, horizontal pivot, low-energy",
+   "cost_sek_m2": 13203.46,
+   "u_value": 0.81,
+   "co2_kg_m2": 87.63
   },
   {
    "code": "16.016",
-   "description": "Window 9x13 aluminum clad wood, horizontal-hung",
-   "cost_sek_m2": 13082.96,
-   "u_value": 1.0
+   "description": "Window 9x13 aluminium-clad timber, horizontal pivot",
+   "cost_sek_m2": 11715.96,
+   "u_value": 1.0,
+   "co2_kg_m2": 92.47
+  },
+  {
+   "code": "16.017",
+   "description": "Window 9x13 aluminium-clad timber, horizontal pivot with E 30 glass",
+   "cost_sek_m2": 24102.07,
+   "u_value": 1.0,
+   "co2_kg_m2": 87.33
+  },
+  {
+   "code": "16.018",
+   "description": "Window 9x12 aluminium-clad timber, inward-opening side-hung",
+   "cost_sek_m2": 13247.89,
+   "u_value": 1.1,
+   "co2_kg_m2": 80.02
+  },
+  {
+   "code": "16.019",
+   "description": "Window 14x13 aluminium-clad timber, outward-opening 2-light",
+   "cost_sek_m2": 12561.05,
+   "u_value": 1.0,
+   "co2_kg_m2": 90.89
+  },
+  {
+   "code": "16.020",
+   "description": "Acoustic window 12x12 aluminium-clad timber, horizontal pivot, 38 dB",
+   "cost_sek_m2": 11460.73,
+   "u_value": 1.0,
+   "co2_kg_m2": 99.22
+  },
+  {
+   "code": "16.021",
+   "description": "Window 9x12 aluminium, fixed",
+   "cost_sek_m2": 7490.48,
+   "u_value": 1.0,
+   "co2_kg_m2": 126.31
+  },
+  {
+   "code": "16.022",
+   "description": "Window 9x12 aluminium, inward-opening side-hung",
+   "cost_sek_m2": 20098.17,
+   "u_value": 1.1,
+   "co2_kg_m2": 141.61
+  },
+  {
+   "code": "16.023",
+   "description": "Window 12x12 PVC, inward-opening side-hung",
+   "cost_sek_m2": 6659.93,
+   "u_value": 0.8,
+   "co2_kg_m2": 87.06
   },
   {
    "code": "16.026",
-   "description": "Window door 9x21 wood, outward-opening",
-   "cost_sek_m2": 17888.38,
-   "u_value": 1.0
+   "description": "French window 9x21 timber, outward-opening",
+   "cost_sek_m2": 10216.1,
+   "u_value": 1.0,
+   "co2_kg_m2": 85.41
   },
   {
    "code": "16.027",
-   "description": "Window door 9x21 aluminum clad wood, outward-opening",
-   "cost_sek_m2": 23961.76,
-   "u_value": 1.0
+   "description": "French window 9x21 aluminium-clad timber, outward-opening",
+   "cost_sek_m2": 13768.15,
+   "u_value": 1.0,
+   "co2_kg_m2": 107.44
   },
   {
    "code": "16.028",
-   "description": "Window door 9x21 aluminum clad wood, fully glazed, outward-opening, safety glass",
-   "cost_sek_m2": 25514.76,
-   "u_value": 1.1
+   "description": "French window 9x21 aluminium-clad timber, fully glazed, outward-opening, safety-glazed",
+   "cost_sek_m2": 13768.15,
+   "u_value": 1.1,
+   "co2_kg_m2": 94.84
   },
   {
    "code": "16.029",
-   "description": "Window door 9x21 aluminum, outward-opening",
-   "cost_sek_m2": 23695.76,
-   "u_value": 1.1
+   "description": "French window 9x21 aluminium, outward-opening",
+   "cost_sek_m2": 13008.39,
+   "u_value": 1.1,
+   "co2_kg_m2": 140.03
   },
   {
    "code": "16.031",
-   "description": "Skylight 24x25",
-   "cost_sek_m2": 32107.24,
-   "u_value": 1.3
+   "description": "Shop window 24x25",
+   "cost_sek_m2": 5608.76,
+   "u_value": 1.3,
+   "co2_kg_m2": 4.23
   },
   {
    "code": "16.032",
-   "description": "Industrial window strip 36x12",
-   "cost_sek_m2": 23449.14,
-   "u_value": 1.3
+   "description": "Industrial ribbon window 36x12",
+   "cost_sek_m2": 5649.42,
+   "u_value": 1.3,
+   "co2_kg_m2": 8.7
   }
  ]
 }

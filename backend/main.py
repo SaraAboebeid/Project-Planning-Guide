@@ -33,10 +33,13 @@ from tools.idf.generate_idf import build_shoebox_idf
 from backend import simdb
 from backend import accounts
 from backend import pv_optimizer
+from backend import staged_plan
 
 app = FastAPI(title="Project Planning Guide API", version="0.1.0")
 # Email sign-in + saved projects (backend/accounts.py).
 app.include_router(accounts.router)
+# Staged renovation plan: MILP timing of measures within a budget (backend/staged_plan.py).
+app.include_router(staged_plan.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1022,6 +1025,59 @@ async def geocode(address: str = Query(...), country: str | None = Query(None)):
         raise HTTPException(404, "Address not found")
     hit = data[0]
     return {"lat": float(hit["lat"]), "lon": float(hit["lon"]), "display_name": hit["display_name"]}
+
+
+# ── Match an uploaded building list against the city's own building data ─────
+# Step 1's CSV upload sends every address here first: instant, no rate limit, and
+# it finds Swedish street addresses AND property designations ("JÄRNBROTT 155:1")
+# exactly as the building data spells them. Only rows it cannot match go on to
+# the public geocoder (Nominatim, max 1 request/s).
+class AddressMatchRequest(BaseModel):
+    addresses: list[str]
+    city_id: str | None = None
+
+
+def _addr_key(s: str) -> str:
+    import re
+    s = (s or "").strip().casefold()
+    s = s.split(",")[0]                                   # "Storgatan 1, 411 01 Göteborg" → "storgatan 1"
+    s = re.sub(r"\s+", " ", s)
+    return s.replace(" :", ":").replace(": ", ":").strip()
+
+
+@app.post("/api/buildings/match-addresses")
+def match_addresses(req: AddressMatchRequest):
+    import re
+    if len(req.addresses) > 5000:
+        raise HTTPException(413, "At most 5000 addresses per upload")
+    buildings = _se_buildings(req.city_id)
+    index: dict[str, tuple] = {}
+    for b in buildings:
+        coords = b.get("coordinates") or []
+        c_lat, c_lon = _polygon_centroid(coords)
+        if c_lat == 0.0 and c_lon == 0.0:
+            continue
+        names = [b.get("address") or ""]
+        extra = b.get("all_addresses")
+        if isinstance(extra, list):
+            names += [str(x) for x in extra]
+        elif isinstance(extra, str):
+            names += re.split(r"[;|,]", extra)
+        for n in names:
+            k = _addr_key(n)
+            if k and k not in index:
+                index[k] = (round(c_lat, 6), round(c_lon, 6), (b.get("address") or n).strip())
+    out = []
+    for a in req.addresses:
+        k = _addr_key(a)
+        hit, how = index.get(k), "exact"
+        if not hit:
+            # "Kaprisgatan 56B" → "Kaprisgatan 56" (entrance letter)
+            k2 = re.sub(r"(\d+)\s*[a-zåäö]$", r"\1", k)
+            if k2 != k:
+                hit, how = index.get(k2), "without entrance letter"
+        out.append({"input": a, "lat": hit[0], "lon": hit[1], "address": hit[2], "how": how} if hit else {"input": a, "lat": None, "lon": None})
+    return {"results": out, "matched": sum(1 for r in out if r["lat"] is not None)}
 
 
 def _df_records(df) -> list[dict]:
@@ -5346,8 +5402,10 @@ async def _recommend_retrofit_impl(address: str, validate_epsm: bool = True) -> 
         for it in cat.get(comp, []):
             if it["u_value"] > base_u[comp]:
                 continue  # only options that actually IMPROVE the component
+            # kg CO2e per m² from Wikells Sektionsdata (A1–A3); 0 where Wikells gives none
             opts.append(OptimizeOption(code=f"{comp}:{it['code']}", label=it["description"][:60],
-                                       u_value=it["u_value"], cost=round(it["cost_sek_m2"] * areas[comp]), carbon=0.0,
+                                       u_value=it["u_value"], cost=round(it["cost_sek_m2"] * areas[comp]),
+                                       carbon=round((it.get("co2_kg_m2") or 0.0) * areas[comp]),
                                        service_life_yr=_measure_life_yr(comp, it["description"])))
         if opts:
             components.append(OptimizeComponent(key=comp, area_m2=round(areas[comp]),
