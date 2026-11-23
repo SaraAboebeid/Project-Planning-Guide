@@ -79,19 +79,10 @@ const WORKFLOW_STEPS = [
   {
     n: 5,
     shortLabel: "Step 5",
-    name: "Staged Plan",
-    desc: "Spread the chosen packages over the years within a budget, reach the city's climate goal on time, and test how robust the timing is to energy prices.",
+    name: "Report",
+    desc: "What was analysed, the baseline, façade findings, every package tested and the recommended ones — shareable or saved as PDF.",
     status: "not-started" as StepStatus,
     path: "/step/5",
-    icon: IC.layers,
-  },
-  {
-    n: 6,
-    shortLabel: "Step 6",
-    name: "Report",
-    desc: "What was analysed, the baseline, façade findings, every package tested, the recommended ones and the staged plan — shareable or saved as PDF.",
-    status: "not-started" as StepStatus,
-    path: "/step/6",
     icon: IC.report,
   },
 ];

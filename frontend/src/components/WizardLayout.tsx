@@ -237,8 +237,7 @@ export default function WizardLayout() {
     1: "review each building's data, fill any gaps, and choose which buildings carry forward.",
     2: "simulate the as-built performance of the selected buildings — the baseline to compare against.",
     3: "design renovation packages and simulate each against the baseline for energy, cost and carbon.",
-    4: "spread the chosen packages over the years within your budget.",
-    5: "compile everything into a shareable report.",
+    4: "compile everything into a shareable report.",
   };
   const nextHint = NEXT_STEP_HINT[activeStep.number] ? t(NEXT_STEP_HINT[activeStep.number]!) : undefined;
 
