@@ -127,6 +127,43 @@ const SV: Record<string, string> = {
   "Zoom to Poseidon": "Zooma till Poseidon",
   "Ranked buildings (worst first)": "Rangordnade byggnader (sämst först)",
   "Advanced settings": "Avancerade inställningar",
+  // "How are parts judged?" dialog
+  "How are parts judged?": "Hur bedöms delarna?",
+  "How the parts are judged": "Så bedöms byggnadsdelarna",
+  "more than 50 years": "mer än 50 år",
+  "50 years or older → worth considering (have it inspected)": "50 år eller äldre → värt att överväga (låt besiktiga)",
+  "{n} years": "{n} år",
+  "past {n} years → renovation needed": "över {n} år → renovering behövs",
+  "{a}–{b} years": "{a}–{b} år",
+  "{a}–{b} years → worth considering; past {b} → renovation needed": "{a}–{b} år → värt att överväga; över {b} → renovering behövs",
+  "Each part of each building — walls, windows, roof, floor and heating system — gets its own verdict:": "Varje del av varje byggnad – väggar, fönster, tak, golv och uppvärmningssystem – får en egen bedömning:",
+  "Up to three kinds of evidence are looked at, and the part gets the worst verdict among them.": "Upp till tre slags underlag vägs in, och delen får den sämsta bedömningen av dem.",
+  "Age against expected service life": "Ålder mot förväntad livslängd",
+  "Age counts from the last renovation recorded for that part (Renovation history window), otherwise from the construction year. Expected service lives come from the IVL Swedish Environmental Research Institute.":
+    "Åldern räknas från den senaste renovering som registrerats för delen (fönstret Renoveringshistorik), annars från byggåret. Förväntade livslängder kommer från IVL Svenska Miljöinstitutet.",
+  "Part": "Del",
+  "Expected service life": "Förväntad livslängd",
+  "Verdict": "Bedömning",
+  "Façade defects (walls only)": "Fasadskador (bara väggar)",
+  "Cracks or other damage found on the façade photos make the walls 'renovation needed'. Damage that only the AI saw counts as 'worth considering' — check it on site.":
+    "Sprickor eller andra skador på fasadfotona gör att väggarna får 'renovering behövs'. Skador som bara AI:n såg räknas som 'värt att överväga' – kontrollera på plats.",
+  "Energy: U-value against the Swedish building regulations": "Energi: U-värde mot Boverkets byggregler",
+  "The U-value says how easily heat passes through a part (lower is better). It is compared with the renovation requirement in the Swedish building regulations:":
+    "U-värdet anger hur lätt värme passerar genom en del (lägre är bättre). Det jämförs med renoveringskravet i Boverkets byggregler:",
+  "Twice the requirement or more → worth considering (a large energy saving is possible).": "Dubbla kravet eller mer → värt att överväga (stor energibesparing möjlig).",
+  "1.3 to 2 times the requirement → worth considering (some saving possible).": "1,3 till 2 gånger kravet → värt att överväga (viss besparing möjlig).",
+  "Below that → OK.": "Under det → OK.",
+  "Only real U-values count — from the energy certificate or a renovation you recorded with its U-value — never national default values. A poor U-value alone never makes a part 'needed': it is a chance to save energy, not damage.":
+    "Bara verkliga U-värden räknas – från energideklarationen eller en renovering du registrerat med U-värde – aldrig nationella standardvärden. Ett dåligt U-värde ensamt gör aldrig en del 'behövs': det är en möjlighet att spara energi, inte en skada.",
+  "What the verdict is used for": "Vad bedömningen används till",
+  "Measures step: parts marked 'needed' or 'worth considering' get the catalogue's suggestion (the cheapest option that meets the building regulations); OK parts get no measure. You or the optimiser can change any of them.":
+    "Åtgärdssteget: delar markerade 'behövs' eller 'värt att överväga' får katalogens förslag (det billigaste alternativet som klarar byggreglerna); OK-delar får ingen åtgärd. Du eller optimeraren kan ändra vilken som helst.",
+  "Staged plan: 'needed' parts are done first when 'Parts past their service life first' is ticked.": "Etappvis plan: delar som 'behövs' görs först när 'Delar som passerat sin livslängd först' är ikryssat.",
+  "The building ranking (which buildings first) is separate: it uses energy need, façade condition and building characteristics with your weights.":
+    "Rangordningen av byggnader (vilka byggnader först) är separat: den använder energibehov, fasadskick och byggnadens egenskaper med dina vikter.",
+  "Good to know": "Bra att veta",
+  "Without recorded renovations, most older buildings flag almost every part, because age alone puts them past their service life. Recording past renovations (with year and, if known, U-value) and inspecting façades is what separates one building from another. A 'needed' heating system currently still defaults to keeping district heating: renewing the old substation is not yet priced.":
+    "Utan registrerade renoveringar flaggar de flesta äldre byggnader nästan alla delar, eftersom åldern ensam passerar livslängden. Att registrera tidigare renoveringar (med år och, om känt, U-värde) och inspektera fasader är det som skiljer byggnaderna åt. Ett uppvärmningssystem som 'behövs' behåller i dag ändå fjärrvärme som standard: förnyelse av den gamla undercentralen är ännu inte prissatt.",
   // Compare: options browser
   "★ Suggested": "★ Förslag",
   "Recommended": "Rekommenderas",

@@ -30,7 +30,7 @@ import {
 } from "../ranking";
 import { rcRun, rowResult, type RcBody, type RcRes, type USource } from "../rc";
 import { MEASURE_BY_CODE, MEASURE_COMPONENTS, U_FIELD, recommendedMeasure, type Measure, type MeasureComponent } from "../catalogue";
-import { BBR_RENOVATION_U } from "../planner/serviceLifeSE";
+import { BBR_RENOVATION_U, COMPONENT_LIFE } from "../planner/serviceLifeSE";
 import { useCatalogueVersion } from "../catalogueStore";
 import { price as hvacPrice, setCarrier, useHvacVersion } from "../hvacStore";
 import {
@@ -1600,12 +1600,82 @@ function CompareDialog({ row, bm, bodies, prices, initial, onUse, onClose }: {
   );
 }
 
+/** "How are parts judged?" — the rules of renovationRecommendations.ts in plain words,
+ *  with the service lives and U-value targets read from the same tables the rules use. */
+function PartsLogicDialog({ onClose }: { onClose: () => void }) {
+  const [, t] = useLang();
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [onClose]);
+  const chip = (txt: string, color: string) => <span className="part-chip" style={{ background: color }}>{txt}</span>;
+  const lifeText = (c: string) => {
+    const l = COMPONENT_LIFE[c];
+    if (!l || l.minYears == null) return [t("more than 50 years"), t("50 years or older → worth considering (have it inspected)")];
+    const max = l.maxYears ?? l.minYears;
+    return l.minYears === max
+      ? [t("{n} years", { n: max }), t("past {n} years → renovation needed", { n: max })]
+      : [t("{a}–{b} years", { a: l.minYears, b: max }), t("{a}–{b} years → worth considering; past {b} → renovation needed", { a: l.minYears, b: max })];
+  };
+  return (
+    <div className="modal-shade">
+      <div className="window active" role="dialog" aria-label={t("How the parts are judged")}
+        style={{ left: "50%", top: "48%", transform: "translate(-50%,-50%)", width: "min(820px, 94vw)", maxHeight: "90vh", minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <div className="title-bar"><span className="title">{t("How the parts are judged")}</span>
+          <div className="title-btns"><button className="title-btn close" aria-label={t("Close")} onClick={onClose}>×</button></div>
+        </div>
+        <div style={{ padding: 10, overflow: "auto", lineHeight: 1.5 }}>
+          <p style={{ marginTop: 0 }}>{t("Each part of each building — walls, windows, roof, floor and heating system — gets its own verdict:")}{" "}
+            {chip("  ", LEVEL_COLOR.needed)} {t("renovation needed")} · {chip("  ", LEVEL_COLOR.consider)} {t("worth considering")} · {chip("  ", LEVEL_COLOR.ok)} {t("OK")} · {chip("  ", LEVEL_COLOR.unknown)} {t("no data")}.{" "}
+            {t("Up to three kinds of evidence are looked at, and the part gets the worst verdict among them.")}</p>
+          <b>1. {t("Age against expected service life")}</b>
+          <p style={{ margin: "2px 0 6px" }}>{t("Age counts from the last renovation recorded for that part (Renovation history window), otherwise from the construction year. Expected service lives come from the IVL Swedish Environmental Research Institute.")}</p>
+          <table className="list sheet" style={{ marginBottom: 8 }}>
+            <thead><tr><th>{t("Part")}</th><th>{t("Expected service life")}</th><th>{t("Verdict")}</th></tr></thead>
+            <tbody>
+              {(["Heating system", "Windows", "Roof", "Walls", "Floor"] as const).map((c) => {
+                const [life, rule] = lifeText(c);
+                return <tr key={c}><td>{t(c)}</td><td>{life}</td><td style={{ whiteSpace: "normal" }}>{rule}</td></tr>;
+              })}
+            </tbody>
+          </table>
+          <b>2. {t("Façade defects (walls only)")}</b>
+          <p style={{ margin: "2px 0 6px" }}>{t("Cracks or other damage found on the façade photos make the walls 'renovation needed'. Damage that only the AI saw counts as 'worth considering' — check it on site.")}</p>
+          <b>3. {t("Energy: U-value against the Swedish building regulations")}</b>
+          <p style={{ margin: "2px 0 2px" }}>{t("The U-value says how easily heat passes through a part (lower is better). It is compared with the renovation requirement in the Swedish building regulations:")}{" "}
+            {(["Walls", "Roof", "Floor", "Windows"] as const).map((c) => `${t(c)} ${BBR_RENOVATION_U[c]}`).join(" · ")} W/m²K.</p>
+          <ul style={{ margin: "2px 0 6px 18px", padding: 0 }}>
+            <li>{t("Twice the requirement or more → worth considering (a large energy saving is possible).")}</li>
+            <li>{t("1.3 to 2 times the requirement → worth considering (some saving possible).")}</li>
+            <li>{t("Below that → OK.")}</li>
+          </ul>
+          <p style={{ margin: "2px 0 6px" }}>{t("Only real U-values count — from the energy certificate or a renovation you recorded with its U-value — never national default values. A poor U-value alone never makes a part 'needed': it is a chance to save energy, not damage.")}</p>
+          <b>{t("What the verdict is used for")}</b>
+          <ul style={{ margin: "2px 0 6px 18px", padding: 0 }}>
+            <li>{t("Measures step: parts marked 'needed' or 'worth considering' get the catalogue's suggestion (the cheapest option that meets the building regulations); OK parts get no measure. You or the optimiser can change any of them.")}</li>
+            <li>{t("Staged plan: 'needed' parts are done first when 'Parts past their service life first' is ticked.")}</li>
+            <li>{t("The building ranking (which buildings first) is separate: it uses energy need, façade condition and building characteristics with your weights.")}</li>
+          </ul>
+          <div className="hint small">
+            <b>{t("Good to know")}:</b>{" "}
+            {t("Without recorded renovations, most older buildings flag almost every part, because age alone puts them past their service life. Recording past renovations (with year and, if known, U-value) and inspecting façades is what separates one building from another. A 'needed' heating system currently still defaults to keeping district heating: renewing the old substation is not yet priced.")}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** What the W / Wi / R / F / H chips and their colours mean (Ranking and Measures). */
 function PartsLegend() {
   const [, t] = useLang();
+  const [info, setInfo] = useState(false);
   const chip = (txt: string, color: string) => <span className="part-chip" style={{ background: color }}>{txt}</span>;
   return (
     <div className="hint small row" style={{ flexWrap: "wrap", gap: 10 }}>
+      <button className="btn mini" style={{ padding: "0 6px" }} onClick={() => setInfo(true)} title={t("How the parts are judged")}>ⓘ {t("How are parts judged?")}</button>
+      {info && <PartsLogicDialog onClose={() => setInfo(false)} />}
       <span><b>{t("Parts")}:</b> {chip("W", LEVEL_COLOR.unknown)} {t("walls")} {chip("Wi", LEVEL_COLOR.unknown)} {t("windows")} {chip("R", LEVEL_COLOR.unknown)} {t("roof")} {chip("F", LEVEL_COLOR.unknown)} {t("floor")} {chip("H", LEVEL_COLOR.unknown)} {t("heating system")}</span>
       <span><b>{t("Colour")}:</b> {chip("\u00a0\u00a0", LEVEL_COLOR.needed)} {t("renovation needed")} {chip("\u00a0\u00a0", LEVEL_COLOR.consider)} {t("worth considering")} {chip("\u00a0\u00a0", LEVEL_COLOR.ok)} {t("OK")} {chip("\u00a0\u00a0", LEVEL_COLOR.unknown)} {t("no data")}</span>
       <span className="muted">{t("Judged on age against typical service lives (IVL Swedish Environmental Research Institute), façade defects and U-value against the Swedish building regulations. Hover a chip for the reasons.")}</span>
