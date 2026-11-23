@@ -21,6 +21,8 @@ const BRIDGE_LABELS = [
   "The viewer's own colours are shown.", "{n} buildings · {b} from Boplats · {a} added by you",
   "Not on the Poseidon list", "Poseidon: added by you", "Poseidon: found in Boplats floor plans",
   "rank {r} of {n}", "Building Table", "Renovation history", "Façade inspection", "Not Poseidon", "Mark as Poseidon",
+  "Ranked buildings (worst first)", "Poseidon buildings, worst first", "Energy class (G worst → A best), then energy use per m². Click a building to fly to it.",
+  "Energy use", "no certificate", "certificate", "model", "Close", "Address", "Class",
 ];
 
 interface BridgeMsg { source: "poseidon-bridge"; type: string; action?: string; rowId?: string | null; lat?: number; lon?: number; address?: string | null; matched?: number; of?: number }
@@ -47,7 +49,9 @@ export default function Viewer3D() {
     return rows.flatMap((r) => r.ids.map((id) => {
       const [lat, lon] = id.split(",").map(Number);
       const rk = rankOf.get(r.id);
-      return { rowId: r.id, lat, lon, status: r.source, label: r.b.addr ?? r.id, P: rk?.P ?? null, rank: rk?.rank ?? null, of: ranked.length };
+      return { rowId: r.id, lat, lon, status: r.source, label: r.b.addr ?? r.id, P: rk?.P ?? null, rank: rk?.rank ?? null, of: ranked.length,
+        // for the "ranked buildings" list: certificate class and energy, and the RC model's heating
+        eclass: r.b.eclass ?? null, epcKwh: r.b.energy ?? null, rcKwh: r.rc?.heating_kwh_m2_yr ?? null };
     }));
   }, [rows, ws]);
 

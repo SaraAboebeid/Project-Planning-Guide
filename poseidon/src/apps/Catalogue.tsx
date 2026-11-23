@@ -128,7 +128,7 @@ function PickList({ items, value, onPick }: { items: { key: string; label: strin
 function WizardKey() {
   const [, t] = useLang();
   return <div className="hint small">
-    {t("Wizard column: items the Renovation Wizard offers as a measure (they have a U-value and a price per m²). Green U = meets the BBR renovation target. ★ = the Wizard's suggestion: the cheapest item that meets the target.")}{" "}
+    {t("Wizard column: items the Renovation Wizard offers as a measure (they have a U-value and a price per m²). Green U = meets the renovation requirement in the Swedish building regulations. ★ = the Wizard's suggestion: the cheapest item that meets the target.")}{" "}
     {MEASURE_COMPONENTS.map((c) => `${t(c)} ${BBR_RENOVATION_U[c] ?? "–"}`).join(" · ")} W/m²K.
   </div>;
 }
@@ -168,7 +168,7 @@ function SdSection({ chapters, pick, setPick, edit, withGroups, withAll }: {
     body = <>
       <div className="hint small">{withGroups
         ? t("Complete new parts from Wikells Sektionsdata, incl. overheads, excl. VAT. Removal of the existing part is not included, and Sektionsdata has no add-on layers (e.g. extra insulation on an existing wall), so adding insulation usually costs less than these prices.")
-        : t("Wikells Sektionsdata, the complete component database for new construction. Section cost per unit incl. overheads, excl. VAT and waste; labour {rate} SEK/h. kg CO₂e = A1–A3 from weight × typical factor; – = not given (e.g. subcontract-only items).", { rate: SD.settings["Labour rate (SEK/h)"] ?? "–" })}</div>
+        : t("Wikells Sektionsdata, the complete component database for new construction. Section cost per unit incl. overheads, excl. VAT and waste; labour {rate} SEK/h. kg CO₂e = climate impact of producing the materials, from weight × typical factor; – = not given (e.g. subcontract-only items).", { rate: SD.settings["Labour rate (SEK/h)"] ?? "–" })}</div>
       <ItemTable rows={r.rows} edit={edit} />
     </>;
   }
@@ -218,7 +218,7 @@ function ItemTable({ rows, edit, showGroupCol, showTech = true, extraCols = [] }
         <thead><tr>
           <th>{t("Code")}</th><th>{t("Wizard")}</th>{showGroupCol && <th>{t("Type")}</th>}<th>{t("Description")}</th>
           <th className="num">{t("Price (SEK)")}</th><th>{t("Unit")}</th><th className="num">{t("U-value (W/m²K)")}</th>
-          <th className="num" title={t("A1–A3, from weight × typical factor (Wikells)")}>kg CO₂e</th>
+          <th className="num" title={t("Climate impact of producing the materials, from weight × typical factor (Wikells)")}>kg CO₂e</th>
           {cols.map((c) => <th key={c.key}>{c.label}{edit && <button className="btn mini" title={t("Remove column")} style={{ marginLeft: 4 }}
             onClick={() => { if (confirm(t("Remove the column \"{c}\" and its values?", { c: c.label }))) removeColumn(c.key); }}>×</button>}</th>)}
           {extraCols.map((c) => <th key={`x:${c}`}>{c}</th>)}

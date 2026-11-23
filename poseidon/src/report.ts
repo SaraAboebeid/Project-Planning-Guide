@@ -48,6 +48,7 @@ export interface ReportContent {
   staged?: {
     startYear: number; years: number; budget: number; carbonPriceSekT: number; costGrowthPct: number; maxBuildingsPerYear: number | null;
     planCost: number; fittedCost: number; measures: number; fitted: number; unscheduled: string[];
+    milestones?: string[]; done?: string[]; robustness?: string;
     rows: { year: number; spend: number; cum: number; budgetCum: number; done: string; bill: number; co2T: number; meet: number; n: number; final?: boolean }[];
   };
   notes: string[];
@@ -97,8 +98,8 @@ ${r.benefits.map((b) => `<td class="n">${sek(b)}</td>`).join("")}<td class="n">$
   const cl = c.climate;
   const climate = cl ? `<h2>${esc(t(cl.goal))}</h2>
 <div>${esc(t(cl.basis))} <span class="muted">(${esc(cl.source)})</span></div>
-<div>${esc(t("Buildings in scope today: Atemp-weighted PET {pet} kWh/m²; {ok} of {n} at or below {goal}.", { pet: num(cl.stockPet), ok: cl.stockOk, n: cl.stockN, goal: cl.petGoal }))}</div>
-${c.totals?.meetGoal != null ? `<div>${esc(t("With the planned measures: {ok} of {n} flagged buildings at or below {goal} kWh/m² PET.", { ok: c.totals.meetGoal, n: c.measures.length, goal: cl.petGoal }))}</div>` : ""}` : "";
+<div>${esc(t("Buildings in scope today: average primary energy (weighted by heated floor area) {pet} kWh/m²; {ok} of {n} at or below {goal}.", { pet: num(cl.stockPet), ok: cl.stockOk, n: cl.stockN, goal: cl.petGoal }))}</div>
+${c.totals?.meetGoal != null ? `<div>${esc(t("With the planned measures: {ok} of {n} flagged buildings at or below {goal} kWh/m² primary energy.", { ok: c.totals.meetGoal, n: c.measures.length, goal: cl.petGoal }))}</div>` : ""}` : "";
   return `<!doctype html><html lang="${locale().slice(0, 2)}"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
   body { font: 12px/1.45 Tahoma, "Segoe UI", Arial, sans-serif; color: #000; margin: 18px 22px; background: #fff; }
@@ -124,7 +125,7 @@ ${c.totals?.meetGoal != null ? `<div>${esc(t("With the planned measures: {ok} of
 ${c.measures.length ? `<h2>${esc(t("Recommended measures"))} (${c.measures.length})</h2>
 <table><thead><tr><th>${esc(t("Building"))}</th><th>${esc(t("Measures"))}</th><th>${esc(t("Heating before (MWh/yr)"))}</th><th>${esc(t("Heating after (MWh/yr)"))}</th>
 <th>${esc(t("Saving (MWh/yr)"))}</th><th>${esc(t("Cost"))}</th><th>${esc(t("Saving per year"))}</th><th>${esc(t("Payback (years)"))}</th>
-${lcaCols ? `<th>${esc(t("Life-cycle saving ({n} yr)", { n: c.studyPeriodYr ?? 50 }))}</th><th>${esc(t("Embodied carbon (t CO₂e)"))}</th><th>${esc(t("Operational CO₂ (t/yr)"))}</th><th>${esc(t("PET (kWh/m²)"))}</th>` : ""}</tr></thead>
+${lcaCols ? `<th>${esc(t("Life-cycle saving ({n} yr)", { n: c.studyPeriodYr ?? 50 }))}</th><th>${esc(t("Embodied carbon (t CO₂e)"))}</th><th>${esc(t("Operational CO₂ (t/yr)"))}</th><th>${esc(t("Primary energy (kWh/m²)"))}</th>` : ""}</tr></thead>
 <tbody>${meas}${c.totals ? `<tr class="totals"><td colspan="2">${esc(t("Total"))}</td><td class="n">${num(c.totals.heatBeforeMWh, 1)}</td><td class="n"></td>
 <td class="n">${num(c.totals.savingMWh, 1)}</td><td class="n">${sek(c.totals.cost)}</td><td class="n">${sek(c.totals.annualSavingSEK)}</td>
 <td class="n">${c.totals.annualSavingSEK > 0 ? num(c.totals.cost / c.totals.annualSavingSEK) : "–"}</td>
@@ -137,6 +138,9 @@ ${c.staged ? `<h2>${esc(t("Staged plan"))} ${c.staged.startYear}–${c.staged.st
 <div>${esc(t("Budget"))} ${sek(c.staged.budget)} ${esc(t("over"))} ${c.staged.years} ${esc(t("years"))} · ${esc(t("CO₂ price (SEK/t)"))} ${num(c.staged.carbonPriceSekT)} · ${esc(t("Cost growth (%/yr)"))} ${num(c.staged.costGrowthPct, 1)}${c.staged.maxBuildingsPerYear ? ` · ${esc(t("Max buildings per year"))} ${c.staged.maxBuildingsPerYear}` : ""}</div>
 <div>${esc(t("Fits in the budget"))}: <b>${c.staged.fitted} / ${c.staged.measures}</b> ${esc(t("measures"))} (${sek(c.staged.fittedCost)} ${esc(t("of"))} ${sek(c.staged.planCost)})</div>
 ${c.staged.unscheduled.length ? `<div style="color:#a00000">${esc(t("Does not fit"))}: ${esc(c.staged.unscheduled.join(" · "))}</div>` : ""}
+${c.staged.milestones?.length ? `<ul>${c.staged.milestones.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>` : ""}
+${c.staged.done?.length ? `<div>${esc(t("Already done (kept fixed)"))}: ${esc(c.staged.done.join(" · "))}</div>` : ""}
+${c.staged.robustness ? `<div>${esc(c.staged.robustness)}</div>` : ""}
 <table><thead><tr><th>${esc(t("Year"))}</th><th>${esc(t("Spend"))}</th><th>${esc(t("Spent so far / budget released"))}</th><th>${esc(t("Measures done this year"))}</th>
 <th>${esc(t("Energy bills per year"))}</th><th>${esc(t("CO₂ per year (t)"))}</th><th>${esc(t("Buildings meeting the climate goal"))}</th></tr></thead>
 <tbody>${c.staged.rows.map((r) => `<tr${r.final ? ' class="totals"' : ""}><td>${r.year}${r.final ? ` (${esc(t("after the plan"))})` : ""}</td><td class="n">${r.spend ? sek(r.spend) : "–"}</td>

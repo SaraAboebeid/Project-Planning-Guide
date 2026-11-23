@@ -34,7 +34,7 @@ import { BBR_RENOVATION_U } from "../planner/serviceLifeSE";
 import { useCatalogueVersion } from "../catalogueStore";
 import {
   ASSUMPTIONS, BASE_SYSTEM, CARBON, DEFAULT_PRICES, HEATING_SYSTEMS, PRICE_SCENARIOS, annuityFactor, baselineEval, buildingModel, climateCheck,
-  evaluate, measureOptions, optimise, pickFromFront, stageItems, stageTimeline, stageValue, type StageSettings, regretMatrix, scaled, type BuildingModel, type Envelope, type OptPoint, type OptRule, type Package, type Prices,
+  evaluate, measureOptions, optimise, pickFromFront, stageItems, stageTimeline, stageValue, type StageBuilding, type StageItem, type StageSettings, regretMatrix, scaled, type BuildingModel, type Envelope, type OptPoint, type OptRule, type Package, type Prices,
 } from "../analysis";
 import { printReport, reportHtml, saveReport, type ReportContent, type ReportMeasureRow } from "../report";
 import { openReport, reportsChanged } from "./ReportsApps";
@@ -45,13 +45,13 @@ const STEPS = [
   { title: "Buildings & data", blurb: "Which of Poseidon's buildings to rank, and what we know about each. Filter by area, address, year or class; untick a building to leave it out. Adding past renovations or façade photos updates the ranking." },
   { title: "Façades & weights", blurb: "How much energy, façade condition and building characteristics each count, and AI defect detection on façade photos (the façade criterion)." },
   { title: "Ranking", blurb: "Which buildings to renovate first, why, and which parts of each. Flag the buildings to plan measures for." },
-  { title: "Measures", blurb: "Measures and heating system for each flagged building: pick them yourself or let the optimiser find the lowest life-cycle cost, the lowest carbon, or the cheapest package that meets the climate goal. EPSM RC recalculates the heating after renovation." },
+  { title: "Measures", blurb: "Measures and heating system for each flagged building: pick them yourself or let the optimiser find the lowest life-cycle cost, the lowest carbon, or the cheapest package that meets the climate goal. The energy model (EPSM) recalculates the heating after renovation." },
   { title: "Climate goal & robustness", blurb: "Do the plans meet Gothenburg's climate goal, and which plan holds up best if energy prices change (minimax regret)?" },
   { title: "Staged plan", blurb: "Spread your plan over the years within a budget. Enter the number of years and the budget; the optimiser decides which measure is done in which year and recalculates the timeline." },
   { title: "Report", blurb: "Save the ranking and measures as a report in the Reports folder, or print it." },
 ];
 
-const C_LABEL: Record<CriterionKey, string> = { E: "Energy (EPSM RC heating)", F: "Façade condition", C: "Building characteristics" };
+const C_LABEL: Record<CriterionKey, string> = { E: "Energy (heating need, energy model)", F: "Façade condition", C: "Building characteristics" };
 const LEVEL_COLOR: Record<RecLevel, string> = { needed: "#c00000", consider: "#b45309", ok: "#2e7d32", unknown: "#808080" };
 const COMP_SHORT: Record<string, string> = { Walls: "W", Windows: "Wi", Roof: "R", Floor: "F", "Heating system": "H" };
 
@@ -120,7 +120,7 @@ export default function Wizard() {
   /* ── ranking (the planner's computePriorities, via src/ranking.ts) ── */
   const { ranked, recs } = useMemo(() => {
     const facade = Object.fromEntries(scoped.filter((r) => r.facade).map((r) => [r.id, r.facade!]));
-    const ranked = rankRows(scoped, weights, ` ${t("space heating (EPSM RC)")}`);
+    const ranked = rankRows(scoped, weights, ` ${t("space heating (energy model)")}`);
 
     // Per-component verdicts. U-values only where they are real data (not a national default).
     const recB: RecBuilding[] = scoped.map((r) => {
@@ -281,7 +281,7 @@ export default function Wizard() {
     }
     applyPackages(byRow);
     if (none.length) await wm.msg({ title: "Optimiser", icon: "info", text: <>{rule === "goal"
-      ? t("No package in the catalogue brings these buildings to the climate goal ({goal} kWh/m² PET); their measures were left unchanged:", { goal: ASSUMPTIONS.petGoal.value })
+      ? t("No package in the catalogue brings these buildings to the climate goal ({goal} kWh/m² primary energy); their measures were left unchanged:", { goal: ASSUMPTIONS.petGoal.value })
       : t("These buildings have no energy model result yet; their measures were left unchanged:")}<br /><span className="small">{none.join(", ")}</span></> });
   }
 
@@ -364,6 +364,7 @@ export default function Wizard() {
   // Portfolio strategies for the regret analysis, all on the same anchored
   // estimate so they compare like with like (your plan's RC figures are in Measures).
   const [alpha, setAlpha] = useState(0.5);
+  const [showAdvanced, setShowAdvanced] = useState(false);   // Hurwicz optimism: an advanced setting, hidden by default
   type Strategy = { id: string; label: string; byRow: Record<string, Package> | null; isBaseline?: boolean };
   const strategies: Strategy[] = useMemo(() => {
     const ids = measureRows.map((r) => r.id).filter((id) => models.has(id));
@@ -376,7 +377,7 @@ export default function Wizard() {
     return [
       { id: "none", label: "Do nothing (reference)", byRow: from(() => ({ envelope: {}, heating: BASE_SYSTEM })), isBaseline: true },
       { id: "yours", label: "Your plan (Measures step)", byRow: from(packageOf) },
-      { id: "suggested", label: "Catalogue suggestion (BBR), keep district heating", byRow: from((id) => ({
+      { id: "suggested", label: "Catalogue suggestion (meets the building regulations), keep district heating", byRow: from((id) => ({
           envelope: Object.fromEntries(MEASURE_COMPONENTS.map((c) => [c, suggested(id, c)]).filter(([, v]) => v)) as Envelope, heating: BASE_SYSTEM })) },
       { id: "hp", label: "Ground-source heat pump only, no envelope work", byRow: from(() => ({ envelope: {}, heating: "gshp" })) },
       { id: "lcc", label: "Optimiser: lowest life-cycle cost", byRow: front("lcc") },
@@ -415,38 +416,98 @@ export default function Wizard() {
   const fmtN = (v: number, d = 0) => new Intl.NumberFormat(locale(), { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
   const sekShort = (v: number) => (v >= 1e6 ? `${fmtN(v / 1e6, 1)} MSEK` : v >= 1e4 ? `${fmtN(v / 1e3)} kSEK` : `${fmtN(v)} SEK`);
 
-  /* ── staged plan: the measures of every flagged building, timed within a budget ── */
-  const DEFAULT_STAGE: StageSettings & { urgentFirst: boolean } = {
-    startYear: new Date().getFullYear() + 1, years: 10, budget: 20_000_000, carbonPriceSekT: 0, costGrowthPct: 0,
-    maxBuildingsPerYear: null, urgentFirst: true,
+  /* ── staged plan: the measures of every flagged building, timed within a budget ──
+     Milestones (climate goals by a year) come first, then as much of the plan as
+     fits, then the best timing. The plan is solved for each energy-price future;
+     minimax regret says which timing holds up best. Steps already carried out are
+     kept fixed ("Advance one year" = a rolling-horizon re-plan). */
+  type Milestone = { id: string; year: number; kind: "building" | "portfolio"; value: number | null; enabled: boolean };
+  const MILESTONE_INFO: Record<string, { label: string; source: string }> = {
+    gbg2030: { label: "Gothenburg 2030: every building's primary energy ≤ {v} kWh/m²", source: "Göteborgs Stad miljö- och klimatprogram 2021–2030: homes 84 kWh/m² primary energy (95 kWh/m² final energy) by 2030" },
+    epbd2030: { label: "EU 2030: average primary energy of the plan's buildings −{v} % vs today", source: "EU Energy Performance of Buildings Directive (2024/1275), Article 9: residential stock average primary energy −16 % by 2030 vs 2020 (today's level stands in for 2020)" },
+    epbd2035: { label: "EU 2035: average primary energy −{v} % vs today", source: "EU Energy Performance of Buildings Directive (2024/1275), Article 9: −20 to 22 % by 2035 vs 2020" },
+    zeb2050: { label: "2050: every building's primary energy ≤ {v} kWh/m²", source: "EU Energy Performance of Buildings Directive: a zero-emission building stock by 2050. Sweden has not set its zero-emission threshold yet and no Gothenburg 2050 target was found — enter Poseidon's own level" },
   };
-  const [stage, setStage] = useState(DEFAULT_STAGE);
-  useEffect(() => { getSetting<typeof DEFAULT_STAGE>("staged-settings").then((v) => v && setStage({ ...DEFAULT_STAGE, ...v })); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
-  const updateStage = (p: Partial<typeof DEFAULT_STAGE>) => setStage((s) => { const n = { ...s, ...p }; void putSetting("staged-settings", n).catch(() => {}); return n; });
-  const stageBuildings = useMemo(() => measureTable.flatMap((m) => {
+  const DEFAULT_MILESTONES: Milestone[] = [
+    { id: "gbg2030", year: 2030, kind: "building", value: ASSUMPTIONS.petGoal.value, enabled: true },
+    { id: "epbd2030", year: 2030, kind: "portfolio", value: 16, enabled: false },
+    { id: "epbd2035", year: 2035, kind: "portfolio", value: 20, enabled: false },
+    { id: "zeb2050", year: 2050, kind: "building", value: null, enabled: false },
+  ];
+  type StageState = StageSettings & { urgentFirst: boolean; milestones: Milestone[]; done: Record<string, number>; scenario: string };
+  const DEFAULT_STAGE: StageState = {
+    startYear: new Date().getFullYear() + 1, years: 10, budget: 20_000_000, carbonPriceSekT: 0, costGrowthPct: 0,
+    maxBuildingsPerYear: null, urgentFirst: true, milestones: DEFAULT_MILESTONES, done: {}, scenario: "base",
+  };
+  const [stage, setStage] = useState<StageState>(DEFAULT_STAGE);
+  useEffect(() => {
+    getSetting<Partial<StageState>>("staged-settings").then((v) => {
+      if (!v) return;
+      const ms = DEFAULT_MILESTONES.map((d) => ({ ...d, ...(v.milestones ?? []).find((m) => m.id === d.id) }));
+      setStage({ ...DEFAULT_STAGE, ...v, milestones: ms, done: v.done ?? {} });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const updateStage = (p: Partial<StageState>) => setStage((s) => { const n = { ...s, ...p }; void putSetting("staged-settings", n).catch(() => {}); return n; });
+  const setMilestone = (id: string, p: Partial<Milestone>) => updateStage({ milestones: stage.milestones.map((m) => (m.id === id ? { ...m, ...p } : m)) });
+
+  /** The plan's steps, priced at one set of energy prices. */
+  const buildStages = (p: Prices) => measureTable.flatMap((m) => {
     const bm = models.get(m.r.id);
     if (!bm) return [];
     const rec = recs.get(m.r.id) ?? {};
     const urgent = new Set(Object.entries(rec).filter(([, v]) => v.level === "needed").map(([k]) => k));
-    const sb = stageItems(bm, m.pkg, prices, m.after, urgent);
+    const sb = stageItems(bm, m.pkg, p, m.after, urgent);
     return sb.items.length ? [sb] : [];
-  }), [measureTable, models, prices, recs]);
-  const [plan, setPlan] = useState<{ schedule: Record<string, number | null>; status: string; covered: number; total: number; seconds: number; key: string } | null>(null);
+  });
+  const scenarioStages = useMemo(() => Object.fromEntries(PRICE_SCENARIOS.map((sc) => [sc.key, buildStages(scaled(prices, sc.mult))])) as Record<string, StageBuilding[]>,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [measureTable, models, prices, recs]);
+  const stageBuildings = scenarioStages.base ?? [];
+  const isDone = (id: string) => stage.done[id] != null;
+
+  /** Milestone rows for the solver (need already reduced by finished steps), and what each asks. */
+  const milestonePlan = useMemo(() => {
+    const rows: { id: string; by: number; need: number; coeffs: [string, number][] }[] = [];
+    const info: { m: Milestone; by: number; unreachable: string[] }[] = [];
+    for (const m of stage.milestones) {
+      if (!m.enabled || m.value == null || m.year < stage.startYear) continue;
+      const by = Math.min(stage.years, m.year - stage.startYear + 1);
+      const unreachable: string[] = [];
+      if (m.kind === "building") {
+        for (const b of stageBuildings) {
+          const total = (b.base.petKwhM2 - m.value) * b.areaM2;
+          if (total <= 0) continue;
+          const doneSave = b.items.filter((i) => isDone(i.id)).reduce((s, i) => s + i.savePetKwh, 0);
+          const open = b.items.filter((i) => !isDone(i.id));
+          if (doneSave + open.reduce((s, i) => s + Math.max(0, i.savePetKwh), 0) < total - 1e-6) unreachable.push(b.address);
+          rows.push({ id: `${m.id}|${b.id}`, by, need: total - doneSave, coeffs: open.map((i) => [i.id, i.savePetKwh]) });
+        }
+      } else {
+        const base = stageBuildings.reduce((s, b) => s + b.base.petKwhM2 * b.areaM2, 0);
+        const total = (m.value / 100) * base;
+        const all = stageBuildings.flatMap((b) => b.items);
+        const doneSave = all.filter((i) => isDone(i.id)).reduce((s, i) => s + i.savePetKwh, 0);
+        if (all.reduce((s, i) => s + Math.max(0, i.savePetKwh), 0) < total - 1e-6) unreachable.push(t("the plan as a whole"));
+        rows.push({ id: m.id, by, need: total - doneSave, coeffs: all.filter((i) => !isDone(i.id)).map((i) => [i.id, i.savePetKwh]) });
+      }
+      info.push({ m, by, unreachable });
+    }
+    return { rows, info };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage.milestones, stage.startYear, stage.years, stage.done, stageBuildings]);
+
+  type PlanResult = { schedule: Record<string, number | null>; status: string; covered: number; total: number; seconds: number; shortfall: Record<string, number> };
+  const [plans, setPlans] = useState<Record<string, PlanResult>>({});
   const [planBusy, setPlanBusy] = useState(false);
   const [planErr, setPlanErr] = useState<string | null>(null);
-  const planKey = JSON.stringify([stage, stageBuildings.map((b) => b.items.map((i) => [i.id, Math.round(i.cost), Math.round(i.saveSekYr)]))]);
+  const planKey = JSON.stringify([{ ...stage, scenario: undefined }, Object.entries(scenarioStages).map(([k, bs]) => [k, bs.map((b) => b.items.map((i) => [i.id, Math.round(i.cost), Math.round(i.saveSekYr)]))])]);
   useEffect(() => {
     if (step !== 5 || !stageBuildings.length || !(stage.years >= 1) || !(stage.budget >= 0)) return;
     let live = true;
     const h = setTimeout(async () => {
       setPlanBusy(true); setPlanErr(null);
       const g = 1 + stage.costGrowthPct / 100;
-      const items = stageBuildings.flatMap((b) => b.items.map((it) => ({
-        id: it.id, building: b.id, cost0: it.cost,
-        costs: Array.from({ length: stage.years }, (_, y) => it.cost * Math.pow(g, y)),
-        // Deferring a part that is past its service life is charged 3 % of its cost a year (risk of failure, emergency repair).
-        values: Array.from({ length: stage.years }, (_, y) => stageValue(it, y, stage) - (stage.urgentFirst && it.urgent ? 0.03 * it.cost * y : 0)),
-      })));
       const after: [string, string][] = [];
       for (const b of stageBuildings) {
         const env = b.items.filter((i) => i.part !== "Heating");
@@ -455,21 +516,92 @@ export default function Wizard() {
         const wall = b.items.find((i) => i.part === "Walls"), win = b.items.find((i) => i.part === "Windows");
         if (wall && win) after.push([wall.id, win.id]);
       }
-      try {
+      const solveFor = async (key: string): Promise<[string, PlanResult]> => {
+        const items = scenarioStages[key]!.flatMap((b) => b.items.filter((it) => !isDone(it.id)).map((it) => ({
+          id: it.id, building: b.id, cost0: it.cost,
+          costs: Array.from({ length: stage.years }, (_, y) => it.cost * Math.pow(g, y)),
+          // Deferring a part that is past its service life is charged 3 % of its cost a year (risk of failure, emergency repair).
+          values: Array.from({ length: stage.years }, (_, y) => stageValue(it, y, stage) - (stage.urgentFirst && it.urgent ? 0.03 * it.cost * y : 0)),
+        })));
+        // A finished step no longer constrains the order: drop rules that involve it.
+        const open = after.filter(([a, b]) => !isDone(a) && !isDone(b));
         const r = await fetch("/api/poseidon/staged-plan", { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ years: stage.years, budget: stage.budget, items, after, max_buildings_per_year: stage.maxBuildingsPerYear || null }) });
+          body: JSON.stringify({ years: stage.years, budget: stage.budget, items, after: open, max_buildings_per_year: stage.maxBuildingsPerYear || null,
+            milestones: milestonePlan.rows }) });
         const j = await r.json();
         if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : `HTTP ${r.status}`);
-        if (live) setPlan({ ...j, key: planKey });
+        return [key, j];
+      };
+      try {
+        const res = await Promise.all(PRICE_SCENARIOS.map((sc) => solveFor(sc.key)));
+        if (live) setPlans(Object.fromEntries(res));
       } catch (e) { if (live) setPlanErr((e as Error).message); }
       finally { if (live) setPlanBusy(false); }
     }, 600);
     return () => { live = false; clearTimeout(h); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planKey, step]);
-  const timeline = useMemo(() => (plan ? stageTimeline(stageBuildings, plan.schedule, stage) : null), [plan, stageBuildings, stage]);
-  const planCost = stageBuildings.reduce((s, b) => s + b.items.reduce((a, i) => a + i.cost, 0), 0);
-  const unscheduled = plan ? stageBuildings.flatMap((b) => b.items.filter((i) => plan.schedule[i.id] == null)) : [];
+
+  const plan: PlanResult | null = plans[stage.scenario] ?? plans.base ?? null;
+  /** The schedule with finished steps placed before the start (they count from year one). */
+  const fullSchedule = useMemo(() => {
+    if (!plan) return null;
+    const s: Record<string, number | null> = { ...plan.schedule };
+    for (const id of Object.keys(stage.done)) s[id] = -1;
+    return s;
+  }, [plan, stage.done]);
+  const timeline = useMemo(() => (fullSchedule ? stageTimeline(stageBuildings, fullSchedule, stage) : null), [fullSchedule, stageBuildings, stage]);
+  const planCost = stageBuildings.reduce((s, b) => s + b.items.filter((i) => !isDone(i.id)).reduce((a, i) => a + i.cost, 0), 0);
+  const doneItems = stageBuildings.flatMap((b) => b.items.filter((i) => isDone(i.id)));
+  const unscheduled = plan ? stageBuildings.flatMap((b) => b.items.filter((i) => !isDone(i.id) && plan.schedule[i.id] == null)) : [];
+
+  /** Where each milestone stands with the shown plan. */
+  const milestoneStatus = useMemo(() => {
+    if (!fullSchedule) return [];
+    return milestonePlan.info.map(({ m, unreachable }) => {
+      const doneBy = (i: StageItem) => { const y = fullSchedule[i.id]; return y != null && stage.startYear + y <= m.year; };
+      if (m.kind === "building") {
+        let ok = 0;
+        for (const b of stageBuildings) {
+          const pet = b.base.petKwhM2 * b.areaM2 - b.items.filter(doneBy).reduce((s, i) => s + i.savePetKwh, 0);
+          if (pet / b.areaM2 <= (m.value ?? 0) + 1e-9) ok++;
+        }
+        return { m, unreachable, text: t("{ok} of {n} buildings meet it by {y}", { ok, n: stageBuildings.length, y: m.year }), met: ok === stageBuildings.length };
+      }
+      const base = stageBuildings.reduce((s, b) => s + b.base.petKwhM2 * b.areaM2, 0);
+      const saved = stageBuildings.flatMap((b) => b.items).filter(doneBy).reduce((s, i) => s + i.savePetKwh, 0);
+      const pct = base ? (saved / base) * 100 : 0;
+      return { m, unreachable, text: t("−{p} % by {y} (goal −{g} %)", { p: Math.round(pct), y: m.year, g: m.value ?? 0 }), met: pct + 1e-9 >= (m.value ?? 0) };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullSchedule, milestonePlan, stageBuildings, stage.startYear]);
+
+  /** Minimax regret over the price futures: each future's optimal timing, judged in every future. */
+  const stageRegret = useMemo(() => {
+    if (PRICE_SCENARIOS.some((sc) => !plans[sc.key])) return null;
+    const valueIn = (sched: Record<string, number | null>, sk: string) =>
+      (scenarioStages[sk] ?? []).flatMap((b) => b.items).reduce((s, it) => {
+        const y = sched[it.id];
+        return y == null || isDone(it.id) ? s : s + stageValue(it, y, stage);
+      }, 0);
+    const options = [
+      { id: "none", label: "Nothing more done (reference)", isBaseline: true, benefits: PRICE_SCENARIOS.map(() => 0) },
+      ...PRICE_SCENARIOS.map((p) => ({ id: p.key, label: p.label, benefits: PRICE_SCENARIOS.map((s) => valueIn(plans[p.key]!.schedule, s.key)) })),
+    ];
+    return regretMatrix(options, alpha);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plans, scenarioStages, stage, alpha]);
+
+  /** Rolling horizon: the first plan year's steps are recorded as done, the plan moves on a year. */
+  function advanceYear() {
+    if (!plan) return;
+    const first = stageBuildings.flatMap((b) => b.items).filter((i) => !isDone(i.id) && plan.schedule[i.id] === 0);
+    const spent = first.reduce((s, i) => s + i.cost, 0);
+    updateStage({
+      done: { ...stage.done, ...Object.fromEntries(first.map((i) => [i.id, stage.startYear])) },
+      startYear: stage.startYear + 1, years: Math.max(1, stage.years - 1), budget: Math.max(0, stage.budget - spent),
+    });
+  }
 
   /* ── report ─────────────────────────────────────────────────────────────── */
   const [reportTitle, setReportTitle] = useState(() => `${t("Renovation priorities")} ${new Date().toISOString().slice(0, 10)}`);
@@ -487,10 +619,10 @@ export default function Wizard() {
       scope: { description: scopeBits, buildings: scoped.length, atempM2: Math.round(scoped.reduce((s, r) => s + (r.b.atemp ?? 0), 0)) },
       weights: { ...weights, how: ws.mode === "ahp" ? `AHP, CR ${ahp.CR.toFixed(2)}` : ws.mode === "manual" ? t("Set weights") : t(ws.preset) },
       method: [
-        `${t(C_LABEL.E)}: ${t("How much heat the building needs per m² a year, from EPSM RC. {lo} kWh or less gives 0 points, {hi} or more gives 100.", { lo: E_LO, hi: E_HI })}`,
+        `${t(C_LABEL.E)}: ${t("How much heat the building needs per m² a year, from the energy model (EPSM). {lo} kWh or less gives 0 points, {hi} or more gives 100.", { lo: E_LO, hi: E_HI })}`,
         `${t(C_LABEL.F)}: ${t("Damage found on façade photos. Cracks and bulging count most; damage only the AI model saw counts half. Buildings without photos are ranked without this criterion.")}`,
         `${t(C_LABEL.C)}: ${t("Older and bigger buildings get more points (age 60 %, size 40 %).")}`,
-        t("Parts (walls, windows, roof, floor, heating) are judged on age against IVL service lives, façade defects and U-value against the BBR renovation target."),
+        t("Parts (walls, windows, roof, floor, heating) are judged on age against typical service lives (IVL Swedish Environmental Research Institute), façade defects and U-value against the renovation requirement in the Swedish building regulations."),
       ],
       ranking: rankRows.map(({ p, r, i }) => ({
         rank: i + 1, address: r.b.addr ?? r.id, area: r.b.area ?? null, year: r.b.year ?? null, eclass: r.b.eclass ?? null,
@@ -513,7 +645,7 @@ export default function Wizard() {
       elPriceSEK: elPrice,
       studyPeriodYr: ASSUMPTIONS.studyPeriodYr.value,
       climate: {
-        goal: "Gothenburg's climate goal for homes", basis: "Primary energy number (PET) of heating and hot water at or below 84 kWh/m² — the city's housing companies' translation of the city's −30 % primary energy goal for 2030.",
+        goal: "Gothenburg's climate goal for homes", basis: "Primary energy number of heating and hot water (weighted by energy source) at or below 84 kWh/m² — the city's housing companies' translation of the city's −30 % primary energy goal for 2030.",
         source: ASSUMPTIONS.petGoal.source, petGoal: ASSUMPTIONS.petGoal.value, stockPet: stockClimate.pet, stockOk: stockClimate.ok, stockN: stockClimate.n,
       },
       decision: decision ? {
@@ -529,6 +661,13 @@ export default function Wizard() {
         maxBuildingsPerYear: stage.maxBuildingsPerYear, planCost, fittedCost: plan.covered,
         measures: stageBuildings.reduce((s, b) => s + b.items.length, 0), fitted: stageBuildings.reduce((s, b) => s + b.items.length, 0) - unscheduled.length,
         unscheduled: unscheduled.map((i) => `${i.address}: ${t(i.part === "Heating" ? "Heating system" : i.part)}`),
+        milestones: milestoneStatus.map((s) => `${s.met ? "✓" : "✗"} ${t(MILESTONE_INFO[s.m.id]!.label, { v: s.m.value ?? "?" })}: ${s.text}${s.unreachable.length ? ` — ${t("your plan cannot reach it for: {b}", { b: s.unreachable.join(", ") })}` : ""}`),
+        done: doneItems.map((i) => `${i.address}: ${t(i.part === "Heating" ? "Heating system" : i.part)} (${stage.done[i.id]})`),
+        robustness: stageRegret?.picks.minimaxRegret
+          ? t("Timing shown: optimised for {s}. Most robust to energy prices (minimax regret): optimised for {r}.", {
+              s: t(PRICE_SCENARIOS.find((p) => p.key === (plans[stage.scenario] ? stage.scenario : "base"))!.label),
+              r: t(PRICE_SCENARIOS.find((p) => p.key === stageRegret.picks.minimaxRegret)?.label ?? "–") })
+          : undefined,
         rows: timeline.map((r, y) => ({ year: r.year, spend: r.spend, cum: r.cum, budgetCum: r.budgetCum, bill: r.bill, co2T: r.co2Kg / 1000, meet: r.meet, n: stageBuildings.length,
           final: y === stage.years, done: r.done.map((i) => `${i.address}: ${t(i.part === "Heating" ? "Heating system" : i.part)}`).join(" · ") })),
       } : undefined,
@@ -538,21 +677,21 @@ export default function Wizard() {
         `${t("Heating degree-days")} ${ASSUMPTIONS.degreeDays.value} — ${ASSUMPTIONS.degreeDays.source}`,
         `PET ${t("weighting factors")}: ${t("district heating")} 0.7, ${t("electricity")} 1.8, ${t("biomass")} 0.6 — ${ASSUMPTIONS.petWeights.source}`,
         t("Heating systems: seasonal efficiency, installation cost per kW, O&M and service life from the main planner's catalogue (provisional values flagged there); heat pumps sized on the heat demand after the envelope measures ({h} full-load hours).", { h: ASSUMPTIONS.eflh.value }),
-        t("Embodied carbon: Wikells Sektionsdata kg CO₂e per item (A1–A3, weight × typical factor), plus replacements within the study period (IVL service lives)."),
+        t("Embodied carbon: Wikells Sektionsdata kg CO₂e per item (producing the materials, weight × typical factor), plus replacements within the study period, using typical service lives (IVL Swedish Environmental Research Institute)."),
       ],
       notes: [
-        t("Energy figures are from the EPSM RC model with a typical weather year — not metered use. Hot water is included in delivered energy and PET; property electricity (fans, pumps, lighting) is not, so PET is somewhat understated."),
-        t("Optimiser and price-scenario figures use the degree-day estimate anchored on each building's own EPSM RC result (the main planner's method); the Measures table shows RC's own result once it has run."),
+        t("Energy figures are from the energy model (EPSM) with a typical weather year — not metered use. Hot water is included in delivered energy and primary energy; property electricity (fans, pumps, lighting) is not, so primary energy is somewhat understated."),
+        t("Optimiser and price-scenario figures use the degree-day estimate anchored on each building's own energy-model result (the main planner's method); the Measures table shows the energy model's own result once it has run."),
         t("{n} buildings use national default U-values for walls, roof or windows because no data exists for them.", { n: stats.defU }),
         t("{a} buildings had floors or height corrected from the energy certificate's heated area (Atemp); {b} have an outline that does not match their certificate and get no energy score.", { a: geoFixed, b: geoBad }),
         t("{n} buildings have façade photos analysed. Street imagery cannot show hairline cracks.", { n: stats.fac }),
         t("Measure prices are Wikells new-build prices for the complete part (replacement); adding insulation to an existing part usually costs less."),
         t("Energy prices are today's list prices (Göteborg Energi district heating 2024–25, SE3 retail electricity) — replace them with Poseidon's own tariffs."),
-        t("The climate goal is city-wide and per inhabitant; scoring it per building with PET is the housing companies' translation, not the city's own rule."),
+        t("The climate goal is city-wide and per inhabitant; scoring it per building with primary energy is the housing companies' translation, not the city's own rule."),
       ],
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ranked, reportRows, flagged, scoped, sc, weights, ws, ahp, recs, measureTable, measureTotals, heatPrice, elPrice, stats, stockClimate, decision, alpha, plan, timeline, stage, stageBuildings, t]);
+  }, [ranked, reportRows, flagged, scoped, sc, weights, ws, ahp, recs, measureTable, measureTotals, heatPrice, elPrice, stats, stockClimate, decision, alpha, plan, plans, timeline, stage, stageBuildings, milestoneStatus, stageRegret, doneItems, t]);
   const reportPreview = useMemo(() => (step === 6 ? reportHtml(reportTitle, reportContent) : ""), [step, reportTitle, reportContent]);
 
   async function doSaveReport() {
@@ -633,7 +772,7 @@ export default function Wizard() {
               <div className="row" style={{ gap: 14, flexWrap: "wrap" }}>
                 <span><b>{scoped.length}</b> {t("of")} {rows.length} {t("buildings in scope")} · {new Intl.NumberFormat(locale()).format(Math.round(scoped.reduce((s, r) => s + (r.b.atemp ?? 0), 0)))} m² Atemp</span>
                 {filtered.length > scoped.length && <span className="muted">({filtered.length - scoped.length} {t("unticked")})</span>}
-                <span>{t("EPSM RC result:")} <b>{stats.rc}</b></span>
+                <span>{t("Energy model result:")} <b>{stats.rc}</b></span>
                 <span className="u-default">{t("National default U-values:")} <b>{stats.defU}</b></span>
                 <span>{t("Renovations recorded:")} <b>{stats.hist}</b></span>
                 <span>{t("Façades inspected:")} <b>{stats.fac}</b></span>
@@ -683,7 +822,7 @@ export default function Wizard() {
                   {(["preset", "manual", "ahp"] as WeightMode[]).map((m) => (
                     <label key={m} className="row" style={{ gap: 4 }}>
                       <input type="radio" checked={ws.mode === m} onChange={() => updateWs({ ...ws, mode: m })} />
-                      {t(m === "preset" ? "Preset" : m === "manual" ? "Set weights" : "Pairwise comparison (AHP)")}
+                      {t(m === "preset" ? "Preset" : m === "manual" ? "Set weights" : "Pairwise comparison (Analytic Hierarchy Process)")}
                     </label>
                   ))}
                   {ws.mode === "preset" && (
@@ -731,7 +870,7 @@ export default function Wizard() {
                         </td>
                         <td style={{ width: 46, textAlign: "right", verticalAlign: "top" }}><b>{Math.round(weights[k] * 100)} %</b></td>
                         <td className="small" style={{ paddingLeft: 10, verticalAlign: "top" }}>
-                          {k === "E" ? t("How much heat the building needs per m² a year, from EPSM RC. {lo} kWh or less gives 0 points, {hi} or more gives 100.", { lo: E_LO, hi: E_HI })
+                          {k === "E" ? t("How much heat the building needs per m² a year, from the energy model (EPSM). {lo} kWh or less gives 0 points, {hi} or more gives 100.", { lo: E_LO, hi: E_HI })
                             : k === "F" ? t("Damage found on façade photos. Cracks and bulging count most; damage only the AI model saw counts half. Buildings without photos are ranked without this criterion.")
                             : t("Older and bigger buildings get more points (age 60 %, size 40 %).")}
                         </td>
@@ -837,9 +976,9 @@ export default function Wizard() {
                   <button className="btn default" disabled={!!optBusy || !measureRows.length} onClick={() => runOptimiser(measureRows.map((r) => r.id), optRule)}>{t("Optimise all")}</button>
                   {optBusy && <span className="small">{t("Optimising {d} / {n}…", { d: optBusy.done + 1, n: optBusy.total })}</span>}
                 </div>
-                <div className="small muted">{t("Searches every combination of catalogue measures (keep, or one of the non-dominated options per part) and heating systems, over {n} years. Applying a result replaces your choices; EPSM RC then checks the heating after renovation.", { n: ASSUMPTIONS.studyPeriodYr.value })}</div>
+                <div className="small muted">{t("Searches every combination of catalogue measures (keep, or one of the non-dominated options per part) and heating systems, over {n} years. Applying a result replaces your choices; the energy model then checks the heating after renovation.", { n: ASSUMPTIONS.studyPeriodYr.value })}</div>
               </fieldset>
-              {measureBusy && <div className="small">{t("EPSM RC: calculating the effect of the measures…")}</div>}
+              {measureBusy && <div className="small">{t("Energy model: calculating the effect of the measures…")}</div>}
               <PartsLegend />
               <div className="sunken-panel grow" style={{ padding: 0, minHeight: 0 }}>
                 <table className="list sheet wrap-head">
@@ -847,11 +986,11 @@ export default function Wizard() {
                     <th>{t("Building")}</th>
                     {MEASURE_COMPONENTS.map((c) => <th key={c}>{t(c)}</th>)}
                     <th>{t("Heating system")}</th>
-                    <th className="num" title={t("Space heating saved per year (EPSM RC). Hover a cell for before → after.")}>{t("Heat saved per year")}</th>
+                    <th className="num" title={t("Space heating saved per year (energy model). Hover a cell for before → after.")}>{t("Heat saved per year")}</th>
                     <th className="num" title={t("Price of the measures and heating plant. Hover a cell for quantities, unit prices and payback.")}>{t("Investment")}</th>
                     <th className="num" title={t("Life-cycle cost of doing nothing minus that of this package, over {n} years (present value)", { n: ASSUMPTIONS.studyPeriodYr.value })}>{t("Money saved vs doing nothing ({n} yr)", { n: ASSUMPTIONS.studyPeriodYr.value })}</th>
                     <th className="num" title={t("CO₂e saved over {n} years: operational saving minus the measures' embodied carbon. Hover a cell for the split.", { n: ASSUMPTIONS.studyPeriodYr.value })}>{t("CO₂ saved vs doing nothing (t, {n} yr)", { n: ASSUMPTIONS.studyPeriodYr.value })}</th>
-                    <th className="num" title={t("Primary energy number (heating + hot water), goal {g} kWh/m²", { g: ASSUMPTIONS.petGoal.value })}>{t("Climate goal: PET ≤ {g}", { g: ASSUMPTIONS.petGoal.value })}</th>
+                    <th className="num" title={t("Primary energy number (heating + hot water), goal {g} kWh/m²", { g: ASSUMPTIONS.petGoal.value })}>{t("Climate goal: primary energy ≤ {g}", { g: ASSUMPTIONS.petGoal.value })}</th>
                     <th />
                   </tr></thead>
                   <tbody>
@@ -881,7 +1020,7 @@ export default function Wizard() {
                           const est = m.after == null && m.ev != null;
                           return (
                             <td className="num" title={afterH == null ? undefined
-                              : `${t("Heating")} ${fmtN(m.before / 1000, 1)} → ${fmtN(afterH / 1000, 1)} MWh/${t("yr")}${est ? ` — ${t("Estimate until EPSM RC has run")}` : ""}`}>
+                              : `${t("Heating")} ${fmtN(m.before / 1000, 1)} → ${fmtN(afterH / 1000, 1)} MWh/${t("yr")}${est ? ` — ${t("Estimate until the energy model has run")}` : ""}`}>
                               {afterH == null ? "…" : `${est ? "≈" : ""}${fmtN((m.before - afterH) / 1000, 1)} MWh`}
                               {afterH != null && m.before > 0 && <span className="small muted"> ({fmtN(((m.before - afterH) / m.before) * 100)} %)</span>}
                             </td>
@@ -927,9 +1066,9 @@ export default function Wizard() {
               <div className="hint small">
                 <b>{t("How to read the table")}:</b>{" "}
                 {t("Every saving is compared with doing nothing: the building as it is today, still on district heating, over {n} years. Money saved = what doing nothing would cost (energy bills) minus what this package costs (investment, replacements, upkeep and the remaining bills), in today's money; red and negative means the package costs more than it saves on energy. CO₂ saved = emissions avoided in operation minus the carbon embodied in the new materials.", { n: ASSUMPTIONS.studyPeriodYr.value })}{" "}
-                {t("Climate goal: the building's primary energy number (PET, kWh per m² a year for heating and hot water) after renovation. ✓ = at or below Gothenburg's {g} kWh/m², so it meets the goal; ✗ = above it. Example: 90 > {g} ✗ misses the goal, 55 ≤ {g} ✓ meets it.", { g: ASSUMPTIONS.petGoal.value })}
+                {t("Climate goal: the building's primary energy number (kWh per m² a year for heating and hot water, weighted by energy source) after renovation. ✓ = at or below Gothenburg's {g} kWh/m², so it meets the goal; ✗ = above it. Example: 90 > {g} ✗ misses the goal, 55 ≤ {g} ✓ meets it.", { g: ASSUMPTIONS.petGoal.value })}
               </div>
-              <div className="small muted">{t("* provisional values in the heating-system catalogue. Heating after renovation with ≈ is an estimate until EPSM RC has run.")}</div>
+              <div className="small muted">{t("* provisional values in the heating-system catalogue. Heating after renovation with ≈ is an estimate until the energy model has run.")}</div>
             </>
           )}
 
@@ -937,8 +1076,8 @@ export default function Wizard() {
             <>
               <fieldset className="group" style={{ marginTop: 0 }}>
                 <legend>{t("Gothenburg's climate goal")}</legend>
-                <div>{t("Primary energy number (PET) of heating and hot water at or below {g} kWh/m² — the city's housing companies' translation of the city's −{c} % primary energy goal for 2030.", { g: ASSUMPTIONS.petGoal.value, c: ASSUMPTIONS.cityCutPct.value })}</div>
-                <div className="small muted">{ASSUMPTIONS.petGoal.source}. {t("PET here excludes property electricity, so it is somewhat understated.")}</div>
+                <div>{t("Primary energy number of heating and hot water (weighted by energy source) at or below {g} kWh/m² — the city's housing companies' translation of the city's −{c} % primary energy goal for 2030.", { g: ASSUMPTIONS.petGoal.value, c: ASSUMPTIONS.cityCutPct.value })}</div>
+                <div className="small muted">{ASSUMPTIONS.petGoal.source}. {t("Primary energy here excludes property electricity, so it is somewhat understated.")}</div>
                 <div className="row" style={{ gap: 18, marginTop: 4, flexWrap: "wrap" }}>
                   <span>{t("Buildings in scope today")}: <b>{stockClimate.pet == null ? "–" : fmtN(stockClimate.pet)}</b> kWh/m² {t("on average")} · {stockClimate.ok} / {stockClimate.n} {t("at or below the goal")}</span>
                   {measureTable.length > 0 && <span>{t("Flagged buildings with your plan")}: <b>{measureTotals.meetGoal} / {measureTable.length}</b> {t("meet the goal")}</span>}
@@ -947,10 +1086,15 @@ export default function Wizard() {
               <fieldset className="group grow" style={{ marginTop: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
                 <legend>{t("Which plan holds up if energy prices change? (minimax regret)")}</legend>
                 <div className="small">{t("Each plan is applied to all flagged buildings. Net benefit = energy bills saved over {n} years minus investment, replacements and upkeep (present value), in each price future. Regret = how much worse a plan is than the best plan for that future; minimax regret picks the plan whose worst regret is smallest. Doing nothing is shown for reference only.", { n: ASSUMPTIONS.studyPeriodYr.value })}</div>
-                <div className="row" style={{ margin: "4px 0" }}>
-                  <label>{t("Optimism α (Hurwicz):")}</label>
-                  <input type="range" min={0} max={1} step={0.1} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))} style={{ width: 120 }} />
-                  <span>{fmtN(alpha, 1)}</span>
+                <div className="row" style={{ margin: "4px 0", flexWrap: "wrap" }}>
+                  <button className="btn mini" style={{ padding: "0 6px" }} aria-expanded={showAdvanced} onClick={() => setShowAdvanced((v) => !v)}>
+                    {showAdvanced ? "▾" : "▸"} {t("Advanced settings")}</button>
+                  {showAdvanced && <>
+                    <label title={t("Hurwicz rule: how optimistic to be. 0 = judge each plan only by its worst future, 1 = only by its best future. It only changes the 'best Hurwicz' pick, not minimax regret.")}>{t("Optimism (Hurwicz rule):")}</label>
+                    <input type="range" min={0} max={1} step={0.1} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))} style={{ width: 120 }} />
+                    <span>{fmtN(alpha, 1)}</span>
+                    <span className="small muted">{t("0 = only the worst future counts · 1 = only the best")}</span>
+                  </>}
                   {optBusy && <span className="small">{t("Optimising {d} / {n}…", { d: optBusy.done + 1, n: optBusy.total })}</span>}
                 </div>
                 {!measureRows.length ? <div className="muted">{t("Flag buildings in the Ranking step to plan measures for them.")}</div>
@@ -960,12 +1104,12 @@ export default function Wizard() {
                       <thead><tr>
                         <th>{t("Plan")}</th><th className="num">{t("Investment")}</th><th className="num" title={t("Life-cycle carbon over {n} years: embodied + operational", { n: ASSUMPTIONS.studyPeriodYr.value })}>{t("t CO₂e ({n} yr)", { n: ASSUMPTIONS.studyPeriodYr.value })}</th><th className="num">{t("Climate goal")}</th>
                         {PRICE_SCENARIOS.map((s) => <th key={s.key} className="num">{t(s.label)}</th>)}
-                        <th className="num">{t("Max regret")}</th><th className="num">Hurwicz</th><th />
+                        <th className="num">{t("Max regret")}</th>{showAdvanced && <th className="num">{t("Hurwicz rule")}</th>}<th />
                       </tr></thead>
                       <tbody>
                         {decision.rows.map((r) => {
                           const strat = strategies.find((s) => s.id === r.id);
-                          const tags = [decision.picks.minimaxRegret === r.id && t("★ minimax regret"), decision.picks.hurwicz === r.id && t("best Hurwicz"),
+                          const tags = [decision.picks.minimaxRegret === r.id && t("★ minimax regret"), showAdvanced && decision.picks.hurwicz === r.id && t("best Hurwicz"),
                             decision.picks.mostRobust === r.id && t("smallest range")].filter(Boolean).join(" · ");
                           return (
                             <tr key={r.id} style={decision.picks.minimaxRegret === r.id ? { background: "#fff6c8" } : r.isBaseline ? { color: "#666" } : undefined}>
@@ -975,7 +1119,7 @@ export default function Wizard() {
                               <td className="num">{r.meet} / {r.n}</td>
                               {r.benefits.map((b, k) => <td key={k} className="num" style={{ color: b < 0 ? "#a00000" : undefined }}>{sekShort(b)}</td>)}
                               <td className="num"><b>{r.isBaseline ? "–" : sekShort(r.maxRegret)}</b></td>
-                              <td className="num">{r.isBaseline ? "–" : sekShort(r.hurwicz)}</td>
+                              {showAdvanced && <td className="num">{r.isBaseline ? "–" : sekShort(r.hurwicz)}</td>}
                               <td>{!r.isBaseline && r.id !== "yours" && strat?.byRow &&
                                 <button className="btn mini" onClick={() => applyPackages(strat.byRow!)} title={t("Make this plan your plan in the Measures step")}>{t("Use plan")}</button>}</td>
                             </tr>
@@ -985,7 +1129,7 @@ export default function Wizard() {
                     </table>
                   </div>
                 )}
-                <div className="small muted">{t("All plans here use the degree-day estimate anchored on each building's EPSM RC result, so they compare like with like. Price futures: today's prices ×0.5, ×1, ×2, and electricity ×2 with district heating unchanged.")}</div>
+                <div className="small muted">{t("All plans here use the degree-day estimate anchored on each building's energy-model result, so they compare like with like. Price futures: today's prices ×0.5, ×1, ×2, and electricity ×2 with district heating unchanged.")}</div>
               </fieldset>
             </>
           )}
@@ -1014,6 +1158,37 @@ export default function Wizard() {
                   {t("The measures are the ones in your plan (Measures step). Rules: the budget is released evenly over the years and unspent money carries over; a heating-system change comes only after that building's envelope measures (so a heat pump is sized for the final building); windows with or after the walls. The optimiser first fits as much of the plan as the budget allows, then picks the timing that saves the most money over {n} years (plus CO₂ at your CO₂ price).", { n: ASSUMPTIONS.studyPeriodYr.value })}
                 </div>
               </fieldset>
+              <fieldset className="group" style={{ marginTop: 0 }}>
+                <legend>{t("Climate milestones")}</legend>
+                <table style={{ borderSpacing: "0 2px" }}>
+                  <tbody>
+                    {stage.milestones.map((m) => {
+                      const st = milestoneStatus.find((x) => x.m.id === m.id);
+                      const info = MILESTONE_INFO[m.id]!;
+                      return (
+                        <tr key={m.id}>
+                          <td><input type="checkbox" checked={m.enabled} onChange={(e) => setMilestone(m.id, { enabled: e.target.checked })} /></td>
+                          <td><input className="field" type="number" style={{ width: 58 }} value={m.year} onChange={(e) => setMilestone(m.id, { year: Number(e.target.value) || m.year })} /></td>
+                          <td title={info.source}>{t(info.label).split("{v}")[0]}
+                            <input className="field" type="number" style={{ width: 52, margin: "0 3px" }} value={m.value ?? ""} placeholder="?"
+                              onChange={(e) => setMilestone(m.id, { value: e.target.value === "" ? null : Number(e.target.value) })} />
+                            {t(info.label).split("{v}")[1] ?? ""}
+                            <span className="small muted" style={{ marginLeft: 6 }}>ⓘ</span>
+                          </td>
+                          <td className="small" style={{ paddingLeft: 10 }}>
+                            {!m.enabled ? <span className="muted">{t("off")}</span>
+                              : m.value == null ? <span className="muted">{t("enter a level to use it")}</span>
+                              : m.year < stage.startYear ? <span className="muted">{t("before the plan starts")}</span>
+                              : st ? <b style={{ color: st.met ? "var(--good)" : "#a00000" }}>{st.met ? "✓ " : "✗ "}{st.text}</b> : "…"}
+                            {st && st.unreachable.length > 0 && <span style={{ color: "#a00000" }}> — {t("your plan cannot reach it for: {b}", { b: st.unreachable.join(", ") })}</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div className="small muted">{t("Milestones come first: the optimiser times the measures so that each ticked milestone is reached by its year as far as the budget allows, then fits the rest of the plan. Hover a milestone for its source. A milestone after the last plan year counts everything in the plan.")}</div>
+              </fieldset>
               {!stageBuildings.length ? <div className="muted">{t("Plan measures for the flagged buildings in the Measures step first.")}</div> : (
                 <>
                   <div className="row" style={{ flexWrap: "wrap", gap: 16 }}>
@@ -1028,6 +1203,40 @@ export default function Wizard() {
                       {t("Does not fit within {y} years and {b}: {n} measures for {c} — raise the budget or the number of years:", { y: stage.years, b: sekShort(stage.budget), n: unscheduled.length, c: sekShort(unscheduled.reduce((s, i) => s + i.cost, 0)) })}{" "}
                       {unscheduled.map((i) => `${i.address}: ${t(i.part === "Heating" ? "Heating system" : i.part)}`).join(" · ")}
                     </div>
+                  )}
+                  <div className="row" style={{ flexWrap: "wrap" }}>
+                    <span className="small">{doneItems.length
+                      ? <>{t("Already done (kept fixed)")}: {doneItems.map((i) => `${i.address}: ${t(i.part === "Heating" ? "Heating system" : i.part)} (${stage.done[i.id]})`).join(" · ")}</>
+                      : t("Nothing recorded as done yet.")}</span>
+                    <span className="grow" />
+                    <button className="btn" disabled={!plan || planBusy} onClick={advanceYear}
+                      title={t("Record the steps planned for {y} as done, move the plan on one year (budget reduced by what was spent) and re-optimise the rest", { y: stage.startYear })}>
+                      {t("{y} done → re-plan from {n}", { y: stage.startYear, n: stage.startYear + 1 })}</button>
+                    <button className="btn" disabled={!doneItems.length} onClick={() => updateStage({ done: {} })}>{t("Clear done steps")}</button>
+                  </div>
+                  {stageRegret && (
+                    <fieldset className="group" style={{ marginTop: 0 }}>
+                      <legend>{t("Which timing holds up if energy prices change? (minimax regret)")}</legend>
+                      <table className="list sheet wrap-head">
+                        <thead><tr>
+                          <th>{t("Plan optimised for")}</th>
+                          {PRICE_SCENARIOS.map((s) => <th key={s.key} className="num">{t("Value if prices turn out")}: {t(s.label)}</th>)}
+                          <th className="num">{t("Max regret")}</th><th />
+                        </tr></thead>
+                        <tbody>
+                          {stageRegret.rows.filter((r) => !r.isBaseline).map((r) => (
+                            <tr key={r.id} style={stageRegret.picks.minimaxRegret === r.id ? { background: "#fff6c8" } : undefined}>
+                              <td>{t(r.label)}{stageRegret.picks.minimaxRegret === r.id && <span className="small" style={{ color: "#00505a" }}> ★ {t("minimax regret")}</span>}
+                                {(stage.scenario === r.id || (!plans[stage.scenario] && r.id === "base")) && <b> ◄ {t("shown")}</b>}</td>
+                              {r.benefits.map((b, k) => <td key={k} className="num" style={{ color: b < 0 ? "#a00000" : undefined }}>{sekShort(b)}</td>)}
+                              <td className="num"><b>{sekShort(r.maxRegret)}</b></td>
+                              <td><button className="btn mini" disabled={stage.scenario === r.id} onClick={() => updateStage({ scenario: r.id })}>{t("Show this plan")}</button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="small muted">{t("The same measures and milestones, timed for each price future. Value = present value over {n} years of what remains to be done (bills saved minus investment and upkeep). Regret = how much less a timing gives than the best timing for the future that actually happens.", { n: ASSUMPTIONS.studyPeriodYr.value })}</div>
+                    </fieldset>
                   )}
                   {timeline && <StageChart rows={timeline} years={stage.years} />}
                   {timeline && plan && (
@@ -1056,11 +1265,18 @@ export default function Wizard() {
                       </div>
                       <div className="sunken-panel" style={{ padding: 0, minHeight: 0, flex: 2 }}>
                         <table className="list sheet">
-                          <thead><tr><th>{t("Building")}</th>{Array.from({ length: stage.years }, (_, y) => <th key={y} style={{ textAlign: "center" }}>{String(stage.startYear + y).slice(2)}</th>)}</tr></thead>
+                          <thead><tr><th>{t("Building")}</th>{doneItems.length > 0 && <th title={t("Already done")}>✓</th>}{Array.from({ length: stage.years }, (_, y) => <th key={y} style={{ textAlign: "center" }}>{String(stage.startYear + y).slice(2)}</th>)}</tr></thead>
                           <tbody>
                             {stageBuildings.map((b) => (
                               <tr key={b.id}>
                                 <td>{b.address}</td>
+                                {doneItems.length > 0 && <td style={{ textAlign: "center", padding: "1px 2px" }}>
+                                  {b.items.filter((i) => isDone(i.id)).map((i) => (
+                                    <span key={i.id} className="part-chip" style={{ background: "#808080", cursor: "pointer" }}
+                                      title={`${t("Done in {y}", { y: stage.done[i.id] })} — ${t("click to undo")}`}
+                                      onClick={() => { const { [i.id]: _gone, ...rest } = stage.done; updateStage({ done: rest }); }}>{COMP_SHORT[i.part === "Heating" ? "Heating system" : i.part]}</span>
+                                  ))}
+                                </td>}
                                 {Array.from({ length: stage.years }, (_, y) => (
                                   <td key={y} style={{ textAlign: "center", padding: "1px 2px" }}>
                                     {b.items.filter((i) => plan.schedule[i.id] === y).map((i) => (
@@ -1133,10 +1349,10 @@ function MeasureSelect({ c, u0, value, onChange, width = 92 }: { c: MeasureCompo
     <select className="field" style={{ width, minHeight: 18 }} value={value} onChange={(e) => onChange(e.target.value)}
       title={cur ? `U ${cur.u} · ${nf(cur.costPerM2)} kr/m² · ${cur.label}` : t("no measure")}>
       <option value="">{t("no measure")}</option>
-      {g.suggested && <optgroup label={t("★ Suggested: cheapest that meets BBR (U ≤ {u})", { u: target })}>{opt(g.suggested, "★ ")}</optgroup>}
-      {g.recommended.length > 0 && <optgroup label={t("Recommended: meets BBR, best value for its U")}>{g.recommended.map((m) => opt(m))}</optgroup>}
-      {g.other.length > 0 && <optgroup label={t("Meets BBR, but a cheaper option is as good")}>{g.other.map((m) => opt(m))}</optgroup>}
-      {g.weak.length > 0 && <optgroup label={t("Not recommended: misses the BBR target (U ≤ {u})", { u: target })}>{g.weak.map((m) => opt(m))}</optgroup>}
+      {g.suggested && <optgroup label={t("★ Suggested: cheapest that meets the building regulations (U ≤ {u})", { u: target })}>{opt(g.suggested, "★ ")}</optgroup>}
+      {g.recommended.length > 0 && <optgroup label={t("Recommended: meets the building regulations, best value for its U")}>{g.recommended.map((m) => opt(m))}</optgroup>}
+      {g.other.length > 0 && <optgroup label={t("Meets the building regulations, but a cheaper option is as good")}>{g.other.map((m) => opt(m))}</optgroup>}
+      {g.weak.length > 0 && <optgroup label={t("Not recommended: misses the building regulations' requirement (U ≤ {u})", { u: target })}>{g.weak.map((m) => opt(m))}</optgroup>}
       {g.worse.length > 0 && <optgroup label={t("Not selectable: no better than today's U ({u})", { u: u0 ?? "?" })}>{g.worse.map((m) => opt(m, "", true))}</optgroup>}
       {cur && ![g.suggested, ...g.recommended, ...g.other, ...g.weak].includes(cur) && !g.worse.includes(cur) && opt(cur)}
     </select>
@@ -1159,7 +1375,7 @@ function StageChart({ rows, years }: { rows: ReturnType<typeof stageTimeline>; y
   const nf = (v: number) => new Intl.NumberFormat(locale(), { maximumFractionDigits: v >= 10 ? 0 : 1 }).format(v);
   const perYear = plan.length ? plan[0]!.budgetCum : 0;
   return (
-    <div className="sunken-panel" style={{ padding: 4, background: "#fff" }}>
+    <div className="sunken-panel" style={{ padding: 4, background: "#fff", flexShrink: 0, overflow: "visible" }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 150, display: "block" }} role="img" aria-label={t("Spend and CO₂ per year")}>
         <line x1={L} y1={Tm + ih} x2={L + iw} y2={Tm + ih} stroke="#808080" />
         <text x={4} y={Tm + 8} fontSize="10" fill="#00505a">MSEK</text>
@@ -1261,7 +1477,7 @@ function CompareDialog({ row, bm, bodies, prices, initial, onUse, onClose }: {
               {t("Add {n} variants", { n: tryList.length })}</button>
             <span className="small muted">{t("(the other parts as in the first row)")}</span>
             <span className="grow" />
-            <button className="btn default" onClick={simulate}>{t("Simulate all with EPSM RC")}</button>
+            <button className="btn default" onClick={simulate}>{t("Simulate all with the energy model")}</button>
           </div>
           <div className="sunken-panel" style={{ padding: 0, minHeight: 0, overflow: "auto" }}>
             <table className="list sheet wrap-head">
@@ -1270,7 +1486,7 @@ function CompareDialog({ row, bm, bodies, prices, initial, onUse, onClose }: {
                 <th className="num">{t("Heat saved per year")}</th><th className="num">{t("Investment")}</th>
                 <th className="num">{t("Money saved vs doing nothing ({n} yr)", { n: ASSUMPTIONS.studyPeriodYr.value })}</th>
                 <th className="num">{t("CO₂ saved vs doing nothing (t, {n} yr)", { n: ASSUMPTIONS.studyPeriodYr.value })}</th>
-                <th className="num">{t("Climate goal: PET ≤ {g}", { g: ASSUMPTIONS.petGoal.value })}</th><th />
+                <th className="num">{t("Climate goal: primary energy ≤ {g}", { g: ASSUMPTIONS.petGoal.value })}</th><th />
               </tr></thead>
               <tbody>
                 {evals.map(({ v, e, sim, climate, money, co2 }) => (
@@ -1284,7 +1500,7 @@ function CompareDialog({ row, bm, bodies, prices, initial, onUse, onClose }: {
                       onChange={(ev) => patch(v.id, (x) => ({ ...x, pkg: { ...x.pkg, heating: ev.target.value } }))}>
                       {HEATING_SYSTEMS.map((s) => <option key={s.id} value={s.id}>{t(s.shortName)}{s.provisional ? " *" : ""}</option>)}
                     </select></td>
-                    <td className="num" title={typeof sim === "number" ? t("EPSM RC") : t("Estimate until EPSM RC has run")}>
+                    <td className="num" title={typeof sim === "number" ? t("energy model") : t("Estimate until the energy model has run")}>
                       {sim === "busy" ? "…" : `${typeof sim === "number" ? "" : "≈"}${nf((bm.heat0 - e.heatKwh) / 1000, 1)} MWh`}
                       {sim === "error" && <span style={{ color: "#a00000" }}> !</span>}
                     </td>
@@ -1302,7 +1518,7 @@ function CompareDialog({ row, bm, bodies, prices, initial, onUse, onClose }: {
               </tbody>
             </table>
           </div>
-          <div className="small muted">{t("Green bold = best in its column. ≈ = degree-day estimate anchored on this building's EPSM RC result; press Simulate to get EPSM RC's own figure (results are cached, so repeating is instant). Savings are against doing nothing over {n} years.", { n: ASSUMPTIONS.studyPeriodYr.value })}</div>
+          <div className="small muted">{t("Green bold = best in its column. ≈ = degree-day estimate anchored on this building's energy-model result; press Simulate to get the energy model's own figure (results are cached, so repeating is instant). Savings are against doing nothing over {n} years.", { n: ASSUMPTIONS.studyPeriodYr.value })}</div>
         </div>
       </div>
     </div>
@@ -1317,7 +1533,7 @@ function PartsLegend() {
     <div className="hint small row" style={{ flexWrap: "wrap", gap: 10 }}>
       <span><b>{t("Parts")}:</b> {chip("W", LEVEL_COLOR.unknown)} {t("walls")} {chip("Wi", LEVEL_COLOR.unknown)} {t("windows")} {chip("R", LEVEL_COLOR.unknown)} {t("roof")} {chip("F", LEVEL_COLOR.unknown)} {t("floor")} {chip("H", LEVEL_COLOR.unknown)} {t("heating system")}</span>
       <span><b>{t("Colour")}:</b> {chip("\u00a0\u00a0", LEVEL_COLOR.needed)} {t("renovation needed")} {chip("\u00a0\u00a0", LEVEL_COLOR.consider)} {t("worth considering")} {chip("\u00a0\u00a0", LEVEL_COLOR.ok)} {t("OK")} {chip("\u00a0\u00a0", LEVEL_COLOR.unknown)} {t("no data")}</span>
-      <span className="muted">{t("Judged on age against IVL service lives, façade defects and U-value against BBR. Hover a chip for the reasons.")}</span>
+      <span className="muted">{t("Judged on age against typical service lives (IVL Swedish Environmental Research Institute), façade defects and U-value against the Swedish building regulations. Hover a chip for the reasons.")}</span>
     </div>
   );
 }

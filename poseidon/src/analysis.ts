@@ -36,8 +36,8 @@ export const ASSUMPTIONS = {
   discountRate: { value: 0.03, source: "EU cost-optimal framework (Delegated Reg. 244/2012), real rate; applied by Boverket for building energy LCC" },
   degreeDays: { value: 3300, source: "Heating degree-days, Gothenburg (Eurostat nrg_chdd; national SE 4 919 in 2022, the coast is milder) — provisional, as in the main planner" },
   eflh: { value: GOTHENBURG_EFLH, source: "Equivalent full-load hours, Gothenburg climate — sizes heat pumps from annual heat demand (planner hvacSystems.ts)" },
-  petWeights: { value: { district_heating: 0.7, electricity: 1.8, biomass: 0.6 }, source: "BBR 9:2 weighting factors for the primary energy number (PET)" },
-  petGoal: { value: 84, source: "Göteborgs Stad miljö- och klimatprogram 2021–2030: the city's housing companies translate the −30 % goal into 84 kWh/m² PET for homes" },
+  petWeights: { value: { district_heating: 0.7, electricity: 1.8, biomass: 0.6 }, source: "Swedish building regulations (Swedish building regulations 9:2) weighting factors for the primary energy number" },
+  petGoal: { value: 84, source: "Göteborgs Stad miljö- och klimatprogram 2021–2030: the city's housing companies translate the −30 % goal into 84 kWh/m² primary energy for homes" },
   cityCutPct: { value: 30, source: "Göteborgs Stad: primary energy use in homes and premises −30 % by 2030 vs 2010 (city-wide, per inhabitant)" },
 };
 const N = ASSUMPTIONS.studyPeriodYr.value;

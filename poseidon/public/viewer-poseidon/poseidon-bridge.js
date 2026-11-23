@@ -24,6 +24,7 @@
     items: [],
     grid: null,                    // centroid grid over DATA
     hooked: false,
+    rankOpen: false,               // the ranked-buildings list is open
     lastIdx: null,
   };
   const L = (k, vars) => {
@@ -148,14 +149,66 @@
     } else {
       legend = '<div class="pz-note">' + esc(L('The viewer\'s own colours are shown.')) + '</div>';
     }
+    // With Poseidon colours on, the viewer's own colour legend (building use type) describes
+    // colours that are not on the map — hide it (poseidon-theme.css: body.pz-colours).
+    document.body.classList.toggle('pz-colours', S.mode !== 'off');
     sec.innerHTML = '<div class="pz-title"><img src="/logo.png" alt="">Poseidon</div>'
       + '<div class="pz-sub">' + esc(L('Colour by')) + '</div>'
       + '<div class="pz-modes">' + btn('stock', L('Poseidon stock')) + btn('priority', L('Renovation priority')) + btn('off', L('Off')) + '</div>'
       + '<div class="pz-legend">' + legend + '</div>'
       + '<div style="font-size:11px;margin-bottom:6px">' + esc(L('{n} buildings · {b} from Boplats · {a} added by you', { n: shown.size, b: nB, a: nA })) + '</div>'
-      + '<button type="button" class="pz-zoom">' + esc(L('Zoom to Poseidon')) + '</button>';
+      + '<div class="pz-modes"><button type="button" class="pz-rank-btn' + (S.rankOpen ? ' on' : '') + '">' + esc(L('Ranked buildings (worst first)')) + '</button>'
+      + '<button type="button" class="pz-zoom">' + esc(L('Zoom to Poseidon')) + '</button></div>';
     sec.querySelectorAll('.pz-modes button[data-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
     sec.querySelector('.pz-zoom').addEventListener('click', zoomToPoseidon);
+    sec.querySelector('.pz-rank-btn').addEventListener('click', () => { S.rankOpen = !S.rankOpen; renderSection(); renderRank(); });
+  }
+
+  /* ── ranked list: Poseidon buildings from worst (renovate first) to best ──
+     By energy class (G → A; no certificate last), then energy use per m² —
+     the certificate's figure, or the EPSM RC model's heating when there is none. */
+  const CLASS_ORDER = { G: 0, F: 1, E: 2, D: 3, C: 4, B: 5, A: 6 };
+  const CLASS_COLOR = { A: '#2e7d32', B: '#55a630', C: '#a7c957', D: '#f2b600', E: '#f08c00', F: '#d9480f', G: '#c00000' };
+  function rankedRows() {
+    const byRow = new Map();
+    for (const it of S.items) if (!byRow.has(it.rowId)) byRow.set(it.rowId, it);
+    const rows = [...byRow.values()].map((it) => ({ it, kwh: it.epcKwh != null ? it.epcKwh : it.rcKwh, src: it.epcKwh != null ? 'certificate' : (it.rcKwh != null ? 'model' : null) }));
+    const cls = (r) => (r.it.eclass && CLASS_ORDER[r.it.eclass] != null ? CLASS_ORDER[r.it.eclass] : 99);
+    rows.sort((a, b) => cls(a) - cls(b) || (b.kwh ?? -1) - (a.kwh ?? -1));
+    return rows;
+  }
+  function locateRow(rowId) {
+    let idx = null;
+    S.byData.forEach((v, b) => { if (idx == null && v.rowId === rowId) idx = DATA.indexOf(b); });
+    if (idx == null || idx < 0) return;
+    const b = DATA[idx];
+    const c = centroidOf(idx);
+    if (!c) return;
+    const baseH = typeof window.getBuildingBaseOffset === 'function' ? window.getBuildingBaseOffset(c[1], c[0]) : 0;
+    viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(c[1], c[0], baseH + (b.height || 6) / 2), 25), {
+      offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-40), 220), duration: 1.5,
+    });
+    window.showInfoPanel(b, idx);
+  }
+  function renderRank() {
+    let p = document.getElementById('pz-rank');
+    if (!S.rankOpen) { if (p) p.remove(); return; }
+    if (!p) { p = document.createElement('div'); p.id = 'pz-rank'; document.body.appendChild(p); }
+    const rows = rankedRows();
+    p.innerHTML = '<div class="pz-rank-title"><span>' + esc(L('Poseidon buildings, worst first')) + ' (' + rows.length + ')</span>'
+      + '<button type="button" class="pz-rank-close" aria-label="' + esc(L('Close')) + '">×</button></div>'
+      + '<div class="pz-rank-note">' + esc(L('Energy class (G worst → A best), then energy use per m². Click a building to fly to it.')) + '</div>'
+      + '<div class="pz-rank-list"><table><thead><tr><th>#</th><th>' + esc(L('Address')) + '</th><th>' + esc(L('Class')) + '</th><th>' + esc(L('Energy use')) + '</th></tr></thead><tbody>'
+      + rows.map((r, i) => '<tr data-row="' + esc(r.it.rowId) + '"><td>' + (i + 1) + '</td><td>' + esc(r.it.label) + '</td><td>'
+        + (r.it.eclass ? '<span class="pz-cls" style="background:' + (CLASS_COLOR[r.it.eclass] || '#808080') + '">' + esc(r.it.eclass) + '</span>' : '<span class="pz-muted">' + esc(L('no certificate')) + '</span>')
+        + '</td><td class="n">' + (r.kwh != null ? Math.round(r.kwh) + ' kWh/m² <span class="pz-muted">' + esc(L(r.src)) + '</span>' : '–') + '</td></tr>').join('')
+      + '</tbody></table></div>';
+    p.querySelector('.pz-rank-close').addEventListener('click', () => { S.rankOpen = false; renderSection(); renderRank(); });
+    p.querySelectorAll('tr[data-row]').forEach((tr) => tr.addEventListener('click', () => {
+      p.querySelectorAll('tr.on').forEach((x) => x.classList.remove('on'));
+      tr.classList.add('on');
+      locateRow(tr.dataset.row);
+    }));
   }
 
   function zoomToPoseidon() {
@@ -208,6 +261,7 @@
       if (i != null) S.byData.set(DATA[i], it);
     }
     renderSection();
+    renderRank();
     if (S.lastIdx != null && DATA[S.lastIdx] && document.getElementById('pz-card')) renderCard(DATA[S.lastIdx], S.lastIdx);
     if (S.mode !== 'off' && typeof rebuildBuildings === 'function') rebuildBuildings();
     post({ type: 'matched', matched: S.byData.size, of: items.length });
@@ -220,6 +274,7 @@
       S.labels = m.labels || {};
       if (m.title) { const t = document.querySelector('#lp-header .lp-title'); if (t) t.textContent = m.title; }
       renderSection();
+      renderRank();
     } else if (m.type === 'items') {
       setItems(m.items || []);
     } else if (m.type === 'mode') {
