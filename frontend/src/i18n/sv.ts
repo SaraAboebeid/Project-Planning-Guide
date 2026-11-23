@@ -50,16 +50,16 @@ const CORE: Record<string, string> = {
   "Select & Baseline": "Urval och nuläge",
   "Renovation Calculator": "Renoveringskalkylator",
   "Report": "Rapport",
-  "Set the components in scope, the KPIs to optimise for, the scale and the location.":
-    "Välj vilka byggnadsdelar som ingår, vilka nyckeltal som ska optimeras, skala och plats.",
-  "Review each building’s data and fill gaps, inspect façade photos for defects, and rank the buildings to flag which to renovate first.":
-    "Granska varje byggnads data och fyll luckor, inspektera fasadfoton efter skador och rangordna byggnaderna för att se vilka som bör renoveras först.",
-  "Confirm which of the flagged buildings to carry forward, then run the EnergyPlus baseline — their as-built demand, monthly or hourly.":
-    "Bekräfta vilka av de utpekade byggnaderna som går vidare och kör sedan nulägessimuleringen i EnergyPlus – deras nuvarande energibehov, per månad eller timme.",
-  "Design component build-ups, combine them into packages, and simulate or optimise each against the baseline for energy, cost and carbon.":
-    "Utforma konstruktioner för byggnadsdelarna, kombinera dem till åtgärdspaket och simulera eller optimera varje paket mot nuläget för energi, kostnad och klimatpåverkan.",
-  "What was analysed, the baseline, façade findings, every package tested and the recommended ones — shareable or saved as PDF.":
-    "Vad som analyserats, nuläget, fasadfynd, alla testade paket och de rekommenderade – att dela eller spara som PDF.",
+  "Name the project, choose what to optimise for, and pick the buildings: an area on the map, a district, single addresses or an uploaded building list (CSV).":
+    "Namnge projektet, välj vad som ska optimeras och välj byggnaderna: ett område på kartan, en stadsdel, enstaka adresser eller en uppladdad byggnadslista (CSV).",
+  "Review and correct each building’s data, add the owner and past renovations, check façade photos for defects, and rank the buildings to see which to renovate first.":
+    "Granska och rätta varje byggnads data, lägg till ägare och tidigare renoveringar, kontrollera fasadfoton efter skador och rangordna byggnaderna för att se vilka som bör renoveras först.",
+  "Confirm which buildings to carry forward, then simulate their energy use as they are today — the baseline every renovation is compared with.":
+    "Bekräfta vilka byggnader som går vidare och simulera sedan deras energianvändning som de är i dag – nuläget som varje renovering jämförs med.",
+  "Build renovation packages, compare their energy, cost and carbon, check heating systems and rooftop solar, and plan the work year by year within a budget.":
+    "Sätt ihop renoveringspaket, jämför energi, kostnad och klimatpåverkan, titta på värmesystem och solceller, och planera arbetet år för år inom en budget.",
+  "What was analysed, the baseline, façade findings, every package tested, the recommended ones, the city climate target and the staged plan — shareable or saved as PDF.":
+    "Vad som analyserats, nuläget, fasadfynd, alla testade paket, de rekommenderade, stadens klimatmål och den etappvisa planen – att dela eller spara som PDF.",
 
   // Dataset numbers
   "3D buildings": "byggnader",

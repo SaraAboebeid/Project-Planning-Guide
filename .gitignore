@@ -56,6 +56,8 @@ ENV/
 *.xlsx
 !sample_data/*.csv
 !sample_data/*.xlsx
+# Step 1's downloadable building-list example must ship with the app
+!frontend/public/examples/*.csv
 
 # Logs
 *.log
