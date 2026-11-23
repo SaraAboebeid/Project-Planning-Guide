@@ -23,7 +23,7 @@ import {
 import LocationMap from "../../components/LocationMap";
 import { useWizardStepNav, setWizardCanNext, setWizardNextError } from "../../components/wizardNav";
 import { useT, translate } from "../../i18n";
-import { geocodeQuery, parseBuildingCsv, type CsvBuildingRow } from "../../utils/buildingCsv";
+import { geocodeQuery, parseBuildingCsv, readTextFile, type CsvBuildingRow } from "../../utils/buildingCsv";
 import { seCityId } from "../../config/countryNav";
 
 /** Most buildings one building-list CSV may hold. */
@@ -200,7 +200,7 @@ export default function DefineProject() {
     try {
       // One row per building: Address (or property designation), optional Postcode/City,
       // optional Lat/Lon, optional Name — see utils/buildingCsv.ts and the example file.
-      const { rows } = parseBuildingCsv(await file.text());
+      const { rows } = parseBuildingCsv(await readTextFile(file));
       if (rows.length === 0) {
         setAddressUploadMessage(t("No buildings found in the file. Use a column called Address (or Lat and Lon), or one address per line."));
         return;
@@ -1352,13 +1352,21 @@ export default function DefineProject() {
             </div>
           )}
           {locationValid && !buildingLoading && project.lookedUpBuildings && project.lookedUpBuildings.length > 1 && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+            <div className="theme-preserve mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
               <span>✓</span>
-              <span><span className="font-semibold">{t("{n} buildings found", { n: project.lookedUpBuildings.length })}</span>. {t("Full data shown in Step 2.")}</span>
+              {(() => {
+                // Entrances of one block (Mandolingatan 80, 84, 90 …) resolve to
+                // the same building — say so instead of letting Step 2 look short.
+                const n = project.lookedUpBuildings.length;
+                const d = new Set(project.lookedUpBuildings.map((b, i) => b.address ?? `#${i}`)).size;
+                return d < n
+                  ? <span><span className="font-semibold">{t("{n} addresses found — {d} buildings", { n, d })}</span> ({t("entrances of the same building count once")}). {t("Full data shown in Step 2.")}</span>
+                  : <span><span className="font-semibold">{t("{n} buildings found", { n })}</span>. {t("Full data shown in Step 2.")}</span>;
+              })()}
             </div>
           )}
           {locationValid && !buildingLoading && project.lookedUpBuilding && (!project.lookedUpBuildings || project.lookedUpBuildings.length <= 1) && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+            <div className="theme-preserve mt-2 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
               <span>✓</span>
               <span>{t("Building found —")} <span className="font-semibold">{project.lookedUpBuilding.address ?? t("EUBUCCO match")}</span>. {t("Full data shown in Step 2.")}</span>
             </div>

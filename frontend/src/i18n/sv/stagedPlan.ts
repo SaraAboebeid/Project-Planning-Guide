@@ -3,6 +3,14 @@ export const SV_STAGED: Record<string, string> = {
   "Renovation Planning · Step 6": "Renoveringsplanering · Steg 6",
   "Everything from Steps 1-5, ready to share or save as PDF.": "Allt från steg 1–5, klart att dela eller spara som PDF.",
   "Staged plan": "Etappvis plan",
+  "Renovation Planning · Step 4": "Renoveringsplanering · Steg 4",
+  "Spread the chosen packages over the years within a budget": "Fördela de valda paketen över åren inom en budget",
+  "Simulate at least one package first": "Simulera minst ett paket först",
+  "{f} of {m} measures fit the budget": "{f} av {m} åtgärder ryms i budgeten",
+  "Pick years and a budget — the optimiser times each measure": "Välj antal år och budget — optimeraren tidsätter varje åtgärd",
+  "Spread the packages chosen above over the years within a budget. Enter the number of years and the budget; the optimiser decides which measure is done in which year and recalculates the timeline.":
+    "Fördela paketen som valts ovan över åren inom en budget. Ange antal år och budget; optimeraren bestämmer vilken åtgärd som görs vilket år och räknar om tidslinjen.",
+  "Staged plan — timing within a budget and climate milestones": "Etappvis plan — tidsättning inom budget och klimatdelmål",
   "Staged Plan": "Etappvis plan",
   "Spread the packages chosen in Step 4 over the years within a budget. Enter the number of years and the budget; the optimiser decides which measure is done in which year and recalculates the timeline.":
     "Fördela paketen som valdes i steg 4 över åren inom en budget. Ange antal år och budget; optimeraren bestämmer vilken åtgärd som görs vilket år och räknar om tidslinjen.",

@@ -43,8 +43,9 @@ import type { BoverketResource, WWRRecord } from "../types";
 import { useT, translate } from "../i18n";
 import {
   Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight, Play, Layers, Settings,
-  ScatterChart, BarChart3, SlidersHorizontal, Info,
+  ScatterChart, BarChart3, SlidersHorizontal, Info, CalendarClock,
 } from "lucide-react";
+import StagedPlan from "./StagedPlan";
 
 /* Sweden/Gothenburg is the only geometry+cost+carbon-complete dataset - UK
  * buildings resolve via /api/uk/building and get real EPSM energy
@@ -805,9 +806,10 @@ export default function RenovationSimulator() {
      façade condition + characteristics + potential) so EPSM runs — and results
      list — the highest-priority buildings first. */
   const buildings = useMemo(() => {
-    if (project.lookedUpBuildings.length > 0) return project.lookedUpBuildings;
-    if (project.lookedUpBuilding) return [project.lookedUpBuilding];
+    // The Step 2 table wins (it holds the selection and edits), as in Step 3.
     const rows = project.bboxRows;
+    if (!rows.length && project.lookedUpBuildings.length > 0) return project.lookedUpBuildings;
+    if (!rows.length && project.lookedUpBuilding) return [project.lookedUpBuilding];
     if (rows.length <= 1) return rows;
     const keys = makeBuildingKeys(rows);
     const items = rows.map((row, i) => ({ row, key: keys[i]!, label: row.address || `Building ${i + 1}` }));
@@ -834,7 +836,8 @@ export default function RenovationSimulator() {
      ones Step 2 stored facadeDefects / buildingHistory under, so they are made
      over the same list in the same order (bboxRows, else the address lookups). */
   const recBuildings = useMemo<RecBuilding[]>(() => {
-    const lookups = project.lookedUpBuildings.length > 0 ? project.lookedUpBuildings
+    const lookups = project.bboxRows.length ? []
+      : project.lookedUpBuildings.length > 0 ? project.lookedUpBuildings
       : project.lookedUpBuilding ? [project.lookedUpBuilding] : [];
     const source: (BuildingLookup | BuildingRecord)[] = lookups.length ? lookups : project.bboxRows;
     const keys = makeBuildingKeys(lookups.length
@@ -2549,6 +2552,11 @@ export default function RenovationSimulator() {
                     : isUK && !hasHeating ? t("Tick “Heating system” under Recommended measures")
                     : !hasHeating ? t("Size rooftop solar · tick “Heating system” to also compare heating")
                     : isUK ? t("Compare heating systems on this building's demand") : t("Compare heating systems and size rooftop solar") },
+                { n: 5, title: t("Staged Plan"), desc: t("Spread the chosen packages over the years within a budget"), icon: <CalendarClock size={19} />,
+                  disabled: done.length === 0,
+                  status: done.length === 0 ? t("Simulate at least one package first")
+                    : project.stagedPlan?.result ? t("{f} of {m} measures fit the budget", { f: project.stagedPlan.result.fitted, m: project.stagedPlan.result.measures })
+                    : t("Pick years and a budget — the optimiser times each measure") },
               ];
             })()}
           />
@@ -3515,6 +3523,9 @@ export default function RenovationSimulator() {
               discountRate={assumptionValue("SE", "discount_rate") ?? 0.03}
             />
           )}
+
+          {/* 4.5 Staged plan: the chosen packages spread over the years. */}
+          {openStage === 5 && <StagedPlan embedded />}
 
           </>
           )}

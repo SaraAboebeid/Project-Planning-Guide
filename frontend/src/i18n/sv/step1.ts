@@ -133,12 +133,16 @@ export const SV_STEP1: Record<string, string> = {
   "Optional:": "Valfritt:",
   "Example:": "Exempel:",
   "Download example CSV": "Ladda ner exempelfil (CSV)",
-  "Excel: File → Save as → CSV. Swedish Excel saves with semicolons (;) and decimal commas — that works too.":
-    "Excel: Arkiv → Spara som → CSV. Svensk Excel sparar med semikolon (;) och decimalkomma – det fungerar också.",
+  "Excel: File → Save as → CSV. Semicolons (;) with decimal commas, as Swedish Excel saves, or commas (,) with decimal points — both work. Å, ä and ö are read correctly whichever way Excel saves the file.":
+    "Excel: Arkiv → Spara som → CSV. Semikolon (;) med decimalkomma, som svensk Excel sparar, eller komma (,) med decimalpunkt – båda fungerar. Å, ä och ö läses rätt hur Excel än sparar filen.",
+  "(your own label — shown only in the Step 1 list; leave it out if you like)":
+    "(er egen etikett – visas bara i listan i steg 1; kan utelämnas)",
+  "Several entrances of one building (e.g. Mandolingatan 80 and 84) become one building.":
+    "Flera uppgångar i samma byggnad (t.ex. Mandolingatan 80 och 84) blir en byggnad.",
   "Swedish addresses are first matched against the planner's own building data (instant); only the rest are looked up on the map, about one per second.":
     "Svenska adresser matchas först mot planerarens egen byggnadsdata (direkt); bara resten söks upp på kartan, ungefär en per sekund.",
-  "With Lat and Lon (WGS84, e.g. 57.66578) no lookup is needed. Up to 500 buildings per file.":
-    "Med Lat och Lon (WGS84, t.ex. 57.66578) behövs ingen sökning. Upp till 500 byggnader per fil.",
+  "With Lat and Lon (WGS84, e.g. 57,65735) no lookup is needed — the last row of the example. Up to 500 buildings per file.":
+    "Med Lat och Lon (WGS84, t.ex. 57,65735) behövs ingen sökning – exemplets sista rad. Upp till 500 byggnader per fil.",
 
   // ── Validation / Continue ──
   "Pick a location inside the covered area to continue.": "Välj en plats inom det täckta området för att fortsätta.",
@@ -175,6 +179,8 @@ export const SV_STEP1: Record<string, string> = {
   "pick a location inside the highlighted area to continue.": "välj en plats inom det markerade området för att fortsätta.",
   "Looking up building data…": "Hämtar byggnadsdata …",
   "{n} buildings found": "{n} byggnader hittades",
+  "{n} addresses found — {d} buildings": "{n} adresser hittades — {d} byggnader",
+  "entrances of the same building count once": "uppgångar i samma byggnad räknas en gång",
   "Full data shown in Step 2.": "Alla data visas i steg 2.",
   "Building found —": "Byggnad hittad –",
   "EUBUCCO match": "Matchning i EUBUCCO",

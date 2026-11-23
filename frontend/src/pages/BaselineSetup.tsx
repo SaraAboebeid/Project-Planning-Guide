@@ -94,9 +94,11 @@ export default function BaselineSetup() {
   const { project, setProject } = useWizardStore();
 
   const buildings = useMemo<BuildingLookup[]>(() => {
+    // The Step 2 table (area, district or addresses) carries the user's
+    // selection and edits, so it wins; the raw Step 1 lookups are the fallback.
+    if (project.bboxRows.length > 0) return project.bboxRows.map(recordToLookup);
     if (project.lookedUpBuildings.length > 0) return project.lookedUpBuildings;
     if (project.lookedUpBuilding) return [project.lookedUpBuilding];
-    if (project.bboxRows.length > 0) return project.bboxRows.map(recordToLookup);
     return [];
   }, [project.lookedUpBuildings, project.lookedUpBuilding, project.bboxRows]);
 
@@ -150,7 +152,7 @@ export default function BaselineSetup() {
   /** The Step 2 table edits of each building in runList (same order), sent with
    *  it so the model is built from the corrected data, not the server's copy. */
   const runEdits = useMemo(() => {
-    const fromTable = project.lookedUpBuildings.length === 0 && !project.lookedUpBuilding;
+    const fromTable = project.bboxRows.length > 0;
     return buildings.flatMap((_, i) => effectiveSelected.has(i)
       ? [fromTable ? project.bboxRows[i]?.user_edits : undefined] : []);
   }, [buildings, effectiveSelected, project.bboxRows, project.lookedUpBuildings, project.lookedUpBuilding]);

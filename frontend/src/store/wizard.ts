@@ -20,8 +20,7 @@ const STEPS: StepDef[] = [
   { number: 2, label: "Building Data & Prioritisation", path: "/step/2" },
   { number: 3, label: "Select & Baseline",    path: "/step/3" },
   { number: 4, label: "Renovation Calculator", path: "/step/4" },
-  { number: 5, label: "Staged Plan",          path: "/step/5" },
-  { number: 6, label: "Report",               path: "/step/6" },
+  { number: 5, label: "Report",               path: "/step/5" },
 ];
 
 /* ── Renovation simulation result types ── */
@@ -298,8 +297,8 @@ interface ProjectState {
   /* Step 4 — the user's own values over the heating-system catalogue defaults,
      keyed by catalogue currency ("SEK" Gothenburg, "GBP" UK). Absent = defaults. */
   hvacOverrides?: Record<string, HvacOverrides>;
-  /* Step 5 — the staged plan: the user's settings and the last result (a
-     snapshot the Step 6 report prints). See pages/StagedPlan.tsx. */
+  /* Step 4.5 — the staged plan: the user's settings and the last result (a
+     snapshot the Step 5 report prints). See pages/StagedPlan.tsx. */
   stagedPlan?: StagedPlanState | null;
 }
 

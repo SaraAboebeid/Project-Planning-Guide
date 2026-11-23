@@ -1,4 +1,4 @@
-/* Step 5 — Staged plan: the packages chosen in Step 4, spread over the years
+/* Step 4.5 — Staged plan (a view of Step 4): the packages chosen in Step 4, spread over the years
    within a budget.
 
    Each building's package is split into one step per component
@@ -13,7 +13,7 @@
    The plan is solved for each energy-price future and compared with minimax
    regret. "Year done → re-plan" records a year's steps as carried out and
    re-optimises the rest (a rolling plan). The result is saved with the project
-   and printed in the Step 6 report. */
+   and printed in the Step 5 report. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, Target, Scale } from "lucide-react";
 import { useWizardStore, type StagedMilestone, type StagedPlanState } from "../store/wizard";
@@ -43,7 +43,8 @@ const assumption = (c: Country, key: string) => ASSUMPTIONS[c].find((a) => a.key
 const input = { background: "#0d1117", color: "#fff", border: `1px solid ${white(0.15)}`, borderRadius: 7, padding: "5px 8px", fontSize: 13 } as const;
 const btn = (primary = false) => ({ padding: "6px 12px", borderRadius: 8, border: `1px solid ${primary ? ACCENT : white(0.18)}`, background: primary ? `${ACCENT}22` : "transparent", color: primary ? "#E5D4FA" : white(0.85), fontSize: 12.5, fontWeight: 600, cursor: "pointer" }) as const;
 
-export default function StagedPlan() {
+/** `embedded`: shown as view 4.5 inside Step 4 (no page title of its own). */
+export default function StagedPlan({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const project = useWizardStore((s) => s.project);
   const setProject = useWizardStore((s) => s.setProject);
@@ -186,7 +187,7 @@ export default function StagedPlan() {
     : m.kind === "portfolio-pct" ? t("EU {y}: the plan's buildings −{v} % energy on average", { y: m.year, v: m.value ?? "?" })
     : t("{y}: every building ≤ {v} kWh/m²", { y: m.year, v: m.value ?? "?" });
 
-  /* save a snapshot for the Step 6 report */
+  /* save a snapshot for the Step 5 report */
   useEffect(() => {
     if (!timeline || !plan) return;
     const result: StagedPlanState["result"] = {
@@ -222,11 +223,15 @@ export default function StagedPlan() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "4px 0 30px" }}>
+      {embedded ? (
+        <p style={{ margin: 0, color: white(0.6), fontSize: 13 }}>{t("Spread the packages chosen above over the years within a budget. Enter the number of years and the budget; the optimiser decides which measure is done in which year and recalculates the timeline.")}</p>
+      ) : (
       <div>
-        <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: ACCENT, fontWeight: 700 }}>{t("Renovation Planning · Step 5")}</div>
+        <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: ACCENT, fontWeight: 700 }}>{t("Renovation Planning · Step 4")}</div>
         <h1 style={{ margin: "4px 0", fontSize: 24, color: "#fff" }}>{t("Staged plan")}</h1>
         <p style={{ margin: 0, color: white(0.6), fontSize: 13.5 }}>{t("Spread the packages chosen in Step 4 over the years within a budget. Enter the number of years and the budget; the optimiser decides which measure is done in which year and recalculates the timeline.")}</p>
       </div>
+      )}
 
       {!buildings.length ? (
         <div style={{ padding: 18, borderRadius: 12, background: white(0.03), border: `1px solid ${white(0.08)}`, color: white(0.7) }}>

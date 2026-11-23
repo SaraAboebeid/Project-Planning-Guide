@@ -13,6 +13,19 @@
    settings); "," and tab work too. Quoted fields ("Storgatan 1, Göteborg") are
    handled. Example: /examples/building_list_example.csv */
 
+/** Read an uploaded text file whatever Excel saved it as. Swedish Excel's
+ *  "CSV (semikolonavgränsad)" is Windows-1252, not UTF-8, so `file.text()`
+ *  would turn "Göteborg" into "G�teborg" and the address would not match.
+ *  UTF-16 (Excel "Unicode text") by its byte-order mark; else strict UTF-8,
+ *  falling back to Windows-1252 when the bytes are not valid UTF-8. */
+export async function readTextFile(file: Blob): Promise<string> {
+  const b = new Uint8Array(await file.arrayBuffer());
+  if (b[0] === 0xff && b[1] === 0xfe) return new TextDecoder("utf-16le").decode(b);
+  if (b[0] === 0xfe && b[1] === 0xff) return new TextDecoder("utf-16be").decode(b);
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(b); }
+  catch { return new TextDecoder("windows-1252").decode(b); }
+}
+
 export interface CsvBuildingRow {
   line: number;          // 1-based line in the file (for messages)
   address: string | null;

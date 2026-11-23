@@ -239,12 +239,12 @@ export default function RenovationReport() {
   const materials    = project.simulationMaterials ?? {};
   const components   = project.renovationEnvelopeComponents ?? [];
   const buildings    = useMemo(() => {
-    const all = project.lookedUpBuildings.length > 0
-      ? project.lookedUpBuildings
-      : project.lookedUpBuilding
-        ? [project.lookedUpBuilding]
-        : project.bboxRows.length > 0
-          ? project.bboxRows.map(recordToLookup)
+    const all = project.bboxRows.length > 0
+      ? project.bboxRows.map(recordToLookup)
+      : project.lookedUpBuildings.length > 0
+        ? project.lookedUpBuildings
+        : project.lookedUpBuilding
+          ? [project.lookedUpBuilding]
           : [];
     // The report describes the project Steps 3-4 analysed, which is the Step 3
     // shortlist - not everything that was selected back in Step 2.
@@ -951,13 +951,13 @@ export default function RenovationReport() {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
-            {t("Renovation Planning · Step 6")}
+            {t("Renovation Planning · Step 5")}
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 900, color: "#fff", margin: "0 0 6px" }}>
             {project.projectName || t("Renovation Report")}
           </h1>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
-            {t("Everything from Steps 1-5, ready to share or save as PDF.")}
+            {t("Everything from Steps 1-4, ready to share or save as PDF.")}
           </p>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", margin: "4px 0 0" }}>
             {locationText} · {buildings.length} {buildings.length !== 1 ? t("buildings") : t("building")} · {components.length} {components.length !== 1 ? t("components") : t("component")}
@@ -1384,7 +1384,7 @@ export default function RenovationReport() {
         </Card>
       )}
 
-      {/* ── Staged plan (Step 5) ── */}
+      {/* ── Staged plan (Step 4.5) ── */}
       {staged && stagedSettings && (
         <Card accent="#B98BE8">
           <SectionTitle icon={<CalendarClock size={15} color="#B98BE8" />} title={t("Staged plan")} />

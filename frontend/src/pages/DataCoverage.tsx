@@ -11,6 +11,7 @@ import FastHeatModelPanel from "../components/FastHeatModelPanel";
 import RetrofitPriorityPanel from "../components/RetrofitPriorityPanel";
 import ModelScopeNotice from "../components/ModelScopeNotice";
 import { buildingUseLabel } from "../utils/useLabels";
+import { readTextFile } from "../utils/buildingCsv";
 import { makeBuildingKeys, type PriorityInput } from "../utils/retrofitPriority";
 import { useT, translate } from "../i18n";
 import {
@@ -995,11 +996,56 @@ function deriveStats(rows: BuildingRecord[]): BboxStats {
   };
 }
 
+/* Address / CSV projects: one table row per address. Each point's
+   neighbourhood (~80 m) is fetched with the same list endpoint an area uses, and
+   the row with the same street address is taken, else the nearest building
+   within 100 m. A building matched twice (two entrances of one block) appears
+   once. Small per-point boxes, not one box over all points — 50 addresses spread
+   over a city would otherwise pull tens of thousands of rows. */
+type PointsReport = { merged: { input: string; into: string }[]; missing: string[] };
+async function rowsForPoints(points: AddressPoint[], country: string | null | undefined, report?: PointsReport): Promise<BuildingRecord[]> {
+  const norm = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  const out: (BuildingRecord | null)[] = new Array(points.length).fill(null);
+  let next = 0;
+  async function worker() {
+    while (next < points.length) {
+      const i = next++;
+      const p = points[i]!;
+      const dLat = 0.0007, dLon = dLat / Math.cos((p.lat * Math.PI) / 180);
+      try {
+        const rows = await api.buildingsBboxList(p.lat + dLat, p.lat - dLat, p.lon + dLon, p.lon - dLon, undefined, country);
+        const want = norm(p.address);
+        const byAddr = want ? rows.find((r) => norm(r.address) === want || norm(r.all_addresses).split(" | ").includes(want)) : undefined;
+        const dist = (r: BuildingRecord) => Math.hypot((r.lat - p.lat) * 111_320, (r.lon - p.lon) * 111_320 * Math.cos((p.lat * Math.PI) / 180));
+        const nearest = [...rows].sort((a, b) => dist(a) - dist(b))[0];
+        // Step 1 points are footprint centroids when the address was matched
+        // locally, so a building right at the point is the one; the street
+        // address decides only for geocoded points that land beside it.
+        out[i] = (nearest && dist(nearest) <= 15 ? nearest : null) ?? byAddr ?? (nearest && dist(nearest) <= 100 ? nearest : null);
+      } catch { /* backend busy — this address just has no row */ }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(6, points.length) }, worker));
+  // Say what was merged or not found, so the row count never silently differs
+  // from the number of addresses uploaded.
+  const seen = new Map<string, string>();
+  const label = (i: number) => points[i]!.address || `${points[i]!.lat.toFixed(5)}, ${points[i]!.lon.toFixed(5)}`;
+  return out.filter((r, i): r is BuildingRecord => {
+    if (!r) { report?.missing.push(label(i)); return false; }
+    const k = `${r.lat.toFixed(6)},${r.lon.toFixed(6)}`;
+    if (seen.has(k)) { report?.merged.push({ input: label(i), into: seen.get(k)! }); return false; }
+    seen.set(k, r.address || label(i));
+    return true;
+  });
+}
+type AddressPoint = { lat: number; lon: number; address: string | null };
+
 function BboxDataBanner({
   bboxStats: bboxStatsProp,
   bbox,
   district,
   polygon,
+  points,
   onRowsChange,
   onSelectionChange,
 }: {
@@ -1007,12 +1053,15 @@ function BboxDataBanner({
   bbox: { north: number; south: number; east: number; west: number } | null;
   district?: string | null;
   polygon?: string | null;
+  /** Address / CSV mode: the buildings picked in Step 1. */
+  points?: AddressPoint[] | null;
   onRowsChange?: (rows: BuildingRecord[]) => void;
   onSelectionChange?: (selected: Set<number>) => void;
 }) {
   const t = useT();
   const [loading, setLoading]         = useState(false);
   const [rows, setRows]               = useState<BuildingRecord[] | null>(null);
+  const [pointsReport, setPointsReport] = useState<PointsReport | null>(null);
   // Each row's key, fixed when the rows are LOADED: an edited address must not
   // re-key a building and orphan its edits, renovations or façade results.
   const [rowKeys, setRowKeys] = useState<string[]>([]);
@@ -1137,15 +1186,17 @@ function BboxDataBanner({
   // and open the table automatically once they're loaded. District mode
   // additionally auto-selects every building (the whole neighborhood is in scope).
   useEffect(() => {
-    if ((bbox || district) && !rows) loadRows().then(() => setViewOpen(true));
+    if ((bbox || district || points?.length) && !rows) loadRows().then(() => setViewOpen(true));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadRows() {
-    if (!bbox && !district) return;
+    if (!bbox && !district && !points?.length) return;
     setLoading(true);
     try {
       const fresh = district
         ? await api.buildingsByDistrict(district)
+        : points?.length
+        ? await (async () => { const rep: PointsReport = { merged: [], missing: [] }; const r = await rowsForPoints(points, country, rep); setPointsReport(rep); return r; })()
         : await api.buildingsBboxList(bbox!.north, bbox!.south, bbox!.east, bbox!.west, polygon ?? undefined, country);
       // Re-apply the user's earlier table edits on top of the server's rows.
       const keys = makeBuildingKeys(fresh);
@@ -1158,7 +1209,7 @@ function BboxDataBanner({
       setRows(data);
       // Auto-select the whole selection (district or drawn shape) so Steps 3-4
       // simulate all of it (the user can still uncheck buildings to narrow).
-      if (district || polygon) setSelected(new Set(data.map((_, i) => i)));
+      if (district || polygon || points?.length) setSelected(new Set(data.map((_, i) => i)));
     } finally {
       setLoading(false);
     }
@@ -1274,7 +1325,7 @@ function BboxDataBanner({
 
   async function handleImportFile(file: File) {
     setImportMsg(t("Reading…"));
-    try { applyImportText(await file.text(), `"${file.name}"`); }
+    try { applyImportText(await readTextFile(file),`"${file.name}"`); }
     catch (e) { setImportMsg(t("Import failed") + ": " + (e as Error).message); }
   }
 
@@ -1413,25 +1464,32 @@ function BboxDataBanner({
           <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
           <div>
             <span className="text-sm font-bold text-white/85">{t("{n} buildings", { n: bboxStats.count.toLocaleString() })}</span>
-            <span className="text-xs text-white/35 ml-2">{t("Bounding box")}</span>
+            <span className="text-xs text-white/35 ml-2">{t(points?.length ? "From your address list" : district ? "Neighbourhood" : "Bounding box")}</span>
             {addrProgress && addrProgress.done < addrProgress.total && (
               <span className="text-[11px] text-white/45 ml-3">
                 {t("Looking up addresses from OpenStreetMap…")} {addrProgress.done}/{addrProgress.total}
               </span>
+            )}
+            {pointsReport && (pointsReport.merged.length > 0 || pointsReport.missing.length > 0) && (
+              <div className="text-[11.5px] mt-1" style={{ color: "#E8B10C" }}>
+                {t("{a} addresses uploaded → {b} buildings.", { a: (points?.length ?? 0), b: rows?.length ?? 0 })}{" "}
+                {pointsReport.merged.length > 0 && <>{t("Entrances of the same building are shown once:")} {pointsReport.merged.map((m) => `${m.input} → ${m.into}`).join(" · ")}. </>}
+                {pointsReport.missing.length > 0 && <>{t("No building found at:")} {pointsReport.missing.join(" · ")}.</>}
+              </div>
             )}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0 ml-3">
           <button
             onClick={handleView}
-            disabled={loading || !bbox}
+            disabled={loading || (!bbox && !district && !points?.length)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
             {loading ? t("Loading…") : viewOpen ? <><ChevronUp className="w-3 h-3" /> {t("Hide")}</> : t("Buildings")}
           </button>
           <button
             onClick={rows ? handleDownload : handleLoadAndDownload}
-            disabled={loading || !bbox}
+            disabled={loading || (!bbox && !district && !points?.length)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
             <Download className="w-3 h-3" /> {t("Export")}
@@ -2108,7 +2166,7 @@ function BuildingDataBanner({
   };
   const handleSingleFile = async (file: File) => {
     setImportMsg(t("Reading…"));
-    try { applySingleImport(await file.text(), `"${file.name}"`); }
+    try { applySingleImport(await readTextFile(file),`"${file.name}"`); }
     catch (e) { setImportMsg(t("Import failed") + ": " + (e as Error).message); }
   };
 
@@ -2432,6 +2490,14 @@ export default function DataCoverage() {
   const buildings  = project.lookedUpBuildings ?? [];
   const bboxStats  = project.bboxStats ?? null;
   const isMulti    = buildings.length > 1;
+  // Address / CSV projects get the same editable table as an area (owner,
+  // renovations, edits) — one row per address from Step 1.
+  const addressPoints = useMemo<AddressPoint[]>(() => (bboxStats || project.district) ? [] :
+    // A CSV Name is stored as "Name – Address"; only the address part is matched.
+    (project.buildingPoints ?? []).map((p, i) => ({ lat: p.lat, lon: p.lon, address: (p.label ?? "").split(" – ").pop()?.trim() || buildings[i]?.address || null })),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [project.buildingPoints, buildings.length, bboxStats, project.district]);
+  const tableMode = !!(bboxStats || project.district || addressPoints.length);
 
 
 
@@ -2707,7 +2773,7 @@ export default function DataCoverage() {
       </div>
 
       {/* EUBUCCO building data banner (single building) */}
-      {!isMulti && building && !bboxStats && (
+      {!isMulti && building && !tableMode && (
         <BuildingDataBanner
           building={building}
           projectType={project.projectType}
@@ -2715,7 +2781,7 @@ export default function DataCoverage() {
       )}
 
       {/* EUBUCCO multi-building banner (multiple addresses selected) */}
-      {isMulti && !bboxStats && (
+      {isMulti && !tableMode && (
         <MultiBuildingDataBanner
           buildings={buildings}
           projectType={project.projectType}
@@ -2775,12 +2841,14 @@ export default function DataCoverage() {
           peerBuildings={peerBuildings}
           cityId={seCityId(project.city)}
           priorityItems={priorityItems}
-          overview={(bboxStats || project.district) ? (
+          overview={tableMode ? (
             <BboxDataBanner
+              key={addressPoints.length ? `pts-${addressPoints.map((p) => `${p.lat},${p.lon}`).join("|")}` : "area"}
               bboxStats={bboxStats}
-              bbox={project.currentBbox ?? null}
+              bbox={addressPoints.length ? null : project.currentBbox ?? null}
               district={project.district ?? null}
               polygon={project.selectionPolygon ?? null}
+              points={addressPoints.length ? addressPoints : null}
               onRowsChange={setBboxRows}
               onSelectionChange={setBboxSelectedIdx}
             />
