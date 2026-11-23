@@ -11,7 +11,7 @@ import { useLang } from "../i18n";
 import { APPS, openFacade, openHistory } from "./launch";
 import { useStock } from "../useStock";
 import { getSetting } from "../stockStore";
-import { DEFAULT_WEIGHT_SETTINGS, rankRows, weightsFrom, type WeightSettings } from "../ranking";
+import { DEFAULT_WEIGHT_SETTINGS, migrateWeights, rankRows, weightsFrom, type WeightSettings } from "../ranking";
 import { loadMapData, saveEdits, statusOf, toggle, type MapData } from "../stock";
 
 const BRIDGE_LABELS = [
@@ -35,7 +35,7 @@ export default function Viewer3D() {
   const [ws, setWs] = useState<WeightSettings>(DEFAULT_WEIGHT_SETTINGS);
   const [data, setData] = useState<MapData | null>(null);
   useEffect(() => {
-    getSetting<WeightSettings>("priority-weights").then((v) => v && setWs({ ...DEFAULT_WEIGHT_SETTINGS, ...v }));
+    getSetting<WeightSettings>("priority-weights").then((v) => v && setWs(migrateWeights({ ...DEFAULT_WEIGHT_SETTINGS, ...v })));
     loadMapData().then(setData, () => {});
   }, []);
 

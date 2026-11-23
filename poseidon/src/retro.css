@@ -149,6 +149,9 @@ button.btn.mini { min-width: 0; min-height: 16px; padding: 0 4px; line-height: 1
 /* a catalogue value the user changed (replaces the catalogue's) */
 .cat-edited { background: #fff6c8; color: #0000a0; font-weight: bold; }
 input.cell-input { min-height: 18px; padding: 0 2px; font: inherit; }
+/* wide analysis tables: let long column headers wrap instead of pushing columns off-screen */
+table.list.wrap-head th { white-space: normal; vertical-align: bottom; max-width: 110px; }
+table.list.wrap-head th:first-child { max-width: none; }
 
 input.field, select.field, textarea.field {
   font: inherit; color: var(--text);

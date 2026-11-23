@@ -2,7 +2,7 @@
    photos per side, run through the ML defect detector + AI vision
    (src/facadeRun.ts). Boxes: ML solid, AI dashed. The saved summary is the F
    criterion of the Renovation Wizard's prioritisation. */
-import { useRef } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useWM, type Win } from "../desktop/wm";
 import { useLang } from "../i18n";
 import { useStore } from "../stockStore";
@@ -15,31 +15,65 @@ const CLASS_COLOR: Record<string, string> = {
   crack: "#d00000", bulge: "#d00000", corrosion: "#b45309", abscission: "#b45309", leakage: "#1d4ed8",
 };
 
-function ShotView({ shot }: { shot: Shot }) {
+/** The photo with its defect boxes (ML solid, AI dashed), at any size. */
+function ShotImage({ shot, style }: { shot: Shot; style?: CSSProperties }) {
   const [, t] = useLang();
   return (
-    <div className="col" style={{ gap: 2 }}>
-      <div style={{ position: "relative", lineHeight: 0 }}>
-        <img src={shot.url} alt={shot.name} style={{ width: "100%", display: "block" }} />
-        {shot.status === "done" && (
-          <svg viewBox={`0 0 ${shot.width} ${shot.height}`} preserveAspectRatio="none"
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-            {shot.dets.map((d, i) => (
-              <rect key={i} x={d.box[0]} y={d.box[1]} width={d.box[2] - d.box[0]} height={d.box[3] - d.box[1]}
-                fill="none" stroke={CLASS_COLOR[d.label] ?? "#d00000"} strokeWidth={Math.max(2, shot.width / 250)}
-                strokeDasharray={d.source === "ai" ? `${shot.width / 80} ${shot.width / 120}` : undefined}>
-                <title>{`${t(d.label)} ${Math.round(d.score * 100)}% · ${d.source === "ai" ? "AI vision" : "ML"}${d.note ? ` — ${d.note}` : ""}`}</title>
-              </rect>
-            ))}
-          </svg>
-        )}
+    <div style={{ position: "relative", lineHeight: 0, ...style }}>
+      <img src={shot.url} alt={shot.name} style={{ width: "100%", display: "block" }} />
+      {shot.status === "done" && (
+        <svg viewBox={`0 0 ${shot.width} ${shot.height}`} preserveAspectRatio="none"
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+          {shot.dets.map((d, i) => (
+            <rect key={i} x={d.box[0]} y={d.box[1]} width={d.box[2] - d.box[0]} height={d.box[3] - d.box[1]}
+              fill="none" stroke={CLASS_COLOR[d.label] ?? "#d00000"} strokeWidth={Math.max(2, shot.width / 250)}
+              strokeDasharray={d.source === "ai" ? `${shot.width / 80} ${shot.width / 120}` : undefined}>
+              <title>{`${t(d.label)} ${Math.round(d.score * 100)}% · ${d.source === "ai" ? "AI vision" : "ML"}${d.note ? ` — ${d.note}` : ""}`}</title>
+            </rect>
+          ))}
+        </svg>
+      )}
+    </div>
+  );
+}
+
+const defectSummary = (shot: Shot, t: (k: string) => string) => Object.entries(shot.dets.reduce<Record<string, number>>((a, d) => ({ ...a, [d.label]: (a[d.label] ?? 0) + 1 }), {}))
+  .map(([k, n]) => `${n} ${t(k)}`).join(", ");
+
+/** Full-window view of one photo; click or Esc closes it. */
+function ShotZoom({ shot, onClose }: { shot: Shot; onClose: () => void }) {
+  const [, t] = useLang();
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [onClose]);
+  // Fit inside the viewport while keeping the aspect ratio.
+  const ratio = shot.width && shot.height ? shot.width / shot.height : 1;
+  const w = `min(94vw, ${Math.round(86 * ratio)}vh)`;
+  return (
+    <div className="modal-shade" onClick={onClose} style={{ background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6, cursor: "zoom-out" }}
+      role="dialog" aria-label={shot.name}>
+      <ShotImage shot={shot} style={{ width: w, boxShadow: "0 0 0 2px #fff" }} />
+      <div style={{ color: "#fff", fontSize: 13 }}>
+        {shot.dets.length ? defectSummary(shot, t) : t("no defects found")} · {shot.name} — {t("click or press Esc to close")}
       </div>
+    </div>
+  );
+}
+
+function ShotView({ shot }: { shot: Shot }) {
+  const [, t] = useLang();
+  const [zoom, setZoom] = useState(false);
+  return (
+    <div className="col" style={{ gap: 2 }}>
+      <div onClick={() => setZoom(true)} style={{ cursor: "zoom-in" }} title={t("Click to enlarge")}><ShotImage shot={shot} /></div>
+      {zoom && <ShotZoom shot={shot} onClose={() => setZoom(false)} />}
       <div className="small" title={shot.name}>
         {shot.status === "running" ? t("Detecting defects…")
           : shot.status === "error" ? <span style={{ color: "var(--bad)" }}>{shot.error}</span>
           : shot.dets.length
-            ? <b style={{ color: "var(--bad)" }}>{Object.entries(shot.dets.reduce<Record<string, number>>((a, d) => ({ ...a, [d.label]: (a[d.label] ?? 0) + 1 }), {}))
-                .map(([k, n]) => `${n} ${t(k)}`).join(", ")}</b>
+            ? <b style={{ color: "var(--bad)" }}>{defectSummary(shot, t)}</b>
             : t("no defects found")}
         {shot.pass2 && <span className="muted"> · {t("second AI look…")}</span>}
         <div className="muted" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shot.name}</div>

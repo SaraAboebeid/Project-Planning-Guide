@@ -20,9 +20,19 @@ export const hasDefaultU = (r: Row) => (["wall", "roof", "win"] as const).some((
 
 export type WeightMode = "preset" | "manual" | "ahp";
 export interface WeightSettings { mode: WeightMode; preset: string; manual: CriterionWeights; pairs: Record<string, number> }
+/** Poseidon starts from equal weights (the user's choice, 2026-11-23); the user then adjusts them. */
+export const EQUAL_WEIGHTS: CriterionWeights = { E: 1 / 3, F: 1 / 3, C: 1 / 3 };
 export const DEFAULT_WEIGHT_SETTINGS: WeightSettings = {
-  mode: "preset", preset: "Balanced (default)", manual: DEFAULT_WEIGHTS, pairs: { "E>F": 1, "E>C": 2, "F>C": 2 },
+  mode: "manual", preset: "Balanced (default)", manual: EQUAL_WEIGHTS, pairs: { "E>F": 1, "E>C": 1, "F>C": 1 },
 };
+/** Saved settings that still hold the old default — the "Balanced (default)"
+ *  preset (45/35/20), or those values on the sliders — become equal weights. */
+export function migrateWeights(ws: WeightSettings): WeightSettings {
+  if (ws.mode === "preset" && ws.preset === "Balanced (default)") return { ...ws, mode: "manual", manual: EQUAL_WEIGHTS };
+  const m = ws.manual, d = DEFAULT_WEIGHTS;
+  const untouched = m && Math.abs(m.E - d.E) < 1e-9 && Math.abs(m.F - d.F) < 1e-9 && Math.abs(m.C - d.C) < 1e-9;
+  return untouched ? { ...ws, manual: EQUAL_WEIGHTS } : ws;
+}
 
 /** The weights in use for saved settings (and the AHP result behind them). */
 export function weightsFrom(ws: WeightSettings): { weights: CriterionWeights; ahp: AhpResult } {

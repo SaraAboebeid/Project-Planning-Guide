@@ -11,7 +11,7 @@ export const APPS: Record<SimpleApp, { title: string; label: string; icon: IconN
   stockmap: { title: "Poseidon Map", label: "Poseidon\nMap", icon: "map", w: 1060, h: 660 },
   stocktable: { title: "Building Table", label: "Building\nTable", icon: "sheet", w: 1120, h: 600 },
   csvimport: { title: "Import building list (CSV)", label: "Import CSV", icon: "report", w: 640, h: 560 },
-  wizard: { title: "Renovation Wizard", label: "Renovation\nWizard", icon: "wizard", w: 1100, h: 680 },
+  wizard: { title: "Renovation Wizard", label: "Renovation\nWizard", icon: "wizard", w: 1480, h: 760 },
   viewer: { title: "3D Map – Gothenburg", label: "3D Map", icon: "globe", w: 1000, h: 640, max: true },
   reports: { title: "Reports", label: "Reports", icon: "folder", w: 620, h: 380 },
   catalogue: { title: "Renovation catalogue", label: "Catalogue", icon: "notepad", w: 1180, h: 700 },

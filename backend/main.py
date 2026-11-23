@@ -35,6 +35,7 @@ from backend import accounts
 from backend import pv_optimizer
 from backend import poseidon_stock
 from backend import poseidon_catalogue
+from backend import poseidon_staged
 
 app = FastAPI(title="Project Planning Guide API", version="0.1.0")
 # Email sign-in + saved projects (backend/accounts.py).
@@ -43,6 +44,8 @@ app.include_router(accounts.router)
 app.include_router(poseidon_stock.router)
 # Poseidon catalogue: edits, uploaded and supplier-API catalogues (backend/poseidon_catalogue.py).
 app.include_router(poseidon_catalogue.router)
+# Poseidon staged renovation plan: MILP timing of measures within a budget (backend/poseidon_staged.py).
+app.include_router(poseidon_staged.router)
 
 app.add_middleware(
     CORSMiddleware,
