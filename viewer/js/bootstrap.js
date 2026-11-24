@@ -44,7 +44,8 @@
       const r = await fetch('/api/se/cities');
       const hit = r.ok && (await r.json()).cities.find(c => c.id === wanted && c.built && c.center);
       if (hit) {
-        city = { id: hit.id, name: hit.name, lat: hit.center[0], lon: hit.center[1], camera_height: 800, data_file: `buildings_${hit.id}.json` };
+        // center = the densest built-up spot (tools/se/city_view_center.py): look AT it.
+        city = { id: hit.id, name: hit.name, lat: hit.center[0], lon: hit.center[1], camera_height: 800, data_file: `buildings_${hit.id}.json`, aim_at_center: true };
         profile.cities.push(city);
       }
     } catch (_) { /* backend unreachable: fall back to the default city */ }
@@ -56,6 +57,7 @@
   window.VIEWER_CITY = city;
   window.VIEW_CENTER = { lon: city.lon, lat: city.lat };
   window.VIEW_HEIGHT = city.camera_height || 800;
+  window.VIEW_AIM_AT_CENTER = !!city.aim_at_center;
 
   // The Swedish page is built as "Gothenburg 3D"; name the city actually loaded
   // (e.g. ?city=malmo) in the tab, the loading screen and the sidebar header.

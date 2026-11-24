@@ -1007,9 +1007,16 @@ const VIEW_AT = window.VIEW_CENTER || MAP_CENTER;
 // Pull the default city "first shot" back a bit for a wider establishing view;
 // a bbox-focused entry (?bbox=) keeps its own tighter framing.
 const VIEW_ALT = (window.VIEW_HEIGHT || 800) * (window.FOCUS_BBOX ? 1 : 1.7);
+// The camera looks north, 40 degrees down, so it SEES the ground ~VIEW_ALT/tan(40)
+// north of where it stands. Registry-built cities give the spot to look AT (their
+// densest built-up area), so stand that far south of it - otherwise Nacka opened
+// looking at open water. Gothenburg's hand-picked view is unchanged.
+const VIEW_CAM = (window.VIEW_AIM_AT_CENTER && !window.FOCUS_BBOX)
+  ? { lon: VIEW_AT.lon, lat: VIEW_AT.lat - (VIEW_ALT / Math.tan(Cesium.Math.toRadians(40))) / 111320 }
+  : VIEW_AT;
 
 viewer.camera.flyTo({
-  destination: Cesium.Cartesian3.fromDegrees(VIEW_AT.lon, VIEW_AT.lat, VIEW_ALT),
+  destination: Cesium.Cartesian3.fromDegrees(VIEW_CAM.lon, VIEW_CAM.lat, VIEW_ALT),
   orientation: { heading:0, pitch: Cesium.Math.toRadians(-40), roll:0 },
   duration: 0,
 });
@@ -1134,7 +1141,7 @@ updateLegend('use');
 // ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-reset').addEventListener('click', () => {
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(VIEW_AT.lon, VIEW_AT.lat, VIEW_ALT),
+    destination: Cesium.Cartesian3.fromDegrees(VIEW_CAM.lon, VIEW_CAM.lat, VIEW_ALT),
     orientation: { heading:0, pitch: Cesium.Math.toRadians(-40), roll:0 },
     duration: 1.5,
   });

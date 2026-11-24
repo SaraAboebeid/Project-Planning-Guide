@@ -148,8 +148,11 @@ def main() -> int:
         result = {"buildings": len(recs), "with_energy": sum(1 for r in recs if r.get("energy") is not None),
                   "epw": epw}
         dyn = json.loads(se_cities.DYNAMIC_FILE.read_text(encoding="utf-8"))
-        dyn[city_id].update({"epw": epw, "built": True, "stats": result,
-                             "center": [round((la + LA) / 2, 5), round((lo + LO) / 2, 5)]})
+        # View centre = the densest built-up spot, not the bounding-box middle
+        # (Nacka's was open water and forest - the 3D viewer looked broken there).
+        from city_view_center import center_for
+        center = center_for(city_id) or [round((la + LA) / 2, 5), round((lo + LO) / 2, 5)]
+        dyn[city_id].update({"epw": epw, "built": True, "stats": result, "center": center})
         se_cities.DYNAMIC_FILE.write_text(json.dumps(dyn, ensure_ascii=False, indent=1), encoding="utf-8")
         st.d.update(state="done", finished=time.time(), result=result)
         st.log(f"done: {result['buildings']:,} buildings, {result['with_energy']:,} with EPC energy")
