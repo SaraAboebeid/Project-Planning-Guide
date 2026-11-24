@@ -3,6 +3,8 @@ export const SV_STEP1: Record<string, string> = {
   // ── Project name ──
   "e.g. {name}": "t.ex. {name}",
   "Neighbourhood Retrofit Study": "Renoveringsstudie för ett område",
+  "e.g. a neighbourhood in {city}": "t.ex. en stadsdel i {city}",
+  "e.g. the neighbourhood's name": "t.ex. stadsdelens namn",
   "{city} Retrofit Study": "Renoveringsstudie {city}",
   "Lindholmen Retrofit Study": "Renoveringsstudie Lindholmen",
   "Rosengård Retrofit Study": "Renoveringsstudie Rosengård",
@@ -141,8 +143,8 @@ export const SV_STEP1: Record<string, string> = {
     "Flera uppgångar i samma byggnad (t.ex. Mandolingatan 80 och 84) blir en byggnad.",
   "Swedish addresses are first matched against the planner's own building data (instant); only the rest are looked up on the map, about one per second.":
     "Svenska adresser matchas först mot planerarens egen byggnadsdata (direkt); bara resten söks upp på kartan, ungefär en per sekund.",
-  "With Lat and Lon (WGS84, e.g. 57,65735) no lookup is needed — the last row of the example. Up to 500 buildings per file.":
-    "Med Lat och Lon (WGS84, t.ex. 57,65735) behövs ingen sökning – exemplets sista rad. Upp till 500 byggnader per fil.",
+  "Optional Lat and Lon columns (WGS84, e.g. 57.65735 and 11.91671) skip the address lookup. Up to 500 buildings per file.":
+    "Valfria kolumner Lat och Lon (WGS84, t.ex. 57,65735 och 11,91671) gör att adressökningen hoppas över. Upp till 500 byggnader per fil.",
 
   // ── Validation / Continue ──
   "Pick a location inside the covered area to continue.": "Välj en plats inom det täckta området för att fortsätta.",

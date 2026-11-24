@@ -589,7 +589,20 @@ const BUILDING_CHUNK_SIZE = 12000;
 let colorMode = 'use';
 let buildingPrimitives = [];
 
+// "Energy certificate" mode: does the building have certificate data (energy
+// figure or class)? Outbuildings (komplement: garages, sheds, waste rooms) never
+// need a certificate, so they are greyed out and left out of the legend counts.
+const EPC_HAS_COLOR = Cesium.Color.fromBytes(50, 130, 220, 215);
+const EPC_NONE_COLOR = Cesium.Color.fromBytes(240, 140, 30, 215);
+const EPC_EXCLUDED_COLOR = Cesium.Color.fromBytes(60, 60, 70, 110);
+function hasCertificateData(b) { return !!b.eclass || b.energy != null; }
+
 function getBuildingColor(b) {
+  if (colorMode === 'epc') {
+    if (b.use_cat === 'komplement') return EPC_EXCLUDED_COLOR;
+    return hasCertificateData(b) ? EPC_HAS_COLOR : EPC_NONE_COLOR;
+  }
+  if ((colorMode === 'eclass' || colorMode === 'year') && b.use_cat === 'komplement') return EPC_EXCLUDED_COLOR;
   if (colorMode === 'eclass')
     return (b.eclass && ECLASS_COLORS[b.eclass]) ? ECLASS_COLORS[b.eclass] : Cesium.Color.fromBytes(60,60,70,140);
   if (colorMode === 'year')
@@ -1102,8 +1115,9 @@ viewer.camera.flyTo({
 // ─────────────────────────────────────────────────────────────────
 function setColorMode(mode) {
   colorMode = mode;
-  ['use','eclass','year'].forEach(m => {
-    document.getElementById('btn-'+m).classList.toggle('active', m === mode);
+  ['use','eclass','year','epc'].forEach(m => {
+    const btn = document.getElementById('btn-'+m);   // 'epc' has no tab, only the Color By option
+    if (btn) btn.classList.toggle('active', m === mode);
   });
   updateLegend(mode);
   rebuildBuildings();

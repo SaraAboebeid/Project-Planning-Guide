@@ -1,6 +1,6 @@
-ï»¿Address;City;Lat;Lon
-Tunnlandsgatan 13;GÃ¶teborg;;
-AdventsvÃ¤gen 29;GÃ¶teborg;;
-Mandolingatan 20;GÃ¶teborg;;
-JÃ„RNBROTT 155:1;GÃ¶teborg;;
-;;57,65735;11,91671
+sep=,
+Address,City
+Tunnlandsgatan 13,Göteborg
+Adventsvägen 29,Göteborg
+Mandolingatan 20,Göteborg
+JÄRNBROTT 155:1,Göteborg

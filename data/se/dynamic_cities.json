@@ -155,13 +155,53 @@
   "built": true,
   "epw": "SWE_ST_Stockholm.024850_TMYx.2011-2025.epw",
   "stats": {
-   "buildings": 30243,
-   "with_energy": 10029,
+   "buildings": 31743,
+   "with_energy": 8276,
    "epw": "SWE_ST_Stockholm.024850_TMYx.2011-2025.epw"
   },
   "center": [
    59.30557,
    18.24856
+  ]
+ },
+ "stockholm": {
+  "bbox_custom": [
+   17.98,
+   59.295,
+   18.1,
+   59.36
+  ],
+  "name_custom": "Stockholm (central)",
+  "name": "Stockholm (central)",
+  "nuts2": "SE11",
+  "bbox4326": [
+   17.98,
+   59.295,
+   18.1,
+   59.36
+  ],
+  "slug": "stockholm",
+  "eubucco": "data/eubucco/stockholm.gpkg",
+  "kommun": "Stockholm",
+  "region_kommuns": [
+   "Stockholm"
+  ],
+  "kommun_codes": {
+   "Stockholm": "0180"
+  },
+  "kommun_code": "0180",
+  "clip_to_footprints": true,
+  "on_demand": true,
+  "built": true,
+  "epw": "SWE_ST_Stockholm.024850_TMYx.2011-2025.epw",
+  "stats": {
+   "buildings": 9555,
+   "with_energy": 7462,
+   "epw": "SWE_ST_Stockholm.024850_TMYx.2011-2025.epw"
+  },
+  "center": [
+   59.3275,
+   18.04
   ]
  }
 }

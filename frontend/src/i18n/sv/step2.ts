@@ -195,6 +195,17 @@ export const SV_STEP2: Record<string, string> = {
   "{n} buildings": "{n} byggnader",
   "Bounding box": "Avgränsningsruta",
   "From your address list": "Från er adresslista",
+  "Certificate energy (kWh/m²)": "Energideklaration (kWh/m²)",
+  "From the energy declaration's “Specifik energianvändning” (Boverket field EgiSpecifikEnergianvandning): the energy bought per m² of heated floor area (Atemp) per year for space heating, hot water, comfort cooling and the building's own electricity (fans, pumps, lifts). Household electricity is not included. It is bought energy, not the heat the building needs: with a heat pump it counts the electricity the pump uses, so it reads far below the heat demand. Newest declaration for the building.":
+    "Från energideklarationens ”Specifik energianvändning” (Boverkets fält EgiSpecifikEnergianvandning): köpt energi per m² uppvärmd golvarea (Atemp) och år för uppvärmning, varmvatten, komfortkyla och fastighetsel (fläktar, pumpar, hissar). Hushållsel ingår inte. Det är köpt energi, inte byggnadens värmebehov: med värmepump räknas elen som pumpen använder, så värdet ligger långt under värmebehovet. Byggnadens senaste deklaration.",
+  "Inferred from the energy declaration's energy use per energy carrier: the carrier with the most energy wins. Declarations from 2019 on give space heating per carrier under “Energianvändning för uppvärmning” (Boverket fields EgiFjarrvarmeUPPV, EgiPumpMarkUPPV, EgiPumpFranluftUPPV, EgiElDirektUPPV, …); older declarations give the total per carrier (EgiFjarrvarme, EgiPumpMark, …). If the address has several declarations, the one with the most heating energy is used. Blank when the declaration lists no heating energy or the address is not in the register.":
+    "Härleds från energideklarationens energianvändning per energibärare: bäraren med mest energi avgör. Deklarationer från 2019 och framåt anger uppvärmning per bärare under ”Energianvändning för uppvärmning” (Boverkets fält EgiFjarrvarmeUPPV, EgiPumpMarkUPPV, EgiPumpFranluftUPPV, EgiElDirektUPPV, …); äldre deklarationer anger totalen per bärare (EgiFjarrvarme, EgiPumpMark, …). Har adressen flera deklarationer används den med mest uppvärmningsenergi. Tomt när deklarationen saknar uppvärmningsenergi eller adressen inte finns i registret.",
+  "Simulation input — an edit here changes the simulation in Steps 3–4": "Simuleringsindata – en ändring här ändrar simuleringen i steg 3–4",
+  "Reference only — an edit here does not change the simulation": "Endast referens – en ändring här påverkar inte simuleringen",
+  "Simulation input": "Simuleringsindata",
+  "Columns marked": "Kolumner markerade med",
+  "are simulation inputs: after Save, Steps 3–4 simulate with your values. Year, certificate energy, energy class and era are for reference only.":
+    "är simuleringsindata: efter Spara simulerar steg 3–4 med era värden. Byggår, deklarerad energi, energiklass och byggnadsperiod är endast referens.",
   "{a} addresses uploaded → {b} buildings.": "{a} adresser uppladdade → {b} byggnader.",
   "Entrances of the same building are shown once:": "Uppgångar i samma byggnad visas en gång:",
   "No building found at:": "Ingen byggnad hittades vid:",

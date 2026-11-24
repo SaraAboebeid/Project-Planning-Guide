@@ -1052,21 +1052,26 @@ def match_addresses(req: AddressMatchRequest):
         raise HTTPException(413, "At most 5000 addresses per upload")
     buildings = _se_buildings(req.city_id)
     index: dict[str, tuple] = {}
-    for b in buildings:
-        coords = b.get("coordinates") or []
-        c_lat, c_lon = _polygon_centroid(coords)
-        if c_lat == 0.0 and c_lon == 0.0:
-            continue
-        names = [b.get("address") or ""]
-        extra = b.get("all_addresses")
-        if isinstance(extra, list):
-            names += [str(x) for x in extra]
-        elif isinstance(extra, str):
-            names += re.split(r"[;|,]", extra)
-        for n in names:
-            k = _addr_key(n)
-            if k and k not in index:
-                index[k] = (round(c_lat, 6), round(c_lon, 6), (b.get("address") or n).strip())
+
+    def _split(v) -> list[str]:
+        return [str(x) for x in v] if isinstance(v, list) else re.split(r"[;|,]", v) if isinstance(v, str) else []
+
+    # Two passes: a building's own entrances (address / all_addresses) first, then
+    # the full address list of its energy certificate (cert_addresses, kept by
+    # tools/se/place_certificates_by_address.py) for addresses no building claims -
+    # so an entrance resolves to the piece it is on, not to another piece that
+    # shares the certificate.
+    for field_names in (("address", "all_addresses"), ("cert_addresses",)):
+        for b in buildings:
+            coords = b.get("coordinates") or []
+            c_lat, c_lon = _polygon_centroid(coords)
+            if c_lat == 0.0 and c_lon == 0.0:
+                continue
+            for f in field_names:
+                for n in _split(b.get(f)):
+                    k = _addr_key(n)
+                    if k and k not in index:
+                        index[k] = (round(c_lat, 6), round(c_lon, 6), (b.get("address") or n).strip())
     out = []
     for a in req.addresses:
         k = _addr_key(a)
@@ -5809,7 +5814,13 @@ def epc_heating(req: EpcHeatingRequest):
     except FileNotFoundError:
         return {"results": {}, "available": False}
 
-    all_cols = [c for cols in _HEATING_GROUPS.values() for c in cols]
+    # Declarations from 2019 on leave the old per-carrier columns empty and give
+    # the space-heating energy per carrier as "<column>UPPV" instead (hot water
+    # separately as *VV). Read both, so newer certificates get a system too.
+    have = {r[0] for r in con.execute("DESCRIBE epc").fetchall()}
+    groups = {label: [c for base in cols for c in (base, base + "UPPV") if c in have]
+              for label, cols in _HEATING_GROUPS.items()}
+    all_cols = [c for cols in groups.values() for c in cols]
     col_sql = ", ".join(f'"{c}"' for c in all_cols)
     keys = list(wanted.keys())
     placeholders = ", ".join(["?"] * len(keys))
@@ -5836,12 +5847,12 @@ def epc_heating(req: EpcHeatingRequest):
     for row in rows:
         k = row[0]
         group_energy: dict[str, float] = {}
-        for label, cols in _HEATING_GROUPS.items():
+        for label, cols in groups.items():
             tot = 0.0
             for c in cols:
                 v = row[idx[c]]
                 try:
-                    tot += float(v) if v is not None else 0.0
+                    tot += float(str(v).replace(",", ".")) if v is not None else 0.0
                 except (TypeError, ValueError):
                     pass
             if tot > 0:

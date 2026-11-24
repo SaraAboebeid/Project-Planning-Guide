@@ -82,6 +82,11 @@ const HIDE_PROJECT_TYPE = true;
 const HIDE_EXPLORATION = true;
 const ALL_EXPLORATION = ["Baseline Assessment", "Comparison of Renovation Packages", "Multi-objective Optimization"];
 
+// "Key Performance Indicators" is hidden too (2026-11-24, user request). Every KPI
+// is recorded as chosen, because Steps 4–5 read them (optimiser axes, material
+// recommendations, report); the question stays behind this flag to bring it back.
+const HIDE_KPIS = true;
+
 /** Example project name that follows the selected city, so the hint never names
  *  somewhere other than where the user is planning. */
 const PROJECT_NAME_EXAMPLE: Record<string, string> = {
@@ -102,6 +107,26 @@ function projectNamePlaceholder(city: string | null | undefined): string {
   return translate("e.g. {name}", {
     name: example ? translate(example) : translate("{city} Retrofit Study", { city }),
   });
+}
+
+/** Example district names for the free-text "District" field, per city. Real
+ *  districts/neighbourhoods only; a city without a list gets a neutral hint
+ *  rather than another city's names (Nacka used to be shown Rotherham's). */
+const DISTRICT_EXAMPLE: Record<string, string> = {
+  Gothenburg: "Askim, Backa, Eriksberg",
+  Malmö: "Västra Hamnen, Limhamn, Rosengård",
+  Stockholm: "Södermalm, Kungsholmen, Vasastan",
+  "Stockholm (central)": "Södermalm, Kungsholmen, Vasastan",
+  Nacka: "Kvarnholmen, Fisksätra, Orminge",
+  Helsingborg: "Tågaborg, Råå, Drottninghög",
+  Rotherham: "Eastwood, Kimberworth, Rawmarsh",
+  Brussels: "Saint-Gilles, Schaerbeek",
+  Liège: "Outremeuse, Saint-Léonard",
+};
+function districtPlaceholder(city: string | null | undefined): string {
+  const example = city ? DISTRICT_EXAMPLE[city] : undefined;
+  if (example) return translate("e.g. {name}", { name: example });
+  return city ? translate("e.g. a neighbourhood in {city}", { city }) : translate("e.g. the neighbourhood's name");
 }
 
 export default function DefineProject() {
@@ -149,14 +174,14 @@ export default function DefineProject() {
   const isBE = project.country === "Belgium";
   // Gothenburg's primärområden are the only named-district list; other Swedish cities
   // (Malmö, ...) select by address or by drawing, like the UK and Belgium.
-  const isSweden = project.country !== "United Kingdom" && !isBE
+  const hasDistrictList = project.country !== "United Kingdom" && !isBE
     && (!project.city || project.city === "Gothenburg");
 
   useEffect(() => {
-    if (project.scale === "Neighborhood" && isSweden && districts.length === 0) {
+    if (project.scale === "Neighborhood" && hasDistrictList && districts.length === 0) {
       api.listDistricts("se").then(r => setDistricts(r.districts)).catch(() => {});
     }
-  }, [project.scale, isSweden, districts.length]);
+  }, [project.scale, hasDistrictList, districts.length]);
 
   const districtMatches = districtQuery.trim()
     ? districts.filter(d => d.name.toLowerCase().includes(districtQuery.trim().toLowerCase()))
@@ -475,7 +500,7 @@ export default function DefineProject() {
       missing.push("at least one system in scope");
     }
     if (!HIDE_EXPLORATION && !project.explorationApproaches.length) missing.push("at least one exploration approach");
-    if (!project.selectedKpis.length) missing.push("at least one KPI");
+    if (!HIDE_KPIS && !project.selectedKpis.length) missing.push("at least one KPI");
     if (!project.scale) missing.push("a project scale");
     if (pt === "Energy Community Planning" && !project.ecEnergyFocus.length) {
       missing.push("an energy focus");
@@ -569,7 +594,13 @@ export default function DefineProject() {
   useEffect(() => {
     if (HIDE_EXPLORATION && project.explorationApproaches.length === 0) setProject({ explorationApproaches: ALL_EXPLORATION });
   }, [project.explorationApproaches.length, setProject]);
-  const kpisReady = project.selectedKpis.length > 0;
+  // With the question hidden there is no way to change the choice, so every
+  // project (saved ones with a subset too) uses all KPIs.
+  const kpisIncomplete = HIDE_KPIS && UNIVERSAL_KPIS.some((k) => !project.selectedKpis.includes(k));
+  useEffect(() => {
+    if (kpisIncomplete) setProject({ selectedKpis: [...UNIVERSAL_KPIS] });
+  }, [kpisIncomplete, setProject]);
+  const kpisReady = HIDE_KPIS || project.selectedKpis.length > 0;
   const scaleReady = !!project.scale;
   const locationReady = !!project.address.trim();
 
@@ -594,7 +625,7 @@ export default function DefineProject() {
     ...(pt === "Renovation Planning" ? [] : ["systems"] as Step1Stage[]),
     ...(pt === "Energy Community Planning" ? ["ecFocus"] as Step1Stage[] : []),
     ...(HIDE_EXPLORATION ? [] : ["exploration"] as Step1Stage[]),
-    "kpis",
+    ...(HIDE_KPIS ? [] : ["kpis"] as Step1Stage[]),
     "scale",
     "location",
     "complete",
@@ -1049,7 +1080,7 @@ export default function DefineProject() {
       )}
 
       {/* ── KPIs ── */}
-      {showKpis && (
+      {!HIDE_KPIS && showKpis && (
         <Card className="animate-fadeIn">
           <Label required>{t("Key Performance Indicators")}</Label>
           <div className="flex flex-wrap gap-2 mt-2">
@@ -1119,7 +1150,7 @@ export default function DefineProject() {
         {project.scale === "Neighborhood" && (
           <div className="mt-4">
             <Label>{t("District")}</Label>
-            {isSweden && districts.length > 0 ? (
+            {hasDistrictList && districts.length > 0 ? (
               <div className="relative mt-1">
                 <button
                   type="button"
@@ -1221,7 +1252,7 @@ export default function DefineProject() {
                   type="text"
                   value={project.neighborhoodName}
                   onChange={(e) => setProject({ neighborhoodName: e.target.value })}
-                  placeholder={t("e.g. {name}", { name: isSweden ? "Askim, Backa, Eriksberg" : isBE ? (project.city === "Liège" ? "Outremeuse, Saint-Léonard" : "Saint-Gilles, Schaerbeek") : "Eastwood, Kimberworth, Rawmarsh" })}
+                  placeholder={districtPlaceholder(project.city)}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:ring-2 focus:ring-teal focus:border-teal mt-1"
                 />
                 <p className="text-xs text-gray-500 mt-1">{t("Name the district or neighborhood this project covers.")}</p>
@@ -1283,12 +1314,12 @@ export default function DefineProject() {
         <Card className="animate-fadeIn">
           <Label>{t("Project Location")}</Label>
           <p className="text-sm text-white/65">
-            {isSweden
+            {hasDistrictList
               ? t("District scale uses the district selection above. The map below shows Gothenburg and the selected district boundary.")
               : t("There is no named-district list for this city yet, so a district name can't load buildings on its own.")}
           </p>
           <p className="text-xs text-white/45 mt-2">
-            {isSweden
+            {hasDistrictList
               ? t("Pick a Gothenburg district above to load its buildings in Step 2.")
               : t("To analyse a whole area, switch the scale to Building and use \u201cDraw box\u201d or \u201cDraw shape\u201d on the map \u2014 every building inside is loaded in Step 2.")}
           </p>
@@ -1308,7 +1339,7 @@ export default function DefineProject() {
         </Card>
       )}
 
-      {showLocation && project.scale !== "Neighborhood" && !(project.scale === "Neighborhood" && isSweden && project.district) && (
+      {showLocation && project.scale !== "Neighborhood" && !(project.scale === "Neighborhood" && hasDistrictList && project.district) && (
         <Card className="animate-fadeIn">
           <Label>{t("Project Location")}</Label>
           <LocationMap

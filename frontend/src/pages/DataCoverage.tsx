@@ -16,8 +16,24 @@ import { makeBuildingKeys, type PriorityInput } from "../utils/retrofitPriority"
 import { useT, translate } from "../i18n";
 import {
   ChevronUp, ChevronDown,
-  Download, Upload, Plus, Pencil, MapPin, Building2, Loader2, Layers, Globe2, Database,
+  Download, Upload, Plus, Pencil, MapPin, Building2, Loader2, Layers, Globe2, Database, Info,
 } from "lucide-react";
+
+/** Where the Swedish EPC (energideklaration) columns come from — behind the ⓘ
+ *  on their headers. Field names are Boverket's register columns. */
+const SE_EPC_ENERGY_INFO =
+  "From the energy declaration's “Specifik energianvändning” (Boverket field EgiSpecifikEnergianvandning): the energy bought per m² of heated floor area (Atemp) per year for space heating, hot water, comfort cooling and the building's own electricity (fans, pumps, lifts). Household electricity is not included. It is bought energy, not the heat the building needs: with a heat pump it counts the electricity the pump uses, so it reads far below the heat demand. Newest declaration for the building.";
+const SE_EPC_HEATING_INFO =
+  "Inferred from the energy declaration's energy use per energy carrier: the carrier with the most energy wins. Declarations from 2019 on give space heating per carrier under “Energianvändning för uppvärmning” (Boverket fields EgiFjarrvarmeUPPV, EgiPumpMarkUPPV, EgiPumpFranluftUPPV, EgiElDirektUPPV, …); older declarations give the total per carrier (EgiFjarrvarme, EgiPumpMark, …). If the address has several declarations, the one with the most heating energy is used. Blank when the declaration lists no heating energy or the address is not in the register.";
+
+function HeaderInfo({ text }: { text: string }) {
+  return (
+    <span title={text} aria-label={text} tabIndex={0} onClick={(e) => e.stopPropagation()}
+      className="inline-flex ml-1 align-[-1px] cursor-help text-white/45 hover:text-white/80">
+      <Info size={11} />
+    </span>
+  );
+}
 
 /* ─────────────────────────────────────────────
    Types
@@ -733,7 +749,13 @@ const BBOX_CSV_COLS: { key: keyof BuildingRecord; label: string }[] = [
   { key: "tabula_period",               label: "TABULA Period" },
   { key: "u_wall",                      label: "U-Wall" },
   { key: "u_window",                    label: "U-Window" },
+  // Roof U is a model input like the other two; without a column it could not be corrected.
+  { key: "u_roof",                      label: "U-Roof" },
 ];
+/* Table cells the energy model reads (backend _EDITABLE_MODEL_FIELDS + footprint).
+   Editing any other column (year, certificate energy, class, era) changes what
+   the table shows, not the simulation. */
+const MODEL_INPUT_COLS = new Set<keyof BuildingRecord>(["building_use", "height_m", "floors", "footprint_m2", "u_wall", "u_window", "u_roof"]);
 // On screen the cadastral id gives way to Owner + Past renovations (it stays in
 // the CSV export, where it is the join key people need).
 const BBOX_TABLE_COLS = BBOX_CSV_COLS.filter((c) => c.key !== "cadastral_id");
@@ -1108,6 +1130,10 @@ function BboxDataBanner({
   // Current heating system per building (from the Boverket EPC), keyed by address.
   const [heating, setHeating]         = useState<Record<string, EpcInfo | null>>({});
   const country = useWizardStore(s => s.project.country);
+
+  /* Simulated energy is shown in Step 3 only (removed from this table
+     2026-11-24, user request); here the energy column is the certificate's. */
+  const isSweden = country === "Sweden" || country == null;
   const projectCity = useWizardStore(s => s.project.city);
   const PAGE_SIZE = 50;
 
@@ -1690,7 +1716,9 @@ function BboxDataBanner({
         <div className="border-t border-white/10">
           {/* Row count */}
           <div className="flex items-center gap-2 px-4 pt-2 pb-1 text-[11.5px] text-white/40">
-            <span className="text-white/45">{t("↕ Tip: click a column header to sort — click again to flip high ↔ low.")}</span>
+            <span className="text-white/45">{editing
+              ? <>{t("Columns marked")} <span style={{ color: "#4ECDC4" }}>⚙</span> {t("are simulation inputs: after Save, Steps 3–4 simulate with your values. Year, certificate energy, energy class and era are for reference only.")}</>
+              : t("↕ Tip: click a column header to sort — click again to flip high ↔ low.")}</span>
             <span className="ml-auto text-gray-400">
               {t("Showing {a}–{b} of {n}", { a: page * PAGE_SIZE + 1, b: Math.min((page + 1) * PAGE_SIZE, rows.length), n: rows.length })}
             </span>
@@ -1717,9 +1745,13 @@ function BboxDataBanner({
                       <Fragment key={c.key}>
                       <th
                           onClick={() => toggleSort(c.key)}
-                          title={t("Sort by this column (click again to flip high ↔ low)")}
+                          title={editing
+                            ? (MODEL_INPUT_COLS.has(c.key) ? t("Simulation input — an edit here changes the simulation in Steps 3–4") : t("Reference only — an edit here does not change the simulation"))
+                            : t("Sort by this column (click again to flip high ↔ low)")}
                           className={`px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap cursor-pointer select-none transition-colors hover:bg-white/10 hover:text-white ${active ? "text-white" : "text-white/60"}`}>
-                        {t(c.label)}
+                        {c.key === "energy_kwh_m2" && isSweden ? t("Certificate energy (kWh/m²)") : t(c.label)}
+                        {c.key === "energy_kwh_m2" && isSweden && <HeaderInfo text={t(SE_EPC_ENERGY_INFO)} />}
+                        {editing && MODEL_INPUT_COLS.has(c.key) && <span className="ml-1 text-[10px]" style={{ color: "#4ECDC4" }} aria-label={t("Simulation input")}>⚙</span>}
                         <span className="ml-1 text-[10px]" style={{ opacity: active ? 1 : 0.55 }}>
                           {active ? (tableSort!.asc ? "▲" : "▼") : "↕"}
                         </span>
@@ -1738,6 +1770,7 @@ function BboxDataBanner({
                   ))}
                   <th className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60" title={t("Current heating system, inferred from the Boverket EPC (energideklaration)")}>
                     {t("Current heating")}
+                    {isSweden && <HeaderInfo text={t(SE_EPC_HEATING_INFO)} />}
                   </th>
                   {/* What no dataset records — entered here, used by Step 4's
                       recommendations and every simulation (BuildingHistoryPanel). */}

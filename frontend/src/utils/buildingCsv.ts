@@ -78,10 +78,15 @@ const num = (s: string | undefined, decimalComma: boolean): number | null => {
 
 export function parseBuildingCsv(text: string): { rows: CsvBuildingRow[]; columns: string[]; hasHeader: boolean } {
   text = text.replace(/^﻿/, "");
+  // Excel's "sep=," first line names the delimiter (it makes Excel open the
+  // file in columns whatever the computer's list separator). Use it and drop it.
+  const sepLine = /^"?sep=(.)"?[ \t]*\r?\n/i.exec(text);
+  let skipped = 0;
+  if (sepLine) { text = text.slice(sepLine[0].length); skipped = 1; }
   const first = text.split(/\r?\n/, 1)[0] ?? "";
   const counts = [";", "\t", ","].map((d) => [d, first.split(d).length - 1] as const);
   const best = counts.reduce((a, b) => (b[1] > a[1] ? b : a));
-  const delim = best[1] > 0 ? best[0] : ",";
+  const delim = sepLine ? sepLine[1]! : best[1] > 0 ? best[0] : ",";
   const raw = splitCsv(text, delim).map((r) => r.map((c) => c.trim()));
   if (!raw.length) return { rows: [], columns: [], hasHeader: false };
   const head = raw[0].map((h) => h.toLowerCase().replace(/[_.]+/g, " ").trim());
@@ -91,7 +96,7 @@ export function parseBuildingCsv(text: string): { rows: CsvBuildingRow[]; column
   if (!hasHeader) {
     // No header: one address (or "lat,lon") per line.
     return {
-      rows: raw.map((cells, i) => ({ line: i + 1, address: cells.join(delim === "," ? ", " : " ").trim() || null, postcode: null, city: null, lat: null, lon: null, name: null })),
+      rows: raw.map((cells, i) => ({ line: i + 1 + skipped, address: cells.join(delim === "," ? ", " : " ").trim() || null, postcode: null, city: null, lat: null, lon: null, name: null })),
       columns: [], hasHeader: false,
     };
   }
@@ -102,7 +107,7 @@ export function parseBuildingCsv(text: string): { rows: CsvBuildingRow[]; column
     if (lat != null && lon != null && Math.abs(lat) < Math.abs(lon)) [lat, lon] = [lon, lat];
     if (lat != null && (lat < -90 || lat > 90)) lat = null;
     if (lon != null && (lon < -180 || lon > 180)) lon = null;
-    return { line: i + 2, address: cell(r, "address"), postcode: cell(r, "postcode"), city: cell(r, "city"), lat, lon, name: cell(r, "name") };
+    return { line: i + 2 + skipped, address: cell(r, "address"), postcode: cell(r, "postcode"), city: cell(r, "city"), lat, lon, name: cell(r, "name") };
   }).filter((r) => r.address || (r.lat != null && r.lon != null));
   return { rows, columns: head, hasHeader: true };
 }

@@ -85,21 +85,42 @@ def run(st: Status, *args: str):
         raise RuntimeError(f"{Path(args[0]).name} failed (exit {p.returncode}) - see the log")
 
 
+def _args():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("code")
+    # Big municipalities can be built for part of their area only (e.g. central
+    # Stockholm). Both are remembered in dynamic_cities.json, so a later rebuild
+    # from the UI (code only) keeps the same extent and name.
+    ap.add_argument("--bbox", help="lon_min,lat_min,lon_max,lat_max (EPSG:4326)")
+    ap.add_argument("--name", help="display name, e.g. 'Stockholm (central)'")
+    return ap.parse_args()
+
+
 def main() -> int:
-    code = sys.argv[1]
+    a = _args()
+    code = a.code
     k = next((k for k in json.loads(KOMMUNER.read_text(encoding="utf-8")) if k["code"] == code), None)
     if k is None:
         raise SystemExit(f"unknown municipality code {code} (run tools/se/kommuner.py)")
     city_id = k["slug"]
     if city_id in se_cities.CITIES:
         raise SystemExit(f"{k['name']} is hand-configured in se_cities.py - build it with build_city.py")
-    st = Status(code, k["name"], city_id)
+    dyn = json.loads(se_cities.DYNAMIC_FILE.read_text(encoding="utf-8")) if se_cities.DYNAMIC_FILE.exists() else {}
+    prev = dyn.get(city_id, {})
+    bbox = [float(v) for v in a.bbox.split(",")] if a.bbox else prev.get("bbox_custom") or k["bbox4326"]
+    name = a.name or prev.get("name_custom") or k["name"]
+    k = {**k, "bbox4326": bbox}
+    st = Status(code, name, city_id)
     try:
         st.stage("register")
-        dyn = json.loads(se_cities.DYNAMIC_FILE.read_text(encoding="utf-8")) if se_cities.DYNAMIC_FILE.exists() else {}
         entry = dyn.get(city_id, {})
+        if a.bbox or prev.get("bbox_custom"):
+            entry["bbox_custom"] = bbox
+        if a.name or prev.get("name_custom"):
+            entry["name_custom"] = name
         entry.update({
-            "name": k["name"], "nuts2": k["nuts2"], "bbox4326": tuple(k["bbox4326"]), "slug": city_id,
+            "name": name, "nuts2": k["nuts2"], "bbox4326": tuple(k["bbox4326"]), "slug": city_id,
             "eubucco": f"data/eubucco/{city_id}.gpkg", "kommun": k["name"], "region_kommuns": [k["name"]],
             "kommun_codes": {k["name"]: code}, "kommun_code": code, "clip_to_footprints": True,
             "on_demand": True, "built": False,
@@ -114,6 +135,10 @@ def main() -> int:
         run(st, "tools/se/download_eubucco_city.py", city_id)
         st.stage("build")
         run(st, "tools/se/build_city.py", city_id)
+        # Sections missing from EUBUCCO, added from OSM (data/se/osm_sections.json).
+        run(st, "tools/se/add_osm_sections.py", city_id)
+        # Certificates the property link missed, placed by their entrance addresses.
+        run(st, "tools/se/place_certificates_by_address.py", city_id)
         st.stage("weather")
         lo, la, LO, LA = k["bbox4326"]
         epw = nearest_epw((la + LA) / 2, (lo + LO) / 2)

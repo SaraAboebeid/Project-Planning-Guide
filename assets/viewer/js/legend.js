@@ -63,8 +63,10 @@ for (let i = 0; i < DATA.length; i++) {
   const energy = (b.energy != null ? b.energy : b.tabula_kwh_m2_yr);
   const period = b.tabula_period || b.tabula_period_used || null;
   _useCounts[b.use_cat] = (_useCounts[b.use_cat] || 0) + 1;
-  if (b.eclass) _eclassCounts[b.eclass] = (_eclassCounts[b.eclass] || 0) + 1;
-  if (period)   _periodCounts[period]   = (_periodCounts[period]   || 0) + 1;
+  // Outbuildings never have their own certificate (older data gave them the house's).
+  const isOut = b.use_cat === 'komplement';
+  if (b.eclass && !isOut) _eclassCounts[b.eclass] = (_eclassCounts[b.eclass] || 0) + 1;
+  if (period && !isOut)   _periodCounts[period]   = (_periodCounts[period]   || 0) + 1;
 
   if (energy != null) {
     const card = {
@@ -74,8 +76,8 @@ for (let i = 0; i < DATA.length; i++) {
     };
     if (!_byUse[b.use_cat]) _byUse[b.use_cat] = [];
     _byUse[b.use_cat].push(card);
-    if (b.eclass) { if (!_byEclass[b.eclass]) _byEclass[b.eclass] = []; _byEclass[b.eclass].push(card); }
-    if (period)   { if (!_byPeriod[period])   _byPeriod[period]   = []; _byPeriod[period].push(card); }
+    if (b.eclass && !isOut) { if (!_byEclass[b.eclass]) _byEclass[b.eclass] = []; _byEclass[b.eclass].push(card); }
+    if (period && !isOut)   { if (!_byPeriod[period])   _byPeriod[period]   = []; _byPeriod[period].push(card); }
   }
 }
 
@@ -83,8 +85,19 @@ for (let i = 0; i < DATA.length; i++) {
 // getBuildingColor); the legend lists them too so the key accounts for every building.
 const _sumCounts = (c) => Object.values(c).reduce((a, n) => a + n, 0);
 const _NONE_CSS = 'rgba(60,60,70,0.55)';
-const _noEclass = DATA.length - _sumCounts(_eclassCounts);
-const _noPeriod = DATA.length - _sumCounts(_periodCounts);
+// "Energy certificate", "Energy class" and "Year era" modes (cesium.js getBuildingColor):
+// outbuildings (komplement) are greyed out and not counted - they never need a certificate.
+let _epcHas = 0, _epcNone = 0, _epcExcluded = 0;
+for (let i = 0; i < DATA.length; i++) {
+  const b = DATA[i];
+  if (b.use_cat === 'komplement') _epcExcluded++;
+  else if (b.eclass || b.energy != null) _epcHas++;
+  else _epcNone++;
+}
+const _noEclass = DATA.length - _epcExcluded - _sumCounts(_eclassCounts);
+const _noPeriod = DATA.length - _epcExcluded - _sumCounts(_periodCounts);
+const _OUTBUILDING_NOTE = () => 'Outbuildings (garages, sheds, waste rooms) are greyed out and not counted: '
+  + _epcExcluded.toLocaleString() + ' buildings. They never need a certificate.';
 
 function _bestWorst(list, n = 15) {
   const sorted = [...list].sort((a, b) => a.energy - b.energy);
@@ -111,8 +124,18 @@ for (const k in _byPeriod) {
 function updateLegend(mode) {
   const container = document.getElementById('legend-container');
   let rows = [];
+  let note = '';
 
-  if (mode === 'use') {
+  if (mode === 'epc') {
+    const pct = (n) => (_epcHas + _epcNone) ? ' (' + Math.round(100 * n / (_epcHas + _epcNone)) + '%)' : '';
+    rows = [
+      { key: 'has',  lbl: 'Has an energy certificate' + pct(_epcHas),  color: 'rgb(50,130,220)', cnt: _epcHas,  hasCards: false },
+      { key: 'none', lbl: 'No energy certificate' + pct(_epcNone),     color: 'rgb(240,140,30)', cnt: _epcNone, hasCards: false },
+    ];
+    note = _OUTBUILDING_NOTE();
+    container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Energy certificate</div>';
+
+  } else if (mode === 'use') {
     rows = Object.entries(USE_LABELS_JS).map(([key, lbl]) => {
       const cnt = _useCounts[key] || 0;
       const cards = _USE_CARDS[key];
@@ -127,6 +150,7 @@ function updateLegend(mode) {
       return { key, lbl, color: ECLASS_CSS[key], cnt, hasCards: cards && (cards.best.length || cards.worst.length) };
     });
     if (_noEclass > 0) rows.push({ key: '_none', lbl: 'Unknown – no energy class', color: _NONE_CSS, cnt: _noEclass, hasCards: false });
+    note = _OUTBUILDING_NOTE();
     container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Energy class (A–G)</div>';
 
   } else { // year/period
@@ -138,6 +162,7 @@ function updateLegend(mode) {
       return { key, lbl: PERIOD_LABELS_JS[key] + sub, color: PERIOD_CSS[key], cnt, hasCards: cards && (cards.best.length || cards.worst.length) };
     });
     if (_noPeriod > 0) rows.push({ key: '_none', lbl: 'Unknown – no construction year', color: _NONE_CSS, cnt: _noPeriod, hasCards: false });
+    note = _OUTBUILDING_NOTE();
     container.innerHTML = '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Construction era</div>';
   }
 
@@ -165,6 +190,12 @@ function updateLegend(mode) {
       });
     }
     container.appendChild(div);
+  }
+  if (note) {
+    const n = document.createElement('div');
+    n.style.cssText = 'margin-top:6px;font-size:10px;line-height:1.4;color:var(--faint)';
+    n.textContent = note;
+    container.appendChild(n);
   }
 }
 

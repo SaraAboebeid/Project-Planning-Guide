@@ -571,7 +571,58 @@ def process_data(city_key: str = "gothenburg") -> dict:
 
     matched = gdf["andamal1_epc"].notna().sum()
     print(f"  EPC-matched buildings: {primary_matched:,} primary + {matched - primary_matched:,} fallback = {matched:,}")
+
+    # ── Buildings EUBUCCO does not have: Lantmäteriet's own outline ────────────
+    # EUBUCCO's geometry predates many new blocks (Nacka: Kvarnholmen, Tollare,
+    # Älta - ~150 certificates / 250,000 m² Atemp had no building at all), while
+    # Lantmäteriet's register is current and its outlines already carry their
+    # linked certificate. Where EUBUCCO covers < LM_FILL_MAX_COVER of a (non-
+    # outbuilding) Lantmäteriet outline, that outline is added as the building,
+    # with its certificate. Height = certificate floors x 3.2 m; without a
+    # certificate a typical storey count for the use (flagged height_estimated).
+    # On-demand cities only - Gothenburg's build is unchanged.
+    LM_FILL_MAX_COVER = 0.05
+    TYPICAL_FLOORS = {"bostad_enfamilj": 1.5, "bostad_flerfamilj": 4.0}
+    if _CLIP_TO_FOOTPRINTS:
+        cand = epc_polys[epc_polys.geometry.intersects(bbox_poly)
+                         & ~epc_polys["andamal1"].fillna("").str.startswith("Komplement")
+                         & (epc_polys.geometry.area >= 15)].copy()
+        cand["lm_area"] = cand.geometry.area
+        cov = gpd.overlay(cand[["fp_idx", "geometry"]], gdf.to_crs("EPSG:3006")[["geometry"]],
+                          how="intersection", keep_geom_type=False)
+        cov_frac = (cov.assign(a=cov.geometry.area).groupby("fp_idx")["a"].sum()
+                    / cand.set_index("fp_idx")["lm_area"]).reindex(cand["fp_idx"]).fillna(0).values
+        add = cand[cov_frac < LM_FILL_MAX_COVER].copy()
+        if len(add):
+            use = add["andamal1"].apply(andamal_to_use)
+            fl = pd.to_numeric(add["floors_epc"], errors="coerce").astype("float64")
+            est = fl.isna() | (fl <= 0)
+            fl = fl.where(~est, use.map(TYPICAL_FLOORS).fillna(1.0).astype("float64"))
+            new = gpd.GeoDataFrame({
+                "andamal1_epc": add["andamal1"].values, "fastighet_epc": add["fastighetsbeteckning"].values,
+                "year_built_epc": add["year_built"].values, "floors_epc": add["floors_epc"].values,
+                "area_atemp_epc": add["area_atemp"].values, "energy_kwh_m2": add["energy_kwh_m2"].values,
+                "energy_class": add["energy_class"].values, "address_epc": add["address"].values,
+                "all_addresses": add["all_addresses"].values, "formular_id": add["FormularId"].values,
+                "height": np.nan, "floors": fl.values,                       # → elev = floors x 3.2 below
+                "geom_source": "lantmateriet", "height_estimated": est.values,
+            }, geometry=add.geometry.values, crs="EPSG:3006").to_crs(gdf.crs)
+            new.index = [f"lm{i}" for i in add["fp_idx"]]
+            gdf = pd.concat([gdf, new])
+            n_cert = int(pd.to_numeric(new["energy_kwh_m2"], errors="coerce").notna().sum())
+            print(f"  added {len(new):,} Lantmäteriet outlines EUBUCCO lacks ({n_cert:,} with certificate energy, "
+                  f"{int(est.sum()):,} with an estimated height)")
     gdf["use_cat"] = gdf["andamal1_epc"].apply(andamal_to_use)
+
+    # Outbuildings (garages, sheds, waste rooms) never have their own certificate:
+    # they only picked up the HOUSE's by overlapping its property's footprint
+    # (Nacka: 2,197 garages showed the house's class, energy and heated area).
+    # On-demand cities: the certificate stays on the main building only.
+    if _CLIP_TO_FOOTPRINTS:
+        out = gdf["use_cat"] == "komplement"
+        n_out = int((out & gdf["energy_kwh_m2"].notna()).sum())
+        gdf.loc[out, ["year_built_epc", "floors_epc", "area_atemp_epc", "energy_kwh_m2", "energy_class"]] = np.nan
+        print(f"  outbuildings: certificate removed from {n_out:,} (kept on the main building)")
 
     # ── TABULA matching ────────────────────────────────────────────────────
     print("Loading TABULA archetypes ...")
@@ -706,6 +757,9 @@ def process_data(city_key: str = "gothenburg") -> dict:
             "tabula_wall":    _safe_str(row.get("tabula_wall")),
             "tabula_roof":    _safe_str(row.get("tabula_roof")),
             "perf_pct":       round(float(row["perf_pct"]), 3) if row.get("perf_pct") is not None and row.get("perf_pct") == row.get("perf_pct") else None,
+            # Outline from Lantmäteriet (EUBUCCO had none); height may be a typical-storey estimate.
+            **({"geom_source": "lantmateriet", "height_estimated": bool(row.get("height_estimated"))}
+               if row.get("geom_source") == "lantmateriet" else {}),
         })
 
     records    = _sanitize(records)
