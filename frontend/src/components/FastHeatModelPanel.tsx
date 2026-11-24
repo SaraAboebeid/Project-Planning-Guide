@@ -14,7 +14,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Zap } from "lucide-react";
 import { rcCity, rcCityRun, rcSimulate, rcWeatherYears, shareHigher, type RcCityStatus, type RcResult, type WeatherYears } from "../api/rc";
-import { useT, useLang } from "../i18n";
+import { useLang } from "../i18n";
+import { useEngineT } from "../utils/engineName";
 import { C, tint } from "../config/colors";
 
 export interface FastHeatBuilding {
@@ -34,7 +35,7 @@ function rankWord(higher: number): { label: string; icon: string; color: string 
 }
 
 export default function FastHeatModelPanel({ buildings, cityId }: { buildings: FastHeatBuilding[]; cityId: string }) {
-  const t = useT();
+  const t = useEngineT();
   const lang = useLang();
   const locale = lang === "sv" ? "sv-SE" : "en-GB";
   const fmt = (n: number, d = 0) => n.toLocaleString(locale, { maximumFractionDigits: d, minimumFractionDigits: d });
@@ -256,7 +257,7 @@ export default function FastHeatModelPanel({ buildings, cityId }: { buildings: F
 }
 
 function CitySummary({ s, fmt }: { s: NonNullable<RcCityStatus["result"]>; fmt: (n: number, d?: number) => string }) {
-  const t = useT();
+  const t = useEngineT();
   const T = s.totals;
   const maxM = Math.max(...s.monthly_mwh, 1);
   const peakDay = Math.floor(T.peak_hour / 24);

@@ -23,7 +23,7 @@ import { useWizardStepNav, setWizardNextInfo } from "../components/wizardNav";
 import OptimizerPanel from "../components/OptimizerPanel";
 import ComponentValuePanel from "../components/ComponentValuePanel";
 import AssemblyBuilder from "../components/AssemblyBuilder";
-import RecommendedMeasuresPanel from "../components/RecommendedMeasuresPanel";
+import RecommendedMeasuresPanel, { ComponentScopeList } from "../components/RecommendedMeasuresPanel";
 import PvOptimizerPanel from "../components/PvOptimizerPanel";
 import PeakDemandPanel from "../components/PeakDemandPanel";
 import { recommendComponents, effectiveScope, recordedUForSimulation, type RecBuilding } from "../utils/renovationRecommendations";
@@ -40,7 +40,8 @@ import {
   EXISTING_LAYER_ID,
 } from "../config/materialCatalogue";
 import type { BoverketResource, WWRRecord } from "../types";
-import { useT, translate } from "../i18n";
+import { translate } from "../i18n";
+import { useEngineT } from "../utils/engineName";
 import {
   Loader2, CheckCircle2, XCircle, Plus, RefreshCw, ChevronDown, ChevronRight, Play, Layers, Settings,
   ScatterChart, BarChart3, SlidersHorizontal, Info, CalendarClock,
@@ -92,8 +93,16 @@ function fmtSEK(n: number): string {
    shoebox never reaches the 25 °C setpoint, so it always reports 0 and a column
    of zeros just reads as a broken number. */
 // expand · package · cost · carbon · 50-yr cost · 50-yr carbon · heating · total · status
-const TABLE_COLS     = "24px 1.5fr 92px 92px 96px 96px 84px 110px 118px";
-const BREAKDOWN_COLS = "1.5fr 92px 92px 96px 96px 84px 110px 118px";
+/** Package names are build-up names joined with " + "; build-ups ADDED to the
+ *  existing construction are themselves named "+ …", which gave "+ a + + b".
+ *  Also drops the " · address" suffix when the view is already that building. */
+function cleanPkgName(name: string, address?: string): string {
+  let s = name.replace(/(^|\s)\+\s+\+\s/g, "$1+ ").replace(/^\+\s*/, "").replace(/\s\+\s\+\s/g, " + ");
+  if (address) s = s.replace(` · ${address}`, "");
+  return s;
+}
+const TABLE_COLS     = "24px minmax(240px, 2.6fr) 96px 96px 104px 108px 88px 116px 84px 92px";
+const BREAKDOWN_COLS = "minmax(240px, 2.6fr) 96px 96px 104px 108px 88px 116px 84px 92px";
 
 /** A designed package not simulated yet: the optimizer's estimate. */
 type EstRow = {
@@ -167,6 +176,8 @@ const STEP_NUMBER = 4;
 interface Step4View {
   n: number; title: string; desc: string; icon: React.ReactNode;
   status: string; disabled?: boolean;
+  /** Not finished: tagged "Coming soon" (greyed out too when also disabled). */
+  soon?: boolean;
 }
 function Step4Hub({ views, active, onSelect }: {
   views: Step4View[]; active: number | null; onSelect: (n: number | null) => void;
@@ -179,7 +190,7 @@ function Step4Hub({ views, active, onSelect }: {
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: 4, borderRadius: 12,
       background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-      {views.map((v) => {
+      {views.map((v, pos) => {
         const on = v.n === active;
         return (
           <button key={v.n} type="button" onClick={() => !v.disabled && onSelect(v.n)} title={v.status}
@@ -189,8 +200,14 @@ function Step4Hub({ views, active, onSelect }: {
               background: on ? `${TEAL}1c` : "transparent",
               color: on ? "#fff" : "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: on ? 800 : 600 }}>
             <span style={{ color: on ? TEAL : "rgba(255,255,255,0.45)", display: "flex" }}>{v.icon}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>{`${STEP_NUMBER}.${v.n}`}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>{`${STEP_NUMBER}.${pos + 1}`}</span>
             {v.title}
+            {v.soon && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 99, marginLeft: 2,
+                color: "rgba(255,255,255,0.5)", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                {translate("Coming soon")}
+              </span>
+            )}
           </button>
         );
       })}
@@ -466,7 +483,7 @@ function LineItemPicker({
 }) {
   const color = COMPONENT_COLORS[item.parentComponent] ?? "var(--brand)";
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
-  const t = useT();
+  const t = useEngineT();
   if (items.length === 0) {
     return <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>{t("No catalogue materials found for this item.")}</p>;
   }
@@ -669,7 +686,7 @@ function UkTierPicker({
   country?: "gb" | "be";
 }) {
   const isBE = country === "be";
-  const t = useT();
+  const t = useEngineT();
   if (!archetype && isBE) {
     return (
       <div style={{ borderRadius: 12, padding: "14px 16px", background: "rgba(232,136,12,0.1)", border: "1px solid rgba(232,136,12,0.25)" }}>
@@ -792,7 +809,7 @@ function UkTierPicker({
 export default function RenovationSimulator() {
   const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
-  const t = useT();
+  const t = useEngineT();
 
   const isUK = project.country === "United Kingdom";
   // Belgium reuses the UK's TABULA-tier flow; UK-only parts (DESNZ £, tariffs,
@@ -993,7 +1010,16 @@ export default function RenovationSimulator() {
   // Which buildings a package is built for: every building in the Step 3
   // shortlist, or one of them. Chosen in 4.1 next to the assemblies, because it
   // changes what the quantities and costs below refer to.
-  const [targetIdx, setTargetIdx] = useState<number | "all">("all");
+  const [targetIdx, setTargetIdxRaw] = useState<number | "all">("all");
+  /* Packages are designed one building at a time by default (2026-11-24): a
+     single "all buildings" package was optimised on the first building only,
+     so a 1960s block and a 2000s house got the same recommendation. "All
+     buildings" stays available as a shortcut. Large shortlists start on "all"
+     so nobody has to click through dozens of buildings. */
+  const targetTouched = useRef(false);
+  const setTargetIdx = (v: number | "all") => { targetTouched.current = true; setTargetIdxRaw(v); };
+  // Default changed 2026-11-24 (user request): "Same package for all" is
+  // selected first; designing one building at a time is a click away.
 
   /* Saved build-ups are per building: the assemblies that suit a 1960s block are
      not the ones that suit its neighbour, and a single shared list meant
@@ -1014,15 +1040,32 @@ export default function RenovationSimulator() {
      object, so the Pareto front was re-requested (after a 450 ms debounce) on
      each render, making the curve slow to settle and the Run button feel like it
      needed several clicks while the tree re-rendered underneath it. */
+  /* A building with no build-ups of its own starts from the ones already saved
+     (for all buildings, else for another building), so moving to the next
+     building does not mean picking every material again. Its first edit makes
+     them its own copy. The optimiser still runs on THIS building's areas,
+     U-values and baseline, so the recommendation differs per building. */
+  const inheritedFrom = (prev: Record<string, ComponentConfig[]>, key: string): string | null => {
+    if (key === "all" || (prev[key]?.length ?? 0) > 0) return null;
+    if ((prev.all?.length ?? 0) > 0) return "all";
+    return Object.keys(prev).find((k) => k !== key && (prev[k]?.length ?? 0) > 0) ?? null;
+  };
+  const configsSource = inheritedFrom(configsByBuilding, cfgKey);
   const configs = useMemo(
-    () => configsByBuilding[cfgKey] ?? EMPTY_CONFIGS,
-    [configsByBuilding, cfgKey],
+    () => configsByBuilding[cfgKey]?.length ? configsByBuilding[cfgKey]!
+      : configsSource ? configsByBuilding[configsSource]! : EMPTY_CONFIGS,
+    [configsByBuilding, cfgKey, configsSource],
   );
   const setConfigs = (updater: ComponentConfig[] | ((prev: ComponentConfig[]) => ComponentConfig[])) =>
-    setConfigsByBuilding((prev) => ({
-      ...prev,
-      [cfgKey]: typeof updater === "function" ? updater(prev[cfgKey] ?? []) : updater,
-    }));
+    setConfigsByBuilding((prev) => {
+      const src = inheritedFrom(prev, cfgKey);
+      const cur = prev[cfgKey]?.length ? prev[cfgKey]! : src ? prev[src]! : [];
+      const next = typeof updater === "function" ? updater(cur) : updater;
+      // A no-op update (e.g. the carbon refresh below finding nothing to change)
+      // must not turn inherited build-ups into this building's own copy.
+      if (next === cur) return prev;
+      return { ...prev, [cfgKey]: next };
+    });
   type GeoEntry = { g: ResolvedBuildingGeometry; idx: number };
   const allEntries: GeoEntry[] = useMemo(() => geometries.map((g, i) => ({ g, idx: i })), [geometries]);
   const targetEntries: GeoEntry[] = targetIdx === "all" ? allEntries : (geometries[targetIdx] ? [{ g: geometries[targetIdx]!, idx: targetIdx }] : allEntries);
@@ -1169,20 +1212,30 @@ export default function RenovationSimulator() {
     // re-submit a new EPSM batch. Match by position (Step 3 iterates the same
     // geometry list in the same order).
     const step3 = useWizardStore.getState().project.renovationBaselineResults;
-    if (step3 && step3.length === geometries.length) {
+    // Matched by COORDINATES, not position: Step 3's list is not always in the
+    // geometry order (incremental runs merge rows), and a positional match gave
+    // a building its neighbour's baseline (16A showed 12A's 140.5 instead of
+    // its own 117.4). Position is only the fallback for rows without coordinates.
+    const step3For = (g: ResolvedBuildingGeometry, idx: number) =>
+      step3?.find((r) => r.lat != null && r.lon != null && Math.abs(r.lat - g.lat) < 1e-6 && Math.abs(r.lon - g.lon) < 1e-6)
+      ?? (step3?.some((r) => r.lat != null) ? undefined : step3?.[idx]);
+    if (step3 && step3.length === geometries.length && entries.every(({ g, idx }) => step3For(g, idx))) {
       const pkg: RenovationCalcPackage = {
         id: "baseline", name: "Baseline (as-built)", color: "rgba(255,255,255,0.4)", isBaseline: true,
         selections: {}, batchId: null,
-        buildings: entries.map(({ g, idx }) => ({
-          address: g.address ?? `Building ${idx + 1}`,
-          lat: g.lat, lon: g.lon,
-          status: "completed" as const,
-          heatingKwhM2Yr: step3[idx]?.heating ?? null,
-          coolingKwhM2Yr: step3[idx]?.cooling ?? null,
-          totalKwhM2Yr: step3[idx]?.energyUse ?? null,
-          floorAreaM2: step3[idx]?.heatedAreaM2 ?? null,
-          costSEK: null, carbonKgCO2e: null, error: null,
-        })),
+        buildings: entries.map(({ g, idx }) => {
+          const r = step3For(g, idx);
+          return {
+            address: g.address ?? `Building ${idx + 1}`,
+            lat: g.lat, lon: g.lon,
+            status: "completed" as const,
+            heatingKwhM2Yr: r?.heating ?? null,
+            coolingKwhM2Yr: r?.cooling ?? null,
+            totalKwhM2Yr: r?.energyUse ?? null,
+            floorAreaM2: r?.heatedAreaM2 ?? null,
+            costSEK: null, carbonKgCO2e: null, error: null,
+          };
+        }),
       };
       setProject({ renovationCalcPackages: [...useWizardStore.getState().project.renovationCalcPackages.filter((p) => p.id !== "baseline"), pkg] });
       return true;
@@ -1240,7 +1293,9 @@ export default function RenovationSimulator() {
     // exist by now, otherwise a fresh EPSM batch.
     const stranded = baseline != null && baseline.batchId === null
       && baseline.buildings.some((b) => b.totalKwhM2Yr == null && b.status !== "failed");
-    if (!baseline || stranded) {
+    // A baseline copied from Step 3 (no batch of its own) is re-copied on every
+    // visit, so one seeded by the old positional match corrects itself.
+    if (!baseline || stranded || baseline.batchId === null) {
       // Reusing Step 3's finished numbers is free; STARTING a batch is not, and
       // must never happen just because the page was opened. The fallback that
       // submits one now sits behind the explicit "Run baseline" button below.
@@ -1649,7 +1704,7 @@ export default function RenovationSimulator() {
             ...(c.mode ? { mode: c.mode } : {}),
           } as RenovationCalcSelection]),
         );
-        const name = `${combo.map((c) => c.name).join(" + ")} · ${b.label}`;
+        const name = `${cleanPkgName(combo.map((c) => c.name).join(" + "))} · ${b.label}`;
         newPkgs.push({
           id: `pkg-${stamp}-${seq}-${Math.round(Math.random() * 1e6)}`,
           name, color: PACKAGE_COLORS[seq % PACKAGE_COLORS.length]!, isBaseline: false,
@@ -1690,6 +1745,24 @@ export default function RenovationSimulator() {
     };
   }
 
+  /** The package selection for one saved build-up. A layer-composed build-up
+   *  passes its computed U through customUValue (replacing the catalogue U in
+   *  the model); a catalogue assembly ADDED to the existing construction passes
+   *  the combined U. */
+  function selectionForConfig(cfg: ComponentConfig): RenovationCalcSelection {
+    return {
+      wikellsCode: cfg.wikellsCode ?? "",
+      quantity: 0,
+      configId: cfg.id,
+      ...(cfg.source === "layers" && cfg.uValue != null
+        ? { customUValue: cfg.uValue, customLabel: cfg.name, layers: cfg.layers }
+        : cfg.source === "catalogue" && cfg.mode === "add" && cfg.uValue != null
+          ? { customUValue: cfg.uValue }
+          : {}),
+      ...(cfg.mode ? { mode: cfg.mode } : {}),
+    } as RenovationCalcSelection;
+  }
+
   /** onlyNew: submit just the designed combinations that have no run yet
    *  (the Results view's button), instead of re-running all of them. */
   function simulateConfiguredPackages(onlyNew = false) {
@@ -1715,7 +1788,7 @@ export default function RenovationSimulator() {
           ...(cfg.mode ? { mode: cfg.mode } : {}),
         };
       });
-      const name = combo.map((c) => c.name).join(" + ") + targetSuffix();
+      const name = cleanPkgName(combo.map((c) => c.name).join(" + ")) + targetSuffix();
       const color = PACKAGE_COLORS[(existing + k) % PACKAGE_COLORS.length]!;
       const buildingRows = makeBuildingRows(targetEntries, (g, i) => configsCostCarbon(combo, g, i));
       return {
@@ -1828,30 +1901,94 @@ export default function RenovationSimulator() {
     const p = ukBlend.price;
     setRegretPrices([0.5, 1, 2].map((m) => Math.round(p * m * 100) / 100));
   }, [ukBlend]);
+  const floorAreaOf = (g: ResolvedBuildingGeometry) => (g.footprintM2 ?? 0) * Math.max(1, Math.round((g.height ?? 3.2) / 3.2));
   const totalFloorAreaM2 = useMemo(
-    () => geometries.reduce((a, g) => a + (g.footprintM2 ?? 0) * Math.max(1, Math.round((g.height ?? 3.2) / 3.2)), 0),
+    () => geometries.reduce((a, g) => a + floorAreaOf(g), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [geometries],
   );
+  /** Floor area of just the buildings a package covers (a one-building package
+   *  must not be charged the energy bill of the whole portfolio). */
+  const areaOfPkg = (pkg: RenovationCalcPackage) => pkg.buildings.reduce((a, b) => {
+    const g = geometries.find((x) => Math.abs(x.lat - b.lat) < 1e-6 && Math.abs(x.lon - b.lon) < 1e-6);
+    return a + (g ? floorAreaOf(g) : 0);
+  }, 0);
+  /** The as-built baseline over the same buildings as a package — a package for
+   *  one building is compared with THAT building, not the portfolio average. */
+  const baselineAggFor = (pkg: RenovationCalcPackage) => {
+    if (!baselinePkg) return null;
+    if (pkg.isBaseline || pkg.buildings.length === baselinePkg.buildings.length) return baselineAgg;
+    const rows = baselinePkg.buildings.filter((b) => pkg.buildings.some((x) => Math.abs(x.lat - b.lat) < 1e-6 && Math.abs(x.lon - b.lon) < 1e-6));
+    return rows.length ? pkgAggregate({ ...baselinePkg, buildings: rows }) : baselineAgg;
+  };
+  /* Packages whose build-ups have since been removed in Materials & packages.
+     They stayed in the project (and in every table and chart) after the user
+     narrowed the build-ups down, so the results never "updated". A package is
+     stale when one of its build-ups is no longer saved for the building(s) it
+     was made for; packages without build-up ids (UK tiers, older runs) and any
+     package chosen for a building are always kept. */
+  const effectiveConfigsFor = (key: string) => {
+    const src = inheritedFrom(configsByBuilding, key);
+    return configsByBuilding[key]?.length ? configsByBuilding[key]! : src ? configsByBuilding[src]! : [];
+  };
+  const chosenIds = new Set(Object.values(saved));
+  /** Out of sync with 4.1: it uses a part that is no longer ticked, or a
+   *  build-up that is no longer saved for its building(s). */
+  const inScopeKeys = new Set(lineItems.map((li) => li.key));
+  const isOutOfSync = (p: RenovationCalcPackage) => {
+    if (p.isBaseline) return false;
+    const keys = Object.keys(p.selections).filter((k) => k !== UK_TIER_SELECTIONS_KEY);
+    if (keys.some((k) => !inScopeKeys.has(k))) return true;
+    const ids = Object.values(p.selections).map((s) => s.configId).filter((x): x is string => !!x);
+    if (!ids.length) return false;
+    const key = p.buildings.length === geometries.length ? "all"
+      : String(geometries.findIndex((g) => Math.abs(g.lat - p.buildings[0]!.lat) < 1e-6 && Math.abs(g.lon - p.buildings[0]!.lon) < 1e-6));
+    const live = new Set(effectiveConfigsFor(key).map((c) => c.id));
+    return ids.some((id) => !live.has(id));
+  };
+  // Hidden when out of sync - except a package chosen for a building, which
+  // stays (flagged) so a choice never silently disappears.
+  const isStalePkg = (p: RenovationCalcPackage) => !chosenIds.has(p.id) && isOutOfSync(p);
+  const stalePackages = packages.filter(isStalePkg);
+  const livePackages = stalePackages.length ? packages.filter((p) => !isStalePkg(p)) : packages;
+
+  /* The price-scenario comparison is for the building(s) being designed for:
+     their own baseline, and every package that covers them cut down to their
+     rows. It used to put one-building packages next to the all-building
+     baseline, which made them look far better than they are. */
+  const regretTargetIdx = useMemo(
+    () => (targetIdx === "all" ? geometries.map((_, i) => i) : geometries[targetIdx] ? [targetIdx] : []),
+    [targetIdx, geometries]);
+  const regretAreaM2 = regretTargetIdx.reduce((a, i) => a + floorAreaOf(geometries[i]!), 0);
   const regretOptions = useMemo<RegretOptionInput[]>(() => {
-    const base = baselineAgg?.avgTotalKwhM2Yr;
-    if (base == null) return [];
+    if (!baselinePkg || !regretTargetIdx.length) return [];
+    const near = (b: { lat: number; lon: number }, i: number) =>
+      Math.abs(b.lat - geometries[i]!.lat) < 1e-6 && Math.abs(b.lon - geometries[i]!.lon) < 1e-6;
+    const rowsFor = (p: RenovationCalcPackage) => regretTargetIdx.map((i) => p.buildings.find((b) => near(b, i)));
+    const baseRows = rowsFor(baselinePkg);
+    if (baseRows.some((r) => r?.totalKwhM2Yr == null)) return [];
+    const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const base = avg(baseRows.map((r) => r!.totalKwhM2Yr!));
     const opts: RegretOptionInput[] = [{ id: "baseline", label: t("Keep as-built (do nothing)"), energyKwhM2: base, investmentSek: 0, isBaseline: true }];
-    for (const p of packages) {
+    for (const p of livePackages) {
       if (p.isBaseline) continue;
-      const agg = pkgAggregate(p);
-      if (agg.avgTotalKwhM2Yr == null) continue; // only options that have an energy result
-      // Per baseline m² (a vertical extension's rate covers more floor area).
-      const scale = agg.floorAreaM2 && baselineAgg?.floorAreaM2 ? agg.floorAreaM2 / baselineAgg.floorAreaM2 : 1;
+      const rows = rowsFor(p);
+      if (rows.some((r) => r?.totalKwhM2Yr == null)) continue; // must cover them all, with a result
+      const energy = avg(rows.map((r) => r!.totalKwhM2Yr!));
+      // Per baseline m² - only a new storey adds floor area.
+      const ext = Object.keys(p.selections).some((k) => k.startsWith("VertExt::"));
+      const pa = rows.reduce((s, r) => s + (r!.floorAreaM2 ?? 0), 0), ba = baseRows.reduce((s, r) => s + (r!.floorAreaM2 ?? 0), 0);
+      const scale = ext && pa > 0 && ba > 0 ? pa / ba : 1;
       // Investment over the study period = upfront + discounted replacements (B4).
-      const idx = p.buildings.map((b) => geometries.findIndex((g) => g.lat === b.lat && g.lon === b.lon)).filter((i) => i >= 0);
-      opts.push({ id: p.id, label: p.name, energyKwhM2: agg.avgTotalKwhM2Yr * scale,
-        investmentSek: (agg.totalCostSEK ?? 0) + replacementsOf(p.selections, idx).cost });
+      opts.push({ id: p.id, label: cleanPkgName(p.name, targetIdx === "all" ? undefined : geometries[targetIdx]?.address ?? undefined),
+        energyKwhM2: energy * scale,
+        investmentSek: rows.reduce((s, r) => s + (r!.costSEK ?? 0), 0) + replacementsOf(p.selections, regretTargetIdx).cost });
     }
     return opts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [packages, baselineAgg?.avgTotalKwhM2Yr, baselineAgg?.floorAreaM2, geometries, configs, lineItems]);
+  }, [livePackages, baselinePkg, regretTargetIdx, geometries, configs, lineItems]);
   const regretResult = useMemo(() => {
-    if (regretOptions.length < 2 || baselineAgg?.avgTotalKwhM2Yr == null || totalFloorAreaM2 <= 0) return null;
+    if (regretOptions.length < 2 || regretAreaM2 <= 0) return null;
     if (isUK && !ukBlend) return null;
     if (isBE) return null;
     const scenarios = [
@@ -1861,14 +1998,14 @@ export default function RenovationSimulator() {
     ];
     const af = annuityFactor(assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03, STUDY_PERIOD_YR);
     const res = computeRegret(regretOptions, scenarios,
-      { baselineEnergyKwhM2: baselineAgg.avgTotalKwhM2Yr, totalFloorAreaM2, annuityFactor: af }, regretAlpha, STUDY_PERIOD_YR, "");
+      { baselineEnergyKwhM2: regretOptions[0]!.energyKwhM2, totalFloorAreaM2: regretAreaM2, annuityFactor: af }, regretAlpha, STUDY_PERIOD_YR, "");
     if (!isUK || !ukBlend) return res;
     return {
       ...res, currency: "GBP" as const,
       priceBasis: t("Blended £/kWh: {pct}% of baseline energy is heating at the gas price (£{gas}/kWh), the rest at electricity (£{elec}/kWh) — Ofgem price cap, {zone}. Package costs are 2020 prices, ex VAT.",
         { pct: Math.round(ukBlend.share * 100), gas: ukBlend.gas, elec: ukBlend.elec, zone: ukTariffs?.zone ?? "Yorkshire" }),
     };
-  }, [isUK, isBE, ukBlend, ukTariffs?.zone, regretOptions, baselineAgg?.avgTotalKwhM2Yr, totalFloorAreaM2, regretPrices, regretAlpha]);
+  }, [isUK, isBE, ukBlend, ukTariffs?.zone, regretOptions, regretAreaM2, regretPrices, regretAlpha]);
   const regretCurrentPrice = isUK ? (ukBlend?.price ?? 0) : (livePriceSek ?? assumptionValue("SE", "energy_price") ?? 0.8);
   // Persist the result and its inputs (incl. the user's prices + alpha) so they
   // survive reloads. Only when the content changes, to avoid store loops.
@@ -1878,7 +2015,7 @@ export default function RenovationSimulator() {
     const af = annuityFactor(assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03, STUDY_PERIOD_YR);
     const inputs = {
       options: regretOptions,
-      config: { baselineEnergyKwhM2: baselineAgg?.avgTotalKwhM2Yr ?? 0, totalFloorAreaM2, annuityFactor: af },
+      config: { baselineEnergyKwhM2: regretOptions[0]?.energyKwhM2 ?? 0, totalFloorAreaM2: regretAreaM2, annuityFactor: af },
       defaultPrices: regretPrices,
       currentPrice: regretCurrentPrice,
       currency: (isUK ? "GBP" : "SEK") as "SEK" | "GBP",
@@ -1901,6 +2038,21 @@ export default function RenovationSimulator() {
      already-resolved geometry, cost, carbon and EPSM baseline. The optimizer
      searches every combination on the fast physics; winners are validated in
      EPSM via validateOptimizerPick below. */
+  /* Components THIS building does not need (recommendation "ok": recent,
+     no defects, U already at the renovation target). The project-wide scope is
+     the union over all buildings, so without this every building was offered
+     every part. A part the user explicitly ticked stays in. */
+  const skipForBuilding = useMemo(() => {
+    if (targetIdx === "all") return new Set<string>();
+    const g = geometries[targetIdx];
+    const key = g ? recKeyByLatLon.get(`${g.lat},${g.lon}`) : undefined;
+    if (!key) return new Set<string>();
+    return new Set(componentRecs
+      .filter((r) => scopeOverrides[r.component] !== true && r.buildings.find((b) => b.key === key)?.level === "ok")
+      .map((r) => r.component));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetIdx, geometries, recKeyByLatLon, componentRecs, JSON.stringify(scopeOverrides)]);
+
   const optimizerInput = useMemo((): { input: { components: OptimizeComponentInput[]; params: OptimizeParams } | null; disabledReason?: string; note?: string } => {
     const repIdx = targetIdx === "all" ? 0 : targetIdx;
     // UK with no saved build-ups: the DESNZ measure set (installed costs). Once
@@ -1920,7 +2072,7 @@ export default function RenovationSimulator() {
         Windows: cur?.win ?? g.tabulaUWin ?? 2.8, Floor: cur?.floor ?? g.tabulaUFloor ?? 0.7,
       };
       const comps: OptimizeComponentInput[] = UK_OPT_COMPONENTS
-        .filter((k) => (opts[k] ?? []).length > 0 && areas[k] > 0)
+        .filter((k) => (opts[k] ?? []).length > 0 && areas[k] > 0 && !skipForBuilding.has(k))
         .map((k) => ({
           key: k, area_m2: Math.round(areas[k]), baseline_u: baseU[k]!,
           options: opts[k]!.map((o) => ({ code: `uk:${o.code}`, label: o.label, u_value: o.uValue, cost: o.costGbp, carbon: o.carbonKgCo2e,
@@ -1954,7 +2106,9 @@ export default function RenovationSimulator() {
     const comps: OptimizeComponentInput[] = [];
     const unpricedNames: string[] = [];
     let hasExtension = false;
+    const notNeeded: string[] = [];
     for (const li of lineItems) {
+      if (skipForBuilding.has(li.parentComponent)) { notNeeded.push(t(li.label)); continue; }
       // Vertical-extension items have no as-built U. They enter with U 0 on both
       // sides - cost and carbon counted, no change to the degree-day heat loss -
       // so extension packages can be listed and sent to EnergyPlus, which then
@@ -1992,6 +2146,9 @@ export default function RenovationSimulator() {
         : "",
       hasExtension
         ? t("Vertical-extension options show their cost and carbon here but no energy effect — the fast model cannot add a storey. Simulate them in EnergyPlus for the taller building's real energy.")
+        : "",
+      notNeeded.length
+        ? t("Not offered for this building — already in good condition: {names}. Tick it under Recommended measures to include it anyway.", { names: notNeeded.join(" · ") })
         : "",
     ].filter(Boolean).join(" ") || undefined;
     if (comps.length === 0)
@@ -2053,7 +2210,7 @@ export default function RenovationSimulator() {
       baseline_heating_kwh_m2_yr: baselinePkg?.buildings[repIdx]?.heatingKwhM2Yr ?? undefined,
     };
     return { input: { components: comps, params }, note: unpricedNote };
-  }, [isUK, isBE, project.city, ukHvac, targetIdx, geometries, baselinePkg, lineItems, configs, wwrByIndex, manualOverrides, boverketAll, livePriceSek]);
+  }, [isUK, isBE, project.city, ukHvac, targetIdx, geometries, baselinePkg, lineItems, configs, wwrByIndex, manualOverrides, boverketAll, livePriceSek, skipForBuilding]);
 
   // Life-cycle cost for the Results table (STUDY_PERIOD_YR), on the SAME energy price and
   // discount rate as the optimizer: material cost today + the simulated energy
@@ -2070,10 +2227,10 @@ export default function RenovationSimulator() {
     ?? (isUK ? (assumptionValue("UK", "carbon_factor_heat") ?? 0.213) / (assumptionValue("UK", "boiler_efficiency") ?? 0.85)
       : isBE ? (assumptionValue("BE", "carbon_factor_heat") ?? 0.202) / (assumptionValue("BE", "boiler_efficiency") ?? 0.85)
       : (assumptionValue("SE", "carbon_factor_heat") ?? 0.022));
-  const lcCarbon30 = (embodied: number | null, kwhM2: number | null): number | null =>
-    embodied == null || kwhM2 == null || lcCarbonFactor == null || totalFloorAreaM2 <= 0
+  const lcCarbon30 = (embodied: number | null, kwhM2: number | null, area: number = totalFloorAreaM2): number | null =>
+    embodied == null || kwhM2 == null || lcCarbonFactor == null || area <= 0
       ? null
-      : Math.round(embodied + kwhM2 * totalFloorAreaM2 * lcCarbonFactor * STUDY_PERIOD_YR);
+      : Math.round(embodied + kwhM2 * area * lcCarbonFactor * STUDY_PERIOD_YR);
 
   // The optimizer runs here (not inside the chart panel) so the Results table
   // can list every not-yet-simulated package with its estimate, whichever view
@@ -2081,15 +2238,19 @@ export default function RenovationSimulator() {
   const [optResult, setOptResult] = useState<OptimizeResponse | null>(null);
   const [optLoading, setOptLoading] = useState(false);
   const [optError, setOptError] = useState<string | null>(null);
+  // The input the current result was computed from: right after switching
+  // building the result on screen is still the previous building's, and the
+  // auto-run must not simulate THAT building's winners for this one.
+  const [optFor, setOptFor] = useState<unknown>(null);
   useEffect(() => {
     const inp = optimizerInput.input;
-    if (!inp || optimizerInput.disabledReason) { setOptResult(null); return; }
+    if (!inp || optimizerInput.disabledReason) { setOptResult(null); setOptFor(null); return; }
     let cancelled = false;
     const t = setTimeout(async () => {
       setOptLoading(true); setOptError(null);
       try {
         const res = await api.optimize({ ...inp, max_results: 24 });
-        if (!cancelled) setOptResult(res);
+        if (!cancelled) { setOptResult(res); setOptFor(inp); }
       } catch (e) {
         if (!cancelled) setOptError((e as Error).message);
       } finally {
@@ -2099,10 +2260,10 @@ export default function RenovationSimulator() {
     return () => { cancelled = true; clearTimeout(t); };
   }, [optimizerInput]);
 
-  const lcc30 = (costNow: number | null, kwhM2: number | null): number | null =>
-    costNow == null || kwhM2 == null || lccPrice == null || totalFloorAreaM2 <= 0
+  const lcc30 = (costNow: number | null, kwhM2: number | null, area: number = totalFloorAreaM2): number | null =>
+    costNow == null || kwhM2 == null || lccPrice == null || area <= 0
       ? null
-      : Math.round(costNow + kwhM2 * totalFloorAreaM2 * lccPrice * lccAF);
+      : Math.round(costNow + kwhM2 * area * lccPrice * lccAF);
 
   /** B4: what re-installing a package's measures within the study period adds —
    *  cost discounted to today, carbon not (EN 15978, as EPSM's LCA counts it).
@@ -2160,15 +2321,25 @@ export default function RenovationSimulator() {
   const isPkgRunning = (p: RenovationCalcPackage) =>
     p.buildings.some((b) => b.status === "queued" || b.status === "running")
     || (p.batchId === null && p.buildings.some((b) => b.status !== "completed" && b.status !== "failed"));
+  /** Was this package built for the building(s) currently being designed for?
+   *  "Already simulated" must be judged per building: the same materials run
+   *  for building A say nothing about building B. */
+  const pkgCoversTarget = (p: RenovationCalcPackage) => {
+    if (targetIdx === "all") return p.buildings.length === geometries.length;
+    const g = geometries[targetIdx];
+    return !!g && p.buildings.length === 1
+      && Math.abs(p.buildings[0]!.lat - g.lat) < 1e-6
+      && Math.abs(p.buildings[0]!.lon - g.lon) < 1e-6;
+  };
   const validatedKeys = useMemo(
-    () => new Set(packages.filter((p) => !p.isBaseline).map(pkgKey)),
+    () => new Set(packages.filter((p) => !p.isBaseline && pkgCoversTarget(p)).map(pkgKey)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [packages]
+    [packages, targetIdx, geometries]
   );
   const runningKeys = useMemo(
-    () => new Set(packages.filter((p) => !p.isBaseline && isPkgRunning(p)).map(pkgKey)),
+    () => new Set(packages.filter((p) => !p.isBaseline && pkgCoversTarget(p) && isPkgRunning(p)).map(pkgKey)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [packages]
+    [packages, targetIdx, geometries]
   );
   // Packages simulated before unpriced materials were treated as unknown stored
   // £0 — clear that cost once so the table says "—" instead of "free".
@@ -2195,94 +2366,128 @@ export default function RenovationSimulator() {
       .map((c) => `${c.componentKey}=${c.id}`).sort().join("|");
   const unsimulatedCombos = activeCombos.filter((c) => !validatedKeys.has(comboSimKey(c)));
 
-  // Turn one Pareto winner into a real package + EPSM run (drops into the
-  // comparison table below alongside any hand-built packages). The optimizer's
-  // option codes are ComponentConfig ids, so resolve each back to its saved
-  // build-up (single Wikells row OR layer-composed assembly).
-  function validateOptimizerPick(point: OptimizePoint, opts?: { auto?: boolean }) {
-    if (geometries.length === 0) return;
-    // UK with no saved build-ups optimises over the DESNZ measures ("uk:" codes);
-    // once build-ups are saved, the options are config ids like everywhere else.
-    if (isUK && configs.length === 0) return validateUkOptimizerPick(point, opts);
-    const cfgById = new Map(configs.map((c) => [c.id, c]));
-    const touched = Object.entries(point.selections)
-      .filter(([, code]) => code !== "__keep__")
-      .map(([key, code]) => [key, cfgById.get(code)] as const)
-      .filter((e): e is readonly [string, ComponentConfig] => !!e[1]);
-    if (touched.length === 0) return;
-    const selections: Record<string, RenovationCalcSelection> = Object.fromEntries(
-      touched.map(([key, cfg]) => [key, {
-        wikellsCode: cfg.wikellsCode ?? "",
-        quantity: 0,
-        configId: cfg.id,
-        ...(cfg.source === "layers" && cfg.uValue != null
-          ? { customUValue: cfg.uValue, customLabel: cfg.name, layers: cfg.layers }
-          : cfg.source === "catalogue" && cfg.mode === "add" && cfg.uValue != null
-            ? { customUValue: cfg.uValue }
-            : {}),
-        ...(cfg.mode ? { mode: cfg.mode } : {}),
-      } as RenovationCalcSelection])
-    );
-    const autoName = touched.map(([, cfg]) => cfg.name).join(" + ");
-    const name = autoName + targetSuffix();
-    const existing = packages.filter((p) => !p.isBaseline).length;
-    const color = PACKAGE_COLORS[existing % PACKAGE_COLORS.length]!;
-    const buildingRows = makeBuildingRows(targetEntries, (g, i) => configsCostCarbon(touched.map(([, cfg]) => cfg), g, i));
-    const id = `pkg-opt-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+  /* Turn one Pareto winner into a package for the building(s) being designed
+     for. The optimizer's option codes are ComponentConfig ids, so each resolves
+     back to its saved build-up (single Wikells row OR layer-composed assembly);
+     UK with no saved build-ups optimises over the DESNZ measures ("uk:" codes).
+     Built separately from submitting, so several picks can be added in ONE
+     store update (calling the old one-at-a-time version in a loop overwrote
+     each previous pick with a stale package list). */
+  type BuiltPkg = { pkg: RenovationCalcPackage; overrides: Record<string, number> };
+  function buildPickPackage(point: OptimizePoint, opts: { auto?: boolean } | undefined, seq: number): BuiltPkg | null {
+    if (geometries.length === 0) return null;
+    const id = `pkg-opt-${Date.now()}-${seq}-${Math.round(Math.random() * 1e6)}`;
+    const color = PACKAGE_COLORS[seq % PACKAGE_COLORS.length]!;
+    let selections: Record<string, RenovationCalcSelection>;
+    let name: string;
+    let buildingRows: RenovationCalcBuildingResult[];
+    if (isUK && configs.length === 0) {
+      const repIdx = targetIdx === "all" ? 0 : targetIdx;
+      const rep = geometries[repIdx];
+      if (!rep) return null;
+      const repOpts = ukOptionsFor(rep, wwrByIndex[repIdx] ?? null);
+      const touched = Object.entries(point.selections)
+        .filter(([, code]) => code.startsWith("uk:"))
+        .map(([key, code]) => [key, (repOpts[key] ?? []).find((o) => `uk:${o.code}` === code)] as const)
+        .filter((e): e is readonly [string, UkMeasureOption] => !!e[1]);
+      if (touched.length === 0) return null;
+      selections = Object.fromEntries(
+        touched.map(([key, o]) => [key, { wikellsCode: `uk:${o.code}`, quantity: 0, customUValue: o.uValue, customLabel: o.label }]),
+      );
+      name = touched.map(([, o]) => o.label).join(" + ") + targetSuffix();
+      buildingRows = makeBuildingRows(targetEntries, (g, i) => {
+        const own = ukOptionsFor(g, wwrByIndex[i] ?? null);
+        let cost = 0, carbon = 0, any = false;
+        for (const [key, o] of touched) {
+          const m = (own[key] ?? []).find((x) => x.code === o.code);
+          if (m) { cost += m.costGbp; carbon += m.carbonKgCo2e; any = true; }
+        }
+        return any ? { costSEK: Math.round(cost), carbonKgCO2e: Math.round(carbon) } : { costSEK: null, carbonKgCO2e: null };
+      });
+    } else {
+      const cfgById = new Map(configs.map((c) => [c.id, c]));
+      const touched = Object.entries(point.selections)
+        .filter(([, code]) => code !== "__keep__")
+        .map(([key, code]) => [key, cfgById.get(code)] as const)
+        .filter((e): e is readonly [string, ComponentConfig] => !!e[1]);
+      if (touched.length === 0) return null;
+      selections = Object.fromEntries(touched.map(([key, cfg]) => [key, selectionForConfig(cfg)]));
+      name = cleanPkgName(touched.map(([, cfg]) => cfg.name).join(" + ")) + targetSuffix();
+      buildingRows = makeBuildingRows(targetEntries, (g, i) => configsCostCarbon(touched.map(([, cfg]) => cfg), g, i));
+    }
     const pkg: RenovationCalcPackage = { id, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows, ...(opts?.auto ? { auto: true } : {}) };
-    // Auto picks REPLACE the previous auto-package so exploring the curve doesn't
-    // pile up dozens of near-identical "Optimal" runs; manual picks always add.
-    // Scoped to THIS building: dropping every auto package meant optimising one
-    // building silently deleted another building's optimal pick, which breaks the
-    // per-building workflow the rest of Step 4 now follows.
-    const sameTarget = (p: RenovationCalcPackage) => {
-      if (targetIdx === "all") return p.buildings.length === geometries.length;
-      const g = geometries[targetIdx];
-      return !!g && p.buildings.length === 1
-        && Math.abs(p.buildings[0]!.lat - g.lat) < 1e-6
-        && Math.abs(p.buildings[0]!.lon - g.lon) < 1e-6;
-    };
-    const kept = opts?.auto ? packages.filter((p) => !p.auto || !sameTarget(p)) : packages;
-    // Stay on the chart: the row flips to "Running in EnergyPlus…" and then
-    // "✓ Simulated", and the package appears under Results.
-    justRanRef.current = true;
-    setProject({ renovationCalcPackages: [...kept, pkg] });
-    submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
+    return { pkg, overrides: overridesFromSeSelections(selections, itemByCode) };
   }
 
-  /** UK Pareto pick -> package: each chosen measure becomes a U-value override,
-   *  re-costed per building on that building's own simulated areas. */
-  function validateUkOptimizerPick(point: OptimizePoint, opts?: { auto?: boolean }) {
-    const repIdx = targetIdx === "all" ? 0 : targetIdx;
-    const rep = geometries[repIdx];
-    if (!rep) return;
-    const repOpts = ukOptionsFor(rep, wwrByIndex[repIdx] ?? null);
-    const touched = Object.entries(point.selections)
-      .filter(([, code]) => code.startsWith("uk:"))
-      .map(([key, code]) => [key, (repOpts[key] ?? []).find((o) => `uk:${o.code}` === code)] as const)
-      .filter((e): e is readonly [string, UkMeasureOption] => !!e[1]);
-    if (touched.length === 0) return;
-    const selections: Record<string, RenovationCalcSelection> = Object.fromEntries(
-      touched.map(([key, o]) => [key, { wikellsCode: `uk:${o.code}`, quantity: 0, customUValue: o.uValue, customLabel: o.label }]),
-    );
-    const name = touched.map(([, o]) => o.label).join(" + ") + targetSuffix();
-    const color = PACKAGE_COLORS[packages.filter((p) => !p.isBaseline).length % PACKAGE_COLORS.length]!;
-    const buildingRows = makeBuildingRows(targetEntries, (g, i) => {
-      const own = ukOptionsFor(g, wwrByIndex[i] ?? null);
-      let cost = 0, carbon = 0, any = false;
-      for (const [key, o] of touched) {
-        const m = (own[key] ?? []).find((x) => x.code === o.code);
-        if (m) { cost += m.costGbp; carbon += m.carbonKgCo2e; any = true; }
-      }
-      return any ? { costSEK: Math.round(cost), carbonKgCO2e: Math.round(carbon) } : { costSEK: null, carbonKgCO2e: null };
-    });
-    const id = `pkg-opt-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    const pkg: RenovationCalcPackage = { id, name, color, isBaseline: false, selections, batchId: null, buildings: buildingRows, ...(opts?.auto ? { auto: true } : {}) };
-    const kept = opts?.auto ? packages.filter((p) => !p.auto) : packages;
-    justRanRef.current = true;   // stay on the chart (see validateOptimizerPick)
-    setProject({ renovationCalcPackages: [...kept, pkg] });
-    submitBatch(id, overridesFromSeSelections(selections, itemByCode), name, targetEntries);
+  /** One saved combination of build-ups as a package for the current target. */
+  function buildComboPackage(combo: ComponentConfig[], seq: number): BuiltPkg {
+    const selections: Record<string, RenovationCalcSelection> = {};
+    combo.forEach((cfg) => { selections[cfg.componentKey] = selectionForConfig(cfg); });
+    const pkg: RenovationCalcPackage = {
+      id: `pkg-${Date.now()}-${seq}-${Math.round(Math.random() * 1e6)}`,
+      name: cleanPkgName(combo.map((c) => c.name).join(" + ")) + targetSuffix(),
+      color: PACKAGE_COLORS[seq % PACKAGE_COLORS.length]!, isBaseline: false, selections, batchId: null,
+      buildings: makeBuildingRows(targetEntries, (g, i) => configsCostCarbon(combo, g, i)),
+    };
+    return { pkg, overrides: overridesFromSeSelections(selections, itemByCode) };
   }
+
+  const chosenPkgIds = useMemo(() => new Set(Object.values(project.selectedPackageByBuilding ?? {})), [project.selectedPackageByBuilding]);
+
+  // A click on a chart point / "Simulate" in the table.
+  function validateOptimizerPick(point: OptimizePoint, opts?: { auto?: boolean }) {
+    const current = useWizardStore.getState().project.renovationCalcPackages;
+    const built = buildPickPackage(point, opts, current.filter((p) => !p.isBaseline).length);
+    if (!built) return;
+    // Auto picks replace this building's previous auto picks (never one the user
+    // chose for a building); manual picks always add.
+    const kept = opts?.auto ? current.filter((p) => !p.auto || !pkgCoversTarget(p) || chosenPkgIds.has(p.id)) : current;
+    justRanRef.current = true;
+    setProject({ renovationCalcPackages: [...kept, built.pkg] });
+    submitBatch(built.pkg.id, built.overrides, built.pkg.name, targetEntries);
+  }
+
+  /* ── Automatic simulation (2026-11-24) ──────────────────────────────────────
+     Opening Packages & results runs, for the building being designed for:
+       • the optimiser's tagged winners (lowest 50-year cost / carbon / energy);
+       • in Sweden, every saved combination too — the EPSM RC model takes a few
+         seconds per batch. UK/Belgium run EnergyPlus (minutes), so only the
+         three winners run there; the rest keep their Simulate button.
+     Each package is tried once per building: a failed run is not resubmitted
+     in a loop, it shows its error and retry button instead. */
+  const autoTried = useRef<Set<string>>(new Set());
+  const inPackagesView = openStage === 2 || openStage === 3;
+  useEffect(() => {
+    if (!inPackagesView || !optResult || optLoading || optFor !== optimizerInput.input) return;
+    if (geometries.length === 0 || baselineAgg?.avgTotalKwhM2Yr == null) return;
+    const tk = String(targetIdx);
+    const tried = (k: string) => autoTried.current.has(`${tk}|${k}`);
+    const combos = !isUK && !isBE && unsimulatedCombos.length <= 40
+      ? unsimulatedCombos.filter((c) => !tried(comboSimKey(c))) : [];
+    const comboKeys = new Set(combos.map(comboSimKey));
+    const picks = optResult.pareto
+      .filter((pt) => (pt.tags?.length ?? 0) > 0)
+      .filter((pt) => { const k = optPointKey(pt); return !!k && !validatedKeys.has(k) && !comboKeys.has(k) && !tried(k); });
+    if (!picks.length && !combos.length) return;
+    const h = setTimeout(() => {
+      picks.forEach((pt) => autoTried.current.add(`${tk}|${optPointKey(pt)}`));
+      combos.forEach((c) => autoTried.current.add(`${tk}|${comboSimKey(c)}`));
+      const current = useWizardStore.getState().project.renovationCalcPackages;
+      // Earlier auto picks for this building that are no longer on the curve
+      // (the build-ups changed) go, unless the user chose one for a building.
+      const onCurve = new Set(optResult.pareto.map(optPointKey));
+      const kept = current.filter((p) => !p.auto || !pkgCoversTarget(p) || chosenPkgIds.has(p.id) || onCurve.has(pkgKey(p)));
+      let seq = kept.filter((p) => !p.isBaseline).length;
+      const built: BuiltPkg[] = [];
+      for (const pt of picks) { const b = buildPickPackage(pt, { auto: true }, seq++); if (b) built.push(b); }
+      for (const c of combos) built.push(buildComboPackage(c, seq++));
+      if (!built.length) return;
+      setProject({ renovationCalcPackages: [...kept, ...built.map((b) => b.pkg)] });
+      built.forEach((b) => submitBatch(b.pkg.id, b.overrides, b.pkg.name, targetEntries));
+    }, 400);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inPackagesView, optResult, optFor, optLoading, targetIdx, unsimulatedCombos.length, baselineAgg?.avgTotalKwhM2Yr]);
 
   function handleSaveAndContinue() {
     setProject({
@@ -2345,11 +2550,22 @@ export default function RenovationSimulator() {
      same columns: cost, carbon, 50-yr cost, 50-yr carbon, heating, total. */
   const optPointKey = (pt: OptimizePoint) =>
     Object.entries(pt.selections).filter(([, v]) => v !== "__keep__").sort().map(([k, v]) => `${k}=${v}`).join("|");
+  /** The as-built baseline over just the building(s) being designed for. */
+  const targetBaseAgg = useMemo(() => {
+    if (!baselinePkg) return null;
+    if (targetIdx === "all") return baselineAgg;
+    const g = geometries[targetIdx];
+    const rows = g ? baselinePkg.buildings.filter((b) => Math.abs(b.lat - g.lat) < 1e-6 && Math.abs(b.lon - g.lon) < 1e-6) : [];
+    return rows.length ? pkgAggregate({ ...baselinePkg, buildings: rows }) : baselineAgg;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baselinePkg, targetIdx, geometries]);
+  const targetAreaM2 = targetEntries.reduce((a, e) => a + floorAreaOf(e.g), 0);
+
   const estimateRows: EstRow[] = useMemo(() => {
-    const baseTot = baselineAgg?.avgTotalKwhM2Yr ?? null;
+    const baseTot = targetBaseAgg?.avgTotalKwhM2Yr ?? null;
     if (!optResult || baseTot == null) return [];
     const baseOpt = optResult.baseline.energy_kwh_m2_yr;
-    const baseHeat = baselineAgg?.avgHeatingKwhM2Yr ?? null;
+    const baseHeat = targetBaseAgg?.avgHeatingKwhM2Yr ?? null;
     const paretoKeys = new Set(optResult.pareto.map(optPointKey));
     const pts = optResult.all_points?.length ? optResult.all_points : optResult.pareto;
     const cfgById = new Map(configs.map((c) => [c.id, c]));
@@ -2394,7 +2610,7 @@ export default function RenovationSimulator() {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [optResult, validatedKeys, configs, targetEntries, baselineAgg?.avgTotalKwhM2Yr, baselineAgg?.avgHeatingKwhM2Yr, wwrByIndex]);
+  }, [optResult, validatedKeys, configs, targetEntries, targetBaseAgg?.avgTotalKwhM2Yr, targetBaseAgg?.avgHeatingKwhM2Yr, wwrByIndex]);
 
   const [resultSort, setResultSort] = useState<"default" | "energy" | "cost" | "lcc" | "lcCarbon">("default");
   // Results is about EnergyPlus-verified outcomes; unsimulated estimates are
@@ -2408,23 +2624,41 @@ export default function RenovationSimulator() {
     pkg.buildings.map((b) => geometries.findIndex((g) => g.lat === b.lat && g.lon === b.lon)).filter((i) => i >= 0));
   const rowMetrics = (r: PkgRow | EstRow) => {
     if (r.kind === "est") return { cost: r.cost, carbon: r.carbon, total: r.total, repl: r.repl,
-      lcc: plus(lcc30(r.cost, r.total), r.repl.cost), lcc_c: plus(lcCarbon30(r.carbon, r.total), r.repl.carbon) };
+      lcc: plus(lcc30(r.cost, r.total, targetAreaM2), r.repl.cost), lcc_c: plus(lcCarbon30(r.carbon, r.total, targetAreaM2), r.repl.carbon) };
     const a = pkgAggregate(r.pkg);
     const cost = r.pkg.isBaseline ? 0 : a.totalCostSEK;
     const carbon = r.pkg.isBaseline ? 0 : a.totalCarbonKgCO2e;
     // A vertical extension is simulated with more floor area, so its per-m² rate
     // applies to more m²: scale the energy by its area relative to the baseline's.
-    const areaScale = !r.pkg.isBaseline && a.floorAreaM2 && baselineAgg?.floorAreaM2
-      ? a.floorAreaM2 / baselineAgg.floorAreaM2 : 1;
+    // ONLY for a new storey: the simulated area and the baseline's area come from
+    // different sources (model floor area vs the declaration's heated area), so
+    // for any other package their ratio is noise - it once multiplied a package's
+    // 50-year energy bill by ~19 (406.8 MSEK against a 43.3 MSEK baseline).
+    const base = baselineAggFor(r.pkg);
+    const hasExtension = Object.keys(r.pkg.selections).some((k) => k.startsWith("VertExt::"));
+    const areaScale = hasExtension && a.floorAreaM2 && base?.floorAreaM2
+      ? a.floorAreaM2 / base.floorAreaM2 : 1;
     const kwhEq = a.avgTotalKwhM2Yr == null ? null : a.avgTotalKwhM2Yr * areaScale;
     // The baseline keeps its existing parts — nothing of it is "replaced" here.
     const repl = r.pkg.isBaseline ? { cost: 0, carbon: 0 } : pkgReplacements(r.pkg);
+    const area = areaOfPkg(r.pkg) || totalFloorAreaM2;
     return { cost, carbon, total: a.avgTotalKwhM2Yr, repl,
-      lcc: plus(lcc30(cost, kwhEq), repl.cost), lcc_c: plus(lcCarbon30(carbon, kwhEq), repl.carbon) };
+      lcc: plus(lcc30(cost, kwhEq, area), repl.cost), lcc_c: plus(lcCarbon30(carbon, kwhEq, area), repl.carbon) };
+  };
+  /* With one building selected, the table shows THAT building: every package
+     that covers it, cut down to its own row, against its own baseline. */
+  const sliceToTarget = (p: RenovationCalcPackage): RenovationCalcPackage | null => {
+    if (targetIdx === "all") return p;
+    const g = geometries[targetIdx];
+    if (!g) return p;
+    const rows = p.buildings.filter((b) => Math.abs(b.lat - g.lat) < 1e-6 && Math.abs(b.lon - g.lon) < 1e-6);
+    if (!rows.length) return null;
+    return rows.length === p.buildings.length ? p : { ...p, buildings: rows };
   };
   const tableRows: (PkgRow | EstRow)[] = (() => {
-    const base = packages.filter((p) => p.isBaseline).map((pkg): PkgRow => ({ kind: "pkg", id: pkg.id, pkg }));
-    const sims = packages.filter((p) => !p.isBaseline).map((pkg): PkgRow => ({ kind: "pkg", id: pkg.id, pkg }));
+    const slice = (ps: RenovationCalcPackage[]) => ps.map(sliceToTarget).filter((p): p is RenovationCalcPackage => p != null);
+    const base = slice(packages.filter((p) => p.isBaseline)).map((pkg): PkgRow => ({ kind: "pkg", id: pkg.id, pkg }));
+    const sims = slice(livePackages.filter((p) => !p.isBaseline)).map((pkg): PkgRow => ({ kind: "pkg", id: pkg.id, pkg }));
     const ests = [...shownEstimates].sort((a, b) => (a.total ?? 1e9) - (b.total ?? 1e9));
     let rest: (PkgRow | EstRow)[] = [...sims, ...ests];
     if (resultSort !== "default") {
@@ -2449,6 +2683,38 @@ export default function RenovationSimulator() {
     return out;
   })();
 
+  /* ── Choosing a package per building (Choose column in Results) ── */
+  const bkOf = (lat: number, lon: number) => `${lat.toFixed(6)},${lon.toFixed(6)}`;
+  const chooseTargets: ResolvedBuildingGeometry[] = targetIdx === "all" ? geometries : geometries[targetIdx] ? [geometries[targetIdx]!] : [];
+  const targetLabel = targetIdx === "all" ? t("all {n} buildings", { n: geometries.length })
+    : geometries[targetIdx]?.address ?? t("Building {n}", { n: targetIdx + 1 });
+  const covers = (p: RenovationCalcPackage, g: ResolvedBuildingGeometry) =>
+    p.buildings.find((b) => Math.abs(b.lat - g.lat) < 1e-6 && Math.abs(b.lon - g.lon) < 1e-6);
+  const chosenForTarget = (() => {
+    const ids = new Set(chooseTargets.map((g) => saved[bkOf(g.lat, g.lon)]));
+    if (ids.size !== 1) return null;
+    const id = [...ids][0];
+    return id ? packages.find((p) => p.id === id) ?? null : null;
+  })();
+  const pendingForTarget = packages.filter((p) => !p.isBaseline && chooseTargets.length > 0
+    && chooseTargets.every((g) => !!covers(p, g))
+    && chooseTargets.some((g) => { const r = covers(p, g)!; return isBuildingRunning(r) || (p.batchId == null && r.status === "idle"); })).length;
+  const canChoose = (p: RenovationCalcPackage) => !p.isBaseline && chooseTargets.length > 0
+    && chooseTargets.every((g) => { const r = covers(p, g); return !!r && isBuildingSettled(r) && r.totalKwhM2Yr != null; });
+  const choosePkg = (pkgId: string) => {
+    const next = { ...(useWizardStore.getState().project.selectedPackageByBuilding ?? {}) };
+    const all = chooseTargets.every((g) => next[bkOf(g.lat, g.lon)] === pkgId);
+    for (const g of chooseTargets) { if (all) delete next[bkOf(g.lat, g.lon)]; else next[bkOf(g.lat, g.lon)] = pkgId; }
+    setProject({ selectedPackageByBuilding: next });
+  };
+  const nextBuildingIdx = targetIdx === "all" || geometries.length < 2 ? null : (() => {
+    for (let k = 1; k < geometries.length; k++) {
+      const j = (targetIdx + k) % geometries.length;
+      if (!saved[bkOf(geometries[j]!.lat, geometries[j]!.lon)]) return j;
+    }
+    return targetIdx + 1 < geometries.length ? targetIdx + 1 : null;
+  })();
+
   const canAddPackage = isUK || isBE ? ukTier != null : packageCombos > 0;
 
   // Inside a Step 4 view, the footer's Continue walks to the next view
@@ -2456,13 +2722,18 @@ export default function RenovationSimulator() {
   // them; only past the last / first view does it leave Step 4.
   // Systems = heating-system comparison and, in Sweden, rooftop solar — so in
   // Sweden it is worth opening even when heating is not in scope.
-  const systemsAvailable = (hasHeating || (!isUK && !isBE)) && !isBE && baselineAgg?.avgHeatingKwhM2Yr != null;
+  const systemsAvailable = !isBE && baselineAgg?.avgHeatingKwhM2Yr != null;
+  // Optimisation (2) and Results (3) are one view since 2026-11-24: the
+  // shortlist simulates itself, so the trade-off chart and the simulated
+  // results belong on the same page. Stage 3 is kept as an alias of 2.
+  const toStaged = { n: 5, label: t("Staged Plan"), hint: t("work in progress — for now, which measure to do first on a limited budget.") };
+  const toSystems = systemsAvailable ? { n: 4, label: t("Systems"), hint: t("compare heating-system alternatives for the selected renovation scenarios.") } : toStaged;
   const VIEW_NEXT: Record<number, { n: number; label: string; hint: string } | null> = {
-    1: hasEnvelope ? { n: 2, label: t("Optimisation & Screening"), hint: t("evaluate every combination with the fast model and shortlist packages to simulate.") }
-                   : { n: 3, label: t("Simulation Results & Comparison"), hint: t("simulate your packages in EnergyPlus and compare the verified outcomes.") },
-    2: { n: 3, label: t("Simulation Results & Comparison"), hint: t("compare the EnergyPlus-verified outcomes of the packages you simulated.") },
-    3: systemsAvailable ? { n: 4, label: t("Systems"), hint: t("compare heating-system alternatives for the selected renovation scenarios.") } : null,
-    4: null,
+    1: { n: 2, label: t("Packages & results"), hint: t("the best combinations are simulated automatically - compare them and choose one per building.") },
+    2: toSystems,
+    3: toSystems,
+    4: toStaged,
+    5: null,
   };
   const nextView = openStage != null ? VIEW_NEXT[openStage] ?? null : null;
   useEffect(() => {
@@ -2475,15 +2746,16 @@ export default function RenovationSimulator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextView?.n, handleSaveAndContinue]);
   const onFooterBack = useCallback(() => {
-    const prev = Object.entries(VIEW_NEXT).find(([, v]) => v?.n === openStage)?.[0];
-    if (prev != null && openStage !== firstView) { setOpenStage(Number(prev)); return; }
+    const cur = openStage === 3 ? 2 : openStage;
+    const prev = Object.entries(VIEW_NEXT).find(([k, v]) => v?.n === cur && k !== "3")?.[0];
+    if (prev != null && cur !== (firstView === 3 ? 2 : firstView)) { setOpenStage(Number(prev)); return; }
     navigate("/step/3");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openStage, firstView, navigate, hasEnvelope]);
   useWizardStepNav({ onNext: onFooterNext, onBack: onFooterBack });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1100 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
       <div>
@@ -2506,7 +2778,9 @@ export default function RenovationSimulator() {
       {/* Decides the scope everything below designs for, so it sits above the
           views — shown on the first view (or when nothing envelope-wise is in
           scope, so the user can always get back to it). */}
-      {geometries.length > 0 && (openStage == null || openStage === 1 || !hasEnvelope) && (
+      {/* Only when nothing to design is ticked: otherwise the same list (with the
+          reasons) is the sidebar of Materials & packages. */}
+      {geometries.length > 0 && !hasEnvelope && (
         <RecommendedMeasuresPanel
           recs={componentRecs}
           scope={components}
@@ -2523,10 +2797,10 @@ export default function RenovationSimulator() {
           <div ref={(el) => { stageRefs.current[1] = el; }} style={{ scrollMarginTop: 80 }} />
           {/* The four views of Step 4 - cards on arrival, a slim strip once inside one. */}
           <Step4Hub
-            active={openStage}
+            active={openStage === 3 ? 2 : openStage}
             onSelect={setOpenStage}
             views={(() => {
-              const designed = packages.filter((p) => !p.isBaseline);
+              const designed = livePackages.filter((p) => !p.isBaseline);
               const done = designed.filter((p) => pkgAggregate(p).avgTotalKwhM2Yr != null);
               const base = baselineAgg?.avgTotalKwhM2Yr ?? null;
               const best = base ? Math.max(...done.map((p) => Math.round(((base - (pkgAggregate(p).avgTotalKwhM2Yr ?? base)) / base) * 100)), -Infinity) : -Infinity;
@@ -2536,31 +2810,67 @@ export default function RenovationSimulator() {
                   status: base == null ? t("Baseline not run yet — run it here first")
                     : configs.length ? t(packageCombosList.length === 1 ? "{list} saved · {n} package" : "{list} saved · {n} packages", { list: configuredComponents.map((c) => `${c.cfgs.length} ${t(c.item.label).toLowerCase()}`).join(" · "), n: packageCombosList.length })
                     : t("As-built {base} kWh/m²·yr · pick materials per component", { base }) },
-                { n: 2, title: t("Optimisation & Screening"), desc: t("All combinations on the fast model — shortlist for simulation"), icon: <ScatterChart size={19} />,
-                  disabled: !hasEnvelope || !!optimizerInput.disabledReason,
-                  status: !hasEnvelope ? t("No envelope components ticked under Recommended measures")
-                    : optimizerInput.disabledReason ?? t("{n} components · trade-offs over every combination", { n: optimizerInput.input?.components.length ?? 0 }) },
-                { n: 3, title: t("Simulation Results & Comparison"), desc: t("EnergyPlus-verified outcomes of simulated packages"), icon: <BarChart3 size={19} />,
-                  disabled: designed.length === 0,
+                { n: 2, title: t("Packages & results"), desc: t("Trade-offs, simulated automatically — choose a package per building"), icon: <BarChart3 size={19} />,
+                  disabled: base == null || (!hasEnvelope && designed.length === 0),
                   status: running ? t("Simulations running — results fill in automatically")
                     : done.length ? `${t(done.length === 1 ? "{n} package vs baseline" : "{n} packages vs baseline", { n: done.length })}${best > -Infinity ? ` · ${t("best −{pct}% energy", { pct: best })}` : ""}`
-                    : t("Run a package to compare it with the baseline") },
+                    : !hasEnvelope ? t("No envelope components ticked under Recommended measures")
+                    : optimizerInput.disabledReason ?? t("Opens the trade-offs and simulates the best packages") },
                 { n: 4, title: t("Systems"), desc: t(isUK ? "Heating-system alternatives for the selected scenarios" : "Heating-system alternatives and rooftop solar"), icon: <SlidersHorizontal size={19} />,
-                  disabled: isBE || base == null || (isUK && !hasHeating),
+                  disabled: isBE || base == null,
                   status: isBE ? t("Not available for Belgium yet")
                     : base == null ? t("Needs the baseline")
-                    : isUK && !hasHeating ? t("Tick “Heating system” under Recommended measures")
-                    : !hasHeating ? t("Size rooftop solar · tick “Heating system” to also compare heating")
                     : isUK ? t("Compare heating systems on this building's demand") : t("Compare heating systems and size rooftop solar") },
                 { n: 5, title: t("Staged Plan"), desc: t("Spread the chosen packages over the years within a budget"), icon: <CalendarClock size={19} />,
-                  disabled: done.length === 0,
-                  status: done.length === 0 ? t("Simulate at least one package first")
-                    : project.stagedPlan?.result ? t("{f} of {m} measures fit the budget", { f: project.stagedPlan.result.fitted, m: project.stagedPlan.result.measures })
-                    : t("Pick years and a budget — the optimiser times each measure") },
+                  // Work in progress (2026-11-24): opens, keeps its "Coming soon"
+                  // tag, and for now holds the future-energy-prices comparison.
+                  disabled: base == null, soon: true,
+                  status: t("Work in progress — for now: which measure to do first on a limited budget") },
               ];
             })()}
           />
         </>
+      )}
+
+      {/* Which building the materials, trade-offs and simulations are for. One
+          building at a time is the default: each gets its own recommendation
+          and its own chosen package (✓), which Step 5 and the report use. */}
+      {geometries.length > 1 && (openStage === 1 || inPackagesView || openStage === 4 || openStage === 5) && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginRight: 4 }}>{t("Designing for")}</span>
+            <button type="button" onClick={() => setTargetIdx("all")}
+              style={{ padding: "4px 10px", borderRadius: 99, fontSize: 12, cursor: "pointer",
+                fontWeight: targetIdx === "all" ? 700 : 500,
+                border: `1px dashed ${targetIdx === "all" ? "#8B6EAD" : "rgba(255,255,255,0.18)"}`,
+                background: targetIdx === "all" ? "rgba(139,110,173,0.18)" : "transparent",
+                color: targetIdx === "all" ? "#fff" : "rgba(255,255,255,0.55)" }}>
+              {t("Same package for all ({n})", { n: geometries.length })}
+            </button>
+            {geometries.map((g, i) => {
+              const on = targetIdx === i;
+              const chosen = !!saved[`${g.lat.toFixed(6)},${g.lon.toFixed(6)}`];
+              return (
+                <button key={`${g.lat},${g.lon}`} type="button" onClick={() => setTargetIdx(i)}
+                  title={chosen ? t("A package is chosen for this building") : t("No package chosen yet")}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 99,
+                    fontSize: 12, fontWeight: on ? 700 : 500, cursor: "pointer", maxWidth: 230,
+                    border: `1px solid ${on ? "#8B6EAD" : "rgba(255,255,255,0.12)"}`,
+                    background: on ? "rgba(139,110,173,0.18)" : "transparent",
+                    color: on ? "#fff" : "rgba(255,255,255,0.65)" }}>
+                  {chosen ? <CheckCircle2 size={12} color="#2FB477" style={{ flexShrink: 0 }} />
+                    : <span style={{ width: 12, height: 12, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.3)", flexShrink: 0 }} />}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.address ?? t("Building {n}", { n: i + 1 })}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)" }}>
+            {targetIdx === "all"
+              ? t("One package for every building. The trade-offs are estimated on {address}; pick a building above to get its own recommendation.", { address: geometries[0]?.address ?? t("the first building") })
+              : t("{done} of {n} buildings have a chosen package.", { done: geometries.filter((g) => saved[`${g.lat.toFixed(6)},${g.lon.toFixed(6)}`]).length, n: geometries.length })}
+          </div>
+        </div>
       )}
 
       {/* Nothing to compare against until a baseline exists. It is copied from
@@ -2592,27 +2902,12 @@ export default function RenovationSimulator() {
           {/* Supplier discount — the % the property owner gets off catalogue material
               prices; deducted from every material cost (Wikells is Sweden-only). */}
           {openStage === 1 && (<>
-          {/* Applies-to selector: small and inline, because it is a qualifier on
-              the design work rather than a step of its own — the panel it
-              replaced took a third of the stage. */}
-          {geometries.length > 1 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{t("These assemblies are for")}</span>
-              <select
-                value={targetIdx === "all" ? "all" : String(targetIdx)}
-                onChange={(e) => setTargetIdx(e.target.value === "all" ? "all" : Number(e.target.value))}
-                style={{ padding: "5px 9px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  background: "#0d1117", color: "#fff", border: "1px solid rgba(255,255,255,0.15)", maxWidth: 280 }}>
-                <option value="all">{t("All buildings ({n})", { n: geometries.length })}</option>
-                {geometries.map((g, i) => (
-                  <option key={`${g.lat},${g.lon}`} value={i}>{g.address ?? t("Building {n}", { n: i + 1 })}</option>
-                ))}
-              </select>
-              <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.3)" }}>
-                {targetIdx === "all"
-                  ? t("one package, applied to every building")
-                  : t("a package built just for this building")}
-              </span>
+          {/* (The "These assemblies are for" select moved up into the building
+              strip under the view bar, shared by Materials and Packages & results.) */}
+          {configsSource && targetIdx !== "all" && (
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 10, lineHeight: 1.5 }}>
+              {t("Starting from the build-ups saved for {source}. Add or remove any to make them this building's own; the trade-offs are always worked out for this building.",
+                { source: configsSource === "all" ? t("all buildings") : geometries[Number(configsSource)]?.address ?? t("Building {n}", { n: Number(configsSource) + 1 }) })}
             </div>
           )}
 
@@ -2667,55 +2962,25 @@ export default function RenovationSimulator() {
 
           {/* Component tabs + material picker (quantities shown are for building 1; each
               building's own quantity is computed at submission time from its own geometry) */}
-          <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {/* Grouped by what they belong to: the existing building vs a new
-                  storey. Flattened, "Walls" and "New Walls" sat adjacent with
-                  nothing explaining the difference. */}
-              {(() => {
-                const groups = new Map<string, typeof lineItems>();
-                lineItems.forEach((li) => {
-                  const g = li.key.startsWith("VertExt::") ? t("Vertical extension (new floor)") : t("Existing building");
-                  const arr = groups.get(g); if (arr) arr.push(li); else groups.set(g, [li]);
-                });
-                return [...groups.entries()].map(([groupLabel, items]) => (
-                  <div key={groupLabel} style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 4 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.28)", letterSpacing: 1.2, textTransform: "uppercase", marginTop: 2 }}>
-                      {groupLabel}
-                    </div>
-                    {items.map((item) => {
-                      const color = COMPONENT_COLORS[item.parentComponent] ?? "var(--brand)";
-                      const isActive = activeItemKey === item.key;
-                      const cfgCount = configs.filter((c) => c.componentKey === item.key).length;
-                      return (
-                        <button
-                          key={item.key}
-                          onClick={() => setActiveItemKey(item.key)}
-                          style={{
-                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "9px 12px", borderRadius: 10, border: `1px solid ${isActive ? `${color}55` : "rgba(255,255,255,0.07)"}`,
-                            background: isActive ? `${color}18` : "rgba(255,255,255,0.03)", cursor: "pointer",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfgCount > 0 ? "#8B6EAD" : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#fff" : "rgba(255,255,255,0.6)" }}>{t(item.label)}</span>
-                          </div>
-                          {cfgCount > 0 && (
-                            <span style={{ fontSize: 11, fontWeight: 700, color: "#8B6EAD", background: "rgba(139,110,173,0.16)", borderRadius: 99, padding: "1px 7px" }}>{cfgCount}</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ));
-              })()}
-              {lineItems.length === 0 && (
-                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>
-                  {t("No components ticked. Choose them under Recommended measures above.")}
-                </p>
-              )}
-            </div>
+          <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 16 }}>
+            {/* One list for what to renovate (the recommendation, with its reasons)
+                and which part's materials are being picked — it used to be a
+                separate "Recommended measures" box above this sidebar. */}
+            <ComponentScopeList
+              recs={componentRecs}
+              scope={components}
+              overrides={scopeOverrides}
+              onToggle={(c, include) => setProject({ renovationScopeOverrides: { ...(useWizardStore.getState().project.renovationScopeOverrides ?? {}), [c]: include } })}
+              onReset={() => setProject({ renovationScopeOverrides: {} })}
+              targetKey={targetIdx === "all" ? null : (() => { const g = geometries[targetIdx]; return g ? recKeyByLatLon.get(`${g.lat},${g.lon}`) ?? null : null; })()}
+              buildingCount={recBuildings.length}
+              showBbr={project.country === "Sweden" || project.country == null}
+              lineItems={lineItems}
+              activeItemKey={activeItem?.key ?? null}
+              onSelectItem={setActiveItemKey}
+              savedCount={(k) => configs.filter((c) => c.componentKey === k).length}
+              colorFor={(c) => COMPONENT_COLORS[c] ?? "var(--brand)"}
+            />
 
             {activeItem && (
               <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: `1px solid ${COMPONENT_COLORS[activeItem.parentComponent] ?? "var(--brand)"}33` }}>
@@ -2960,7 +3225,7 @@ export default function RenovationSimulator() {
           {/* ══ OPTIMISATION view ══ Pareto front over the fast degree-day
               physics, from the saved build-ups (UK with none saved: the DESNZ
               measure set). Each validated winner runs in EPSM and lands in Results. */}
-          {hasEnvelope && openStage === 2 && (
+          {hasEnvelope && inPackagesView && (
             <OptimizerPanel
               input={optimizerInput.input}
               disabledReason={optimizerInput.disabledReason}
@@ -2978,23 +3243,52 @@ export default function RenovationSimulator() {
               loading={optLoading}
               error={optError}
               scopeLabel={geometries.length > 1
-                ? `${geometries[targetIdx === "all" ? 0 : targetIdx]?.address ?? t("the first building")} (${t(targetIdx === "all" && geometries.length > 1 ? "representative building — the Results view sums all {n} buildings" : "representative building — the Results view sums all {n} building", { n: targetIdx === "all" ? geometries.length : 1 })})`
+                ? targetIdx === "all"
+                  ? `${geometries[0]?.address ?? t("the first building")} (${t("standing in for all {n} buildings", { n: geometries.length })})`
+                  : geometries[targetIdx]?.address ?? undefined
                 : undefined}
+              onOpenTable={() => stageRefs.current[3]?.scrollIntoView({ behavior: "smooth", block: "start" })}
             />
           )}
-          {hasEnvelope && openStage === 2 && !isBE && (
-            <ComponentValuePanel
-              input={optimizerInput.disabledReason ? null : optimizerInput.input}
-              currency={isUK && configs.length === 0 ? "GBP" : MONEY}
-              scopeLabel={geometries.length > 1 ? geometries[targetIdx === "all" ? 0 : targetIdx]?.address ?? undefined : undefined}
-            />
-          )}
+          {/* (Best value per component moved to 4.4 Staged plan, 2026-11-24.) */}
 
-          {(isUK || isBE || hasEnvelope) && (<>
+          {(<>
           <div ref={(el) => { stageRefs.current[3] = el; }} style={{ scrollMarginTop: 80 }} />
 
-          {openStage === 3 && (
+          {inPackagesView && (
           <>
+          {/* Choosing happens in the table below (Choose column); this bar says
+              for which building and moves on to the next one. (A separate
+              "Choose the package" card listed the same packages again - removed
+              2026-11-24 at the user's request.) */}
+          {chooseTargets.length > 0 && baselinePkg && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12, padding: "10px 14px", borderRadius: 12,
+              background: "rgba(139,110,173,0.06)", border: "1px solid rgba(139,110,173,0.3)" }}>
+              <span style={{ fontSize: 13, color: "#fff", flex: 1, minWidth: 240 }}>
+                {chosenForTarget && isOutOfSync(chosenForTarget)
+                  ? <span style={{ color: "#E8880C" }}>⚠ {t("The package chosen for {target} uses build-ups or parts you changed in 4.1 — choose again below.", { target: targetLabel })}</span>
+                  : chosenForTarget
+                  ? <><CheckCircle2 size={13} color="#2FB477" style={{ verticalAlign: "-2px", marginRight: 5 }} />
+                      {t("Chosen for {target}: {name}", { target: targetLabel, name: cleanPkgName(chosenForTarget.name) })}</>
+                  : t("Choose a package for {target} in the table below.", { target: targetLabel })}
+              </span>
+              {pendingForTarget > 0 && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#E8880C" }}>
+                  <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} />
+                  {t(pendingForTarget === 1 ? "{n} package still simulating" : "{n} packages still simulating", { n: pendingForTarget })}
+                </span>
+              )}
+              {nextBuildingIdx != null && (
+                <button type="button" onClick={() => { setTargetIdx(nextBuildingIdx); stageRefs.current[1]?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+                  style={{ padding: "6px 13px", borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                    border: "1px solid #8B6EAD", background: chosenForTarget ? "#8B6EAD" : "transparent",
+                    color: chosenForTarget ? "#0b1220" : "#8B6EAD" }}>
+                  {t("Next building: {address} →", { address: geometries[nextBuildingIdx]?.address ?? t("Building {n}", { n: nextBuildingIdx + 1 }) })}
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Prominent "EnergyPlus is running" banner so it's obvious a simulation
               is in flight and results will appear on their own (no click needed). */}
           {(() => {
@@ -3070,6 +3364,23 @@ export default function RenovationSimulator() {
                 </span>
               </span>
             </div>
+            {stalePackages.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10, padding: "8px 12px", borderRadius: 10,
+                fontSize: 12, color: "rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.15)" }}>
+                <span style={{ flex: 1 }}>
+                  {t(stalePackages.length === 1
+                    ? "{n} earlier package is hidden — it uses a part or build-up no longer selected in Materials & packages."
+                    : "{n} earlier packages are hidden — they use parts or build-ups no longer selected in Materials & packages.", { n: stalePackages.length })}
+                </span>
+                <button type="button" onClick={() => {
+                  const gone = new Set(stalePackages.map((p) => p.id));
+                  setProject({ renovationCalcPackages: useWizardStore.getState().project.renovationCalcPackages.filter((p) => !gone.has(p.id)) });
+                }} style={{ padding: "4px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  border: "1px solid rgba(255,255,255,0.18)", background: "transparent", color: "rgba(255,255,255,0.7)" }}>
+                  {t("Delete them")}
+                </button>
+              </div>
+            )}
             {(baselinePkg?.buildings.length ?? 0) > 1 && (
               <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
                 {([["package", "By package"], ["building", "By building"]] as const).map(([v, label]) => (
@@ -3141,6 +3452,7 @@ export default function RenovationSimulator() {
                     ? t("All simulated energy per m² per year: heating, hot water, cooling, lighting and equipment.")
                     : t("Simulated heating + hot water + cooling per m² per year. Household electricity (appliances, lighting in flats) is simulated for the heat it gives off, but not counted here - the same rule as Swedish energy declarations.") },
                 { k: "status", l: t("Status") },
+                { k: "choose", l: t("Choose"), info: t("Choose the package for the building(s) selected above. Each building can have a different one; Step 5 and the report use them.") },
               ] as { k: string; l: string; sub?: string; info?: string }[];
               })().map((h) => (
                 <span key={h.k} style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>
@@ -3194,7 +3506,7 @@ export default function RenovationSimulator() {
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{row.heat == null ? "—" : `≈ ${row.heat}`}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>
                       {row.total == null ? "—" : `≈ ${row.total}`}
-                      {vsBaseline(row.total, baselineAgg?.avgTotalKwhM2Yr ?? null, false)}
+                      {vsBaseline(row.total, targetBaseAgg?.avgTotalKwhM2Yr ?? null, false)}
                     </span>
                     <span>
                       {running ? (
@@ -3210,6 +3522,7 @@ export default function RenovationSimulator() {
                         </button>
                       )}
                     </span>
+                    <span />
                   </div>
                 );
               }
@@ -3232,14 +3545,7 @@ export default function RenovationSimulator() {
                     >
                       {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </button>
-                    {!pkg.isBaseline && pkg.buildings.length === 1 && geometries.length > 1 && (
-                      <span title={t("Built for {address} only", { address: pkg.buildings[0]!.address })}
-                        style={{ fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 99, marginRight: 6,
-                          color: "#8B6EAD", background: "rgba(139,110,173,0.14)", whiteSpace: "nowrap" }}>
-                        {t("1 building")}
-                      </span>
-                    )}
-                    <span style={{ fontSize: 12, fontWeight: 600, color: pkg.isBaseline ? "rgba(255,255,255,0.5)" : "#fff" }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: pkg.isBaseline ? "rgba(255,255,255,0.5)" : "#fff", minWidth: 0 }}>
                       {(rowTags[row.id] ?? []).length > 0 && (
                         <span style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 3 }}>
                           {rowTags[row.id]!.map((tag) => (
@@ -3248,9 +3554,14 @@ export default function RenovationSimulator() {
                         </span>
                       )}
                       <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: pkg.color, marginRight: 6 }} />
-                      {pkg.isBaseline ? t(pkg.name) : pkg.name}{agg.n > 1 ? ` (${t("{n} buildings", { n: agg.n })})` : ""}
+                      {pkg.isBaseline ? t(pkg.name) : cleanPkgName(pkg.name, targetIdx === "all" ? undefined : geometries[targetIdx]?.address)}{agg.n > 1 ? ` (${t("{n} buildings", { n: agg.n })})` : ""}
                       {/* Applied envelope U-values — makes an uninsulated pick (which
                           replaces, never adds to, the baseline U) explain its own result. */}
+                      {!pkg.isBaseline && isOutOfSync(packages.find((x) => x.id === pkg.id) ?? pkg) && (
+                        <span style={{ display: "block", fontSize: 11, marginTop: 3, color: "#E8880C", fontWeight: 600 }}>
+                          ⚠ {t("Uses build-ups or parts you have since changed in 4.1 — kept because it is chosen for a building.")}
+                        </span>
+                      )}
                       {!pkg.isBaseline && ((!isUK && !isBE) || pkgCostSource(pkg) === "catalogue") && (() => {
                         const us = appliedUValues(pkg, itemByCode);
                         if (!us.length) return null;
@@ -3273,8 +3584,8 @@ export default function RenovationSimulator() {
                       })()}
                       {/* Worse-than-baseline guardrail: if the package's average total
                           energy exceeds the as-built baseline, say why in plain terms. */}
-                      {!pkg.isBaseline && agg.avgTotalKwhM2Yr != null && baselineAgg?.avgTotalKwhM2Yr != null
-                        && agg.avgTotalKwhM2Yr > baselineAgg.avgTotalKwhM2Yr && (
+                      {!pkg.isBaseline && agg.avgTotalKwhM2Yr != null && baselineAggFor(pkg)?.avgTotalKwhM2Yr != null
+                        && agg.avgTotalKwhM2Yr > baselineAggFor(pkg)!.avgTotalKwhM2Yr! && (
                         <span style={{ display: "block", fontSize: 11, marginTop: 3, color: "#E2483B", fontWeight: 600, lineHeight: 1.4 }}>
                           ⚠ {t("Less insulated than the current building — this raises energy use. Choose an assembly with insulation (e.g. M95 / M145 walls, or an insulated roof).")}
                         </span>
@@ -3317,11 +3628,11 @@ export default function RenovationSimulator() {
                     })()}
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>
                       {agg.avgHeatingKwhM2Yr ?? "—"}
-                      {vsBaseline(agg.avgHeatingKwhM2Yr, baselineAgg?.avgHeatingKwhM2Yr ?? null, pkg.isBaseline)}
+                      {vsBaseline(agg.avgHeatingKwhM2Yr, baselineAggFor(pkg)?.avgHeatingKwhM2Yr ?? null, pkg.isBaseline)}
                     </span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: pkg.isBaseline ? "rgba(255,255,255,0.6)" : "#2FB477" }}>
                       {agg.avgTotalKwhM2Yr ?? "—"}
-                      {vsBaseline(agg.avgTotalKwhM2Yr, baselineAgg?.avgTotalKwhM2Yr ?? null, pkg.isBaseline)}
+                      {vsBaseline(agg.avgTotalKwhM2Yr, baselineAggFor(pkg)?.avgTotalKwhM2Yr ?? null, pkg.isBaseline)}
                     </span>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       {agg.running > 0 && <Loader2 size={13} color="#E8880C" style={{ animation: "spin 1s linear infinite" }} />}
@@ -3333,7 +3644,7 @@ export default function RenovationSimulator() {
                       {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#2FB477" />}
                       {agg.failed > 0 && <XCircle size={13} color="#E2483B" />}
                       {(agg.failed > 0 || agg.pending > 0) && (
-                        <button onClick={() => retryPackage(pkg)}
+                        <button onClick={() => retryPackage(packages.find((p) => p.id === pkg.id) ?? pkg)}
                           title={agg.failed > 0 ? t("Retry failed buildings") : t("Re-run stuck buildings")}
                           style={{ background: "transparent", border: 0, cursor: "pointer",
                             color: agg.failed > 0 ? "#E2483B" : "rgba(255,255,255,0.35)" }}>
@@ -3341,6 +3652,20 @@ export default function RenovationSimulator() {
                         </button>
                       )}
                       <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{agg.completed}/{agg.n}</span>
+                    </span>
+                    <span>
+                      {canChoose(pkg) && (() => {
+                        const on = chosenForTarget?.id === pkg.id;
+                        return (
+                          <button type="button" onClick={() => choosePkg(pkg.id)}
+                            title={on ? t("Chosen — click again to undo") : t("Choose this package for {target}", { target: targetLabel })}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+                              border: `1px solid ${on ? "#2FB477" : "rgba(139,110,173,0.6)"}`,
+                              background: on ? "rgba(47,180,119,0.16)" : "transparent", color: on ? "#2FB477" : "#B8A3D0" }}>
+                            {on ? <><CheckCircle2 size={11} /> {t("Chosen")}</> : t("Choose")}
+                          </button>
+                        );
+                      })()}
                     </span>
                   </div>
                   {expanded && (
@@ -3369,6 +3694,7 @@ export default function RenovationSimulator() {
                               </span>
                             );
                           })()}
+                          <span />
                         </div>
                       ))}
                     </div>
@@ -3470,28 +3796,23 @@ export default function RenovationSimulator() {
             )}
           </div>
 
-          {/* Future energy prices: compare packages across Low/Medium/High price
-              scenarios (moved back here from Step 5). */}
-          {regretResult && regretResult.options.length >= 2 && (
-            <div style={{ marginTop: 16 }}>
-              <DecisionAnalysisPanel
-                result={regretResult}
-                alpha={regretAlpha}
-                setAlpha={setRegretAlpha}
-                prices={regretPrices}
-                setPrices={setRegretPrices}
-                currentPrice={regretCurrentPrice}
-              />
-            </div>
-          )}
+          {/* (The future-energy-prices comparison moved to 4.4 Staged plan.) */}
 
           </>)}
 
-          {/* ══ SYSTEMS view ══ heating-system swap comparison */}
-          {openStage === 4 && hasHeating && !isBE && baselineAgg?.avgHeatingKwhM2Yr != null && totalFloorAreaM2 > 0 && (
+          {/* ══ SYSTEMS view ══ heating-system swap comparison - always shown in
+              4.3 (2026-11-24: it used to need "Heating system" ticked in 4.1, so
+              it often seemed to be missing), for the building(s) selected under
+              "Designing for", on their simulated as-built heating demand. */}
+          {openStage === 4 && !hasHeating && !isBE && (
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+              {t("“Heating system” is not ticked in Materials & packages, so it is not part of the renovation scope — the comparison below is for information.")}
+            </div>
+          )}
+          {openStage === 4 && !isBE && targetBaseAgg?.avgHeatingKwhM2Yr != null && targetAreaM2 > 0 && (
             <HeatingSystemPanel
-              heatingDemandKwhM2Yr={baselineAgg.avgHeatingKwhM2Yr}
-              floorAreaM2={totalFloorAreaM2}
+              heatingDemandKwhM2Yr={targetBaseAgg.avgHeatingKwhM2Yr}
+              floorAreaM2={targetAreaM2}
               discountRate={assumptionValue(isUK ? "UK" : "SE", "discount_rate") ?? 0.03}
               catalogue={ukHvac}
             />
@@ -3500,18 +3821,36 @@ export default function RenovationSimulator() {
           {/* Peak demand, baseline vs every finished package (Results view).
               Climate-scenario copies (`__<scenario>`) run on other weather and
               would not be a like-for-like comparison, so they are left out. */}
-          {openStage === 3 && (() => {
+          {inPackagesView && (() => {
             const baseBatch = packages.find((p) => p.isBaseline && p.batchId)?.batchId ?? project.baselineBatchId;
-            const done = packages.filter((p) => !p.isBaseline && p.batchId && !p.id.includes("__")
-              && p.buildings.length > 0 && p.buildings.every((b) => b.status === "completed"));
+            // Same buildings on both sides: the building(s) being designed for,
+            // and only packages that cover all of them. A one-building package
+            // against the all-building baseline showed a "−76 %" peak cut.
+            const done = livePackages.filter((p) => !p.isBaseline && p.batchId && !p.id.includes("__")
+              && chooseTargets.length > 0 && chooseTargets.every((g) => { const r = covers(p, g); return !!r && r.status === "completed"; }));
             if (!baseBatch || done.length === 0) return null;
+            const addr = targetIdx === "all" ? undefined : geometries[targetIdx]?.address ?? undefined;
             return (
               <PeakDemandPanel
-                scenarios={[{ label: t("Baseline"), batchId: baseBatch }, ...done.map((p) => ({ label: p.name, batchId: p.batchId! }))]}
-                points={geometries.map((g) => ({ lat: g.lat, lon: g.lon }))}
+                scenarios={[{ label: t("Today (no renovation)"), batchId: baseBatch }, ...done.map((p) => ({ label: cleanPkgName(p.name, addr), batchId: p.batchId! }))]}
+                points={chooseTargets.map((g) => ({ lat: g.lat, lon: g.lon }))}
+                preferredBatchId={chosenForTarget?.batchId ?? null}
               />
             );
           })()}
+
+          {/* Future energy prices: the packages compared across low / medium /
+              high price futures - last in Packages & results (2026-11-24). */}
+          {inPackagesView && regretResult && regretResult.options.length >= 2 && (
+            <DecisionAnalysisPanel
+              result={regretResult}
+              alpha={regretAlpha}
+              setAlpha={setRegretAlpha}
+              prices={regretPrices}
+              setPrices={setRegretPrices}
+              currentPrice={regretCurrentPrice}
+            />
+          )}
 
           {/* Rooftop PV — Sweden only: the prices, tax rules and EPC property
               electricity it rests on are Swedish. Independent of the heating
@@ -3524,8 +3863,30 @@ export default function RenovationSimulator() {
             />
           )}
 
-          {/* 4.5 Staged plan: the chosen packages spread over the years. */}
-          {openStage === 5 && <StagedPlan embedded />}
+          {/* ══ 4.4 STAGED PLAN (work in progress) ══ For now it holds "Best value
+              per component" - which measure to do first when the budget is
+              limited (moved here from Packages & results, 2026-11-24). The
+              year-by-year budget plan (StagedPlan) stays off until finished. */}
+          {openStage === 5 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ padding: "10px 14px", borderRadius: 12, fontSize: 12.5, lineHeight: 1.55,
+                background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.18)", color: "rgba(255,255,255,0.6)" }}>
+                <b style={{ color: "#fff" }}>{t("Work in progress.")}</b>{" "}
+                {t("The staged plan — spreading the chosen packages over the years within a budget — is coming. For now this view ranks the measures by value, to see what to do first when the budget is limited.")}
+              </div>
+              {hasEnvelope && !isBE ? (
+                <ComponentValuePanel
+                  input={optimizerInput.disabledReason ? null : optimizerInput.input}
+                  currency={isUK && configs.length === 0 ? "GBP" : MONEY}
+                  scopeLabel={geometries.length > 1 ? geometries[targetIdx === "all" ? 0 : targetIdx]?.address ?? undefined : undefined}
+                />
+              ) : (
+                <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.5)" }}>
+                  {t(isBE ? "Not available for Belgium yet." : "Save build-ups in Materials & packages to rank them here.")}
+                </div>
+              )}
+            </div>
+          )}
 
           </>
           )}

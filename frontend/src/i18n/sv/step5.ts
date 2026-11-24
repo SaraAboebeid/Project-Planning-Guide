@@ -437,4 +437,12 @@ export const SV_STEP5: Record<string, string> = {
 
   // ── 50-year study period ──
   "50-yr LCC": "LCC 50 år",
+  // ── 2026-11-24: per-building packages, merged Packages & results, chart ──
+  "Change": "Förändring",
+  "Embodied carbon": "Inbyggd klimatpåverkan",
+  "No renovation chosen": "Ingen renovering vald",
+  "Whole project": "Hela projektet",
+  "{c} of {n} buildings renovated": "{c} av {n} byggnader renoveras",
+  "Energy in kWh/m²·yr; the whole-project figure is weighted by each building's floor area. Cost is the renovation itself, one-off.": "Energi i kWh/m²·år; värdet för hela projektet är viktat efter varje byggnads golvyta. Kostnaden är själva renoveringen, en gång.",
+  "the building outline was too low for the number of floors in the energy declaration, so these buildings were simulated at floors × 3.2 m instead": "byggnadens kontur var för låg för antalet våningar i energideklarationen, så dessa byggnader simulerades i stället med våningar × 3,2 m",
 };

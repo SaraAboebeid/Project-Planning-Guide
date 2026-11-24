@@ -18,7 +18,8 @@ import {
 import { AlertTriangle, Download, Loader2 } from "lucide-react";
 import { api } from "../api/client";
 import { C, tint } from "../config/colors";
-import { useT, translate } from "../i18n";
+import { translate } from "../i18n";
+import { useEngineT } from "../utils/engineName";
 
 type Resolution = "monthly" | "hourly";
 type EndUse = "heating" | "cooling" | "lighting" | "equipment" | "dhw";
@@ -62,7 +63,7 @@ export default function BaselineLoadProfile({
   /** Fallback labels for the building picker when a run has no address. */
   addresses: string[];
 }) {
-  const t = useT();
+  const t = useEngineT();
   const [resolution, setResolution] = useState<Resolution>("monthly");
   const [buildingIdx, setBuildingIdx] = useState(0);
   const [perM2, setPerM2] = useState(true);

@@ -23,7 +23,8 @@ const stagedMoney = (v: number, cur: string) => {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell,
 } from "recharts";
-import { useT, useLang, translate } from "../i18n";
+import { useLang, translate } from "../i18n";
+import { useEngineT } from "../utils/engineName";
 
 /* Facade labels for the report. Kept here rather than imported from the Step 2
    panel so the report has no dependency on that component's UI internals. */
@@ -220,7 +221,7 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
 export default function RenovationReport() {
   const navigate = useNavigate();
   const { project, setProject } = useWizardStore();
-  const t = useT();
+  const t = useEngineT();
   // Memoised labels below are built in the current language, so they recompute on a switch.
   const lang = useLang();
   // UK projects are costed in GBP from UK sources; everything else is Swedish.
@@ -431,20 +432,45 @@ export default function RenovationReport() {
   /* Per-building package choices made in Step 4. When present they are the real
      recommendation — a portfolio-wide "best package" is an average that may suit
      none of the buildings individually. */
-  const perBuildingPicks = useMemo(() => {
+  type BuildingPick = { address: string; pkg: string | null; baseline: number; after: number | null;
+    cost: number | null; carbon: number | null; area: number | null };
+  const perBuildingPicks = useMemo((): BuildingPick[] => {
     const saved = project.selectedPackageByBuilding ?? {};
     if (!Object.keys(saved).length) return [];
     const pkgById = new Map(project.renovationCalcPackages.map((p) => [p.id, p]));
+    // Every building is listed: one with no chosen package stays as it is
+    // (no renovation), so the project total below covers the whole portfolio.
     return (project.renovationBaselineResults ?? [])
+      .filter((b) => b.lat != null && b.lon != null)
       .map((b) => {
-        if (b.lat == null || b.lon == null) return null;
-        const pkg = pkgById.get(saved[`${b.lat.toFixed(6)},${b.lon.toFixed(6)}`] ?? "");
-        if (!pkg) return null;
-        const row = pkg.buildings.find((x) => Math.abs(x.lat - b.lat!) < 1e-6 && Math.abs(x.lon - b.lon!) < 1e-6);
-        return { address: b.address, pkg: pkg.name, baseline: b.energyUse, after: row?.totalKwhM2Yr ?? null };
-      })
-      .filter((x): x is { address: string; pkg: string; baseline: number; after: number | null } => x != null);
+        const pkg = pkgById.get(saved[`${b.lat!.toFixed(6)},${b.lon!.toFixed(6)}`] ?? "");
+        const row = pkg?.buildings.find((x) => Math.abs(x.lat - b.lat!) < 1e-6 && Math.abs(x.lon - b.lon!) < 1e-6);
+        return pkg
+          ? { address: b.address, pkg: pkg.name, baseline: b.energyUse, after: row?.totalKwhM2Yr ?? null,
+              cost: row?.costSEK ?? null, carbon: row?.carbonKgCO2e ?? null, area: b.heatedAreaM2 ?? row?.floorAreaM2 ?? null }
+          : { address: b.address, pkg: null, baseline: b.energyUse, after: b.energyUse, cost: 0, carbon: 0, area: b.heatedAreaM2 ?? null };
+      });
   }, [project.selectedPackageByBuilding, project.renovationCalcPackages, project.renovationBaselineResults]);
+  /** The whole project with each building's chosen package: energy weighted by
+   *  floor area (a big block counts for more than a villa), cost and carbon summed. */
+  const picksTotal = useMemo(() => {
+    if (!perBuildingPicks.length) return null;
+    const withArea = perBuildingPicks.filter((r) => r.area != null && r.area > 0 && r.after != null);
+    const weigh = (f: (r: BuildingPick) => number) => withArea.length === perBuildingPicks.length
+      ? withArea.reduce((s, r) => s + f(r) * r.area!, 0) / withArea.reduce((s, r) => s + r.area!, 0)
+      : null;
+    const before = weigh((r) => r.baseline);
+    const after = weigh((r) => r.after!);
+    const sum = (f: (r: BuildingPick) => number | null) =>
+      perBuildingPicks.every((r) => f(r) != null) ? perBuildingPicks.reduce((s, r) => s + (f(r) ?? 0), 0) : null;
+    return { before, after, cost: sum((r) => r.cost), carbon: sum((r) => r.carbon),
+      chosen: perBuildingPicks.filter((r) => r.pkg != null).length, n: perBuildingPicks.length };
+  }, [perBuildingPicks]);
+
+  /* Buildings whose outline was too low for the floors in their energy
+     declaration, so the model ran at floors × 3.2 m (shown in Step 3 until
+     2026-11-24; the caveat now lives in the report). */
+  const heightFixes = baselines.filter((b) => b.heightCorrected);
 
   const facadeEntries = useMemo(
     () => Object.entries(project.facadeDefects ?? {}).filter(([, sum]) => sum && sum.imageCount > 0),
@@ -716,6 +742,7 @@ export default function RenovationReport() {
         ? `<td>${b.totalGasKwh != null ? `${Math.round(b.totalGasKwh / Math.max(1, b.dwellings ?? 1)).toLocaleString("en-GB")} kWh/yr` : "—"}</td>` : ""}</tr>`).join("")
     : `<tr><td colspan="${isUK ? 5 : 4}" class="muted">${t("No baseline simulation recorded.")}</td></tr>`}
   </tbody></table>
+  ${heightFixes.length ? `<p class="sub" style="color:#b45309">${t("Height corrected:")} ${t("the building outline was too low for the number of floors in the energy declaration, so these buildings were simulated at floors × 3.2 m instead")} — ${heightFixes.map((b) => esc(t("{address}: {floors} floors, {from} m → {to} m", { address: b.address, floors: b.heightCorrected!.floors, from: b.heightCorrected!.from_m, to: b.heightCorrected!.to_m }))).join("; ")}. ${t("The outline may belong to a lower wing or be linked to the wrong declaration, so treat these results with care.")}</p>` : ""}
   ${baselineChart}
 
   ${pvOk.length ? `
@@ -737,15 +764,20 @@ export default function RenovationReport() {
   ${perBuildingPicks.length ? `
   <h2>${t("Chosen package per building")}</h2>
   <p class="sub">${t("Selected building by building in Step 4 — where a portfolio-wide pick would average over real differences between them.")}</p>
-  <table><thead><tr><th>${t("Building")}</th><th>${t("Chosen package")}</th><th>${t("Baseline")}</th><th>${t("After")}</th><th>${t("Reduction")}</th></tr></thead><tbody>
+  <table><thead><tr><th>${t("Building")}</th><th>${t("Chosen package")}</th><th>${t("Baseline")}</th><th>${t("After")}</th><th>${t("Change")}</th><th>${t("Cost")}</th><th>${t("Embodied carbon")}</th></tr></thead><tbody>
   ${perBuildingPicks.map((r) => {
     const pct = r.after != null && r.baseline ? Math.round(((r.after - r.baseline) / r.baseline) * 100) : null;
-    return `<tr><td>${esc(r.address)}</td><td>${esc(r.pkg)}</td>
+    return `<tr><td>${esc(r.address)}</td><td>${r.pkg ? esc(r.pkg) : `<span class="muted">${t("No renovation chosen")}</span>`}</td>
       <td>${r.baseline.toFixed(1)}</td><td>${r.after == null ? "—" : r.after.toFixed(1)}</td>
-      <td>${pct == null ? "—" : `${pct}%`}</td></tr>`;
+      <td>${pct == null ? "—" : `${pct}%`}</td>
+      <td>${r.cost == null ? "—" : money(r.cost)}</td><td>${r.carbon == null || isBE ? "—" : `${Math.round(r.carbon).toLocaleString(numLocale)} kg`}</td></tr>`;
   }).join("")}
+  ${picksTotal ? `<tr style="font-weight:700"><td>${t("Whole project")}</td><td>${t("{c} of {n} buildings renovated", { c: picksTotal.chosen, n: picksTotal.n })}</td>
+      <td>${picksTotal.before == null ? "—" : picksTotal.before.toFixed(1)}</td><td>${picksTotal.after == null ? "—" : picksTotal.after.toFixed(1)}</td>
+      <td>${picksTotal.before && picksTotal.after != null ? `${Math.round(((picksTotal.after - picksTotal.before) / picksTotal.before) * 100)}%` : "—"}</td>
+      <td>${picksTotal.cost == null ? "—" : money(picksTotal.cost)}</td><td>${picksTotal.carbon == null || isBE ? "—" : `${Math.round(picksTotal.carbon).toLocaleString(numLocale)} kg`}</td></tr>` : ""}
   </tbody></table>
-  <p class="sub" style="margin-top:4px">${t("Energy in kWh/m²·yr.")}</p>` : ""}
+  <p class="sub" style="margin-top:4px">${t("Energy in kWh/m²·yr; the whole-project figure is weighted by each building's floor area. Cost is the renovation itself, one-off.")}</p>` : ""}
 
   <h2>${t("Recommended packages — and what they are made of")}</h2>
   ${bestBlock(t("Best energy saving"), bestEnergy, t("largest reduction in energy use"))}
@@ -1087,6 +1119,16 @@ export default function RenovationReport() {
             {t("As-built energy use by end use, kWh/m²·yr — the baseline every package is measured against.")}
           </p>
           <div dangerouslySetInnerHTML={{ __html: baselineChartHtml(SCREEN_THEME) }} />
+          {heightFixes.length > 0 && (
+            <div style={{ marginTop: 10, padding: "10px 13px", borderRadius: 10, fontSize: 12, lineHeight: 1.55,
+              background: "rgba(232,136,12,0.08)", border: "1px solid rgba(232,136,12,0.3)", color: "#E8880C" }}>
+              <b>{t("Height corrected:")}</b>{" "}
+              {t("the building outline was too low for the number of floors in the energy declaration, so these buildings were simulated at floors × 3.2 m instead")}
+              {" — "}{heightFixes.map((b) => t("{address}: {floors} floors, {from} m → {to} m",
+                { address: b.address, floors: b.heightCorrected!.floors, from: b.heightCorrected!.from_m, to: b.heightCorrected!.to_m })).join("; ")}.{" "}
+              {t("The outline may belong to a lower wing or be linked to the wrong declaration, so treat these results with care.")}
+            </div>
+          )}
         </Card>
       )}
 
@@ -1198,22 +1240,40 @@ export default function RenovationReport() {
             {t("Selected building by building in Step 4 — a single portfolio-wide pick would average over real differences between them.")}
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {perBuildingPicks.map((r) => {
+            {perBuildingPicks.map((r, i) => {
               const pct = r.after != null && r.baseline ? Math.round(((r.after - r.baseline) / r.baseline) * 100) : null;
               return (
-                <div key={r.address} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                <div key={`${r.address}-${i}`} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
                   padding: "8px 12px", borderRadius: 9, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "#fff", minWidth: 160 }}>{r.address}</span>
-                  <span style={{ fontSize: 12, color: "#8B6EAD", flex: 1 }}>{r.pkg}</span>
+                  <span style={{ fontSize: 12, color: r.pkg ? "#8B6EAD" : "rgba(255,255,255,0.35)", flex: 1, fontStyle: r.pkg ? "normal" : "italic" }}>{r.pkg ?? t("No renovation chosen")}</span>
                   <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
                     {r.baseline.toFixed(1)} → {r.after == null ? "—" : r.after.toFixed(1)} kWh/m²·yr
                   </span>
-                  {pct != null && (
+                  {pct != null && r.pkg && (
                     <span style={{ fontSize: 12, fontWeight: 700, color: pct < 0 ? "#2FB477" : "#E2483B" }}>{pct}%</span>
                   )}
+                  {r.pkg && r.cost != null && <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>{money(r.cost)}</span>}
                 </div>
               );
             })}
+            {picksTotal && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                padding: "9px 12px", borderRadius: 9, background: "rgba(139,110,173,0.08)", border: "1px solid rgba(139,110,173,0.3)" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff", minWidth: 160 }}>{t("Whole project")}</span>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", flex: 1 }}>{t("{c} of {n} buildings renovated", { c: picksTotal.chosen, n: picksTotal.n })}</span>
+                {picksTotal.before != null && picksTotal.after != null && (<>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{picksTotal.before.toFixed(1)} → {picksTotal.after.toFixed(1)} kWh/m²·yr</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: picksTotal.after < picksTotal.before ? "#2FB477" : "#E2483B" }}>
+                    {Math.round(((picksTotal.after - picksTotal.before) / picksTotal.before) * 100)}%
+                  </span>
+                </>)}
+                {picksTotal.cost != null && <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{money(picksTotal.cost)}</span>}
+              </div>
+            )}
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", margin: "2px 0 0" }}>
+              {t("Energy in kWh/m²·yr; the whole-project figure is weighted by each building's floor area. Cost is the renovation itself, one-off.")}
+            </p>
           </div>
         </Card>
       )}

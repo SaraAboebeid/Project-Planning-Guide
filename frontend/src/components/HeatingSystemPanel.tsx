@@ -5,14 +5,14 @@ import { SE_HVAC_CATALOGUE, type HvacCatalogue } from "../config/hvacSystems";
 import { STUDY_PERIOD_YR } from "../config/optimizationAssumptions";
 import { useWizardStore, type HvacOverrides } from "../store/wizard";
 import { applyHvacOverrides, hasHvacOverrides } from "../utils/hvacOverrides";
-import { useT } from "../i18n";
+import { useEngineT } from "../utils/engineName";
 
 /** Number box that commits on blur/Enter; an emptied box (or the default
  *  value) clears the override. Edited values are highlighted. */
 function NumField({ value, def, step, width = 64, onCommit }: {
   value: number; def: number; step?: number; width?: number; onCommit: (v: number | undefined) => void;
 }) {
-  const t = useT();
+  const t = useEngineT();
   const [text, setText] = useState(String(value));
   useEffect(() => setText(String(value)), [value]);
   const edited = Math.abs(value - def) > 1e-9;
@@ -71,7 +71,7 @@ export default function HeatingSystemPanel({
   discountRate?: number;
   catalogue?: HvacCatalogue;
 }) {
-  const t = useT();
+  const t = useEngineT();
   // The user's own values (Assumptions & sources) over the catalogue defaults,
   // kept per catalogue currency so Swedish and UK edits never mix.
   const overrides = useWizardStore((s) => s.project.hvacOverrides?.[baseCatalogue.currency]);

@@ -72,7 +72,7 @@ export default function DecisionAnalysisPanel({
       title={t("Compare renovation choices across future energy prices")}
       subtitle={t("The same options tested across low / medium / high energy-price futures")}
     >
-      <p style={{ fontSize: 12, color: white(0.4), margin: "8px 0 14px", lineHeight: 1.6, maxWidth: 720 }}>
+      <p style={{ fontSize: 12, color: white(0.4), margin: "8px 0 14px", lineHeight: 1.6 }}>
         {t("We cannot know future energy prices, so each option is tested in three possible futures:")} <b style={{ color: white(0.6) }}>{t("Low")}</b> {t("(cheap energy),")}
         <b style={{ color: white(0.6) }}> {t("Medium")}</b> {t("(middle prices), and")} <b style={{ color: white(0.6) }}>{t("High")}</b> {t("(expensive energy).")}
         {" "}{t("Results show")} <b style={{ color: white(0.6) }}>{t("{n}-year net benefit", { n: result.studyPeriodYr })}</b> {t("= energy savings value minus investment.")}
@@ -149,7 +149,9 @@ export default function DecisionAnalysisPanel({
             </tr>
           </thead>
           <tbody>
-            {options.map((o) => {
+            {/* The do-nothing option is the 0 reference every value is measured
+                against; its all-zero row is not shown (2026-11-24, user request). */}
+            {options.filter((o) => !o.isBaseline).map((o) => {
               const tags = picksFor(o.id);
               const highlighted = tags.length > 0;
               return (
@@ -243,8 +245,7 @@ export default function DecisionAnalysisPanel({
         })}
         <div style={{ fontSize: 11.5, color: white(0.3), marginTop: 4, lineHeight: 1.6 }}>
           {t("Values are {n}-yr net present benefit ({cur}, in millions) — a negative number means the investment isn't repaid by energy savings alone under that scenario (deep retrofits are also done for the climate target, comfort and asset value).", { n: result.studyPeriodYr, cur })}{" "}
-          <b style={{ color: white(0.45) }}>{t("Green")}</b> {t("= best retrofit in that future;")} <i>{t("Keep as-built")}</i> {t("is the do-nothing")}{" "}
-          <b style={{ color: white(0.45) }}>{t("0 reference")}</b>{t(", so retrofits are ranked among themselves. Saved to the Step 5 report.")}
+          <b style={{ color: white(0.45) }}>{t("Green")}</b> {t("= best retrofit in that future. Every value is measured against keeping the building as it is (0), so retrofits are ranked among themselves. Saved to the Step 5 report.")}
         </div>
       </div>
     </PanelShell>

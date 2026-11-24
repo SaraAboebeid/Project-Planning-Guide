@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, ListOrdered } from "lucide-react";
 import type { OptimizeComponentInput, OptimizeParams } from "../api/client";
-import { useT } from "../i18n";
+import { useEngineT } from "../utils/engineName";
 
 /* "Best value per component": with a limited budget it matters not only WHICH
  * building to renovate but WHICH part of it. Each saved build-up is scored on
@@ -24,7 +24,7 @@ export default function ComponentValuePanel({ input, currency, scopeLabel }: {
   currency: "SEK" | "GBP" | "EUR";
   scopeLabel?: string;
 }) {
-  const t = useT();
+  const t = useEngineT();
   const [open, setOpen] = useState(true);
   const white = (o: number) => `rgba(255,255,255,${o})`;
   const money = (n: number) =>

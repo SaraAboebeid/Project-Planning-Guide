@@ -9,12 +9,11 @@ import {
 } from "recharts";
 import { Building2, Zap, Loader2, BarChart2, Thermometer, Droplets, Download, Lightbulb, Cpu } from "lucide-react";
 import BaselineLoadProfile from "../components/BaselineLoadProfile";
-import PeakDemandPanel from "../components/PeakDemandPanel";
 import ModelScopeNotice from "../components/ModelScopeNotice";
 import { makeBuildingKeys } from "../utils/retrofitPriority";
 import { recordedUForSimulation } from "../utils/renovationRecommendations";
 import { excludesHouseholdElectricity, reportedTotalKwhM2 } from "../utils/energyTotals";
-import { useT } from "../i18n";
+import { useEngineT } from "../utils/engineName";
 
 /** Normalise a bbox BuildingRecord into the same shape as BuildingLookup */
 function recordToLookup(r: BuildingRecord, idx: number): BuildingLookup {
@@ -81,7 +80,7 @@ function mergedVal(
 /* ─── Main page ───────────────────────────────────────────────────────────── */
 export default function BaselineSetup() {
   const navigate = useNavigate();
-  const t = useT();
+  const t = useEngineT();
   const { project, setProject } = useWizardStore();
 
   const buildings = useMemo<BuildingLookup[]>(() => {
@@ -452,7 +451,7 @@ export default function BaselineSetup() {
   }, [project.baselineStatus, project.baselineBatchId, runList, lookupTried]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1000 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
       {/* ── Header ── */}
@@ -668,24 +667,9 @@ export default function BaselineSetup() {
                 <Download size={12} /> {t("Download CSV")}
               </button>
             </div>
-            {/* Warnings about whether these numbers can be trusted. (The "Annual
-                end-use comparison" bar chart that held them was removed 2026-11-24 at
-                the user's request: the load-profile panel below shows the same split.) */}
-            {(() => {
-              const fixed = results.filter((r) => r.heightCorrected);
-              if (fixed.length === 0) return null;
-              return (
-                <div style={{ fontSize: 12, lineHeight: 1.55, color: "#E8880C", background: "rgba(232,136,12,0.08)",
-                  border: "1px solid rgba(232,136,12,0.35)", borderRadius: 10, padding: "9px 12px" }}>
-                  <b>{t("Height corrected:")}</b>{" "}
-                  {fixed.length === 1
-                    ? t("the building outline was too low for the number of floors in the energy declaration, so this building was simulated at floors × 3.2 m instead —")
-                    : t("the building outline was too low for the number of floors in the energy declaration, so {n} buildings were simulated at floors × 3.2 m instead —", { n: fixed.length })}{" "}
-                  {fixed.map((r) => t("{address}: {floors} floors, {from} m → {to} m", { address: r.address, floors: r.heightCorrected!.floors, from: r.heightCorrected!.from_m, to: r.heightCorrected!.to_m })).join(" · ")}.{" "}
-                  {t("The outline may belong to a lower wing or be linked to the wrong declaration, so treat these results with care.")}
-                </div>
-              );
-            })()}
+            {/* Warning when some buildings are types the model cannot represent. (The
+                "Annual end-use comparison" chart and the "Height corrected" note were
+                removed 2026-11-24 at the user's request.) */}
             {results.some((r) => r.modelScope?.level === "out_of_scope") && (
               <ModelScopeNotice
                 scope={{
@@ -772,9 +756,8 @@ export default function BaselineSetup() {
                 addresses={results.map((r, i) => r.address || t("Building {n}", { n: i + 1 }))}
               />
             )}
-            {project.baselineBatchId && (
-              <PeakDemandPanel scenarios={[{ label: t("Baseline"), batchId: project.baselineBatchId }]} />
-            )}
+            {/* Peak demand table removed from Step 3 on 2026-11-24 (user request);
+                peaks are shown in Step 4, baseline against each package. */}
             {project.country === "Belgium" ? (
             <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
               {t("* Real EnergyPlus (EPSM) output with {weather} weather. Belgium has no open per-building EPCs, so the envelope is the TABULA Belgium archetype for the building's type and construction period, and the period is sampled from Statbel's municipal building stock unless OpenStreetMap records a year. Shared walls with neighbours are modelled as adiabatic. Heating is ideal loads (heat delivered, not fuel) and the model is not yet calibrated against Belgian EPB certificate statistics, so treat absolute values as indicative and compare packages relative to this baseline in Step 4.", { weather: project.city === "Liège" ? "Liège-Bierset" : "Uccle" })}

@@ -4975,10 +4975,12 @@ def _peak_stats(hourly: list[float], area_m2: Optional[float]) -> dict:
 
 
 @app.get("/api/simulation-peaks/{batch_id}")
-async def simulation_peaks(batch_id: str, points: Optional[str] = Query(None, description="Only these buildings: 'lat,lon;lat,lon' (matched within 25 m).")):
+async def simulation_peaks(batch_id: str, points: Optional[str] = Query(None, description="Only these buildings: 'lat,lon;lat,lon' (matched within 25 m)."),
+                           series: bool = Query(False, description="Also return the combined hourly heat demand (8760 values, kW) for plotting.")):
     """Peak heat and electricity demand per building of a batch, plus the
     combined peak of all of them (summed hour by hour, so buildings peaking at
-    different times are not double counted)."""
+    different times are not double counted). With series=true the combined
+    hourly heat curve is included, so Step 4 can plot how a package shaves it."""
     rows = simdb.get_by_epsm_id(batch_id)
     if not rows:
         raise HTTPException(404, "Unknown batch_id")
@@ -5013,7 +5015,8 @@ async def simulation_peaks(batch_id: str, points: Optional[str] = Query(None, de
         "buildings": buildings,
         "total": {"buildings": len(buildings), "floor_area_m2": round(total_area) or None,
                   "heat": _peak_stats(total_heat, total_area or None),
-                  "electricity": _peak_stats(total_el, total_area or None)} if buildings else None,
+                  "electricity": _peak_stats(total_el, total_area or None),
+                  **({"heat_hourly": [round(v, 2) for v in total_heat]} if series else {})} if buildings else None,
         "without_hourly_data": missing,
     }
 

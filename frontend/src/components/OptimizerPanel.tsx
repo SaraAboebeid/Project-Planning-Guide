@@ -3,7 +3,7 @@ import { api, type OptimizeComponentInput, type OptimizeParams, type OptimizePoi
 import { Loader2, ChevronDown, ChevronRight, Sparkles, Play } from "lucide-react";
 import ParetoChart, { axesFromKpis, OBJECTIVES } from "./ParetoChart";
 import ParallelCoordinates from "./ParallelCoordinates";
-import { useT } from "../i18n";
+import { useEngineT } from "../utils/engineName";
 
 /* The "pick the Pareto-optimal packages" step of the hybrid optimizer.
  * RenovationSimulator gathers the option matrix + economy/climate params from
@@ -46,7 +46,7 @@ export default function OptimizerPanel({
   runningKeys?: Set<string>;
   selectedKpis: string[];
 }) {
-  const t = useT();
+  const t = useEngineT();
   const axes = axesFromKpis(selectedKpis);
   const [open, setOpen] = useState(true);
   const controlled = extResult !== undefined;
@@ -131,7 +131,7 @@ export default function OptimizerPanel({
           }}
         >
           <Sparkles size={16} color="#B8A3D0" />
-          <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{t("Optimisation & Screening · Pareto curve and estimated packages")}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{t("Trade-offs between cost, carbon and energy")}</span>
           {loading && <Loader2 size={13} color="#B8A3D0" style={{ animation: "spin 1s linear infinite" }} />}
           {result && !loading && (
             <span style={{ fontSize: 12, color: white(0.45) }}>
@@ -153,7 +153,7 @@ export default function OptimizerPanel({
       {open && (
         <div style={{ padding: "0 18px 18px" }}>
           <p style={{ fontSize: 12, color: white(0.5), margin: "0 0 12px", lineHeight: 1.6 }}>
-            {t("As you pick materials, this scores ")}<b>{t("every combination")}</b>{t(" of your picks on the fast degree-day physics (no EnergyPlus) and plots the ")}<b>{t("Pareto-optimal")}</b>{t(" set live — the packages where you can't improve one objective without sacrificing another. Cost is ")}<b>{t("life-cycle over 50 years")}</b>{t(": material cost today plus the energy bill (at the energy price below, discounted) over the study period. Shortlist the promising ones: click a chart point or ")}<b>{t("Simulate")}</b>{t(" in the table below to verify that package in EnergyPlus (EPSM). Model after Enerbäck & Strömberg.")}
+            {t("A quick estimate of every combination of your saved build-ups, to see which are worth it. The shortlisted ones are simulated automatically and appear in the table below.")}
           </p>
 
           <details style={{ marginBottom: 14, fontSize: 12, color: white(0.6), lineHeight: 1.6 }}>
@@ -185,7 +185,7 @@ export default function OptimizerPanel({
                 </li>
               </ol>
               <p style={{ margin: 0, color: white(0.5) }}>
-                <b>{t("Keep in mind:")}</b> {t("the estimate is still somewhat optimistic about savings, so simulate the packages you care about. A new storey shows its cost and carbon but no energy effect here (EnergyPlus models it). Parts that wear out within 50 years are replaced in the totals (IVL service lives). With several buildings, the optimisation is done for one representative building and the same choices are applied to all.")}
+                <b>{t("Keep in mind:")}</b> {t("the estimate is still somewhat optimistic about savings, so simulate the packages you care about. A new storey shows its cost and carbon but no energy effect here (EnergyPlus models it). Parts that wear out within 50 years are replaced in the totals (IVL service lives). With several buildings, each building is optimised on its own areas, U-values and simulated baseline.")}
               </p>
             </div>
           </details>
@@ -223,16 +223,12 @@ export default function OptimizerPanel({
               {/* The 2-D Pareto frontier (cost×GWP, colour = energy) is the primary,
                   full-width view; the parallel-coordinates plot is an opt-in advanced
                   toggle, and the Pareto can be maximised to a fullscreen overlay. */}
-              <div style={{ marginBottom: 6, fontSize: 12, color: white(0.45) }}>
-                {t("Axes from your Step-1 KPIs:")} <b style={{ color: "#fff" }}>{t(OBJECTIVES[axes.x].label)}</b> ×{" "}
-                <b style={{ color: "#fff" }}>{t(OBJECTIVES[axes.y].label)}</b>, {t("coloured by")} <b style={{ color: "#fff" }}>{t(OBJECTIVES[axes.color].label)}</b>.
-              </div>
               {/* Pareto frontier — full width. Parallel coordinates is an opt-in
                   advanced view (toggle); the Pareto can be maximised to fullscreen. */}
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: white(0.4), textTransform: "uppercase" }}>
-                    {t("Pareto frontier")}
+                    {t("Trade-offs")}
                   </div>
                   <div style={{ marginLeft: "auto", display: "flex", gap: 7 }}>
                     <button onClick={() => setShowParallel(v => !v)}
@@ -279,7 +275,7 @@ export default function OptimizerPanel({
                   <div onClick={e => e.stopPropagation()}
                     style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: "16px 20px", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{t("Pareto frontier")}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{t("Trade-offs")}</span>
                       <span style={{ fontSize: 12, color: white(0.45) }}>
                         {t(OBJECTIVES[axes.x].label)} × {t(OBJECTIVES[axes.y].label)}, {t("coloured by")} {t(OBJECTIVES[axes.color].label)}
                       </span>
@@ -307,12 +303,12 @@ export default function OptimizerPanel({
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, padding: "10px 14px", borderRadius: 10,
                   background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: white(0.6), flex: 1, lineHeight: 1.5 }}>
-                    {t("Every package — with cost, carbon, 50-year cost and carbon, heating and total energy — is in one table under ")}<b style={{ color: "#fff" }}>{t("Results & comparison")}</b>{t(": estimates until simulated, EnergyPlus figures after. Click a point above to simulate it.")}
+                    {t("The best combinations are simulated automatically; their results, and the package you choose for this building, are below. Click a circle above to simulate another one.")}
                   </span>
                   <button onClick={onOpenTable}
                     style={{ fontSize: 12, fontWeight: 600, padding: "7px 14px", borderRadius: 8, cursor: "pointer",
                       border: "1px solid #8B6EAD", background: "rgba(139,110,173,0.14)", color: "#8B6EAD" }}>
-                    {t("Open the packages table →")}
+                    {t("Go to the results ↓")}
                   </button>
                 </div>
               ) : (<>

@@ -1,28 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { Play, Pause } from "lucide-react";
 import type { OptimizePoint, OptimizeCloudPoint } from "../api/client";
-import { useT } from "../i18n";
+import { useEngineT } from "../utils/engineName";
 
-/* Animated Pareto frontier for the renovation optimizer. Mirrors the classic
- * cost-vs-GWP scatter+frontier plot, but the two axes and the colour axis are
- * chosen from the KPIs the user selected in Step 1. The cloud of evaluated
- * packages fills in over frames while the frontier tightens — the same "N of M
- * packages evaluated" reveal you'd get watching the optimizer run. */
+/* Trade-off chart for the renovation optimiser: every combination of the
+ * user's saved build-ups as one dot, cost on one axis, carbon on the other,
+ * energy as colour (the axes follow the Step 1 KPIs).
+ *
+ * Rewritten 2026-11-24: users did not understand the earlier version. The
+ * legend used text glyphs (—●, ◯, ●, ◆) that did not look like the markers,
+ * the y axis said "GWP", and a replay animation drew the cloud in. Now the
+ * legend draws the SAME SVG markers as the plot, axes are in plain words, the
+ * good corner is labelled, and everything is drawn at once. */
 
 export type ObjKey = "cost" | "carbon" | "energy";
 type Metric = "total_cost" | "total_carbon" | "energy_kwh_m2_yr";
 
 export const OBJECTIVES: Record<ObjKey, { metric: Metric; label: string; short: string; kpi: string; unit: string; money: boolean }> = {
-  cost:   { metric: "total_cost",        label: "Life-cycle cost",         short: "Cost",   kpi: "Cost",                     unit: "",           money: true },
-  carbon: { metric: "total_carbon",      label: "Global warming potential", short: "GWP",    kpi: "Global Warming Potential", unit: "kg CO₂e",    money: false },
-  energy: { metric: "energy_kwh_m2_yr",  label: "Energy demand",           short: "Energy", kpi: "Energy Demand",            unit: "kWh/m²/yr",  money: false },
+  cost:   { metric: "total_cost",        label: "50-year cost",   short: "50-year cost",   kpi: "Cost",                     unit: "",          money: true },
+  carbon: { metric: "total_carbon",      label: "50-year carbon", short: "50-year carbon", kpi: "Global Warming Potential", unit: "kg CO₂e",   money: false },
+  energy: { metric: "energy_kwh_m2_yr",  label: "Energy use",     short: "Energy use",     kpi: "Energy Demand",            unit: "kWh/m²·yr", money: false },
 };
 
 /** Pick X / Y / colour objectives from the Step-1 KPIs; falls back to the
- * canonical cost→X, GWP→Y, energy→colour when the KPIs don't disambiguate. */
+ * canonical cost→X, carbon→Y, energy→colour when the KPIs don't disambiguate. */
 export function axesFromKpis(kpis: string[]): { x: ObjKey; y: ObjKey; color: ObjKey } {
   const order: ObjKey[] = ["cost", "carbon", "energy"];
   const selected = order.filter((k) => kpis.includes(OBJECTIVES[k].kpi));
@@ -56,6 +59,29 @@ function pareto2D<T extends { x: number; y: number }>(pts: T[]): T[] {
 interface Datum { x: number; y: number; c: number; fill: string; }
 interface OptDatum extends Datum { point: OptimizePoint; validated: boolean; }
 
+/* Markers — the chart and the legend draw these same shapes. */
+const CLOUD_R = 3.1, FRONT_R = 3.5, OPT_R = 7;
+const FRONT_COLOR = "#B8A3D0", OPT_COLOR = "#8B6EAD", SIM_COLOR = "#2FB477";
+const diamond = (cx: number, cy: number, r = 6) => `M ${cx} ${cy - r} L ${cx + r} ${cy} L ${cx} ${cy + r} L ${cx - r} ${cy} Z`;
+
+function LegendMark({ kind }: { kind: "cloud" | "front" | "opt" | "sim" | "base" }) {
+  return (
+    <svg width={kind === "front" ? 26 : 16} height={16} style={{ flexShrink: 0, verticalAlign: "middle" }} aria-hidden>
+      {kind === "cloud" && (<>
+        <circle cx={4} cy={8} r={CLOUD_R} fill={viridis(0.1)} fillOpacity={0.8} />
+        <circle cx={12} cy={8} r={CLOUD_R} fill={viridis(0.9)} fillOpacity={0.8} />
+      </>)}
+      {kind === "front" && (<>
+        <line x1={1} y1={8} x2={25} y2={8} stroke={FRONT_COLOR} strokeWidth={2.5} />
+        <circle cx={13} cy={8} r={FRONT_R} fill="#0d1117" stroke={FRONT_COLOR} strokeWidth={2} />
+      </>)}
+      {kind === "opt" && <circle cx={8} cy={8} r={OPT_R - 1} fill="rgba(139,110,173,0.18)" stroke={OPT_COLOR} strokeWidth={2.2} />}
+      {kind === "sim" && <circle cx={8} cy={8} r={OPT_R - 1} fill="rgba(47,180,119,0.9)" stroke={SIM_COLOR} strokeWidth={2.2} />}
+      {kind === "base" && <path d={diamond(8, 8, 6)} fill="rgba(255,255,255,0.85)" stroke="#0d1117" strokeWidth={1} />}
+    </svg>
+  );
+}
+
 export default function ParetoChart({
   cloud, pareto, baseline, axes, currency, evaluated, onValidate, validatedKeys, pointKey, height = 340,
 }: {
@@ -70,9 +96,10 @@ export default function ParetoChart({
   pointKey: (p: OptimizePoint) => string;
   height?: number;
 }) {
-  const t = useT();
+  const t = useEngineT();
   const xO = OBJECTIVES[axes.x], yO = OBJECTIVES[axes.y], cO = OBJECTIVES[axes.color];
   const white = (o: number) => `rgba(255,255,255,${o})`;
+  const unitOf = (o: typeof xO) => (o.money ? currency : o.unit);
 
   const fmt = (v: number, o: typeof xO) =>
     o.money
@@ -80,23 +107,23 @@ export default function ParetoChart({
         : currency === "EUR" ? `€${Math.round(v).toLocaleString("nl-BE")}` : `£${Math.round(v).toLocaleString("en-GB")}`)
       : `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })}${o.unit ? " " + o.unit : ""}`;
   const tick = (v: number, o: typeof xO) =>
-    o.money ? (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1000)}k`) : `${Math.round(v)}`;
+    o.money || Math.abs(v) >= 10000
+      ? (Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${Math.round(v / 1000)}k`)
+      : `${Math.round(v)}`;
 
-  // Colour normalisation over the full cloud (stable across the animation).
+  // Colour normalisation over the full cloud.
   const [cMin, cMax] = useMemo(() => {
     const cs = cloud.map((p) => p[cO.metric]);
     return cs.length ? [Math.min(...cs), Math.max(...cs)] : [0, 1];
   }, [cloud, cO.metric]);
   const colorOf = (v: number) => viridis(cMax > cMin ? (v - cMin) / (cMax - cMin) : 0.5);
 
-  // Full cloud mapped to {x,y,c,fill} — reveal slices this progressively.
   const cloudData: Datum[] = useMemo(
     () => cloud.map((p) => ({ x: p[xO.metric], y: p[yO.metric], c: p[cO.metric], fill: colorOf(p[cO.metric]) })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [cloud, xO.metric, yO.metric, cO.metric, cMin, cMax]
   );
 
-  // Fixed axis domains (4% pad) so the view doesn't jump as points appear.
   const domains = useMemo(() => {
     const xs = cloudData.map((d) => d.x), ys = cloudData.map((d) => d.y);
     xs.push(baseline[xO.metric]); ys.push(baseline[yO.metric]);
@@ -104,42 +131,11 @@ export default function ParetoChart({
     return { x: pad(xs), y: pad(ys) };
   }, [cloudData, baseline, xO.metric, yO.metric]);
 
-  /* ── Animation ── */
-  const total = cloudData.length;
-  const batch = Math.max(1, Math.ceil(total / 45));
-  const [revealed, setRevealed] = useState(total);
-  const [playing, setPlaying] = useState(false);
-  /** Clicking a Pareto marker pins it here; the detail card below is a real,
-   *  stationary target you can click — unlike the hover tooltip. */
+  /** Clicking a shortlisted marker pins it; the card below is a stationary
+   *  target you can click — unlike the hover tooltip. */
   const [pinned, setPinned] = useState<OptimizePoint | null>(null);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const frontier = useMemo(() => pareto2D(cloudData), [cloudData]);
 
-  // New results → play the reveal from the start.
-  useEffect(() => {
-    if (total === 0) { setRevealed(0); return; }
-    setRevealed(Math.min(batch, total));
-    setPlaying(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [total]);
-
-  useEffect(() => {
-    if (timer.current) { clearInterval(timer.current); timer.current = null; }
-    if (!playing) return;
-    timer.current = setInterval(() => {
-      setRevealed((r) => {
-        const next = r + batch;
-        if (next >= total) { setPlaying(false); return total; }
-        return next;
-      });
-    }, 200);
-    return () => { if (timer.current) clearInterval(timer.current); };
-  }, [playing, total, batch]);
-
-  const shown = cloudData.slice(0, revealed);
-  const frontier = useMemo(() => pareto2D(shown), [shown]);
-
-  // The 3-objective optimal packages, as clickable overlay markers. Only shown
-  // once the reveal is far enough that they've "appeared".
   const optimalData: OptDatum[] = useMemo(
     () => pareto.map((p) => ({
       x: p[xO.metric], y: p[yO.metric], c: p[cO.metric], fill: colorOf(p[cO.metric]),
@@ -148,47 +144,46 @@ export default function ParetoChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pareto, xO.metric, yO.metric, cO.metric, validatedKeys, cMin, cMax]
   );
-  const showOptimal = revealed >= total;
-
   const baselineDatum = [{ x: baseline[xO.metric], y: baseline[yO.metric] }];
 
   const CloudDot = (props: { cx?: number; cy?: number; payload?: Datum }) =>
     props.cx != null && props.cy != null
-      ? <circle cx={props.cx} cy={props.cy} r={3.1} fill={props.payload?.fill ?? "#888"} fillOpacity={0.6} />
+      ? <circle cx={props.cx} cy={props.cy} r={CLOUD_R} fill={props.payload?.fill ?? "#888"} fillOpacity={0.6} />
       : null;
   const FrontierDot = (props: { cx?: number; cy?: number }) =>
     props.cx != null && props.cy != null
-      ? <circle cx={props.cx} cy={props.cy} r={3.5} fill="#0d1117" stroke="#B8A3D0" strokeWidth={2} />
+      ? <circle cx={props.cx} cy={props.cy} r={FRONT_R} fill="#0d1117" stroke={FRONT_COLOR} strokeWidth={2} />
       : null;
   const OptimalDot = (props: { cx?: number; cy?: number; payload?: OptDatum }) => {
     if (props.cx == null || props.cy == null) return null;
     const v = props.payload?.validated;
-    return <circle cx={props.cx} cy={props.cy} r={7} fill={v ? "rgba(47,180,119,0.9)" : "rgba(139,110,173,0.18)"}
-      stroke={v ? "#2FB477" : "#8B6EAD"} strokeWidth={2.2} style={{ cursor: "pointer" }} />;
+    return <circle cx={props.cx} cy={props.cy} r={OPT_R} fill={v ? "rgba(47,180,119,0.9)" : "rgba(139,110,173,0.18)"}
+      stroke={v ? SIM_COLOR : OPT_COLOR} strokeWidth={2.2} style={{ cursor: "pointer" }} />;
   };
   const BaselineDot = (props: { cx?: number; cy?: number }) =>
     props.cx != null && props.cy != null
-      ? <path d={`M ${props.cx} ${props.cy - 6} L ${props.cx + 6} ${props.cy} L ${props.cx} ${props.cy + 6} L ${props.cx - 6} ${props.cy} Z`}
-          fill="rgba(255,255,255,0.85)" stroke="#0d1117" strokeWidth={1} />
+      ? <path d={diamond(props.cx, props.cy)} fill="rgba(255,255,255,0.85)" stroke="#0d1117" strokeWidth={1} />
       : null;
 
   const TooltipContent = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: Datum & Partial<OptDatum> }> }) => {
     if (!active || !payload || !payload.length) return null;
     const d = payload[0]!.payload;
     const isOpt = "point" in d && d.point;
+    const isBase = !("fill" in d);
     return (
       <div style={{ background: "#0d1117", border: `1px solid ${white(0.15)}`, borderRadius: 8, padding: "8px 11px", fontSize: 12 }}>
-        {isOpt && <div style={{ color: "#8B6EAD", fontWeight: 700, marginBottom: 4 }}>{t("Pareto-optimal package")}</div>}
+        {isOpt && <div style={{ color: OPT_COLOR, fontWeight: 700, marginBottom: 4 }}>{t("Shortlisted combination")}</div>}
+        {isBase && <div style={{ color: "#fff", fontWeight: 700, marginBottom: 4 }}>{t("Today's building (no renovation)")}</div>}
         <div style={{ color: "#fff" }}>{t(xO.short)}: <b>{fmt(d.x, xO)}</b></div>
         <div style={{ color: "#fff" }}>{t(yO.short)}: <b>{fmt(d.y, yO)}</b></div>
-        <div style={{ color: white(0.7) }}>{t(cO.short)}: {fmt(d.c, cO)}</div>
+        {!isBase && <div style={{ color: white(0.7) }}>{t(cO.short)}: {fmt(d.c, cO)}</div>}
         {isOpt && (d as OptDatum).point && (
-          <div style={{ marginTop: 5, color: white(0.55), maxWidth: 220 }}>
+          <div style={{ marginTop: 5, color: white(0.55), maxWidth: 240 }}>
             {Object.entries((d as OptDatum).point.selection_labels).filter(([, v]) => v !== "Keep as-built").map(([k, v]) => (
               <div key={k}>{t(k.replace("VertExt::", ""))}: {v}</div>
             ))}
-            <div style={{ color: "#8B6EAD", marginTop: 3 }}>
-              {(d as OptDatum).validated ? t("✓ validated in EPSM") : t("click to pin this package")}
+            <div style={{ color: OPT_COLOR, marginTop: 3 }}>
+              {(d as OptDatum).validated ? t("✓ simulated in EnergyPlus") : t("click to select it")}
             </div>
           </div>
         )}
@@ -196,81 +191,83 @@ export default function ParetoChart({
     );
   };
 
-  if (total === 0) return null;
+  if (cloudData.length === 0) return null;
 
   return (
     <div style={{ marginTop: 6 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
-        <button
-          onClick={() => (revealed >= total ? (setRevealed(Math.min(batch, total)), setPlaying(true)) : setPlaying((p) => !p))}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 8, cursor: "pointer",
-            fontSize: 12, fontWeight: 600, background: "rgba(184,163,208,0.16)", border: "1px solid rgba(184,163,208,0.5)", color: "#DACFE6",
-          }}
-        >
-          {playing ? <Pause size={12} /> : <Play size={12} />}{playing ? t("Pause") : revealed >= total ? t("Replay") : t("Play")}
-        </button>
-        <span style={{ fontSize: 12, color: white(0.55) }}>
-          <b style={{ color: "#fff" }}>{Math.min(revealed, total).toLocaleString()}</b> {t("of {total} packages plotted", { total: total.toLocaleString() })}
-          {evaluated > total ? t(" (sampled from {n})", { n: evaluated.toLocaleString() }) : ""}
-          {" · "}<span style={{ color: "#B8A3D0" }}>{t("{n} on the {x}–{y} frontier", { n: frontier.length, x: t(xO.short).toLowerCase(), y: t(yO.short).toLowerCase() })}</span>
+      {/* How to read it — before the chart, in plain words. */}
+      <div style={{ fontSize: 12, color: white(0.6), lineHeight: 1.6, marginBottom: 8 }}>
+        {t("Each dot is one combination of the build-ups you saved. Further left = lower {x}; further down = lower {y}; the colour shows {c} (darker = less). The best combinations sit towards the bottom-left.",
+          { x: t(xO.short).toLowerCase(), y: t(yO.short).toLowerCase(), c: t(cO.short).toLowerCase() })}
+        <span style={{ color: white(0.4) }}>
+          {" "}{t("{n} combinations plotted", { n: cloudData.length.toLocaleString() })}
+          {evaluated > cloudData.length ? t(" (a sample of {n})", { n: evaluated.toLocaleString() }) : ""}.
         </span>
       </div>
 
-      {/* scrubber */}
-      <input
-        type="range" min={0} max={total} step={batch} value={Math.min(revealed, total)}
-        onChange={(e) => { setPlaying(false); setRevealed(Math.min(total, Number(e.target.value))); }}
-        style={{ width: "100%", accentColor: "#B8A3D0", marginBottom: 6 }}
-      />
-
       <div style={{ display: "flex", gap: 10 }}>
-        <div style={{ flex: 1, height }}>
+        <div style={{ flex: 1, height, position: "relative" }}>
           <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 8, right: 12, bottom: 30, left: 12 }}>
+            <ScatterChart margin={{ top: 8, right: 12, bottom: 30, left: 18 }}>
               <CartesianGrid stroke={white(0.06)} />
               <XAxis
                 type="number" dataKey="x" domain={domains.x} allowDataOverflow
                 tick={{ fill: white(0.45), fontSize: 11 }} tickFormatter={(v) => tick(v, xO)}
-                label={{ value: `${t(xO.label)}${xO.unit ? ` (${xO.unit})` : xO.money ? ` (${currency})` : ""}`, position: "bottom", offset: 12, fill: white(0.55), fontSize: 12 }}
+                label={{ value: `${t(xO.label)} (${unitOf(xO)})`, position: "bottom", offset: 12, fill: white(0.6), fontSize: 12 }}
               />
               <YAxis
                 type="number" dataKey="y" domain={domains.y} allowDataOverflow
-                tick={{ fill: white(0.45), fontSize: 11 }} tickFormatter={(v) => tick(v, yO)} width={54}
-                label={{ value: `${t(yO.short)}${yO.unit ? ` (${yO.unit})` : ""}`, angle: -90, position: "insideLeft", fill: white(0.55), fontSize: 12 }}
+                tick={{ fill: white(0.45), fontSize: 11 }} tickFormatter={(v) => tick(v, yO)} width={58}
+                label={{ value: `${t(yO.label)} (${unitOf(yO)})`, angle: -90, position: "insideLeft", offset: -6, fill: white(0.6), fontSize: 12, style: { textAnchor: "middle" } }}
               />
               <Tooltip content={<TooltipContent />} cursor={{ stroke: white(0.2) }} />
-              <Scatter data={shown} shape={<CloudDot />} isAnimationActive={false} />
-              <Scatter data={frontier} line={{ stroke: "#B8A3D0", strokeWidth: 2.5 }} lineJointType="linear" shape={<FrontierDot />} isAnimationActive={false} legendType="none" />
+              <Scatter data={cloudData} shape={<CloudDot />} isAnimationActive={false} />
+              <Scatter data={frontier} line={{ stroke: FRONT_COLOR, strokeWidth: 2.5 }} lineJointType="linear" shape={<FrontierDot />} isAnimationActive={false} legendType="none" />
               <Scatter data={baselineDatum} shape={<BaselineDot />} isAnimationActive={false} />
-              {showOptimal && (
-                <Scatter data={optimalData} shape={<OptimalDot />} isAnimationActive={false}
-                  style={{ cursor: "pointer" }}
-                  // Recharts hands back the datum wrapped in a props object on some
-                  // versions and bare on others — read both, or the click silently
-                  // does nothing (which is what the tooltip was inviting you to do).
-                  onClick={(d: unknown) => {
-                    const o = d as { point?: OptimizePoint; payload?: { point?: OptimizePoint } } | undefined;
-                    const p = o?.point ?? o?.payload?.point;
-                    // PIN the selection instead of acting on it directly. The
-                    // hover tooltip disappears the moment the mouse moves, so a
-                    // "click to validate" living inside it was unusable.
-                    if (p) setPinned(p);
-                  }} />
-              )}
+              <Scatter data={optimalData} shape={<OptimalDot />} isAnimationActive={false}
+                style={{ cursor: "pointer" }}
+                // Recharts hands back the datum wrapped in a props object on some
+                // versions and bare on others — read both.
+                onClick={(d: unknown) => {
+                  const o = d as { point?: OptimizePoint; payload?: { point?: OptimizePoint } } | undefined;
+                  const p = o?.point ?? o?.payload?.point;
+                  if (p) setPinned(p);
+                }} />
             </ScatterChart>
           </ResponsiveContainer>
+          {/* The good corner, labelled where it is. */}
+          <span style={{ position: "absolute", left: 92, bottom: 66, fontSize: 11, fontWeight: 600, color: white(0.4), pointerEvents: "none" }}>
+            ↙ {t("better")}
+          </span>
         </div>
 
-        {/* colour bar (3rd objective) + legend */}
-        <div style={{ width: 70, display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 30, paddingTop: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: white(0.5), textAlign: "center", marginBottom: 4 }}>{t(cO.short)}</div>
-          <div style={{ fontSize: 11, color: white(0.4) }}>{tick(cMax, cO)}</div>
+        {/* colour scale for the third objective */}
+        <div style={{ width: 74, display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 30, paddingTop: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: white(0.6), textAlign: "center", lineHeight: 1.3 }}>{t(cO.short)}</div>
+          <div style={{ fontSize: 10, color: white(0.4), marginBottom: 4 }}>{unitOf(cO)}</div>
+          <div style={{ fontSize: 11, color: white(0.45) }}>{tick(cMax, cO)} · {t("more")}</div>
           <div style={{ width: 12, flex: 1, borderRadius: 4, margin: "3px 0",
             background: `linear-gradient(to top, ${viridis(0)}, ${viridis(0.25)}, ${viridis(0.5)}, ${viridis(0.75)}, ${viridis(1)})` }} />
-          <div style={{ fontSize: 11, color: white(0.4) }}>{tick(cMin, cO)}</div>
-          <div style={{ fontSize: 8.5, color: white(0.35), marginTop: 2 }}>{cO.unit}</div>
+          <div style={{ fontSize: 11, color: white(0.45) }}>{tick(cMin, cO)} · {t("less")}</div>
         </div>
+      </div>
+
+      {/* Legend — the same markers as the plot. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "6px 16px",
+        fontSize: 12, color: white(0.6), marginTop: 4, paddingLeft: 8 }}>
+        <span style={{ display: "flex", gap: 7, alignItems: "center" }}><LegendMark kind="cloud" />
+          {t("One combination of your build-ups (colour = {c})", { c: t(cO.short).toLowerCase() })}</span>
+        <span style={{ display: "flex", gap: 7, alignItems: "center" }}><LegendMark kind="front" />
+          {t("Lowest {y} you can get for each {x}", { y: t(yO.short).toLowerCase(), x: t(xO.short).toLowerCase() })}</span>
+        <span style={{ display: "flex", gap: 7, alignItems: "center" }}><LegendMark kind="opt" />
+          {t("Shortlisted: nothing else is better on cost, carbon and energy at once (click to select)")}</span>
+        <span style={{ display: "flex", gap: 7, alignItems: "center" }}><LegendMark kind="sim" />
+          {t("Shortlisted and simulated in EnergyPlus")}</span>
+        <span style={{ display: "flex", gap: 7, alignItems: "center" }}><LegendMark kind="base" />
+          {t("Today's building (no renovation)")}</span>
+      </div>
+      <div style={{ fontSize: 11.5, color: white(0.4), marginTop: 6, paddingLeft: 8, lineHeight: 1.5 }}>
+        {t("A shortlisted circle can sit above the line: it may cost or emit a little more but use clearly less energy, which the line (cost and carbon only) does not show.")}
       </div>
 
       {/* Pinned package — a stationary target, unlike the hover tooltip */}
@@ -278,11 +275,11 @@ export default function ParetoChart({
         const isVal = validatedKeys.has(pointKey(pinned));
         const touched = Object.entries(pinned.selection_labels).filter(([, v]) => v !== "Keep as-built");
         return (
-          <div style={{ marginTop: 8, padding: "11px 14px", borderRadius: 10,
+          <div style={{ marginTop: 10, padding: "11px 14px", borderRadius: 10,
             background: "rgba(139,110,173,0.08)", border: "1px solid rgba(139,110,173,0.35)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 220 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#8B6EAD", marginBottom: 4 }}>{t("Selected package")}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: OPT_COLOR, marginBottom: 4 }}>{t("Selected combination")}</div>
                 {touched.length === 0
                   ? <div style={{ fontSize: 12, color: white(0.5), fontStyle: "italic" }}>{t("Keep everything as-built")}</div>
                   : touched.map(([k, v]) => (
@@ -304,8 +301,8 @@ export default function ParetoChart({
                     cursor: isVal ? "default" : "pointer",
                     border: `1px solid ${isVal ? "rgba(47,180,119,0.5)" : "rgba(139,110,173,0.55)"}`,
                     background: isVal ? "rgba(47,180,119,0.14)" : "rgba(139,110,173,0.18)",
-                    color: isVal ? "#2FB477" : "#8B6EAD" }}>
-                  {isVal ? t("✓ Running in EPSM") : t("Run this pick in EPSM →")}
+                    color: isVal ? SIM_COLOR : OPT_COLOR }}>
+                  {isVal ? t("✓ Simulated in EnergyPlus") : t("Simulate this in EnergyPlus →")}
                 </button>
                 <button onClick={() => setPinned(null)}
                   style={{ background: "transparent", border: 0, cursor: "pointer", color: white(0.4), fontSize: 16, lineHeight: 1 }}
@@ -315,21 +312,6 @@ export default function ParetoChart({
           </div>
         );
       })()}
-
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 11.5, color: white(0.5), marginTop: 2, paddingLeft: 8 }}>
-        <span>
-          <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", marginRight: 4, verticalAlign: "middle",
-            background: `linear-gradient(90deg, ${viridis(0)}, ${viridis(1)})` }} />
-          {t("one package tried (colour = {c}, see bar)", { c: t(cO.short).toLowerCase() })}
-        </span>
-        <span><span style={{ color: "#B8A3D0" }}>—●</span> {t("best {x}–{y} trade-offs", { x: t(xO.short).toLowerCase(), y: t(yO.short).toLowerCase() })}</span>
-        <span><span style={{ color: "#8B6EAD" }}>◯</span> {t("shortlisted: nothing beats it on cost, carbon and energy at once (click to select)")}</span>
-        <span><span style={{ color: "#2FB477" }}>●</span> {t("simulated in EnergyPlus")}</span>
-        <span><span style={{ color: "#fff" }}>◆</span> {t("today's building (do nothing)")}</span>
-      </div>
-      <div style={{ fontSize: 11.5, color: white(0.4), marginTop: 4, paddingLeft: 8, lineHeight: 1.5 }}>
-        {t("Dots stacked straight up and down use the same energy but cost more and/or emit more — e.g. build-ups with the same U-value at different prices, or the same package plus a new storey (whose energy only EnergyPlus can show).")}
-      </div>
     </div>
   );
 }
