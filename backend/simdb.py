@@ -335,6 +335,34 @@ def get_raw_by_epsm_id(epsm_simulation_id: str, idf_idx: Optional[int] = None) -
         con.close()
 
 
+def clone_into_batch(new_id: str, items: list[tuple[str, int]], submitted_at: str) -> int:
+    """Copy finished rows (incl. their hourly trace) into a new batch, in order.
+
+    `items` = (epsm_simulation_id, idf_idx) of each building to include. Used to
+    keep ONE baseline batch for the load-profile / peak panels when Step 3 only
+    simulates the buildings that were added: the kept buildings' existing
+    results are copied, not re-simulated. Returns the number of rows copied."""
+    con = _connect()
+    try:
+        n = 0
+        for i, (src_id, src_idx) in enumerate(items):
+            row = con.execute(
+                "SELECT * FROM simulations WHERE epsm_simulation_id = ? AND idf_idx = ? AND status = 'completed' LIMIT 1",
+                (src_id, src_idx)).fetchone()
+            if row is None:
+                raise KeyError(f"no completed result for {src_id}#{src_idx}")
+            d = dict(row)
+            d.pop("id", None)
+            d.update(batch_id=new_id, epsm_simulation_id=new_id, epsm_task_id=None, idf_idx=i, submitted_at=submitted_at)
+            cols = ", ".join(d)
+            con.execute(f"INSERT INTO simulations ({cols}) VALUES ({', '.join('?' * len(d))})", list(d.values()))
+            n += 1
+        con.commit()
+        return n
+    finally:
+        con.close()
+
+
 def all_records() -> list[dict]:
     con = _connect()
     try:

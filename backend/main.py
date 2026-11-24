@@ -322,7 +322,13 @@ def viewer_config():
                 "tiles": [f"https://a.basemaps.cartocdn.com/{style}/{{z}}/{{x}}/{{y}}.png?key={key}"],
                 "credit": credit,
             }
-    return {"basemaps": basemaps, "basemap_provider": "carto" if key else "esri"}
+    # Cesium ion token (CESIUM_ION_TOKEN in .env) for Google Photorealistic 3D
+    # Tiles in the home page's 3D background (frontend/public/city_bg.html). That
+    # page only looked in the browser's localStorage, so wherever nobody had typed
+    # a token into the 3D viewer it fell back to a flat dark map.
+    ion = os.environ.get("CESIUM_ION_TOKEN", "").strip().strip("\"'")
+    return {"basemaps": basemaps, "basemap_provider": "carto" if key else "esri",
+            **({"ion_token": ion} if ion else {})}
 
 
 def _resolve_facade_ml_url(default: str | None = None) -> str:
@@ -4650,6 +4656,37 @@ async def submit_simulation_batch(req: SimulationBatchSubmitRequest):
         })
 
     return {"batch_id": batch_id, "task_id": payload.get("task_id"), "total": len(resolved), "status": "queued"}
+
+
+class BatchMergeItem(BaseModel):
+    batch_id: str
+    idf_idx: int
+
+
+class BatchMergeRequest(BaseModel):
+    items: list[BatchMergeItem]
+
+
+@app.post("/api/simulation-batch-merge")
+def simulation_batch_merge(req: BatchMergeRequest):
+    """One batch from finished results of several batches, without simulating.
+
+    Step 3 now simulates only the buildings added since the last run (and just
+    drops removed ones); this puts the kept + new results back into a single
+    batch so the load-profile and peak panels, which read one batch, show
+    exactly the current selection. The new id has the RC prefix, so every
+    status / timeseries / peaks endpoint reads it straight from the database
+    (all rows are already completed) - also when the rows came from EnergyPlus."""
+    import uuid
+    if not req.items:
+        raise HTTPException(400, "Nothing to merge")
+    new_id = _RC_ID_PREFIX + "merge-" + uuid.uuid4().hex
+    now = datetime.datetime.utcnow().isoformat() + "Z"
+    try:
+        simdb.clone_into_batch(new_id, [(i.batch_id, i.idf_idx) for i in req.items], now)
+    except KeyError as exc:
+        raise HTTPException(409, f"Cannot merge: {exc}")
+    return {"batch_id": new_id, "total": len(req.items)}
 
 
 @app.get("/api/simulation-batch-status/{batch_id}")

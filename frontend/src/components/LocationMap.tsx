@@ -835,8 +835,10 @@ export default function LocationMap({
         return;
       }
       const key = (p: { lat: number; lon: number }) => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
+      // Clicking a building that is already picked (or its dot) removes it - a toggle.
       if (picked.some((p) => key(p) === key(b))) {
-        setPickMsg(t("{name} is already selected.", { name: b.address ?? t("This building") }));
+        publishPicked(picked.filter((p) => key(p) !== key(b)));
+        setPickMsg(t("{name} removed.", { name: b.address ?? t("This building") }));
         return;
       }
       const label = b.address ?? t("Building at {lat}, {lon}", { lat: b.lat.toFixed(5), lon: b.lon.toFixed(5) });
@@ -1249,7 +1251,7 @@ export default function LocationMap({
             <span>
               {picked.length === 0
                 ? t("Click a building on the map to add it. Zoom in to see the buildings.")
-                : t("{n} buildings selected - click more on the map, or ✕ to remove one.", { n: picked.length })}
+                : t("{n} buildings selected - click a building again (or ✕) to remove it.", { n: picked.length })}
             </span>
             {picked.length > 0 && (
               <button onClick={() => { publishPicked([]); setPickMsg(null); }}

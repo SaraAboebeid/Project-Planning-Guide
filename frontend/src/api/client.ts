@@ -289,6 +289,11 @@ export const api = {
     package_id?: string; package_label?: string | null;
   }) => post<{ batch_id: string; task_id: string; total: number; status: string }>("/simulation-batch-submit", body),
 
+  /** One batch from finished results of several batches, without simulating
+   *  (Step 3 keeps a single baseline batch after an incremental run). */
+  simulationBatchMerge: (items: { batch_id: string; idf_idx: number }[]) =>
+    post<{ batch_id: string; total: number }>("/simulation-batch-merge", { items }),
+
   /** Multi-objective renovation optimizer — enumerate material combinations,
    * score on the fast degree-day physics, return the Pareto-optimal front over
    * (cost, carbon, energy). The winners are then validated in EPSM. */

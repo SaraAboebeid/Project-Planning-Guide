@@ -222,12 +222,58 @@ export default function BaselineSetup() {
     saveFile(JSON.stringify(payload, null, 2), "epsm_baseline_results.json", "application/json");
   }
 
-  /** Real batch EPSM run - one shoebox IDF per building, submitted together
-   * (see backend's /api/simulation-batch-submit, which hands EPSM a LIST of
-   * IDF files it runs as independent parallel tasks under one batch_id).
-   * Polls batch-status every 3s until every building is completed/failed. */
-  async function runBaseline() {
+  /** The request for building i of runList. Also its input signature: a
+   *  result is only reused while the building is simulated with exactly these
+   *  inputs (Step 2 edits, facade glazing, recorded renovations). */
+  function specFor(b: BuildingLookup, i: number) {
+    // Each building carries the glazing ratios read from its own facade photos in
+    // Step 2 (utils/retrofitPriority.makeBuildingKeys gives the same key the
+    // facade panel wrote them under). Facades with no photo keep the default ratio.
+    const measured = project.facadeWwr?.[runKeys[i]!];
+    const byOrientation = Object.fromEntries(
+      Object.entries(measured ?? {}).map(([dir, v]) => [dir, v!.wwr]),
+    );
+    // U-values the user recorded for past renovations (Step 2).
+    const recorded = recordedUForSimulation(project.buildingHistory?.[runKeys[i]!]);
+    return {
+      lat: b.lat, lon: b.lon, address: b.address,
+      ...(Object.keys(byOrientation).length ? { wwr_by_orientation: byOrientation } : {}),
+      ...(recorded ? { recorded_u: recorded } : {}),
+      ...(runEdits[i] ? { edits: runEdits[i] } : {}),
+    };
+  }
+  const coordKey = (x: { lat?: number | null; lon?: number | null }) =>
+    `${(x.lat ?? 0).toFixed(6)},${(x.lon ?? 0).toFixed(6)}`;
+
+  /** What a run has to do (2026-11-24, user: adding or removing one building
+   *  re-ran all of them). `reuse[i]` = a stored result that is still current for
+   *  building i; `toRun` = the buildings that need simulating (new, or inputs
+   *  changed); `extra` = stored results for buildings no longer selected. */
+  const runPlan = useMemo(() => {
+    const specs = runList.map((b, i) => specFor(b, i));
+    const sigs = specs.map((s) => JSON.stringify(s));
+    const stored = new Map((results ?? []).map((r) => [coordKey(r), r]));
+    const reuse = runList.map((b, i) => {
+      const r = stored.get(coordKey(b));
+      return r && r.inputSig === sigs[i] && r.batchId && r.batchIdx != null ? r : null;
+    });
+    const toRun = runList.map((_, i) => i).filter((i) => !reuse[i]);
+    const selectedKeys = new Set(runList.map(coordKey));
+    const extra = (results ?? []).filter((r) => !selectedKeys.has(coordKey(r))).length;
+    return { specs, sigs, reuse, toRun, extra };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runList, results, runKeys, runEdits, project.facadeWwr, project.buildingHistory]);
+
+  /** Baseline run. Only the buildings in runPlan.toRun are simulated (all of them
+   *  with `force`); results still current are reused, and results for buildings
+   *  no longer selected are dropped. The kept + new results are then merged into
+   *  ONE batch on the server (no re-simulation) for the load-profile and peak
+   *  panels, which read a single batch. Polls batch-status every second. */
+  async function runBaseline(opts?: { force?: boolean }) {
     if (runList.length === 0) return;
+    const { specs, sigs } = runPlan;
+    const reuse = opts?.force ? runList.map(() => null) : runPlan.reuse;
+    const toRun = opts?.force ? runList.map((_, i) => i) : runPlan.toRun;
     setSimRunning(true);
     setSimProgress(0);
     setSimError(null);
@@ -235,101 +281,108 @@ export default function BaselineSetup() {
     const isBE = project.country === "Belgium";
 
     try {
-      const { batch_id } = await api.simulationBatchSubmit({
-        country: isUK ? "gb" : isBE ? "be" : "se",
-        // Sweden needs an explicit city_id (only "gothenburg" is mapped); UK and
-        // Belgium omit it and the server resolves the nearest district from lat/lon.
-        ...(isUK || isBE ? {} : { city_id: seCityId(project.city) }),
-        // Each building carries the glazing ratios read from its own facade
-        // photos in Step 2 (utils/retrofitPriority.makeBuildingKeys gives the
-        // same key the facade panel wrote them under). Facades with no photo are
-        // simply absent, and keep the model's default ratio.
-        buildings: runList.map((b, i) => {
-          const measured = project.facadeWwr?.[runKeys[i]!];
-          const byOrientation = Object.fromEntries(
-            Object.entries(measured ?? {}).map(([dir, v]) => [dir, v!.wwr]),
-          );
-          // U-values the user recorded for past renovations (Step 2).
-          const recorded = recordedUForSimulation(project.buildingHistory?.[runKeys[i]!]);
-          return {
-            lat: b.lat, lon: b.lon, address: b.address,
-            ...(Object.keys(byOrientation).length ? { wwr_by_orientation: byOrientation } : {}),
-            ...(recorded ? { recorded_u: recorded } : {}),
-            ...(runEdits[i] ? { edits: runEdits[i] } : {}),
-          };
-        }),
-        package_id: "baseline",
-      });
+      const fresh: Record<number, RenovationBaselineResult> = {};
+      let newBatch: string | null = null;
+      if (toRun.length > 0) {
+        const { batch_id } = await api.simulationBatchSubmit({
+          country: isUK ? "gb" : isBE ? "be" : "se",
+          // Sweden needs an explicit city_id; UK and Belgium omit it and the
+          // server resolves the nearest district from lat/lon.
+          ...(isUK || isBE ? {} : { city_id: seCityId(project.city) }),
+          buildings: toRun.map((i) => specs[i]!),
+          package_id: "baseline",
+        });
+        newBatch = batch_id;
 
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const status = await api.simulationBatchStatus(batch_id);
-        const done = (status.counts.completed ?? 0) + (status.counts.failed ?? 0);
-        // Our own rows all flip at the very end of the batch, so counting them
-        // pinned the bar at 0% for the whole run. EPSM's own progress moves
-        // during it; take whichever is further along, and never go backwards.
-        const rowPct = status.total ? Math.round((done / status.total) * 100) : 0;
-        const epsmPct = typeof status.overall_progress === "number"
-          ? Math.max(0, Math.min(100, Math.round(status.overall_progress)))
-          : 0;
-        setSimProgress((prev) => Math.max(prev, rowPct, epsmPct));
-
-        if (status.overall_status === "completed" || status.overall_status === "failed" || done === status.total) {
-          const mapped: RenovationBaselineResult[] = status.buildings.map((row, i) => {
-            const src = runList[i];
-            const r = row.results;
-            return {
-              address: row.address ?? (src ? bKey(src, i) : `Building ${i + 1}`),
-              lat: row.lat ?? src?.lat,
-              lon: row.lon ?? src?.lon,
-              // Sweden: household/business electricity is simulated but not part
-              // of the reported total or shown (utils/energyTotals).
-              energyUse: reportedTotalKwhM2(r, project.country) ?? 0,
-              heating: r?.heating_kwh_m2_yr ?? 0,
-              cooling: r?.cooling_kwh_m2_yr ?? 0,
-              lighting: excludesHouseholdElectricity(project.country) ? 0 : (r?.lighting_kwh_m2_yr ?? 0),
-              equipment: excludesHouseholdElectricity(project.country) ? 0 : (r?.equipment_kwh_m2_yr ?? 0),
-              // Real EnergyPlus "Water Systems" output. The shoebox draws hot
-              // water from a stand-alone water heater sized to the Sveby
-              // standard intensity for the building's use category, so this is
-              // a played-back assumption rather than a prediction - but it puts
-              // our total on the same end-use basis as an energideklaration.
-              dhw: r?.dhw_kwh_m2_yr ?? 0,
-              // Infiltration IS modelled (ZoneInfiltration:DesignFlowRate), but
-              // EnergyPlus books it inside Heating rather than as its own end
-              // use, so there is no separate figure to report.
-              airLeakage: 0,
-              eClass: src?.eclass ?? null,
-              eClassFromEpc: !!src?.eclass,
-              gasKwh: r?.gas_kwh ?? null,
-              totalGasKwh: r?.total_gas_kwh ?? null,
-              gasKwhPerDwelling: r?.gas_kwh_per_dwelling ?? null,
-              dwellings: r?.dwellings ?? null,
-              heatedAreaM2: r?.total_floor_area_m2 ?? null,
-              heatingSystem: r?.heating_system ?? null,
-              // Carried from the backend so the caveat stays attached to the
-              // number wherever it is shown (pools, hospitals, industry).
-              modelScope: r?.model_scope ?? src?.model_scope ?? null,
-              heightCorrected: r?.height_corrected ?? null,
-            };
-          });
-          setProject({ baselineStatus: "done", renovationBaselineResults: mapped, baselineBatchId: batch_id });
-          setSimRunning(false);
-          setSimProgress(100);
-          // Auto-scroll to results
-          setTimeout(() => {
-            resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }, 150);
-          return;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const status = await api.simulationBatchStatus(batch_id);
+          const done = (status.counts.completed ?? 0) + (status.counts.failed ?? 0);
+          // Our own rows all flip at the very end of the batch; EPSM's own
+          // progress moves during it. Take whichever is further, never go back.
+          const rowPct = status.total ? Math.round((done / status.total) * 100) : 0;
+          const epsmPct = typeof status.overall_progress === "number"
+            ? Math.max(0, Math.min(100, Math.round(status.overall_progress)))
+            : 0;
+          setSimProgress((prev) => Math.max(prev, rowPct, epsmPct));
+          if (status.overall_status === "completed" || status.overall_status === "failed" || done === status.total) {
+            status.buildings.forEach((row, j) => {
+              const i = toRun[j]!;
+              const src = runList[i];
+              const r = row.results;
+              const ok = row.status === "completed";
+              fresh[i] = {
+                address: row.address ?? (src ? bKey(src, i) : `Building ${i + 1}`),
+                lat: row.lat ?? src?.lat,
+                lon: row.lon ?? src?.lon,
+                // Only a finished result can be reused or merged later.
+                ...(ok ? { batchId: batch_id, batchIdx: j, inputSig: sigs[i] } : {}),
+                // Sweden: household/business electricity is simulated but not part
+                // of the reported total or shown (utils/energyTotals).
+                energyUse: reportedTotalKwhM2(r, project.country) ?? 0,
+                heating: r?.heating_kwh_m2_yr ?? 0,
+                cooling: r?.cooling_kwh_m2_yr ?? 0,
+                lighting: excludesHouseholdElectricity(project.country) ? 0 : (r?.lighting_kwh_m2_yr ?? 0),
+                equipment: excludesHouseholdElectricity(project.country) ? 0 : (r?.equipment_kwh_m2_yr ?? 0),
+                // Hot water: the Sveby standard draw (or the building's EPC
+                // figure) played back - an assumption, not a prediction - but it
+                // puts the total on the same end-use basis as an energideklaration.
+                dhw: r?.dhw_kwh_m2_yr ?? 0,
+                // Infiltration is modelled but booked inside Heating.
+                airLeakage: 0,
+                eClass: src?.eclass ?? null,
+                eClassFromEpc: !!src?.eclass,
+                gasKwh: r?.gas_kwh ?? null,
+                totalGasKwh: r?.total_gas_kwh ?? null,
+                gasKwhPerDwelling: r?.gas_kwh_per_dwelling ?? null,
+                dwellings: r?.dwellings ?? null,
+                heatedAreaM2: r?.total_floor_area_m2 ?? null,
+                heatingSystem: r?.heating_system ?? null,
+                // Carried so the caveat stays attached to the number (pools, hospitals, industry).
+                modelScope: r?.model_scope ?? src?.model_scope ?? null,
+                heightCorrected: r?.height_corrected ?? null,
+              };
+            });
+            break;
+          }
+          // 1 s: a building takes ~5 s in EPSM, so a 3 s poll added up to 60 % on top.
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
-        // 1 s: a building takes ~5 s in EPSM, so a 3 s poll added up to 60 % on top.
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      // Selection order; buildings no longer selected simply drop out.
+      const merged = runList.map((_, i) => fresh[i] ?? reuse[i]).filter((r): r is RenovationBaselineResult => !!r);
+      // One batch for the panels: the new batch when everything was just run,
+      // otherwise the kept + new results copied into one (no simulation).
+      let panelBatch: string | null = toRun.length === runList.length ? newBatch : null;
+      if (!panelBatch) {
+        const items = merged.filter((r) => r.batchId && r.batchIdx != null)
+          .map((r) => ({ batch_id: r.batchId!, idf_idx: r.batchIdx! }));
+        try { panelBatch = items.length ? (await api.simulationBatchMerge(items)).batch_id : newBatch; }
+        catch { panelBatch = newBatch ?? project.baselineBatchId; }   // panels may then show part of the set
+      }
+      setProject({ baselineStatus: "done", renovationBaselineResults: merged, baselineBatchId: panelBatch });
+      setSimRunning(false);
+      setSimProgress(100);
+      if (toRun.length > 0) {
+        setTimeout(() => { resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 150);
       }
     } catch (err) {
       setSimError((err as Error).message);
       setSimRunning(false);
     }
   }
+
+  /* Unticking a building only drops its row: when every selected building
+     already has a current result, the run is just the server-side merge. Done
+     automatically, so removing a building needs no click and no simulation. */
+  useEffect(() => {
+    if (project.baselineStatus !== "done" || simRunning || runList.length === 0) return;
+    if (runPlan.toRun.length > 0 || runPlan.extra === 0) return;
+    const h = setTimeout(() => { void runBaseline(); }, 400);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runPlan, project.baselineStatus, simRunning]);
 
 
   const buildingStatus = useMemo(() =>
@@ -502,7 +555,7 @@ export default function BaselineSetup() {
           <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.07)" }}>
             <button
               disabled={!canRunBaseline || simRunning}
-              onClick={runBaseline}
+              onClick={() => runBaseline(baselineIsCurrent && runPlan.toRun.length === 0 ? { force: true } : undefined)}
               style={{
                 display: "flex", alignItems: "center", gap: 8,
                 padding: "11px 24px", borderRadius: 10, border: 0,
@@ -513,7 +566,14 @@ export default function BaselineSetup() {
               }}
             >
               {simRunning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={14} />}
-              {simRunning ? t("Running…") : isRerun
+              {simRunning ? t("Running…")
+                : project.baselineStatus === "done" && runPlan.toRun.length > 0 && runPlan.toRun.length < runList.length
+                ? (runPlan.toRun.length !== 1
+                  ? t("Run baseline for the {n} new or changed buildings", { n: runPlan.toRun.length })
+                  : t("Run baseline for the 1 new or changed building"))
+                : baselineIsCurrent && runPlan.toRun.length === 0
+                ? t("Re-run all {n} buildings", { n: runList.length })
+                : isRerun
                 ? (runList.length !== 1
                   ? t("Re-run baseline energy simulation (EPSM) for {n} buildings", { n: runList.length })
                   : t("Re-run baseline energy simulation (EPSM) for {n} building", { n: runList.length }))

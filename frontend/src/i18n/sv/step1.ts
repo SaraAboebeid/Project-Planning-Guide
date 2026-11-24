@@ -202,6 +202,8 @@ export const SV_STEP1: Record<string, string> = {
     "Klicka på byggnader i kartan för att lägga till dem en i taget – de kan ligga var som helst i staden.",
   "No building there - click directly on a building.": "Ingen byggnad där – klicka direkt på en byggnad.",
   "{name} is already selected.": "{name} är redan vald.",
+  "{name} removed.": "{name} borttagen.",
+  "{n} buildings selected - click a building again (or ✕) to remove it.": "{n} byggnader valda – klicka på en byggnad igen (eller ✕) för att ta bort den.",
   "This building": "Den här byggnaden",
   "Building at {lat}, {lon}": "Byggnad vid {lat}, {lon}",
   "Click a building on the map to add it. Zoom in to see the buildings.": "Klicka på en byggnad i kartan för att lägga till den. Zooma in för att se byggnaderna.",

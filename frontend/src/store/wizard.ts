@@ -26,6 +26,13 @@ const STEPS: StepDef[] = [
 /* ── Renovation simulation result types ── */
 export interface RenovationBaselineResult {
   address: string;
+  /* Where this result lives on the server (batch + position) and the inputs it
+     was simulated with, so Step 3 re-simulates only buildings that are new or
+     whose inputs changed, and merges the rest into one batch (2026-11-24).
+     Absent on results saved before that = treated as needing a run. */
+  batchId?: string;
+  batchIdx?: number;
+  inputSig?: string;
   /* Which building this row IS. Step 4 and the Step 5 report narrow themselves
      to the buildings Step 3 actually simulated, and matching on coordinates is
      exact where matching on an address string is not (a building with no address

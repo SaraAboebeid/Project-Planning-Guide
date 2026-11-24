@@ -65,18 +65,25 @@
 
     // Google Photorealistic 3D Tiles when a Cesium ion token is available,
     // otherwise a dark basemap so the scene still reads as the right city.
+    // Token: ?token=, the one the 3D viewer saved in this browser, or the
+    // server's (/api/viewer-config) - the last one was missing, so any browser
+    // where nobody had typed a token into the viewer only got the flat map.
     const urlToken = P.get('token');
     const lsToken  = (() => { try { return localStorage.getItem('cesium_ion_token'); } catch { return null; } })();
-    const ionToken = urlToken || lsToken || '';
+    const cfgPromise = fetch('/api/viewer-config', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null)).catch(() => null);
 
-    if (ionToken) {
-      Cesium.Ion.defaultAccessToken = ionToken;
-      Cesium.createGooglePhotorealistic3DTileset()
-        .then(tileset => { viewer.scene.primitives.add(tileset); startSlowRotation(); })
-        .catch(() => loadFallbackMap());
-    } else {
-      loadFallbackMap();
-    }
+    cfgPromise.then(cfg => {
+      const ionToken = urlToken || lsToken || (cfg && cfg.ion_token) || '';
+      if (ionToken) {
+        Cesium.Ion.defaultAccessToken = ionToken;
+        Cesium.createGooglePhotorealistic3DTileset()
+          .then(tileset => { viewer.scene.primitives.add(tileset); startSlowRotation(); })
+          .catch(() => loadFallbackMap());
+      } else {
+        loadFallbackMap();
+      }
+    });
 
     function loadFallbackMap() {
       // The viewer is constructed with `globe: false`, and imagery layers belong
@@ -92,8 +99,7 @@
       // The key lives in .env and comes from /api/viewer-config - the same
       // endpoint the 3D viewer uses. If that is unreachable, fall back to
       // Esri's keyless dark canvas so the hero is never watermarked.
-      fetch('/api/viewer-config', { cache: 'no-store' })
-        .then(r => (r.ok ? r.json() : null)).catch(() => null)
+      cfgPromise
         .then(cfg => {
           const dark = cfg && cfg.basemaps && cfg.basemaps.dark;
           const useCarto = !!(dark && dark.tiles && dark.tiles.length);

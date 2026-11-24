@@ -37,6 +37,9 @@ export const SV_STEP3: Record<string, string> = {
   // ── Baseline simulation card ──
   "Baseline Energy Simulation": "Nulägessimulering av energi",
   "Baseline complete": "Nuläget är klart",
+  "Run baseline for the {n} new or changed buildings": "Simulera nuläget för de {n} nya eller ändrade byggnaderna",
+  "Run baseline for the 1 new or changed building": "Simulera nuläget för den nya eller ändrade byggnaden",
+  "Re-run all {n} buildings": "Kör om alla {n} byggnader",
   "Running EPSM simulation — please wait…": "EPSM-simuleringen körs – vänta …",
   "Send {n} buildings to EPSM to compute the as-built baseline. Missing envelope details fall back to TABULA archetype defaults, so the run always completes.":
     "Skicka {n} byggnader till EPSM för att beräkna nuläget. Saknade uppgifter om klimatskalet ersätts med standardvärden från TABULA-typbyggnader, så körningen blir alltid klar.",
