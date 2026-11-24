@@ -208,23 +208,9 @@ export default function PvOptimizerPanel({ buildings, cityId, discountRate }: { 
               )}
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>{t("Value over the panels' life by system size")}</div>
-                  <ResponsiveContainer width="100%" height={210}>
-                    <LineChart data={result.points} margin={{ top: 8, right: 12, bottom: 18, left: 8 }}>
-                      <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                      <XAxis dataKey="kwp" type="number" domain={["dataMin", "dataMax"]} tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }}
-                        label={{ value: "kWp", position: "insideBottom", offset: -10, fontSize: 11, fill: "rgba(255,255,255,0.45)" }} />
-                      <YAxis tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }} width={56}
-                        tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
-                      <ReferenceLine y={0} stroke="rgba(255,255,255,0.35)" />
-                      <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, fontSize: 12 }}
-                        labelFormatter={(k) => `${k} kWp`} formatter={(v: number) => [sek(v), t("Net present value")]} />
-                      <Line type="monotone" dataKey="npv_sek" stroke={SOLAR} strokeWidth={2} dot={false} isAnimationActive={false} />
-                      {best && <ReferenceDot x={best.kwp} y={best.npv_sek} r={5} fill={SOLAR} stroke="#0d1117" strokeWidth={2} />}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                {/* (The "value over the panels' life by system size" line chart was
+                    removed 2026-11-24 at the user's request; the best size and its
+                    value are in the tiles above.) */}
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>
                     {best ? t("Electricity use and solar output per month, at {k} kWp", { k: best.kwp }) : t("Electricity use per month")}

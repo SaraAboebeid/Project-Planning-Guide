@@ -10,7 +10,7 @@ import PeerComparisonPanel, { type PeerBuildingRow } from "../components/PeerCom
 import FastHeatModelPanel from "../components/FastHeatModelPanel";
 import RetrofitPriorityPanel from "../components/RetrofitPriorityPanel";
 import ModelScopeNotice from "../components/ModelScopeNotice";
-import { buildingUseLabel } from "../utils/useLabels";
+import { buildingUseLabel, buildingUseShort } from "../utils/useLabels";
 import { readTextFile } from "../utils/buildingCsv";
 import { makeBuildingKeys, type PriorityInput } from "../utils/retrofitPriority";
 import { useT, translate } from "../i18n";
@@ -759,6 +759,14 @@ const MODEL_INPUT_COLS = new Set<keyof BuildingRecord>(["building_use", "height_
 // On screen the cadastral id gives way to Owner + Past renovations (it stays in
 // the CSV export, where it is the join key people need).
 const BBOX_TABLE_COLS = BBOX_CSV_COLS.filter((c) => c.key !== "cadastral_id");
+/* Compact view (2026-11-24, user request: no scrolling sideways): floors join
+   height, the three U-values share one column, the two certificate dates share
+   one, and use codes get one-word labels. "Edit Table" still shows every field
+   in its own column, because each needs its own input. */
+const FOLDED_IN_COMPACT = new Set<keyof BuildingRecord>(["floors", "u_window", "u_roof"]);
+const COMPACT_LABEL: Partial<Record<keyof BuildingRecord, string>> = {
+  height_m: "Height · floors", u_wall: "U wall · window · roof", tabula_period: "Era", footprint_m2: "Footprint (m²)",
+};
 
 /** What the per-address EPC lookup returns: current heating plus the newest
  *  certificate's issue date and its expiry (issue + 10 years). */
@@ -1725,7 +1733,7 @@ function BboxDataBanner({
           </div>
           <div className="overflow-x-auto">
             <OwnerSuggestions />
-            <table className="w-full text-[12.5px] border-collapse">
+            <table className="w-full text-[12px] border-collapse">
               <thead>
                 <tr className="bg-white/8">
                   {/* Select-all checkbox */}
@@ -1739,7 +1747,7 @@ function BboxDataBanner({
                       title={t("Select / deselect all on this page")}
                     />
                   </th>
-                  {BBOX_TABLE_COLS.map(c => {
+                  {(editing ? BBOX_TABLE_COLS : BBOX_TABLE_COLS.filter((c) => !FOLDED_IN_COMPACT.has(c.key))).map(c => {
                     const active = tableSort?.key === c.key;
                     return (
                       <Fragment key={c.key}>
@@ -1748,8 +1756,10 @@ function BboxDataBanner({
                           title={editing
                             ? (MODEL_INPUT_COLS.has(c.key) ? t("Simulation input — an edit here changes the simulation in Steps 3–4") : t("Reference only — an edit here does not change the simulation"))
                             : t("Sort by this column (click again to flip high ↔ low)")}
-                          className={`px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap cursor-pointer select-none transition-colors hover:bg-white/10 hover:text-white ${active ? "text-white" : "text-white/60"}`}>
-                        {c.key === "energy_kwh_m2" && isSweden ? t("Certificate energy (kWh/m²)") : t(c.label)}
+                          className={`px-1.5 py-1 text-left font-semibold border-b border-white/10 cursor-pointer select-none transition-colors hover:bg-white/10 hover:text-white ${editing ? "whitespace-nowrap" : ""} ${active ? "text-white" : "text-white/60"}`}>
+                        {c.key === "energy_kwh_m2" && isSweden
+                          ? (editing ? t("Certificate energy (kWh/m²)") : <>{t("Certificate energy")}<span className="block text-[10.5px] font-normal text-white/40">kWh/m²</span></>)
+                          : !editing && COMPACT_LABEL[c.key] ? t(COMPACT_LABEL[c.key]!) : t(c.label)}
                         {c.key === "energy_kwh_m2" && isSweden && <HeaderInfo text={t(SE_EPC_ENERGY_INFO)} />}
                         {editing && MODEL_INPUT_COLS.has(c.key) && <span className="ml-1 text-[11px]" style={{ color: "#8B6EAD" }} aria-label={t("Simulation input")}>⚙</span>}
                         <span className="ml-1 text-[11px]" style={{ opacity: active ? 1 : 0.55 }}>
@@ -1759,13 +1769,13 @@ function BboxDataBanner({
                       </Fragment>
                     );
                   })}
-                  {EPC_DATE_COLS.map(col => (
+                  {(editing ? EPC_DATE_COLS : EPC_DATE_COLS.filter((c) => c.key === "expires")).map(col => (
                     <th
                       key={col.key}
                       className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60"
                       title={t(col.title)}
                     >
-                      {t(col.label)}
+                      {editing ? t(col.label) : t("Certificate valid until")}
                     </th>
                   ))}
                   <th className="px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap text-white/60" title={t("Current heating system, inferred from the Boverket EPC (energideklaration)")}>
@@ -1801,7 +1811,7 @@ function BboxDataBanner({
                           className="w-3 h-3 cursor-pointer accent-violet-600"
                         />
                       </td>
-                      {BBOX_TABLE_COLS.map(c => {
+                      {(editing ? BBOX_TABLE_COLS : BBOX_TABLE_COLS.filter((c) => !FOLDED_IN_COMPACT.has(c.key))).map(c => {
                         const val     = r[c.key];
                         const present = val !== null && val !== undefined;
                         const isBoplats = (c.key as string).startsWith("boplats_");
@@ -1826,15 +1836,24 @@ function BboxDataBanner({
                         // Use codes are the shared (Swedish-schema) keys — show English
                         // labels outside Sweden, where the Swedish words mean nothing.
                         const nonSE = useWizardStore.getState().project.country !== "Sweden";
+                        const fmtV = (v: unknown) => (v === null || v === undefined ? "—" : String(v));
                         const display = c.key === "address"
                           ? (isCadastralId(val as string, r.cadastral_id) ? "—" : formatAddress(val as string))
+                          : c.key === "building_use" && !editing && present
+                            ? t(buildingUseShort(val as string))
                           : c.key === "building_use" && nonSE && present
                             ? buildingUseLabel(val as string)
+                          // compact view: folded columns
+                          : c.key === "height_m" && !editing
+                            ? `${fmtV(r.height_m)}${r.floors != null ? ` · ${r.floors} ${t("fl.")}` : ""}`
+                          : c.key === "u_wall" && !editing
+                            ? (r.u_wall == null && r.u_window == null && r.u_roof == null ? "—"
+                              : `${estimated ? "≈ " : ""}${fmtV(r.u_wall)} · ${fmtV(r.u_window)} · ${fmtV(r.u_roof)}`)
                           : present ? `${estimated ? "≈ " : ""}${String(val)}` : "—";
                         return (
                           <Fragment key={c.key}>
-                          <td title={estimated ? estimateNote! : undefined}
-                              className={`px-2 py-1 ${editing ? "" : cell} whitespace-nowrap`}
+                          <td title={estimated ? estimateNote! : c.key === "building_use" && present && !editing ? buildingUseLabel(val as string) : undefined}
+                              className={`px-1.5 py-1 ${editing ? "" : cell} whitespace-nowrap`}
                               onClick={editing ? (e => e.stopPropagation()) : undefined}>
                             {editing ? (
                               <input
@@ -1847,7 +1866,7 @@ function BboxDataBanner({
                           </Fragment>
                         );
                       })}
-                      {EPC_DATE_COLS.map(col => {
+                      {(editing ? EPC_DATE_COLS : EPC_DATE_COLS.filter((c) => c.key === "expires")).map(col => {
                         const e = r.address ? heating[r.address] : null;
                         const val = col.key === "issued" ? e?.issued : e?.expires;
                         // Expiry status: expired / within 12 months / valid.
@@ -1862,9 +1881,12 @@ function BboxDataBanner({
                         return (
                           <td
                             key={col.key}
-                            className={`px-2 py-1 whitespace-nowrap ${isSelected ? "" : tone}`}
-                            title={col.key === "expires" && status === "expired" ? t("This certificate has expired — its energy figure may be out of date.")
-                              : col.key === "expires" && status === "soon" ? t("Expires within 12 months.") : t(col.title)}
+                            className={`px-1.5 py-1 whitespace-nowrap ${isSelected ? "" : tone}`}
+                            title={[
+                              col.key === "expires" && status === "expired" ? t("This certificate has expired — its energy figure may be out of date.")
+                                : col.key === "expires" && status === "soon" ? t("Expires within 12 months.") : t(col.title),
+                              !editing && e?.issued ? `${t("EPC issued")}: ${e.issued}` : "",
+                            ].filter(Boolean).join(" · ")}
                             onClick={editing ? (ev => ev.stopPropagation()) : undefined}
                           >
                             {val ?? "—"}{col.key === "expires" && status === "expired" ? ` · ${t("expired")}` : ""}
@@ -1875,7 +1897,7 @@ function BboxDataBanner({
                         const h = r.address ? heating[r.address] : null;
                         const sys = h?.system ?? null;
                         return (
-                          <td className={`px-2 py-1 whitespace-nowrap ${isSelected ? "" : sys ? "bg-sky-900/15 text-sky-300" : "bg-white/[0.02] text-white/25"}`}
+                          <td className={`px-1.5 py-1 whitespace-nowrap ${isSelected ? "" : sys ? "bg-sky-900/15 text-sky-300" : "bg-white/[0.02] text-white/25"}`}
                               onClick={editing ? (e => e.stopPropagation()) : undefined}>
                             {sys ?? "—"}
                           </td>
@@ -1887,7 +1909,7 @@ function BboxDataBanner({
                         return (<>
                           {/* Typing here must not toggle the row's selection. */}
                           <td className="px-2 py-1" onClick={e => e.stopPropagation()}>
-                            <OwnerCell b={hb} owner={buildingHistory[hb.key]?.owner} width={150} />
+                            <OwnerCell b={hb} owner={buildingHistory[hb.key]?.owner} width={editing ? 150 : 104} />
                           </td>
                           <td className="px-2 py-1" onClick={e => e.stopPropagation()}>
                             <RenovationsCell b={hb} renovations={buildingHistory[hb.key]?.renovations ?? []} />

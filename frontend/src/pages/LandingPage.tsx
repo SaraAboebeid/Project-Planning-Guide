@@ -94,6 +94,10 @@ const CITY_BG: Record<string, BgView> = {
   Gothenburg: { lat: 57.698500, lon: 11.957000, height: 360, heading: 45 }, // Feskekôrka — from across the Rosenlund canal (SW) looking NE at the church
   Stockholm:  { lat: 59.325100, lon: 18.071100, height: 700, heading: 30 },
   "Malmö":    { lat: 55.605000, lon: 13.003800, height: 650, heading: 20 },
+  // Nacka centrum (Nacka Forum, stadshuset, Järla) seen from the south, looking
+  // north - the municipality's centre point put the camera over Saltsjön, so the
+  // home page showed water and islands instead of Nacka.
+  Nacka:      { lat: 59.302600, lon: 18.163000, height: 450, heading: 0 },
   London:     { lat: 51.503300, lon: -0.078500, height: 700, heading: 345 },
   Rotherham:  { lat: 53.430200, lon: -1.356800, height: 520, heading: 20 },
   "Liège":    { lat: 50.640500, lon: 5.576000, height: 600, heading: 60 },

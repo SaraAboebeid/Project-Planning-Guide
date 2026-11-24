@@ -19,3 +19,21 @@ export function buildingUseLabel(raw: string | null | undefined): string {
   if (!raw) return "—";
   return USE_LABELS[raw] ?? raw;
 }
+
+/** One-word labels for tight tables (Step 2 building table). */
+const USE_SHORT: Record<string, string> = {
+  bostad_enfamilj: "House",
+  bostad_flerfamilj: "Apartments",
+  verksamhet: "Commercial",
+  handel: "Retail",
+  kontor: "Office",
+  samhalle: "Public",
+  samhallsfunktion: "Public",
+  industri: "Industrial",
+  komplement: "Outbuilding",
+  ovrigt: "Other",
+};
+export function buildingUseShort(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  return USE_SHORT[raw] ?? raw;
+}
