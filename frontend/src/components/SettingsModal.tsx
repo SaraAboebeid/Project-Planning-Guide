@@ -23,9 +23,9 @@ function Row({ label, sub, ok, okText, offText }: { label: string; sub?: string;
       <Dot ok={ok} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, color: "#fff", fontWeight: 600 }}>{label}</div>
-        {sub && <div style={{ fontSize: 10.5, color: white(0.35), fontFamily: "ui-monospace, monospace" }}>{sub}</div>}
+        {sub && <div style={{ fontSize: 11.5, color: white(0.35), fontFamily: "ui-monospace, monospace" }}>{sub}</div>}
       </div>
-      <span style={{ fontSize: 11, fontWeight: 700, color: ok ? "#2FB477" : "#E2483B" }}>{ok ? okText : offText}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: ok ? "#2FB477" : "#E2483B" }}>{ok ? okText : offText}</span>
     </div>
   );
 }
@@ -75,14 +75,14 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   };
 
   const btn = (danger?: boolean): React.CSSProperties => ({
-    display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 9, fontSize: 12, fontWeight: 700,
+    display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 9, fontSize: 12, fontWeight: 600,
     cursor: "pointer", border: `1px solid ${danger ? "rgba(226,72,59,0.4)" : "rgba(255,255,255,0.15)"}`,
     background: danger ? "rgba(226,72,59,0.12)" : "rgba(255,255,255,0.05)", color: danger ? "#fca5a5" : white(0.8),
   });
 
   const sectionTitle = (icon: React.ReactNode, title: string) => (
     <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0 8px" }}>
-      {icon}<span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>{title}</span>
+      {icon}<span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{title}</span>
     </div>
   );
 
@@ -94,39 +94,39 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", borderBottom: `1px solid ${white(0.08)}`, position: "sticky", top: 0, background: "#0d1117" }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: "#fff", flex: 1 }}>{t("Settings")}</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", flex: 1 }}>{t("Settings")}</span>
           <button onClick={onClose} style={{ background: "transparent", border: 0, color: white(0.6), cursor: "pointer", padding: 4 }}><X size={18} /></button>
         </div>
 
         <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 22 }}>
           {/* Language */}
           <div>
-            {sectionTitle(<Languages size={15} color="#B98BE8" />, t("Language"))}
-            <p style={{ fontSize: 11, color: white(0.4), margin: "0 0 10px", lineHeight: 1.5 }}>
+            {sectionTitle(<Languages size={15} color="#B8A3D0" />, t("Language"))}
+            <p style={{ fontSize: 12, color: white(0.4), margin: "0 0 10px", lineHeight: 1.5 }}>
               {t("Choose the language of the interface. Data such as addresses, material names and source titles stay as published.")}
             </p>
             <div style={{ display: "flex", gap: 8 }}>
               {LANGS.map((l) => (
                 <button key={l.id} onClick={() => setLang(l.id)} aria-pressed={lang === l.id}
-                  style={{ ...btn(), ...(lang === l.id ? { background: "rgba(139,92,246,0.18)", borderColor: "rgba(139,92,246,0.6)", color: "#fff" } : {}) }}>
+                  style={{ ...btn(), ...(lang === l.id ? { background: "rgba(167,141,197,0.18)", borderColor: "rgba(167,141,197,0.6)", color: "#fff" } : {}) }}>
                   {lang === l.id && <Check size={13} />} {l.label}
                 </button>
               ))}
             </div>
             {lang === "sv" && (
-              <p style={{ fontSize: 10.5, color: white(0.35), margin: "8px 0 0" }}>{t("Some pages are not translated yet and still show English.")}</p>
+              <p style={{ fontSize: 11.5, color: white(0.35), margin: "8px 0 0" }}>{t("Some pages are not translated yet and still show English.")}</p>
             )}
           </div>
 
           {/* Connections & status */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {sectionTitle(<Plug size={15} color="#4ECDC4" />, t("Connections & status"))}
-              <button onClick={loadStatus} style={{ marginLeft: "auto", background: "transparent", border: 0, color: white(0.4), cursor: "pointer", fontSize: 11 }}>
+              {sectionTitle(<Plug size={15} color="#8B6EAD" />, t("Connections & status"))}
+              <button onClick={loadStatus} style={{ marginLeft: "auto", background: "transparent", border: 0, color: white(0.4), cursor: "pointer", fontSize: 12 }}>
                 {loading ? <Loader2 size={13} className="animate-spin" /> : t("Refresh")}
               </button>
             </div>
-            <p style={{ fontSize: 11, color: white(0.4), margin: "0 0 6px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: white(0.4), margin: "0 0 6px", lineHeight: 1.5 }}>
               {t("Optional services — each feature degrades gracefully when its service is offline.")}
             </p>
             {status ? (
@@ -144,7 +144,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           {/* Data & session */}
           <div>
             {sectionTitle(<Database size={15} color="#E8880C" />, t("Data & session"))}
-            <p style={{ fontSize: 11, color: white(0.4), margin: "0 0 10px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: white(0.4), margin: "0 0 10px", lineHeight: 1.5 }}>
               {t("All project data lives in this browser session. Clear parts of it, or reset everything.")}
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

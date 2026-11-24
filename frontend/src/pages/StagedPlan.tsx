@@ -28,7 +28,7 @@ import {
 } from "../utils/stagedPlan";
 
 const white = (o: number) => `rgba(255,255,255,${o})`;
-const ACCENT = "#B98BE8";
+const ACCENT = "#B8A3D0";
 const PRICE_FUTURES = [
   { key: "low", label: "Prices ×0.5", mult: 0.5 },
   { key: "base", label: "Today's prices", mult: 1 },
@@ -41,7 +41,7 @@ const countryOf = (c: string | null | undefined): Country => (c === "United King
 const assumption = (c: Country, key: string) => ASSUMPTIONS[c].find((a) => a.key === key)?.value ?? null;
 
 const input = { background: "#0d1117", color: "#fff", border: `1px solid ${white(0.15)}`, borderRadius: 7, padding: "5px 8px", fontSize: 13 } as const;
-const btn = (primary = false) => ({ padding: "6px 12px", borderRadius: 8, border: `1px solid ${primary ? ACCENT : white(0.18)}`, background: primary ? `${ACCENT}22` : "transparent", color: primary ? "#E5D4FA" : white(0.85), fontSize: 12.5, fontWeight: 600, cursor: "pointer" }) as const;
+const btn = (primary = false) => ({ padding: "6px 12px", borderRadius: 8, border: `1px solid ${primary ? ACCENT : white(0.18)}`, background: primary ? `${ACCENT}22` : "transparent", color: primary ? "#E6DFEF" : white(0.85), fontSize: 12.5, fontWeight: 600, cursor: "pointer" }) as const;
 
 /** `embedded`: shown as view 4.5 inside Step 4 (no page title of its own). */
 export default function StagedPlan({ embedded = false }: { embedded?: boolean } = {}) {
@@ -216,7 +216,7 @@ export default function StagedPlan({ embedded = false }: { embedded?: boolean } 
 
   const num = (v: string) => (v.trim() === "" ? null : Number(v.replace(",", ".")));
   const field = (label: string, value: number | null | string, on: (v: string) => void, w = 90, title?: string) => (
-    <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: white(0.6) }} title={title}>
+    <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 12, color: white(0.6) }} title={title}>
       {label}<input style={{ ...input, width: w }} type="number" value={value ?? ""} onChange={(e) => on(e.target.value)} />
     </label>
   );
@@ -227,7 +227,7 @@ export default function StagedPlan({ embedded = false }: { embedded?: boolean } 
         <p style={{ margin: 0, color: white(0.6), fontSize: 13 }}>{t("Spread the packages chosen above over the years within a budget. Enter the number of years and the budget; the optimiser decides which measure is done in which year and recalculates the timeline.")}</p>
       ) : (
       <div>
-        <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: ACCENT, fontWeight: 700 }}>{t("Renovation Planning · Step 4")}</div>
+        <div style={{ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", color: ACCENT, fontWeight: 600 }}>{t("Renovation Planning · Step 4")}</div>
         <h1 style={{ margin: "4px 0", fontSize: 24, color: "#fff" }}>{t("Staged plan")}</h1>
         <p style={{ margin: 0, color: white(0.6), fontSize: 13.5 }}>{t("Spread the packages chosen in Step 4 over the years within a budget. Enter the number of years and the budget; the optimiser decides which measure is done in which year and recalculates the timeline.")}</p>
       </div>
@@ -250,7 +250,7 @@ export default function StagedPlan({ embedded = false }: { embedded?: boolean } 
           {field(t("Cost growth (%/yr)"), settings.costGrowthPct, (v) => update({ costGrowthPct: Number(v) || 0 }), 70, t("Real growth of construction prices per year (above inflation)"))}
           {field(t("Max buildings per year"), settings.maxBuildingsPerYear, (v) => update({ maxBuildingsPerYear: v ? Math.max(1, Number(v)) : null }), 70, t("Contractor capacity / tenant disruption; empty = no limit"))}
         </div>
-        <p style={{ fontSize: 11.5, color: white(0.45), margin: "10px 0 0" }}>
+        <p style={{ fontSize: 12, color: white(0.45), margin: "10px 0 0" }}>
           {t("Rules: the budget is released evenly over the years and unspent money carries over; windows go with or after the walls of the same building. The optimiser first reaches the ticked climate milestones, then fits as much of the plan as the budget allows, then picks the timing that saves the most money over {n} years.", { n: STUDY_PERIOD_YR })}
           {skipped.length > 0 && <> {t("Left out (no baseline result): {b}.", { b: skipped.join(", ") })}</>}
         </p>
@@ -275,7 +275,7 @@ export default function StagedPlan({ embedded = false }: { embedded?: boolean } 
               </div>
             );
           })}
-          <p style={{ fontSize: 11.5, color: white(0.45), margin: "4px 0 0" }}>
+          <p style={{ fontSize: 12, color: white(0.45), margin: "4px 0 0" }}>
             {t("The city goal is scored per building against its own simulated baseline. The EU levels follow the Energy Performance of Buildings Directive (residential stock −16 % by 2030 and −20 to 22 % by 2035 vs 2020; today's level stands in for 2020). No 2050 level is set by default — Sweden has not yet set its zero-emission threshold; enter your own.")}
           </p>
         </div>
@@ -285,7 +285,7 @@ export default function StagedPlan({ embedded = false }: { embedded?: boolean } 
         {plan && <span>{t("Fits in the budget")}: <b style={{ color: unscheduled.length ? "#F87171" : "#2FB477" }}>{allSteps.length - doneSteps.length - unscheduled.length} / {allSteps.length - doneSteps.length}</b> {t("measures")} ({money(plan.covered)} {t("of")} {money(planCost)})</span>}
         {busy && <span style={{ color: white(0.5) }}>{t("Optimising the timeline…")}</span>}
         {err && <span style={{ color: "#F87171" }}>{err}</span>}
-        {plan && !busy && <span style={{ fontSize: 11.5, color: white(0.4) }}>{t("solved in {s} s", { s: plan.seconds })}</span>}
+        {plan && !busy && <span style={{ fontSize: 12, color: white(0.4) }}>{t("solved in {s} s", { s: plan.seconds })}</span>}
         <span style={{ flex: 1 }} />
         <button style={btn()} disabled={!plan || busy} onClick={advanceYear}
           title={t("Record the steps planned for {y} as done, move the plan on one year (budget reduced by what was spent) and re-optimise the rest", { y: settings.startYear })}>
@@ -301,7 +301,7 @@ export default function StagedPlan({ embedded = false }: { embedded?: boolean } 
       )}
 
       {regret && (
-        <PanelShell icon={<Scale size={16} />} iconColor="#4ECDC4" title={t("Which timing holds up if energy prices change? (minimax regret)")} defaultOpen={false}
+        <PanelShell icon={<Scale size={16} />} iconColor="#8B6EAD" title={t("Which timing holds up if energy prices change? (minimax regret)")} defaultOpen={false}
           subtitle={t("Most robust: optimised for {s}", { s: t(PRICE_FUTURES.find((f) => f.key === regret.pick)!.label) })}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, color: white(0.85) }}>
             <thead><tr style={{ color: white(0.5), textAlign: "right" }}>
@@ -311,16 +311,16 @@ export default function StagedPlan({ embedded = false }: { embedded?: boolean } 
             </tr></thead>
             <tbody>
               {regret.rows.map((r) => (
-                <tr key={r.key} style={{ borderTop: `1px solid ${white(0.06)}`, background: regret.pick === r.key ? "rgba(185,139,232,0.10)" : undefined }}>
+                <tr key={r.key} style={{ borderTop: `1px solid ${white(0.06)}`, background: regret.pick === r.key ? "rgba(184,163,208,0.10)" : undefined }}>
                   <td style={{ padding: 6 }}>{t(r.label)}{regret.pick === r.key && <span style={{ color: ACCENT }}> ★ {t("minimax regret")}</span>}{(settings.scenario === r.key) && <b> ◄ {t("shown")}</b>}</td>
                   {r.v.map((v, i) => <td key={i} style={{ padding: 6, textAlign: "right", color: v < 0 ? "#FCA5A5" : undefined }}>{money(v)}</td>)}
-                  <td style={{ padding: 6, textAlign: "right", fontWeight: 700 }}>{money(r.maxRegret)}</td>
+                  <td style={{ padding: 6, textAlign: "right", fontWeight: 600 }}>{money(r.maxRegret)}</td>
                   <td style={{ padding: 6 }}><button style={btn()} disabled={settings.scenario === r.key} onClick={() => update({ scenario: r.key })}>{t("Show this plan")}</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p style={{ fontSize: 11.5, color: white(0.45), margin: "8px 0 0" }}>{t("The same measures and milestones, timed for each price future. Value = present value over {n} years of what remains to be done (bills saved minus investment and replacements). Regret = how much less a timing gives than the best timing for the future that actually happens.", { n: STUDY_PERIOD_YR })}</p>
+          <p style={{ fontSize: 12, color: white(0.45), margin: "8px 0 0" }}>{t("The same measures and milestones, timed for each price future. Value = present value over {n} years of what remains to be done (bills saved minus investment and replacements). Regret = how much less a timing gives than the best timing for the future that actually happens.", { n: STUDY_PERIOD_YR })}</p>
         </PanelShell>
       )}
 
@@ -369,7 +369,7 @@ export default function StagedPlan({ embedded = false }: { embedded?: boolean } 
                 ))}
               </tbody>
             </table>
-            <div style={{ fontSize: 11, color: white(0.4), padding: 6 }}>{t("Hover a chip for the measure and its price.")}</div>
+            <div style={{ fontSize: 12, color: white(0.4), padding: 6 }}>{t("Hover a chip for the measure and its price.")}</div>
           </div>
         </div>
       )}
@@ -380,7 +380,7 @@ export default function StagedPlan({ embedded = false }: { embedded?: boolean } 
 
 const SHORT: Record<string, string> = { Walls: "W", Windows: "Wi", Roof: "R", Floor: "F", Doors: "D", Balcony: "B" };
 function Chip({ s, color, title, onClick }: { s: StageStep; color: string; title: string; onClick?: () => void }) {
-  return <span title={title} onClick={onClick} style={{ display: "inline-block", minWidth: 18, padding: "0 4px", margin: 1, borderRadius: 4, background: color, color: "#fff", fontSize: 10.5, fontWeight: 700, cursor: onClick ? "pointer" : "default" }}>{SHORT[s.part] ?? s.part.slice(0, 2)}</span>;
+  return <span title={title} onClick={onClick} style={{ display: "inline-block", minWidth: 18, padding: "0 4px", margin: 1, borderRadius: 4, background: color, color: "#fff", fontSize: 11.5, fontWeight: 600, cursor: onClick ? "pointer" : "default" }}>{SHORT[s.part] ?? s.part.slice(0, 2)}</span>;
 }
 
 /* spend per year (bars) vs budget released per year (dashed), CO₂ per year (line) */
@@ -397,20 +397,20 @@ function StageChart({ rows, years, money }: { rows: ReturnType<typeof stageTimel
     <div style={{ borderRadius: 12, border: `1px solid ${white(0.08)}`, background: white(0.02), padding: 8 }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 170, display: "block" }} role="img" aria-label={t("Spend and CO₂ per year")}>
         <line x1={L} y1={T + ih} x2={L + iw} y2={T + ih} stroke={white(0.2)} />
-        <text x={4} y={T + 9} fontSize="10" fill={ACCENT}>{money(maxS)}</text>
-        <text x={W - R + 4} y={T + 9} fontSize="10" fill="#F87171">{Math.round(maxC)} t CO₂</text>
+        <text x={4} y={T + 9} fontSize="11" fill={ACCENT}>{money(maxS)}</text>
+        <text x={W - R + 4} y={T + 9} fontSize="11" fill="#F87171">{Math.round(maxC)} t CO₂</text>
         {plan.map((r, i) => (
           <g key={r.year}>
             <rect x={L + i * bw + bw * 0.15} y={yS(r.spend)} width={bw * 0.7} height={T + ih - yS(r.spend)} fill={ACCENT} opacity={0.85}><title>{`${r.year}: ${money(r.spend)}`}</title></rect>
-            <text x={L + i * bw + bw / 2} y={H - 6} fontSize="10" textAnchor="middle" fill={white(0.55)}>{r.year}</text>
+            <text x={L + i * bw + bw / 2} y={H - 6} fontSize="11" textAnchor="middle" fill={white(0.55)}>{r.year}</text>
           </g>
         ))}
-        <line x1={L} y1={yS(perYear)} x2={L + iw} y2={yS(perYear)} stroke="#E5D4FA" strokeDasharray="5 4" opacity={0.7} />
+        <line x1={L} y1={yS(perYear)} x2={L + iw} y2={yS(perYear)} stroke="#E6DFEF" strokeDasharray="5 4" opacity={0.7} />
         <polyline fill="none" stroke="#F87171" strokeWidth={2} points={rows.map((r, i) => `${L + Math.min(i, years) * bw},${yC(r.co2Kg / 1000)}`).join(" ")} />
       </svg>
-      <div style={{ display: "flex", gap: 14, fontSize: 11, color: white(0.55), padding: "0 4px" }}>
+      <div style={{ display: "flex", gap: 14, fontSize: 12, color: white(0.55), padding: "0 4px" }}>
         <span><span style={{ display: "inline-block", width: 10, height: 10, background: ACCENT, marginRight: 4 }} />{t("spend per year")}</span>
-        <span><span style={{ display: "inline-block", width: 14, borderTop: "2px dashed #E5D4FA", verticalAlign: "middle", marginRight: 4 }} />{t("budget released per year")}</span>
+        <span><span style={{ display: "inline-block", width: 14, borderTop: "2px dashed #E6DFEF", verticalAlign: "middle", marginRight: 4 }} />{t("budget released per year")}</span>
         <span><span style={{ display: "inline-block", width: 14, borderTop: "2px solid #F87171", verticalAlign: "middle", marginRight: 4 }} />{t("CO₂ per year (right axis)")}</span>
       </div>
     </div>

@@ -80,7 +80,7 @@ function FitToPoints({ points }: { points: BoplatsPoint[] }) {
 
 const chipBase: React.CSSProperties = {
   display: "flex", alignItems: "center", gap: 6, padding: "3px 9px", borderRadius: 99,
-  fontSize: 11, cursor: "pointer", userSelect: "none", transition: "opacity 0.15s",
+  fontSize: 12, cursor: "pointer", userSelect: "none", transition: "opacity 0.15s",
   background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
 };
 
@@ -139,17 +139,17 @@ export default function BoplatsRentalMap() {
     <div style={{ marginBottom: 16 }}>
       {/* Mode toggle + coverage */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>Colour by</span>
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>Colour by</span>
         {([["class", "Energy class"], ["rent", "Rent (SEK/m²)"]] as [Mode, string][]).map(([m, label]) => (
           <button key={m} onClick={() => setMode(m)} style={{
-            padding: "4px 11px", borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer",
-            background: mode === m ? "rgba(78,205,196,0.18)" : "rgba(255,255,255,0.06)",
+            padding: "4px 11px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer",
+            background: mode === m ? "rgba(139,110,173,0.18)" : "rgba(255,255,255,0.06)",
             border: `1px solid ${mode === m ? "#4ECDC460" : "rgba(255,255,255,0.12)"}`,
-            color: mode === m ? "#4ECDC4" : "rgba(255,255,255,0.70)",
+            color: mode === m ? "#8B6EAD" : "rgba(255,255,255,0.70)",
           }}>{label}</button>
         ))}
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.40)" }}>
+        <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.40)" }}>
           {shown.length.toLocaleString("sv-SE")} buildings · {shownListings.toLocaleString("sv-SE")} listings shown
         </span>
       </div>
@@ -230,7 +230,7 @@ export default function BoplatsRentalMap() {
         </MapContainer>
       </div>
 
-      <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.38)", margin: "8px 0 0", lineHeight: 1.6 }}>
+      <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.38)", margin: "8px 0 0", lineHeight: 1.6 }}>
         One marker per building, sized by listing count. {data.matched_listings.toLocaleString("sv-SE")} of{" "}
         {data.total_listings.toLocaleString("sv-SE")} listings are placed on{" "}
         {data.buildings_with_listings.toLocaleString("sv-SE")} buildings; the remaining{" "}

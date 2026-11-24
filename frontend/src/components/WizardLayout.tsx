@@ -7,51 +7,8 @@ import { countryCodeFromName } from "../config/countryNav";
 import TopBar from "./TopBar";
 import ThemeToggle from "./ThemeToggle";
 import { useT } from "../i18n";
-
-// ── Confetti ─────────────────────────────────────────────────────────────────
-// Tiny self-contained canvas burst (no dependency) fired once when the user
-// lands on the final step. Cleans itself up after ~2.6 s.
-function fireConfetti() {
-  if (typeof document === "undefined") return;
-  const canvas = document.createElement("canvas");
-  canvas.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9999";
-  document.body.appendChild(canvas);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) { canvas.remove(); return; }
-  const dpr = window.devicePixelRatio || 1;
-  const W = (canvas.width = window.innerWidth * dpr);
-  const H = (canvas.height = window.innerHeight * dpr);
-  const COLORS = ["#2FB477", "#4ECDC4", "var(--brand-deep)", "#E8880C", "#E2483B", "#4A90E2", "#B98BE8"];
-  const parts = Array.from({ length: 170 }, () => ({
-    x: W / 2 + (Math.random() - 0.5) * W * 0.35,
-    y: H * 0.32 + (Math.random() - 0.5) * 60 * dpr,
-    vx: (Math.random() - 0.5) * 15 * dpr,
-    vy: (Math.random() * -9 - 5) * dpr,
-    size: (5 + Math.random() * 6) * dpr,
-    rot: Math.random() * Math.PI,
-    vr: (Math.random() - 0.5) * 0.35,
-    color: COLORS[(Math.random() * COLORS.length) | 0]!,
-  }));
-  const start = performance.now();
-  const g = 0.34 * dpr;
-  function frame(now: number) {
-    const t = now - start;
-    ctx!.clearRect(0, 0, W, H);
-    for (const p of parts) {
-      p.vy += g; p.x += p.vx; p.y += p.vy; p.vx *= 0.99; p.rot += p.vr;
-      ctx!.save();
-      ctx!.translate(p.x, p.y);
-      ctx!.rotate(p.rot);
-      ctx!.globalAlpha = Math.max(0, 1 - t / 2600);
-      ctx!.fillStyle = p.color;
-      ctx!.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.62);
-      ctx!.restore();
-    }
-    if (t < 2600) requestAnimationFrame(frame);
-    else canvas.remove();
-  }
-  requestAnimationFrame(frame);
-}
+import { Loader2, Save } from "lucide-react";
+import { saveProject } from "../utils/projectSave";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
@@ -106,7 +63,7 @@ function SideNavItem({
                   : "text-white/20 cursor-not-allowed opacity-60"
             } ${className ?? ""}`}>
       <Icon d={iconD} size={19} />
-      <span className="text-[9px] tracking-wide font-medium leading-none text-center px-0.5">{label}</span>
+      <span className="text-[11px] tracking-wide font-medium leading-none text-center px-0.5">{label}</span>
     </button>
   );
 }
@@ -132,9 +89,9 @@ function ContextRow({ icon, label, value, valueColor }: {
     <div className="flex items-start justify-between gap-2">
       <div className="flex items-center gap-1.5 shrink-0">
         <span style={{ color: "rgba(255,255,255,0.30)" }}><Icon d={icon} size={12} /></span>
-        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>{label}</span>
+        <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>{label}</span>
       </div>
-      <span className="text-[11px] font-semibold text-right leading-snug"
+      <span className="text-[12px] font-semibold text-right leading-snug"
             style={{ color: valueColor ?? "rgba(255,255,255,0.85)" }}>
         {value}
       </span>
@@ -146,8 +103,8 @@ function ProgressRow({ label, pct, color }: { label: string; pct: number; color:
   return (
     <div>
       <div className="flex justify-between mb-1">
-        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>{label}</span>
-        <span className="text-[11px] font-bold" style={{ color }}>{pct}%</span>
+        <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>{label}</span>
+        <span className="text-[12px] font-semibold" style={{ color }}>{pct}%</span>
       </div>
       <div className="h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
@@ -169,9 +126,9 @@ function DataNeededRow({ label, status }: {
          style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
       <div className="flex items-center gap-2">
         <span style={{ color: "var(--brand-deep)" }}><Icon d={iconD} size={12} /></span>
-        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.65)" }}>{label}</span>
+        <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.65)" }}>{label}</span>
       </div>
-      <span className="text-[10px] font-semibold" style={{ color }}>{text}</span>
+      <span className="text-[11px] font-semibold" style={{ color }}>{text}</span>
     </div>
   );
 }
@@ -209,19 +166,23 @@ export default function WizardLayout() {
     navigate(path);
   }
 
-  // Arrival splash on the final step (Report): a full-screen message appears with
-  // a confetti burst, then fades out to reveal the report behind it.
-  //   "in"   → shown (text animates in, confetti fires)
+  // Arrival on the final step (Report): a short, quiet "Generating report…" screen
+  // (spinner + one line), then it fades out to reveal the report behind it.
+  // (Was a confetti burst + "You've reached the final step 🎉"; replaced
+  // 2026-11-24 at the user's request for something more professional.)
+  //   "in"   → shown
   //   "out"  → fading away (report becomes visible behind)
   //   "gone" → removed
   const [splash, setSplash] = useState<"in" | "out" | "gone">("gone");
+  // Final step's "Save and finish".
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
   useEffect(() => {
     if (!isLastStep) { setSplash("gone"); return; }
     setSplash("in");
-    const tC = window.setTimeout(fireConfetti, 350);
-    const tOut = window.setTimeout(() => setSplash("out"), 2100);
-    const tGone = window.setTimeout(() => setSplash("gone"), 3000);
-    return () => { window.clearTimeout(tC); window.clearTimeout(tOut); window.clearTimeout(tGone); };
+    const tOut = window.setTimeout(() => setSplash("out"), 1400);
+    const tGone = window.setTimeout(() => setSplash("gone"), 1900);
+    return () => { window.clearTimeout(tOut); window.clearTimeout(tGone); };
   }, [isLastStep]);
 
   const hasBuilding = (project.buildingPoints?.length ?? 0) > 0 || !!project.bboxStats;
@@ -274,23 +235,20 @@ export default function WizardLayout() {
           position: "fixed", inset: 0, zIndex: 9998,
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           textAlign: "center", padding: 24,
-          background: "radial-gradient(circle at 50% 42%, rgba(24,20,44,0.90) 0%, rgba(8,11,18,0.95) 70%)",
+          background: "rgba(10,13,20,0.96)",
           opacity: splash === "out" ? 0 : 1,
-          transition: "opacity 0.85s ease",
+          transition: "opacity 0.45s ease",
           pointerEvents: splash === "out" ? "none" : "auto",
         }}>
-          <div style={{ animation: "splashIn 0.7s cubic-bezier(0.16,1,0.3,1) both" }}>
-            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, textTransform: "uppercase", color: "#B98BE8", marginBottom: 16 }}>
-              {t("Step {n} · {label}", { n: activeStep.number, label: t(activeStep.label) })}
+          <div role="status" aria-live="polite" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+            <Loader2 size={28} className="animate-spin" color="rgba(255,255,255,0.7)" />
+            <div style={{ fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
+              {t("Generating report…")}
             </div>
-            <div style={{ fontSize: 46, fontWeight: 900, color: "#fff", lineHeight: 1.1, marginBottom: 14 }}>
-              {t("You've reached the final step 🎉")}
-            </div>
-            <div style={{ fontSize: 16, color: "rgba(255,255,255,0.62)", maxWidth: 540, lineHeight: 1.6, margin: "0 auto" }}>
-              {t("Your renovation plan is ready — review the report, download it, and share.")}
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>
+              {t("Compiling the baseline, renovation packages and recommendations")}
             </div>
           </div>
-          <style>{`@keyframes splashIn{from{opacity:0;transform:translateY(18px) scale(0.96)}to{opacity:1;transform:none}}`}</style>
         </div>
       )}
 
@@ -299,7 +257,7 @@ export default function WizardLayout() {
              style={{ background: "#0a0d14", borderRight: "1px solid rgba(255,255,255,0.07)" }}>
         {/* Logo */}
         <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 shadow-lg shrink-0 cursor-pointer theme-preserve"
-             style={{ background: "linear-gradient(135deg,var(--brand-deep),var(--brand-dark))" }}
+             style={{ background: "var(--brand-deep)" }}
              onClick={() => navigate("/")}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         </div>
@@ -367,14 +325,42 @@ export default function WizardLayout() {
                   <span style={{ color: "#E2483B", fontSize: 15, lineHeight: 1 }}>⚠</span> {nextError}
                 </div>
               ) : (
-                <div style={{ maxWidth: 620, fontSize: 11.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.45, textAlign: "center" }}>
-                  <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginRight: 7 }}>{t("Next")}</span>
-                  <b style={{ color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>{wizardNav.nextInfo?.label ?? nextStepLabel}</b>
+                <div style={{ maxWidth: 620, fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.45, textAlign: "center" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginRight: 7 }}>{t("Next")}</span>
+                  <b style={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>{wizardNav.nextInfo?.label ?? nextStepLabel}</b>
                   {(wizardNav.nextInfo?.hint ?? nextHint) ? <span style={{ color: "rgba(255,255,255,0.42)" }}> — {wizardNav.nextInfo?.hint ?? nextHint}</span> : null}
                 </div>
               )}
             </div>
-          ) : <div style={{ flex: 1 }} />}
+          ) : (
+            <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", padding: "0 16px",
+              fontSize: 12, color: finishError ? "#fca5a5" : "rgba(255,255,255,0.45)", textAlign: "center" }}>
+              {finishError
+                ? <>⚠ {t("Could not save: {error}", { error: finishError })}</>
+                : t("Saving keeps the project in My projects, so you can open and adjust it later.")}
+            </div>
+          )}
+          {/* Final step (Report): nothing comes after it, so the main button saves
+              the project and closes it to My projects instead of Continue. */}
+          {isLastStep && (
+            <button
+              onClick={async () => {
+                setFinishing(true); setFinishError(null);
+                try { await saveProject(); navigate("/projects"); }
+                catch (e) { setFinishError(e instanceof Error ? e.message : String(e)); }
+                finally { setFinishing(false); }
+              }}
+              disabled={finishing}
+              className="no-hover-shadow theme-preserve"
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "8px 24px",
+                borderRadius: 12, fontSize: 13, fontWeight: 600, color: "#fff",
+                background: "var(--brand-deep)", border: 0, cursor: finishing ? "wait" : "pointer",
+              }}>
+              {finishing ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+              {t("Save and finish")}
+            </button>
+          )}
           {/* No Continue on the final step (Report) — nothing comes after it. */}
           {!isLastStep && (
             <button
@@ -384,9 +370,9 @@ export default function WizardLayout() {
               className="no-hover-shadow theme-preserve"
               style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "8px 24px",
-                borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#fff",
-                background: canNext ? "linear-gradient(135deg,var(--brand-deep),var(--brand-dark))" : "rgba(255,255,255,0.10)",
-                boxShadow: canNext ? "0 4px 14px rgba(var(--brand-rgb),0.45)" : "none", border: 0,
+                borderRadius: 12, fontSize: 13, fontWeight: 600, color: "#fff",
+                background: canNext ? "var(--brand-deep)" : "rgba(255,255,255,0.10)",
+                boxShadow: canNext ? "none" : "none", border: 0,
                 cursor: canNext ? "pointer" : "not-allowed",
                 opacity: canNext ? 1 : 0.55, transition: "all 0.15s",
               }}>

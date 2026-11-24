@@ -38,14 +38,14 @@ function pct(x: number) { return `${Math.round(x)}%`; }
 function ScoreBar({ k, s }: { k: CriterionKey; s: SubScore }) {
   const t = useT();
   if (!s.available) {
-    return <span className="text-[10px] text-white/25" title={`${t(CRITERION_LABELS[k])}: ${t(s.note)}`}>—</span>;
+    return <span className="text-[11px] text-white/25" title={`${t(CRITERION_LABELS[k])}: ${t(s.note)}`}>—</span>;
   }
   return (
     <div className="flex items-center gap-1.5" title={`${t(CRITERION_LABELS[k])}: ${Math.round(s.value)} (${t(s.note)})`}>
       <div className="h-1.5 w-10 rounded-full bg-white/10 overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${s.value}%`, background: CRITERION_COLORS[k] }} />
       </div>
-      <span className="text-[10px] text-white/45 tabular-nums w-5 text-right">{Math.round(s.value)}</span>
+      <span className="text-[11px] text-white/45 tabular-nums w-5 text-right">{Math.round(s.value)}</span>
     </div>
   );
 }
@@ -58,7 +58,7 @@ function FacadeCell({ s }: { s: SubScore }) {
   return (
     <div className="space-y-0.5">
       <ScoreBar k="F" s={s} />
-      <div className="text-[9px] leading-tight text-white/40 max-w-[130px]" title={t(s.note)}>{t(s.note)}</div>
+      <div className="text-[11px] leading-tight text-white/40 max-w-[130px]" title={t(s.note)}>{t(s.note)}</div>
     </div>
   );
 }
@@ -158,13 +158,13 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
     // the "Renovation Prioritisation" wizard section, which already supplies the
     // title, the number and the collapse control.
     <div className="space-y-2.5">
-      <p className="text-[11px] text-white/40 m-0">
+      <p className="text-[12px] text-white/40 m-0">
         {items.length === 1
           ? t("Ranks {n} building by a weighted score of energy, façade condition, and building characteristics — which to renovate first.", { n: items.length })
           : t("Ranks {n} buildings by a weighted score of energy, façade condition, and building characteristics — which to renovate first.", { n: items.length })}
       </p>
       {/* Live link to façade detection — F updates automatically as photos are analysed */}
-      <div className="flex items-center gap-2 text-[10px] bg-black/20 border border-white/8 rounded-md px-2.5 py-1.5">
+      <div className="flex items-center gap-2 text-[11px] bg-black/20 border border-white/8 rounded-md px-2.5 py-1.5">
         <ScanSearch className="w-3.5 h-3.5 text-violet-300 shrink-0" />
         <span className="text-white/45">
           {t("Façade condition (F) is scored only for inspected buildings —")}
@@ -178,7 +178,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
       </div>
 
       {/* Controls */}
-      <div className="flex items-center gap-3 flex-wrap text-[11px]">
+      <div className="flex items-center gap-3 flex-wrap text-[12px]">
         <label className="flex items-center gap-1.5 text-white/45">
           {t("Flag top")}
           <input type="number" min={1} max={items.length} value={topN}
@@ -191,7 +191,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
             className="w-14 bg-[#0d1117] border border-white/12 rounded px-2 py-0.5 text-white/80 text-center" />
           {t("priorities")}
         </label>
-        <span className="text-[10px] text-amber-300/90 font-medium">
+        <span className="text-[11px] text-amber-300/90 font-medium">
           {topN === 1
             ? t("Step 3 baseline will run this {n} building by default", { n: topN })
             : t("Step 3 baseline will run these {n} buildings by default", { n: topN })}
@@ -209,15 +209,15 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
           style={{ background: `${CRITERION_COLORS[helpCrit as CriterionKey]}14`,
                    border: `1px solid ${CRITERION_COLORS[helpCrit as CriterionKey]}44` }}>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[12px] font-bold" style={{ color: CRITERION_COLORS[helpCrit as CriterionKey], flex: 1 }}>
+            <span className="text-[12px] font-semibold" style={{ color: CRITERION_COLORS[helpCrit as CriterionKey], flex: 1 }}>
               {t(CRITERION_LABELS[helpCrit as CriterionKey])}
             </span>
             <button onClick={() => setHelpCrit(null)} title={t("Close")}
               className="text-white/45 hover:text-white/80"
               style={{ background: "transparent", border: 0, cursor: "pointer", padding: 0, lineHeight: 1, fontSize: 13 }}>×</button>
           </div>
-          <div className="text-[11px] text-white/70 leading-relaxed">{t(CRITERION_HELP[helpCrit]!.what)}</div>
-          <div className="text-[10.5px] text-white/45 leading-relaxed mt-1">
+          <div className="text-[12px] text-white/70 leading-relaxed">{t(CRITERION_HELP[helpCrit]!.what)}</div>
+          <div className="text-[11.5px] text-white/45 leading-relaxed mt-1">
             <b className="text-white/60">{t("Based on:")}</b> {t(CRITERION_HELP[helpCrit]!.from)}
           </div>
         </div>
@@ -225,7 +225,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
 
       {/* Ranked table */}
       <div className="overflow-x-auto rounded-lg border border-white/8">
-        <table className="w-full text-[11px] border-collapse">
+        <table className="w-full text-[12px] border-collapse">
           <thead>
             <tr className="bg-white/[0.03] text-white/40 text-left">
               <th className="px-2 py-2 font-semibold w-8">#</th>
@@ -261,7 +261,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
                     <div className="h-2 flex-1 min-w-[40px] rounded-full bg-white/10 overflow-hidden">
                       <div className="h-full rounded-full" style={{ width: `${r.P}%`, background: scoreColor(r.P) }} />
                     </div>
-                    <span className="font-bold tabular-nums w-7 text-right" style={{ color: scoreColor(r.P) }}>{Math.round(r.P)}</span>
+                    <span className="font-semibold tabular-nums w-7 text-right" style={{ color: scoreColor(r.P) }}>{Math.round(r.P)}</span>
                   </div>
                 </td>
                 {CRITS.map(k => (
@@ -287,7 +287,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
         <div className="rounded-lg border border-white/8 bg-black/20 overflow-hidden">
           <button
             onClick={() => setShowRemaining(v => !v)}
-            className="w-full flex items-center justify-between px-3 py-2 text-left text-[10px] font-medium text-white/60 hover:text-white hover:bg-white/[0.03] transition"
+            className="w-full flex items-center justify-between px-3 py-2 text-left text-[11px] font-medium text-white/60 hover:text-white hover:bg-white/[0.03] transition"
           >
             <span>
               {remainingRanked.length === 1
@@ -298,7 +298,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
           </button>
           {showRemaining && (
             <div className="border-t border-white/8">
-              <table className="w-full text-[11px] border-collapse">
+              <table className="w-full text-[12px] border-collapse">
                 <tbody>
                   {remainingRanked.map((r, i) => (
                     <tr key={r.key} className="border-t border-white/6 hover:bg-white/[0.03] transition">
@@ -309,7 +309,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
                           <div className="h-2 flex-1 min-w-[40px] rounded-full bg-white/10 overflow-hidden">
                             <div className="h-full rounded-full" style={{ width: `${r.P}%`, background: scoreColor(r.P) }} />
                           </div>
-                          <span className="font-bold tabular-nums w-7 text-right" style={{ color: scoreColor(r.P) }}>{Math.round(r.P)}</span>
+                          <span className="font-semibold tabular-nums w-7 text-right" style={{ color: scoreColor(r.P) }}>{Math.round(r.P)}</span>
                         </div>
                       </td>
                     </tr>
@@ -325,7 +325,7 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
       <div className="space-y-2.5">
         <button
           onClick={() => setWeightsOpen(v => !v)}
-          className="flex w-full items-center justify-between rounded-lg border border-white/8 bg-black/20 px-3 py-2 text-left text-[11px] font-semibold text-white/60 hover:text-white/80 transition"
+          className="flex w-full items-center justify-between rounded-lg border border-white/8 bg-black/20 px-3 py-2 text-left text-[12px] font-semibold text-white/60 hover:text-white/80 transition"
         >
           <span className="inline-flex items-center gap-1.5">
             <SlidersHorizontal className="w-3.5 h-3.5" /> {t("Change criterion weights")}
@@ -335,33 +335,33 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
         {weightsOpen && (
           <div className="space-y-2.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-semibold text-white/60">{t("Weighting method")}</span>
+              <span className="text-[12px] font-semibold text-white/60">{t("Weighting method")}</span>
               <div className="inline-flex rounded-md border border-white/10 bg-white/5 p-0.5">
                 <button
                   onClick={() => setWeightingMethod("ahp")}
-                  className={`px-2.5 py-1 rounded text-[10px] transition ${weightingMethod === "ahp" ? "bg-amber-600/85 text-white" : "text-white/55 hover:text-white hover:bg-white/10"}`}
+                  className={`px-2.5 py-1 rounded text-[11px] transition ${weightingMethod === "ahp" ? "bg-amber-600/85 text-white" : "text-white/55 hover:text-white hover:bg-white/10"}`}
                 >
                   {t("Pairwise expert judgment")}
                 </button>
                 <button
                   onClick={() => setWeightingMethod("direct")}
-                  className={`px-2.5 py-1 rounded text-[10px] transition ${weightingMethod === "direct" ? "bg-violet-600/85 text-white" : "text-white/55 hover:text-white hover:bg-white/10"}`}
+                  className={`px-2.5 py-1 rounded text-[11px] transition ${weightingMethod === "direct" ? "bg-violet-600/85 text-white" : "text-white/55 hover:text-white hover:bg-white/10"}`}
                 >
                   {t("Direct sliders")}
                 </button>
               </div>
-              <span className="text-[10px] text-white/35">
+              <span className="text-[11px] text-white/35">
                 {t("Analytical Hierarchy Process derives weights from pairwise judgements and checks consistency (CR). Direct sliders are faster manual percentages.")}
               </span>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-white/60"><Scale className="w-3.5 h-3.5" /> {t("Criterion weights")}</span>
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-white/60"><Scale className="w-3.5 h-3.5" /> {t("Criterion weights")}</span>
               {weightingMethod === "direct" && (
                 <div className="flex gap-1 flex-wrap ml-auto">
                   {Object.entries(WEIGHT_PRESETS).map(([name, w]) => (
                     <button key={name} onClick={() => setWeights(w)}
-                      className="px-2 py-0.5 rounded text-[10px] text-white/50 hover:text-white bg-white/5 hover:bg-white/12 transition">
+                      className="px-2 py-0.5 rounded text-[11px] text-white/50 hover:text-white bg-white/5 hover:bg-white/12 transition">
                       {t(name)}
                     </button>
                   ))}
@@ -373,24 +373,24 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
                 {CRITS.map(k => (
                   <div key={k} className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: CRITERION_COLORS[k] }} />
-                    <span className="text-[11px] text-white/55 w-[150px] shrink-0">{t(CRITERION_LABELS[k])}</span>
+                    <span className="text-[12px] text-white/55 w-[150px] shrink-0">{t(CRITERION_LABELS[k])}</span>
                     <input type="range" min={0} max={1} step={0.01} value={weights[k]}
                       onChange={e => setW(k, parseFloat(e.target.value))}
                       className="flex-1 accent-violet-500 h-1" />
-                    <span className="text-[11px] font-semibold text-white/70 w-9 text-right tabular-nums">{pct(norm[k] * 100)}</span>
+                    <span className="text-[12px] font-semibold text-white/70 w-9 text-right tabular-nums">{pct(norm[k] * 100)}</span>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="rounded-lg border border-white/8 bg-black/20">
                 <button onClick={() => setAhpOpen(o => !o)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-white/60 hover:text-white/80 transition">
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold text-white/60 hover:text-white/80 transition">
                   <Scale className="w-3.5 h-3.5" /> {t("Derive weights via pairwise expert judgment")}
                   {ahpOpen ? <ChevronUp className="w-3.5 h-3.5 ml-auto" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto" />}
                 </button>
                 {ahpOpen && (
                   <div className="px-2 pb-2 space-y-1.5">
-                    <p className="text-[10px] text-white/35 leading-relaxed flex gap-1.5">
+                    <p className="text-[11px] text-white/35 leading-relaxed flex gap-1.5">
                       <Info className="w-3 h-3 mt-0.5 shrink-0" />
                       {t("Slide toward the more important criterion in each pair.")}
                     </p>
@@ -404,12 +404,12 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
                         <div key={key} className="rounded-lg border border-white/10 bg-white/[0.02] px-2.5 py-2 space-y-1">
                           <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0 flex-1">
-                              <div className="text-[10px] leading-tight truncate" style={{ color: CRITERION_COLORS[a] }}>{t(CRITERION_LABELS[a])}</div>
-                              <div className="text-[9px] text-white/55">◀ {t("more")}</div>
+                              <div className="text-[11px] leading-tight truncate" style={{ color: CRITERION_COLORS[a] }}>{t(CRITERION_LABELS[a])}</div>
+                              <div className="text-[11px] text-white/55">◀ {t("more")}</div>
                             </div>
                             <div className="min-w-0 flex-1 text-right">
-                              <div className="text-[10px] leading-tight truncate" style={{ color: CRITERION_COLORS[b] }}>{t(CRITERION_LABELS[b])}</div>
-                              <div className="text-[9px] text-white/55">{t("more")} ▶</div>
+                              <div className="text-[11px] leading-tight truncate" style={{ color: CRITERION_COLORS[b] }}>{t(CRITERION_LABELS[b])}</div>
+                              <div className="text-[11px] text-white/55">{t("more")} ▶</div>
                             </div>
                           </div>
 
@@ -423,27 +423,27 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
                             className="w-full accent-amber-500 h-1"
                           />
 
-                          <div className="grid grid-cols-9 text-[9px] text-white/55 select-none leading-none">
+                          <div className="grid grid-cols-9 text-[11px] text-white/55 select-none leading-none">
                             {SAATY_TICKS.map((tick, idx) => (
                               <span key={`${key}-${idx}`} className={`text-center ${idx === 4 ? "text-white/80 font-semibold" : ""}`}>{tick}</span>
                             ))}
                           </div>
 
-                          <div className="text-[9px] text-white/50 text-center leading-none">
+                          <div className="text-[11px] text-white/50 text-center leading-none">
                             {pos === 0 ? t("Equal") : t("{x} toward {c}", { x: intensity, c: favored })}
                           </div>
                         </div>
                       );
                     })}
                     <div className="flex items-center gap-3 flex-wrap pt-1">
-                      <span className="text-[10px] text-white/40">
+                      <span className="text-[11px] text-white/40">
                         {t("Derived:")} {CRITS.map(k => `${k} ${pct(ahp.weights[k] * 100)}`).join(" · ")}
                       </span>
-                      <span className={`text-[10px] font-medium ${ahp.consistent ? "text-emerald-400" : "text-amber-400"}`}>
+                      <span className={`text-[11px] font-medium ${ahp.consistent ? "text-emerald-400" : "text-amber-400"}`}>
                         CR {ahp.CR.toFixed(2)} {ahp.consistent ? t("✓ consistent") : t("⚠ inconsistent (>0.10)")}
                       </span>
                       <button onClick={() => { setWeights(ahp.weights); setWeightingMethod("direct"); }}
-                        className="ml-auto px-2.5 py-1 rounded-md text-[10px] font-semibold bg-amber-600/80 hover:bg-amber-600 text-white transition">
+                        className="ml-auto px-2.5 py-1 rounded-md text-[11px] font-semibold bg-amber-600/80 hover:bg-amber-600 text-white transition">
                         {t("Copy pairwise weights to Direct sliders")}
                       </button>
                     </div>
@@ -451,14 +451,14 @@ export default function RetrofitPriorityPanel({ items }: { items: PriorityInput[
                 )}
               </div>
             )}
-            <div className="text-[10px] text-white/30">
+            <div className="text-[11px] text-white/30">
               {t("P = {e} energy + {f} façade + {c} characteristics", { e: pct(norm.E * 100), f: pct(norm.F * 100), c: pct(norm.C * 100) })}
             </div>
           </div>
         )}
       </div>
 
-      <p className="text-[10px] text-white/30 leading-relaxed">
+      <p className="text-[11px] text-white/30 leading-relaxed">
         {t("Scores are 0–100 (higher = higher priority). Energy performance, façade condition (from the AI inspection above; shown as “—” and excluded until a building is inspected), and building characteristics are the three scoring groups.")}
         <b className="text-white/45"> {t("Data coverage")}</b> {t("reflects how much real data backs each building — low coverage means fill gaps in the table or add façade photos. The flagged top {n} are the buildings to carry into Steps 3–4 first.", { n: topN })}
       </p>

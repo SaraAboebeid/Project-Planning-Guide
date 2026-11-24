@@ -30,12 +30,12 @@ export default function BEDataExplorer() {
       </div>
 
       <div style={{ borderRadius: 14, background: "rgba(255,255,255,0.03)", border: `1px solid ${white(0.08)}`, padding: "14px 18px" }}>
-        <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: white(0.35), textTransform: "uppercase", marginBottom: 8 }}>Datasets</div>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, color: white(0.35), textTransform: "uppercase", marginBottom: 8 }}>Datasets</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {SOURCES.map((s) => (
             <div key={s.name} style={{ display: "grid", gridTemplateColumns: "minmax(200px, 1fr) minmax(200px, 1fr) 2fr", gap: 12, fontSize: 12, padding: "6px 0", borderTop: `1px solid ${white(0.06)}` }}>
-              <span style={{ fontWeight: 700, color: "#fff" }}>{s.name}</span>
-              <span style={{ color: "#4ECDC4" }}>{s.role}</span>
+              <span style={{ fontWeight: 600, color: "#fff" }}>{s.name}</span>
+              <span style={{ color: "#8B6EAD" }}>{s.role}</span>
               <span style={{ color: white(0.5) }}>{s.note}</span>
             </div>
           ))}

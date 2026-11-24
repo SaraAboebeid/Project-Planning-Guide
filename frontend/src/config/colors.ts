@@ -22,9 +22,9 @@ export const C = {
   bad:       "#E2483B", // error · "worse than baseline" · failed
   warn:      "#E8880C", // warning · provisional data · running
   info:      "#4A90E2", // neutral info · UK accent
-  selected:  "#4ECDC4", // active / selected state (brand teal) — unchanged
+  selected:  "#8B6EAD", // active / selected state (brand teal) — unchanged
   brand:     "var(--brand-deep)", // primary purple — unchanged
-  brandLite: "#B98BE8", // light purple accent — unchanged
+  brandLite: "#B8A3D0", // light purple accent — unchanged
 } as const;
 
 export type SemanticColor = keyof typeof C;

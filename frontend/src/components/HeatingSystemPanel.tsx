@@ -25,7 +25,7 @@ function NumField({ value, def, step, width = 64, onCommit }: {
     <input type="number" step={step ?? "any"} value={text} title={edited ? t("Default {v}", { v: def }) : t("Default value")}
       onChange={(e) => setText(e.target.value)} onBlur={commit}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-      style={{ width, padding: "3px 6px", borderRadius: 6, fontSize: 11, textAlign: "right",
+      style={{ width, padding: "3px 6px", borderRadius: 6, fontSize: 12, textAlign: "right",
         border: `1px solid ${edited ? "#E8880C" : "rgba(255,255,255,0.15)"}`,
         background: edited ? "rgba(232,136,12,0.10)" : "rgba(255,255,255,0.05)", color: "#fff" }} />
   );
@@ -57,9 +57,9 @@ const SYSTEM_EXPLAIN: Record<string, string> = {
 
 const PICKS: Record<string, { fg: string; label: string }> = {
   lowestLcc: { fg: "#2FB477", label: "Lowest 50-yr cost" },
-  lowestCarbon: { fg: "#4ECDC4", label: "Lowest carbon" },
+  lowestCarbon: { fg: "#8B6EAD", label: "Lowest carbon" },
   lowestEnergy: { fg: "#4A90E2", label: "Lowest energy" },
-  lowestOpCost: { fg: "#B98BE8", label: "Cheapest to run" },
+  lowestOpCost: { fg: "#B8A3D0", label: "Cheapest to run" },
 };
 
 export default function HeatingSystemPanel({
@@ -117,7 +117,7 @@ export default function HeatingSystemPanel({
   const td: React.CSSProperties = { padding: "7px 8px", textAlign: "right", whiteSpace: "nowrap", color: white(0.82) };
 
   const deltaTag = (pct: number) => (
-    <span style={{ fontSize: 9.5, marginLeft: 4, color: pct < 0 ? "#2FB477" : pct > 0 ? "#E2483B" : white(0.3) }}>
+    <span style={{ fontSize: 11, marginLeft: 4, color: pct < 0 ? "#2FB477" : pct > 0 ? "#E2483B" : white(0.3) }}>
       {pct > 0 ? "+" : ""}{pct}%
     </span>
   );
@@ -128,8 +128,8 @@ export default function HeatingSystemPanel({
         style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", background: "transparent", border: 0, cursor: "pointer", textAlign: "left" }}>
         <span style={{ padding: 6, borderRadius: 9, background: "rgba(232,136,12,0.16)", color: "#E8880C", display: "flex" }}><Flame size={16} /></span>
         <span style={{ flex: 1 }}>
-          <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#fff" }}>{t("Heating system (HVAC)")}</span>
-          <span style={{ display: "block", fontSize: 11, color: white(0.4) }}>
+          <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: "#fff" }}>{t("Heating system (HVAC)")}</span>
+          <span style={{ display: "block", fontSize: 12, color: white(0.4) }}>
             {t("Compare & choose the heating source —")} {selected ? <b style={{ color: "#E8880C" }}>{t("selected:")} {selected.shortName}</b> : t("energy, cost & carbon on the same heat demand")}.
           </span>
         </span>
@@ -138,23 +138,23 @@ export default function HeatingSystemPanel({
 
       {open && (
         <div style={{ padding: "0 18px 16px" }}>
-          <p style={{ fontSize: 11.5, color: white(0.45), margin: "0 0 12px", lineHeight: 1.6, maxWidth: 760 }}>
+          <p style={{ fontSize: 12, color: white(0.45), margin: "0 0 12px", lineHeight: 1.6, maxWidth: 760 }}>
             {t("The building's")} <b style={{ color: white(0.65) }}>{Math.round(heatingDemandKwhM2Yr)} kWh/m²·yr</b> {t("of heat demand is fixed — each system just converts it to delivered energy at its own efficiency (SPF). Values are {n}-yr life-cycle at a {r}% discount rate.", { n: studyPeriodYr, r: Math.round(discountRate * 100) })}
             {" "}{t("The heat demand still comes from real EnergyPlus (EPSM); the system economics are a supply-side layer on top.")}
           </p>
 
           {selected && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12, padding: "9px 12px",
-              borderRadius: 10, background: "rgba(78,205,196,0.08)", border: "1px solid rgba(78,205,196,0.3)" }}>
-              <span style={{ fontSize: 11.5, color: white(0.6) }}>{t("Selected heating system:")}</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 800, color: "#fff" }}>
+              borderRadius: 10, background: "rgba(139,110,173,0.08)", border: "1px solid rgba(139,110,173,0.3)" }}>
+              <span style={{ fontSize: 12, color: white(0.6) }}>{t("Selected heating system:")}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#fff" }}>
                 <span style={{ width: 9, height: 9, borderRadius: 2, background: selected.color }} /> {selected.shortName}
               </span>
-              <span style={{ fontSize: 11.5, color: white(0.55) }}>
+              <span style={{ fontSize: 12, color: white(0.55) }}>
                 {selected.deliveredKwhM2Yr} kWh/m²·yr · {sek(selected.operatingCostYrSek)} {cur}/yr · {sek(selected.carbonYrKg)} kg CO₂e/yr · {sek(selected.lccSek)} {cur} {t("life-cycle")}
               </span>
               {!selected.isBaseline && selected.vsBaseline && (
-                <span style={{ fontSize: 10.5, color: selected.vsBaseline.opCostPct < 0 ? "#2FB477" : "#E2483B" }}>
+                <span style={{ fontSize: 11.5, color: selected.vsBaseline.opCostPct < 0 ? "#2FB477" : "#E2483B" }}>
                   ({t("{cost}% cost, {carbon}% carbon vs {base}", {
                     cost: `${selected.vsBaseline.opCostPct > 0 ? "+" : ""}${selected.vsBaseline.opCostPct}`,
                     carbon: `${selected.vsBaseline.carbonPct > 0 ? "+" : ""}${selected.vsBaseline.carbonPct}`,
@@ -185,11 +185,11 @@ export default function HeatingSystemPanel({
                   return (
                     <tr key={s.id} onClick={() => selectSystem(s.id)} title={t("Click to select this heating system")}
                       style={{ borderTop: `1px solid ${white(0.07)}`, cursor: "pointer",
-                        boxShadow: isSel ? "inset 3px 0 0 #4ECDC4" : undefined,
-                        background: isSel ? "rgba(78,205,196,0.10)" : s.isBaseline ? "rgba(232,136,12,0.05)" : tags.length ? "rgba(255,255,255,0.02)" : undefined }}>
+                        boxShadow: isSel ? "inset 3px 0 0 #8B6EAD" : undefined,
+                        background: isSel ? "rgba(139,110,173,0.10)" : s.isBaseline ? "rgba(232,136,12,0.05)" : tags.length ? "rgba(255,255,255,0.02)" : undefined }}>
                       <td style={{ padding: "7px 8px", textAlign: "center" }}>
                         <span style={{ display: "inline-flex", width: 15, height: 15, borderRadius: "50%", alignItems: "center", justifyContent: "center",
-                          border: `1.5px solid ${isSel ? "#4ECDC4" : white(0.25)}`, background: isSel ? "#4ECDC4" : "transparent" }}>
+                          border: `1.5px solid ${isSel ? "#8B6EAD" : white(0.25)}`, background: isSel ? "#8B6EAD" : "transparent" }}>
                           {isSel && <Check size={10} color="#0d1117" strokeWidth={3} />}
                         </span>
                       </td>
@@ -217,7 +217,7 @@ export default function HeatingSystemPanel({
                             const p = PICKS[tag];
                             if (!p) return null;
                             return (
-                              <span key={tag} style={{ fontSize: 8.5, fontWeight: 800, padding: "1px 6px", borderRadius: 99, color: p.fg, background: `${p.fg}22` }}>★ {t(p.label)}</span>
+                              <span key={tag} style={{ fontSize: 8.5, fontWeight: 700, padding: "1px 6px", borderRadius: 99, color: p.fg, background: `${p.fg}22` }}>★ {t(p.label)}</span>
                             );
                           })}
                         </div>
@@ -225,7 +225,7 @@ export default function HeatingSystemPanel({
                       <td style={td}>{s.spf.toFixed(s.spf >= 1.5 ? 1 : 2)}</td>
                       <td style={td}>{s.deliveredKwhM2Yr}{s.vsBaseline && !s.isBaseline ? deltaTag(s.vsBaseline.deliveredPct) : null}</td>
                       <td style={{ ...td, color: s.id === picks.lowestOpCost ? "#2FB477" : white(0.82) }}>{sek(s.operatingCostYrSek)}{s.vsBaseline && !s.isBaseline ? deltaTag(s.vsBaseline.opCostPct) : null}</td>
-                      <td style={{ ...td, color: s.id === picks.lowestCarbon ? "#4ECDC4" : white(0.82) }}>{sek(s.carbonYrKg)}{s.vsBaseline && !s.isBaseline ? deltaTag(s.vsBaseline.carbonPct) : null}</td>
+                      <td style={{ ...td, color: s.id === picks.lowestCarbon ? "#8B6EAD" : white(0.82) }}>{sek(s.carbonYrKg)}{s.vsBaseline && !s.isBaseline ? deltaTag(s.vsBaseline.carbonPct) : null}</td>
                       <td style={td}>{sek(s.capexSek)}</td>
                       <td style={{ ...td, fontWeight: s.id === picks.lowestLcc ? 800 : 400, color: s.id === picks.lowestLcc ? "#2FB477" : "#fff" }}>{sek(s.lccSek)}</td>
                     </tr>
@@ -237,23 +237,23 @@ export default function HeatingSystemPanel({
 
           {/* Assumptions & sources */}
           <button onClick={() => setShowSources((v) => !v)}
-            style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: 0, color: white(0.5), cursor: "pointer", fontSize: 11 }}>
+            style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: 0, color: white(0.5), cursor: "pointer", fontSize: 12 }}>
             <Info size={13} /> {t("Assumptions & sources — edit values")} {showSources ? "▲" : "▼"}
           </button>
           {edited && (
-            <span style={{ marginLeft: 10, fontSize: 10.5, color: "#E8880C" }}>
+            <span style={{ marginLeft: 10, fontSize: 11.5, color: "#E8880C" }}>
               {t("Using your own values (orange boxes).")}{" "}
               <button onClick={() => setOverrides(() => ({}))}
-                style={{ background: "transparent", border: 0, padding: 0, cursor: "pointer", color: "#4ECDC4", fontSize: 10.5, textDecoration: "underline" }}>
+                style={{ background: "transparent", border: 0, padding: 0, cursor: "pointer", color: "#8B6EAD", fontSize: 11.5, textDecoration: "underline" }}>
                 {t("Reset to defaults")}
               </button>
             </span>
           )}
           {showSources && (() => {
-            const ths: React.CSSProperties = { padding: "4px 6px", fontWeight: 600, color: white(0.45), textAlign: "right", whiteSpace: "nowrap", fontSize: 10.5 };
+            const ths: React.CSSProperties = { padding: "4px 6px", fontWeight: 600, color: white(0.45), textAlign: "right", whiteSpace: "nowrap", fontSize: 11.5 };
             const tds: React.CSSProperties = { padding: "4px 6px", textAlign: "right", whiteSpace: "nowrap" };
             return (
-            <div style={{ marginTop: 8, fontSize: 10.5, color: white(0.45), lineHeight: 1.6, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ marginTop: 8, fontSize: 11.5, color: white(0.45), lineHeight: 1.6, display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ color: white(0.5) }}>
                 {t("Change any value and press Enter (or click away) — the table above recalculates. Empty a box to go back to its default.")}
               </div>
@@ -271,7 +271,7 @@ export default function HeatingSystemPanel({
                       const c = catalogue.carriers[key]!;
                       return (
                         <tr key={key} style={{ borderTop: `1px solid ${white(0.06)}` }}>
-                          <td style={{ ...tds, textAlign: "left", color: white(0.7), fontWeight: 700 }}>{def!.label}</td>
+                          <td style={{ ...tds, textAlign: "left", color: white(0.7), fontWeight: 600 }}>{def!.label}</td>
                           <td style={tds}><NumField value={c.tariffSek} def={def!.tariffSek} step={0.01} onCommit={(v) => setCarrier(key, "tariffSek", v)} /></td>
                           <td style={tds}><NumField value={Math.round(c.carbonKgPerKwh * 10000) / 10} def={Math.round(def!.carbonKgPerKwh * 10000) / 10} step={1}
                             onCommit={(v) => setCarrier(key, "carbonKgPerKwh", v == null ? undefined : v / 1000)} /></td>
@@ -298,7 +298,7 @@ export default function HeatingSystemPanel({
                       const s = catalogue.systems.find((x) => x.id === def.id)!;
                       return (
                         <tr key={def.id} style={{ borderTop: `1px solid ${white(0.06)}` }}>
-                          <td style={{ ...tds, textAlign: "left", color: white(0.7), fontWeight: 700 }}>
+                          <td style={{ ...tds, textAlign: "left", color: white(0.7), fontWeight: 600 }}>
                             {def.shortName}{def.provisional ? <span style={{ fontWeight: 400, color: white(0.35) }}> {t("(cost provisional)")}</span> : null}
                           </td>
                           <td style={tds}><NumField value={s.spf.base} def={def.spf.base} step={0.1} width={56} onCommit={(v) => setSystem(def.id, "spfBase", v)} /></td>

@@ -836,23 +836,23 @@ const SINGLE_NUMERIC = new Set<string>(["year", "floors", "height", "footprint_m
 function ImportFormatGuide() {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const cell = "font-mono text-[10px] text-emerald-300/90 bg-black/40 rounded p-2 overflow-x-auto whitespace-pre";
+  const cell = "font-mono text-[11px] text-emerald-300/90 bg-black/40 rounded p-2 overflow-x-auto whitespace-pre";
   return (
     <div className="mt-2">
       <button
         onClick={() => setOpen(o => !o)}
-        className="text-[10.5px] font-semibold text-violet-300 hover:text-violet-200 transition"
+        className="text-[11.5px] font-semibold text-violet-300 hover:text-violet-200 transition"
       >
         {open ? "▾" : "▸"} {t("How should my CSV or JSON look?")}
       </button>
       {open && (
-        <div className="mt-1.5 rounded-md border border-white/10 bg-[#0d1117] p-2.5 text-[10.5px] text-white/60 space-y-2.5 leading-relaxed">
+        <div className="mt-1.5 rounded-md border border-white/10 bg-[#0d1117] p-2.5 text-[11.5px] text-white/60 space-y-2.5 leading-relaxed">
           <div>
             <b className="text-white/75">{t("One row per building.")}</b> {t("Include only the columns you actually have — any you leave out just stay as they are. Rows are matched to a building by its")} <b className="text-white/75">Address</b>{t("; for a single building, the first row is used if no address matches. Values overwrite what's shown; a blank cell is ignored.")}
           </div>
           <div>
             <div className="text-white/45 font-semibold mb-1">{t("Column headers it understands (use any subset):")}</div>
-            <div className="font-mono text-[10px] text-white/70">
+            <div className="font-mono text-[11px] text-white/70">
               Address · Use · Year · Floors · Height (m) · Footprint (m²) · Energy class · Energy (kWh/m²) · U-wall · U-window
             </div>
             <div className="text-white/35 mt-1">{t("Header matching is flexible —")} <span className="font-mono">energy</span>, <span className="font-mono">energy_kwh_m2</span> {t("and")} <span className="font-mono">Energy (kWh/m²)</span> {t("all work.")}</div>
@@ -1489,15 +1489,15 @@ function BboxDataBanner({
         <div className="flex items-center gap-3 min-w-0">
           <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
           <div>
-            <span className="text-sm font-bold text-white/85">{t("{n} buildings", { n: bboxStats.count.toLocaleString() })}</span>
+            <span className="text-sm font-semibold text-white/85">{t("{n} buildings", { n: bboxStats.count.toLocaleString() })}</span>
             <span className="text-xs text-white/35 ml-2">{t(points?.length ? "From your address list" : district ? "Neighbourhood" : "Bounding box")}</span>
             {addrProgress && addrProgress.done < addrProgress.total && (
-              <span className="text-[11px] text-white/45 ml-3">
+              <span className="text-[12px] text-white/45 ml-3">
                 {t("Looking up addresses from OpenStreetMap…")} {addrProgress.done}/{addrProgress.total}
               </span>
             )}
             {pointsReport && (pointsReport.merged.length > 0 || pointsReport.missing.length > 0) && (
-              <div className="text-[11.5px] mt-1" style={{ color: "#E8B10C" }}>
+              <div className="text-[12px] mt-1" style={{ color: "#E8B10C" }}>
                 {t("{a} addresses uploaded → {b} buildings.", { a: (points?.length ?? 0), b: rows?.length ?? 0 })}{" "}
                 {pointsReport.merged.length > 0 && <>{t("Entrances of the same building are shown once:")} {pointsReport.merged.map((m) => `${m.input} → ${m.into}`).join(" · ")}. </>}
                 {pointsReport.missing.length > 0 && <>{t("No building found at:")} {pointsReport.missing.join(" · ")}.</>}
@@ -1509,14 +1509,14 @@ function BboxDataBanner({
           <button
             onClick={handleView}
             disabled={loading || (!bbox && !district && !points?.length)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
             {loading ? t("Loading…") : viewOpen ? <><ChevronUp className="w-3 h-3" /> {t("Hide")}</> : t("Buildings")}
           </button>
           <button
             onClick={rows ? handleDownload : handleLoadAndDownload}
             disabled={loading || (!bbox && !district && !points?.length)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
             <Download className="w-3 h-3" /> {t("Export")}
           </button>
@@ -1526,7 +1526,7 @@ function BboxDataBanner({
             onClick={selectAllRows}
             disabled={!rows || !rows.length}
             title={t("Select every loaded building")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
             {t("Select all")}
           </button>
@@ -1534,14 +1534,14 @@ function BboxDataBanner({
             onClick={clearSelection}
             disabled={selected.size === 0}
             title={t("Clear the current selection")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-white/50 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
           >
             {t("Clear")}
           </button>
           <button
             onClick={() => setAddOpen(o => !o)}
             title={t("Open guided add-data panel: template, upload, paste, and formatting help")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 whitespace-nowrap transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-white/50 hover:bg-white/8 whitespace-nowrap transition"
           >
             <Plus className="w-3.5 h-3.5" /> {t("Add Data")}
           </button>
@@ -1550,7 +1550,7 @@ function BboxDataBanner({
               onClick={startEditMode}
               disabled={!rows || loading}
               title={t("Edit the current table values and save them for this session")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/60 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-white/60 hover:bg-white/8 disabled:opacity-40 whitespace-nowrap transition"
             >
               <Pencil className="w-3 h-3" /> {t("Edit Table")}
             </button>
@@ -1558,13 +1558,13 @@ function BboxDataBanner({
             <>
               <button
                 onClick={saveEditMode}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold bg-emerald-700/30 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-700/45 whitespace-nowrap transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold bg-emerald-700/30 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-700/45 whitespace-nowrap transition"
               >
                 {t("Save changes")}
               </button>
               <button
                 onClick={cancelEditMode}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-white/50 hover:bg-white/8 whitespace-nowrap transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-white/50 hover:bg-white/8 whitespace-nowrap transition"
               >
                 {t("Cancel")}
               </button>
@@ -1576,7 +1576,7 @@ function BboxDataBanner({
             title={selected.size > 0
               ? (selected.size === 1 ? t("Open the 3D viewer on the {n} selected building", { n: selected.size }) : t("Open the 3D viewer on the {n} selected buildings", { n: selected.size }))
               : t("Open the 3D viewer on this selection")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-purple-400 hover:bg-purple-900/30 whitespace-nowrap transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium text-purple-400 hover:bg-purple-900/30 whitespace-nowrap transition"
           >
             <Globe2 className="w-3 h-3" /> {t("3D view")}
           </a>
@@ -1584,7 +1584,7 @@ function BboxDataBanner({
       </div>
 
       {importMsg && (
-        <div className="px-4 py-2 border-t border-white/8 text-[11px]">
+        <div className="px-4 py-2 border-t border-white/8 text-[12px]">
           <span className={`${importMsg.startsWith("✓") ? "text-emerald-400" : importMsg.startsWith("⚠") ? "text-amber-400" : importMsg.startsWith(t("Import failed")) ? "text-red-400" : "text-white/40"}`}>
             {importMsg}
           </span>
@@ -1598,7 +1598,7 @@ function BboxDataBanner({
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
               <div>
                 <div className="text-sm font-semibold text-white/90">{t("Add Data")}</div>
-                <div className="text-[11px] text-white/45">{t("Import CSV/JSON with a clear guided flow")}</div>
+                <div className="text-[12px] text-white/45">{t("Import CSV/JSON with a clear guided flow")}</div>
               </div>
               <button
                 onClick={() => setAddOpen(false)}
@@ -1610,11 +1610,11 @@ function BboxDataBanner({
             </div>
 
             <div className="px-4 py-3 space-y-3">
-              <div className="text-[10px] text-white/40 bg-violet-950/20 border border-violet-800/30 rounded-md px-2.5 py-1.5 leading-relaxed">
+              <div className="text-[11px] text-white/40 bg-violet-950/20 border border-violet-800/30 rounded-md px-2.5 py-1.5 leading-relaxed">
                 <b className="text-violet-300">{t("Where do my edits go?")}</b> {t("Changes are kept in")} <b className="text-white/60">{t("your browser session")}</b> {t("and become the numbers Steps 3–4 (simulation & results) use. They are")} <b className="text-white/60">{t("not written back")}</b> {t("to the cadastral / EUBUCCO / EPC source data, and don't affect other users. Closing the tab clears them.")}
               </div>
 
-              <div className="text-[11px] text-white/65">
+              <div className="text-[12px] text-white/65">
                 {t("1. Download a template or open the format guide.")}
                 {" "}{t("2. Import your CSV/JSON file.")}
                 {" "}{t("3. Use Edit Table outside this dialog if you prefer direct cell editing.")}
@@ -1623,13 +1623,13 @@ function BboxDataBanner({
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={downloadTemplateCsv}
-                  className="px-3 py-1.5 rounded-md text-[11px] font-semibold bg-white/8 text-white/75 hover:bg-white/12 transition"
+                  className="px-3 py-1.5 rounded-md text-[12px] font-semibold bg-white/8 text-white/75 hover:bg-white/12 transition"
                 >
                   {t("Download CSV template")}
                 </button>
                 <label
                   title={t("Upload your own CSV or JSON to overwrite or fill missing data — matched by Address or Cadastral ID")}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold text-violet-200 bg-violet-600/20 ring-1 ring-violet-500/60 hover:bg-violet-600/35 hover:text-white whitespace-nowrap transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold text-violet-200 bg-violet-600/20 ring-1 ring-violet-500/60 hover:bg-violet-600/35 hover:text-white whitespace-nowrap transition cursor-pointer"
                 >
                   <Upload className="w-3 h-3" /> {t("Drop / choose file")}
                   <input
@@ -1643,7 +1643,7 @@ function BboxDataBanner({
               <div className="flex items-center justify-between pt-1">
                 <button
                   onClick={() => setShowPaste(v => !v)}
-                  className="text-[11px] font-medium text-violet-300 hover:text-violet-200 transition"
+                  className="text-[12px] font-medium text-violet-300 hover:text-violet-200 transition"
                 >
                   {showPaste ? t("Hide manual paste") : t("Paste data manually")}
                 </button>
@@ -1652,21 +1652,21 @@ function BboxDataBanner({
 
               {showPaste && (
                 <>
-                  <div className="text-[10px] text-white/35">{t("Paste CSV / JSON (same columns as Export; rows matched by Address / Cadastral ID):")}</div>
+                  <div className="text-[11px] text-white/35">{t("Paste CSV / JSON (same columns as Export; rows matched by Address / Cadastral ID):")}</div>
                   <textarea
                     value={pasteText}
                     onChange={e => setPasteText(e.target.value)}
                     placeholder={'Address,Energy (kWh/m²),U-Wall\nHerkulesgatan 38,90,0.30\n\n— or —\n[{"address":"Herkulesgatan 38","energy_kwh_m2":90,"u_wall":0.30}]'}
                     rows={6}
-                    className="w-full rounded-md bg-[#0d1117] border border-white/12 px-3 py-2 text-[11px] text-white/80 font-mono resize-y focus:outline-none focus:border-violet-500/60"
+                    className="w-full rounded-md bg-[#0d1117] border border-white/12 px-3 py-2 text-[12px] text-white/80 font-mono resize-y focus:outline-none focus:border-violet-500/60"
                   />
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => applyImportText(pasteText, t("pasted data"))}
                       disabled={!pasteText.trim()}
-                      className="px-3 py-1.5 rounded-md text-[11px] font-semibold bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition"
+                      className="px-3 py-1.5 rounded-md text-[12px] font-semibold bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition"
                     >{t("Apply pasted data")}</button>
-                    <button onClick={() => setPasteText("")} className="px-3 py-1.5 rounded-md text-[11px] text-white/45 hover:bg-white/8 transition">{t("Clear")}</button>
+                    <button onClick={() => setPasteText("")} className="px-3 py-1.5 rounded-md text-[12px] text-white/45 hover:bg-white/8 transition">{t("Clear")}</button>
                   </div>
                 </>
               )}
@@ -1674,7 +1674,7 @@ function BboxDataBanner({
               <div className="flex justify-end pt-1">
                 <button
                   onClick={() => setAddOpen(false)}
-                  className="px-3 py-1.5 rounded-md text-[11px] font-medium text-white/60 hover:bg-white/8 transition"
+                  className="px-3 py-1.5 rounded-md text-[12px] font-medium text-white/60 hover:bg-white/8 transition"
                 >
                   {t("Done")}
                 </button>
@@ -1684,7 +1684,7 @@ function BboxDataBanner({
               <button
                 onClick={selectAllRows}
                 disabled={!rows || allRowsChecked}
-                className="px-3 py-1.5 rounded-md border border-white/10 text-[11px] font-medium text-white/70 hover:bg-white/8 disabled:opacity-35 disabled:hover:bg-transparent transition"
+                className="px-3 py-1.5 rounded-md border border-white/10 text-[12px] font-medium text-white/70 hover:bg-white/8 disabled:opacity-35 disabled:hover:bg-transparent transition"
                 title={t("Select every building in the table")}
               >
                 {t("Select all")}
@@ -1692,7 +1692,7 @@ function BboxDataBanner({
               <button
                 onClick={clearSelection}
                 disabled={selected.size === 0}
-                className="px-3 py-1.5 rounded-md border border-white/10 text-[11px] font-medium text-white/70 hover:bg-white/8 disabled:opacity-35 disabled:hover:bg-transparent transition"
+                className="px-3 py-1.5 rounded-md border border-white/10 text-[12px] font-medium text-white/70 hover:bg-white/8 disabled:opacity-35 disabled:hover:bg-transparent transition"
                 title={t("Clear the current selection")}
               >
                 {t("Clear")}
@@ -1715,9 +1715,9 @@ function BboxDataBanner({
       {viewOpen && rows && (
         <div className="border-t border-white/10">
           {/* Row count */}
-          <div className="flex items-center gap-2 px-4 pt-2 pb-1 text-[11.5px] text-white/40">
+          <div className="flex items-center gap-2 px-4 pt-2 pb-1 text-[12px] text-white/40">
             <span className="text-white/45">{editing
-              ? <>{t("Columns marked")} <span style={{ color: "#4ECDC4" }}>⚙</span> {t("are simulation inputs: after Save, Steps 3–4 simulate with your values. Year, certificate energy, energy class and era are for reference only.")}</>
+              ? <>{t("Columns marked")} <span style={{ color: "#8B6EAD" }}>⚙</span> {t("are simulation inputs: after Save, Steps 3–4 simulate with your values. Year, certificate energy, energy class and era are for reference only.")}</>
               : t("↕ Tip: click a column header to sort — click again to flip high ↔ low.")}</span>
             <span className="ml-auto text-gray-400">
               {t("Showing {a}–{b} of {n}", { a: page * PAGE_SIZE + 1, b: Math.min((page + 1) * PAGE_SIZE, rows.length), n: rows.length })}
@@ -1751,8 +1751,8 @@ function BboxDataBanner({
                           className={`px-2 py-1 text-left font-semibold border-b border-white/10 whitespace-nowrap cursor-pointer select-none transition-colors hover:bg-white/10 hover:text-white ${active ? "text-white" : "text-white/60"}`}>
                         {c.key === "energy_kwh_m2" && isSweden ? t("Certificate energy (kWh/m²)") : t(c.label)}
                         {c.key === "energy_kwh_m2" && isSweden && <HeaderInfo text={t(SE_EPC_ENERGY_INFO)} />}
-                        {editing && MODEL_INPUT_COLS.has(c.key) && <span className="ml-1 text-[10px]" style={{ color: "#4ECDC4" }} aria-label={t("Simulation input")}>⚙</span>}
-                        <span className="ml-1 text-[10px]" style={{ opacity: active ? 1 : 0.55 }}>
+                        {editing && MODEL_INPUT_COLS.has(c.key) && <span className="ml-1 text-[11px]" style={{ color: "#8B6EAD" }} aria-label={t("Simulation input")}>⚙</span>}
+                        <span className="ml-1 text-[11px]" style={{ opacity: active ? 1 : 0.55 }}>
                           {active ? (tableSort!.asc ? "▲" : "▼") : "↕"}
                         </span>
                       </th>
@@ -1902,7 +1902,7 @@ function BboxDataBanner({
           </div>
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 py-2 border-t border-white/8 text-[11px]">
+            <div className="flex items-center justify-center gap-2 py-2 border-t border-white/8 text-[12px]">
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
@@ -1918,7 +1918,7 @@ function BboxDataBanner({
           )}
           {/* Selection actions — shown after table rows. */}
           {selected.size > 0 && (
-            <div className="flex items-center justify-end gap-3 px-4 py-2 border-t border-white/10 text-[11.5px]">
+            <div className="flex items-center justify-end gap-3 px-4 py-2 border-t border-white/10 text-[12px]">
               <span className="text-white/40">{t("{n} selected", { n: selected.size })}</span>
               <button
                 onClick={clearSelection}
@@ -1937,13 +1937,13 @@ function BboxDataBanner({
         <div className="border-t-2 border-violet-700/50 bg-[#0d1117]">
           {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-2.5 bg-purple-900/20 border-b border-purple-700/30">
-            <span className="text-xs font-bold text-purple-300">
+            <span className="text-xs font-semibold text-purple-300">
               {t("Comparing {n} buildings — ranked best to worst", { n: selectedRows.length })}
             </span>
             <div className="flex items-center gap-3">
               <button
                 onClick={saveSelectedCsv}
-                className="flex items-center gap-1.5 text-[11px] font-medium text-purple-400 hover:text-purple-300"
+                className="flex items-center gap-1.5 text-[12px] font-medium text-purple-400 hover:text-purple-300"
                 title={t("Download selected buildings as CSV")}
               >
                 <Download className="w-3 h-3" /> {t("Export")}
@@ -1957,13 +1957,13 @@ function BboxDataBanner({
 
           {/* Sort-by category pills */}
           <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-purple-700/20 bg-purple-900/10">
-            <span className="text-[10px] text-white/40 mr-1">{t("Sort by:")}</span>
+            <span className="text-[11px] text-white/40 mr-1">{t("Sort by:")}</span>
             {COMPARE_COLS.map(c => (
               <button
                 key={c.key}
                 onClick={() => setSortCol(c.key)}
                 title={t(c.betterLabel)}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition ${
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition ${
                   sortCol === c.key
                     ? "bg-violet-600 text-white border-violet-600 shadow-sm"
                     : "bg-white/5 text-white/50 border-white/15 hover:border-purple-500 hover:text-purple-300"
@@ -1972,12 +1972,12 @@ function BboxDataBanner({
                 {t(c.label)}
               </button>
             ))}
-            <span className="ml-1 text-[10px] text-gray-400 italic">({t(cfg.betterLabel)})</span>
+            <span className="ml-1 text-[11px] text-gray-400 italic">({t(cfg.betterLabel)})</span>
           </div>
 
           {/* Ranked table */}
           <div className="overflow-x-auto px-4 py-3">
-            <table className="w-full text-[11px] border-collapse rounded-lg overflow-hidden border border-purple-700/30">
+            <table className="w-full text-[12px] border-collapse rounded-lg overflow-hidden border border-purple-700/30">
               <thead>
                 <tr className="bg-purple-900/30">
                   <th className="px-2 py-1.5 text-left font-semibold text-purple-300 border-b border-purple-700/30 whitespace-nowrap">{t("Address")}</th>
@@ -2013,7 +2013,7 @@ function BboxDataBanner({
                           <td className="px-2 py-1.5 font-medium whitespace-nowrap max-w-[220px] text-white/75" title={fullTitle}>
                             <span className="mr-1.5 text-xs text-white/30">{rank + 1}</span>
                             <span className="truncate">{isCadastralId(r.address, r.cadastral_id) ? "—" : formatAddress(r.address)}</span>
-                            {extra > 0 && <span className="ml-1 text-[10px] text-teal/70" title={entrances.join(", ")}>+{extra}</span>}
+                            {extra > 0 && <span className="ml-1 text-[11px] text-teal/70" title={entrances.join(", ")}>+{extra}</span>}
                           </td>
                         );
                       })()}
@@ -2058,7 +2058,7 @@ function FieldChip({
 }: { label: string; value: string | number | null | undefined; critical: boolean }) {
   const t = useT();
   const hasVal = value !== null && value !== undefined;
-  const base = "flex flex-col px-2.5 py-2 rounded-lg border text-[11px]";
+  const base = "flex flex-col px-2.5 py-2 rounded-lg border text-[12px]";
   const colors = hasVal
     ? critical ? "bg-purple-900/30 border-purple-700/50 text-purple-300"
                : "bg-emerald-900/30 border-emerald-700/50 text-emerald-300"
@@ -2067,7 +2067,7 @@ function FieldChip({
   return (
     <div className={`${base} ${colors}`}>
       <span className="font-semibold leading-tight">{hasVal ? String(value) : "—"}</span>
-      <span className="text-[10px] opacity-70 mt-0.5">{t(label)}{critical && " ★"}</span>
+      <span className="text-[11px] opacity-70 mt-0.5">{t(label)}{critical && " ★"}</span>
     </div>
   );
 }
@@ -2210,18 +2210,18 @@ function BuildingDataBanner({
         <div className="flex items-center gap-2">
           <span className="text-base">🏗️</span>
           <span className="text-xs font-semibold text-purple-300">{t("Data Available")}</span>
-          <span className="px-1.5 py-0.5 rounded-full bg-purple-900/50 text-purple-300 text-[9px] font-bold border border-purple-600/50">{isUK ? "OSM + EUBUCCO" : isBE ? "UrbIS 3D + TABULA BE" : "EUBUCCO"}</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-purple-900/50 text-purple-300 text-[11px] font-semibold border border-purple-600/50">{isUK ? "OSM + EUBUCCO" : isBE ? "UrbIS 3D + TABULA BE" : "EUBUCCO"}</span>
           {building.has_epc && (
             <span title={isUK && building.epc_latest_date ? t("EPC register - newest certificate {d}", { d: building.epc_latest_date }) : undefined}
-              className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">EPC</span>
+              className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[11px] font-semibold border border-emerald-700/50">EPC</span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          {building.address && !isCadastralId(building.address) && <span className="text-[10px] text-purple-400/70 truncate max-w-[160px]">{formatAddress(building.address)}</span>}
+          {building.address && !isCadastralId(building.address) && <span className="text-[11px] text-purple-400/70 truncate max-w-[160px]">{formatAddress(building.address)}</span>}
           <button
             onClick={() => setEditing(e => !e)}
             title={t("Add or correct this building's data — overrides feed Steps 3-4 (stored for this session only, never written back to the source data).")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition ring-1 ${editing
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[12px] font-semibold whitespace-nowrap transition ring-1 ${editing
               ? "bg-violet-600/30 text-violet-200 ring-violet-500/60"
               : "bg-white/5 text-white/70 ring-white/15 hover:bg-white/10 hover:text-white"}`}>
             <Plus className="w-3.5 h-3.5" /> {editing ? t("Done") : t("Add / Edit")}
@@ -2231,7 +2231,7 @@ function BuildingDataBanner({
 
       {editing && (
         <div className="mx-3 mt-3 -mb-1 space-y-2.5">
-          <div className="rounded-lg bg-violet-900/20 border border-violet-700/30 px-3 py-2 text-[10.5px] text-violet-200/80">
+          <div className="rounded-lg bg-violet-900/20 border border-violet-700/30 px-3 py-2 text-[11.5px] text-violet-200/80">
             {t("Editing overrides for")} <b className="text-violet-100">{t("this session only")}</b> {t("— they feed the simulation and prioritisation in Steps 3-4 and are never written back to the source datasets. Edit the fields below, or import your own file. Leave a field blank to clear it.")}
           </div>
           {/* Import the user's own data onto this one building */}
@@ -2239,7 +2239,7 @@ function BuildingDataBanner({
             <div className="flex items-center gap-2 flex-wrap">
               <label
                 title={t("Upload a CSV or JSON file to fill in this building's data. Excel: save the sheet as .csv first.")}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-violet-200 bg-violet-600/20 ring-1 ring-violet-500/60 hover:bg-violet-600/35 hover:text-white whitespace-nowrap transition cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-semibold text-violet-200 bg-violet-600/20 ring-1 ring-violet-500/60 hover:bg-violet-600/35 hover:text-white whitespace-nowrap transition cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" /> {t("Import CSV / JSON file")}
                 <input
@@ -2248,23 +2248,23 @@ function BuildingDataBanner({
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleSingleFile(f); e.currentTarget.value = ""; }}
                 />
               </label>
-              <span className="text-[10px] text-white/35">{t("Excel? Save it as")} <b className="text-white/55">.csv</b> {t("first.")}</span>
+              <span className="text-[11px] text-white/35">{t("Excel? Save it as")} <b className="text-white/55">.csv</b> {t("first.")}</span>
             </div>
-            <div className="text-[10px] text-white/35 mt-2">{t("Or paste CSV / JSON — column headers should match the field labels below (Year, Energy (kWh/m²), U-wall, Floors, …):")}</div>
+            <div className="text-[11px] text-white/35 mt-2">{t("Or paste CSV / JSON — column headers should match the field labels below (Year, Energy (kWh/m²), U-wall, Floors, …):")}</div>
             <textarea
               value={pasteText}
               onChange={e => setPasteText(e.target.value)}
               placeholder={'address,Year,Energy (kWh/m²),U-wall\nStorgatan 1,1965,142,0.45\n\n— or JSON —\n{ "year": 1965, "energy": 142, "tabula_u_wall": 0.45 }'}
               rows={4}
-              className="w-full mt-1.5 bg-[#0d1117] border border-white/12 rounded-md px-2.5 py-2 text-[11px] text-white/85 font-mono placeholder:text-white/25 focus:outline-none focus:border-violet-500/60"
+              className="w-full mt-1.5 bg-[#0d1117] border border-white/12 rounded-md px-2.5 py-2 text-[12px] text-white/85 font-mono placeholder:text-white/25 focus:outline-none focus:border-violet-500/60"
             />
             <div className="flex items-center gap-3 mt-2">
               <button
                 onClick={() => applySingleImport(pasteText, t("pasted data"))}
                 disabled={!pasteText.trim()}
-                className="px-3 py-1 rounded-md text-[11px] font-semibold bg-violet-600/25 text-violet-200 ring-1 ring-violet-500/60 hover:bg-violet-600/40 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="px-3 py-1 rounded-md text-[12px] font-semibold bg-violet-600/25 text-violet-200 ring-1 ring-violet-500/60 hover:bg-violet-600/40 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
               >{t("Apply pasted data")}</button>
-              {importMsg && <span className="text-[10.5px]" style={{ color: importMsg.startsWith("✓") ? "#2FB477" : importMsg.startsWith("⚠") || importMsg.startsWith(t("Import failed")) ? "#E2483B" : "rgba(255,255,255,0.5)" }}>{importMsg}</span>}
+              {importMsg && <span className="text-[11.5px]" style={{ color: importMsg.startsWith("✓") ? "#2FB477" : importMsg.startsWith("⚠") || importMsg.startsWith(t("Import failed")) ? "#E2483B" : "rgba(255,255,255,0.5)" }}>{importMsg}</span>}
             </div>
             <ImportFormatGuide />
           </div>
@@ -2301,15 +2301,15 @@ function BuildingDataBanner({
           )
         ))}
         {/* Current heating system — inferred from the EPC, read-only */}
-        <div className={`flex flex-col px-2.5 py-2 rounded-lg border text-[11px] ${heating ? "bg-sky-900/25 border-sky-700/50 text-sky-300" : "bg-white/5 border-white/10 text-white/30"}`}>
+        <div className={`flex flex-col px-2.5 py-2 rounded-lg border text-[12px] ${heating ? "bg-sky-900/25 border-sky-700/50 text-sky-300" : "bg-white/5 border-white/10 text-white/30"}`}>
           <span className="font-semibold leading-tight">{heating?.system ?? "—"}</span>
-          <span className="text-[10px] opacity-70 mt-0.5">{t("Current heating")}</span>
+          <span className="text-[11px] opacity-70 mt-0.5">{t("Current heating")}</span>
         </div>
       </div>
 
       {/* UK: which area is simulated, and how old the certificates are */}
       {isUK && building.heated_area_m2 != null && (
-        <div className="mx-3 mb-2 rounded-lg border border-sky-700/30 bg-sky-900/10 px-3 py-2 text-[11px] text-white/70 space-y-1">
+        <div className="mx-3 mb-2 rounded-lg border border-sky-700/30 bg-sky-900/10 px-3 py-2 text-[12px] text-white/70 space-y-1">
           <div title={t("Footprint = OSM outline (may cover a semi pair or terrace row). Heated area = the floor area the energy model simulates, from the homes' EPC total floor areas.")}>
             <b className="text-sky-300">{t("Areas:")}</b>{" "}
             {t("footprint {a} m² (OSM outline)", { a: Math.round(building.footprint_m2 ?? 0).toLocaleString("en-GB") })}
@@ -2331,7 +2331,7 @@ function BuildingDataBanner({
       {/* Wallonia: EPB certificates of similar dwellings - the open data has no
           address, so this is a municipality reference, not this building's certificate */}
       {isBE && building.peb_ref_n != null && (
-        <div className="mx-3 mb-2 rounded-lg border border-emerald-700/30 bg-emerald-900/10 px-3 py-2 text-[11px] text-white/70 space-y-1"
+        <div className="mx-3 mb-2 rounded-lg border border-emerald-700/30 bg-emerald-900/10 px-3 py-2 text-[12px] text-white/70 space-y-1"
           title={t("Open Data Wallonie-Bruxelles EPB certificates (CC BY 4.0). E_spec is the certificate's primary energy per heated m² per year — a calculated rating, not metered use.")}>
           <div>
             <b className="text-emerald-300">{t("EPB certificates of similar homes in {scope}:", { scope: building.peb_ref_scope ?? "" })}</b>{" "}
@@ -2351,7 +2351,7 @@ function BuildingDataBanner({
 
       {/* UK: measured consumption and non-domestic certificates, read-only */}
       {isUK && (building.desnz_gas_median_kwh != null || building.desnz_electricity_median_kwh != null || building.dec_band || building.nd_epc_band) && (
-        <div className="mx-3 mb-3 rounded-lg border border-emerald-700/30 bg-emerald-900/10 px-3 py-2 text-[11px] text-white/70 space-y-1">
+        <div className="mx-3 mb-3 rounded-lg border border-emerald-700/30 bg-emerald-900/10 px-3 py-2 text-[12px] text-white/70 space-y-1">
           {(building.desnz_gas_median_kwh != null || building.desnz_electricity_median_kwh != null) && (
             <div title={t("DESNZ postcode-level domestic gas and electricity statistics (OGL v3.0). Median metered annual use per meter in this postcode — a neighbourhood figure, not this building's own meter.")}>
               <b className="text-emerald-300">{t("Metered use, postcode {pc} ({y}):", { pc: building.desnz_postcode ?? "", y: building.desnz_year ?? "" })}</b>{" "}
@@ -2398,7 +2398,7 @@ function BuildingDataBanner({
       {/* 3D Inspector link */}
       <div className="px-3 pb-3">
         <a href={viewerUrl} target="_blank" rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-400 hover:text-purple-300 underline underline-offset-2">
+          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-purple-400 hover:text-purple-300 underline underline-offset-2">
           📷 {isUK ? t("Open UK 3D viewer") : isBE ? t("Open {city} 3D viewer", { city: projectCity === "Liège" ? "Liège" : "Brussels" }) : t("Open Gothenburg 3D")} →
         </a>
       </div>
@@ -2413,15 +2413,15 @@ function EditableChip({
   const t = useT();
   const hasVal = value !== null && value !== undefined;
   return (
-    <div className={`flex flex-col px-2.5 py-2 rounded-lg border text-[11px] ${
+    <div className={`flex flex-col px-2.5 py-2 rounded-lg border text-[12px] ${
       critical ? "bg-purple-900/20 border-purple-700/50" : "bg-white/5 border-white/12"}`}>
       <input
         value={hasVal ? String(value) : ""}
         onChange={e => onChange(e.target.value)}
         placeholder="—"
-        className="w-full bg-[#0d1117] border border-white/12 rounded px-1 py-0.5 text-[11px] text-white/90 focus:outline-none focus:border-violet-500/60"
+        className="w-full bg-[#0d1117] border border-white/12 rounded px-1 py-0.5 text-[12px] text-white/90 focus:outline-none focus:border-violet-500/60"
       />
-      <span className="text-[10px] opacity-70 mt-1 text-white/50">{t(label)}{critical && " ★"}</span>
+      <span className="text-[11px] opacity-70 mt-1 text-white/50">{t(label)}{critical && " ★"}</span>
     </div>
   );
 }
@@ -2466,24 +2466,24 @@ function MultiBuildingDataBanner({
           <span className="text-xs font-semibold text-purple-300">
             {t("Data Available — {n} buildings", { n: buildings.length })}
           </span>
-          <span className="px-1.5 py-0.5 rounded-full bg-purple-900/50 text-purple-300 text-[9px] font-bold border border-purple-600/50">EUBUCCO</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-purple-900/50 text-purple-300 text-[11px] font-semibold border border-purple-600/50">EUBUCCO</span>
           {withEpc > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50">
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[11px] font-semibold border border-emerald-700/50">
               EPC ({withEpc}/{buildings.length})
             </span>
           )}
         </div>
-        <span className="text-[10px] text-purple-400/70">{projectType ? t(projectType) : projectType}</span>
+        <span className="text-[11px] text-purple-400/70">{projectType ? t(projectType) : projectType}</span>
       </div>
 
       {/* Building list */}
       <div className="divide-y divide-white/6">
         {shownBuildings.map((b, i) => (
           <div key={i} className="flex items-start gap-2 px-3 py-2">
-            <span className="text-[10px] text-white/25 font-mono mt-0.5 w-4 flex-shrink-0">{i + 1}</span>
+            <span className="text-[11px] text-white/25 font-mono mt-0.5 w-4 flex-shrink-0">{i + 1}</span>
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium text-white/75 truncate">{isCadastralId(b.address) ? t("EUBUCCO building") : (formatAddress(b.address) ?? t("EUBUCCO building"))}</div>
-              <div className="flex flex-wrap gap-x-3 mt-0.5 text-[10px] text-white/40">
+              <div className="flex flex-wrap gap-x-3 mt-0.5 text-[11px] text-white/40">
                 {b.use_cat    && <span>{b.country === "gb" || b.country === "be" ? buildingUseLabel(b.use_cat) : b.use_cat}</span>}
                 {b.year       && <span>{t("Built {y}", { y: b.year })}</span>}
                 {b.floors     && <span>{t("{n} floors", { n: b.floors })}</span>}
@@ -2495,7 +2495,7 @@ function MultiBuildingDataBanner({
               </div>
             </div>
             {b.has_epc && (
-              <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[9px] font-bold border border-emerald-700/50 mt-0.5 flex-shrink-0">EPC</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 text-[11px] font-semibold border border-emerald-700/50 mt-0.5 flex-shrink-0">EPC</span>
             )}
           </div>
         ))}
@@ -2504,7 +2504,7 @@ function MultiBuildingDataBanner({
       {buildings.length > 3 && (
         <button
           onClick={() => setExpanded(e => !e)}
-          className="w-full text-[11px] font-medium text-purple-400 hover:text-purple-300 py-2 border-t border-purple-700/30 hover:bg-purple-900/20 transition-colors"
+          className="w-full text-[12px] font-medium text-purple-400 hover:text-purple-300 py-2 border-t border-purple-700/30 hover:bg-purple-900/20 transition-colors"
         >
           {expanded ? `${t("Show less")} ▲` : `${t("Show all {n} buildings", { n: buildings.length })} ▼`}
         </button>
@@ -2778,7 +2778,7 @@ export default function DataCoverage() {
 
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-white">{t("Building Data & Prioritisation")}</h2>
+        <h2 className="text-2xl font-semibold text-white">{t("Building Data & Prioritisation")}</h2>
         <p className="text-sm text-white/45 mt-1">
           {/* A brief, not a walkthrough — each numbered section below carries its
               own subtitle explaining what it does. */}
@@ -2852,7 +2852,7 @@ export default function DataCoverage() {
               {viewerSelection.eclass  && <span>{t("Class {c}", { c: viewerSelection.eclass })}</span>}
             </span>
           </div>
-          <span className="text-[10px] font-medium text-violet-400 bg-purple-900/30 px-2 py-0.5 rounded shrink-0">{t("3D Viewer")}</span>
+          <span className="text-[11px] font-medium text-violet-400 bg-purple-900/30 px-2 py-0.5 rounded shrink-0">{t("3D Viewer")}</span>
           <button
             onClick={() => { setViewerSelection(null); try { localStorage.removeItem('ppg_selected_building'); } catch { /**/ } }}
             className="text-white/25 hover:text-white/60 shrink-0 text-sm leading-none ml-1"
@@ -2997,9 +2997,9 @@ function Step2Sections({
         <div style={{
           minWidth: 26, height: 26, padding: "0 7px", borderRadius: 999, flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          background: isOpen ? "#4ECDC4" : done ? "rgba(47,180,119,0.25)" : "rgba(255,255,255,0.07)",
-          border: `1.5px solid ${isOpen ? "#4ECDC4" : done ? "rgba(47,180,119,0.5)" : "rgba(255,255,255,0.12)"}`,
-          fontSize: 11, fontWeight: 800, letterSpacing: 0.2,
+          background: isOpen ? "#8B6EAD" : done ? "rgba(47,180,119,0.25)" : "rgba(255,255,255,0.07)",
+          border: `1.5px solid ${isOpen ? "#8B6EAD" : done ? "rgba(47,180,119,0.5)" : "rgba(255,255,255,0.12)"}`,
+          fontSize: 12, fontWeight: 700, letterSpacing: 0.2,
           color: isOpen ? "#0b1220" : done ? "#2FB477" : "rgba(255,255,255,0.4)",
         }}>
           {/* Position within the sections actually on screen, so a hidden
@@ -3008,10 +3008,10 @@ function Step2Sections({
         </div>
         {/* Labels */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: isOpen ? "#fff" : "rgba(255,255,255,0.55)" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: isOpen ? "#fff" : "rgba(255,255,255,0.55)" }}>
             {t(label)}
           </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>{t(subtitle)}</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>{t(subtitle)}</div>
         </div>
         {/* Chevron */}
         {isOpen
@@ -3029,7 +3029,7 @@ function Step2Sections({
           ref={overviewRef}
           style={{
             borderRadius: 14,
-            border: `1px solid ${openSec === "overview" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            border: `1px solid ${openSec === "overview" ? "rgba(139,110,173,0.35)" : "rgba(255,255,255,0.08)"}`,
             background: "rgba(255,255,255,0.02)",
             overflow: "hidden",
             transition: "border-color 0.18s",
@@ -3052,7 +3052,7 @@ function Step2Sections({
           ref={peersRef}
           style={{
             borderRadius: 14,
-            border: `1px solid ${openSec === "peers" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            border: `1px solid ${openSec === "peers" ? "rgba(139,110,173,0.35)" : "rgba(255,255,255,0.08)"}`,
             background: "rgba(255,255,255,0.02)",
             overflow: "hidden",
             transition: "border-color 0.18s",
@@ -3075,7 +3075,7 @@ function Step2Sections({
           ref={heatRef}
           style={{
             borderRadius: 14,
-            border: `1px solid ${openSec === "heat" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            border: `1px solid ${openSec === "heat" ? "rgba(139,110,173,0.35)" : "rgba(255,255,255,0.08)"}`,
             background: "rgba(255,255,255,0.02)",
             overflow: "hidden",
             transition: "border-color 0.18s",
@@ -3098,7 +3098,7 @@ function Step2Sections({
           ref={historyRef}
           style={{
             borderRadius: 14,
-            border: `1px solid ${openSec === "history" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            border: `1px solid ${openSec === "history" ? "rgba(139,110,173,0.35)" : "rgba(255,255,255,0.08)"}`,
             background: "rgba(255,255,255,0.02)",
             overflow: "hidden",
             transition: "border-color 0.18s",
@@ -3121,7 +3121,7 @@ function Step2Sections({
           ref={facadeRef}
           style={{
             borderRadius: 14,
-            border: `1px solid ${openSec === "facade" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            border: `1px solid ${openSec === "facade" ? "rgba(139,110,173,0.35)" : "rgba(255,255,255,0.08)"}`,
             background: "rgba(255,255,255,0.02)",
             overflow: "hidden",
             transition: "border-color 0.18s",
@@ -3150,7 +3150,7 @@ function Step2Sections({
           ref={priorityRef}
           style={{
             borderRadius: 14,
-            border: `1px solid ${openSec === "priority" ? "rgba(78,205,196,0.35)" : "rgba(255,255,255,0.08)"}`,
+            border: `1px solid ${openSec === "priority" ? "rgba(139,110,173,0.35)" : "rgba(255,255,255,0.08)"}`,
             background: "rgba(255,255,255,0.02)",
             overflow: "hidden",
             transition: "border-color 0.18s",

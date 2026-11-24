@@ -520,9 +520,9 @@ export const SAMPLE_REPORTS = [
   {
     id:          "energy-community",
     label:       "Energy Community Planning",
-    color:       "#5A1790",
-    accentBg:    "rgba(114,28,184,0.08)",
-    accentBorder:"rgba(114,28,184,0.25)",
+    color:       "#52396E",
+    accentBg:    "rgba(104,72,140,0.08)",
+    accentBorder:"rgba(104,72,140,0.25)",
     project:     SAMPLE_EC_PROJECT,
     computed:    SAMPLE_EC_COMPUTED,
     summary: {

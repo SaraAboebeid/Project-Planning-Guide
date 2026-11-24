@@ -65,7 +65,7 @@ export default function ComponentValuePanel({ input, currency, scopeLabel }: {
 
   if (!input || rows.length === 0) return null;
   const best = rows[0]!;
-  const th: React.CSSProperties = { textAlign: "right", padding: "6px 8px", fontWeight: 700, color: white(0.5), fontSize: 10.5, whiteSpace: "nowrap" };
+  const th: React.CSSProperties = { textAlign: "right", padding: "6px 8px", fontWeight: 600, color: white(0.5), fontSize: 11.5, whiteSpace: "nowrap" };
   const td: React.CSSProperties = { textAlign: "right", padding: "6px 8px", color: white(0.8), whiteSpace: "nowrap" };
   const yrs = (v: number | null) => v == null ? "—" : v > 100 ? t("> 100 yr") : t("{n} yr", { n: v.toFixed(v < 10 ? 1 : 0) });
 
@@ -74,20 +74,20 @@ export default function ComponentValuePanel({ input, currency, scopeLabel }: {
       <button onClick={() => setOpen((o) => !o)}
         style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 18px",
           background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
-        <ListOrdered size={16} color="#4ECDC4" />
-        <span style={{ fontSize: 14, fontWeight: 800, color: "#fff", flex: 1 }}>{t("Best value per component · if the budget is limited")}</span>
+        <ListOrdered size={16} color="#8B6EAD" />
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#fff", flex: 1 }}>{t("Best value per component · if the budget is limited")}</span>
         {open ? <ChevronDown size={16} color={white(0.4)} /> : <ChevronRight size={16} color={white(0.4)} />}
       </button>
       {open && (
         <div style={{ padding: "0 18px 16px" }}>
           <p style={{ fontSize: 12, color: white(0.55), margin: "0 0 10px", lineHeight: 1.6 }}>
             {t("Each build-up you saved, done")} <b>{t("on its own")}</b> {t("(everything else left as it is), ranked by how quickly the energy it saves pays back its cost. Best value right now:")}{" "}
-            <b style={{ color: "#4ECDC4" }}>{t(best.component)} — {best.label}</b>,{" "}
+            <b style={{ color: "#8B6EAD" }}>{t(best.component)} — {best.label}</b>,{" "}
             {t("saving about")} <b>{best.savedPerM2.toFixed(1)} kWh/m²·yr</b> {t("and paying back in")} <b>{yrs(best.paybackYr)}</b>.
             {scopeLabel && <> {t("Figures for {scope}.", { scope: scopeLabel })}</>}
           </p>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${white(0.1)}` }}>
                   <th style={{ ...th, textAlign: "left" }}>#</th>
@@ -102,7 +102,7 @@ export default function ComponentValuePanel({ input, currency, scopeLabel }: {
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={`${r.component}|${r.label}|${i}`} style={{ borderBottom: `1px solid ${white(0.05)}`,
-                    background: i === 0 ? "rgba(78,205,196,0.08)" : "transparent" }}>
+                    background: i === 0 ? "rgba(139,110,173,0.08)" : "transparent" }}>
                     <td style={{ ...td, textAlign: "left", color: white(0.45) }}>{i + 1}</td>
                     <td style={{ ...td, textAlign: "left", whiteSpace: "normal" }}>
                       <b style={{ color: "#fff" }}>{t(r.component)}</b> <span style={{ color: white(0.6) }}>— {r.label}</span>
@@ -110,20 +110,20 @@ export default function ComponentValuePanel({ input, currency, scopeLabel }: {
                     <td style={td}>{r.savedPerM2.toFixed(1)}</td>
                     <td style={td}>{r.pct.toFixed(0)}%</td>
                     <td style={td}>{money(r.cost)}</td>
-                    <td style={{ ...td, fontWeight: 700, color: i === 0 ? "#4ECDC4" : white(0.85) }}>{yrs(r.paybackYr)}</td>
+                    <td style={{ ...td, fontWeight: 600, color: i === 0 ? "#8B6EAD" : white(0.85) }}>{yrs(r.paybackYr)}</td>
                     <td style={td}>{yrs(r.carbonPaybackYr)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p style={{ fontSize: 10.5, color: white(0.4), margin: "8px 0 0", lineHeight: 1.55 }}>
+          <p style={{ fontSize: 11.5, color: white(0.4), margin: "8px 0 0", lineHeight: 1.55 }}>
             {t("Quick estimate from the same calibrated model as the trade-off curve; simulate a package in EnergyPlus for final numbers. Savings of single measures don't add up exactly to a package's saving — each measure reduces what the others can save. Payback is simple (today's energy price, not discounted).")}
             {noGain.length > 0 && <> {t("No energy saving (not better than what is there now):")} {noGain.map(([k, l]) => `${t(k)}: ${l}`).join(" · ")}.</>}
           </p>
 
           <details style={{ marginTop: 10, fontSize: 12, color: white(0.6), lineHeight: 1.6 }}>
-            <summary style={{ cursor: "pointer", color: "#4ECDC4", fontWeight: 700 }}>{t("How this is calculated")}</summary>
+            <summary style={{ cursor: "pointer", color: "#8B6EAD", fontWeight: 600 }}>{t("How this is calculated")}</summary>
             <div style={{ padding: "8px 0 0 14px" }}>
               <p style={{ margin: "0 0 8px" }}>
                 <b>{t("In short:")}</b> {t("for each build-up, how much heat the building stops losing if only that part is renovated, turned into money and carbon saved per year, then ranked by how fast it pays for itself.")}

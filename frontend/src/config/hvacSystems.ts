@@ -145,7 +145,7 @@ export const HVAC_SYSTEMS: HvacSystem[] = [
     capexPerKwSek: 7000,
     omFractionYr: 0.015,
     lifetimeYr: 16,
-    color: "#B98BE8",
+    color: "#B8A3D0",
     note: "Common in Swedish apartment blocks with mechanical exhaust ventilation; limited output, so best as a base-load or in smaller buildings.",
     source: "SPF: SVEP / Energimyndigheten frånluftsvärmepump data. Cost: Swedish installer estimates.",
     sourceUrl: "https://www.energimyndigheten.se/",

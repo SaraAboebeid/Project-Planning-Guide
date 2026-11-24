@@ -7,7 +7,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 const white = (o: number) => `rgba(255,255,255,${o})`;
 
 export default function PanelShell({
-  icon, iconColor = "#B98BE8", title, subtitle, badge, defaultOpen = true, children,
+  icon, iconColor = "#B8A3D0", title, subtitle, badge, defaultOpen = true, children,
 }: {
   icon: ReactNode;
   iconColor?: string;
@@ -29,8 +29,8 @@ export default function PanelShell({
           {icon}
         </span>
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#fff", lineHeight: 1.25 }}>{title}</span>
-          {subtitle && <span style={{ display: "block", fontSize: 11, color: white(0.42), marginTop: 1 }}>{subtitle}</span>}
+          <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: "#fff", lineHeight: 1.25 }}>{title}</span>
+          {subtitle && <span style={{ display: "block", fontSize: 12, color: white(0.42), marginTop: 1 }}>{subtitle}</span>}
         </span>
         {badge}
         {open ? <ChevronUp size={16} color={white(0.4)} style={{ flexShrink: 0 }} /> : <ChevronDown size={16} color={white(0.4)} style={{ flexShrink: 0 }} />}

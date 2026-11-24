@@ -15,7 +15,7 @@ const FLOW_DATA: Record<string, {
   }>;
 }> = {
   "Energy Community Planning": {
-    color: "#4ECDC4",
+    color: "#8B6EAD",
     steps: [
       {
         n: 1, label: "Define Project", color: "var(--brand)",
@@ -36,7 +36,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 3, label: "Data Overview", color: "#4ECDC4",
+        n: 3, label: "Data Overview", color: "#8B6EAD",
         subNodes: [
           { label: "OAT Sensitivity analysis", type: "engine" },
           { label: "Data readiness: 68%", type: "output" },
@@ -84,7 +84,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 3, label: "Select & Baseline", color: "#4ECDC4",
+        n: 3, label: "Select & Baseline", color: "#8B6EAD",
         subNodes: [
           { label: "EnergyPlus baseline via EPSM", type: "engine" },
           { label: "As-built heating / cooling / total", type: "output" },
@@ -136,7 +136,7 @@ const FLOW_DATA: Record<string, {
         ],
       },
       {
-        n: 3, label: "Data Overview", color: "#4ECDC4",
+        n: 3, label: "Data Overview", color: "#8B6EAD",
         subNodes: [
           { label: "OAT Sensitivity analysis", type: "engine" },
           { label: "Data readiness: 71%", type: "output" },
@@ -166,7 +166,7 @@ const SUB_COLORS: Record<SubNodeType, string> = {
   input:    "var(--brand)",
   db:       "#4A90E2",
   estimate: "#E8880C",
-  engine:   "#4ECDC4",
+  engine:   "#8B6EAD",
   scenario: "#E8880C",
   output:   "#2FB477",
 };
@@ -187,7 +187,7 @@ const PHASE_LABELS = [
 const GRID9 = "1fr 28px 1fr 28px 1fr 28px 1fr 28px 1fr";
 
 const TAB_COLORS: Record<string, string> = {
-  "Energy Community Planning": "#4ECDC4",
+  "Energy Community Planning": "#8B6EAD",
   "Renovation Planning":       "var(--brand)",
   "Renewable Energy Planning": "#2FB477",
 };
@@ -215,7 +215,7 @@ function ProjectFlowDiagram({ activeType, onTypeChange }: {
       {/* ── Header + Tabs ── */}
       <div style={{ padding: "14px 18px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <div style={{
-          fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.28)",
+          fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.28)",
           letterSpacing: 1.5, marginBottom: 10,
         }}>
           STEP-BY-STEP WORKFLOW
@@ -231,7 +231,7 @@ function ProjectFlowDiagram({ activeType, onTypeChange }: {
                 disabled={disabled}
                 title={disabled ? "Coming soon — not available yet" : undefined}
                 style={{
-                padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                 cursor: disabled ? "not-allowed" : "pointer",
                 border: `1px solid ${on && !disabled ? col : "rgba(255,255,255,0.10)"}`,
                 background: on && !disabled ? `${col}22` : "transparent",
@@ -255,7 +255,7 @@ function ProjectFlowDiagram({ activeType, onTypeChange }: {
             {flow.steps.flatMap((step, idx) => {
               const ph = (
                 <div key={`ph-${step.n}`} style={{
-                  fontSize: 9, fontWeight: 800, letterSpacing: 1.3,
+                  fontSize: 11, fontWeight: 700, letterSpacing: 1.3,
                   color: step.color + "cc", textAlign: "center",
                   paddingBottom: 6, borderBottom: `2px solid ${step.color}30`,
                 }}>
@@ -289,9 +289,9 @@ function ProjectFlowDiagram({ activeType, onTypeChange }: {
                     width: 24, height: 24, borderRadius: 7,
                     background: `${step.color}22`, border: `1px solid ${step.color}44`,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 12, fontWeight: 800, color: step.color, marginBottom: 8,
+                    fontSize: 12, fontWeight: 700, color: step.color, marginBottom: 8,
                   }}>{step.n}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#fff", lineHeight: 1.3 }}>
                     {step.label}
                   </div>
 
@@ -342,12 +342,12 @@ function ProjectFlowDiagram({ activeType, onTypeChange }: {
                         background: `${col}0d`, border: `1px solid ${col}28`,
                       }}>
                         <div style={{
-                          fontSize: 8, fontWeight: 700, color: col + "99",
+                          fontSize: 8, fontWeight: 600, color: col + "99",
                           letterSpacing: 0.8, marginBottom: 2,
                         }}>
                           {SUB_LABELS[node.type]}
                         </div>
-                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.62)", lineHeight: 1.35 }}>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.62)", lineHeight: 1.35 }}>
                           {node.label}
                         </div>
                       </div>
@@ -379,7 +379,7 @@ function ProjectFlowDiagram({ activeType, onTypeChange }: {
                   }}>
                     <Ic size={12} color={pw.color} />
                   </div>
-                  <div style={{ fontSize: 9, fontWeight: 800, color: `${pw.color}cc`, letterSpacing: 1.3 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: `${pw.color}cc`, letterSpacing: 1.3 }}>
                     PATHWAY DELIVERABLES
                   </div>
                 </div>
@@ -390,10 +390,10 @@ function ProjectFlowDiagram({ activeType, onTypeChange }: {
                       background: `${pw.color}0d`, border: `1px solid ${pw.color}30`,
                     }}>
                       <div style={{
-                        fontSize: 8, fontWeight: 800, color: pw.color,
+                        fontSize: 8, fontWeight: 700, color: pw.color,
                         letterSpacing: 0.8, marginBottom: 4,
                       }}>OUTPUT {o.n}</div>
-                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.68)", lineHeight: 1.4 }}>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.68)", lineHeight: 1.4 }}>
                         {o.text}
                       </div>
                     </div>
@@ -408,7 +408,7 @@ function ProjectFlowDiagram({ activeType, onTypeChange }: {
             display: "flex", gap: 14, marginTop: 14, flexWrap: "wrap",
             borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 12, alignItems: "center",
           }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.22)", letterSpacing: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.22)", letterSpacing: 1 }}>
               LEGEND
             </div>
             {(Object.entries(SUB_LABELS) as [SubNodeType, string][]).map(([type, label]) => (
@@ -417,16 +417,16 @@ function ProjectFlowDiagram({ activeType, onTypeChange }: {
                   width: 8, height: 8, borderRadius: 2,
                   background: SUB_COLORS[type] + "80", border: `1px solid ${SUB_COLORS[type]}60`,
                 }} />
-                <span style={{ fontSize: 9, color: "rgba(255,255,255,0.32)" }}>{label}</span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.32)" }}>{label}</span>
               </div>
             ))}
             <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 8 }}>
               <div style={{ width: 18, height: 1, background: "rgba(255,255,255,0.28)" }} />
-              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.32)" }}>Data Flow</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.32)" }}>Data Flow</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <div style={{ width: 18, height: 0, borderTop: "1px dashed rgba(255,255,255,0.28)" }} />
-              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.32)" }}>Tool Connection</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.32)" }}>Tool Connection</span>
             </div>
           </div>
         </div>
@@ -458,9 +458,9 @@ const PATHWAYS = [
     key: "Energy Community Planning",
     label: "Energy Community",
     sub: "Planning",
-    color: "#4ECDC4",
-    bgActive: "#4ECDC4",
-    borderActive: "#4ECDC4",
+    color: "#8B6EAD",
+    bgActive: "#8B6EAD",
+    borderActive: "#8B6EAD",
     Icon: Zap,
     outputs: [
       { n: "01", text: "Member building eligibility" },
@@ -489,13 +489,13 @@ const PATHWAYS = [
 ] as const;
 
 const ENGINE_TAGS = [
-  { label: "EnergyPlus / EPSM",     color: "#4ECDC4" },
+  { label: "EnergyPlus / EPSM",     color: "#8B6EAD" },
   { label: "MCDA + AHP",            color: "#E8880C" },
   { label: "Facade ML (MBDD2025)",  color: "#E6194B" },
-  { label: "Pareto optimizer",      color: "#B98BE8" },
+  { label: "Pareto optimizer",      color: "#B8A3D0" },
   { label: "Regret / Hurwicz",      color: "#4A90E2" },
   { label: "Sensitivity OAT",       color: "#4A90E2" },
-  { label: "TABULA Archetypes",     color: "#4ECDC4" },
+  { label: "TABULA Archetypes",     color: "#8B6EAD" },
   { label: "Wikells Cost DB",       color: "var(--brand)" },
   { label: "Boverket Klimatdb",     color: "#2FB477" },
   { label: "Nord Pool spot price",  color: "#4A90E2" },
@@ -555,7 +555,7 @@ const STATUS_COLOR: Record<OatStatus, string> = {
   available: "#2FB477",
   partial:   "#E8880C",
   proxy:     "#4A90E2",
-  assumed:   "#a78bfa",
+  assumed:   "#c1afd6",
   missing:   "rgba(255,80,80,0.90)",
 };
 const STATUS_LABEL: Record<OatStatus, string> = {
@@ -573,7 +573,7 @@ const TIER_COLOR = (rank: number) =>
 /* ─── EC pathway detail ─────────────────────────────────────────────── */
 function ECPathwayDetail() {
   const scenarios = [
-    { id: "A", name: "Micro cluster",  buildings: "2–4 bldgs",  pv: "20–40 kWp",  self: "55–70%", color: "#4ECDC4" },
+    { id: "A", name: "Micro cluster",  buildings: "2–4 bldgs",  pv: "20–40 kWp",  self: "55–70%", color: "#8B6EAD" },
     { id: "B", name: "Block sharing",  buildings: "5–12 bldgs", pv: "50–120 kWp", self: "70–85%", color: "#4A90E2" },
     { id: "C", name: "District-scale", buildings: "13+ bldgs",  pv: "150+ kWp",   self: "85–95%", color: "#2FB477" },
   ];
@@ -586,7 +586,7 @@ function ECPathwayDetail() {
   ];
   return (
     <div style={{ marginTop: 28 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.35)",
+      <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.35)",
                     textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>
         Your active pathway — Energy Community
       </div>
@@ -603,14 +603,14 @@ function ECPathwayDetail() {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontWeight: 900, fontSize: 15, color: s.color,
               }}>{s.id}</div>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{s.name}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{s.name}</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {[{ k: "Members", v: s.buildings }, { k: "PV system", v: s.pv }, { k: "Self-consumption", v: s.self }]
                 .map(({ k, v }) => (
                   <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.40)" }}>{k}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{v}</span>
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.40)" }}>{k}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{v}</span>
                   </div>
                 ))}
             </div>
@@ -623,15 +623,15 @@ function ECPathwayDetail() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <Users size={14} color="rgba(255,255,255,0.40)" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.55)" }}>
             Inputs needed to run this pathway
           </span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {inputs.map((inp, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11,
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12,
                                   color: "rgba(255,255,255,0.55)" }}>
-              <span style={{ color: "#4ECDC4", fontWeight: 800, fontSize: 10, marginTop: 1, flexShrink: 0 }}>
+              <span style={{ color: "#8B6EAD", fontWeight: 700, fontSize: 11, marginTop: 1, flexShrink: 0 }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
               {inp}
@@ -659,7 +659,7 @@ function REPathwayDetail() {
   ];
   return (
     <div style={{ marginTop: 28 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.35)",
+      <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.35)",
                     textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>
         Your active pathway — Renewable Energy
       </div>
@@ -677,15 +677,15 @@ function REPathwayDetail() {
                 fontWeight: 900, fontSize: 15, color: s.color,
               }}>{s.id}</div>
               <div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", display: "block" }}>{s.name}</span>
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.30)" }}>Roof coverage {s.pct}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", display: "block" }}>{s.name}</span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.30)" }}>Roof coverage {s.pct}</span>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {[{ k: "Capacity", v: s.kWp }, { k: "Annual yield", v: s.yield }].map(({ k, v }) => (
                 <div key={k} style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.40)" }}>{k}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{v}</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.40)" }}>{k}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{v}</span>
                 </div>
               ))}
             </div>
@@ -698,15 +698,15 @@ function REPathwayDetail() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <BarChart2 size={14} color="rgba(255,255,255,0.40)" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.55)" }}>
             Inputs needed to run this pathway
           </span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {inputs.map((inp, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11,
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12,
                                   color: "rgba(255,255,255,0.55)" }}>
-              <span style={{ color: "#2FB477", fontWeight: 800, fontSize: 10, marginTop: 1, flexShrink: 0 }}>
+              <span style={{ color: "#2FB477", fontWeight: 700, fontSize: 11, marginTop: 1, flexShrink: 0 }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
               {inp}
@@ -728,7 +728,7 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
   const top3 = params.slice(0, 3);
   const rest = params.slice(3);
   const typeColor = activeType === "Renovation Planning" ? "var(--brand)"
-    : activeType === "Energy Community Planning" ? "#4ECDC4" : "#2FB477";
+    : activeType === "Energy Community Planning" ? "#8B6EAD" : "#2FB477";
 
   return (
     <div style={{
@@ -750,10 +750,10 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
             <TrendingUp size={16} color={typeColor} />
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", letterSpacing: 0.4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", letterSpacing: 0.4 }}>
               SENSITIVITY IMPACT MAP
             </div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.28)", marginTop: 1 }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.28)", marginTop: 1 }}>
               One-At-a-Time (OAT) · {data.metric} · {params.length} parameters ranked
             </div>
           </div>
@@ -771,7 +771,7 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
 
       {/* ── Heatmap impact strip ── */}
       <div style={{ padding: "12px 18px 0" }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.22)", letterSpacing: 1, marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.22)", letterSpacing: 1, marginBottom: 6 }}>
           IMPACT DISTRIBUTION — {data.unit.toUpperCase()}
         </div>
         <div style={{ display: "flex", height: 22, borderRadius: 8, overflow: "hidden", gap: 1 }}>
@@ -787,7 +787,7 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
                 {pct > 9 && (
                   <span style={{
                     position: "absolute", inset: 0, display: "flex", alignItems: "center",
-                    justifyContent: "center", fontSize: 8, fontWeight: 800,
+                    justifyContent: "center", fontSize: 8, fontWeight: 700,
                     color: "rgba(0,0,0,0.55)",
                   }}>{pct.toFixed(0)}%</span>
                 )}
@@ -833,17 +833,17 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
                 {/* tier badge + rank */}
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
                   <span style={{
-                    fontSize: 8, fontWeight: 800, letterSpacing: 0.8, padding: "1px 6px",
+                    fontSize: 8, fontWeight: 700, letterSpacing: 0.8, padding: "1px 6px",
                     borderRadius: 4, background: `${tierCol}22`, color: tierCol,
                     border: `1px solid ${tierCol}40`,
                   }}>{TIER_LABEL(i + 1)}</span>
-                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.22)" }}>#{i + 1}</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.22)" }}>#{i + 1}</span>
                 </div>
                 {/* label */}
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.2, marginBottom: 4 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#fff", lineHeight: 1.2, marginBottom: 4 }}>
                   {p.label}
                 </div>
-                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.30)", marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.30)", marginBottom: 8 }}>
                   {p.category}
                 </div>
                 {/* big % */}
@@ -851,7 +851,7 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
                   <span style={{ fontSize: 24, fontWeight: 900, color: tierCol, lineHeight: 1 }}>
                     {pct.toFixed(1)}
                   </span>
-                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.30)" }}>% of spread</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.30)" }}>% of spread</span>
                 </div>
                 {/* mini bar */}
                 <div style={{
@@ -866,16 +866,16 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
                 {/* status + mwh */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                   <span style={{
-                    fontSize: 9, fontWeight: 700, padding: "1px 7px", borderRadius: 4,
+                    fontSize: 11, fontWeight: 600, padding: "1px 7px", borderRadius: 4,
                     background: `${col}18`, color: col, border: `1px solid ${col}35`,
                   }}>{STATUS_LABEL[p.status]}</span>
-                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>
                     ±{(p.rangeKwh / 1000).toFixed(0)} MWh
                   </span>
                 </div>
                 {/* insight */}
                 <p style={{
-                  fontSize: 10, color: "rgba(255,255,255,0.38)", margin: 0, lineHeight: 1.5,
+                  fontSize: 11, color: "rgba(255,255,255,0.38)", margin: 0, lineHeight: 1.5,
                   borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8,
                 }}>{p.insight}</p>
               </div>
@@ -889,7 +889,7 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
         <button onClick={() => setExpanded(!expanded)} style={{
           width: "100%", padding: "7px 12px", borderRadius: 8, cursor: "pointer",
           background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
-          color: "rgba(255,255,255,0.40)", fontSize: 10, fontWeight: 600, textAlign: "left",
+          color: "rgba(255,255,255,0.40)", fontSize: 11, fontWeight: 600, textAlign: "left",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
           <span>All {params.length} parameters ranked</span>
@@ -906,11 +906,11 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
               return (
                 <div key={p.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{
-                    width: 20, flexShrink: 0, textAlign: "right", fontSize: 9, fontWeight: 800,
+                    width: 20, flexShrink: 0, textAlign: "right", fontSize: 11, fontWeight: 700,
                     color: i < 2 ? TIER_COLOR(i + 1) : "rgba(255,255,255,0.18)",
                   }}>#{i + 1}</span>
                   <span style={{
-                    width: 160, flexShrink: 0, fontSize: 10, fontWeight: 500,
+                    width: 160, flexShrink: 0, fontSize: 11, fontWeight: 500,
                     color: "rgba(255,255,255,0.65)", whiteSpace: "nowrap",
                     overflow: "hidden", textOverflow: "ellipsis",
                   }}>{p.label}</span>
@@ -924,11 +924,11 @@ function SensitivityPanel({ activeType }: { activeType: string }) {
                       transition: "width 0.5s ease",
                     }} />
                   </div>
-                  <span style={{ width: 34, flexShrink: 0, textAlign: "right", fontSize: 10, fontWeight: 700, color: col }}>
+                  <span style={{ width: 34, flexShrink: 0, textAlign: "right", fontSize: 11, fontWeight: 600, color: col }}>
                     {pct.toFixed(1)}%
                   </span>
                   <span style={{
-                    width: 54, flexShrink: 0, textAlign: "right", fontSize: 9,
+                    width: 54, flexShrink: 0, textAlign: "right", fontSize: 11,
                     padding: "1px 6px", borderRadius: 4,
                     background: `${col}14`, color: col, border: `1px solid ${col}28`,
                     fontWeight: 600,
@@ -967,7 +967,7 @@ function FlowConnector() {
       }} />
       <div style={{
         position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
-        color: "rgba(255,255,255,0.22)", fontSize: 11, lineHeight: 1,
+        color: "rgba(255,255,255,0.22)", fontSize: 12, lineHeight: 1,
       }}>▼</div>
     </div>
   );
@@ -977,7 +977,7 @@ function DownArrow() {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", height: 32, justifyContent: "center" }}>
       <div style={{ width: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
-      <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 11, lineHeight: 1 }}>▼</div>
+      <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 12, lineHeight: 1 }}>▼</div>
     </div>
   );
 }
@@ -998,9 +998,9 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: 0 }}>Workflow</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: "#fff", margin: 0 }}>Workflow</h2>
           <span style={{
-            padding: "2px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700,
+            padding: "2px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
             background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.40)",
             border: "1px solid rgba(255,255,255,0.09)", letterSpacing: 1,
           }}>TOOL CAPABILITY MAP</span>
@@ -1029,13 +1029,13 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
           <Cpu size={20} color="#4A90E2" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", marginBottom: 8, letterSpacing: 0.3 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 8, letterSpacing: 0.3 }}>
             ANALYSIS ENGINE
           </div>
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             {ENGINE_TAGS.map((t) => (
               <span key={t.label} style={{
-                padding: "2px 8px", borderRadius: 5, fontSize: 9, fontWeight: 700,
+                padding: "2px 8px", borderRadius: 5, fontSize: 11, fontWeight: 600,
                 background: `${t.color}14`, color: t.color,
                 border: `1px solid ${t.color}28`, letterSpacing: 0.3,
               }}>{t.label}</span>

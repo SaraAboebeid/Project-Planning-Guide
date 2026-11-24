@@ -42,7 +42,7 @@ if (window.location.protocol === 'file:') {
     '<p style="color:#94a3b8;font-size:13px;line-height:1.8">Cesium cannot load its 3D engine from <b>file://</b>.<br><br>' +
     'Open a terminal in the project folder and run:<br><br>' +
     '<code style="background:rgba(255,255,255,0.1);padding:8px 20px;border-radius:8px;font-size:14px">python launch.py</code><br><br>' +
-    'Your browser will open automatically at<br><b style="color:#a78bfa">http://localhost:8765</b></p>' +
+    'Your browser will open automatically at<br><b style="color:#c1afd6">http://localhost:8765</b></p>' +
     '</div>';
   throw new Error('file:// not supported');
 }
@@ -768,7 +768,7 @@ function setBuildingHighlight(idx, color) {
         vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
       }),
       attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(
-        color || Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.42)) },
+        color || Cesium.Color.fromCssColorString('#c1afd6').withAlpha(0.42)) },
       id: { _dataIdx: idx },
     }),
     appearance: new Cesium.PerInstanceColorAppearance({ closed: true, translucent: true }),
@@ -789,8 +789,8 @@ window.setHighlightVisible = function (visible) {
 // heavier both obscures the building and tints the image the WWR vision model is
 // asked to judge. (It is hidden outright during a capture — see
 // setHighlightVisible below.)
-const HL_HOVER  = Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.08);
-const HL_SELECT = Cesium.Color.fromCssColorString('#4ECDC4').withAlpha(0.10);
+const HL_HOVER  = Cesium.Color.fromCssColorString('#c1afd6').withAlpha(0.08);
+const HL_SELECT = Cesium.Color.fromCssColorString('#8B6EAD').withAlpha(0.10);
 let _pinnedIdx = null;
 
 window.setSelectedBuilding = function (idx) {

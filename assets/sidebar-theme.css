@@ -19,23 +19,23 @@
   --sb-surface: rgba(15, 17, 23, 0.045);     /* was rgba(255,255,255,0.05) */
   --sb-surface-2: rgba(15, 17, 23, 0.085);   /* was rgba(255,255,255,0.09) */
   --sb-border: rgba(15, 17, 23, 0.12);       /* was rgba(255,255,255,0.08) */
-  --sb-border-strong: rgba(114, 28, 184, 0.45);
+  --sb-border-strong: rgba(104,72,140, 0.45);
   --sb-text: rgba(15, 17, 23, 0.88);         /* was rgba(255,255,255,0.9) */
   --sb-muted: rgba(15, 17, 23, 0.58);        /* was rgba(255,255,255,0.56) */
   --sb-faint: rgba(15, 17, 23, 0.46);        /* was rgba(255,255,255,0.35) */
-  --sb-accent: #721cb8;
-  --sb-accent-dark: #421869;
-  --sb-accent-light: #995bd5;
+  --sb-accent: #68488c;
+  --sb-accent-dark: #3f2c55;
+  --sb-accent-light: #967ab6;
   --sb-success: #2FB477;
   --sb-shadow: 0 18px 40px rgba(15, 17, 23, 0.16);  /* was 0 24px 48px rgba(0,0,0,.4) */
 
-  /* Light-surface-safe variants. #995bd5 on white is ~4.0:1 and #2FB477 is
+  /* Light-surface-safe variants. #967ab6 on white is ~4.0:1 and #2FB477 is
      ~2.8:1 — both too low for the small bold numerals they were used on, so
      the sidebar uses these instead while the dark panels keep the originals. */
-  --sb-accent-on-light: #6D28D9;
+  --sb-accent-on-light: #7E58A9;
   --sb-success-on-light: #1F8A5B;
-  --sb-tint: rgba(114, 28, 184, 0.10);
-  --sb-tint-strong: rgba(114, 28, 184, 0.16);
+  --sb-tint: rgba(104,72,140, 0.10);
+  --sb-tint-strong: rgba(104,72,140, 0.16);
   --sb-hairline: rgba(15, 17, 23, 0.09);
 
   /* SECOND TOKEN FAMILY — do not miss this one.
@@ -50,12 +50,12 @@
   --map-sidebar-surface: rgba(15, 17, 23, 0.045);     /* was rgba(255,255,255,0.05) */
   --map-sidebar-surface-strong: rgba(15, 17, 23, 0.085); /* was rgba(255,255,255,0.08) */
   --map-sidebar-border: rgba(15, 17, 23, 0.12);       /* was rgba(255,255,255,0.10) */
-  --map-sidebar-border-strong: rgba(114, 28, 184, 0.45);
+  --map-sidebar-border-strong: rgba(104,72,140, 0.45);
   --map-sidebar-text: rgba(15, 17, 23, 0.88);         /* was rgba(255,255,255,0.92) */
   --map-sidebar-muted: rgba(15, 17, 23, 0.58);        /* was rgba(255,255,255,0.58) */
   --map-sidebar-faint: rgba(15, 17, 23, 0.46);        /* was rgba(255,255,255,0.36) */
-  --map-sidebar-accent: #721CB8;
-  --map-sidebar-accent-2: #6D28D9;                    /* was #995BD5 — too pale on white */
+  --map-sidebar-accent: #68488C;
+  --map-sidebar-accent-2: #7E58A9;                    /* was #967AB6 — too pale on white */
   --map-sidebar-success: #1F8A5B;                     /* was #37D39A — ~2.2:1 on white */
 }
 
@@ -77,7 +77,7 @@
 }
 
 #lp-header {
-  background: linear-gradient(135deg, var(--sb-accent-dark) 0%, var(--sb-accent) 100%) !important;
+  background: var(--sb-accent-dark) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
   padding: 18px 16px 14px !important;
 }
@@ -210,7 +210,7 @@
 }
 
 .lp-tab:hover {
-  background: rgba(114, 28, 184, 0.2) !important;
+  background: rgba(104,72,140, 0.2) !important;
   border-color: var(--sb-border-strong) !important;
   color: #fff !important;
 }
@@ -220,7 +220,7 @@
   border-color: var(--sb-accent) !important;
   color: #fff !important;
   font-weight: 600 !important;
-  box-shadow: 0 4px 14px rgba(114, 28, 184, 0.3) !important;
+  box-shadow: 0 4px 14px rgba(104,72,140, 0.3) !important;
 }
 
 /* Buttons */
@@ -236,14 +236,14 @@
 .btn:hover,
 .tool-btn:hover:not(:disabled),
 .sub-btn:hover {
-  background: rgba(114, 28, 184, 0.2) !important;
+  background: rgba(104,72,140, 0.2) !important;
   border-color: var(--sb-border-strong) !important;
   color: #fff !important;
 }
 
 .btn.active,
 .sub-btn.active {
-  background: rgba(114, 28, 184, 0.28) !important;
+  background: rgba(104,72,140, 0.28) !important;
   border-color: var(--sb-accent-light) !important;
   color: #fff !important;
 }
@@ -281,7 +281,7 @@
 .tool-btn:hover:not(:disabled),
 .tool-btn.pvgis-btn:hover:not(:disabled),
 #btn-reset:hover {
-  background: rgba(114, 28, 184, 0.2) !important;
+  background: rgba(104,72,140, 0.2) !important;
   border-color: rgba(255, 255, 255, 0.16) !important;
   color: #fff !important;
 }
@@ -301,13 +301,13 @@
 
 .base-btn:hover,
 .overlay-btn:hover {
-  background: rgba(114, 28, 184, 0.2) !important;
+  background: rgba(104,72,140, 0.2) !important;
   color: #fff !important;
 }
 
 .base-btn.active,
 .overlay-btn.active {
-  background: rgba(114, 28, 184, 0.28) !important;
+  background: rgba(104,72,140, 0.28) !important;
   color: #fff !important;
 }
 
@@ -319,7 +319,7 @@
 .base-btn.active .base-indicator {
   background: var(--sb-accent-light) !important;
   border-color: var(--sb-accent-light) !important;
-  box-shadow: 0 0 0 3px rgba(114, 28, 184, 0.18) !important;
+  box-shadow: 0 0 0 3px rgba(104,72,140, 0.18) !important;
 }
 
 .overlay-btn.active .overlay-check {
@@ -348,7 +348,7 @@
   color: var(--sb-text) !important;
 }
 .analysis-tools-group .tool-btn:hover:not(:disabled) {
-  background: rgba(114, 28, 184, 0.2) !important;
+  background: rgba(104,72,140, 0.2) !important;
   color: #fff !important;
 }
 
@@ -368,7 +368,7 @@
 .scb-year-sel:focus {
   background: var(--sb-surface-2) !important;
   border-color: var(--sb-accent-light) !important;
-  box-shadow: 0 0 0 3px rgba(114, 28, 184, 0.18) !important;
+  box-shadow: 0 0 0 3px rgba(104,72,140, 0.18) !important;
   outline: none !important;
 }
 
@@ -382,7 +382,7 @@
 }
 
 .result-item:hover {
-  background: rgba(114, 28, 184, 0.2) !important;
+  background: rgba(104,72,140, 0.2) !important;
 }
 
 /* Tooltip and hover card */
@@ -411,7 +411,7 @@
 
 #hover-card {
   background: rgba(13, 17, 23, 0.96) !important;
-  border: 1px solid rgba(114, 28, 184, 0.3) !important;
+  border: 1px solid rgba(104,72,140, 0.3) !important;
   color: rgba(255, 255, 255, 0.88) !important;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4) !important;
 }
@@ -466,15 +466,15 @@
 
 #token-input:focus {
   border-color: var(--sb-accent-light) !important;
-  box-shadow: 0 0 0 3px rgba(114, 28, 184, 0.18) !important;
+  box-shadow: 0 0 0 3px rgba(104,72,140, 0.18) !important;
   outline: none !important;
 }
 
 #btn-wwr-save,
 #btn-manual-capture {
-  background: rgba(114, 28, 184, 0.26) !important;
+  background: rgba(104,72,140, 0.26) !important;
   border-color: var(--sb-accent-light) !important;
-  color: #ecd9ff !important;
+  color: #ece6f2 !important;
 }
 
 /* Transit rows and panel details */
@@ -484,7 +484,7 @@
 }
 
 .vt-disr-row:hover {
-  background: rgba(114, 28, 184, 0.14) !important;
+  background: rgba(104,72,140, 0.14) !important;
 }
 
 .vt-dest,
@@ -499,7 +499,7 @@
 
 /* Scrollbar and small toggles */
 #lp-scroll::-webkit-scrollbar-thumb {
-  background: rgba(114, 28, 184, 0.35) !important;
+  background: rgba(104,72,140, 0.35) !important;
 }
 
 #vt-ghost-toggle {
@@ -625,7 +625,7 @@
 #country-energy-bars .bar-fill {
   height: 100% !important;
   border-radius: 4px !important;
-  background: linear-gradient(90deg, #7c3aed, #a78bfa) !important;
+  background: #9171b6 !important;
 }
 
 /* ── Global clickability affordance (matches the React app) ─────────────────
@@ -706,7 +706,7 @@ a[href]:hover,
   color: var(--sb-accent-on-light) !important;
 }
 
-/* .lp-tab.active keeps solid #721cb8 with white text — that contrast is fine. */
+/* .lp-tab.active keeps solid #68488c with white text — that contrast is fine. */
 
 /* ── 3. Hairlines and dividers ──────────────────────────────── */
 .lp-divider,
@@ -769,7 +769,7 @@ a[href]:hover,
 #wwr-panel,
 #facade-panel {
   background: #FFFFFF !important;
-  border: 1px solid rgba(114, 28, 184, 0.22) !important;
+  border: 1px solid rgba(104,72,140, 0.22) !important;
   color: rgba(15, 17, 23, 0.88) !important;
   box-shadow: 0 16px 38px rgba(15, 17, 23, 0.18) !important;
 }
@@ -801,30 +801,30 @@ a[href]:hover,
    fills are painted in facade_inspector.js and were changed there to match. */
 .fi-manual {
   background: #F8FAFC !important;
-  border-color: #C4B5FD !important;
+  border-color: #D8CDE5 !important;
 }
 .fi-cardinals-label {
   color: rgba(15, 17, 23, 0.55) !important;   /* was --faint: ~2.5:1 at 9px */
 }
 /* Restated with !important so the base rule below cannot flatten them. */
 .facade-thumb          { border-color: #E2E8F0 !important; }
-.facade-thumb.active   { border-color: #A78BFA !important; }
+.facade-thumb.active   { border-color: #C1AFD6 !important; }
 .facade-thumb.captured { border-color: #22C55E !important; }
 
-/* Primary actions: pale-lilac text (#c4b5fd / #ecd9ff) only worked on black.
+/* Primary actions: pale-lilac text (#d8cde5 / #ece6f2) only worked on black.
    Solid purple with white text reads on white and still marks "do this". */
 .fi-primary,
 #btn-manual-capture,
 #btn-wwr-save {
-  background: #6D28D9 !important;
-  border-color: #6D28D9 !important;
+  background: #7E58A9 !important;
+  border-color: #7E58A9 !important;
   color: #FFFFFF !important;
 }
 .fi-primary:hover,
 #btn-manual-capture:hover,
 #btn-wwr-save:hover {
-  background: #5B21B6 !important;
-  border-color: #5B21B6 !important;
+  background: #69498E !important;
+  border-color: #69498E !important;
   color: #FFFFFF !important;
 }
 
@@ -893,7 +893,7 @@ a[href]:hover,
 
 /* ── 8. Loading screen ─────────────────────────────────────── */
 /* White, to match the sidebar and panels (was #0f1117 in main.css). The lime
-   title (#96D74C) and pale spinner arc (#a78bfa) were picked for the old
+   title (#96D74C) and pale spinner arc (#c1afd6) were picked for the old
    near-black background and are ~1.7:1 on white, so both move to the brand
    purple. Lives here rather than in gothenburg_3d.css, which build.py
    regenerates; both the Gothenburg and UK viewers load this file. */
@@ -901,12 +901,12 @@ a[href]:hover,
   background: #FFFFFF !important;
 }
 #loading h1 {
-  color: #6D28D9 !important;
+  color: #7E58A9 !important;
 }
 #loading p {
   color: #64748B !important;
 }
 .spinner {
-  border-color: rgba(114, 28, 184, 0.15) !important;
-  border-top-color: #6D28D9 !important;
+  border-color: rgba(104,72,140, 0.15) !important;
+  border-top-color: #7E58A9 !important;
 }

@@ -18,6 +18,7 @@ import {
   TileLayer,
   Marker,
   Popup,
+  Tooltip,
   Rectangle,
   Polygon,
   CircleMarker,
@@ -28,9 +29,10 @@ import {
 import L from "leaflet";
 import type { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MapPin, Search, Square, PenTool, X, Maximize2, Minimize2 } from "lucide-react";
+import { MapPin, Search, Square, PenTool, X, Maximize2, Minimize2, MousePointerClick, Loader2 } from "lucide-react";
 import { countryCodeFromName, mapCenterFor, seCityId } from "../config/countryNav";
 import { useT } from "../i18n";
+import { api } from "../api/client";
 
 // ── Fix Leaflet default icon paths broken by Vite bundling ──────────────────
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -72,7 +74,7 @@ function pointInBoundary(lat: number, lon: number, geom: BoundaryGeom): boolean 
 }
 
 // ── Location modes (Building scale): the one clear choice a user makes ────────
-type LocationMode = "addresses" | "area" | "bbox" | "polygon";
+type LocationMode = "addresses" | "area" | "bbox" | "polygon" | "pick";
 const LOCATION_MODES: {
   key: LocationMode;
   label: string;
@@ -81,6 +83,8 @@ const LOCATION_MODES: {
 }[] = [
   { key: "addresses", label: "Address", icon: MapPin,
     desc: "Pin one or more specific buildings by address." },
+  { key: "pick", label: "Pick buildings", icon: MousePointerClick,
+    desc: "Click buildings on the map to add them one by one - they can be anywhere in the city." },
   { key: "bbox", label: "Draw box", icon: Square,
     desc: "Drag a rectangle on the map to grab everything inside it." },
   { key: "polygon", label: "Draw shape", icon: PenTool,
@@ -148,14 +152,14 @@ const _bboxCornerIcon = L.divIcon({
 
 const _bboxEdgeIcon = L.divIcon({
   className: "",
-  html: '<div style="width:10px;height:10px;border-radius:9999px;background:#6E2AAE;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.30)"></div>',
+  html: '<div style="width:10px;height:10px;border-radius:9999px;background:#6A4B8D;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.30)"></div>',
   iconSize: [10, 10],
   iconAnchor: [5, 5],
 });
 
 const _bboxCenterIcon = L.divIcon({
   className: "",
-  html: '<div style="width:14px;height:14px;border-radius:9999px;background:#14b8a6;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.35)"></div>',
+  html: '<div style="width:14px;height:14px;border-radius:9999px;background:#644587;border:2px solid #fff;box-shadow:0 1px 6px rgba(15,23,42,0.35)"></div>',
   iconSize: [14, 14],
   iconAnchor: [7, 7],
 });
@@ -242,6 +246,22 @@ function MapFitBounds({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, map]);
+  return null;
+}
+
+/** Frame these points once (on mount) - for a selection restored from the project. */
+function FitOnce({ points }: { points: LatLngTuple[] }) {
+  const map = useMap();
+  useEffect(() => {
+    const go = () => {
+      if (points.length === 1) map.setView(points[0]!, 17);
+      else map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 17 });
+    };
+    // Step 1 reveals the map card with an animation; wait for a real size.
+    const t = window.setTimeout(() => { map.invalidateSize(); go(); }, 350);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return null;
 }
 
@@ -418,6 +438,17 @@ function BboxEditHandles({
     </>
   );
 }
+
+// ── Pick mode: each map click adds the building under the cursor ────────────
+function PickClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }) {
+  useMapEvents({ click(e) { onPick(e.latlng.lat, e.latlng.lng); } });
+  return null;
+}
+
+/** A click further than this from the nearest building's centre is treated as
+ *  "not on a building" rather than silently picking a neighbour. Generous enough
+ *  for the far end of a long slab block (the lookup measures to the centre). */
+const PICK_MAX_DIST_M = 60;
 
 // ── Polygon (any-shape) draw handler: click to add each vertex ──────────────
 function PolygonClickHandler({
@@ -603,6 +634,16 @@ interface LocationMapProps {
   ) => void;
   onBuildingListCsvUpload?: (file: File | null) => void;
   buildingListCsvMessage?: string | null;
+  /** The selection already made (from the project), so coming back to Step 1
+   *  shows it instead of an empty map - and never clears it on mount. */
+  initialSelection?: {
+    mode?: LocationMode;
+    points?: { lat: number; lon: number; label: string }[];
+    bbox?: BboxCoords | null;
+    polygon?: string | null;
+  };
+  /** Fires when the user switches mode, so it can be stored with the project. */
+  onModeChange?: (mode: LocationMode) => void;
   /** Fires when the selected location's validity changes (e.g. an address falls
    *  outside the Gothenburg municipality). `valid=false` should block Continue. */
   onLocationValidityChange?: (valid: boolean, message: string | null) => void;
@@ -620,7 +661,23 @@ export default function LocationMap({
   onBuildingListCsvUpload,
   buildingListCsvMessage,
   onLocationValidityChange,
+  initialSelection,
+  onModeChange,
 }: LocationMapProps) {
+  // ── Restore what was selected before (coming back to Step 1 from a later step) ──
+  // Everything below starts from the project's stored selection. Read once, on
+  // mount; afterwards the map's own state is the source of truth.
+  const [init] = useState(() => {
+    const s = initialSelection ?? {};
+    const polyVertsInit: LatLngTuple[] = (s.polygon ?? "").split(";").map((pair) => {
+      const [lon, lat] = pair.split(",").map(Number);
+      return [lat, lon] as LatLngTuple;
+    }).filter((v) => Number.isFinite(v[0]) && Number.isFinite(v[1]));
+    const pts: GeoPoint[] = (s.points ?? []).map((p) => ({ address: p.label ?? "", lat: p.lat, lon: p.lon, label: p.label ?? "" }));
+    const mode: LocationMode = s.mode
+      ?? (polyVertsInit.length >= 3 ? "polygon" : s.bbox ? "bbox" : "addresses");
+    return { mode, pts, bbox: s.bbox ?? null, polyVerts: polyVertsInit };
+  });
   const t = useT();
   const isBuilding = scale === "Building";
   const countryCode = countryCodeFromName(country);
@@ -646,25 +703,35 @@ export default function LocationMap({
   const [boundary, setBoundary] = useState<BoundaryFeature | null>(null);
   const [districtBoundary, setDistrictBoundary] = useState<BoundaryFeature | null>(null);
 
-  const [locationMode, setLocationMode] = useState<"addresses" | "area" | "bbox" | "polygon">(
-    "addresses"
-  );
+  // Points to frame once on mount when a pick list or a shape is restored.
+  const [restoredFit] = useState<LatLngTuple[]>(() =>
+    init.mode === "pick" ? init.pts.map((p) => [p.lat, p.lon] as LatLngTuple)
+      : init.mode === "polygon" && init.polyVerts.length >= 3 ? init.polyVerts : []);
+  const [locationMode, setLocationModeState] = useState<LocationMode>(init.mode);
+  const setLocationMode = (m: LocationMode) => { setLocationModeState(m); onModeChange?.(m); };
+  // Pick mode: buildings clicked on the map (snapped to each building's centre).
+  const [picked, setPicked] = useState<GeoPoint[]>(init.mode === "pick" ? init.pts : []);
+  const [pickBusy, setPickBusy] = useState(false);
+  const [pickMsg, setPickMsg] = useState<string | null>(null);
   // CSV formatting rules start hidden: uploading is one option among several, and
   // the rules only matter to someone actually preparing a file.
   const [csvHelpOpen, setCsvHelpOpen] = useState(false);
   // Street/area search: the label of the feature whose bounds are selected.
   const [areaLabel, setAreaLabel] = useState<string | null>(null);
-  const [addressInputs, setAddressInputs] = useState<string[]>([""]);
-  const [geoPoints, setGeoPoints] = useState<(GeoPoint | null)[]>([null]);
+  const restoreAddr = init.mode === "addresses" && init.pts.length > 0;
+  const [addressInputs, setAddressInputs] = useState<string[]>(restoreAddr ? init.pts.map((p) => p.label) : [""]);
+  const [geoPoints, setGeoPoints] = useState<(GeoPoint | null)[]>(restoreAddr ? init.pts : [null]);
 
-  const [bbox, setBbox] = useState<BboxCoords | null>(null);
+  const restoreBox = (init.mode === "bbox" || init.mode === "area") && !!init.bbox;
+  const [bbox, setBbox] = useState<BboxCoords | null>(restoreBox ? init.bbox : null);
   const [bboxPreview, setBboxPreview] = useState<BboxCoords | null>(null);
-  const [bboxDone, setBboxDone] = useState(false);
+  const [bboxDone, setBboxDone] = useState(restoreBox);
   const [bboxRedrawMode, setBboxRedrawMode] = useState(false);
 
   // Free-form polygon vertices ([lat, lng] for Leaflet); done = closed & applied
-  const [polyVerts, setPolyVerts] = useState<LatLngTuple[]>([]);
-  const [polyDone, setPolyDone] = useState(false);
+  const restorePoly = init.mode === "polygon" && init.polyVerts.length >= 3;
+  const [polyVerts, setPolyVerts] = useState<LatLngTuple[]>(restorePoly ? init.polyVerts : []);
+  const [polyDone, setPolyDone] = useState(restorePoly);
 
   // Maximized map: fills the screen so an area is easier to find and draw.
   const [mapMaximized, setMapMaximized] = useState(false);
@@ -731,10 +798,65 @@ export default function LocationMap({
       onAddressChange("");
       onPointsChange?.([]);
     }
+
+    // Pick and Address each own a list of buildings; switching shows (and
+    // selects) that mode's list, and drops any drawn area.
+    if (next === "pick" || next === "addresses") {
+      setAreaLabel(null);
+      setBbox(null);
+      setBboxPreview(null);
+      setBboxDone(false);
+      setBboxRedrawMode(false);
+      setPolyVerts([]);
+      setPolyDone(false);
+      onBboxChange?.(null);
+      onPolygonChange?.(null, null);
+      setPickMsg(null);
+      const pts = next === "pick" ? picked : geoPoints.filter((p): p is GeoPoint => p !== null && !!p.lat);
+      onPointsChange?.(pts.map((p) => ({ lat: p.lat, lon: p.lon, label: p.label })));
+      onAddressChange(next === "pick" ? picked.map((p) => p.label).join("; ") : addressInputs.filter(Boolean).join("; "));
+    }
   }
 
-  // Reset when scale changes
+  // ── Pick handlers ──────────────────────────────────────────────────────────
+  function publishPicked(next: GeoPoint[]) {
+    setPicked(next);
+    onPointsChange?.(next.map((p) => ({ lat: p.lat, lon: p.lon, label: p.label })));
+    onAddressChange(next.map((p) => p.label).join("; "));
+  }
+  async function pickAt(lat: number, lon: number) {
+    if (pickBusy) return;
+    setPickBusy(true);
+    setPickMsg(null);
+    try {
+      const b = await api.lookupBuilding(lat, lon, country);
+      if (!b || typeof b.lat !== "number" || (b.dist_m ?? 0) > PICK_MAX_DIST_M) {
+        setPickMsg(t("No building there - click directly on a building."));
+        return;
+      }
+      const key = (p: { lat: number; lon: number }) => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
+      if (picked.some((p) => key(p) === key(b))) {
+        setPickMsg(t("{name} is already selected.", { name: b.address ?? t("This building") }));
+        return;
+      }
+      const label = b.address ?? t("Building at {lat}, {lon}", { lat: b.lat.toFixed(5), lon: b.lon.toFixed(5) });
+      publishPicked([...picked, { address: label, lat: b.lat, lon: b.lon, label }]);
+    } catch {
+      setPickMsg(t("No building there - click directly on a building."));
+    } finally {
+      setPickBusy(false);
+    }
+  }
+
+  // Reset when the scale CHANGES. Not on mount: this effect used to run when Step 1
+  // remounted (coming back from a later step) and reported an empty selection
+  // upwards, which wiped the drawn area and the loaded buildings.
+  // (Compared with the previous value, not a "first run" flag: React's
+  // development mode runs effects twice on mount.)
+  const prevScale = useRef(scale);
   useEffect(() => {
+    if (prevScale.current === scale) return;
+    prevScale.current = scale;
     setLocationMode("addresses");
     setAddressInputs([""]);
     setGeoPoints([null]);
@@ -745,6 +867,8 @@ export default function LocationMap({
     setPolyVerts([]);
     setPolyDone(false);
     setAreaLabel(null);
+    setPicked([]);
+    setPickMsg(null);
     onAddressChange("");
     onBboxChange?.(null);
     onPolygonChange?.(null, null);
@@ -783,7 +907,8 @@ export default function LocationMap({
   useEffect(() => {
     if (!coverageUrl || !boundary) { onLocationValidityChange?.(true, null); return; }
     const geom = boundary.geometry;
-    const addrPts = geoPoints.filter((p): p is GeoPoint => !!p && typeof p.lat === "number");
+    const addrPts = locationMode === "pick" ? picked
+      : geoPoints.filter((p): p is GeoPoint => !!p && typeof p.lat === "number");
     const tests: { lat: number; lon: number; kind: "address" | "area" }[] =
       addrPts.map((p) => ({ lat: p.lat, lon: p.lon, kind: "address" as const }));
     if (bbox) tests.push({ lat: (bbox.north + bbox.south) / 2, lon: (bbox.east + bbox.west) / 2, kind: "area" });
@@ -808,7 +933,7 @@ export default function LocationMap({
       onLocationValidityChange?.(true, null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geoPoints, bbox, polyVerts, polyDone, boundary, coverageUrl, coverageName]);
+  }, [geoPoints, picked, locationMode, bbox, polyVerts, polyDone, boundary, coverageUrl, coverageName]);
 
   /* Street / area search → select every building inside the feature's bounds.
      Nominatim returns a boundingbox for each hit: for "Jättestensgatan" that is
@@ -983,16 +1108,16 @@ export default function LocationMap({
 
           <div className="rounded-xl border border-white/10 bg-[#0b1118] p-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">{t("Building list CSV")}</div>
+              <div className="text-[12px] font-semibold uppercase tracking-wide text-white/70">{t("Building list CSV")}</div>
               <div className="flex items-center gap-2 ml-auto">
               <button
                 type="button"
                 onClick={() => setCsvHelpOpen((v) => !v)}
-                className="text-[11px] text-white/45 hover:text-white/80 underline underline-offset-2"
+                className="text-[12px] text-white/45 hover:text-white/80 underline underline-offset-2"
               >
                 {csvHelpOpen ? t("Hide format") : t("File format")}
               </button>
-              <label className="flex items-center gap-2 rounded-lg border border-[#4ECDC4]/50 bg-[#4ECDC4]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[#A8F3EA] hover:bg-[#4ECDC4]/20 cursor-pointer">
+              <label className="flex items-center gap-2 rounded-lg border border-[#8B6EAD]/50 bg-[#8B6EAD]/10 px-2.5 py-1.5 text-[12px] font-semibold text-[#CCBEDD] hover:bg-[#8B6EAD]/20 cursor-pointer">
                 <span>{t("Upload CSV")}</span>
                 <input
                   type="file"
@@ -1012,14 +1137,14 @@ export default function LocationMap({
                 for whoever is actually preparing a file. */}
             {csvHelpOpen && (
               <>
-                <p className="mt-2 text-[11px] text-white/50">
+                <p className="mt-2 text-[12px] text-white/50">
                   {t("One row per building, first row = column names (English or Swedish). Each row needs an")} <span className="font-mono text-emerald-300">Address</span> {t("(street address or property designation, e.g. JÄRNBROTT 155:1) or")} <span className="font-mono text-emerald-300">Lat</span>+<span className="font-mono text-emerald-300">Lon</span>. {t("Optional:")} <span className="font-mono text-emerald-300">City</span>, <span className="font-mono text-emerald-300">Postcode</span>, <span className="font-mono text-emerald-300">Name</span> {t("(your own label — shown only in the Step 1 list; leave it out if you like)")}.
                 </p>
-                <div className="mt-2 text-[10.5px] text-white/60 rounded-md border border-white/10 bg-[#0d1117] p-2.5 leading-relaxed">
+                <div className="mt-2 text-[11.5px] text-white/60 rounded-md border border-white/10 bg-[#0d1117] p-2.5 leading-relaxed">
                   <div className="flex items-center gap-2"><b className="text-white/75">{t("Example:")}</b>
-                    <a href="/examples/building_list_example.csv" download className="ml-auto text-[#A8F3EA] underline underline-offset-2">{t("Download example CSV")}</a></div>
+                    <a href="/examples/building_list_example.csv" download className="ml-auto text-[#CCBEDD] underline underline-offset-2">{t("Download example CSV")}</a></div>
                   {/* A string, not JSX text: JSX folds the line breaks into spaces. */}
-                  <div className="mt-1 font-mono text-[10px] text-emerald-300/90 whitespace-pre overflow-x-auto">{"Address,City\nTunnlandsgatan 13,Göteborg\nAdventsvägen 29,Göteborg\nMandolingatan 20,Göteborg\nJÄRNBROTT 155:1,Göteborg"}</div>
+                  <div className="mt-1 font-mono text-[11px] text-emerald-300/90 whitespace-pre overflow-x-auto">{"Address,City\nTunnlandsgatan 13,Göteborg\nAdventsvägen 29,Göteborg\nMandolingatan 20,Göteborg\nJÄRNBROTT 155:1,Göteborg"}</div>
                   <ul className="mt-2 list-disc pl-4 space-y-0.5">
                     <li>{t("Excel: File → Save as → CSV. Semicolons (;) with decimal commas, as Swedish Excel saves, or commas (,) with decimal points — both work. Å, ä and ö are read correctly whichever way Excel saves the file.")}</li>
                     <li>{t("Swedish addresses are first matched against the planner's own building data (instant); only the rest are looked up on the map, about one per second.")}</li>
@@ -1030,7 +1155,7 @@ export default function LocationMap({
               </>
             )}
             {buildingListCsvMessage && (
-              <p className="mt-2 text-[11px] text-violet-300">{buildingListCsvMessage}</p>
+              <p className="mt-2 text-[12px] text-violet-300">{buildingListCsvMessage}</p>
             )}
           </div>
         </div>
@@ -1116,6 +1241,39 @@ export default function LocationMap({
         </div>
       )}
 
+      {/* Picked buildings — click on the map to add, ✕ to remove. */}
+      {isBuilding && locationMode === "pick" && (
+        <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white/75">
+          <div className="flex items-center gap-2 flex-wrap">
+            {pickBusy ? <Loader2 size={14} className="animate-spin text-white/60" /> : <MousePointerClick size={14} className="text-white/60" />}
+            <span>
+              {picked.length === 0
+                ? t("Click a building on the map to add it. Zoom in to see the buildings.")
+                : t("{n} buildings selected - click more on the map, or ✕ to remove one.", { n: picked.length })}
+            </span>
+            {picked.length > 0 && (
+              <button onClick={() => { publishPicked([]); setPickMsg(null); }}
+                className="ml-auto px-2.5 py-1 rounded-md border border-white/15 text-white/70 text-xs font-medium hover:border-white/30">
+                {t("Clear all")}
+              </button>
+            )}
+          </div>
+          {pickMsg && <p className="mt-1.5 text-xs text-amber-300">{pickMsg}</p>}
+          {picked.length > 0 && (
+            <ul className="mt-2 space-y-1 max-h-48 overflow-y-auto pr-1">
+              {picked.map((p, i) => (
+                <li key={`${p.lat},${p.lon}`} className="flex items-center gap-2 text-[13px]">
+                  <span className="w-5 text-right tabular-nums text-white/40">{i + 1}.</span>
+                  <span className="truncate" title={p.label}>{p.label}</span>
+                  <button onClick={() => publishPicked(picked.filter((_, j) => j !== i))} aria-label={t("Remove {name}", { name: p.label })}
+                    className="ml-auto px-1.5 text-white/45 hover:text-red-400">✕</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Bbox draw instructions */}
       {isBuilding && locationMode === "bbox" && (
         <div className="flex items-center gap-2 text-xs text-white/80 bg-[var(--brand-deep)]/15 border border-[var(--brand-deep)]/35 rounded-lg px-3 py-2">
@@ -1167,7 +1325,7 @@ export default function LocationMap({
         {mapMaximized && (
           <div className="flex items-center gap-2 flex-wrap px-3 py-2 border-b border-white/10">
             <span className="text-sm font-semibold text-white mr-1">{t("Select your area")}</span>
-            {isBuilding && LOCATION_MODES.filter((m) => m.key === "bbox" || m.key === "polygon").map((m) => {
+            {isBuilding && LOCATION_MODES.filter((m) => m.key === "pick" || m.key === "bbox" || m.key === "polygon").map((m) => {
               const active = locationMode === m.key;
               const Icon = m.icon;
               return (
@@ -1186,7 +1344,9 @@ export default function LocationMap({
                   ? (bboxDone ? t("Area drawn. Drag the handles to resize or the centre to move.") : t("Click and drag on the map to draw your area."))
                   : locationMode === "polygon"
                     ? t("Click on the map to drop each corner of your area.")
-                    : t("Choose Draw box or Draw shape to select an area.")}
+                    : locationMode === "pick"
+                      ? (picked.length ? t("{n} buildings selected - click more to add.", { n: picked.length }) : t("Click buildings to add them."))
+                      : t("Choose Draw box or Draw shape to select an area.")}
             </span>
             {isBuilding && locationMode === "bbox" && bboxDone && (
               <span className="flex gap-3">
@@ -1244,7 +1404,9 @@ export default function LocationMap({
               />
             </>
           )}
-          {boundary && validPoints.length === 0 && !bbox && <FitToBoundary boundary={boundary} />}
+          {/* Coming back to Step 1 with picked buildings or a drawn shape: show them. */}
+          {restoredFit.length > 0 && <FitOnce points={restoredFit} />}
+          {boundary && validPoints.length === 0 && !bbox && restoredFit.length === 0 && <FitToBoundary boundary={boundary} />}
 
           {/* Selected district boundary — highlighted on top of municipality so
               users can confirm exactly which primärområde is selected. */}
@@ -1260,11 +1422,11 @@ export default function LocationMap({
                 key="district-boundary"
                 data={districtBoundary as never}
                 interactive={false}
-                style={() => ({ color: "#4ECDC4", weight: 3.5, opacity: 1, fillColor: "#4ECDC4", fillOpacity: 0.20 })}
+                style={() => ({ color: "#8B6EAD", weight: 3.5, opacity: 1, fillColor: "#8B6EAD", fillOpacity: 0.20 })}
               />
             </>
           )}
-          {districtBoundary && validPoints.length === 0 && !bbox && <FitToBoundary boundary={districtBoundary} />}
+          {districtBoundary && validPoints.length === 0 && !bbox && restoredFit.length === 0 && <FitToBoundary boundary={districtBoundary} />}
 
           {/* Auto-fit bounds when points or bbox changes */}
           {/* Address points steer the view only in address mode - a point left
@@ -1281,6 +1443,17 @@ export default function LocationMap({
               </Marker>
             ))}
 
+          {/* Pick mode: click to add the building there; picked ones are dots
+              with their address on hover. */}
+          {isBuilding && locationMode === "pick" && <PickClickHandler onPick={pickAt} />}
+          {isBuilding && locationMode === "pick" &&
+            picked.map((p) => (
+              <CircleMarker key={`${p.lat},${p.lon}`} center={[p.lat, p.lon]} radius={7}
+                pathOptions={{ color: "#ffffff", weight: 2, fillColor: "var(--brand-deep)", fillOpacity: 1 }}>
+                <Tooltip>{p.label}</Tooltip>
+              </CircleMarker>
+            ))}
+
           {/* Bbox drag-draw handler */}
           {isBuilding && locationMode === "bbox" && (!bboxDone || bboxRedrawMode) && (
             <BboxDragHandler onDraw={handleBboxDraw} />
@@ -1294,7 +1467,7 @@ export default function LocationMap({
                 pathOptions={{
                   color: "var(--brand-deep)",
                   weight: 2,
-                  fillColor: "#6E2AAE",
+                  fillColor: "#6A4B8D",
                   fillOpacity: 0.12,
                 }}
               />
@@ -1315,13 +1488,13 @@ export default function LocationMap({
           {isBuilding && locationMode === "polygon" && polyVerts.length >= 2 && (
             <Polygon
               positions={polyVerts}
-              pathOptions={{ color: "#0d9488", weight: 2, fillColor: "#14b8a6", fillOpacity: 0.14 }}
+              pathOptions={{ color: "#4f376a", weight: 2, fillColor: "#644587", fillOpacity: 0.14 }}
             />
           )}
           {isBuilding && locationMode === "polygon" &&
             polyVerts.map((v, i) => (
               <CircleMarker key={i} center={v} radius={4}
-                pathOptions={{ color: "#0d9488", fillColor: "#fff", fillOpacity: 1, weight: 2 }} />
+                pathOptions={{ color: "#4f376a", fillColor: "#fff", fillOpacity: 1, weight: 2 }} />
             ))}
         </MapContainer>
         </div>

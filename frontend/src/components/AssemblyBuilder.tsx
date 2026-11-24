@@ -14,8 +14,8 @@ import { useT } from "../i18n";
 
 const CAT_COLOR: Record<LayerCategory, string> = {
   structure:  "#E8880C",
-  insulation: "#4ECDC4",
-  board:      "#9B7FD4",
+  insulation: "#8B6EAD",
+  board:      "#A894BF",
   cladding:   "#4A90E2",
   cavity:     "#6B7280",
 };
@@ -90,10 +90,10 @@ export default function AssemblyBuilder({
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {/* Presets */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ fontSize: 10, color: white(0.4), textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>{t("Start from")}</span>
+        <span style={{ fontSize: 11, color: white(0.4), textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>{t("Start from")}</span>
         {PRESET_LIST.map((p) => (
           <button key={p.label} onClick={() => onChange(p.layers.map((l) => ({ ...l })))}
-            style={{ fontSize: 10.5, padding: "3px 9px", borderRadius: 99, cursor: "pointer",
+            style={{ fontSize: 11.5, padding: "3px 9px", borderRadius: 99, cursor: "pointer",
               background: "rgba(255,255,255,0.05)", border: `1px solid ${white(0.12)}`, color: white(0.7) }}>
             {p.label}
           </button>
@@ -102,20 +102,20 @@ export default function AssemblyBuilder({
 
       {/* Result */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", borderRadius: 10,
-        background: uGood ? "rgba(78,205,196,0.08)" : "rgba(255,255,255,0.04)",
-        border: `1px solid ${uGood ? "rgba(78,205,196,0.3)" : white(0.1)}` }}>
+        background: uGood ? "rgba(139,110,173,0.08)" : "rgba(255,255,255,0.04)",
+        border: `1px solid ${uGood ? "rgba(139,110,173,0.3)" : white(0.1)}` }}>
         <div>
-          <div style={{ fontSize: 9.5, color: white(0.4), textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>{t("U-value")}</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: uGood ? "#4ECDC4" : "#fff", lineHeight: 1.15 }}>
-            {uText} <span style={{ fontSize: 11, fontWeight: 600, color: white(0.45) }}>W/m²·K</span>
+          <div style={{ fontSize: 11, color: white(0.4), textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>{t("U-value")}</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: uGood ? "#8B6EAD" : "#fff", lineHeight: 1.15 }}>
+            {uText} <span style={{ fontSize: 12, fontWeight: 600, color: white(0.45) }}>W/m²·K</span>
           </div>
         </div>
-        <div style={{ fontSize: 10.5, color: white(0.45), lineHeight: 1.6 }}>
+        <div style={{ fontSize: 11.5, color: white(0.45), lineHeight: 1.6 }}>
           R<sub>tot</sub> = {result.rTotal.toFixed(2)} m²·K/W<br />
           R<sub>si</sub> {sr.rsi} + R<sub>se</sub> {sr.rse} ({sr.label.split("—")[1]?.trim()})
         </div>
         {result.framingApplied && (
-          <span style={{ marginLeft: "auto", fontSize: 9.5, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+          <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 99,
             background: "rgba(232,136,12,0.14)", border: "1px solid rgba(232,136,12,0.35)", color: "#E8880C" }}>
             {t("framing correction applied")}
           </span>
@@ -123,23 +123,23 @@ export default function AssemblyBuilder({
       </div>
 
       {/* Reach a target U: solve the insulation thickness */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 11.5, color: white(0.7) }}>
-        <Target size={13} color="#4ECDC4" />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 12, color: white(0.7) }}>
+        <Target size={13} color="#8B6EAD" />
         <span>{t("Reach a U-value of")}</span>
         <input type="number" step={0.01} min={0.05} max={2} value={targetU} aria-label={t("Target U-value")}
           onChange={(e) => { setTargetU(Number(e.target.value) || 0); setSolved(null); }}
-          style={{ width: 64, background: "#11161d", color: "#fff", border: `1px solid ${white(0.15)}`, borderRadius: 6, padding: "3px 6px", fontSize: 11.5 }} />
+          style={{ width: 64, background: "#11161d", color: "#fff", border: `1px solid ${white(0.15)}`, borderRadius: 6, padding: "3px 6px", fontSize: 12 }} />
         <span style={{ color: white(0.45) }}>W/m²·K</span>
         <button onClick={sizeInsulation} disabled={!(targetU > 0)}
-          style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
-            background: "rgba(78,205,196,0.12)", border: "1px solid rgba(78,205,196,0.4)", color: "#4ECDC4" }}>
+          style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
+            background: "rgba(139,110,173,0.12)", border: "1px solid rgba(139,110,173,0.4)", color: "#8B6EAD" }}>
           {t("Size the insulation")}
         </button>
         {!defaultTargetU && bbrU != null && !materials && (
-          <span style={{ fontSize: 10.5, color: white(0.4) }}>{t("BBR guidance when renovating: {u}", { u: bbrU })}</span>
+          <span style={{ fontSize: 11.5, color: white(0.4) }}>{t("BBR guidance when renovating: {u}", { u: bbrU })}</span>
         )}
       </div>
-      {solved && <div role="status" style={{ fontSize: 11, color: white(0.7), lineHeight: 1.5, marginTop: -4 }}>{solved}</div>}
+      {solved && <div role="status" style={{ fontSize: 12, color: white(0.7), lineHeight: 1.5, marginTop: -4 }}>{solved}</div>}
 
       {/* Resistance share bar */}
       {result.layers.length > 0 && result.rTotal > 0 && (
@@ -154,7 +154,7 @@ export default function AssemblyBuilder({
       {/* Layers, outside → inside as listed */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {layers.length === 0 && (
-          <p style={{ fontSize: 11, color: white(0.35), fontStyle: "italic" }}>{t("No layers yet — start from a preset or add one below.")}</p>
+          <p style={{ fontSize: 12, color: white(0.35), fontStyle: "italic" }}>{t("No layers yet — start from a preset or add one below.")}</p>
         )}
         {layers.map((l, i) => {
           const m = MATERIAL_BY_ID[l.materialId];
@@ -165,7 +165,7 @@ export default function AssemblyBuilder({
               padding: "6px 8px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: `1px solid ${white(0.07)}` }}>
               <span style={{ width: 6, height: 26, borderRadius: 3, background: CAT_COLOR[m.category] }} title={t(CAT_LABEL[m.category])} />
               <select value={l.materialId} onChange={(e) => setLayer(i, { materialId: e.target.value, thicknessMm: MATERIAL_BY_ID[e.target.value]?.defaultMm ?? l.thicknessMm })}
-                style={{ background: "#11161d", color: "#fff", border: `1px solid ${white(0.12)}`, borderRadius: 6, padding: "4px 6px", fontSize: 11.5 }}>
+                style={{ background: "#11161d", color: "#fff", border: `1px solid ${white(0.12)}`, borderRadius: 6, padding: "4px 6px", fontSize: 12 }}>
                 {(["insulation", "structure", "board", "cladding", "cavity"] as LayerCategory[]).map((cat) => (
                   <optgroup key={cat} label={t(CAT_LABEL[cat])} style={{ background: "#11161d" }}>
                     {LAYER_LIST.filter((mm) => mm.category === cat).map((mm) => (
@@ -179,14 +179,14 @@ export default function AssemblyBuilder({
                   disabled={m.category === "cavity"}
                   onChange={(e) => setLayer(i, { thicknessMm: Math.max(0, Number(e.target.value) || 0) })}
                   style={{ width: 56, background: "#11161d", color: "#fff", border: `1px solid ${white(0.12)}`,
-                    borderRadius: 6, padding: "4px 6px", fontSize: 11.5, opacity: m.category === "cavity" ? 0.5 : 1 }} />
-                <span style={{ fontSize: 10, color: white(0.35) }}>mm</span>
+                    borderRadius: 6, padding: "4px 6px", fontSize: 12, opacity: m.category === "cavity" ? 0.5 : 1 }} />
+                <span style={{ fontSize: 11, color: white(0.35) }}>mm</span>
               </span>
-              <span style={{ fontSize: 10.5, color: white(0.5) }} title={m.lambda == null ? t("Fixed cavity resistance") : `λ = ${m.lambda} W/m·K`}>
+              <span style={{ fontSize: 11.5, color: white(0.5) }} title={m.lambda == null ? t("Fixed cavity resistance") : `λ = ${m.lambda} W/m·K`}>
                 R {r ? r.r.toFixed(2) : "—"}
               </span>
               {layerNote?.(l) && (
-                <span style={{ gridColumn: "2 / -1", gridRow: 2, fontSize: 9.5, color: white(0.38), marginTop: -2 }}>{layerNote(l)}</span>
+                <span style={{ gridColumn: "2 / -1", gridRow: 2, fontSize: 11, color: white(0.38), marginTop: -2 }}>{layerNote(l)}</span>
               )}
               <span style={{ display: "flex", gap: 2, justifyContent: "flex-end", gridRow: 1, gridColumn: 5 }}>
                 <button onClick={() => move(i, -1)} disabled={i === 0} title={t("Move out")}
@@ -204,8 +204,8 @@ export default function AssemblyBuilder({
       {/* Add layer */}
       <div style={{ position: "relative" }}>
         <button onClick={() => setAddOpen((o) => !o)}
-          style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "5px 11px",
-            borderRadius: 8, cursor: "pointer", background: "rgba(var(--brand-rgb),0.18)", border: "1px solid rgba(var(--brand-rgb),0.45)", color: "#D9C3F2" }}>
+          style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, padding: "5px 11px",
+            borderRadius: 8, cursor: "pointer", background: "rgba(var(--brand-rgb),0.18)", border: "1px solid rgba(var(--brand-rgb),0.45)", color: "#DACFE6" }}>
           <Plus size={12} /> {t("Add layer")}
         </button>
         {addOpen && (
@@ -213,14 +213,14 @@ export default function AssemblyBuilder({
             background: "#11161d", border: `1px solid ${white(0.14)}`, borderRadius: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.5)" }}>
             {(["insulation", "structure", "board", "cladding", "cavity"] as LayerCategory[]).map((cat) => (
               <div key={cat}>
-                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase",
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase",
                   color: CAT_COLOR[cat], padding: "6px 10px 2px" }}>{t(CAT_LABEL[cat])}</div>
                 {LAYER_LIST.filter((m) => m.category === cat).map((m) => (
                   <button key={m.id} onClick={() => add(m.id)}
-                    style={{ display: "block", width: "100%", textAlign: "left", padding: "5px 10px", fontSize: 11.5,
+                    style={{ display: "block", width: "100%", textAlign: "left", padding: "5px 10px", fontSize: 12,
                       background: "transparent", border: 0, cursor: "pointer", color: white(0.8) }}>
                     {m.label}
-                    <span style={{ color: white(0.35), fontSize: 10 }}>
+                    <span style={{ color: white(0.35), fontSize: 11 }}>
                       {m.lambda != null ? `  λ ${m.lambda}` : "  R 0.18"}
                     </span>
                   </button>
@@ -232,12 +232,12 @@ export default function AssemblyBuilder({
       </div>
 
       {layers.length > 0 && result.warnings.map((w) => (
-        <div key={w} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11, color: "#E8880C" }}>
+        <div key={w} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: "#E8880C" }}>
           <AlertTriangle size={13} style={{ marginTop: 1, flexShrink: 0 }} />{t(w)}
         </div>
       ))}
 
-      <p style={{ fontSize: 10, color: white(0.3), lineHeight: 1.6 }}>
+      <p style={{ fontSize: 11, color: white(0.3), lineHeight: 1.6 }}>
         U = 1 / (R<sub>si</sub> + R<sub>se</sub> + Σ d/λ) {t("per EN ISO 6946; design λ from EN ISO 10456 / Swedish BBR.")}{" "}
         {t("Framed layers use the ISO 6946 parallel-path correction, so studs bridging the insulation raise U realistically.")}
       </p>

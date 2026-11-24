@@ -40,6 +40,26 @@ export const HOME_TABS_RIGHT_OFFSET = 20 + 12 + (4 + 28 + 6 + 12);
  *   • Pass nothing (DataLayout does) and the bar reads the country from the URL
  *     and the city from the wizard store, persisting the choice across pages.
  */
+/** A Chalmers logo in the brand purple. The artwork is a white-on-transparent
+ *  PNG, so it is used as a MASK over a purple fill rather than shown as an image.
+ *  The fill is a light purple because light mode inverts the whole app
+ *  (index.css): #C6B6D8 renders there as the muted Chalmers plum (#4D3D5F),
+ *  and in dark mode it reads as a light purple on the dark bar. */
+function BrandMark({ src, label }: { src: string; label: string }) {
+  const H = 36, ASPECT = 2480 / 834;   // the PNGs' own proportions (40 px overflowed the wizard bar at 1440 px)
+  return (
+    <span role="img" aria-label={label} title={label}
+      style={{
+        display: "inline-block", height: H, width: Math.round(H * ASPECT), flexShrink: 0,
+        backgroundColor: "#C6B6D8",
+        WebkitMaskImage: `url(${src})`, maskImage: `url(${src})`,
+        WebkitMaskSize: "contain", maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center", maskPosition: "center",
+      }} />
+  );
+}
+
 export default function TopBar({
   country: countryProp,
   city: cityProp,
@@ -132,13 +152,16 @@ export default function TopBar({
           <button
             key={tab.label}
             onClick={() => navigate(targetPath)}
+            // Selected: real plum with white text. Opting out of light mode's
+            // inversion (index.css .theme-preserve), which turned it lavender.
+            className={isActive ? "theme-preserve" : undefined}
             style={{
               border: 0,
               borderRadius: 8,
               padding: "6px 10px",
               cursor: "pointer",
-              fontSize: 10,
-              fontWeight: 700,
+              fontSize: 11,
+              fontWeight: 600,
               whiteSpace: "nowrap",
               color: isActive ? "#fff" : "rgba(255,255,255,0.45)",
               background: isActive ? "var(--brand-deep)" : "transparent",
@@ -169,13 +192,13 @@ export default function TopBar({
           width: 28,
           height: 28,
           borderRadius: "50%",
-          background: "linear-gradient(135deg,var(--brand-deep),var(--brand-dark))",
+          background: "var(--brand-deep)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           color: "#fff",
-          fontSize: 11,
-          fontWeight: 700,
+          fontSize: 12,
+          fontWeight: 600,
         }}
       >
         {email ? initialsOf(email) : <User size={14} />}
@@ -188,8 +211,15 @@ export default function TopBar({
       <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
       <div role="menu" style={{ position: "absolute", right: 0, top: 36, zIndex: 41, width: 230, padding: 8, borderRadius: 12,
         background: "#0d1117", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 12px 32px rgba(0,0,0,0.5)" }}>
-        {!LOGIN_ENABLED ? null : email ? (<>
-          <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)", padding: "4px 8px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={email}>
+        {/* Projects are saved in this browser when nobody is signed in, so
+            "My projects" is always there. */}
+        {!LOGIN_ENABLED ? (<>
+          <button role="menuitem" onClick={() => { setMenuOpen(false); navigate("/projects"); }} style={menuItem}>
+            <FolderOpen size={14} /> {t("My projects")}
+          </button>
+          <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "6px 0" }} />
+        </>) : email ? (<>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", padding: "4px 8px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={email}>
             {email}
           </div>
           <button role="menuitem" onClick={() => { setMenuOpen(false); navigate("/projects"); }} style={menuItem}>
@@ -205,15 +235,15 @@ export default function TopBar({
           </button>
         )}
         {LOGIN_ENABLED && <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "6px 0" }} />}
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.8, textTransform: "uppercase", color: "rgba(255,255,255,0.4)", padding: "4px 8px 6px" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: "rgba(255,255,255,0.4)", padding: "4px 8px 6px" }}>
           {t("Language")}
         </div>
         {LANGS.map((l) => (
           <button key={l.id} role="menuitemradio" aria-checked={lang === l.id} onClick={() => { setLang(l.id); setMenuOpen(false); }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 8px", borderRadius: 8, border: 0, cursor: "pointer",
               fontSize: 12.5, fontWeight: lang === l.id ? 700 : 500, textAlign: "left",
-              background: lang === l.id ? "rgba(139,92,246,0.16)" : "transparent", color: lang === l.id ? "#fff" : "rgba(255,255,255,0.75)" }}>
-            <span style={{ width: 14, display: "inline-flex" }}>{lang === l.id && <Check size={14} color="#8B5CF6" />}</span>
+              background: lang === l.id ? "rgba(167,141,197,0.16)" : "transparent", color: lang === l.id ? "#fff" : "rgba(255,255,255,0.75)" }}>
+            <span style={{ width: 14, display: "inline-flex" }}>{lang === l.id && <Check size={14} color="#A78DC5" />}</span>
             {l.label}
           </button>
         ))}
@@ -242,48 +272,53 @@ export default function TopBar({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-        <img src="/CTH_new_logo_white.png" alt="Chalmers" className="brand-logo" style={{ height: 28, opacity: 0.8 }} />
-        <span style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)" }} />
-        <img src="/CNL_new_logo_white.png" alt="Chalmers Next Labs" className="brand-logo" style={{ height: 28, opacity: 0.8 }} />
+        <BrandMark src="/CTH_new_logo_white.png" label="Chalmers" />
+        <span style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)" }} />
+        <BrandMark src="/CNL_new_logo_white.png" label="Chalmers Next Labs" />
         <span style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)" }} />
         {/* Product name + mark. The text folds away on narrower screens so the
             tabs and the country/city pills keep their room. */}
         <button onClick={() => navigate("/")} title={t("Renovation Planning Toolbox — home")}
           style={{ display: "flex", alignItems: "center", gap: 9, border: 0, background: "transparent", padding: 0, cursor: "pointer" }}>
           <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8,
-            background: "rgba(139,92,246,0.16)", border: "1px solid rgba(139,92,246,0.4)", flexShrink: 0 }}>
-            <Building2 size={16} color="#8B5CF6" />
+            background: "rgba(167,141,197,0.16)", border: "1px solid rgba(167,141,197,0.4)", flexShrink: 0 }}>
+            <Building2 size={16} color="#A78DC5" />
           </span>
           <span className="hidden 2xl:block" style={{ textAlign: "left", lineHeight: 1.15 }}>
-            <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: "#fff", whiteSpace: "nowrap" }}>{t("Renovation Planning Toolbox")}</span>
-            <span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap" }}>{t("Digital Twin Decision Support")}</span>
+            <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>{t("Renovation Planning Toolbox")}</span>
+            <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap" }}>{t("Digital Twin Decision Support")}</span>
           </span>
         </button>
       </div>
 
+      {/* Step title shrinks (shortened with "…", full title on hover) before the
+          bar overflows: long titles like "Building Data & Prioritisation"
+          pushed the tabs and avatar off-screen at laptop widths. */}
       {step && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <span style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 1, minWidth: 0 }} title={t(step.label)}>
+          <span style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)", flexShrink: 0 }} />
           <span style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center",
-            justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff",
+            justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff",
             background: "rgba(var(--brand-rgb),0.25)", border: "1px solid rgba(var(--brand-rgb),0.55)" }}>
             {step.number}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>{t(step.label)}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{t(step.label)}</span>
         </div>
       )}
 
-      {!tabsRightWidth && tabs}
-
       <div style={{ flex: 1 }} />
+
+      {/* Page tabs sit next to the country/city selector, not across an empty
+          gap from it (2026-11-24, user request). */}
+      {!tabsRightWidth && tabs}
 
       {showLocationBadge && (
         <div title={t("Planning location — change it from the home page")}
-          style={{ ...pill, padding: "5px 12px", gap: 7, flexShrink: 0, fontSize: 11, whiteSpace: "nowrap" }}>
-          <span style={{ fontWeight: 700, color: "#fff" }}>{t(badgeCountry!.name)}</span>
+          style={{ ...pill, padding: "5px 12px", gap: 7, flexShrink: 0, fontSize: 12, whiteSpace: "nowrap" }}>
+          <span style={{ fontWeight: 600, color: "#fff" }}>{t(badgeCountry!.name)}</span>
           {badgeCity && (<>
             <span style={{ color: "rgba(255,255,255,0.3)" }}>›</span>
-            <span style={{ fontWeight: 700, color: "#4ECDC4" }}>{t(badgeCity)}</span>
+            <span style={{ fontWeight: 600, color: "#8B6EAD" }}>{t(badgeCity)}</span>
           </>)}
         </div>
       )}
@@ -300,13 +335,14 @@ export default function TopBar({
               key={c.id}
               onClick={enabled ? () => selectCountry(c.id) : undefined}
               disabled={!enabled}
-              title={enabled ? undefined : t("Coming soon — not available yet")}
+              title={enabled ? undefined : t("Not available yet")}
+              className={country === c.id ? "theme-preserve" : undefined}
               style={{
                 padding: "4px 10px",
                 borderRadius: 8,
                 border: 0,
                 cursor: enabled ? "pointer" : "not-allowed",
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: country === c.id ? 700 : 500,
                 background: country === c.id ? "var(--brand-deep)" : "transparent",
                 color: !enabled ? "rgba(255,255,255,0.32)"
@@ -322,44 +358,37 @@ export default function TopBar({
           })}
         </div>
 
+        {/* City: a dropdown, not a row of buttons - with every built
+            municipality the row ran off the screen (Nacka was cut off). Cities
+            without a build yet are listed but disabled. */}
         {safeCountryDef.cities.length > 0 && (
           <>
             <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 12, margin: "0 2px" }}>›</span>
-            <div style={pill}>
+            <select
+              value={city ?? ""}
+              onChange={(e) => { if (cityEnabled(country, e.target.value)) selectCity(e.target.value); }}
+              aria-label={t("City")}
+              style={{
+                padding: "6px 28px 6px 10px", borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                color: "#fff", backgroundColor: "#11161d", border: "1px solid rgba(255,255,255,0.12)",
+                maxWidth: 200,
+              }}>
               {safeCountryDef.cities.map((name) => {
                 const enabled = cityEnabled(country, name);
                 return (
-                <button
-                  key={name}
-                  onClick={enabled ? () => selectCity(name) : undefined}
-                  disabled={!enabled}
-                  title={enabled ? undefined : t("Coming soon — not available yet")}
-                  style={{
-                    padding: "4px 10px",
-                    borderRadius: 8,
-                    border: 0,
-                    cursor: enabled ? "pointer" : "not-allowed",
-                    fontSize: 11,
-                    fontWeight: city === name ? 700 : 500,
-                    background: city === name ? "#4ECDC4" : "transparent",
-                    color: !enabled ? "rgba(255,255,255,0.32)"
-                      : city === name ? "#0b1220" : "rgba(255,255,255,0.72)",
-                    opacity: enabled ? 1 : 0.6,
-                    transition: "all .15s",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {t(name)}
-                </button>
+                  <option key={name} value={name} disabled={!enabled}
+                    style={{ backgroundColor: "#11161d", color: enabled ? "#fff" : "rgba(255,255,255,0.4)" }}>
+                    {t(name)}{enabled ? "" : ` (${t("not available yet")})`}
+                  </option>
                 );
               })}
-            </div>
+            </select>
           </>
         )}
       </div>}
 
       {/* Saving belongs to the wizard, where there is a project to save. */}
-      {step && LOGIN_ENABLED && <ProjectSaveControl />}
+      {step && <ProjectSaveControl />}
 
       {tabsRightWidth ? <>{tabs}{avatar}</> : avatar}
     </header>

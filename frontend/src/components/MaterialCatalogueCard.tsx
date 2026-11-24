@@ -20,16 +20,16 @@ export default function MaterialCatalogueCard({ country }: { country: "UK" | "BE
   const rows = mats.filter((m) => (cat === "all" || m.category === cat)
     && (!q || `${m.id} ${m.item} ${m.spec}`.toLowerCase().includes(q.toLowerCase())));
 
-  const th = { padding: "6px 8px", fontWeight: 700, fontSize: 10, textTransform: "uppercase" as const, letterSpacing: 0.8, color: white(0.4), textAlign: "left" as const, whiteSpace: "nowrap" as const };
-  const td = { padding: "7px 8px", fontSize: 11.5, color: white(0.75), verticalAlign: "top" as const };
+  const th = { padding: "6px 8px", fontWeight: 600, fontSize: 11, textTransform: "uppercase" as const, letterSpacing: 0.8, color: white(0.4), textAlign: "left" as const, whiteSpace: "nowrap" as const };
+  const td = { padding: "7px 8px", fontSize: 12, color: white(0.75), verticalAlign: "top" as const };
 
   return (
     <div style={{ marginTop: 10 }}>
       <CollapsibleCard
         title={`Renovation Materials Catalogue — ${country === "UK" ? "United Kingdom" : "Belgium"}`}
         subtitle={`${mats.length} materials with both price and embodied carbon — the options Step 4 builds packages from (${excluded} workbook rows left out)`}
-        color="#4ECDC4">
-        <p style={{ fontSize: 11.5, color: white(0.5), margin: "0 0 10px", lineHeight: 1.55 }}>
+        color="#8B6EAD">
+        <p style={{ fontSize: 12, color: white(0.5), margin: "0 0 10px", lineHeight: 1.55 }}>
           Prices are <b>material only, incl. VAT, excluding labour</b> (Oct 2026 workbook). Carbon is embodied A1–A3 per unit.
           Insulation is priced and carbon-rated at the listed thickness and scaled linearly to the chosen thickness; its U-value
           comes from λ (EN ISO 6946). Only materials with <b>both a price and an embodied-carbon value</b> are listed and offered
@@ -57,21 +57,21 @@ export default function MaterialCatalogueCard({ country }: { country: "UK" | "BE
                   <td style={{ ...td, fontFamily: "ui-monospace, monospace", color: white(0.5) }}>{m.id}</td>
                   <td style={td}>
                     <div style={{ color: "#fff", fontWeight: 600 }}>{m.item}</div>
-                    <div style={{ fontSize: 10, color: white(0.4) }}>{m.category}</div>
+                    <div style={{ fontSize: 11, color: white(0.4) }}>{m.category}</div>
                   </td>
                   <td style={td}>{m.spec}</td>
                   <td style={{ ...td, whiteSpace: "nowrap" }}>
                     {m.price == null
-                      ? <span style={{ color: "#E8880C", fontWeight: 700 }}>no price</span>
+                      ? <span style={{ color: "#E8880C", fontWeight: 600 }}>no price</span>
                       : <>{sym}{m.price.toFixed(2)} <span style={{ color: white(0.4) }}>/{m.unit}</span></>}
-                    {m.priceQuality && <div style={{ fontSize: 9.5, color: white(0.4) }}>{m.priceQuality}</div>}
+                    {m.priceQuality && <div style={{ fontSize: 11, color: white(0.4) }}>{m.priceQuality}</div>}
                   </td>
                   <td style={{ ...td, whiteSpace: "nowrap" }}>
                     {m.gwp == null ? <span style={{ color: white(0.35) }}>—</span> : <>{m.gwp} kg <span style={{ color: white(0.4) }}>/{m.unit}</span></>}
-                    {m.carbonQuality && <div style={{ fontSize: 9.5, color: white(0.4) }}>{m.carbonQuality}</div>}
+                    {m.carbonQuality && <div style={{ fontSize: 11, color: white(0.4) }}>{m.carbonQuality}</div>}
                   </td>
                   <td style={td}>{m.lambda ?? "—"}</td>
-                  <td style={{ ...td, fontSize: 10.5, color: white(0.45), minWidth: 260 }}>
+                  <td style={{ ...td, fontSize: 11.5, color: white(0.45), minWidth: 260 }}>
                     {m.priceSource && <div><b style={{ color: white(0.6) }}>Price:</b> {m.priceSource}</div>}
                     {m.carbonSource && <div><b style={{ color: white(0.6) }}>Carbon:</b> {m.carbonSource}</div>}
                   </td>

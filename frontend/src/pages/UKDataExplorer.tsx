@@ -149,7 +149,7 @@ const UK_SOURCES: Source[] = [
     description:
       "The construction-era buckets the viewer colours buildings by in ‘Year era’ mode — the same bands " +
       "the English Housing Survey reports EPC distributions against.",
-    accent: "#4ECDC4",
+    accent: "#8B6EAD",
     iconD: IC.tabula,
     status: "cached",
     fields: ["dwelling_age", "dwellings_thousands", "sample_size"],
@@ -265,10 +265,10 @@ function SourceCard({ source }: { source: Source }) {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{source.name}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{source.name}</span>
             <span style={{
-              fontSize: 9,
-              fontWeight: 700,
+              fontSize: 11,
+              fontWeight: 600,
               padding: "2px 7px",
               borderRadius: 99,
               background: `${STATUS_COLOR[source.status]}20`,
@@ -280,7 +280,7 @@ function SourceCard({ source }: { source: Source }) {
               {STATUS_LABEL[source.status]}
             </span>
           </div>
-          <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>{source.description}</p>
+          <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>{source.description}</p>
         </div>
 
         <button
@@ -303,7 +303,7 @@ function SourceCard({ source }: { source: Source }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 5, padding: "0 18px 14px" }}>
         {source.fields.map((field) => (
           <span key={field} style={{
-            fontSize: 10,
+            fontSize: 11,
             color: "rgba(255,255,255,0.56)",
             padding: "2px 8px",
             borderRadius: 99,
@@ -329,7 +329,7 @@ function SourceCard({ source }: { source: Source }) {
           )}
           {!loading && !error && rows && rows.length > 0 && (
             <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid rgba(255,255,255,0.10)" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: "rgba(255,255,255,0.04)" }}>
                     {cols.map((col) => (
@@ -337,7 +337,7 @@ function SourceCard({ source }: { source: Source }) {
                         padding: "8px 10px",
                         textAlign: "left",
                         color: "rgba(255,255,255,0.45)",
-                        fontSize: 10,
+                        fontSize: 11,
                         letterSpacing: "0.06em",
                         textTransform: "uppercase",
                         borderBottom: "1px solid rgba(255,255,255,0.08)",
@@ -388,10 +388,10 @@ export default function UKDataExplorer() {
     <div style={{ padding: "0 0 40px 0", maxWidth: 920, margin: "0 auto" }}>
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: 0 }}>Data Explorer</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: 0 }}>Data Explorer</h1>
           <span style={{
-            fontSize: 10,
-            fontWeight: 700,
+            fontSize: 11,
+            fontWeight: 600,
             padding: "3px 9px",
             borderRadius: 99,
             background: "rgba(95,165,255,0.15)",
@@ -401,8 +401,8 @@ export default function UKDataExplorer() {
             United Kingdom
           </span>
           <span style={{
-            fontSize: 10,
-            fontWeight: 700,
+            fontSize: 11,
+            fontWeight: 600,
             padding: "3px 9px",
             borderRadius: 99,
             background: healthOk ? "rgba(47,180,119,0.15)" : "rgba(255,255,255,0.08)",
@@ -428,11 +428,11 @@ export default function UKDataExplorer() {
               border: "1px solid rgba(255,255,255,0.10)",
               background: "rgba(13,17,23,0.8)",
             }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{c.name}</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{c.district}</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#4A90E2" }}>{c.buildings.toLocaleString()}</div>
-              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>buildings</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{c.name}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{c.district}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#4A90E2" }}>{c.buildings.toLocaleString()}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>buildings</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
                 {c.with_epc.toLocaleString()} matched · {c.estimated_from_ehs.toLocaleString()} estimated
               </div>
             </div>
@@ -462,7 +462,7 @@ export default function UKDataExplorer() {
       <OptimizationAssumptions country="UK" />
       <MaterialCatalogueCard country="UK" />
 
-      <div style={{ marginTop: 24, fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
+      <div style={{ marginTop: 24, fontSize: 11, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
         Sources: OpenStreetMap (ODbL) · Energy Performance of Buildings Register, MHCLG (Open Government Licence v3.0) ·
         English Housing Survey 2024-25, MHCLG (Open Government Licence v3.0). EPC certificate lookups require a
         bearer token from{" "}

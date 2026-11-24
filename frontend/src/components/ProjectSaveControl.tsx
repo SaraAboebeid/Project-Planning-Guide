@@ -1,14 +1,14 @@
 /* Wizard top-bar control: "Save" the first time (asks for a name), then a quiet
-   status line while autosave keeps the saved copy current. Signed out, it
-   leads to sign-in and comes back here afterwards. */
+   status line while autosave keeps the saved copy current. Signed in it saves
+   to the account; otherwise to this browser (utils/projectStore.ts), where a
+   named project also saves itself once Step 1 is done. */
 
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Save, Check, Loader2, CloudOff } from "lucide-react";
-import { useAuth } from "../store/auth";
 import { useWizardStore } from "../store/wizard";
 import { saveProject, useProjectAutosave } from "../utils/projectSave";
-import { RETURN_KEY } from "../pages/Login";
+import { useProjectsWhere } from "../utils/projectStore";
 import { useT, useLang } from "../i18n";
 import { C } from "../config/colors";
 
@@ -16,8 +16,7 @@ export default function ProjectSaveControl() {
   const t = useT();
   const lang = useLang();
   const navigate = useNavigate();
-  const location = useLocation();
-  const email = useAuth((s) => s.email);
+  const where = useProjectsWhere();
   const saved = useWizardStore((s) => s.savedProject);
   const projectName = useWizardStore((s) => s.project.projectName);
   const { status, error } = useProjectAutosave();
@@ -26,19 +25,10 @@ export default function ProjectSaveControl() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const base: React.CSSProperties = {
-    display: "flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: 8, fontSize: 11.5,
-    fontWeight: 700, whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0,
+    display: "flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: 8, fontSize: 12,
+    fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0,
     background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.85)",
   };
-
-  if (!email) {
-    return (
-      <button style={base} title={t("Sign in to save this project")}
-        onClick={() => { try { sessionStorage.setItem(RETURN_KEY, location.pathname); } catch { /**/ } navigate("/login"); }}>
-        <Save size={13} /> {t("Save")}
-      </button>
-    );
-  }
 
   if (saved) {
     const time = new Date(saved.savedAt).toLocaleTimeString(lang === "sv" ? "sv-SE" : "en-GB", { hour: "2-digit", minute: "2-digit" });
@@ -47,7 +37,10 @@ export default function ProjectSaveControl() {
       // the tooltip and on My projects.
       <button style={{ ...base, padding: "5px 6px", background: "transparent", border: "1px solid transparent", fontWeight: 600,
         color: status === "error" ? C.bad : "rgba(255,255,255,0.5)" }}
-        title={status === "error" ? `${saved.name}: ${error ?? ""}` : t("“{name}” is saved to your account — open it again from My projects", { name: saved.name })}
+        title={status === "error" ? `${saved.name}: ${error ?? ""}`
+          : where === "browser"
+            ? t("“{name}” is saved in this browser — open it again from My projects", { name: saved.name })
+            : t("“{name}” is saved to your account — open it again from My projects", { name: saved.name })}
         onClick={() => navigate("/projects")}>
         {status === "saving" ? <Loader2 size={13} className="animate-spin" />
           : status === "error" ? <CloudOff size={13} /> : <Check size={13} color={C.good} />}
@@ -72,13 +65,14 @@ export default function ProjectSaveControl() {
         <button style={{ ...base, background: "var(--brand-deep)", border: 0, color: "#fff" }} onClick={submit} disabled={busy}>
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} {t("Save")}
         </button>
-        {saveError && <span role="alert" title={saveError} style={{ fontSize: 11, color: C.bad }}>⚠ {t("not saved")}</span>}
+        {saveError && <span role="alert" title={saveError} style={{ fontSize: 12, color: C.bad }}>⚠ {t("not saved")}</span>}
       </div>
     );
   }
 
   return (
-    <button style={base} onClick={() => setNaming(projectName || "")} title={t("Save this project to your account")}>
+    <button style={base} onClick={() => setNaming(projectName || "")}
+      title={where === "browser" ? t("Save this project in this browser") : t("Save this project to your account")}>
       <Save size={13} /> {t("Save")}
     </button>
   );

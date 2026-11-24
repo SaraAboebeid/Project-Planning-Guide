@@ -77,7 +77,7 @@ export default function DataLayout({
             borderRadius: 10,
             marginBottom: 12,
             cursor: "pointer",
-            background: "linear-gradient(135deg,var(--brand-deep),var(--brand-dark))",
+            background: "var(--brand-deep)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -139,7 +139,7 @@ export default function DataLayout({
           }}
         >
           <Icon d={IC.settings} size={18} />
-          <span className="text-[9px] tracking-wide font-medium leading-none">Settings</span>
+          <span className="text-[11px] tracking-wide font-medium leading-none">Settings</span>
         </button>
       </aside>
 
@@ -154,10 +154,10 @@ export default function DataLayout({
           {(title || accentBadge) && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
               {title && (
-                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.3, textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>{title}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.3, textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>{title}</span>
               )}
               {accentBadge && (
-                <span style={{ padding: "4px 8px", borderRadius: 999, background: accentColor, color: "#0b1220", fontSize: 10, fontWeight: 800, letterSpacing: 0.8 }}>{accentBadge}</span>
+                <span style={{ padding: "4px 8px", borderRadius: 999, background: accentColor, color: "#0b1220", fontSize: 11, fontWeight: 700, letterSpacing: 0.8 }}>{accentBadge}</span>
               )}
             </div>
           )}

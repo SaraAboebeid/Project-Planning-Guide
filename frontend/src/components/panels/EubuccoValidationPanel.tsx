@@ -44,9 +44,9 @@ function MetricCard({
 }: { label: string; value: string; sub: string; color: string }) {
   return (
     <div className={`rounded-xl border p-3.5 space-y-0.5 ${color}`}>
-      <p className="text-[10px] font-semibold uppercase tracking-wider opacity-60">{label}</p>
-      <p className="text-xl font-bold">{value}</p>
-      <p className="text-[11px] opacity-70">{sub}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wider opacity-60">{label}</p>
+      <p className="text-xl font-semibold">{value}</p>
+      <p className="text-[12px] opacity-70">{sub}</p>
     </div>
   );
 }
@@ -116,13 +116,13 @@ export default function EubuccoValidationPanel() {
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={ERROR_DIST} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="diff" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+              <XAxis dataKey="diff" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
               <Tooltip
                 formatter={(v: number, _n: string, item: { payload?: { pct?: number } }) =>
                   [`${v.toLocaleString()} (${item.payload?.pct ?? ""}%)`, "Buildings"]
                 }
-                contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                contentStyle={{ fontSize: 12, borderRadius: 8 }}
               />
               <ReferenceLine x="0" stroke="#1e293b" strokeWidth={1.5} strokeDasharray="4 2" />
               <Bar dataKey="count" radius={[3, 3, 0, 0]}>
@@ -141,7 +141,7 @@ export default function EubuccoValidationPanel() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          <div className="flex flex-wrap gap-3 text-[10px]">
+          <div className="flex flex-wrap gap-3 text-[11px]">
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> Exact match</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-orange-500 inline-block" /> Under-estimate</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-500 inline-block" /> Over-estimate</span>
@@ -158,13 +158,13 @@ export default function EubuccoValidationPanel() {
               <div key={row.type} className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-slate-700">{row.type}</span>
-                  <span className="text-[10px] text-slate-400 tabular-nums">
+                  <span className="text-[11px] text-slate-400 tabular-nums">
                     n = {row.n.toLocaleString()}
                   </span>
                 </div>
                 {/* Exact match bar */}
                 <div>
-                  <div className="flex justify-between text-[10px] text-slate-500 mb-0.5">
+                  <div className="flex justify-between text-[11px] text-slate-500 mb-0.5">
                     <span>Exact match</span>
                     <span className="font-semibold">{row.exactPct}%</span>
                   </div>
@@ -176,10 +176,10 @@ export default function EubuccoValidationPanel() {
                   </div>
                 </div>
                 {/* MAE chip */}
-                <div className="flex items-center gap-2 text-[10px]">
+                <div className="flex items-center gap-2 text-[11px]">
                   <span className="text-slate-400">MAE:</span>
                   <span
-                    className="px-1.5 py-0.5 rounded font-bold text-white"
+                    className="px-1.5 py-0.5 rounded font-semibold text-white"
                     style={{ backgroundColor: row.mae > 1.5 ? "#E2483B" : row.mae > 1.1 ? "#E8880C" : "#2FB477" }}
                   >
                     {row.mae} floors
@@ -195,7 +195,7 @@ export default function EubuccoValidationPanel() {
           </div>
 
           {/* Insight */}
-          <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 text-[11px] text-slate-600 mt-2">
+          <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 text-[12px] text-slate-600 mt-2">
             <strong>Note:</strong> Row houses (Gavel / Mellanliggande) show higher error
             because EUBUCCO assigns a single footprint per building block while the EPC
             counts floors per dwelling unit.
@@ -205,7 +205,7 @@ export default function EubuccoValidationPanel() {
 
       {/* Implication for model */}
       <div className="space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
           Implication for energy model
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -234,7 +234,7 @@ export default function EubuccoValidationPanel() {
                 {c.icon}
                 <p className="text-xs font-semibold text-slate-800">{c.title}</p>
               </div>
-              <p className="text-[11px] text-slate-600">{c.body}</p>
+              <p className="text-[12px] text-slate-600">{c.body}</p>
             </div>
           ))}
         </div>

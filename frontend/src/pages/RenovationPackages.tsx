@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 /* ─── Constants ───────────────────────────────────────────────────── */
-const PACKAGE_COLORS = ["var(--brand-deep)", "#6E2AAE", "#2FB477", "#509724"];
+const PACKAGE_COLORS = ["#5A1790", "#6E2AAE", "#2FB477", "#509724"];
 const PACKAGE_NAMES  = ["Package A", "Package B", "Package C", "Package D"];
 
 /* ─── Fixed building elements for vertical extension ─────────────── */
@@ -195,14 +195,14 @@ function ElementRow({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100 rounded-t-xl">
         <div>
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">{el.label}</span>
-          <span className="ml-2 text-[10px] text-slate-400">{el.description}</span>
+          <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">{el.label}</span>
+          <span className="ml-2 text-[11px] text-slate-400">{el.description}</span>
         </div>
         {area > 0 && item && (
           <div className="flex items-center gap-3 text-xs">
             <span className="tabular-nums font-semibold text-slate-600">{fmtSEK(totalCost)} SEK</span>
             <span className={`tabular-nums font-semibold ${carbonEst ? "text-amber-600" : "text-emerald-600"}`}>
-              {totalCarbon.toFixed(0)} kg CO₂e{carbonEst && <sup className="ml-0.5 text-[9px]">~est</sup>}
+              {totalCarbon.toFixed(0)} kg CO₂e{carbonEst && <sup className="ml-0.5 text-[11px]">~est</sup>}
             </span>
           </div>
         )}
@@ -222,11 +222,11 @@ function ElementRow({
             />
           </div>
           {defaultArea > 0 && area !== defaultArea && (
-            <button onClick={() => onChange(code, defaultArea)} className="text-[10px] text-[var(--brand-deep)] hover:underline">
+            <button onClick={() => onChange(code, defaultArea)} className="text-[11px] text-[var(--brand-deep)] hover:underline">
               Reset to {fmtSEK(defaultArea)} m²
             </button>
           )}
-          <span className="text-[10px] text-slate-400 italic">{el.areaNote}</span>
+          <span className="text-[11px] text-slate-400 italic">{el.areaNote}</span>
         </div>
 
         {/* Assembly picker */}
@@ -267,9 +267,9 @@ function ElementRow({
                         onClick={() => toggleSg(sg.label)}
                         className="w-full flex items-center justify-between px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border-y border-slate-100 text-left"
                       >
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{sg.label}</span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{sg.label}</span>
                         <div className="flex items-center gap-1">
-                          <span className="text-[9px] text-slate-400">{m2Items.length} options</span>
+                          <span className="text-[11px] text-slate-400">{m2Items.length} options</span>
                           {expanded ? <ChevronUp className="w-3 h-3 text-slate-400" /> : <ChevronDown className="w-3 h-3 text-slate-400" />}
                         </div>
                       </button>
@@ -280,21 +280,21 @@ function ElementRow({
                           <button
                             key={it.code}
                             onClick={() => { onChange(it.code, area); setOpen(false); setFilter(""); }}
-                            className={`w-full text-left px-3 py-2 text-xs flex items-start justify-between hover:bg-[#f7f5fb] transition ${isSel ? "bg-[#f0f4ff] font-semibold" : ""}`}
+                            className={`w-full text-left px-3 py-2 text-xs flex items-start justify-between hover:bg-[#f8f6fa] transition ${isSel ? "bg-[#f0f4ff] font-semibold" : ""}`}
                           >
                             <div className="flex-1 min-w-0 pr-3">
                               <span className="block truncate text-slate-700 leading-snug">{it.description}</span>
                               <div className="flex gap-2 mt-0.5">
-                                <span className="text-[10px] text-slate-400 font-mono">{it.code}</span>
-                                {it.uValue && <span className="text-[10px] text-teal-600">U={it.uValue}</span>}
-                                {it.fireClass && <span className="text-[10px] text-orange-600">{it.fireClass}</span>}
+                                <span className="text-[11px] text-slate-400 font-mono">{it.code}</span>
+                                {it.uValue && <span className="text-[11px] text-teal-600">U={it.uValue}</span>}
+                                {it.fireClass && <span className="text-[11px] text-orange-600">{it.fireClass}</span>}
                               </div>
                             </div>
                             <div className="flex-shrink-0 text-right space-y-0.5">
                               <span className="block text-slate-600 font-semibold tabular-nums">{fmtSEK(it.costSEK)} /m²</span>
                               {icd
-                                ? <span className="block text-emerald-600 text-[10px] tabular-nums">{icd.kgCO2ePerM2.toFixed(1)} CO₂e</span>
-                                : <span className="block text-amber-500 text-[10px]">~CO₂e</span>
+                                ? <span className="block text-emerald-600 text-[11px] tabular-nums">{icd.kgCO2ePerM2.toFixed(1)} CO₂e</span>
+                                : <span className="block text-amber-500 text-[11px]">~CO₂e</span>
                               }
                             </div>
                           </button>
@@ -315,25 +315,25 @@ function ElementRow({
         {item && (
           <div className="flex flex-wrap gap-1.5">
             {item.uValue && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-teal-700 font-semibold">
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-teal-700 font-semibold">
                 U = {item.uValue} W/m²K
               </span>
             )}
             {item.fireClass && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 font-semibold">
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 font-semibold">
                 {item.fireClass}
               </span>
             )}
             {item.weightKgM2 && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-semibold">
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-semibold">
                 {item.weightKgM2} kg/m²
               </span>
             )}
             {cd
-              ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold flex items-center gap-1">
+              ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold flex items-center gap-1">
                   <Leaf className="w-2.5 h-2.5" />{cd.kgCO2ePerM2.toFixed(1)} kg CO₂e/m²
                 </span>
-              : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-600 font-semibold">
+              : <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-600 font-semibold">
                   Carbon: ~30 kg/m² (fallback)
                 </span>
             }
@@ -508,7 +508,7 @@ export default function RenovationPackages() {
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-slate-800">Step 4 – Deliverables</h2>
+        <h2 className="text-xl font-semibold text-slate-800">Step 4 – Deliverables</h2>
         <p className="text-sm text-slate-500 mt-1">
           Review the expected deliverables for your project, then configure renovation packages with cost and carbon estimates.
         </p>
@@ -529,8 +529,8 @@ export default function RenovationPackages() {
       {/* ── Extension parameters ── */}
       <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 space-y-4">
         <div className="flex items-center gap-2">
-          <Settings2 className="w-4 h-4 text-[#3A1C36]" />
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Extension Parameters</span>
+          <Settings2 className="w-4 h-4 text-[#2A2432]" />
+          <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Extension Parameters</span>
         </div>
         <div className="flex flex-wrap gap-6">
           <div>
@@ -538,12 +538,12 @@ export default function RenovationPackages() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setNewFloors(f => Math.max(1, f - 1))}
-                className="w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                className="w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 text-sm font-semibold"
               >−</button>
-              <span className="w-8 text-center font-bold text-[#3A1C36] text-lg tabular-nums">{newFloors}</span>
+              <span className="w-8 text-center font-semibold text-[#2A2432] text-lg tabular-nums">{newFloors}</span>
               <button
                 onClick={() => setNewFloors(f => Math.min(10, f + 1))}
-                className="w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                className="w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 text-sm font-semibold"
               >+</button>
             </div>
           </div>
@@ -552,7 +552,7 @@ export default function RenovationPackages() {
             <input
               type="number" min={2.4} max={5} step={0.1} value={floorH}
               onChange={e => setFloorH(parseFloat(e.target.value) || 3.0)}
-              className="w-20 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#3A1C36]/30"
+              className="w-20 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#2A2432]/30"
             />
           </div>
           <div>
@@ -563,9 +563,9 @@ export default function RenovationPackages() {
                 setWwrEdited(true);
                 setWwrPct(clamp(parseFloat(e.target.value) || 0, 5, 80));
               }}
-              className="w-24 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#3A1C36]/30"
+              className="w-24 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#2A2432]/30"
             />
-            <div className="text-[10px] text-slate-400 mt-1">Source: {wwrSource}</div>
+            <div className="text-[11px] text-slate-400 mt-1">Source: {wwrSource}</div>
           </div>
           <div className="flex items-end">
             <div className="text-xs text-slate-400 space-y-0.5">
@@ -584,8 +584,8 @@ export default function RenovationPackages() {
           className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition text-left"
         >
           <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-[#3A1C36]" />
-            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <Building2 className="w-4 h-4 text-[#2A2432]" />
+            <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
               Buildings from Step 2
             </span>
             <span className="text-xs text-slate-400 font-normal">
@@ -616,7 +616,7 @@ export default function RenovationPackages() {
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">
                       {["Building", "Footprint", "Gross wall", "Window area", "Opaque wall", "Roof area", "Floor slab"].map(h => (
-                        <th key={h} className="text-left px-4 py-2 text-slate-500 font-semibold uppercase tracking-wider text-[10px] whitespace-nowrap">{h}</th>
+                        <th key={h} className="text-left px-4 py-2 text-slate-500 font-semibold uppercase tracking-wider text-[11px] whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -628,18 +628,18 @@ export default function RenovationPackages() {
                         <td className="px-4 py-2 tabular-nums text-slate-700 font-semibold">{fmtSEK(r.grossWallArea)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-sky-600 font-semibold">{fmtSEK(r.windowArea)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-[var(--brand-deep)] font-semibold">{fmtSEK(r.opaqueWallArea)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#6E2AAE] font-semibold">{fmtSEK(r.roofArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#6A4B8D] font-semibold">{fmtSEK(r.roofArea)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-[#509724] font-semibold">{fmtSEK(r.floorArea)} m²</td>
                       </tr>
                     ))}
                     {bldgRows.length > 1 && (
-                      <tr className="bg-slate-50 font-bold border-t border-slate-200">
+                      <tr className="bg-slate-50 font-semibold border-t border-slate-200">
                         <td className="px-4 py-2 text-slate-700">Total ({bldgRows.length} buildings)</td>
                         <td className="px-4 py-2 tabular-nums text-slate-700">{fmtSEK(totals.footprint)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-slate-700">{fmtSEK(totals.grossWallArea)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-sky-700">{fmtSEK(totals.windowArea)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-[var(--brand-deep)]">{fmtSEK(totals.opaqueWallArea)} m²</td>
-                        <td className="px-4 py-2 tabular-nums text-[#6E2AAE]">{fmtSEK(totals.roofArea)} m²</td>
+                        <td className="px-4 py-2 tabular-nums text-[#6A4B8D]">{fmtSEK(totals.roofArea)} m²</td>
                         <td className="px-4 py-2 tabular-nums text-[#509724]">{fmtSEK(totals.floorArea)} m²</td>
                       </tr>
                     )}
@@ -661,14 +661,14 @@ export default function RenovationPackages() {
               onClick={() => setActiveTab(i)}
               className={`flex items-center gap-1.5 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-all ${
                 activeTab === i
-                  ? "border-[#3A1C36] text-[#3A1C36] bg-white"
+                  ? "border-[#2A2432] text-[#2A2432] bg-white"
                   : "border-transparent text-slate-400 hover:text-slate-600"
               }`}
             >
               <Package className="w-3.5 h-3.5" style={{ color: pkg.color }} />
               {pkg.name}
               {packageTotals[i]!.totalCostSEK > 0 && (
-                <span className="text-[9px] text-slate-400 tabular-nums ml-0.5">
+                <span className="text-[11px] text-slate-400 tabular-nums ml-0.5">
                   {(packageTotals[i]!.totalCostSEK / 1000).toFixed(0)} kSEK
                 </span>
               )}
@@ -677,7 +677,7 @@ export default function RenovationPackages() {
           {packages.length < 4 && (
             <button
               onClick={addPackage}
-              className="flex items-center gap-1.5 px-4 py-3 text-xs font-semibold text-slate-400 hover:text-[#3A1C36] border-b-2 border-transparent whitespace-nowrap transition-all"
+              className="flex items-center gap-1.5 px-4 py-3 text-xs font-semibold text-slate-400 hover:text-[#2A2432] border-b-2 border-transparent whitespace-nowrap transition-all"
             >
               <Plus className="w-3.5 h-3.5" /> Add package
             </button>
@@ -691,13 +691,13 @@ export default function RenovationPackages() {
               <input
                 type="text" value={activePkg.name}
                 onChange={e => updatePackages(packages.map((p, i) => i === activeTab ? { ...p, name: e.target.value } : p))}
-                className="flex-1 max-w-xs rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#3A1C36]/30"
+                className="flex-1 max-w-xs rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2A2432]/30"
               />
               <button
                 onClick={() => duplicatePackage(activeTab)}
                 disabled={packages.length >= 4}
                 title="Duplicate package"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-[#3A1C36] hover:bg-slate-100 disabled:opacity-30 transition"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-[#2A2432] hover:bg-slate-100 disabled:opacity-30 transition"
               >
                 <Copy className="w-4 h-4" />
               </button>
@@ -735,19 +735,19 @@ export default function RenovationPackages() {
               return (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex flex-wrap gap-6">
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Material Cost</div>
-                    <div className="text-xl font-bold text-[var(--brand-deep)] tabular-nums">{fmtSEK(t.totalCostSEK)} SEK</div>
-                    <div className="text-[10px] text-slate-400 tabular-nums">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Material Cost</div>
+                    <div className="text-xl font-semibold text-[var(--brand-deep)] tabular-nums">{fmtSEK(t.totalCostSEK)} SEK</div>
+                    <div className="text-[11px] text-slate-400 tabular-nums">
                       ({(t.totalCostSEK / 1000).toFixed(0)} kSEK &nbsp;·&nbsp; {(t.totalCostSEK / 1_000_000).toFixed(2)} MSEK)
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1">
                       Embodied Carbon
                       {!t.hasAllCarbon && <span className="text-amber-500 font-normal">(partly est.)</span>}
                     </div>
-                    <div className="text-xl font-bold text-[#6E2AAE] tabular-nums">{t.totalCarbonKg.toFixed(0)} kg CO₂e</div>
-                    <div className="text-[10px] text-slate-400 tabular-nums">
+                    <div className="text-xl font-semibold text-[#6A4B8D] tabular-nums">{t.totalCarbonKg.toFixed(0)} kg CO₂e</div>
+                    <div className="text-[11px] text-slate-400 tabular-nums">
                       ({(t.totalCarbonKg / 1000).toFixed(1)} tonne CO₂e)
                     </div>
                   </div>
@@ -763,18 +763,18 @@ export default function RenovationPackages() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            <span className="text-sm font-bold text-slate-800">Package Comparison</span>
+            <span className="text-sm font-semibold text-slate-800">Package Comparison</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th className="text-left py-2 pr-4 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Package</th>
-                  <th className="text-right py-2 pr-4 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Cost (SEK)</th>
-                  <th className="text-right py-2 pr-4 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Cost / m² wall</th>
-                  <th className="text-right py-2 pr-4 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">CO₂e (kg)</th>
-                  <th className="text-right py-2 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">CO₂e / m² wall</th>
+                  <th className="text-left py-2 pr-4 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Package</th>
+                  <th className="text-right py-2 pr-4 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Cost (SEK)</th>
+                  <th className="text-right py-2 pr-4 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Cost / m² wall</th>
+                  <th className="text-right py-2 pr-4 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">CO₂e (kg)</th>
+                  <th className="text-right py-2 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">CO₂e / m² wall</th>
                 </tr>
               </thead>
               <tbody>
@@ -792,16 +792,16 @@ export default function RenovationPackages() {
                           <span className="font-semibold text-slate-800">{t.pkg.name}</span>
                         </div>
                       </td>
-                      <td className="py-2.5 pr-4 text-right font-bold tabular-nums text-slate-700">
+                      <td className="py-2.5 pr-4 text-right font-semibold tabular-nums text-slate-700">
                         {t.totalCostSEK > 0 ? fmtSEK(t.totalCostSEK) : "—"}
-                        {cheapest && <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">lowest</span>}
+                        {cheapest && <span className="ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">lowest</span>}
                       </td>
                       <td className="py-2.5 pr-4 text-right tabular-nums text-slate-500">
                         {wallArea > 0 && t.totalCostSEK > 0 ? `${fmtSEK(Math.round(t.totalCostSEK / wallArea))} /m²` : "—"}
                       </td>
-                      <td className="py-2.5 pr-4 text-right font-bold tabular-nums text-slate-700">
+                      <td className="py-2.5 pr-4 text-right font-semibold tabular-nums text-slate-700">
                         {t.totalCarbonKg > 0 ? t.totalCarbonKg.toFixed(0) : "—"}
-                        {greenest && <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700 border border-teal-200">lowest</span>}
+                        {greenest && <span className="ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700 border border-teal-200">lowest</span>}
                       </td>
                       <td className="py-2.5 text-right tabular-nums text-slate-500">
                         {wallArea > 0 && t.totalCarbonKg > 0 ? `${(t.totalCarbonKg / wallArea).toFixed(1)} kg/m²` : "—"}
@@ -821,8 +821,8 @@ export default function RenovationPackages() {
               </p>
               <ResponsiveContainer width="100%" height={170}>
                 <BarChart data={chartData} barSize={36}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 10 }} unit=" k" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} unit=" k" />
                   <Tooltip formatter={(v: number) => [`${v} kSEK`, "Cost"]} />
                   <Bar dataKey="cost" radius={[6, 6, 0, 0]}>
                     {chartData.map(d => <Cell key={d.name} fill={d.color} />)}
@@ -834,13 +834,13 @@ export default function RenovationPackages() {
               <p className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1.5">
                 <Leaf className="w-3.5 h-3.5 text-emerald-500" /> Embodied Carbon (kg CO₂e)
                 {packageTotals.some(t => !t.hasAllCarbon) && (
-                  <span className="text-[9px] text-amber-500 font-normal">* partly estimated</span>
+                  <span className="text-[11px] text-amber-500 font-normal">* partly estimated</span>
                 )}
               </p>
               <ResponsiveContainer width="100%" height={170}>
                 <BarChart data={chartData} barSize={36}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip formatter={(v: number) => [`${v} kg CO₂e`, "Carbon"]} />
                   <Bar dataKey="carbon" radius={[6, 6, 0, 0]}>
                     {chartData.map(d => <Cell key={d.name} fill={d.color} />)}

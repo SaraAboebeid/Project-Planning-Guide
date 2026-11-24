@@ -38,7 +38,7 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
 
       {/* Wide matrix scrolls in its own container — never widens the page. */}
       <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
           <thead>
             <tr>
               <th style={thStyle("left")}>{t("Building")}</th>
@@ -53,7 +53,7 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
                     {c.color && <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color }} />}
                     {t("Package {n}", { n: i + 1 })}
                   </span>
-                  <div style={{ fontSize: 9, fontWeight: 600, color: c.met === c.total ? "#2FB477" : "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: c.met === c.total ? "#2FB477" : "rgba(255,255,255,0.35)", marginTop: 2 }}>
                     {t("{met}/{total} meet", { met: c.met, total: c.total })}
                   </div>
                 </th>
@@ -67,7 +67,7 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
                   {r.address}
                 </td>
                 <td style={{ ...tdStyle, textAlign: "right", color: gray }}>{r.baselineEnergy.toFixed(0)}</td>
-                <td style={{ ...tdStyle, textAlign: "right", color: "rgba(255,255,255,0.8)", fontWeight: 700 }}>
+                <td style={{ ...tdStyle, textAlign: "right", color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
                   ≤ {r.targetEnergy.toFixed(0)}
                 </td>
                 {r.cells.map((cell, i) => {
@@ -75,11 +75,11 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
                   const met = cell.tier === "meets" || cell.tier === "exceeds";
                   return (
                     <td key={i} style={{ ...tdStyle, textAlign: "right", background: met ? "rgba(47,180,119,0.08)" : undefined }}>
-                      <div style={{ fontWeight: 700, color }}>
+                      <div style={{ fontWeight: 600, color }}>
                         {cell.energy == null ? "—" : cell.energy.toFixed(0)}
                         {met && <CheckCircle2 size={11} color="#2FB477" style={{ marginLeft: 4, verticalAlign: "-1px" }} />}
                       </div>
-                      <div style={{ fontSize: 9.5, color, opacity: 0.85, marginTop: 1 }}>
+                      <div style={{ fontSize: 11, color, opacity: 0.85, marginTop: 1 }}>
                         {cellText(cell.reductionPct, cell.tier, requiredPct(goal, r.baselineEnergy))}
                       </div>
                     </td>
@@ -92,7 +92,7 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
       </div>
 
       {/* Key: which package is which */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 8, fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
         {columns.map((c, i) => (
           <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }} title={c.label}>
             {c.color && <span style={{ width: 7, height: 7, borderRadius: "50%", background: c.color, flexShrink: 0 }} />}
@@ -103,7 +103,7 @@ export default function ClimateGoalBuildingTable({ a }: { a: BuildingGoalAssessm
       </div>
 
       {/* Legend */}
-      <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
+      <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap", fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
         <Legend color="#2FB477" label={goal.kind === "absolute" ? t("Meets target (≤ {kwh} kWh/m²·yr)", { kwh: goal.targetKwhM2 ?? "" }) : t("Meets target (≥ −{pct}%)", { pct: goal.reductionPct })} />
         <Legend color="#E8880C" label={t("Below target (reduces, not enough)")} />
         <Legend color="#E2483B" label={t("No reduction vs baseline")} />
@@ -132,8 +132,8 @@ function thStyle(align: "left" | "right"): React.CSSProperties {
   return {
     padding: "8px 8px",
     textAlign: align,
-    fontSize: 9.5,
-    fontWeight: 700,
+    fontSize: 11,
+    fontWeight: 600,
     letterSpacing: 0.6,
     textTransform: "uppercase",
     color: "rgba(255,255,255,0.4)",

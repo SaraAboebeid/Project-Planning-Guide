@@ -38,10 +38,10 @@ function ItemRow({ item, min, max }: { item: WikellsItem; min: number; max: numb
   };
   
   return (
-    <tr className="border-b border-slate-100 hover:bg-[#f7f5fb] transition-colors group">
-      <td className="py-2.5 pl-3 pr-2 text-[11px] font-mono text-slate-400 whitespace-nowrap">{item.code}</td>
+    <tr className="border-b border-slate-100 hover:bg-[#f8f6fa] transition-colors group">
+      <td className="py-2.5 pl-3 pr-2 text-[12px] font-mono text-slate-400 whitespace-nowrap">{item.code}</td>
       <td className="py-2.5 pr-4 text-xs text-slate-700 leading-snug">{item.description}</td>
-      <td className={`py-2.5 pr-4 text-xs font-bold tabular-nums whitespace-nowrap ${costBand(item.costSEK, min, max)}`}>
+      <td className={`py-2.5 pr-4 text-xs font-semibold tabular-nums whitespace-nowrap ${costBand(item.costSEK, min, max)}`}>
         {item.costSEK.toLocaleString("sv-SE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </td>
       <td className="py-2.5 pr-4 whitespace-nowrap">
@@ -50,30 +50,30 @@ function ItemRow({ item, min, max }: { item: WikellsItem; min: number; max: numb
             <span className="text-xs font-semibold text-slate-700 tabular-nums">
               {carbonData.kgCO2ePerM2.toFixed(1)}
             </span>
-            <span className="text-[9px] text-slate-400">kg CO₂e</span>
+            <span className="text-[11px] text-slate-400">kg CO₂e</span>
           </div>
         ) : (
-          <span className="text-[11px] text-slate-400">—</span>
+          <span className="text-[12px] text-slate-400">—</span>
         )}
       </td>
       <td className="py-2.5 pr-4 whitespace-nowrap">
         {carbonCat ? (
-          <span className={`inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${getCarbonBadgeClasses(carbonCat.color)}`}>
+          <span className={`inline-block text-[11px] font-semibold px-1.5 py-0.5 rounded-full border ${getCarbonBadgeClasses(carbonCat.color)}`}>
             {carbonCat.label}
           </span>
         ) : "—"}
       </td>
-      <td className="py-2.5 pr-4 text-[10px] text-slate-500 whitespace-nowrap">{item.unit}</td>
-      <td className="py-2.5 pr-4 text-[11px] text-slate-500 whitespace-nowrap">
+      <td className="py-2.5 pr-4 text-[11px] text-slate-500 whitespace-nowrap">{item.unit}</td>
+      <td className="py-2.5 pr-4 text-[12px] text-slate-500 whitespace-nowrap">
         {item.weightKgM2 != null ? `${item.weightKgM2} kg/m²` : "—"}
       </td>
       <td className="py-2.5 pr-3 whitespace-nowrap">
         {ub ? (
-          <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${ub.cls}`}>
+          <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full border ${ub.cls}`}>
             U={item.uValue} ({ub.label})
           </span>
         ) : item.soundRw != null ? (
-          <span className="text-[11px] text-slate-600">R'w = {item.soundRw} dB</span>
+          <span className="text-[12px] text-slate-600">R'w = {item.soundRw} dB</span>
         ) : "—"}
       </td>
     </tr>
@@ -172,40 +172,40 @@ export default function WikellsPanel() {
       {/* ── Stats bar ── */}
       {chapterStats && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="rounded-xl bg-[#f7f5fb] border border-[#e8e0f5] px-3 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 text-center">Options Available</p>
-            <p className="text-lg font-bold text-[var(--brand-deep)] mt-0.5 text-center">{chapterStats.count}</p>
+          <div className="rounded-xl bg-[#f8f6fa] border border-[#eae5f0] px-3 py-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 text-center">Options Available</p>
+            <p className="text-lg font-semibold text-[var(--brand-deep)] mt-0.5 text-center">{chapterStats.count}</p>
           </div>
           <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mb-1 flex items-center gap-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 mb-1 flex items-center gap-1">
               💰 Lowest Cost
             </p>
-            <p className="text-[11px] text-slate-700 leading-tight mb-0.5 line-clamp-2">{chapterStats.minItem.description}</p>
-            <p className="text-sm font-bold text-emerald-700">{chapterStats.minCost.toLocaleString("sv-SE")} SEK/m²</p>
+            <p className="text-[12px] text-slate-700 leading-tight mb-0.5 line-clamp-2">{chapterStats.minItem.description}</p>
+            <p className="text-sm font-semibold text-emerald-700">{chapterStats.minCost.toLocaleString("sv-SE")} SEK/m²</p>
             {WIKELLS_CARBON_MAP[chapterStats.minItem.code] && (
-              <p className="text-[10px] text-emerald-600 mt-0.5">
+              <p className="text-[11px] text-emerald-600 mt-0.5">
                 {WIKELLS_CARBON_MAP[chapterStats.minItem.code]!.kgCO2ePerM2.toFixed(1)} kg CO₂e
               </p>
             )}
           </div>
           {chapterStats.minCarbonItem && chapterStats.minCarbon && (
             <div className="rounded-xl bg-teal-50 border border-teal-200 px-3 py-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-600 mb-1 flex items-center gap-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-teal-600 mb-1 flex items-center gap-1">
                 <Leaf className="w-3 h-3" /> Lowest Carbon
               </p>
-              <p className="text-[11px] text-slate-700 leading-tight mb-0.5 line-clamp-2">{chapterStats.minCarbonItem.description}</p>
-              <p className="text-sm font-bold text-teal-700">{chapterStats.minCarbon.toFixed(1)} kg CO₂e/m²</p>
-              <p className="text-[10px] text-teal-600 mt-0.5">
+              <p className="text-[12px] text-slate-700 leading-tight mb-0.5 line-clamp-2">{chapterStats.minCarbonItem.description}</p>
+              <p className="text-sm font-semibold text-teal-700">{chapterStats.minCarbon.toFixed(1)} kg CO₂e/m²</p>
+              <p className="text-[11px] text-teal-600 mt-0.5">
                 {chapterStats.minCarbonItem.costSEK.toLocaleString("sv-SE")} SEK/m²
               </p>
             </div>
           )}
           {chapterStats.maxCarbonItem && chapterStats.maxCarbon && (
             <div className="rounded-xl bg-orange-50 border border-orange-200 px-3 py-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-orange-600 mb-1">Highest Carbon</p>
-              <p className="text-[11px] text-slate-700 leading-tight mb-0.5 line-clamp-2">{chapterStats.maxCarbonItem.description}</p>
-              <p className="text-sm font-bold text-orange-700">{chapterStats.maxCarbon.toFixed(1)} kg CO₂e/m²</p>
-              <p className="text-[10px] text-orange-600 mt-0.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-orange-600 mb-1">Highest Carbon</p>
+              <p className="text-[12px] text-slate-700 leading-tight mb-0.5 line-clamp-2">{chapterStats.maxCarbonItem.description}</p>
+              <p className="text-sm font-semibold text-orange-700">{chapterStats.maxCarbon.toFixed(1)} kg CO₂e/m²</p>
+              <p className="text-[11px] text-orange-600 mt-0.5">
                 {chapterStats.maxCarbonItem.costSEK.toLocaleString("sv-SE")} SEK/m²
               </p>
             </div>
@@ -248,7 +248,7 @@ export default function WikellsPanel() {
               <button
                 key={s}
                 onClick={() => setSortBy(s)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[12px] font-medium transition-colors ${
                   sortBy === s
                     ? "bg-[var(--brand-deep)]/10 border-[var(--brand-deep)]/30 text-[var(--brand-deep)]"
                     : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
@@ -266,7 +266,7 @@ export default function WikellsPanel() {
               <button
                 key={s}
                 onClick={() => setSortBy(s)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[12px] font-medium transition-colors ${
                   sortBy === s
                     ? "bg-teal-600/10 border-teal-600/30 text-teal-700"
                     : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
@@ -278,13 +278,13 @@ export default function WikellsPanel() {
             ))}
           </div>
         </div>
-        <span className="text-[11px] text-slate-400 ml-auto">
+        <span className="text-[12px] text-slate-400 ml-auto">
           {filtered.reduce((n, g) => n + g.items.length, 0)} assemblies
         </span>
       </div>
 
       {/* ── Legend ── */}
-      <div className="flex flex-wrap gap-4 text-[11px] text-slate-500">
+      <div className="flex flex-wrap gap-4 text-[12px] text-slate-500">
         <div className="flex items-center gap-3">
           <span className="font-medium text-slate-600">Cost:</span>
           <span className="flex items-center gap-1.5">
@@ -340,7 +340,7 @@ export default function WikellsPanel() {
                 >
                   <span className="text-xs font-semibold text-slate-700">{sg.label}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-400">{sg.items.length} items</span>
+                    <span className="text-[12px] text-slate-400">{sg.items.length} items</span>
                     {isOpen
                       ? <ChevronUp   className="w-4 h-4 text-slate-400" />
                       : <ChevronDown className="w-4 h-4 text-slate-400" />}
@@ -350,7 +350,7 @@ export default function WikellsPanel() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left min-w-[700px]">
                       <thead>
-                        <tr className="bg-[#f7f5fb] border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        <tr className="bg-[#f8f6fa] border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                           <th className="py-2 pl-3 pr-2 whitespace-nowrap">Code</th>
                           <th className="py-2 pr-4">Assembly description</th>
                           <th className="py-2 pr-4 whitespace-nowrap">Cost</th>
@@ -380,7 +380,7 @@ export default function WikellsPanel() {
         </div>
       )}
 
-      <p className="text-[10px] text-slate-400 border-t border-slate-100 pt-3">
+      <p className="text-[11px] text-slate-400 border-t border-slate-100 pt-3">
         <strong>Cost data</strong> from <em>Wikells Sektionsfakta</em> (Swedish construction cost database).
         <strong>Carbon footprint</strong> from <em>Boverket Klimatdatabas</em> (GWP A1-A3, kg CO₂e/m²).
         Values are approximations based on typical material quantities. Carbon confidence levels: High = direct material mapping, Medium/Low = estimated from similar materials.

@@ -288,7 +288,7 @@
   Object.assign(_tt.style, {
     position: 'fixed', pointerEvents: 'none', zIndex: '1001',
     background: 'rgba(15,23,42,0.93)', color: '#e2e8f0',
-    borderRadius: '9px', padding: '9px 12px', fontSize: '11px',
+    borderRadius: '9px', padding: '9px 12px', fontSize: '12px',
     lineHeight: '1.6', display: 'none', maxWidth: '230px',
     boxShadow: '0 4px 20px rgba(0,0,0,0.45)',
     border: '1px solid rgba(255,255,255,0.09)',

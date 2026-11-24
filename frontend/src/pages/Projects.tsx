@@ -1,27 +1,29 @@
-/* "My projects" — the signed-in user's saved projects: open, rename, delete,
-   or start a new one. Each account sees only its own (backend/accounts.py). */
+/* "My projects" — saved projects: open, rename, delete, or start a new one.
+   Signed in: the account's projects (backend/accounts.py). Otherwise: the
+   projects saved in this browser (utils/projectStore.ts). */
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FolderOpen, Pencil, Trash2, Plus, Loader2, Save } from "lucide-react";
-import { accounts, type ProjectMeta } from "../api/accounts";
+import type { ProjectMeta } from "../api/accounts";
 import { useAuth } from "../store/auth";
 import { useWizardStore } from "../store/wizard";
 import { openProject, saveProject } from "../utils/projectSave";
-import { RETURN_KEY } from "./Login";
+import { projectsBackend, useProjectsWhere } from "../utils/projectStore";
 import { useT, useLang } from "../i18n";
 import { C, tint } from "../config/colors";
 
 const btn: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 8, cursor: "pointer",
-  fontSize: 12, fontWeight: 700, background: "transparent", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.8)",
+  fontSize: 12, fontWeight: 600, background: "transparent", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.8)",
 };
 
 export default function Projects() {
   const t = useT();
   const lang = useLang();
   const navigate = useNavigate();
-  const { email, loaded } = useAuth();
+  const email = useAuth((s) => s.email);
+  const where = useProjectsWhere();
   const current = useWizardStore((s) => s.project);
   const savedProject = useWizardStore((s) => s.savedProject);
   const reset = useWizardStore((s) => s.reset);
@@ -31,28 +33,13 @@ export default function Projects() {
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
 
   const load = async () => {
-    try { setProjects((await accounts.listProjects()).projects); setError(null); }
+    try { setProjects(await projectsBackend().list()); setError(null); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   };
-  useEffect(() => { if (email) load(); }, [email]);
+  useEffect(() => { load(); }, [where]);
 
   const fmtDate = (iso: string) => new Date(iso).toLocaleString(lang === "sv" ? "sv-SE" : "en-GB",
     { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-
-  if (loaded && !email) {
-    return (
-      <div style={{ maxWidth: 520, margin: "48px auto", textAlign: "center" }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>{t("My projects")}</h1>
-        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.6 }}>
-          {t("Sign in with your work email to save projects and open them again later.")}
-        </p>
-        <button style={{ ...btn, background: "var(--brand-deep)", border: 0, color: "#fff", padding: "9px 16px", fontSize: 13 }}
-          onClick={() => { try { sessionStorage.setItem(RETURN_KEY, "/projects"); } catch { /**/ } navigate("/login"); }}>
-          {t("Sign in")}
-        </button>
-      </div>
-    );
-  }
 
   // Work in this tab that isn't saved anywhere yet.
   const unsavedWork = !savedProject && (!!current.projectName.trim() || current.bboxRows.length > 0 || current.lookedUpBuildings.length > 0);
@@ -61,8 +48,12 @@ export default function Projects() {
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "8px 0 40px" }}>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 240 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>{t("My projects")}</h1>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{t("Signed in as {email}", { email: email ?? "" })}</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>{t("My projects")}</h1>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+            {where === "account"
+              ? t("Signed in as {email}", { email: email ?? "" })
+              : t("Saved in this browser on this computer. Clearing the browser's site data removes them.")}
+          </div>
         </div>
         {unsavedWork && (
           <button style={btn} disabled={busyId === "save"}
@@ -86,7 +77,9 @@ export default function Projects() {
       ) : projects.length === 0 ? (
         <div style={{ padding: "28px 20px", borderRadius: 14, border: "1px dashed rgba(255,255,255,0.15)", textAlign: "center",
           color: "rgba(255,255,255,0.5)", fontSize: 13, lineHeight: 1.6 }}>
-          {t("No saved projects yet. Start a project and press Save in the top bar — after that it saves itself as you work.")}
+          {where === "browser"
+            ? t("No saved projects yet. Start a project: once it has a name and you continue past Step 1, it saves itself as you work.")
+            : t("No saved projects yet. Start a project and press Save in the top bar — after that it saves itself as you work.")}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -103,19 +96,19 @@ export default function Projects() {
                       onKeyDown={async (e) => {
                         if (e.key === "Escape") setRenaming(null);
                         if (e.key === "Enter") {
-                          await accounts.renameProject(p.id, renaming.name);
+                          await projectsBackend().rename(p.id, renaming.name.trim());
                           if (isOpen) useWizardStore.getState().setSavedProject({ ...savedProject!, name: renaming.name.trim() });
                           setRenaming(null); load();
                         }
                       }}
                       aria-label={t("Project name")}
-                      style={{ fontSize: 14, fontWeight: 700, color: "#fff", background: "#0d1117", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "3px 8px", width: "100%", maxWidth: 380 }} />
+                      style={{ fontSize: 14, fontWeight: 600, color: "#fff", background: "#0d1117", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "3px 8px", width: "100%", maxWidth: 380 }} />
                   ) : (
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {p.name}{isOpen && <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 800, color: C.selected }}>● {t("open in this tab")}</span>}
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {p.name}{isOpen && <span style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 700, color: C.selected }}>● {t("open in this tab")}</span>}
                     </div>
                   )}
-                  <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)", marginTop: 3 }}>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 3 }}>
                     {[s.city && s.country ? `${t(s.city)}, ${t(s.country)}` : s.country ? t(s.country) : null,
                       s.buildings ? t(s.buildings === 1 ? "{n} building" : "{n} buildings", { n: s.buildings }) : null,
                       s.step ? t("Step {n}", { n: s.step }) : null,
@@ -134,7 +127,7 @@ export default function Projects() {
                 <button style={{ ...btn, color: C.bad, borderColor: tint(C.bad, 0.35) }} title={t("Delete")} aria-label={t("Delete")}
                   onClick={async () => {
                     if (!window.confirm(t("Delete “{name}”? This can't be undone.", { name: p.name }))) return;
-                    await accounts.deleteProject(p.id);
+                    await projectsBackend().remove(p.id);
                     if (isOpen) useWizardStore.getState().setSavedProject(null);
                     load();
                   }}>

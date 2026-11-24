@@ -1,6 +1,6 @@
 export default function BrandedHeader() {
   return (
-    <header className="bg-gradient-to-r from-[var(--brand-dark)] via-[var(--brand-deep)] to-[#5a1490] shadow-md">
+    <header className="bg-gradient-to-r from-[var(--brand-dark)] via-[var(--brand-deep)] to-[#50386c] shadow-md">
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
         {/* Left — Logos */}
         <div className="flex items-center gap-4">
@@ -22,14 +22,14 @@ export default function BrandedHeader() {
           <h1 className="text-white text-[15px] font-semibold tracking-wide leading-tight">
             Data Fidelity Navigator
           </h1>
-          <p className="text-white/60 text-[10px] tracking-[0.18em] uppercase mt-0.5">
+          <p className="text-white/60 text-[11px] tracking-[0.18em] uppercase mt-0.5">
             Digital ToolBox
           </p>
         </div>
 
         {/* Right — Team */}
-        <div className="text-left text-[10px] text-white/70 leading-relaxed">
-          <p className="font-semibold text-white/85 tracking-[0.12em] uppercase text-[9px] mb-0.5">
+        <div className="text-left text-[11px] text-white/70 leading-relaxed">
+          <p className="font-semibold text-white/85 tracking-[0.12em] uppercase text-[11px] mb-0.5">
             Team
           </p>
           <p>Sara Abouebeid &nbsp;·&nbsp; Elena Malakhatka</p>

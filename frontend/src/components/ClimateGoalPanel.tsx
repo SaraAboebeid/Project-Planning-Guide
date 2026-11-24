@@ -15,11 +15,11 @@ const WORSE = "#E2483B";   // red — worse than baseline
 // Layer build-up chip colors by material category — insulation stands out (teal)
 // since it's the layer that answers "which insulation?".
 const LAYER_COLOR: Record<string, string> = {
-  insulation: "#4ECDC4",
+  insulation: "#8B6EAD",
   structure: "#E8880C",
   board: "#9CA3AF",
   cladding: "#4A90E2",
-  cavity: "#A78BFA",
+  cavity: "#C1AFD6",
 };
 
 /* The EU-wide target, shown as a reference line under each package. Not scored:
@@ -84,7 +84,7 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
       title={goalTitle(goal)}
       subtitle={goalStatement(goal)}
       badge={
-        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, padding: "3px 10px", borderRadius: 100, background: `${accent}1e`, color: accent, border: `1px solid ${accent}44`, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, padding: "3px 10px", borderRadius: 100, background: `${accent}1e`, color: accent, border: `1px solid ${accent}44`, flexShrink: 0 }}>
           {goal.kind === "absolute" ? t("≤ {kwh} kWh/m² BY {year}", { kwh: goal.targetKwhM2 ?? "", year: goal.targetYear }) : t("−{pct}% BY {year}", { pct: goal.reductionPct, year: goal.targetYear })}
           {goal.scope === "national" ? ` · ${t("NATIONAL")}` : goal.scope === "regional" ? ` · ${t("REGIONAL")}` : ""}
         </span>
@@ -95,7 +95,7 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
       {/* Verdict */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 14px" }}>
         {achievers.length ? <CheckCircle2 size={15} color={MET} /> : <Target size={14} color={NEAR} />}
-        <span style={{ fontSize: 13, fontWeight: 700, color: achievers.length ? MET : "rgba(255,255,255,0.75)" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: achievers.length ? MET : "rgba(255,255,255,0.75)" }}>
           {headline}
         </span>
       </div>
@@ -105,12 +105,12 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
         {/* Level goals: the as-built building on the same scale, for reference. */}
         {abs && (
           <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 96px", gap: 10, alignItems: "center" }}>
-            <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>{t("As-built today")}</span>
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>{t("As-built today")}</span>
             <div style={{ position: "relative", height: 10, borderRadius: 5, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
               <div style={{ position: "absolute", inset: 0, width: `${(a.baselineEnergy / maxE) * 100}%`, background: "rgba(255,255,255,0.25)", borderRadius: 5 }} />
               <div style={{ position: "absolute", top: -2, bottom: -2, left: `${targetLeft}%`, width: 2, background: "rgba(255,255,255,0.55)" }} />
             </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.55)", textAlign: "right" }}>{Math.round(a.baselineEnergy)}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.55)", textAlign: "right" }}>{Math.round(a.baselineEnergy)}</span>
           </div>
         )}
         {rows.map((r, i) => {
@@ -130,7 +130,7 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
                   cursor: hasMat ? "pointer" : "default", borderRadius: 6,
                   background: open ? "rgba(255,255,255,0.04)" : "transparent" }}
               >
-                <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center" }}>
                   {hasMat && (open
                     ? <ChevronDown size={12} style={{ marginRight: 2, flexShrink: 0, opacity: 0.5 }} />
                     : <ChevronRight size={12} style={{ marginRight: 2, flexShrink: 0, opacity: 0.5 }} />)}
@@ -142,7 +142,7 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
                   <div style={{ position: "absolute", inset: 0, width: `${w}%`, background: c, borderRadius: 5, transition: "width .4s" }} />
                   <div style={{ position: "absolute", top: -2, bottom: -2, left: `${targetLeft}%`, width: 2, background: "rgba(255,255,255,0.55)" }} title={abs ? t("Target ≤ {kwh} kWh/m²·yr", { kwh: T }) : t("Target −{pct}%", { pct: goal.reductionPct })} />
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: c, textAlign: "right" }}
+                <span style={{ fontSize: 12, fontWeight: 600, color: c, textAlign: "right" }}
                   title={abs && !r.meets ? t("{n} kWh/m²·yr above the target", { n: Math.round(r.energyUse - T) }) : undefined}>
                   {abs
                     ? `${Math.round(r.energyUse)}${r.meets ? "" : ` (+${Math.round(r.energyUse - T)})`}`
@@ -155,7 +155,7 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
                 <div style={{ display: "grid", gridTemplateColumns: "150px 1fr", gap: 10, marginTop: 3 }}>
                   <span />
                   <a href={EU_TARGET_URL} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", textDecoration: "none" }}
+                    style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", textDecoration: "none" }}
                     title={t("The European Union's binding climate target (European Climate Law). Shown for reference; it is an economy-wide emissions target, not scored per building.")}>
                     <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 2, background: "#4A90E2", marginRight: 5, verticalAlign: "0px" }} />
                     {t(EU_TARGET_TEXT)}
@@ -169,11 +169,11 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
                   display: "flex", flexDirection: "column", gap: 8 }}>
                   {r.materials!.map((m, i) => (
                     <div key={`${m.component}-${i}`} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11 }}>
-                        <span style={{ minWidth: 78, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "capitalize" }}>{t(m.component)}</span>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12 }}>
+                        <span style={{ minWidth: 78, fontWeight: 600, color: "rgba(255,255,255,0.5)", textTransform: "capitalize" }}>{t(m.component)}</span>
                         <span style={{ flex: 1, color: "rgba(255,255,255,0.82)" }}>{m.material}</span>
                         {m.u != null && (
-                          <span style={{ fontWeight: 700, color: m.u > 0.4 ? "#E2483B" : m.u > 0.3 ? "#E8880C" : "#2FB477", flexShrink: 0 }}>
+                          <span style={{ fontWeight: 600, color: m.u > 0.4 ? "#E2483B" : m.u > 0.3 ? "#E8880C" : "#2FB477", flexShrink: 0 }}>
                             U {m.u.toFixed(2)}
                           </span>
                         )}
@@ -182,12 +182,12 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
                       {m.layers && m.layers.length > 0 && (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingLeft: 86 }}>
                           {m.layers.map((l, j) => (
-                            <span key={j} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10,
+                            <span key={j} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11,
                               padding: "1px 7px", borderRadius: 6,
                               background: `${LAYER_COLOR[l.category ?? ""] ?? "#9CA3AF"}1e`,
                               border: `1px solid ${LAYER_COLOR[l.category ?? ""] ?? "#9CA3AF"}40`,
                               color: "rgba(255,255,255,0.8)" }}>
-                              <span style={{ fontWeight: 700, color: LAYER_COLOR[l.category ?? ""] ?? "#9CA3AF" }}>{l.thicknessMm} mm</span>
+                              <span style={{ fontWeight: 600, color: LAYER_COLOR[l.category ?? ""] ?? "#9CA3AF" }}>{l.thicknessMm} mm</span>
                               {l.name}
                             </span>
                           ))}
@@ -204,7 +204,7 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
 
       {/* Target-line legend + source */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, flexWrap: "wrap", gap: 6 }}>
-        <span style={{ fontSize: 9.5, color: "rgba(255,255,255,0.35)" }}>
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
           <span style={{ display: "inline-block", width: 2, height: 9, background: "rgba(255,255,255,0.55)", marginRight: 5, verticalAlign: "-1px" }} />
           {abs
             ? t("≤ {kwh} kWh/m²·yr target · simulated energy use, kWh/m²·yr (+n = above the target)", { kwh: T })
@@ -217,7 +217,7 @@ export default function ClimateGoalPanel({ a }: { a: GoalAssessment }) {
 }
 
 function SourceLink({ goal }: { goal: ClimateGoal }) {
-  const style = { fontSize: 9.5, color: "rgba(255,255,255,0.35)" } as const;
+  const style = { fontSize: 11, color: "rgba(255,255,255,0.35)" } as const;
   return goal.sourceUrl
     ? <a href={goal.sourceUrl} target="_blank" rel="noreferrer" style={{ ...style, textDecoration: "underline" }}>{goal.source}</a>
     : <span style={style}>{goal.source}</span>;
@@ -228,7 +228,7 @@ function SourceLink({ goal }: { goal: ClimateGoal }) {
 function GoalBasis({ goal }: { goal: ClimateGoal }) {
   const t = useT();
   return (
-    <div style={{ fontSize: 11, lineHeight: 1.55, color: "rgba(255,255,255,0.5)", margin: "6px 0 0" }}>
+    <div style={{ fontSize: 12, lineHeight: 1.55, color: "rgba(255,255,255,0.5)", margin: "6px 0 0" }}>
       {goal.headline && <div><b style={{ color: "rgba(255,255,255,0.7)" }}>{t("Headline goal:")}</b> {t(goal.headline)}</div>}
       <div><b style={{ color: "rgba(255,255,255,0.7)" }}>{t("Official target:")}</b> {t(goal.basis)}</div>
     </div>
@@ -244,8 +244,8 @@ function BandChip({ band, sap, faded }: { band: string | null; sap: number | nul
   const c = BAND_COLOR[band] ?? "#9CA3AF";
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, opacity: faded ? 0.75 : 1 }}>
-      <span style={{ minWidth: 18, textAlign: "center", fontWeight: 800, fontSize: 11, padding: "1px 5px", borderRadius: 4, background: `${c}26`, color: c, border: `1px solid ${c}55` }}>{band}</span>
-      {sap != null && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)" }}>{sap}</span>}
+      <span style={{ minWidth: 18, textAlign: "center", fontWeight: 700, fontSize: 12, padding: "1px 5px", borderRadius: 4, background: `${c}26`, color: c, border: `1px solid ${c}55` }}>{band}</span>
+      {sap != null && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{sap}</span>}
     </span>
   );
 }
@@ -269,7 +269,7 @@ export function ClimateGoalRatingPanel({ a }: { a: RatingAssessment }) {
     <PanelShell icon={<Target size={17} />} iconColor={accent}
       title={goalTitle(goal)} subtitle={goalStatement(goal)}
       badge={
-        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, padding: "3px 10px", borderRadius: 100, background: `${accent}1e`, color: accent, border: `1px solid ${accent}44`, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, padding: "3px 10px", borderRadius: 100, background: `${accent}1e`, color: accent, border: `1px solid ${accent}44`, flexShrink: 0 }}>
           {t("EPC {band} BY {year}", { band: goal.targetRating ?? "", year: goal.targetYear })}
         </span>
       }>
@@ -277,7 +277,7 @@ export function ClimateGoalRatingPanel({ a }: { a: RatingAssessment }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 12px" }}>
         {allMet ? <CheckCircle2 size={15} color={MET} /> : <Target size={14} color={NEAR} />}
-        <span style={{ fontSize: 13, fontWeight: 700, color: allMet ? MET : "rgba(255,255,255,0.75)" }}>{headline}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: allMet ? MET : "rgba(255,255,255,0.75)" }}>{headline}</span>
       </div>
 
       {/* Share of buildings at the target band: today, then per package. */}
@@ -285,7 +285,7 @@ export function ClimateGoalRatingPanel({ a }: { a: RatingAssessment }) {
         {[{ label: t("Today (certificates)"), met: metToday, total: rows.length, color: undefined as string | undefined, medianSap: null as number | null, today: true },
           ...columns.map((c) => ({ ...c, today: false }))].map((c, i) => (
           <div key={i} style={{ display: "grid", gridTemplateColumns: "150px 1fr 120px", gap: 10, alignItems: "center" }}>
-            <span style={{ fontSize: 11.5, color: c.today ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.75)", fontStyle: c.today ? "italic" : "normal",
+            <span style={{ fontSize: 12, color: c.today ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.75)", fontStyle: c.today ? "italic" : "normal",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center" }}>
               {c.color && <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color, marginRight: 6, flexShrink: 0 }} />}
               <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{c.label}</span>
@@ -293,7 +293,7 @@ export function ClimateGoalRatingPanel({ a }: { a: RatingAssessment }) {
             <div style={{ height: 10, borderRadius: 5, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${c.total ? (c.met / c.total) * 100 : 0}%`, background: c.today ? "rgba(255,255,255,0.3)" : (c.met === c.total ? MET : NEAR), borderRadius: 5 }} />
             </div>
-            <span style={{ fontSize: 11.5, fontWeight: 700, textAlign: "right", color: c.met === c.total ? MET : "rgba(255,255,255,0.7)" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, textAlign: "right", color: c.met === c.total ? MET : "rgba(255,255,255,0.7)" }}>
               {t("{met}/{total} at {band}+", { met: c.met, total: c.total, band: goal.targetRating ?? "" })}
               {c.medianSap != null && <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.4)" }}> · SAP {c.medianSap}</span>}
             </span>
@@ -303,12 +303,12 @@ export function ClimateGoalRatingPanel({ a }: { a: RatingAssessment }) {
 
       {/* Every building: band today → estimated band under each package. */}
       <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5, minWidth: 420 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12, minWidth: 420 }}>
           <thead>
             <tr style={{ color: "rgba(255,255,255,0.45)", textAlign: "left" }}>
-              <th style={{ padding: "7px 10px", fontWeight: 700 }}>{t("Building")}</th>
-              <th style={{ padding: "7px 10px", fontWeight: 700 }}>{t("Today")}</th>
-              {columns.map((c) => <th key={c.label} style={{ padding: "7px 10px", fontWeight: 700, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</th>)}
+              <th style={{ padding: "7px 10px", fontWeight: 600 }}>{t("Building")}</th>
+              <th style={{ padding: "7px 10px", fontWeight: 600 }}>{t("Today")}</th>
+              {columns.map((c) => <th key={c.label} style={{ padding: "7px 10px", fontWeight: 600, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -328,7 +328,7 @@ export function ClimateGoalRatingPanel({ a }: { a: RatingAssessment }) {
           </tbody>
         </table>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginTop: 10, fontSize: 9.5, color: "rgba(255,255,255,0.35)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginTop: 10, fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
         <span>
           {t("Band (SAP score) · package bands are estimates: the certificate's SAP moved by the simulated change in fuel use.")}
           {fromBand > 0 && ` * ${fromBand === 1 ? t("{n} building has no certificate SAP and start from the middle of their band.", { n: fromBand }) : t("{n} buildings have no certificate SAP and start from the middle of their band.", { n: fromBand })}`}

@@ -24,7 +24,7 @@ const PHASE_SPLIT: [string, number][] = [
   ["Validation & QA",      0.15],
   ["Reporting",            0.10],
 ];
-const TL_COLORS = ["var(--brand-deep)", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
+const TL_COLORS = ["#5A1790", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
 
 function fmt(d: Date) { return d.toISOString().slice(0, 10); }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
@@ -76,7 +76,7 @@ function Card({ title, icon, children }: { title: string; icon: React.ReactNode;
           width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.07)",
           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
         }}>{icon}</div>
-        <span style={{ fontWeight: 700, fontSize: 14, color: "rgba(255,255,255,0.85)" }}>{title}</span>
+        <span style={{ fontWeight: 600, fontSize: 14, color: "rgba(255,255,255,0.85)" }}>{title}</span>
       </div>
       <div style={{ padding: "18px 20px" }}>{children}</div>
     </div>
@@ -102,7 +102,7 @@ function FormulaRow({
         {label}
       </span>
       <span style={{
-        fontSize: 11, color: "rgba(47,180,119,0.7)",
+        fontSize: 12, color: "rgba(47,180,119,0.7)",
         background: "rgba(47,180,119,0.06)", borderRadius: 6,
         padding: "2px 8px", fontFamily: "monospace",
       }}>
@@ -179,10 +179,10 @@ export default function Budget() {
 
       {/* ── Page header ── */}
       <div>
-        <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
           Planning & Cost Estimate
         </p>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>
           Planning & Cost Estimate
         </h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0 }}>
@@ -199,8 +199,8 @@ export default function Budget() {
           { v: `${fmtNum(opexTotal)} ${currency}`,   l: "Annual OPEX",             c: "#2FB477", bg: "rgba(47,180,119,0.10)", border: "rgba(47,180,119,0.25)" },
         ].map(s => (
           <div key={s.l} style={{ borderRadius: 14, background: s.bg, border: `1px solid ${s.border}`, padding: "14px 16px", textAlign: "center" }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: s.c }}>{s.v}</div>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".8px", color: "rgba(255,255,255,0.4)", marginTop: 4 }}>{s.l}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: s.c }}>{s.v}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".8px", color: "rgba(255,255,255,0.4)", marginTop: 4 }}>{s.l}</div>
           </div>
         ))}
       </div>
@@ -286,12 +286,12 @@ export default function Budget() {
 
         <div style={{ marginTop: 14, borderRadius: 10, background: "rgba(80,151,36,0.08)", border: "1px solid rgba(80,151,36,0.2)", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Annual OPEX Total</span>
-          <span style={{ fontSize: 16, fontWeight: 800, color: opexTotal < 0 ? "#2FB477" : "rgba(255,255,255,0.85)" }}>{fmtNum(opexTotal)} {currency}/yr</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: opexTotal < 0 ? "#2FB477" : "rgba(255,255,255,0.85)" }}>{fmtNum(opexTotal)} {currency}/yr</span>
         </div>
       </Card>
 
       {/* ══ 3. PROJECT TIMELINE ══ */}
-      <Card title="Project Timeline" icon={<Calendar size={16} color="#6E2AAE" />}>
+      <Card title="Project Timeline" icon={<Calendar size={16} color="#6A4B8D" />}>
 
         <GuideBox title="How project hours are estimated">
           <p style={{ margin: "0 0 8px" }}>
@@ -353,8 +353,8 @@ export default function Budget() {
         <div style={{ height: 160, marginBottom: 16 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={barData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
-              <XAxis dataKey="phase" tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }} />
-              <YAxis tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }} />
+              <XAxis dataKey="phase" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }} />
+              <YAxis tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }} />
               <Tooltip
                 contentStyle={{ background: "#1e1e2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }}
                 formatter={(v: number) => [`${v} hours`, "Hours"]}
@@ -378,7 +378,7 @@ export default function Budget() {
             <thead>
               <tr>
                 {["Phase", "Start", "End", "Duration", "Hours"].map(h => (
-                  <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".8px", color: "rgba(255,255,255,0.35)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>{h}</th>
+                  <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".8px", color: "rgba(255,255,255,0.35)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -389,7 +389,7 @@ export default function Budget() {
                   <td style={{ padding: "8px 10px", color: "rgba(255,255,255,0.45)", fontVariantNumeric: "tabular-nums" }}>{r.start}</td>
                   <td style={{ padding: "8px 10px", color: "rgba(255,255,255,0.45)", fontVariantNumeric: "tabular-nums" }}>{r.end}</td>
                   <td style={{ padding: "8px 10px" }}>
-                    <span style={{ background: TL_COLORS[i], color: "#fff", borderRadius: 100, padding: "2px 9px", fontSize: 10, fontWeight: 700 }}>
+                    <span style={{ background: TL_COLORS[i], color: "#fff", borderRadius: 100, padding: "2px 9px", fontSize: 11, fontWeight: 600 }}>
                       {r.weeks} wk
                     </span>
                   </td>
@@ -414,19 +414,19 @@ export default function Budget() {
         borderRadius: 16, background: "rgba(var(--brand-rgb),0.10)",
         border: "1px solid rgba(var(--brand-rgb),0.25)", padding: "20px 24px",
       }}>
-        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.2, color: "rgba(255,255,255,0.35)", marginBottom: 14 }}>Total Estimate</p>
+        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.2, color: "rgba(255,255,255,0.35)", marginBottom: 14 }}>Total Estimate</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 16, alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>Consultant Service Cost</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "var(--brand-deep)" }}>{fmtNum(serviceCost)} {currency}</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>Consultant Service Cost</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--brand-deep)" }}>{fmtNum(serviceCost)} {currency}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>Annual OPEX</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#2FB477" }}>{fmtNum(opexTotal)} {currency}/yr</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>Annual OPEX</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#2FB477" }}>{fmtNum(opexTotal)} {currency}/yr</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2 }}>Consultant + OPEX Total</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>{fmtNum(totalCost)} {currency}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 2 }}>Consultant + OPEX Total</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#fff" }}>{fmtNum(totalCost)} {currency}</div>
           </div>
         </div>
       </div>

@@ -7,10 +7,14 @@ import {
 } from "../config/countryNav";
 import {
   Globe, MapPin, Users, User, Lock, Building2, ArrowRight,
-  ChevronRight, Plus, Loader2, CheckCircle2, AlertTriangle,
+  ChevronRight, Plus, Loader2, CheckCircle2, AlertTriangle, FolderOpen, Trash2,
 } from "lucide-react";
+import { useWizardStore } from "../store/wizard";
 import { useNavigate } from "react-router-dom";
-import { useT, translate } from "../i18n";
+import { useT, useLang, translate } from "../i18n";
+import type { ProjectMeta } from "../api/accounts";
+import { projectsBackend, useProjectsWhere } from "../utils/projectStore";
+import { openProject } from "../utils/projectSave";
 import { useAuth } from "../store/auth";
 import { RETURN_KEY } from "../pages/Login";
 import { LOGIN_ENABLED } from "../config/features";
@@ -22,7 +26,7 @@ import { LOGIN_ENABLED } from "../config/features";
    page so there is one entry screen. A figure that does not exist shows "—". */
 
 const FLAG: Record<CountryCode, string> = { se: "🇸🇪", gb: "🇬🇧", be: "🇧🇪" };
-const ACCENT = "#8B5CF6";
+const ACCENT = "#A78DC5";
 
 /* ── Selection card ──────────────────────────────────────────────────────────── */
 export interface DatasetMetric { label: string; value: string; color: string }
@@ -86,9 +90,9 @@ export function WorkspaceCard({ country, city, metrics, onCountry, onCity, onSta
               title={t("Partner Login")} sub={accessMode === "partner" ? email! : t("Sign in with partner")} />
           </div>
           {email && LOGIN_ENABLED && (
-            <div className="text-[11.5px] text-white/45 mt-2">
+            <div className="text-[12px] text-white/45 mt-2">
               {t("Signed in — your projects are saved to your account.")}{" "}
-              <button onClick={() => navigate("/projects")} className="font-semibold" style={{ color: "#4ECDC4" }}>{t("My projects")}</button>
+              <button onClick={() => navigate("/projects")} className="font-semibold" style={{ color: "#8B6EAD" }}>{t("My projects")}</button>
             </div>
           )}
         </div>
@@ -97,23 +101,26 @@ export function WorkspaceCard({ country, city, metrics, onCountry, onCity, onSta
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3 mt-5">
         <button onClick={onStart}
-          className="ppg-start-cta flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white transition hover:brightness-110"
-          style={{ background: "linear-gradient(135deg, #6D28D9 0%, #8B5CF6 100%)", boxShadow: "0 6px 22px rgba(139,92,246,0.4)" }}>
-          {t("Start Planning")} <ArrowRight size={16} />
+          className="ppg-start-cta flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-lg text-[14px] font-semibold transition"
+          /* Light purple + dark text here: light mode inverts this panel, so it
+             renders as the muted-plum button with white text. */
+          style={{ background: "#C6B6D8", color: "#0b1220" }}>
+          {t("New project")} <ArrowRight size={16} />
         </button>
       </div>
+
+      <RecentProjects />
 
       {/* The selected city's dataset, in numbers */}
       {metrics.length > 0 && (
         <div className="mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-white/35 mb-2.5">{t("{city} dataset", { city: t(city) })}</div>
+          <div className="text-[12px] font-semibold uppercase tracking-wider text-white/35 mb-2.5">{t("{city} dataset", { city: t(city) })}</div>
           <div className="grid grid-cols-3 gap-2">
             {metrics.map((m) => (
-              <div key={m.label} className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.color, flexShrink: 0 }} />
-                <span className="text-[14px] font-bold text-white/90">{m.value}</span>
-                <span className="text-[11px] text-white/45 truncate">{t(m.label)}</span>
+              <div key={m.label} className="flex flex-col gap-0.5 px-3 py-2 rounded-lg"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <span className="text-[16px] font-semibold text-white/90 tabular-nums">{m.value}</span>
+                <span className="text-[12px] text-white/50 leading-snug">{t(m.label)}</span>
               </div>
             ))}
           </div>
@@ -208,19 +215,19 @@ export function SeMunicipalityBuilder({ onBuilt }: { onBuilt: (name: string) => 
                 onBuilt(staticName ?? picked.name);
               }}
               className="px-4 rounded-lg text-[13px] font-semibold text-white/85"
-              style={{ border: "1px solid rgba(78,205,196,0.5)", background: "rgba(78,205,196,0.10)" }}>
+              style={{ border: "1px solid rgba(139,110,173,0.5)", background: "rgba(139,110,173,0.10)" }}>
               {t("Select")}
             </button>
           ) : (
             <button onClick={build} disabled={!picked || !!running}
-              className="px-4 rounded-lg text-[13px] font-bold text-white transition"
-              style={{ background: picked && !running ? "linear-gradient(135deg, #6D28D9 0%, #8B5CF6 100%)" : "rgba(255,255,255,0.06)",
+              className="px-4 rounded-lg text-[13px] font-semibold text-white transition"
+              style={{ background: picked && !running ? "#C6B6D8" : "rgba(255,255,255,0.06)", color: picked && !running ? "#0b1220" : undefined,
                        opacity: picked && !running ? 1 : 0.5, cursor: picked && !running ? "pointer" : "not-allowed" }}>
               {t("Build")}
             </button>
           )}
         </div>
-        <div className="text-[11.5px] text-white/40 mt-1.5">
+        <div className="text-[12px] text-white/40 mt-1.5">
           {picked
             ? picked.built
               ? t("{name} is already built.", { name: picked.name })
@@ -240,10 +247,10 @@ export function SeMunicipalityBuilder({ onBuilt }: { onBuilt: (name: string) => 
                 : (st.stage && st.stage_labels?.[st.stage]) || t("Starting...")}
             </div>
             <div className="h-1.5 rounded-full overflow-hidden mt-2" style={{ background: "rgba(255,255,255,0.07)" }}>
-              <div style={{ width: `${pct}%`, height: "100%", background: st.state === "failed" ? "#E2483B" : "#4ECDC4", transition: "width .5s" }} />
+              <div style={{ width: `${pct}%`, height: "100%", background: st.state === "failed" ? "#E2483B" : "#8B6EAD", transition: "width .5s" }} />
             </div>
             {st.log && st.log.length > 0 && st.state !== "done" && (
-              <div className="text-[10.5px] text-white/35 mt-1.5 font-mono truncate">{st.log[st.log.length - 1]}</div>
+              <div className="text-[11.5px] text-white/35 mt-1.5 font-mono truncate">{st.log[st.log.length - 1]}</div>
             )}
           </div>
         )}
@@ -281,6 +288,76 @@ function Select({ value, onChange, options }: {
   );
 }
 
+/* Saved projects to pick up again (account or this browser, utils/projectStore.ts):
+   the three most recent, newest first, plus a link to all of them. */
+function RecentProjects() {
+  const t = useT();
+  const lang = useLang();
+  const navigate = useNavigate();
+  const where = useProjectsWhere();
+  const [items, setItems] = useState<ProjectMeta[] | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    projectsBackend().list().then((l) => { if (alive) setItems(l); }).catch(() => { if (alive) setItems([]); });
+    return () => { alive = false; };
+  }, [where]);
+  if (!items || items.length === 0) return null;
+  const fmt = (iso: string) => new Date(iso).toLocaleDateString(lang === "sv" ? "sv-SE" : "en-GB", { day: "numeric", month: "short" });
+  return (
+    <div className="mt-4">
+      <div className="flex items-center mb-1.5">
+        <span className="text-[12px] font-medium text-white/50">{t("Continue a project")}</span>
+        <button onClick={() => navigate("/projects")} className="ml-auto text-[12px] text-white/50 hover:text-white/85 underline underline-offset-2">
+          {t("All projects ({n})", { n: items.length })}
+        </button>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {items.slice(0, 3).map((p) => (
+          <div key={p.id} className="flex items-stretch rounded-lg overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <button disabled={!!opening}
+              onClick={async () => {
+                setOpening(p.id); setErr(null);
+                try { const step = await openProject(p.id); navigate(`/step/${step}`); }
+                catch (e) { setErr(e instanceof Error ? e.message : String(e)); setOpening(null); }
+              }}
+              className="flex flex-1 min-w-0 items-center gap-3 px-3 py-2 text-left">
+              {opening === p.id ? <Loader2 size={14} className="animate-spin text-white/60" /> : <FolderOpen size={14} className="text-white/50" />}
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-medium text-white/90 truncate">{p.name}</span>
+                <span className="block text-[12px] text-white/45 truncate">
+                  {[p.summary?.city ? t(p.summary.city) : null,
+                    p.summary?.buildings ? t(p.summary.buildings === 1 ? "{n} building" : "{n} buildings", { n: p.summary.buildings }) : null,
+                    p.summary?.step ? t("Step {n}", { n: p.summary.step }) : null,
+                    fmt(p.updated_at)].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+              <ChevronRight size={14} className="text-white/35" />
+            </button>
+            <button title={t("Delete")} aria-label={t("Delete “{name}”", { name: p.name })}
+              onClick={async () => {
+                if (!window.confirm(t("Delete “{name}”? This can't be undone.", { name: p.name }))) return;
+                try {
+                  await projectsBackend().remove(p.id);
+                  // The project open in this tab is no longer saved anywhere.
+                  if (useWizardStore.getState().savedProject?.id === p.id) useWizardStore.getState().setSavedProject(null);
+                  setItems((prev) => (prev ?? []).filter((x) => x.id !== p.id));
+                } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+              }}
+              className="px-3 text-white/35 hover:text-red-400"
+              style={{ borderLeft: "1px solid rgba(255,255,255,0.08)" }}>
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+      {err && <div role="alert" className="text-[12px] text-red-300 mt-1.5">⚠ {err}</div>}
+    </div>
+  );
+}
+
 function AccessCard({ active, soon, icon: Icon, title, sub, onClick }: {
   active: boolean; soon?: boolean; icon: typeof User; title: string; sub: string; onClick?: () => void;
 }) {
@@ -288,15 +365,16 @@ function AccessCard({ active, soon, icon: Icon, title, sub, onClick }: {
     <button onClick={soon ? undefined : onClick} disabled={soon}
       className="relative flex flex-col items-center text-center gap-1 px-2 py-3 rounded-xl transition"
       style={{
-        background: active ? "rgba(139,92,246,0.14)" : "rgba(255,255,255,0.02)",
-        border: `1px solid ${active ? "rgba(139,92,246,0.6)" : "rgba(255,255,255,0.09)"}`,
-        opacity: soon ? 0.55 : 1, cursor: soon ? "not-allowed" : "pointer",
+        background: active ? "rgba(167,141,197,0.14)" : "rgba(255,255,255,0.02)",
+        border: `1px solid ${active ? "rgba(167,141,197,0.6)" : "rgba(255,255,255,0.09)"}`,
+        // Not available yet: fully greyed out (no colour at all), not just faded.
+        opacity: soon ? 0.45 : 1, filter: soon ? "grayscale(1)" : undefined, cursor: soon ? "not-allowed" : "pointer",
       }}>
-      {active && <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white" style={{ background: ACCENT }}>✓</span>}
-      {soon && <span className="absolute top-1.5 right-1.5 text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}>{translate("Soon")}</span>}
+      {active && <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[11px] font-black text-white" style={{ background: ACCENT }}>✓</span>}
+      {soon && <span className="absolute top-1.5 right-1.5 text-[8px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}>{translate("Soon")}</span>}
       <Icon size={17} className={active ? "" : "text-white/50"} color={active ? ACCENT : undefined} />
       <span className="text-[12px] font-semibold text-white/85">{title}</span>
-      <span className="text-[10px] text-white/40 leading-tight max-w-full truncate" title={sub}>{sub}</span>
+      <span className="text-[11px] text-white/40 leading-tight max-w-full truncate" title={sub}>{sub}</span>
     </button>
   );
 }

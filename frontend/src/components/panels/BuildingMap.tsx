@@ -28,7 +28,7 @@ export default function BuildingMapPanel() {
             <p className="text-sm font-semibold text-navy leading-tight">
               Gothenburg 3D Explorer
             </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[12px] text-slate-400 mt-0.5">
               {buildingPoints.length > 0
                 ? `${buildingPoints.length} address${buildingPoints.length > 1 ? "es" : ""} selected — only matching buildings will load`
                 : "92,973 buildings · EUBUCCO + EPC energy data · deck.gl / MapLibre"}
@@ -61,13 +61,13 @@ export default function BuildingMapPanel() {
               [122,80,8,20],[138,74,10,26],[154,79,8,21],[170,82,10,18],
             ] as number[][]).map(([x,y,w,h],i) => (
               <rect key={i} x={x} y={y} width={w} height={h} rx={1}
-                fill={["var(--brand-deep)","#2FB477","#6E2AAE","#509724","#3a6e1a"][i % 5]}
+                fill={["var(--brand-deep)","#2FB477","#6A4B8D","#509724","#3a6e1a"][i % 5]}
                 opacity={0.6 + (i % 3) * 0.13}
               />
             ))}
             <line x1="0" y1="100" x2="192" y2="100" stroke="white" strokeOpacity="0.1" strokeWidth="1"/>
           </svg>
-          <div className="absolute bottom-2 left-0 right-0 text-center text-[9px] text-white/40 font-mono">
+          <div className="absolute bottom-2 left-0 right-0 text-center text-[11px] text-white/40 font-mono">
             57.70&deg;N &middot; 12.00&deg;E
           </div>
         </div>
@@ -96,9 +96,9 @@ export default function BuildingMapPanel() {
             <div key={m.title} className={`rounded-xl border p-3 ${m.accent}`}>
               <div className="flex items-center gap-1.5 mb-1">
                 {m.icon}
-                <span className="text-[11px] font-semibold text-slate-700">{m.title}</span>
+                <span className="text-[12px] font-semibold text-slate-700">{m.title}</span>
               </div>
-              <p className="text-[10px] text-slate-500 leading-relaxed">{m.desc}</p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">{m.desc}</p>
             </div>
           ))}
         </div>
@@ -112,7 +112,7 @@ export default function BuildingMapPanel() {
           { icon: <Layers    className="w-3 h-3" />, value: "17,346",             label: "TABULA matched" },
           { icon: <Map       className="w-3 h-3" />, value: "Central Gothenburg", label: "coverage" },
         ].map((s) => (
-          <div key={s.label} className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <div key={s.label} className="flex items-center gap-1.5 text-[12px] text-slate-500">
             <span className="text-slate-400">{s.icon}</span>
             <span className="font-semibold text-slate-700">{s.value}</span>
             <span>{s.label}</span>

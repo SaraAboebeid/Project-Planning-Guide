@@ -9,7 +9,7 @@ import {
 } from "../../config/sensitivityData";
 import { TreemapView, SankeyFlowView, RadialImpactView, BubbleScatterView } from "./InnovativeCharts";
 
-const COLORS = ["var(--brand-deep)", "#2FB477", "#509724", "#6E2AAE", "#E8880C", "#E2483B", "var(--brand-dark)", "#ec4899", "#06b6d4", "#64748b", "#3a6e1a", "#2FB477", "#d946ef"];
+const COLORS = ["#5A1790", "#2FB477", "#509724", "#6E2AAE", "#E8880C", "#E2483B", "#421869", "#ec4899", "#06b6d4", "#64748b", "#3a6e1a", "#2FB477", "#d946ef"];
 
 function fmt(n: number) {
   return n >= 1000 ? `${(n / 1000).toFixed(0)}k` : n.toFixed(0);
@@ -124,8 +124,8 @@ export default function SensitivityPanel() {
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis type="number" tickFormatter={(v) => `${v}%`} fontSize={11} />
-                <YAxis type="category" dataKey="name" fontSize={11} width={120} />
+                <XAxis type="number" tickFormatter={(v) => `${v}%`} fontSize={12} />
+                <YAxis type="category" dataKey="name" fontSize={12} width={120} />
                 <Tooltip
                   formatter={(v: number) => [
                     `${v}%`,
@@ -144,18 +144,18 @@ export default function SensitivityPanel() {
           {/* Summary stats */}
           <div className="grid grid-cols-3 gap-3">
             <div className="ppg-stat ppg-stat-navy">
-              <div className="text-lg font-bold text-navy">{ranking.length}</div>
-              <div className="text-[11px] text-gray-500">Parameters Tested</div>
+              <div className="text-lg font-semibold text-navy">{ranking.length}</div>
+              <div className="text-[12px] text-gray-500">Parameters Tested</div>
             </div>
             <div className="ppg-stat ppg-stat-teal">
-              <div className="text-lg font-bold text-teal">{fmt(BASELINE_HEATING_KWH)} kWh</div>
-              <div className="text-[11px] text-gray-500">Baseline Heating</div>
+              <div className="text-lg font-semibold text-teal">{fmt(BASELINE_HEATING_KWH)} kWh</div>
+              <div className="text-[12px] text-gray-500">Baseline Heating</div>
             </div>
             <div className="ppg-stat ppg-stat-green">
-              <div className="text-lg font-bold text-green">
+              <div className="text-lg font-semibold text-green">
                 {ranking[0]?.label ?? "—"}
               </div>
-              <div className="text-[11px] text-gray-500">Most Influential</div>
+              <div className="text-[12px] text-gray-500">Most Influential</div>
             </div>
           </div>
         </>
@@ -188,7 +188,7 @@ export default function SensitivityPanel() {
           <div className="ppg-card">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h4 className="text-sm font-bold text-slate-800">{param.label}</h4>
+                <h4 className="text-sm font-semibold text-slate-800">{param.label}</h4>
                 <p className="text-xs text-gray-400">
                   Unit: {param.unit} · Baseline: {String(param.baseline_value)} · Range: ±{fmt(param.range_kwh)} kWh
                 </p>
@@ -201,13 +201,13 @@ export default function SensitivityPanel() {
             {/* Facade details for WWR parameter */}
             {param.facadeDetails && (
               <div className="mb-4 p-3 bg-gradient-to-r from-teal/10 to-green/10 rounded-lg border border-teal/20">
-                <h5 className="text-xs font-bold text-slate-700 mb-2">🧭 Facade-Specific Impact</h5>
+                <h5 className="text-xs font-semibold text-slate-700 mb-2">🧭 Facade-Specific Impact</h5>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.entries(param.facadeDetails).map(([direction, details]) => (
                     <div key={direction} className="bg-white/60 rounded px-2 py-1.5">
                       <div className="text-xs font-semibold text-slate-800 capitalize">{direction}</div>
-                      <div className="text-[10px] text-gray-600">Range: {Math.round(details.range).toLocaleString()} kWh</div>
-                      <div className="text-[10px] text-gray-500 italic">{details.impact}</div>
+                      <div className="text-[11px] text-gray-600">Range: {Math.round(details.range).toLocaleString()} kWh</div>
+                      <div className="text-[11px] text-gray-500 italic">{details.impact}</div>
                     </div>
                   ))}
                 </div>
@@ -218,12 +218,12 @@ export default function SensitivityPanel() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={detailData} margin={{ top: 10, right: 20, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="value" fontSize={11} />
+                  <XAxis dataKey="value" fontSize={12} />
                   <YAxis
-                    fontSize={11}
+                    fontSize={12}
                     tickFormatter={(v) => fmt(v)}
                     domain={["auto", "auto"]}
-                    label={{ value: "kWh/yr", angle: -90, position: "insideLeft", fontSize: 11 }}
+                    label={{ value: "kWh/yr", angle: -90, position: "insideLeft", fontSize: 12 }}
                   />
                   <Tooltip
                     formatter={(v: number) => [`${v.toLocaleString()} kWh`, "Annual Heating"]}
@@ -233,7 +233,7 @@ export default function SensitivityPanel() {
                     y={BASELINE_HEATING_KWH}
                     stroke="#94a3b8"
                     strokeDasharray="4 4"
-                    label={{ value: "Baseline", position: "right", fontSize: 10, fill: "#94a3b8" }}
+                    label={{ value: "Baseline", position: "right", fontSize: 11, fill: "#94a3b8" }}
                   />
                   <Line
                     type="monotone"

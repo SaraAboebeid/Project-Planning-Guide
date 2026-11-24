@@ -33,12 +33,12 @@ export function CollapsibleCard({
       >
         <span style={{ width: 9, height: 9, borderRadius: 3, background: color, flexShrink: 0 }} />
         <span style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>{title}</span>
-          {subtitle && <span style={{ fontSize: 11.5, color: white(0.4) }}>{subtitle}</span>}
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{title}</span>
+          {subtitle && <span style={{ fontSize: 12, color: white(0.4) }}>{subtitle}</span>}
           {badge}
         </span>
         <span style={{
-          color: white(0.45), fontSize: 11, flexShrink: 0,
+          color: white(0.45), fontSize: 12, flexShrink: 0,
           transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s",
         }}>▶</span>
       </button>
@@ -51,13 +51,13 @@ export function CollapsibleCard({
 export function EquationRow({ label, tex, explain }: { label: string; tex: string; explain?: string }) {
   return (
     <div>
-      <div style={{ fontSize: 9.5, color: white(0.4), marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 11, color: white(0.4), marginBottom: 3 }}>{label}</div>
       <div style={{
-        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11.5, color: "#f0f4ff",
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "#f0f4ff",
         background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "7px 10px", overflowX: "auto",
         border: "1px solid rgba(255,255,255,0.06)",
       }}>{tex}</div>
-      {explain && <div style={{ fontSize: 10.5, color: white(0.42), marginTop: 3, lineHeight: 1.5 }}>{explain}</div>}
+      {explain && <div style={{ fontSize: 11.5, color: white(0.42), marginTop: 3, lineHeight: 1.5 }}>{explain}</div>}
     </div>
   );
 }
@@ -66,7 +66,7 @@ export function EquationRow({ label, tex, explain }: { label: string; tex: strin
 export function SubHead({ children }: { children: ReactNode }) {
   return (
     <div style={{
-      fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: white(0.35),
+      fontSize: 11, fontWeight: 700, letterSpacing: 1.4, color: white(0.35),
       textTransform: "uppercase", margin: "16px 0 8px",
     }}>{children}</div>
   );

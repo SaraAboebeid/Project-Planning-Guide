@@ -39,7 +39,7 @@ export default function ModelScopeNotice({
         margin: compact ? "8px 0" : "10px 0",
       }}
     >
-      <span aria-hidden style={{ color: accent, fontWeight: 800, lineHeight: 1.3 }}>
+      <span aria-hidden style={{ color: accent, fontWeight: 700, lineHeight: 1.3 }}>
         {blocking ? "!" : "?"}
       </span>
       <div style={{ fontSize: compact ? 11.5 : 12.5, lineHeight: 1.55 }}>

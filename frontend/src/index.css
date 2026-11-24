@@ -4,8 +4,8 @@
 @theme {
   /* Brand anchors */
   --color-navy: var(--brand);
-  --color-navy-dark: #421869;
-  --color-teal: #995BD5;
+  --color-navy-dark: #3f2c55;
+  --color-teal: #967AB6;
   /* Supporting scale — unified to the "good" family (colour-blind-tuned) */
   --color-lime: #2FB477;
   --color-green: #29a16a;
@@ -13,19 +13,19 @@
   /* Neutrals */
   --color-dark: #0f172a;
   --color-surface: #ffffff;
-  --color-bg: #f7f5fb;
+  --color-bg: #f8f6fa;
   --color-muted: #64748b;
 
   /* PPG aliases */
   --color-ppg-navy: var(--brand);
-  --color-ppg-navy-dark: #421869;
-  --color-ppg-teal: #995BD5;
+  --color-ppg-navy-dark: #3f2c55;
+  --color-ppg-teal: #967AB6;
   --color-ppg-lime: #2FB477;
   --color-ppg-green: #29a16a;
   --color-ppg-olive: #1a6844;
   --color-ppg-dark: #0f172a;
   --color-ppg-surface: #ffffff;
-  --color-ppg-bg: #f7f5fb;
+  --color-ppg-bg: #f8f6fa;
   --color-ppg-muted: #64748b;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
@@ -49,13 +49,13 @@
   --color-sky-50:#f1f6fc; --color-sky-100:#e0ebf8; --color-sky-200:#bfd8f5; --color-sky-300:#92bdef; --color-sky-400:#629fe7; --color-sky-500:#3584e1; --color-sky-600:#2072d3; --color-sky-700:#1a5faf; --color-sky-800:#154d8e; --color-sky-900:#113d71; --color-sky-950:#0b2849;
   --color-blue-50:#f1f6fc; --color-blue-100:#e0ebf8; --color-blue-200:#bfd8f5; --color-blue-300:#92bdef; --color-blue-400:#629fe7; --color-blue-500:#3584e1; --color-blue-600:#2072d3; --color-blue-700:#1a5faf; --color-blue-800:#154d8e; --color-blue-900:#113d71; --color-blue-950:#0b2849;
   --color-indigo-50:#f1f6fc; --color-indigo-100:#e0ebf8; --color-indigo-200:#bfd8f5; --color-indigo-300:#92bdef; --color-indigo-400:#629fe7; --color-indigo-500:#3584e1; --color-indigo-600:#2072d3; --color-indigo-700:#1a5faf; --color-indigo-800:#154d8e; --color-indigo-900:#113d71; --color-indigo-950:#0b2849;
-  /* selected — #4ECDC4 */
-  --color-teal-50:#f2fafa; --color-teal-100:#e3f5f4; --color-teal-200:#c5efec; --color-teal-300:#9de4df; --color-teal-400:#71d8d1; --color-teal-500:#49cdc4; --color-teal-600:#34beb4; --color-teal-700:#2b9e96; --color-teal-800:#23807a; --color-teal-900:#1c6661; --color-teal-950:#12423f;
-  --color-cyan-50:#f2fafa; --color-cyan-100:#e3f5f4; --color-cyan-200:#c5efec; --color-cyan-300:#9de4df; --color-cyan-400:#71d8d1; --color-cyan-500:#49cdc4; --color-cyan-600:#34beb4; --color-cyan-700:#2b9e96; --color-cyan-800:#23807a; --color-cyan-900:#1c6661; --color-cyan-950:#12423f;
-  /* brand — #5A1790 */
-  --color-purple-50:#f7f0fc; --color-purple-100:#ede0f8; --color-purple-200:#ddbef6; --color-purple-300:#c592ef; --color-purple-400:#ab61e8; --color-purple-500:#9434e2; --color-purple-600:#821ed4; --color-purple-700:#6c19b0; --color-purple-800:#58148f; --color-purple-900:#461072; --color-purple-950:#2d0a4a;
-  --color-violet-50:#f7f0fc; --color-violet-100:#ede0f8; --color-violet-200:#ddbef6; --color-violet-300:#c592ef; --color-violet-400:#ab61e8; --color-violet-500:#9434e2; --color-violet-600:#821ed4; --color-violet-700:#6c19b0; --color-violet-800:#58148f; --color-violet-900:#461072; --color-violet-950:#2d0a4a;
-  --color-fuchsia-50:#f7f0fc; --color-fuchsia-100:#ede0f8; --color-fuchsia-200:#ddbef6; --color-fuchsia-300:#c592ef; --color-fuchsia-400:#ab61e8; --color-fuchsia-500:#9434e2; --color-fuchsia-600:#821ed4; --color-fuchsia-700:#6c19b0; --color-fuchsia-800:#58148f; --color-fuchsia-900:#461072; --color-fuchsia-950:#2d0a4a;
+  /* selected — #8B6EAD */
+  --color-teal-50:#f6f4f8; --color-teal-100:#ece8f0; --color-teal-200:#d9d0e4; --color-teal-300:#bfafd2; --color-teal-400:#a38bbe; --color-teal-500:#896aac; --color-teal-600:#77569b; --color-teal-700:#634881; --color-teal-800:#503a69; --color-teal-900:#402e54; --color-teal-950:#291e36;
+  --color-cyan-50:#f6f4f8; --color-cyan-100:#ece8f0; --color-cyan-200:#d9d0e4; --color-cyan-300:#bfafd2; --color-cyan-400:#a38bbe; --color-cyan-500:#896aac; --color-cyan-600:#77569b; --color-cyan-700:#634881; --color-cyan-800:#503a69; --color-cyan-900:#402e54; --color-cyan-950:#291e36;
+  /* brand — #52396E */
+  --color-purple-50:#f6f3f9; --color-purple-100:#ece6f2; --color-purple-200:#d9cee6; --color-purple-300:#bfacd4; --color-purple-400:#a388c1; --color-purple-500:#8966b0; --color-purple-600:#7652a0; --color-purple-700:#624485; --color-purple-800:#50376c; --color-purple-900:#402c56; --color-purple-950:#291d37;
+  --color-violet-50:#f6f3f9; --color-violet-100:#ece6f2; --color-violet-200:#d9cee6; --color-violet-300:#bfacd4; --color-violet-400:#a388c1; --color-violet-500:#8966b0; --color-violet-600:#7652a0; --color-violet-700:#624485; --color-violet-800:#50376c; --color-violet-900:#402c56; --color-violet-950:#291d37;
+  --color-fuchsia-50:#f6f3f9; --color-fuchsia-100:#ece6f2; --color-fuchsia-200:#d9cee6; --color-fuchsia-300:#bfacd4; --color-fuchsia-400:#a388c1; --color-fuchsia-500:#8966b0; --color-fuchsia-600:#7652a0; --color-fuchsia-700:#624485; --color-fuchsia-800:#50376c; --color-fuchsia-900:#402c56; --color-fuchsia-950:#291d37;
 }
 
 /* ── Global refinements ── */
@@ -102,15 +102,15 @@ body {
 }
 
 /* Brand purple as a token, because bright mode inverts the whole app: the
-   literal #721CB8 came out of `invert(1) hue-rotate(180deg)` as #FEA8FF - bright
+   literal #68488C came out of `invert(1) hue-rotate(180deg)` as #D3C6E1 - bright
    pink - which is where the pink on every page came from. The bright value is
    pre-compensated so it RENDERS as purple after that transform. Two forms
    because rgba() tints cannot take a hex variable. */
 :root {
-  --brand: #721CB8;
-  --brand-rgb: 114, 28, 184;
-  --brand-deep: #5A1790;
-  --brand-dark: #421869;
+  --brand: #9C81BB;        /* muted Chalmers purple; light mode renders it #856AA4 */
+  --brand-rgb: 156, 129, 187;
+  --brand-deep: #4A2E6B;   /* muted plum: primary buttons (they opt out of the inversion) */
+  --brand-dark: #3A2454;
 }
 
 /* ── Bright mode (global) ─────────────────────────────────────────────── */
@@ -120,10 +120,10 @@ body.bright-mode {
      the pink the tool has always used here. Overriding it produced a purple
      that was not wanted; the tokens stay in place so the shade is a one-line
      change if that is ever revisited. */
-  --brand: #721CB8;
-  --brand-rgb: 114, 28, 184;
-  --brand-deep: #5A1790;
-  --brand-dark: #421869;
+  --brand: #9C81BB;        /* muted Chalmers purple; light mode renders it #856AA4 */
+  --brand-rgb: 156, 129, 187;
+  --brand-deep: #4A2E6B;   /* muted plum: primary buttons (they opt out of the inversion) */
+  --brand-dark: #3A2454;
   background: #f6f8fc;
   --sidebar-icon-color: #4b5563;
   --sidebar-icon-hover-color: #374151;
@@ -210,7 +210,7 @@ body.bright-mode .sidebar-theme-icon {
 }
 .ppg-card:hover {
   border-color: #cbd5e1;
-  box-shadow: 0 4px 14px rgba(66, 24, 105, 0.14);
+  box-shadow: 0 4px 14px rgba(63,44,85, 0.14);
 }
 
 /* ── Dark shell overrides (wizard-shell context) ── */
@@ -223,12 +223,12 @@ body.bright-mode .sidebar-theme-icon {
    reads as clickable. */
 .wizard-shell .ppg-card {
   background: rgba(13, 17, 23, 0.80);
-  border-color: rgba(var(--brand-rgb), 0.45);
+  border-color: rgba(255, 255, 255, 0.10);
   color: rgba(255,255,255,0.88);
   box-shadow: none;
 }
 .wizard-shell .ppg-card:hover {
-  border-color: rgba(var(--brand-rgb), 0.45);
+  border-color: rgba(255, 255, 255, 0.10);
   box-shadow: none;
 }
 
@@ -327,15 +327,15 @@ body.bright-mode .sidebar-theme-icon {
   font-size: 0.875rem;
   font-weight: 600;
   color: #fff;
-  background: linear-gradient(135deg, #421869 0%, var(--brand) 100%);
-  box-shadow: 0 1px 3px rgba(66, 24, 105, 0.24);
+  background: var(--brand-deep);
+  box-shadow: none;
   transition: opacity 0.15s, box-shadow 0.15s;
   cursor: pointer;
   border: none;
 }
 .ppg-btn-primary:hover {
-  background: #5a1490;
-  box-shadow: 0 2px 10px rgba(66, 24, 105, 0.32);
+  background: var(--brand-dark);
+  box-shadow: none;
 }
 
 /* ── Secondary / back button ── */
@@ -356,7 +356,7 @@ body.bright-mode .sidebar-theme-icon {
 }
 .ppg-btn-secondary:hover {
   background: #f8fafc;
-  border-color: #5a1490;
+  border-color: #50386c;
 }
 
 /* ── Stat card (top summary) ── */
@@ -367,13 +367,13 @@ body.bright-mode .sidebar-theme-icon {
   border: 1px solid;
 }
 .ppg-stat-navy { background: rgba(var(--brand-rgb), 0.10); border-color: rgba(var(--brand-rgb), 0.24); }
-.ppg-stat-teal { background: rgba(153, 91, 213, 0.10); border-color: rgba(153, 91, 213, 0.25); }
+.ppg-stat-teal { background: rgba(150,122,182, 0.10); border-color: rgba(150,122,182, 0.25); }
 .ppg-stat-green { background: rgba(47,180,119, 0.12); border-color: rgba(47,180,119, 0.35); }
 
 /* ── Accent line reusable ── */
 .ppg-accent-line {
   height: 3px;
-  background: linear-gradient(90deg, #2FB477 0%, #509724 50%, var(--brand) 100%);
+  background: var(--brand);
 }
 
 /* ── Section heading ── */
@@ -452,7 +452,7 @@ a[href]:focus-visible,
 [role="button"]:not([aria-disabled="true"]):not(.no-hover-shadow):hover,
 [role="button"]:not([aria-disabled="true"]):not(.no-hover-shadow):focus-visible {
   filter: brightness(1.08);
-  box-shadow: 0 0 0 1px rgba(78, 205, 196, 0.55), 0 6px 16px rgba(0, 0, 0, 0.38);
+  box-shadow: 0 0 0 1px rgba(139,110,173, 0.55), 0 6px 16px rgba(0, 0, 0, 0.38);
 }
 
 /* Clickable containers marked with an inline cursor:pointer (the many onClick
@@ -468,10 +468,10 @@ a[href]:focus-visible,
    box-shadow (which would block the generic hover ring), so give it its own
    growing purple glow on hover / press — !important to beat the inline style. */
 .ppg-start-cta:hover {
-  box-shadow: 0 10px 34px rgba(var(--brand-rgb), 0.7) !important;
+  box-shadow: 0 0 0 2px rgba(var(--brand-rgb), 0.35) !important;
 }
 .ppg-start-cta:active {
-  box-shadow: 0 3px 12px rgba(var(--brand-rgb), 0.5) !important;
+  box-shadow: none !important;
 }
 
 /* Disabled / non-clickable: clearly NOT interactive. */

@@ -434,8 +434,8 @@ export default function DefineProject() {
 
   const scaleOptions = pt ? SCALE_OPTIONS_BY_TYPE[pt] : ["Building", "Neighborhood", "City"];
   const orderedScaleOptions = ["Building", "Neighborhood", "City", "Portfolio"].filter((opt) => scaleOptions.includes(opt));
-  const disabledScales = new Set(["City"]);
-  const comingSoonScales = new Set(["City", "Portfolio"]);
+  // Not available yet: shown greyed out and not clickable (no "Soon" tag).
+  const disabledScales = new Set(["City", "Portfolio"]);
 
   /* ── handlers ────────────────────────────────────────────────── */
 
@@ -686,16 +686,16 @@ export default function DefineProject() {
       {!HIDE_PROJECT_TYPE && <Card>
         {HIDE_PROJECT_TYPE ? (
           <div>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "1.4px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>{t("Project type")}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "1.4px", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>{t("Project type")}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
               <svg width="34" height="34" viewBox="0 0 52 52" fill="none" style={{ flexShrink: 0 }}>
                 <rect x="10" y="18" width="32" height="26" rx="1" stroke="var(--brand-deep)" strokeWidth="1.5" fill="none"/>
                 <path d="M6 20L26 6l20 14" stroke="var(--brand-deep)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <rect x="20" y="30" width="12" height="14" rx="1" stroke="var(--brand-deep)" strokeWidth="1.5" fill="none"/>
-                <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
-                <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
+                <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#8B6EAD" strokeWidth="1.5" fill="none"/>
+                <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#8B6EAD" strokeWidth="1.5" fill="none"/>
               </svg>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{t("Renovation Planning")}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{t("Renovation Planning")}</div>
             </div>
           </div>
         ) : (<>
@@ -707,10 +707,10 @@ export default function DefineProject() {
             const ICONS: Record<string, React.ReactNode> = {
               "Energy Community Planning": (
                 <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-                  <rect x="6" y="28" width="10" height="16" rx="1" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
-                  <rect x="21" y="20" width="10" height="24" rx="1" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
-                  <rect x="36" y="24" width="10" height="20" rx="1" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
-                  <path d="M2 44h48" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round"/>
+                  <rect x="6" y="28" width="10" height="16" rx="1" stroke="#8B6EAD" strokeWidth="1.5" fill="none"/>
+                  <rect x="21" y="20" width="10" height="24" rx="1" stroke="#8B6EAD" strokeWidth="1.5" fill="none"/>
+                  <rect x="36" y="24" width="10" height="20" rx="1" stroke="#8B6EAD" strokeWidth="1.5" fill="none"/>
+                  <path d="M2 44h48" stroke="#8B6EAD" strokeWidth="1.5" strokeLinecap="round"/>
                   <circle cx="26" cy="10" r="5" stroke="#2FB477" strokeWidth="1.5" fill="none"/>
                   <path d="M26 5v-3M26 18v-3M17 10h-3M38 10h-3" stroke="#2FB477" strokeWidth="1.5" strokeLinecap="round"/>
                   <path d="M19.5 7.5l-2-2M34.5 12.5l-2-2M19.5 12.5l-2 2M34.5 7.5l-2 2" stroke="#2FB477" strokeWidth="1.5" strokeLinecap="round"/>
@@ -721,17 +721,17 @@ export default function DefineProject() {
                   <rect x="10" y="18" width="32" height="26" rx="1" stroke="var(--brand-deep)" strokeWidth="1.5" fill="none"/>
                   <path d="M6 20L26 6l20 14" stroke="var(--brand-deep)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   <rect x="20" y="30" width="12" height="14" rx="1" stroke="var(--brand-deep)" strokeWidth="1.5" fill="none"/>
-                  <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
-                  <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#4ECDC4" strokeWidth="1.5" fill="none"/>
+                  <rect x="13" y="24" width="8" height="8" rx="0.5" stroke="#8B6EAD" strokeWidth="1.5" fill="none"/>
+                  <rect x="31" y="24" width="8" height="8" rx="0.5" stroke="#8B6EAD" strokeWidth="1.5" fill="none"/>
                 </svg>
               ),
               "Renewable Energy Planning": (
                 <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
                   <path d="M26 8v6M26 38v6M8 26H2M50 26h-6" stroke="#2FB477" strokeWidth="1.5" strokeLinecap="round"/>
                   <circle cx="26" cy="26" r="10" stroke="#2FB477" strokeWidth="1.5" fill="none"/>
-                  <path d="M32 14c2-4 6-6 8-4s0 6-4 8" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-                  <path d="M38 32c4 2 6 6 4 8s-6 0-8-4" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-                  <path d="M14 32c-4 2-6 6-4 8s6 0 8-4" stroke="#4ECDC4" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                  <path d="M32 14c2-4 6-6 8-4s0 6-4 8" stroke="#8B6EAD" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                  <path d="M38 32c4 2 6 6 4 8s-6 0-8-4" stroke="#8B6EAD" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                  <path d="M14 32c-4 2-6 6-4 8s6 0 8-4" stroke="#8B6EAD" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
                 </svg>
               ),
             };
@@ -742,8 +742,8 @@ export default function DefineProject() {
                 disabled={disabled}
                 title={disabled ? translate("Coming soon — not available yet") : undefined}
                 style={{
-                  background: selected ? "#4ECDC4" : "rgba(13,17,40,0.85)",
-                  border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.10)"}`,
+                  background: selected ? "#8B6EAD" : "rgba(13,17,40,0.85)",
+                  border: `2px solid ${selected ? "#8B6EAD" : "rgba(255,255,255,0.10)"}`,
                   borderRadius: 16,
                   padding: "24px 20px",
                   textAlign: "center",
@@ -755,10 +755,10 @@ export default function DefineProject() {
                   flexDirection: "column",
                   alignItems: "center",
                   gap: 12,
-                  boxShadow: selected ? "0 0 0 1px #4ECDC4, 0 4px 20px rgba(78,205,196,0.18)" : "none",
+                  boxShadow: selected ? "0 0 0 1px #8B6EAD, 0 4px 20px rgba(139,110,173,0.18)" : "none",
                 }}
                 onMouseEnter={e => {
-                  if (!selected && !disabled) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(78,205,196,0.35)";
+                  if (!selected && !disabled) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(139,110,173,0.35)";
                 }}
                 onMouseLeave={e => {
                   if (!selected && !disabled) (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.10)";
@@ -768,7 +768,7 @@ export default function DefineProject() {
                 {disabled ? (
                   <span style={{
                     position: "absolute", top: 12, right: 12,
-                    fontSize: 9, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase",
+                    fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase",
                     padding: "3px 8px", borderRadius: 999,
                     background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.55)",
                     border: "1px solid rgba(255,255,255,0.14)",
@@ -777,8 +777,8 @@ export default function DefineProject() {
                   <div style={{
                     position: "absolute", top: 12, right: 12,
                     width: 22, height: 22, borderRadius: "50%",
-                    border: `2px solid ${selected ? "#4ECDC4" : "rgba(255,255,255,0.25)"}`,
-                    background: selected ? "#4ECDC4" : "transparent",
+                    border: `2px solid ${selected ? "#8B6EAD" : "rgba(255,255,255,0.25)"}`,
+                    background: selected ? "#8B6EAD" : "transparent",
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
                     {selected && (
@@ -795,7 +795,7 @@ export default function DefineProject() {
                 {/* Label + desc */}
                 <div>
                   <div style={{
-                    fontSize: 14, fontWeight: 700,
+                    fontSize: 14, fontWeight: 600,
                     color: selected ? "#0b1220" : "rgba(255,255,255,0.85)",
                     marginBottom: 8, lineHeight: 1.3,
                   }}>
@@ -830,7 +830,7 @@ export default function DefineProject() {
                 nameMissing ? "border-red-400" : "border-gray-300"}`}
             />
             {nameMissing && (
-              <p className="mt-1 text-[11px]" style={{ color: "#fca5a5" }}>
+              <p className="mt-1 text-[12px]" style={{ color: "#fca5a5" }}>
                 {t("A project name is required — it's used to label your project and any data you edit in Step 2.")}
               </p>
             )}
@@ -849,7 +849,7 @@ export default function DefineProject() {
                 onClick={() => setProject({ buildingDevelopmentType: opt.value })}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
                   project.buildingDevelopmentType === opt.value
-                    ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
+                    ? "bg-[#8B6EAD] text-[#0b1220] border-[#8B6EAD]"
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
                 }`}
               >
@@ -875,7 +875,7 @@ export default function DefineProject() {
                 onClick={() => toggleSystem(sys)}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
                   systemsSet.has(sys)
-                    ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
+                    ? "bg-[#8B6EAD] text-[#0b1220] border-[#8B6EAD]"
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
                 }`}
               >
@@ -918,7 +918,7 @@ export default function DefineProject() {
                       }
                       className={`px-4 py-1 rounded-lg text-sm font-medium border ${
                         (opt === "Yes") === answer
-                          ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
+                          ? "bg-[#8B6EAD] text-[#0b1220] border-[#8B6EAD]"
                           : "bg-white border-gray-300"
                       }`}
                     >
@@ -950,7 +950,7 @@ export default function DefineProject() {
                         onClick={() => setProject({ ecExistingPv: val })}
                         className={`px-4 py-1 rounded-lg text-sm font-medium border ${
                           project.ecExistingPv === val
-                            ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
+                            ? "bg-[#8B6EAD] text-[#0b1220] border-[#8B6EAD]"
                             : "bg-white border-gray-300"
                         }`}
                       >
@@ -975,7 +975,7 @@ export default function DefineProject() {
                         onClick={() => setProject({ ecExistingBattery: val })}
                         className={`px-4 py-1 rounded-lg text-sm font-medium border ${
                           project.ecExistingBattery === val
-                            ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
+                            ? "bg-[#8B6EAD] text-[#0b1220] border-[#8B6EAD]"
                             : "bg-white border-gray-300"
                         }`}
                       >
@@ -1005,7 +1005,7 @@ export default function DefineProject() {
                     }
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
                       project.reElectricityThreshold === opt
-                        ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
+                        ? "bg-[#8B6EAD] text-[#0b1220] border-[#8B6EAD]"
                         : "bg-white border-gray-300"
                     }`}
                   >
@@ -1034,7 +1034,7 @@ export default function DefineProject() {
                 }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
                   project.ecEnergyFocus.includes(opt)
-                    ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
+                    ? "bg-[#8B6EAD] text-[#0b1220] border-[#8B6EAD]"
                     : "bg-white text-gray-600 border-gray-300"
                 }`}
               >
@@ -1060,7 +1060,7 @@ export default function DefineProject() {
                   onClick={() => toggleExploration(approach)}
                   className={`w-full text-left rounded-xl border-2 px-4 py-3 transition ${
                     selected
-                      ? "border-[#4ECDC4] bg-[#4ECDC4]"
+                      ? "border-[#8B6EAD] bg-[#8B6EAD]"
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
@@ -1090,7 +1090,7 @@ export default function DefineProject() {
                 onClick={() => toggleKpi(kpi)}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
                   project.selectedKpis.includes(kpi)
-                    ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
+                    ? "bg-[#8B6EAD] text-[#0b1220] border-[#8B6EAD]"
                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
                 }`}
                 style={{ color: project.selectedKpis.includes(kpi) ? "#0b1220" : "rgba(255,255,255,0.80)" }}
@@ -1119,28 +1119,20 @@ export default function DefineProject() {
                 setProject({ scale: opt, buildingUses: [] });
               }}
               disabled={disabledScales.has(opt)}
+              title={disabledScales.has(opt) ? t("Not available yet") : undefined}
               className={`px-4 py-2 rounded-lg text-sm font-medium border ${
                 project.scale === opt
-                  ? "bg-[#4ECDC4] text-[#0b1220] border-[#4ECDC4]"
+                  ? "bg-[#8B6EAD] text-[#0b1220] border-[#8B6EAD]"
                   : disabledScales.has(opt)
-                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50 no-hover-shadow"
                     : "bg-white border-gray-300 hover:border-gray-400"
               }`}
             >
-              <span className="inline-flex items-center gap-2">
-                <span>
-                  {opt === "Building"
-                    ? t("Building(s)")
-                    : opt === "Neighborhood"
-                      ? t("Districts")
-                      : t(opt)}
-                </span>
-                {comingSoonScales.has(opt) && (
-                  <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                    {t("Soon")}
-                  </span>
-                )}
-              </span>
+              {opt === "Building"
+                ? t("Building(s)")
+                : opt === "Neighborhood"
+                  ? t("Districts")
+                  : t(opt)}
             </button>
           ))}
         </div>
@@ -1162,7 +1154,7 @@ export default function DefineProject() {
                     setDistrictOpen(true);
                     setDistrictQuery("");
                   }}
-                  className="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-[#0f1721] px-4 py-3 text-left text-sm text-white shadow-sm transition hover:border-[#4ECDC4] focus:outline-none focus:ring-2 focus:ring-teal focus:ring-offset-0"
+                  className="flex w-full items-center justify-between rounded-xl border border-gray-300 bg-[#0f1721] px-4 py-3 text-left text-sm text-white shadow-sm transition hover:border-[#8B6EAD] focus:outline-none focus:ring-2 focus:ring-teal focus:ring-offset-0"
                 >
                   <span className={selectedDistrict ? "text-white" : "text-white/60"}>
                     {districtTriggerLabel}
@@ -1191,7 +1183,7 @@ export default function DefineProject() {
                       }}
                       onFocus={() => setDistrictOpen(true)}
                       placeholder={t("Search district")}
-                      className="w-full rounded-lg border border-white/10 bg-[#0b1118] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-[#4ECDC4] focus:outline-none"
+                      className="w-full rounded-lg border border-white/10 bg-[#0b1118] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-[#8B6EAD] focus:outline-none"
                     />
                     {districtMatches.length > 0 ? (
                       <ul className="mt-2 max-h-64 overflow-auto">
@@ -1222,7 +1214,7 @@ export default function DefineProject() {
                 )}
 
                 <div className="mt-3 rounded-xl border border-white/10 bg-[#0b1118] p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">{t("Or upload a list of addresses")}</div>
+                  <div className="text-[12px] font-semibold uppercase tracking-wide text-white/70">{t("Or upload a list of addresses")}</div>
                   <input
                     type="file"
                     accept=".csv,.txt,text/csv,text/plain"
@@ -1231,18 +1223,18 @@ export default function DefineProject() {
                       void handleAddressCsvUpload(file);
                       e.target.value = "";
                     }}
-                    className="mt-2 block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border-0 file:bg-[#4ECDC4] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#0b1220] file:cursor-pointer"
+                    className="mt-2 block w-full text-xs text-white/80 file:mr-3 file:rounded-lg file:border-0 file:bg-[#8B6EAD] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[#0b1220] file:cursor-pointer"
                   />
-                  <p className="mt-2 text-[11px] text-white/50">
+                  <p className="mt-2 text-[12px] text-white/50">
                     {t("Use one column named")} <span className="font-mono text-emerald-300">Address</span> {t("or put one address per line. Excel: save as CSV first.")}
                   </p>
-                  <div className="mt-2 rounded-lg border border-white/10 bg-black/20 p-2 font-mono text-[10px] text-emerald-300 whitespace-pre-wrap">
+                  <div className="mt-2 rounded-lg border border-white/10 bg-black/20 p-2 font-mono text-[11px] text-emerald-300 whitespace-pre-wrap">
                     Address
                     Storgatan 1, Gothenburg
                     Kungsgatan 10, Göteborg
                   </div>
                   {addressUploadMessage && (
-                    <p className="mt-2 text-[11px] text-violet-300">{addressUploadMessage}</p>
+                    <p className="mt-2 text-[12px] text-violet-300">{addressUploadMessage}</p>
                   )}
                 </div>
               </div>
@@ -1299,7 +1291,7 @@ export default function DefineProject() {
                 nameMissing ? "border-red-400" : "border-gray-300"}`}
             />
             {nameMissing && (
-              <p className="mt-1 text-[11px]" style={{ color: "#fca5a5" }}>
+              <p className="mt-1 text-[12px]" style={{ color: "#fca5a5" }}>
                 {t("A project name is required — it's used to label your project and any data you edit in Step 2.")}
               </p>
             )}
@@ -1333,6 +1325,8 @@ export default function DefineProject() {
               onPointsChange={(pts) => setProject({ buildingPoints: pts })}
               onBboxChange={handleBboxChange}
               onPolygonChange={handlePolygonChange}
+              initialSelection={{ mode: project.selectionMode, points: project.buildingPoints, bbox: project.currentBbox, polygon: project.selectionPolygon }}
+              onModeChange={(m) => setProject({ selectionMode: m })}
               onLocationValidityChange={(valid, message) => { setLocationValid(valid); setLocationMsg(message); }}
             />
           </div>
@@ -1351,6 +1345,8 @@ export default function DefineProject() {
             onPointsChange={(pts) => setProject({ buildingPoints: pts })}
             onBboxChange={handleBboxChange}
             onPolygonChange={handlePolygonChange}
+            initialSelection={{ mode: project.selectionMode, points: project.buildingPoints, bbox: project.currentBbox, polygon: project.selectionPolygon }}
+            onModeChange={(m) => setProject({ selectionMode: m })}
             onBuildingListCsvUpload={handleAddressCsvUpload}
             buildingListCsvMessage={addressUploadMessage}
             onLocationValidityChange={(valid, message) => { setLocationValid(valid); setLocationMsg(message); }}

@@ -19,7 +19,7 @@ export function TreemapView() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-800">📊 Hierarchical Impact View</h3>
+        <h3 className="text-sm font-semibold text-slate-800">📊 Hierarchical Impact View</h3>
         <span className="text-xs text-gray-500">Size = Impact magnitude</span>
       </div>
       <div className="h-[400px]">
@@ -137,7 +137,7 @@ export function SankeyFlowView() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-800">🌊 Uncertainty Flow Diagram</h3>
+        <h3 className="text-sm font-semibold text-slate-800">🌊 Uncertainty Flow Diagram</h3>
         <span className="text-xs text-gray-500">Flow width = Impact contribution</span>
       </div>
       <div className="h-[350px]">
@@ -170,15 +170,15 @@ export function SankeyFlowView() {
       </div>
       <div className="grid grid-cols-3 gap-2 text-xs">
         <div className="ppg-stat ppg-stat-navy">
-          <div className="font-bold">{Math.round(envelopeSum).toLocaleString()}</div>
+          <div className="font-semibold">{Math.round(envelopeSum).toLocaleString()}</div>
           <div className="text-gray-500">Envelope (kWh)</div>
         </div>
         <div className="ppg-stat ppg-stat-green">
-          <div className="font-bold">{Math.round(geometrySum).toLocaleString()}</div>
+          <div className="font-semibold">{Math.round(geometrySum).toLocaleString()}</div>
           <div className="text-gray-500">Geometry (kWh)</div>
         </div>
         <div className="ppg-stat ppg-stat-teal">
-          <div className="font-bold">{Math.round(systemsSum).toLocaleString()}</div>
+          <div className="font-semibold">{Math.round(systemsSum).toLocaleString()}</div>
           <div className="text-gray-500">Systems (kWh)</div>
         </div>
       </div>
@@ -202,7 +202,7 @@ export function RadialImpactView() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-800">🌅 Radial Impact View</h3>
+        <h3 className="text-sm font-semibold text-slate-800">🌅 Radial Impact View</h3>
         <span className="text-xs text-gray-500">Top 8 parameters</span>
       </div>
       <div className="h-[400px]">
@@ -221,14 +221,14 @@ export function RadialImpactView() {
               background
               dataKey="value"
               cornerRadius={10}
-              label={{ position: 'insideStart', fill: '#fff', fontSize: 11 }}
+              label={{ position: 'insideStart', fill: '#fff', fontSize: 12 }}
             />
             <Legend
               iconSize={10}
               layout="vertical"
               verticalAlign="middle"
               align="right"
-              wrapperStyle={{ fontSize: 11 }}
+              wrapperStyle={{ fontSize: 12 }}
             />
             <Tooltip
               content={({ active, payload }) => {
@@ -269,7 +269,7 @@ export function BubbleScatterView() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-800">🔵 Impact Landscape</h3>
+        <h3 className="text-sm font-semibold text-slate-800">🔵 Impact Landscape</h3>
         <span className="text-xs text-gray-500">Bubble size = % of baseline</span>
       </div>
       <div className="h-[400px] relative">
@@ -287,10 +287,10 @@ export function BubbleScatterView() {
               ))}
               
               {/* Axis labels */}
-              <text x="260" y="385" textAnchor="middle" fontSize="11" fill="#64748b">
+              <text x="260" y="385" textAnchor="middle" fontSize="12" fill="#64748b">
                 Importance (%)
               </text>
-              <text x="-175" y="-25" transform="rotate(-90)" textAnchor="middle" fontSize="11" fill="#64748b">
+              <text x="-175" y="-25" transform="rotate(-90)" textAnchor="middle" fontSize="12" fill="#64748b">
                 Range (MWh/yr)
               </text>
               
@@ -316,7 +316,7 @@ export function BubbleScatterView() {
                         x={x}
                         y={y - r - 5}
                         textAnchor="middle"
-                        fontSize="9"
+                        fontSize="11"
                         fill="#64748b"
                         fontWeight="600"
                       >

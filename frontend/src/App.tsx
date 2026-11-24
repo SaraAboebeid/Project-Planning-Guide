@@ -74,21 +74,21 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login"        element={<DataLayout title="Sign in" accentColor="var(--brand)" accentBadge="Account"><LoginPage /></DataLayout>} />
       <Route path="/login/verify" element={<DataLayout title="Sign in" accentColor="var(--brand)" accentBadge="Account"><LoginVerifyPage /></DataLayout>} />
-      <Route path="/projects"     element={<DataLayout title="My projects" accentColor="var(--brand)" accentBadge="Account"><Projects /></DataLayout>} />
+      <Route path="/projects"     element={<DataLayout title="My projects" accentColor="var(--brand)" accentBadge="Projects"><Projects /></DataLayout>} />
       {/* The workspace/toolbox selection now lives on the home page itself. */}
       <Route path="/workspace" element={<Navigate to="/" replace />} />
       <Route path="/data"      element={<DataLayout><DataExplorer /></DataLayout>} />
       <Route path="/data/uk"   element={<DataLayout title="Data Explorer" accentColor="#4A90E2" accentBadge="United Kingdom Data"><UKDataExplorer /></DataLayout>} />
       <Route path="/data/be"   element={<DataLayout title="Data Explorer" accentColor="#E8880C" accentBadge="Belgium Data"><BEDataExplorer /></DataLayout>} />
       <Route path="/pathways"  element={<DataLayout title="Workflow"       accentColor="var(--brand)" accentBadge="Tool Overview"><Scenarios /></DataLayout>} />
-      <Route path="/analysis"  element={<DataLayout title="Analysis" accentColor="#4ECDC4" accentBadge="Tools"><AnalysisTools /></DataLayout>} />
+      <Route path="/analysis"  element={<DataLayout title="Analysis" accentColor="#8B6EAD" accentBadge="Tools"><AnalysisTools /></DataLayout>} />
       <Route path="/viewer"    element={<DataLayout title="" accentColor="#5FA5FF" accentBadge=""><MapViewer /></DataLayout>} />
       <Route path="/viewer/uk" element={<DataLayout title="" accentColor="#5FA5FF" accentBadge=""><UKMapViewer /></DataLayout>} />
       <Route path="/viewer/be" element={<DataLayout title="" accentColor="#5FA5FF" accentBadge=""><BEMapViewer /></DataLayout>} />
       <Route path="/map"       element={<Navigate to="/viewer" replace />} />
       <Route path="/budget"    element={<DataLayout title="Planning & Cost" accentColor="#E8880C" accentBadge="Cost Estimate"><Budget /></DataLayout>} />
       <Route path="/reports" element={<DataLayout title="Reports" accentColor="#2FB477" accentBadge="Examples"><SampleReports /></DataLayout>} />
-      <Route path="/team"    element={<DataLayout title="Project Team" accentColor="#B98BE8" accentBadge="About"><ProjectTeam /></DataLayout>} />
+      <Route path="/team"    element={<DataLayout title="Project Team" accentColor="#B8A3D0" accentBadge="About"><ProjectTeam /></DataLayout>} />
       <Route element={<WizardLayout />}>
         <Route path="/step/1" element={<DefineProject />} />
         <Route path="/step/2" element={<DataCoverage />} />

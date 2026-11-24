@@ -29,8 +29,8 @@ export default function ComponentScopePanel({ components, onChange, goalAssessme
       border: "1px solid rgba(255,255,255,0.08)",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Renovation scope</span>
-        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Renovation scope</span>
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
           which components to renovate — add more to reach deeper savings
         </span>
       </div>
@@ -44,19 +44,19 @@ export default function ComponentScopePanel({ components, onChange, goalAssessme
               style={{
                 fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 99, cursor: "pointer",
                 display: "inline-flex", alignItems: "center", gap: 6,
-                border: `1px solid ${on ? "#4ECDC4" : "rgba(255,255,255,0.15)"}`,
+                border: `1px solid ${on ? "#8B6EAD" : "rgba(255,255,255,0.15)"}`,
                 borderStyle: on ? "solid" : "dashed",
-                background: on ? "#4ECDC4" : "rgba(255,255,255,0.03)",
+                background: on ? "#8B6EAD" : "rgba(255,255,255,0.03)",
                 color: on ? "#0b1220" : "rgba(255,255,255,0.55)",
               }}>
-              <span style={{ fontSize: 11 }}>{on ? "✓" : "＋"}</span>{c}
+              <span style={{ fontSize: 12 }}>{on ? "✓" : "＋"}</span>{c}
             </button>
           );
         })}
       </div>
 
       {reached && (
-        <div style={{ marginTop: 11, fontSize: 11.5, color: "#2FB477" }}>
+        <div style={{ marginTop: 11, fontSize: 12, color: "#2FB477" }}>
           ✓ The climate target is reached with the current scope.
         </div>
       )}

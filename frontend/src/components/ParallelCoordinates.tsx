@@ -80,7 +80,7 @@ export default function ParallelCoordinates({
   }, [axes, pareto]);
 
   if (!pareto.length || axes.length < 2) {
-    return <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", padding: "20px 0", textAlign: "center" }}>
+    return <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", padding: "20px 0", textAlign: "center" }}>
       {t("Not enough variation across packages to plot.")}
     </div>;
   }
@@ -167,7 +167,7 @@ export default function ParallelCoordinates({
             return (
               <g key={ax.kind + ax.key}>
                 <line x1={x} y1={plotTop} x2={x} y2={plotBot} stroke="rgba(255,255,255,0.22)" strokeWidth={1} />
-                <text x={x} y={plotTop - 12} fill="rgba(255,255,255,0.75)" fontSize={10} fontWeight={700} textAnchor="middle">
+                <text x={x} y={plotTop - 12} fill="rgba(255,255,255,0.75)" fontSize={11} fontWeight={700} textAnchor="middle">
                   {(() => { const title = t(ax.title); return isNum ? title : title.length > 16 ? title.slice(0, 15) + "…" : title; })()}
                 </text>
                 {isNum && ranges[ax.key] && (
@@ -189,7 +189,7 @@ export default function ParallelCoordinates({
                     {brush[ax.key] && (
                       <rect x={x - 5} y={numY(ax.key, brush[ax.key]![1])} width={10}
                         height={Math.max(2, numY(ax.key, brush[ax.key]![0]) - numY(ax.key, brush[ax.key]![1]))}
-                        fill="rgba(185,139,232,0.35)" stroke="#B98BE8" strokeWidth={1} rx={2} />
+                        fill="rgba(184,163,208,0.35)" stroke="#B8A3D0" strokeWidth={1} rx={2} />
                     )}
                     <rect x={x - 7} y={plotTop} width={14} height={plotH} fill="transparent" style={{ cursor: "ns-resize" }}
                       onPointerDown={(e) => onAxisDown(ax.key, e)} onPointerMove={onAxisMove} onPointerUp={() => onAxisUp(ax.key)} />
@@ -233,11 +233,11 @@ export default function ParallelCoordinates({
           position: "absolute", left: Math.min(tip.x + 12, (wrapRef.current?.clientWidth ?? 400) - 200), top: tip.y + 8,
           pointerEvents: "none", zIndex: 5, maxWidth: 230,
           background: "rgba(13,17,23,0.97)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, padding: "8px 10px",
-          fontSize: 10.5, color: "rgba(255,255,255,0.8)", boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+          fontSize: 11.5, color: "rgba(255,255,255,0.8)", boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
         }}>
-          <div style={{ display: "flex", gap: 10, marginBottom: 5, fontWeight: 700 }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 5, fontWeight: 600 }}>
             <span style={{ color: "#4A90E2" }}>{Math.round(pareto[hover]!.energy_kwh_m2_yr)} kWh/m²</span>
-            <span style={{ color: "#4ECDC4" }}>{(pareto[hover]!.total_carbon / 1000).toFixed(1)}k kg</span>
+            <span style={{ color: "#8B6EAD" }}>{(pareto[hover]!.total_carbon / 1000).toFixed(1)}k kg</span>
             <span style={{ color: "#2FB477" }}>{fmt("cost", pareto[hover]!.total_cost)}</span>
           </div>
           {Object.entries(pareto[hover]!.selection_labels).filter(([, v]) => v !== "Keep as-built").map(([k, v]) => (
@@ -247,12 +247,12 @@ export default function ParallelCoordinates({
       )}
 
       {/* footer: filter hint / clear */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, fontSize: 10, color: "rgba(255,255,255,0.35)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
         <span>{t("Drag on Energy / GWP / Cost axes to filter · hover a line for details")}</span>
         {anyBrush && (
           <button onClick={() => setBrush({})} style={{
-            marginLeft: "auto", fontSize: 10, color: "#B98BE8", background: "transparent",
-            border: "1px solid rgba(185,139,232,0.4)", borderRadius: 6, padding: "1px 8px", cursor: "pointer",
+            marginLeft: "auto", fontSize: 11, color: "#B8A3D0", background: "transparent",
+            border: "1px solid rgba(184,163,208,0.4)", borderRadius: 6, padding: "1px 8px", cursor: "pointer",
           }}>{t("Clear filters")}</button>
         )}
       </div>

@@ -158,13 +158,13 @@ export default function ParetoChart({
       : null;
   const FrontierDot = (props: { cx?: number; cy?: number }) =>
     props.cx != null && props.cy != null
-      ? <circle cx={props.cx} cy={props.cy} r={3.5} fill="#0d1117" stroke="#B98BE8" strokeWidth={2} />
+      ? <circle cx={props.cx} cy={props.cy} r={3.5} fill="#0d1117" stroke="#B8A3D0" strokeWidth={2} />
       : null;
   const OptimalDot = (props: { cx?: number; cy?: number; payload?: OptDatum }) => {
     if (props.cx == null || props.cy == null) return null;
     const v = props.payload?.validated;
-    return <circle cx={props.cx} cy={props.cy} r={7} fill={v ? "rgba(47,180,119,0.9)" : "rgba(78,205,196,0.18)"}
-      stroke={v ? "#2FB477" : "#4ECDC4"} strokeWidth={2.2} style={{ cursor: "pointer" }} />;
+    return <circle cx={props.cx} cy={props.cy} r={7} fill={v ? "rgba(47,180,119,0.9)" : "rgba(139,110,173,0.18)"}
+      stroke={v ? "#2FB477" : "#8B6EAD"} strokeWidth={2.2} style={{ cursor: "pointer" }} />;
   };
   const BaselineDot = (props: { cx?: number; cy?: number }) =>
     props.cx != null && props.cy != null
@@ -177,8 +177,8 @@ export default function ParetoChart({
     const d = payload[0]!.payload;
     const isOpt = "point" in d && d.point;
     return (
-      <div style={{ background: "#0d1117", border: `1px solid ${white(0.15)}`, borderRadius: 8, padding: "8px 11px", fontSize: 11.5 }}>
-        {isOpt && <div style={{ color: "#4ECDC4", fontWeight: 800, marginBottom: 4 }}>{t("Pareto-optimal package")}</div>}
+      <div style={{ background: "#0d1117", border: `1px solid ${white(0.15)}`, borderRadius: 8, padding: "8px 11px", fontSize: 12 }}>
+        {isOpt && <div style={{ color: "#8B6EAD", fontWeight: 700, marginBottom: 4 }}>{t("Pareto-optimal package")}</div>}
         <div style={{ color: "#fff" }}>{t(xO.short)}: <b>{fmt(d.x, xO)}</b></div>
         <div style={{ color: "#fff" }}>{t(yO.short)}: <b>{fmt(d.y, yO)}</b></div>
         <div style={{ color: white(0.7) }}>{t(cO.short)}: {fmt(d.c, cO)}</div>
@@ -187,7 +187,7 @@ export default function ParetoChart({
             {Object.entries((d as OptDatum).point.selection_labels).filter(([, v]) => v !== "Keep as-built").map(([k, v]) => (
               <div key={k}>{t(k.replace("VertExt::", ""))}: {v}</div>
             ))}
-            <div style={{ color: "#4ECDC4", marginTop: 3 }}>
+            <div style={{ color: "#8B6EAD", marginTop: 3 }}>
               {(d as OptDatum).validated ? t("✓ validated in EPSM") : t("click to pin this package")}
             </div>
           </div>
@@ -205,15 +205,15 @@ export default function ParetoChart({
           onClick={() => (revealed >= total ? (setRevealed(Math.min(batch, total)), setPlaying(true)) : setPlaying((p) => !p))}
           style={{
             display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 8, cursor: "pointer",
-            fontSize: 11.5, fontWeight: 700, background: "rgba(185,139,232,0.16)", border: "1px solid rgba(185,139,232,0.5)", color: "#D9C3F2",
+            fontSize: 12, fontWeight: 600, background: "rgba(184,163,208,0.16)", border: "1px solid rgba(184,163,208,0.5)", color: "#DACFE6",
           }}
         >
           {playing ? <Pause size={12} /> : <Play size={12} />}{playing ? t("Pause") : revealed >= total ? t("Replay") : t("Play")}
         </button>
-        <span style={{ fontSize: 11.5, color: white(0.55) }}>
+        <span style={{ fontSize: 12, color: white(0.55) }}>
           <b style={{ color: "#fff" }}>{Math.min(revealed, total).toLocaleString()}</b> {t("of {total} packages plotted", { total: total.toLocaleString() })}
           {evaluated > total ? t(" (sampled from {n})", { n: evaluated.toLocaleString() }) : ""}
-          {" · "}<span style={{ color: "#B98BE8" }}>{t("{n} on the {x}–{y} frontier", { n: frontier.length, x: t(xO.short).toLowerCase(), y: t(yO.short).toLowerCase() })}</span>
+          {" · "}<span style={{ color: "#B8A3D0" }}>{t("{n} on the {x}–{y} frontier", { n: frontier.length, x: t(xO.short).toLowerCase(), y: t(yO.short).toLowerCase() })}</span>
         </span>
       </div>
 
@@ -221,7 +221,7 @@ export default function ParetoChart({
       <input
         type="range" min={0} max={total} step={batch} value={Math.min(revealed, total)}
         onChange={(e) => { setPlaying(false); setRevealed(Math.min(total, Number(e.target.value))); }}
-        style={{ width: "100%", accentColor: "#B98BE8", marginBottom: 6 }}
+        style={{ width: "100%", accentColor: "#B8A3D0", marginBottom: 6 }}
       />
 
       <div style={{ display: "flex", gap: 10 }}>
@@ -231,17 +231,17 @@ export default function ParetoChart({
               <CartesianGrid stroke={white(0.06)} />
               <XAxis
                 type="number" dataKey="x" domain={domains.x} allowDataOverflow
-                tick={{ fill: white(0.45), fontSize: 10 }} tickFormatter={(v) => tick(v, xO)}
-                label={{ value: `${t(xO.label)}${xO.unit ? ` (${xO.unit})` : xO.money ? ` (${currency})` : ""}`, position: "bottom", offset: 12, fill: white(0.55), fontSize: 11 }}
+                tick={{ fill: white(0.45), fontSize: 11 }} tickFormatter={(v) => tick(v, xO)}
+                label={{ value: `${t(xO.label)}${xO.unit ? ` (${xO.unit})` : xO.money ? ` (${currency})` : ""}`, position: "bottom", offset: 12, fill: white(0.55), fontSize: 12 }}
               />
               <YAxis
                 type="number" dataKey="y" domain={domains.y} allowDataOverflow
-                tick={{ fill: white(0.45), fontSize: 10 }} tickFormatter={(v) => tick(v, yO)} width={54}
-                label={{ value: `${t(yO.short)}${yO.unit ? ` (${yO.unit})` : ""}`, angle: -90, position: "insideLeft", fill: white(0.55), fontSize: 11 }}
+                tick={{ fill: white(0.45), fontSize: 11 }} tickFormatter={(v) => tick(v, yO)} width={54}
+                label={{ value: `${t(yO.short)}${yO.unit ? ` (${yO.unit})` : ""}`, angle: -90, position: "insideLeft", fill: white(0.55), fontSize: 12 }}
               />
               <Tooltip content={<TooltipContent />} cursor={{ stroke: white(0.2) }} />
               <Scatter data={shown} shape={<CloudDot />} isAnimationActive={false} />
-              <Scatter data={frontier} line={{ stroke: "#B98BE8", strokeWidth: 2.5 }} lineJointType="linear" shape={<FrontierDot />} isAnimationActive={false} legendType="none" />
+              <Scatter data={frontier} line={{ stroke: "#B8A3D0", strokeWidth: 2.5 }} lineJointType="linear" shape={<FrontierDot />} isAnimationActive={false} legendType="none" />
               <Scatter data={baselineDatum} shape={<BaselineDot />} isAnimationActive={false} />
               {showOptimal && (
                 <Scatter data={optimalData} shape={<OptimalDot />} isAnimationActive={false}
@@ -264,11 +264,11 @@ export default function ParetoChart({
 
         {/* colour bar (3rd objective) + legend */}
         <div style={{ width: 70, display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 30, paddingTop: 8 }}>
-          <div style={{ fontSize: 9.5, fontWeight: 700, color: white(0.5), textAlign: "center", marginBottom: 4 }}>{t(cO.short)}</div>
-          <div style={{ fontSize: 9, color: white(0.4) }}>{tick(cMax, cO)}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: white(0.5), textAlign: "center", marginBottom: 4 }}>{t(cO.short)}</div>
+          <div style={{ fontSize: 11, color: white(0.4) }}>{tick(cMax, cO)}</div>
           <div style={{ width: 12, flex: 1, borderRadius: 4, margin: "3px 0",
             background: `linear-gradient(to top, ${viridis(0)}, ${viridis(0.25)}, ${viridis(0.5)}, ${viridis(0.75)}, ${viridis(1)})` }} />
-          <div style={{ fontSize: 9, color: white(0.4) }}>{tick(cMin, cO)}</div>
+          <div style={{ fontSize: 11, color: white(0.4) }}>{tick(cMin, cO)}</div>
           <div style={{ fontSize: 8.5, color: white(0.35), marginTop: 2 }}>{cO.unit}</div>
         </div>
       </div>
@@ -279,18 +279,18 @@ export default function ParetoChart({
         const touched = Object.entries(pinned.selection_labels).filter(([, v]) => v !== "Keep as-built");
         return (
           <div style={{ marginTop: 8, padding: "11px 14px", borderRadius: 10,
-            background: "rgba(78,205,196,0.08)", border: "1px solid rgba(78,205,196,0.35)" }}>
+            background: "rgba(139,110,173,0.08)", border: "1px solid rgba(139,110,173,0.35)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 220 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#4ECDC4", marginBottom: 4 }}>{t("Selected package")}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#8B6EAD", marginBottom: 4 }}>{t("Selected package")}</div>
                 {touched.length === 0
-                  ? <div style={{ fontSize: 11.5, color: white(0.5), fontStyle: "italic" }}>{t("Keep everything as-built")}</div>
+                  ? <div style={{ fontSize: 12, color: white(0.5), fontStyle: "italic" }}>{t("Keep everything as-built")}</div>
                   : touched.map(([k, v]) => (
-                      <div key={k} style={{ fontSize: 11.5, color: white(0.8) }}>
+                      <div key={k} style={{ fontSize: 12, color: white(0.8) }}>
                         <span style={{ color: white(0.45) }}>{t(k.replace("VertExt::", ""))}:</span> {v}
                       </div>
                     ))}
-                <div style={{ fontSize: 11, color: white(0.55), marginTop: 5 }}>
+                <div style={{ fontSize: 12, color: white(0.55), marginTop: 5 }}>
                   {fmt(pinned[OBJECTIVES.energy.metric], OBJECTIVES.energy)}
                   {" · "}{fmt(pinned[OBJECTIVES.cost.metric], OBJECTIVES.cost)}
                   {" · "}{fmt(pinned[OBJECTIVES.carbon.metric], OBJECTIVES.carbon)}
@@ -300,11 +300,11 @@ export default function ParetoChart({
                 <button
                   onClick={() => onValidate(pinned)}
                   disabled={isVal}
-                  style={{ padding: "8px 15px", borderRadius: 9, fontSize: 12, fontWeight: 800,
+                  style={{ padding: "8px 15px", borderRadius: 9, fontSize: 12, fontWeight: 700,
                     cursor: isVal ? "default" : "pointer",
-                    border: `1px solid ${isVal ? "rgba(47,180,119,0.5)" : "rgba(78,205,196,0.55)"}`,
-                    background: isVal ? "rgba(47,180,119,0.14)" : "rgba(78,205,196,0.18)",
-                    color: isVal ? "#2FB477" : "#4ECDC4" }}>
+                    border: `1px solid ${isVal ? "rgba(47,180,119,0.5)" : "rgba(139,110,173,0.55)"}`,
+                    background: isVal ? "rgba(47,180,119,0.14)" : "rgba(139,110,173,0.18)",
+                    color: isVal ? "#2FB477" : "#8B6EAD" }}>
                   {isVal ? t("✓ Running in EPSM") : t("Run this pick in EPSM →")}
                 </button>
                 <button onClick={() => setPinned(null)}
@@ -316,18 +316,18 @@ export default function ParetoChart({
         );
       })()}
 
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 10.5, color: white(0.5), marginTop: 2, paddingLeft: 8 }}>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 11.5, color: white(0.5), marginTop: 2, paddingLeft: 8 }}>
         <span>
           <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", marginRight: 4, verticalAlign: "middle",
             background: `linear-gradient(90deg, ${viridis(0)}, ${viridis(1)})` }} />
           {t("one package tried (colour = {c}, see bar)", { c: t(cO.short).toLowerCase() })}
         </span>
-        <span><span style={{ color: "#B98BE8" }}>—●</span> {t("best {x}–{y} trade-offs", { x: t(xO.short).toLowerCase(), y: t(yO.short).toLowerCase() })}</span>
-        <span><span style={{ color: "#4ECDC4" }}>◯</span> {t("shortlisted: nothing beats it on cost, carbon and energy at once (click to select)")}</span>
+        <span><span style={{ color: "#B8A3D0" }}>—●</span> {t("best {x}–{y} trade-offs", { x: t(xO.short).toLowerCase(), y: t(yO.short).toLowerCase() })}</span>
+        <span><span style={{ color: "#8B6EAD" }}>◯</span> {t("shortlisted: nothing beats it on cost, carbon and energy at once (click to select)")}</span>
         <span><span style={{ color: "#2FB477" }}>●</span> {t("simulated in EnergyPlus")}</span>
         <span><span style={{ color: "#fff" }}>◆</span> {t("today's building (do nothing)")}</span>
       </div>
-      <div style={{ fontSize: 10.5, color: white(0.4), marginTop: 4, paddingLeft: 8, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 11.5, color: white(0.4), marginTop: 4, paddingLeft: 8, lineHeight: 1.5 }}>
         {t("Dots stacked straight up and down use the same energy but cost more and/or emit more — e.g. build-ups with the same U-value at different prices, or the same package plus a new storey (whose energy only EnergyPlus can show).")}
       </div>
     </div>

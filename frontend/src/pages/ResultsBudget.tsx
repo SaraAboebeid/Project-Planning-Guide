@@ -29,7 +29,7 @@ const PHASE_SPLIT: [string, number][] = [
   ["Validation & QA",      0.15],
   ["Reporting",            0.10],
 ];
-const TL_COLORS = ["var(--brand-deep)", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
+const TL_COLORS = ["#5A1790", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
 
 function fmt(d: Date) { return d.toISOString().slice(0, 10); }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
@@ -38,7 +38,7 @@ function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDat
 const CONSULTANT_RATES: Record<string, number> = {
   SEK: 1400, EUR: 140, USD: 150, GBP: 130, NOK: 1500, DKK: 1050,
 };
-const PIE_COLORS = ["var(--brand-deep)", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
+const PIE_COLORS = ["#5A1790", "#6E2AAE", "#2FB477", "#509724", "#3a6e1a"];
 
 function fmtNum(n: number) { return n.toLocaleString(); }
 
@@ -70,7 +70,7 @@ function Section({
           <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
             {icon}
           </div>
-          <span className="font-bold text-sm text-slate-800">{title}</span>
+          <span className="font-semibold text-sm text-slate-800">{title}</span>
         </div>
         {open
           ? <ChevronUp   className="w-4 h-4 text-slate-400 flex-shrink-0" />
@@ -214,7 +214,7 @@ export default function ResultsBudget() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Step 5 – Timeline & Cost</h2>
+          <h2 className="text-xl font-semibold text-slate-800">Step 5 – Timeline & Cost</h2>
           <p className="text-sm text-slate-500 mt-1">
             Review your expected deliverables, project timeline, and cost estimate.
           </p>
@@ -231,13 +231,13 @@ export default function ResultsBudget() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { value: String(totalDelivs),          label: "Deliverables",  color: "text-[var(--brand-deep)]", bg: "bg-[var(--brand-deep)]/8" },
-          { value: `${userTotalHours} hrs`,       label: "Est. Effort",   color: "text-[#6E2AAE]", bg: "bg-[#6E2AAE]/10" },
+          { value: `${userTotalHours} hrs`,       label: "Est. Effort",   color: "text-[#6A4B8D]", bg: "bg-[#6A4B8D]/10" },
           { value: `${userWeeks} wk`,             label: "Duration",      color: "text-[#509724]", bg: "bg-[#2FB477]/20" },
           { value: `${fmtNum(serviceCost)} ${currency}`, label: "Service Cost", color: "text-[#3a6e1a]", bg: "bg-[#509724]/10" },
         ].map(s => (
           <div key={s.label} className={`rounded-2xl border border-slate-200 px-4 py-3 text-center ${s.bg}`}>
-            <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">{s.label}</div>
+            <div className={`text-xl font-semibold ${s.color}`}>{s.value}</div>
+            <div className="text-[11px] text-slate-500 uppercase tracking-wider mt-0.5">{s.label}</div>
           </div>
         ))}
       </div>
@@ -272,7 +272,7 @@ export default function ResultsBudget() {
             ))}
           </div>
           {selectedPkg?.carbonEstimated && (
-            <p className="mt-2 text-[11px] text-amber-600 flex items-center gap-1">
+            <p className="mt-2 text-[12px] text-amber-600 flex items-center gap-1">
               <Info className="w-3 h-3" /> Carbon partly estimated using 30 kg CO₂e/m² fallback
             </p>
           )}
@@ -280,7 +280,7 @@ export default function ResultsBudget() {
       )}
 
       {/* ── Timeline ── */}
-      <Section title="Project Timeline" icon={<Calendar className="w-5 h-5 text-[#6E2AAE]" />}>
+      <Section title="Project Timeline" icon={<Calendar className="w-5 h-5 text-[#6A4B8D]" />}>
         <div className="flex flex-wrap gap-4 mb-4">
           <div>
             <label className="text-xs text-slate-500 block mb-1">Start date</label>
@@ -293,7 +293,7 @@ export default function ResultsBudget() {
           </div>
           <button
             onClick={() => setPhaseHours(Object.fromEntries(PHASE_SPLIT.map(([p, f]) => [p, Math.round(totalHours * f)])))}
-            className="self-end text-xs text-[#6E2AAE] hover:underline"
+            className="self-end text-xs text-[#6A4B8D] hover:underline"
           >
             Reset to estimates
           </button>
@@ -329,7 +329,7 @@ export default function ResultsBudget() {
             <thead>
               <tr className="border-b border-slate-200">
                 {["Phase", "Start", "End", "Duration", "Hours"].map(h => (
-                  <th key={h} className="text-left py-2 pr-3 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">{h}</th>
+                  <th key={h} className="text-left py-2 pr-3 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -340,7 +340,7 @@ export default function ResultsBudget() {
                   <td className="py-2 pr-3 tabular-nums text-slate-500">{r.start}</td>
                   <td className="py-2 pr-3 tabular-nums text-slate-500">{r.end}</td>
                   <td className="py-2 pr-3">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-white"
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold text-white"
                       style={{ background: TL_COLORS[i] }}>
                       {r.weeks} wk
                     </span>
@@ -367,8 +367,8 @@ export default function ResultsBudget() {
             { v: `${fmtNum(serviceCost)} ${currency}`, l: "Service Cost",  c: "text-[var(--brand-deep)]", bg: "bg-[var(--brand-deep)]/8" },
           ].map(s => (
             <div key={s.l} className={`rounded-xl border border-slate-200 px-3 py-2.5 text-center ${s.bg}`}>
-              <div className={`text-lg font-bold ${s.c}`}>{s.v}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider">{s.l}</div>
+              <div className={`text-lg font-semibold ${s.c}`}>{s.v}</div>
+              <div className="text-[11px] text-slate-500 uppercase tracking-wider">{s.l}</div>
             </div>
           ))}
         </div>
@@ -416,7 +416,7 @@ export default function ResultsBudget() {
               </tr>
               <tr className="bg-slate-50">
                 <td className="px-4 py-2.5 font-semibold text-slate-800">Total Service Cost</td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-bold text-[var(--brand-deep)]">{fmtNum(serviceCost)} {currency}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-[var(--brand-deep)]">{fmtNum(serviceCost)} {currency}</td>
               </tr>
             </tbody>
           </table>
@@ -428,7 +428,7 @@ export default function ResultsBudget() {
         <div className="flex gap-3">
           <button
             onClick={handleCreateReport}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--brand-deep)] text-white font-semibold text-sm shadow hover:bg-[#5c16a0] transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--brand-deep)] text-white font-semibold text-sm shadow hover:bg-[#593e78] transition-colors"
           >
             <Download className="w-4 h-4" />
             Create Report

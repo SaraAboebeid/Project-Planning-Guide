@@ -99,7 +99,7 @@ function SectionCard({
             {icon}
           </div>
           <div>
-            <span className="font-bold text-sm text-slate-800">{title}</span>
+            <span className="font-semibold text-sm text-slate-800">{title}</span>
             <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
           </div>
         </div>
@@ -256,7 +256,7 @@ export default function DataAssumptions() {
               ["Validation",   "Satellite-corrected · High confidence"],
             ].map(([label, value]) => (
               <div key={label}>
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
+                <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
                 <span className="text-xs font-medium text-slate-700">{value}</span>
               </div>
             ))}
@@ -290,7 +290,7 @@ export default function DataAssumptions() {
               ["Usage",         "ToU profiles · battery dispatch · NPV"],
             ].map(([label, value]) => (
               <div key={label}>
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
+                <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
                 <span className="text-xs font-medium text-slate-700">{value}</span>
               </div>
             ))}
@@ -312,7 +312,7 @@ export default function DataAssumptions() {
 
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-navy">Step 3 – Data Overview</h2>
+        <h2 className="text-2xl font-semibold text-navy">Step 3 – Data Overview</h2>
         <p className="text-sm text-slate-500 mt-1">
           Review model confidence, understand how data gaps translate to output uncertainty,
           and explore the reference datasets that fill them.
@@ -358,7 +358,7 @@ export default function DataAssumptions() {
             <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-slate-700">Overall Model Confidence</span>
-                <span className="text-xl font-bold text-navy">{confPct}%</span>
+                <span className="text-xl font-semibold text-navy">{confPct}%</span>
               </div>
               <div className="w-full h-3 rounded-full bg-slate-200 overflow-hidden flex">
                 <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(avail / total) * 100}%` }} />
@@ -374,7 +374,7 @@ export default function DataAssumptions() {
                   <div key={label} className="flex items-center gap-1.5">
                     {icon}
                     <span className="text-slate-500">{label}</span>
-                    <span className="font-bold text-slate-700 tabular-nums">{count}</span>
+                    <span className="font-semibold text-slate-700 tabular-nums">{count}</span>
                   </div>
                 ))}
               </div>
@@ -400,7 +400,7 @@ export default function DataAssumptions() {
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-3">
+                <p className="text-[12px] text-slate-400 mt-3">
                   Expand a dataset in Section 3 below to inspect what it contains and how
                   confident you can be in the estimates.
                 </p>
@@ -463,7 +463,7 @@ export default function DataAssumptions() {
                          :                    "text-emerald-700 bg-emerald-50 border-emerald-200";
                 return (
                   <div key={driver} className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                    <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border mt-0.5 ${rc}`}>
+                    <span className={`flex-shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full border mt-0.5 ${rc}`}>
                       {risk}
                     </span>
                     <div>
@@ -474,7 +474,7 @@ export default function DataAssumptions() {
                 );
               })}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[12px] text-slate-400 mt-1">
               Full quantitative sensitivity analysis (Sobol indices) will be generated when
               your simulation runs.
             </p>
@@ -534,7 +534,7 @@ export default function DataAssumptions() {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-slate-800">{card.title}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${card.badgeColor}`}>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold ${card.badgeColor}`}>
                           {card.badge}
                         </span>
                       </div>

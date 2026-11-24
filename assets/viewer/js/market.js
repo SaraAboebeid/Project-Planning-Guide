@@ -174,16 +174,16 @@
     const price = salePrice(r), q = saleSqm(r);
     const tag = r.status === 'sold' ? 'Sold' + (r.sold_date ? ' ' + String(r.sold_date).slice(0, 10) : '') : 'For sale';
     return `<div style="font-size:11px;line-height:1.5;padding:5px 0;border-top:1px solid rgba(255,255,255,0.07)">
-      <b style="color:#fff">${kr(price)} SEK</b> ${q ? '· <b style="color:#B98BE8">' + kr(q) + ' kr/m²</b>' : ''}
+      <b style="color:#fff">${kr(price)} SEK</b> ${q ? '· <b style="color:#B8A3D0">' + kr(q) + ' kr/m²</b>' : ''}
       <span style="color:rgba(255,255,255,0.4)"> · ${r.rooms || '?'} rok · ${r.living_area_m2 || '?'} m²${r.construction_year ? ' · ' + r.construction_year : ''}${r.energy_class ? ' · EPC ' + r.energy_class : ''}</span>
-      <span style="display:inline-block;margin-left:4px;font-size:9px;font-weight:700;color:${r.status === 'sold' ? '#9B7FD4' : '#2FB477'}">${tag}</span>
+      <span style="display:inline-block;margin-left:4px;font-size:9px;font-weight:700;color:${r.status === 'sold' ? '#A894BF' : '#2FB477'}">${tag}</span>
       ${r.url ? ' · <a href="' + r.url + '" target="_blank" rel="noopener" style="color:#4A90E2;text-decoration:none">Booli ↗</a>' : ''}
     </div>`;
   };
   const rentLine = r => {
     const q = rentPerM2(r);
     return `<div style="font-size:11px;line-height:1.5;padding:5px 0;border-top:1px solid rgba(255,255,255,0.07)">
-      <b style="color:#fff">${kr(num(r.rent_sek))} SEK/mo</b> ${q ? '· <b style="color:#4ECDC4">' + Math.round(q) + ' SEK/m²</b>' : ''}
+      <b style="color:#fff">${kr(num(r.rent_sek))} SEK/mo</b> ${q ? '· <b style="color:#8B6EAD">' + Math.round(q) + ' SEK/m²</b>' : ''}
       <span style="color:rgba(255,255,255,0.4)"> · ${r.rooms || '?'} rok · ${r.size_m2 || '?'} m²${r.floor_current ? ' · fl ' + r.floor_current : ''}</span>
     </div>`;
   };
@@ -193,8 +193,8 @@
     if (!loaded) return '';
     const sales = listingsFor(b, booli), rents = listingsFor(b, boplats);
     if (!sales.length && !rents.length) return '';
-    let html = '<div style="margin-top:12px;border-top:1px solid rgba(114,28,184,0.35);padding-top:9px">'
-      + '<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#B98BE8;margin-bottom:4px">Market</div>';
+    let html = '<div style="margin-top:12px;border-top:1px solid rgba(104,72,140,0.35);padding-top:9px">'
+      + '<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#B8A3D0;margin-bottom:4px">Market</div>';
     if (rents.length) {
       const q = rents.map(rentPerM2).filter(v => v);
       const avg = q.length ? Math.round(q.reduce((a, c) => a + c, 0) / q.length) : null;
@@ -217,7 +217,7 @@
     if (_popup) return _popup;
     _popup = document.createElement('div');
     _popup.id = 'market-popup';
-    _popup.style.cssText = 'position:absolute;z-index:60;max-width:280px;background:#0d1117;border:1px solid rgba(114,28,184,0.5);border-radius:10px;padding:10px 12px 11px;box-shadow:0 8px 30px rgba(0,0,0,0.55);display:none;color:#fff;font-family:inherit';
+    _popup.style.cssText = 'position:absolute;z-index:60;max-width:280px;background:#0d1117;border:1px solid rgba(104,72,140,0.5);border-radius:10px;padding:10px 12px 11px;box-shadow:0 8px 30px rgba(0,0,0,0.55);display:none;color:#fff;font-family:inherit';
     (document.getElementById('cesiumContainer') || document.body).appendChild(_popup);
     return _popup;
   }
@@ -252,16 +252,16 @@
     const p = document.getElementById('market-panel');
     if (!p) return;
     const radio = (val, label) => '<button class="mk-tint' + (_tintMode === val ? ' on' : '') + '" data-tint="' + val + '" '
-      + 'style="flex:1;padding:4px 6px;border-radius:7px;border:1px solid ' + (_tintMode === val ? 'rgba(114,28,184,0.8)' : 'rgba(255,255,255,0.12)')
-      + ';background:' + (_tintMode === val ? 'rgba(114,28,184,0.32)' : 'transparent') + ';color:' + (_tintMode === val ? '#fff' : 'rgba(255,255,255,0.6)')
+      + 'style="flex:1;padding:4px 6px;border-radius:7px;border:1px solid ' + (_tintMode === val ? 'rgba(104,72,140,0.8)' : 'rgba(255,255,255,0.12)')
+      + ';background:' + (_tintMode === val ? 'rgba(104,72,140,0.32)' : 'transparent') + ';color:' + (_tintMode === val ? '#fff' : 'rgba(255,255,255,0.6)')
       + ';font-size:10px;font-weight:700;cursor:pointer">' + label + '</button>';
     let legend = '';
     if (_tintMode === 'rent') legend = colorbar(RAMP_RENT, rentDomain[0], rentDomain[1], 'SEK/m²/mo');
     else if (_tintMode === 'retrofit') legend = '<div style="font-size:9.5px;color:rgba(255,255,255,0.42);margin-top:5px">High price/m² × poor EPC = most market value from a retrofit.</div>' + colorbar(RAMP_RETRO, 0, 1, 'low → high value');
     p.innerHTML =
-      '<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#B98BE8;margin-bottom:6px">Market data</div>'
+      '<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#B8A3D0;margin-bottom:6px">Market data</div>'
       + '<label style="display:flex;align-items:center;gap:7px;font-size:11px;color:rgba(255,255,255,0.75);cursor:pointer;margin-bottom:8px">'
-      + '<input type="checkbox" id="mk-points"' + (_visible ? ' checked' : '') + ' style="accent-color:#B98BE8;cursor:pointer"> Sale &amp; sold points <span style="color:rgba(255,255,255,0.35)">(Booli)</span></label>'
+      + '<input type="checkbox" id="mk-points"' + (_visible ? ' checked' : '') + ' style="accent-color:#B8A3D0;cursor:pointer"> Sale &amp; sold points <span style="color:rgba(255,255,255,0.35)">(Booli)</span></label>'
       + (_visible ? colorbar(RAMP_SALE, saleDomain[0], saleDomain[1], 'kr/m²') + '<div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:3px">● filled = for sale · ○ hollow = sold</div>' : '')
       + '<div style="font-size:10px;color:rgba(255,255,255,0.5);margin:11px 0 5px">Colour buildings by</div>'
       + '<div style="display:flex;gap:5px">' + radio('none', 'Off') + radio('rent', 'Rent') + radio('retrofit', 'Retrofit value') + '</div>'
@@ -277,7 +277,7 @@
     panel.id = 'market-panel';
     // NOTE: no 'panel' class — that class is absolutely positioned (the floating
     // info box) and made this overlap the sidebar. Plain block, in normal flow.
-    panel.style.cssText = 'display:none;margin:8px 2px 4px;background:rgba(114,28,184,0.10);border:1px solid rgba(114,28,184,0.34);border-radius:10px;padding:11px 13px';
+    panel.style.cssText = 'display:none;margin:8px 2px 4px;background:rgba(104,72,140,0.10);border:1px solid rgba(104,72,140,0.34);border-radius:10px;padding:11px 13px';
     // Embed it directly under the "Market data" toggle, inside Additional Layers.
     const bc = document.getElementById('buildings-content');
     const grp = bc && bc.querySelector('.overlay-group');

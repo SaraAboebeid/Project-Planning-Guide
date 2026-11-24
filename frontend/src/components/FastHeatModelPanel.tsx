@@ -120,7 +120,7 @@ export default function FastHeatModelPanel({ buildings, cityId }: { buildings: F
           {years.suggested.map((y) => (
             <button key={y.year} onClick={() => setYear(year === y.year ? null : y.year)} title={t(y.note)}
               aria-pressed={year === y.year}
-              style={{ padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer",
+              style={{ padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
                        color: year === y.year ? "#0b0f14" : C.selected,
                        background: year === y.year ? C.selected : tint(C.selected, 0.1),
                        border: `1px solid ${tint(C.selected, 0.45)}` }}>
@@ -155,7 +155,7 @@ export default function FastHeatModelPanel({ buildings, cityId }: { buildings: F
               : t("With the weather of {y}, these buildings need {pct}% less heat than in a typical year.", { y: year, pct: Math.abs(dHeat) })}</strong>{" "}
             {t("Coldest-hour demand: {a} kW in {y}, against {b} kW in a typical year ({sign}{d}%).", { a: fmt(yearTotals.peak), y: year, b: fmt(selTotals.peak), sign: dPeak >= 0 ? "+" : "−", d: Math.abs(dPeak) })}
             {yearNote ? <> {t("{y}: {note}.", { y: year, note: t(yearNote) })}</> : null}
-            <div style={{ ...muted, fontSize: 11, marginTop: 4 }}>
+            <div style={{ ...muted, fontSize: 12, marginTop: 4 }}>
               {t("Real weather from SMHI station observations, gaps filled from nearby stations and ERA5 (smhi2epw). Use it to check heating capacity in a hard winter; the typical year stays the basis for annual energy and costs.")}
             </div>
           </div>
@@ -177,8 +177,8 @@ export default function FastHeatModelPanel({ buildings, cityId }: { buildings: F
             [t("Coldest-hour demand (all added up)"), `${fmt(selTotals.peak)} kW`],
           ].map(([k, v]) => (
             <div key={k} style={{ ...card, flex: "1 1 180px" }}>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{k}</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{v}</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>{k}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{v}</div>
             </div>
           ))}
         </div>
@@ -208,7 +208,7 @@ export default function FastHeatModelPanel({ buildings, cityId }: { buildings: F
                       {r.error
                         ? <span style={{ color: "rgba(255,255,255,0.45)" }}>{t("Could not be estimated")}</span>
                         : w
-                          ? <span><span style={{ color: w.color, fontWeight: 700 }}>{w.icon} {t(w.label)}</span>
+                          ? <span><span style={{ color: w.color, fontWeight: 600 }}>{w.icon} {t(w.label)}</span>
                               <span style={{ color: "rgba(255,255,255,0.6)" }}> · {t("needs more heat than {n} of 100 buildings", { n: 100 - higher! })}</span></span>
                           : <span style={{ color: "rgba(255,255,255,0.45)" }}>—</span>}
                     </td>
@@ -229,7 +229,7 @@ export default function FastHeatModelPanel({ buildings, cityId }: { buildings: F
 
       {/* ── Whole city ── */}
       <div style={{ ...card, display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#fff" }}>{t("The whole city")}</div>
+        <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff" }}>{t("The whole city")}</div>
         {!city?.result && city?.status?.state === "running" && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", ...muted }}>
             <Loader2 size={13} className="animate-spin" />
@@ -240,7 +240,7 @@ export default function FastHeatModelPanel({ buildings, cityId }: { buildings: F
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <span style={muted}>{t("No city-wide estimate yet. It runs every heated building through the same model — about 15 minutes for Gothenburg.")}</span>
             <button onClick={startCity} disabled={starting}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                        color: C.selected, background: tint(C.selected, 0.12), border: `1px solid ${tint(C.selected, 0.4)}`, cursor: "pointer" }}>
               <Zap size={13} /> {t("Estimate the whole city")}
             </button>
@@ -264,7 +264,7 @@ function CitySummary({ s, fmt }: { s: NonNullable<RcCityStatus["result"]>; fmt: 
   const muted = { fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.6 } as const;
   const groupTable = (title: string, rows: typeof s.by_use, label: (g: string) => string) => (
     <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.75)", marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", marginBottom: 4 }}>{title}</div>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
         <tbody>
           {rows.slice(0, 8).map((g) => (
@@ -290,14 +290,14 @@ function CitySummary({ s, fmt }: { s: NonNullable<RcCityStatus["result"]>; fmt: 
         {" "}{t("Coldest hour: {date}.", { date: peakDate.toLocaleDateString(undefined, { day: "numeric", month: "long", timeZone: "UTC" }) })}
       </p>
       <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>{t("Heat need by month")} (GWh)</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>{t("Heat need by month")} (GWh)</div>
         <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 90 }} role="img"
           aria-label={s.monthly_mwh.map((v, i) => `${t(MONTHS[i]!)} ${fmt(v / 1000, 1)} GWh`).join(", ")}>
           {s.monthly_mwh.map((v, i) => (
             <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }} title={`${t(MONTHS[i]!)}: ${fmt(v / 1000, 1)} GWh`}>
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{fmt(v / 1000)}</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{fmt(v / 1000)}</span>
               <div style={{ width: "100%", height: Math.max(2, (v / maxM) * 60), background: C.info, borderRadius: "3px 3px 0 0" }} />
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{t(MONTHS[i]!)}</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{t(MONTHS[i]!)}</span>
             </div>
           ))}
         </div>
@@ -306,7 +306,7 @@ function CitySummary({ s, fmt }: { s: NonNullable<RcCityStatus["result"]>; fmt: 
         {groupTable(t("By construction era"), s.by_era, (g) => t(g))}
         {groupTable(t("By district (largest first)"), s.by_district, (g) => g)}
       </div>
-      <div style={{ ...muted, fontSize: 11 }}>
+      <div style={{ ...muted, fontSize: 12 }}>
         {t("Outbuildings and small unheated buildings are left out. Weather: {w}. Calculated {d}.", { w: s.weather, d: new Date(s.created).toLocaleDateString() })}
       </div>
     </>

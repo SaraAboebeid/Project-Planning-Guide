@@ -11,8 +11,8 @@ import { useT, useLang } from "../i18n";
 import { C } from "../config/colors";
 
 // Validated with the dataviz palette checker against the dark surface (#0d1117).
-const SOLAR = "#26A69A";
-const DEMAND = "#9575CD";
+const SOLAR = "#644686";
+const DEMAND = "#A08BB7";
 
 export interface PvBuilding {
   address: string | null;
@@ -39,7 +39,7 @@ function Num({ label, value, onChange, step, unit }: { label: string; value: num
   const [text, setText] = useState(String(value));
   useEffect(() => setText(String(value)), [value]);
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: "rgba(255,255,255,0.55)" }}>
+    <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: "rgba(255,255,255,0.55)" }}>
       {label}
       <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
         <input type="number" step={step ?? "any"} value={text} onChange={(e) => setText(e.target.value)}
@@ -47,7 +47,7 @@ function Num({ label, value, onChange, step, unit }: { label: string; value: num
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
           style={{ width: 84, padding: "4px 7px", borderRadius: 6, fontSize: 12, textAlign: "right", color: "#fff",
             background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)" }} />
-        <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)" }}>{unit}</span>
+        <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)" }}>{unit}</span>
       </span>
     </label>
   );
@@ -113,9 +113,9 @@ export default function PvOptimizerPanel({ buildings, cityId, discountRate }: { 
 
   const tile = (label: string, value: string, sub?: string) => (
     <div style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", minWidth: 130, flex: 1 }}>
-      <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)" }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", marginTop: 2 }}>{value}</div>
-      {sub && <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>{sub}</div>}
+      <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)" }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginTop: 2 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>{sub}</div>}
     </div>
   );
 
@@ -124,8 +124,8 @@ export default function PvOptimizerPanel({ buildings, cityId, discountRate }: { 
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
         <Sun size={18} color={SOLAR} style={{ marginTop: 2 }} />
         <div style={{ flex: 1 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>{t("Rooftop solar — best size")}</h3>
-          <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.55 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>{t("Rooftop solar — best size")}</h3>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.55 }}>
             {t("Matches hourly solar output with the building's own hourly electricity use and finds the size worth most over the panels' life. Since 2026 exported power earns about the spot price only, so solar the building uses itself is worth far more than solar it sells.")}
           </p>
         </div>
@@ -134,7 +134,7 @@ export default function PvOptimizerPanel({ buildings, cityId, discountRate }: { 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", fontSize: 12, color: "rgba(255,255,255,0.75)" }}>
         {buildings.length > 1 && (
           <select value={idx} onChange={(e) => setIdx(Number(e.target.value))}
-            style={{ padding: "5px 9px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#0d1117", color: "#fff", border: "1px solid rgba(255,255,255,0.15)", maxWidth: 260 }}>
+            style={{ padding: "5px 9px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "#0d1117", color: "#fff", border: "1px solid rgba(255,255,255,0.15)", maxWidth: 260 }}>
             {buildings.map((x, i) => <option key={`${x.lat},${x.lon}`} value={i}>{x.address ?? t("Building {n}", { n: i + 1 })}</option>)}
           </select>
         )}
@@ -147,7 +147,7 @@ export default function PvOptimizerPanel({ buildings, cityId, discountRate }: { 
           {t("Owner can't deduct VAT (e.g. rental housing)")}
         </label>
         <button onClick={() => setShowAssumptions((s) => !s)}
-          style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: 0, cursor: "pointer", color: C.selected, fontSize: 11.5, fontWeight: 700, padding: 0 }}>
+          style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: 0, cursor: "pointer", color: C.selected, fontSize: 12, fontWeight: 600, padding: 0 }}>
           {t("Prices & assumptions")} {showAssumptions ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
       </div>
@@ -164,7 +164,7 @@ export default function PvOptimizerPanel({ buildings, cityId, discountRate }: { 
           <Num label={t("Real discount rate")} unit="" value={p.discount} step={0.005} onChange={(v) => setP({ ...p, discount: v })} />
           <Num label={t("Output loss per year")} unit="" value={p.degradation} step={0.001} onChange={(v) => setP({ ...p, degradation: v })} />
           <Num label={t("Upkeep per year (share of cost)")} unit="" value={p.om} step={0.005} onChange={(v) => setP({ ...p, om: v })} />
-          <div style={{ flexBasis: "100%", fontSize: 10.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
+          <div style={{ flexBasis: "100%", fontSize: 11.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
             {t("Bought electricity: {buy} kr/kWh · sold: {sell} kr/kWh. Sources for every default are listed in the Data Explorer; values marked provisional there still need checking.",
               { buy: buy.toFixed(2), sell: sell.toFixed(2) })}
           </div>
@@ -209,16 +209,16 @@ export default function PvOptimizerPanel({ buildings, cityId, discountRate }: { 
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
                 <div>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>{t("Value over the panels' life by system size")}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>{t("Value over the panels' life by system size")}</div>
                   <ResponsiveContainer width="100%" height={210}>
                     <LineChart data={result.points} margin={{ top: 8, right: 12, bottom: 18, left: 8 }}>
                       <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                      <XAxis dataKey="kwp" type="number" domain={["dataMin", "dataMax"]} tick={{ fontSize: 10, fill: "rgba(255,255,255,0.45)" }}
-                        label={{ value: "kWp", position: "insideBottom", offset: -10, fontSize: 10, fill: "rgba(255,255,255,0.45)" }} />
-                      <YAxis tick={{ fontSize: 10, fill: "rgba(255,255,255,0.45)" }} width={56}
+                      <XAxis dataKey="kwp" type="number" domain={["dataMin", "dataMax"]} tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }}
+                        label={{ value: "kWp", position: "insideBottom", offset: -10, fontSize: 11, fill: "rgba(255,255,255,0.45)" }} />
+                      <YAxis tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }} width={56}
                         tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
                       <ReferenceLine y={0} stroke="rgba(255,255,255,0.35)" />
-                      <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, fontSize: 11 }}
+                      <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, fontSize: 12 }}
                         labelFormatter={(k) => `${k} kWp`} formatter={(v: number) => [sek(v), t("Net present value")]} />
                       <Line type="monotone" dataKey="npv_sek" stroke={SOLAR} strokeWidth={2} dot={false} isAnimationActive={false} />
                       {best && <ReferenceDot x={best.kwp} y={best.npv_sek} r={5} fill={SOLAR} stroke="#0d1117" strokeWidth={2} />}
@@ -226,18 +226,18 @@ export default function PvOptimizerPanel({ buildings, cityId, discountRate }: { 
                   </ResponsiveContainer>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>
                     {best ? t("Electricity use and solar output per month, at {k} kWp", { k: best.kwp }) : t("Electricity use per month")}
                   </div>
                   <ResponsiveContainer width="100%" height={210}>
                     <BarChart data={monthly} margin={{ top: 8, right: 8, bottom: 0, left: 8 }} barGap={2}>
                       <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fontSize: 10, fill: "rgba(255,255,255,0.45)" }} />
-                      <YAxis tick={{ fontSize: 10, fill: "rgba(255,255,255,0.45)" }} width={56}
+                      <XAxis dataKey="month" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }} />
+                      <YAxis tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }} width={56}
                         tickFormatter={(v: number) => `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k`} />
-                      <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, fontSize: 11 }}
+                      <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, fontSize: 12 }}
                         cursor={{ fill: "rgba(255,255,255,0.05)" }} formatter={(v: number, name: string) => [`${v.toLocaleString(locale)} kWh`, name]} />
-                      <Legend wrapperStyle={{ fontSize: 10.5 }} iconType="square" />
+                      <Legend wrapperStyle={{ fontSize: 11.5 }} iconType="square" />
                       <Bar dataKey="use" name={t("Electricity use")} fill={DEMAND} radius={[4, 4, 0, 0]} isAnimationActive={false} />
                       <Bar dataKey="solar" name={t("Solar output")} fill={SOLAR} radius={[4, 4, 0, 0]} isAnimationActive={false} />
                     </BarChart>
@@ -245,7 +245,7 @@ export default function PvOptimizerPanel({ buildings, cityId, discountRate }: { 
                 </div>
               </div>
 
-              <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
+              <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
                 {t("Electricity use: households {h} kWh/yr (simulated, Sveby profile) + building {pr} kWh/yr from {src}, spread evenly over the year. Solar: PVGIS hourly data for 2019, {y} kWh per kWp, panels tilted 35° facing south, up to {m2} m² of roof (80% of the footprint).",
                   { h: result.demand.households_kwh.toLocaleString(locale), pr: result.demand.property_kwh.toLocaleString(locale),
                     src: t(result.demand.property_source), y: result.specific_yield_kwh_kwp, m2: result.roof_usable_m2 })}
@@ -256,12 +256,12 @@ export default function PvOptimizerPanel({ buildings, cityId, discountRate }: { 
         </div>
       )}
       {busy && result && (
-        <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
           <Loader2 size={12} className="animate-spin" /> {t("Updating…")}
         </div>
       )}
       {!busy && !result && !error && b?.footprintM2 && (
-        <button onClick={run} style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: 0, background: "var(--brand-deep)", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+        <button onClick={run} style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: 0, background: "var(--brand-deep)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
           <Play size={13} /> {t("Find best size")}
         </button>
       )}

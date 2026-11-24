@@ -18,21 +18,21 @@ const TEAM: Member[] = [
   {
     name: "Sara Abouebeid",
     role: "Lead Developer",
-    roleColor: "#4ECDC4",
+    roleColor: "#8B6EAD",
     bio: "Leads the design and development of the platform — the data pipelines, the building-energy analysis engine, the 3D viewer and the planning wizard that ties them together. Responsible for turning the research models into a working, end-to-end tool.",
     link: { href: "mailto:saraabo@chalmers.se", label: "saraabo@chalmers.se", kind: "email" },
   },
   {
     name: "Holger Wallbaum",
     role: "Project Lead",
-    roleColor: "#B98BE8",
+    roleColor: "#B8A3D0",
     bio: "Project lead, setting the overall research direction and ensuring the work stays grounded in sustainable building practice. Brings the strategic and scientific oversight that connects the platform to wider goals in the built environment.",
     link: { href: "mailto:holger.wallbaum@chalmers.se", label: "holger.wallbaum@chalmers.se", kind: "email" },
   },
   {
     name: "Liane Thuvander",
     role: "Project Lead",
-    roleColor: "#B98BE8",
+    roleColor: "#B8A3D0",
     bio: "Project lead, guiding the methodology and the link between the 3D viewer approach and real renovation and energy-district decision-making. Anchors the platform in applied research on the existing building stock.",
     link: { href: "mailto:liane.thuvander@chalmers.se", label: "liane.thuvander@chalmers.se", kind: "email" },
   },
@@ -70,13 +70,13 @@ function MemberCard({ m }: { m: Member }) {
       onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
     >
       <div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: "#f0f4ff", lineHeight: 1.2 }}>{m.name}</div>
+        <div style={{ fontSize: 18, fontWeight: 600, color: "#f0f4ff", lineHeight: 1.2 }}>{m.name}</div>
         <span
           style={{
             display: "inline-block",
             marginTop: 8,
-            fontSize: 10,
-            fontWeight: 800,
+            fontSize: 11,
+            fontWeight: 700,
             letterSpacing: 0.8,
             textTransform: "uppercase",
             padding: "3px 10px",
@@ -121,10 +121,10 @@ export default function ProjectTeam() {
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 8px" }}>
       {/* Page header */}
       <div style={{ marginBottom: 32 }}>
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>
           ABOUT
         </div>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: "#f0f4ff", margin: 0, lineHeight: 1.2 }}>Project Team</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#f0f4ff", margin: 0, lineHeight: 1.2 }}>Project Team</h1>
         <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", marginTop: 8, lineHeight: 1.6 }}>
           The team behind the platform — research leadership, development and business development working together to bring the toolbox from research into practice.
         </p>

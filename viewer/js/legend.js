@@ -99,6 +99,27 @@ const _noPeriod = DATA.length - _epcExcluded - _sumCounts(_periodCounts);
 const _OUTBUILDING_NOTE = () => 'Outbuildings (garages, sheds, waste rooms) are greyed out and not counted: '
   + _epcExcluded.toLocaleString() + ' buildings. They never need a certificate.';
 
+// Header stats for the city actually loaded. The page ships Gothenburg's figures
+// (92,973 buildings · 85,670 EPC matched · 26,263 TABULA matched) and nothing
+// replaced them, so Nacka, Malmö, ... showed Gothenburg's numbers. Same
+// definitions as the home page's dataset card: has_epc / a TABULA era.
+(function updateHeaderStats() {
+  try {
+    const n = DATA.length;
+    const epc = DATA.filter((b) => b.has_epc).length;
+    const tab = DATA.filter((b) => b.tabula_period).length;
+    const nums = document.querySelectorAll('.stat-box .stat-num');
+    if (nums[0]) nums[0].textContent = epc.toLocaleString('en-GB');
+    if (nums[1]) nums[1].textContent = tab.toLocaleString('en-GB');
+    const sub = document.getElementById('city-subtitle');
+    if (sub) sub.textContent = sub.textContent.replace(/[\d,]+ buildings/, n.toLocaleString('en-GB') + ' buildings');
+    const info = document.querySelector('.info-btn[data-title="Buildings"]');
+    if (info) info.setAttribute('data-desc', info.getAttribute('data-desc')
+      .replace(/^[\d,]+ building footprints/, n.toLocaleString('en-GB') + ' building footprints')
+      .replace(' for Gothenburg.', '.'));
+  } catch (e) { /* header stats are cosmetic */ }
+})();
+
 function _bestWorst(list, n = 15) {
   const sorted = [...list].sort((a, b) => a.energy - b.energy);
   return { best: sorted.slice(0, n), worst: sorted.slice(-n).reverse() };
@@ -173,16 +194,16 @@ function updateLegend(mode) {
     div.innerHTML = '<div style="width:12px;height:12px;border-radius:3px;background:'+r.color+';flex-shrink:0"></div>'
       + '<span style="flex:1">'+r.lbl+'</span>'
       + '<span style="color:var(--faint);font-size:10px">'+r.cnt.toLocaleString()+'</span>'
-      + (r.hasCards ? '<span style="margin-left:4px;font-size:10px;color:#a78bfa" title="Click to see best/worst">&#9654;</span>' : '');
+      + (r.hasCards ? '<span style="margin-left:4px;font-size:10px;color:#c1afd6" title="Click to see best/worst">&#9654;</span>' : '');
     if (r.hasCards) {
       const _key = r.key, _mode = mode;
       // Interactive rows are real controls: reachable and operable by keyboard.
       div.setAttribute('role', 'button');
       div.setAttribute('tabindex', '0');
       div.setAttribute('aria-label', r.lbl + ' — show best and worst performers');
-      div.addEventListener('mouseenter', () => div.style.background = 'rgba(167,139,250,0.1)');
+      div.addEventListener('mouseenter', () => div.style.background = 'rgba(193,175,214,0.1)');
       div.addEventListener('mouseleave', () => div.style.background = '');
-      div.addEventListener('focus', () => div.style.background = 'rgba(167,139,250,0.16)');
+      div.addEventListener('focus', () => div.style.background = 'rgba(193,175,214,0.16)');
       div.addEventListener('blur', () => div.style.background = '');
       div.addEventListener('click', () => showPerfCards(_mode, _key));
       div.addEventListener('keydown', (e) => {
@@ -275,7 +296,7 @@ function renderPerfList() {
 
   const tabs = [['energy','⚡ Energy'],['year','📅 Year built'],['eclass','🏷 Class']].map(([m,lbl]) =>
     '<button onclick="_sortMode=\''+m+'\';renderPerfList()" style="flex:1;padding:5px 0;font-size:11px;border:none;border-radius:6px;cursor:pointer;font-family:inherit;'
-    +(_sortMode===m ? 'background:#7c3aed;color:#fff;font-weight:600' : 'background:rgba(0,0,0,0.07);color:var(--muted)')
+    +(_sortMode===m ? 'background:#9171b6;color:#fff;font-weight:600' : 'background:rgba(0,0,0,0.07);color:var(--muted)')
     +'">'+lbl+'</button>'
   ).join('');
 
@@ -285,7 +306,7 @@ function renderPerfList() {
     const minE = Math.min(...sel.map(b=>b.energy||999));
     const maxE = Math.max(...sel.map(b=>b.energy||0));
     cmpHtml = '<div style="background:#7c3aed22;border:1px solid #7c3aed55;border-radius:8px;padding:10px;margin-bottom:8px">';
-    cmpHtml += '<div style="font-weight:600;color:#6d28d9;font-size:11px;margin-bottom:8px">⚖ Compare ('+_compareSet.size+')</div>';
+    cmpHtml += '<div style="font-weight:600;color:#7e58a9;font-size:11px;margin-bottom:8px">⚖ Compare ('+_compareSet.size+')</div>';
     for (const b of sel) {
       const span = maxE > minE ? (b.energy - minE)/(maxE - minE) : 0.5;
       const pct  = Math.round(span * 100);
@@ -319,13 +340,13 @@ function renderPerfList() {
     const meta = [b.year?'Built '+b.year:'', b.area?b.area+' m²':''].filter(Boolean).join(' · ');
     const safeAddr = (b.addr||'').replace(/"/g,'&quot;');
     rows += '<div data-addr="'+safeAddr+'" data-idx="'+b.idx+'" class="pr"'
-      + ' style="background:'+(inCmp?'rgba(124,58,237,0.18)':'rgba(0,0,0,0.04)')+';border-radius:8px;padding:8px 10px;margin:4px 0;cursor:pointer;'
-      + 'border:1px solid '+(inCmp?'#7c3aed':'transparent')+';'+(isLoc?'box-shadow:inset 3px 0 0 #7c3aed;':'')+'transition:all .15s">';
+      + ' style="background:'+(inCmp?'rgba(145,113,182,0.18)':'rgba(0,0,0,0.04)')+';border-radius:8px;padding:8px 10px;margin:4px 0;cursor:pointer;'
+      + 'border:1px solid '+(inCmp?'#9171b6':'transparent')+';'+(isLoc?'box-shadow:inset 3px 0 0 #9171b6;':'')+'transition:all .15s">';
     rows +=   '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'
             + '<span style="flex:1;font-size:11px;font-weight:600;line-height:1.3">'+b.addr+'</span>'
             + badge + ' ' + perBadge
             + '<button class="pr-loc" title="Show on map" aria-label="Show '+safeAddr+' on map"'
-            + ' style="border:1px solid '+(isLoc?'#7c3aed':'rgba(15,23,42,0.15)')+';background:'+(isLoc?'#7c3aed':'#fff')+';color:'+(isLoc?'#fff':'#475569')+';'
+            + ' style="border:1px solid '+(isLoc?'#9171b6':'rgba(15,23,42,0.15)')+';background:'+(isLoc?'#9171b6':'#fff')+';color:'+(isLoc?'#fff':'#475569')+';'
             + 'border-radius:6px;padding:1px 6px;font-size:11px;line-height:16px;cursor:pointer;font-family:inherit">📍</button>'
             + '</div>';
     rows +=   '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
@@ -350,7 +371,7 @@ function renderPerfList() {
       _perfLocate(Number(el.getAttribute('data-idx')));
     });
     el.addEventListener('mouseenter', () => { el.style.background = 'rgba(0,0,0,0.08)'; });
-    el.addEventListener('mouseleave', () => { el.style.background = _compareSet.has(addr) ? 'rgba(124,58,237,0.18)' : 'rgba(0,0,0,0.04)'; });
+    el.addEventListener('mouseleave', () => { el.style.background = _compareSet.has(addr) ? 'rgba(145,113,182,0.18)' : 'rgba(0,0,0,0.04)'; });
   });
 }
 

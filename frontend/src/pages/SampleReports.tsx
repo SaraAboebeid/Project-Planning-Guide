@@ -34,12 +34,12 @@ export default function SampleReports() {
       {/* ── Page header ── */}
       <div style={{ marginBottom: 32 }}>
         <p style={{
-          fontSize: 10, fontWeight: 800, letterSpacing: 1.6,
+          fontSize: 11, fontWeight: 700, letterSpacing: 1.6,
           color: "rgba(255,255,255,0.3)", marginBottom: 8, textTransform: "uppercase",
         }}>
           Report Samples
         </p>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#fff", margin: "0 0 8px" }}>
           Example Project Reports
         </h1>
         <p style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", maxWidth: 560, margin: 0, lineHeight: 1.6 }}>
@@ -107,10 +107,10 @@ function SampleCard({
               {icon}
             </div>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", color: sample.color, marginBottom: 3 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.4, textTransform: "uppercase", color: sample.color, marginBottom: 3 }}>
                 {sample.label}
               </p>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: "#fff", margin: 0 }}>
                 {sample.project.projectName}
               </h2>
             </div>
@@ -123,7 +123,7 @@ function SampleCard({
               display: "flex", alignItems: "center", gap: 7,
               padding: "9px 18px", borderRadius: 10, border: "none", cursor: "pointer",
               background: sample.color, color: "#fff",
-              fontSize: 13, fontWeight: 700, flexShrink: 0,
+              fontSize: 13, fontWeight: 600, flexShrink: 0,
               boxShadow: `0 0 18px ${sample.color}40`,
             }}
           >
@@ -164,7 +164,7 @@ function Pill({ icon, text, color }: { icon: React.ReactNode; text: string; colo
       padding: "4px 10px", borderRadius: 100,
       background: "rgba(255,255,255,0.05)",
       border: "1px solid rgba(255,255,255,0.08)",
-      fontSize: 11, color: "rgba(255,255,255,0.55)",
+      fontSize: 12, color: "rgba(255,255,255,0.55)",
     }}>
       <span style={{ color }}>{icon}</span>
       {text}
@@ -200,20 +200,20 @@ function SectionsList({ sample }: { sample: (typeof SAMPLE_REPORTS)[number] }) {
             background: "rgba(255,255,255,0.04)",
             border: "1px solid rgba(255,255,255,0.06)",
             borderRadius: 8, padding: "7px 12px",
-            fontSize: 11,
+            fontSize: 12,
           }}
         >
           <span style={{
             width: 18, height: 18, borderRadius: 5, flexShrink: 0,
             background: "rgba(255,255,255,0.08)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.4)",
+            fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)",
           }}>
             {s.num}
           </span>
           <div>
             <div style={{ fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{s.label}</div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{s.sub}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{s.sub}</div>
           </div>
         </div>
       ))}

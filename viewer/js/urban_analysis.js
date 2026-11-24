@@ -62,7 +62,7 @@ const _isSE = (window.VIEWER_COUNTRY === 'se') && (!window.VIEWER_CITY || window
     btn.classList.toggle('active', LAYERS[key].active);
     btn.setAttribute('aria-pressed', String(LAYERS[key].active));
     const check = btn.querySelector('.overlay-check');
-    if (check) check.style.background = LAYERS[key].active ? '#5B21B6' : '';
+    if (check) check.style.background = LAYERS[key].active ? '#69498E' : '';
   }
   // Let the browser paint between chunks of a long computation.
   const yieldToUI = () => new Promise((r) => setTimeout(r, 0));

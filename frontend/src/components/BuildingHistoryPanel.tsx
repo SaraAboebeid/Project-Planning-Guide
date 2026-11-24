@@ -70,16 +70,16 @@ function AddRenovation({ b }: { b: HistoryBuilding }) {
           className={`w-[78px] bg-[#0d1117] border rounded px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-violet-500/60 ${uBad ? "border-red-500/70" : "border-white/12"}`} />
       )}
       <button onClick={add} disabled={!valid || uBad}
-        className="px-2 py-1 rounded text-[12px] font-semibold whitespace-nowrap shrink-0 border border-[#4ECDC4]/40 text-[#4ECDC4] hover:bg-[#4ECDC4]/10 disabled:opacity-30 disabled:cursor-not-allowed">
+        className="px-2 py-1 rounded text-[12px] font-semibold whitespace-nowrap shrink-0 border border-[#8B6EAD]/40 text-[#8B6EAD] hover:bg-[#8B6EAD]/10 disabled:opacity-30 disabled:cursor-not-allowed">
         + {t("Add")}
       </button>
       {uBad && (
-        <span className="text-[10px] text-red-300" role="alert">
+        <span className="text-[11px] text-red-300" role="alert">
           ⚠ {t("U-value for {c} should be between {a} and {b}", { c: t(component), a: uMin, b: uMax })}
         </span>
       )}
       {beforeBuilt && (
-        <span className="text-[10px] text-amber-300" title={t("This is before the recorded construction year — check the year.")}>
+        <span className="text-[11px] text-amber-300" title={t("This is before the recorded construction year — check the year.")}>
           ⚠ {t("before built {y}", { y: b.yearBuilt! })}
         </span>
       )}
@@ -149,7 +149,7 @@ export default function BuildingHistoryPanel({ buildings }: { buildings: History
 
   return (
     <div className="space-y-3">
-      <p className="text-[11.5px] text-white/50 leading-relaxed">
+      <p className="text-[12px] text-white/50 leading-relaxed">
         {t("No dataset records who owns a building or what has been renovated. Add what you know: a recorded renovation restarts that part's age, so Step 4 won't recommend replacing windows that were replaced in 2010.")}{" "}
         {t("If you know the U-value after the renovation, add it too: the energy simulations in Steps 3 and 4 then use it instead of the value typical for the building's era (re-run the baseline if it has already run).")}
       </p>

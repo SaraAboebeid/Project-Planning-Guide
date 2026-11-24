@@ -39,7 +39,7 @@ const METHODS: Method[] = [
   {
     title: "Decision Under Uncertainty",
     subtitle: "Regret · Robustness · Hurwicz",
-    color: "#4ECDC4",
+    color: "#8B6EAD",
     equations: [
       { label: "Net benefit of an option in a scenario", tex: "benefit = (energy saved × area) × price × annuity − investment" },
       { label: "Regret (opportunity loss)", tex: "regretᵢ,ₛ = maxⱼ(benefitⱼ,ₛ) − benefitᵢ,ₛ" },
@@ -59,7 +59,7 @@ const METHODS: Method[] = [
 export default function MethodEquationsPanel() {
   return (
     <div style={{ marginTop: 28 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 800, color: "#fff", margin: "0 0 4px 0" }}>Analysis methods &amp; equations</h2>
+      <h2 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: "0 0 4px 0" }}>Analysis methods &amp; equations</h2>
       <p style={{ fontSize: 12, color: white(0.45), margin: "0 0 14px 0" }}>
         The formal models behind the tool's analysis steps — how each score is computed. Click a card to expand it.
         The optimization model (its assumptions, equations &amp; methods) is in the <b style={{ color: white(0.65) }}>Optimization Model</b> card below.
@@ -73,14 +73,14 @@ export default function MethodEquationsPanel() {
               <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "4px 0 14px" }}>
                 {m.criteria.map((c) => (
                   <div key={c.key} style={{ display: "flex", gap: 9 }}>
-                    <span style={{ width: 16, flexShrink: 0, fontWeight: 800, color: m.color, fontSize: 12 }}>{c.key}</span>
+                    <span style={{ width: 16, flexShrink: 0, fontWeight: 700, color: m.color, fontSize: 12 }}>{c.key}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12 }}>
                         <span style={{ color: "#f0f4ff", fontWeight: 600 }}>{c.name}</span>
                         <span style={{ color: m.color, marginLeft: 6 }}>w = {c.weight}</span>
                       </div>
-                      <div style={{ fontSize: 10.5, color: white(0.4), marginTop: 1 }}>{c.vars}</div>
-                      <div style={{ fontSize: 10.5, color: white(0.55), marginTop: 1 }}>Score: {c.rule}</div>
+                      <div style={{ fontSize: 11.5, color: white(0.4), marginTop: 1 }}>{c.vars}</div>
+                      <div style={{ fontSize: 11.5, color: white(0.55), marginTop: 1 }}>Score: {c.rule}</div>
                     </div>
                   </div>
                 ))}
@@ -94,16 +94,16 @@ export default function MethodEquationsPanel() {
               ))}
             </div>
 
-            <div style={{ fontSize: 10, color: white(0.42), marginTop: 11, lineHeight: 1.55 }}>{m.note}</div>
+            <div style={{ fontSize: 11, color: white(0.42), marginTop: 11, lineHeight: 1.55 }}>{m.note}</div>
 
             {m.sources && (
               <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 10 }}>
-                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: white(0.3), marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, color: white(0.3), marginBottom: 8 }}>
                   SOURCES &amp; ASSUMPTIONS
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {m.sources.map((s) => (
-                    <div key={s.label} style={{ fontSize: 10, lineHeight: 1.5 }}>
+                    <div key={s.label} style={{ fontSize: 11, lineHeight: 1.5 }}>
                       <span style={{ color: "#f0f4ff", fontWeight: 600 }}>{s.label}</span>
                       <span style={{ color: white(0.45) }}> — {s.cite}</span>
                       {s.url && (

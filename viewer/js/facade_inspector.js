@@ -105,9 +105,9 @@ document.getElementById('btn-inspect').addEventListener('click', () => {
   mc.width = 520; mc.height = 120;
   const mctx = mc.getContext('2d');
   // Light placeholder + dark-purple prompt for the white window (were
-  // #0d0d1a and #a78bfa, tuned for the old black one).
+  // #0d0d1a and #c1afd6, tuned for the old black one).
   mctx.fillStyle = '#f8fafc'; mctx.fillRect(0, 0, mc.width, mc.height);
-  mctx.fillStyle = '#6d28d9'; mctx.font = '600 13px Inter';
+  mctx.fillStyle = '#7e58a9'; mctx.font = '600 13px Inter';
   mctx.textAlign = 'center';
   mctx.fillText('Click  \u{1F4F7} Draw & Capture  then drag a box', mc.width / 2, mc.height / 2 - 8);
   mctx.fillText('over the building area you want to analyse', mc.width / 2, mc.height / 2 + 12);
@@ -282,8 +282,8 @@ for (const dir of DIRS) {
   });
   const sel = document.createElement('div');
   Object.assign(sel.style, {
-    position: 'absolute', border: '2px dashed #a78bfa',
-    background: 'rgba(114,28,184,0.12)', display: 'none',
+    position: 'absolute', border: '2px dashed #c1afd6',
+    background: 'rgba(104,72,140,0.12)', display: 'none',
     boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
   });
   overlay.appendChild(sel);
@@ -292,10 +292,10 @@ for (const dir of DIRS) {
   Object.assign(tip.style, {
     position: 'absolute', top: '50%', left: '50%',
     transform: 'translate(-50%,-50%)',
-    background: 'rgba(10,10,20,0.9)', color: '#c4b5fd',
+    background: 'rgba(10,10,20,0.9)', color: '#d8cde5',
     padding: '10px 20px', borderRadius: '10px', fontSize: '13px',
     fontWeight: '600', pointerEvents: 'none', textAlign: 'center',
-    border: '1px solid #a78bfa',
+    border: '1px solid #c1afd6',
   });
   tip.textContent = 'Drag to select the area to capture   ·   Esc to cancel';
   overlay.appendChild(tip);
@@ -356,7 +356,7 @@ for (const dir of DIRS) {
     document.getElementById('facade-sub').textContent = '✓ Area captured — click AI Estimate to analyse it';
     const wrap = document.getElementById('manual-canvas-wrap');
     wrap.style.borderColor = '#4ade80';
-    setTimeout(() => { wrap.style.borderColor = '#a78bfa'; }, 1200);
+    setTimeout(() => { wrap.style.borderColor = '#c1afd6'; }, 1200);
   });
 
   document.addEventListener('keydown', e => {

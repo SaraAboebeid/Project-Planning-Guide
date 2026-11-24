@@ -16,15 +16,6 @@ import { recordedUForSimulation } from "../utils/renovationRecommendations";
 import { excludesHouseholdElectricity, reportedTotalKwhM2 } from "../utils/energyTotals";
 import { useT } from "../i18n";
 
-const END_USE_COLORS = {
-  heating: "#E2483B",
-  dhw: "#93c5fd",
-  cooling: "#4A90E2",
-  lighting: "#E8880C",
-  equipment: "#2FB477",
-  total: "#d1d5db",
-} as const;
-
 /** Normalise a bbox BuildingRecord into the same shape as BuildingLookup */
 function recordToLookup(r: BuildingRecord, idx: number): BuildingLookup {
   // bbox rows never carry a real polygon (only /api/building does), so wall
@@ -109,8 +100,6 @@ export default function BaselineSetup() {
   const [simRunning, setSimRunning] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
   const [simError, setSimError] = useState<string | null>(null);
-  const [resultView, setResultView] = useState<"all" | "building">("all");
-  const [activeResultAddress, setActiveResultAddress] = useState<string | null>(null);
   // Ref to the results section so we can auto-scroll when simulation completes
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -174,16 +163,6 @@ export default function BaselineSetup() {
 
   const results = project.renovationBaselineResults;
 
-  useEffect(() => {
-    if (!results.length) {
-      setActiveResultAddress(null);
-      return;
-    }
-    if (!activeResultAddress || !results.some((r) => r.address === activeResultAddress)) {
-      setActiveResultAddress(results[0]?.address ?? null);
-    }
-  }, [activeResultAddress, results]);
-
   /** Hot water for a saved result. Results written before the DHW field existed
    *  stored 0, but the total is the sum of all five end uses by construction, so
    *  the residual recovers it exactly - and stays 0 for genuinely DHW-free runs.
@@ -198,39 +177,6 @@ export default function BaselineSetup() {
   function totalOf(r: RenovationBaselineResult) {
     return showElec ? r.energyUse : Math.round((r.energyUse - r.lighting - r.equipment) * 10) / 10;
   }
-
-  const allBuildingsChartData = useMemo(
-    () => results.map((r) => ({
-      name: r.address,
-      shortName: r.address.length > 28 ? `${r.address.slice(0, 28)}…` : r.address,
-      heating: r.heating,
-      dhw: dhwOf(r),
-      cooling: r.cooling,
-      lighting: showElec ? r.lighting : 0,
-      equipment: showElec ? r.equipment : 0,
-      total: totalOf(r),
-    })),
-    [results, showElec], // eslint-disable-line react-hooks/exhaustive-deps
-  );
-
-  const activeBuildingResult = useMemo(
-    () => results.find((r) => r.address === activeResultAddress) ?? results[0] ?? null,
-    [activeResultAddress, results],
-  );
-
-  const activeBuildingChartData = useMemo(() => {
-    if (!activeBuildingResult) return [];
-    return [
-      { key: "Heating", value: activeBuildingResult.heating, color: END_USE_COLORS.heating },
-      { key: "Hot water", value: dhwOf(activeBuildingResult), color: END_USE_COLORS.dhw },
-      { key: "Cooling", value: activeBuildingResult.cooling, color: END_USE_COLORS.cooling },
-      ...(showElec ? [
-        { key: "Lighting", value: activeBuildingResult.lighting, color: END_USE_COLORS.lighting },
-        { key: "Equipment", value: activeBuildingResult.equipment, color: END_USE_COLORS.equipment },
-      ] : []),
-      { key: "Total", value: totalOf(activeBuildingResult), color: END_USE_COLORS.total },
-    ];
-  }, [activeBuildingResult, showElec]); // eslint-disable-line react-hooks/exhaustive-deps
 
  /** Trigger a browser download for an in-memory file. */
   function saveFile(contents: string, filename: string, mime: string) {
@@ -458,10 +404,10 @@ export default function BaselineSetup() {
 
       {/* ── Header ── */}
       <div>
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
           {t("Renovation Planning · Step 3")}
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>
           {t("Select & Baseline")}
         </h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
@@ -481,8 +427,8 @@ export default function BaselineSetup() {
       ) : (
         <div style={{ borderRadius: 14, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-            <Building2 size={14} color="#4ECDC4" />
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
+            <Building2 size={14} color="#8B6EAD" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>
               {buildings.length !== 1
                 ? t("{n} of {total} buildings selected", { n: effectiveSelected.size, total: buildings.length })
                 : t("{n} of {total} building selected", { n: effectiveSelected.size, total: buildings.length })}
@@ -491,40 +437,40 @@ export default function BaselineSetup() {
               {shortlistDiffersFromAll && (
               <button onClick={() => applySelection(new Set(prioritizedIdx!), "step2")}
                 style={{
-                  fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
-                  background: selectionMode === "step2" ? "#4ECDC4" : "rgba(78,205,196,0.12)",
-                  border: `1px solid ${selectionMode === "step2" ? "#4ECDC4" : "rgba(78,205,196,0.35)"}`,
-                  color: selectionMode === "step2" ? "#0b1220" : "#4ECDC4",
-                  boxShadow: selectionMode === "step2" ? "0 0 0 1px rgba(78,205,196,0.18)" : "none",
+                  fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
+                  background: selectionMode === "step2" ? "#8B6EAD" : "rgba(139,110,173,0.12)",
+                  border: `1px solid ${selectionMode === "step2" ? "#8B6EAD" : "rgba(139,110,173,0.35)"}`,
+                  color: selectionMode === "step2" ? "#0b1220" : "#8B6EAD",
+                  boxShadow: selectionMode === "step2" ? "0 0 0 1px rgba(139,110,173,0.18)" : "none",
                 }}>
                 {t("Use Step 2 shortlist")}
               </button>
               )}
               <button onClick={() => applySelection(new Set(allIdx), "all")}
                 style={{
-                  fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
-                  background: selectionMode === "all" ? "#4ECDC4" : "rgba(78,205,196,0.12)",
-                  border: `1px solid ${selectionMode === "all" ? "#4ECDC4" : "rgba(78,205,196,0.35)"}`,
-                  color: selectionMode === "all" ? "#0b1220" : "#4ECDC4",
-                  boxShadow: selectionMode === "all" ? "0 0 0 1px rgba(78,205,196,0.18)" : "none",
+                  fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
+                  background: selectionMode === "all" ? "#8B6EAD" : "rgba(139,110,173,0.12)",
+                  border: `1px solid ${selectionMode === "all" ? "#8B6EAD" : "rgba(139,110,173,0.35)"}`,
+                  color: selectionMode === "all" ? "#0b1220" : "#8B6EAD",
+                  boxShadow: selectionMode === "all" ? "0 0 0 1px rgba(139,110,173,0.18)" : "none",
                 }}>
                 {t("Select all")}
               </button>
               <button onClick={() => applySelection(new Set(), "custom")}
-                style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
+                style={{ fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
                   background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)" }}>
                 {t("Clear")}
               </button>
             </span>
           </div>
           {prioritizedIdx && (
-            <p style={{ fontSize: 11, color: carriesFromStep2 ? "#fcd34d" : "rgba(255,255,255,0.45)", margin: "0 0 10px" }}>
+            <p style={{ fontSize: 12, color: carriesFromStep2 ? "#fcd34d" : "rgba(255,255,255,0.45)", margin: "0 0 10px" }}>
               {(project.prioritizedBuildingCount || prioritizedIdx.size) === 1
                 ? t("Step 2 flagged top priorities: {n} building. These are the default buildings that will run baseline energy simulation in Step 3.", { n: project.prioritizedBuildingCount || prioritizedIdx.size })
                 : t("Step 2 flagged top priorities: {n} buildings. These are the default buildings that will run baseline energy simulation in Step 3.", { n: project.prioritizedBuildingCount || prioritizedIdx.size })}
             </p>
           )}
-          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", margin: "0 0 10px" }}>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "0 0 10px" }}>
             {t("Click a building to include or exclude it from the baseline run.")}
             {outbuildingIdx.size > 0 && (
               <>{" "}{outbuildingIdx.size === 1
@@ -538,14 +484,14 @@ export default function BaselineSetup() {
               return (
                 <button key={bs.key} onClick={() => toggleBuilding(idx)} title={on ? t("Click to exclude") : t("Click to include")}
                   style={{
-                    fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 600, cursor: "pointer",
+                    fontSize: 12, padding: "4px 10px", borderRadius: 8, fontWeight: 600, cursor: "pointer",
                     display: "inline-flex", alignItems: "center", gap: 5,
-                    background: on ? "#4ECDC4" : "rgba(255,255,255,0.03)",
+                    background: on ? "#8B6EAD" : "rgba(255,255,255,0.03)",
                     color: on ? "#0b1220" : "rgba(255,255,255,0.4)",
-                    border: `1px solid ${on ? "#4ECDC4" : "rgba(255,255,255,0.08)"}`,
+                    border: `1px solid ${on ? "#8B6EAD" : "rgba(255,255,255,0.08)"}`,
                     maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
-                  <span style={{ fontSize: 10 }}>{on ? "✓" : "＋"}</span>{bs.key}
+                  <span style={{ fontSize: 11 }}>{on ? "✓" : "＋"}</span>{bs.key}
                 </button>
               );
             })}
@@ -562,7 +508,7 @@ export default function BaselineSetup() {
                 padding: "11px 24px", borderRadius: 10, border: 0,
                 background: canRunBaseline && !simRunning ? "linear-gradient(135deg,#5a9e1e,#2FB477)" : "rgba(255,255,255,0.06)",
                 color: canRunBaseline && !simRunning ? "#0a0d14" : "rgba(255,255,255,0.2)",
-                fontSize: 13, fontWeight: 800, cursor: canRunBaseline && !simRunning ? "pointer" : "not-allowed",
+                fontSize: 13, fontWeight: 700, cursor: canRunBaseline && !simRunning ? "pointer" : "not-allowed",
                 boxShadow: canRunBaseline && !simRunning ? "0 4px 14px rgba(47,180,119,0.3)" : "none",
               }}
             >
@@ -589,12 +535,12 @@ export default function BaselineSetup() {
           {simRunning
             ? <Loader2 size={15} color="#2FB477" style={{ animation: "spin 1s linear infinite" }} />
             : <Zap size={15} color={canRunBaseline ? "#2FB477" : "rgba(255,255,255,0.2)"} />}
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: canRunBaseline ? "#fff" : "rgba(255,255,255,0.35)", margin: 0 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: canRunBaseline ? "#fff" : "rgba(255,255,255,0.35)", margin: 0 }}>
             {t("Baseline Energy Simulation")}
           </h3>
           {baselineIsCurrent && !simRunning && (
             <span style={{
-              marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#2FB477",
+              marginLeft: "auto", fontSize: 12, fontWeight: 600, color: "#2FB477",
               background: "rgba(47,180,119,0.15)", padding: "2px 10px", borderRadius: 20,
             }}>
               ✓ {t("Baseline complete")}
@@ -617,10 +563,10 @@ export default function BaselineSetup() {
         {simRunning && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{project.country === "United Kingdom" || project.country === "Belgium"
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{project.country === "United Kingdom" || project.country === "Belgium"
                 ? t("Running EnergyPlus for each building…")
                 : t("Running the EPSM RC model for each building…")}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#2FB477" }}>{simProgress}%</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#2FB477" }}>{simProgress}%</span>
             </div>
             <div style={{ height: 6, borderRadius: 4, background: "rgba(255,255,255,0.08)" }}>
               <div style={{ height: "100%", borderRadius: 4, background: "linear-gradient(90deg,#5a9e1e,#2FB477)", width: `${simProgress}%`, transition: "width 0.25s" }} />
@@ -637,7 +583,7 @@ export default function BaselineSetup() {
         {/* Real EPSM results — only for the selection they actually describe. */}
         {baselineIsCurrent && !simRunning && (
           <div ref={resultsRef} style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18, scrollMarginTop: 80 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 2 }}>
               {t("EPSM Baseline Results")}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
@@ -645,8 +591,8 @@ export default function BaselineSetup() {
                 onClick={downloadResults}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                  border: "1px solid rgba(78,205,196,0.35)", background: "rgba(78,205,196,0.08)", color: "#4ECDC4",
+                  padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  border: "1px solid rgba(139,110,173,0.35)", background: "rgba(139,110,173,0.08)", color: "#8B6EAD",
                 }}
               >
                 <Download size={12} /> {t("Download JSON")}
@@ -655,219 +601,111 @@ export default function BaselineSetup() {
                 onClick={downloadResultsCsv}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                  border: "1px solid rgba(78,205,196,0.35)", background: "rgba(78,205,196,0.08)", color: "#4ECDC4",
+                  padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  border: "1px solid rgba(139,110,173,0.35)", background: "rgba(139,110,173,0.08)", color: "#8B6EAD",
                 }}
               >
                 <Download size={12} /> {t("Download CSV")}
               </button>
             </div>
-            <div style={{
-              borderRadius: 12, padding: "14px 16px",
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{t("Annual end-use comparison")}</div>
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 4 }}>
-                    {t("Compare all buildings together, or inspect one building's annual EPSM end-use split. For monthly and hourly profiles, see the load-profile panel below.")}
-                  </div>
+            {/* Warnings about whether these numbers can be trusted. (The "Annual
+                end-use comparison" bar chart that held them was removed 2026-11-24 at
+                the user's request: the load-profile panel below shows the same split.) */}
+            {(() => {
+              const fixed = results.filter((r) => r.heightCorrected);
+              if (fixed.length === 0) return null;
+              return (
+                <div style={{ fontSize: 12, lineHeight: 1.55, color: "#E8880C", background: "rgba(232,136,12,0.08)",
+                  border: "1px solid rgba(232,136,12,0.35)", borderRadius: 10, padding: "9px 12px" }}>
+                  <b>{t("Height corrected:")}</b>{" "}
+                  {fixed.length === 1
+                    ? t("the building outline was too low for the number of floors in the energy declaration, so this building was simulated at floors × 3.2 m instead —")
+                    : t("the building outline was too low for the number of floors in the energy declaration, so {n} buildings were simulated at floors × 3.2 m instead —", { n: fixed.length })}{" "}
+                  {fixed.map((r) => t("{address}: {floors} floors, {from} m → {to} m", { address: r.address, floors: r.heightCorrected!.floors, from: r.heightCorrected!.from_m, to: r.heightCorrected!.to_m })).join(" · ")}.{" "}
+                  {t("The outline may belong to a lower wing or be linked to the wrong declaration, so treat these results with care.")}
                 </div>
-                <div style={{ display: "inline-flex", borderRadius: 10, padding: 3, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
-                  <button
-                    onClick={() => setResultView("all")}
-                    style={{
-                      border: 0, cursor: "pointer", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 700,
-                      background: resultView === "all" ? "rgba(78,205,196,0.18)" : "transparent",
-                      color: resultView === "all" ? "#4ECDC4" : "rgba(255,255,255,0.55)",
-                    }}
-                  >
-                    {t("All buildings")}
-                  </button>
-                  <button
-                    onClick={() => setResultView("building")}
-                    style={{
-                      border: 0, cursor: "pointer", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 700,
-                      background: resultView === "building" ? "rgba(78,205,196,0.18)" : "transparent",
-                      color: resultView === "building" ? "#4ECDC4" : "rgba(255,255,255,0.55)",
-                    }}
-                  >
-                    {t("One building")}
-                  </button>
+              );
+            })()}
+            {results.some((r) => r.modelScope?.level === "out_of_scope") && (
+              <ModelScopeNotice
+                scope={{
+                  level: "out_of_scope",
+                  reason: t(
+                    "{n} of {total} buildings are types the model cannot represent (swimming pools, hospitals, industrial process buildings): {names}.",
+                    { n: results.filter((r) => r.modelScope?.level === "out_of_scope").length, total: results.length,
+                      names: results.filter((r) => r.modelScope?.level === "out_of_scope").map((r) => r.address).join(", ") },
+                  ),
+                }}
+              />
+            )}
+            {/* One compact table, a row per building (was a card per building with
+                a tile per end use - 2026-11-24, user: "can be more compact").
+                All values are EPSM end-use output per m² heated area per year.
+                Hot water: results saved before the hot-water field existed stored
+                dhw: 0 even when the run included it; the total is the sum of all
+                end uses by construction, so the residual recovers it exactly. */}
+            {(() => {
+              const noHouseholdEl = !showElec;   // Sweden: building energy without household electricity
+              const r1 = (v: number) => Math.round(v * 10) / 10;
+              const cols: { key: string; label: string; icon: React.ReactNode; color: string; get: (r: typeof results[number]) => number }[] = [
+                { key: "total", label: "Total energy use", icon: <BarChart2 size={12} color="#E8880C" />, color: "#E8880C",
+                  get: (r) => (noHouseholdEl ? r1(r.energyUse - r.lighting - r.equipment) : r.energyUse) },
+                { key: "heat", label: "Heating", icon: <Thermometer size={12} color="#E2483B" />, color: "#fca5a5", get: (r) => r.heating },
+                { key: "cool", label: "Cooling", icon: <Droplets size={12} color="#4A90E2" />, color: "#93c5fd", get: (r) => r.cooling },
+                ...(noHouseholdEl ? [] : [
+                  { key: "light", label: "Lighting", icon: <Lightbulb size={12} color="#E8880C" />, color: "#fcd34d", get: (r: typeof results[number]) => r.lighting },
+                  { key: "equip", label: "Equipment", icon: <Cpu size={12} color="#2FB477" />, color: "#86efac", get: (r: typeof results[number]) => r.equipment },
+                ]),
+                { key: "dhw", label: "Hot water", icon: <Droplets size={12} color="#4A90E2" />, color: "#93c5fd",
+                  get: (r) => r.dhw || Math.max(0, r1(r.energyUse - r.heating - r.cooling - r.lighting - r.equipment)) },
+              ];
+              const th: React.CSSProperties = { padding: "7px 10px", fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: "right", whiteSpace: "nowrap", borderBottom: "1px solid rgba(255,255,255,0.10)" };
+              const td: React.CSSProperties = { padding: "6px 10px", fontSize: 13, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", borderBottom: "1px solid rgba(255,255,255,0.05)" };
+              return (
+                <div style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)", overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...th, textAlign: "left" }}>{t("Building")}</th>
+                        {cols.map((c) => (
+                          <th key={c.key} style={th}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>{c.icon}{t(c.label)}</span>
+                          </th>
+                        ))}
+                      </tr>
+                      <tr>
+                        <th style={{ ...th, textAlign: "left", fontWeight: 400, paddingTop: 0, color: "rgba(255,255,255,0.35)" }} />
+                        <th colSpan={cols.length} style={{ ...th, fontWeight: 400, paddingTop: 0, color: "rgba(255,255,255,0.35)" }}>kWh/m²·yr</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.map((r) => (
+                        <tr key={r.address}>
+                          {/* (The EPC energy-class badge was removed: the class is the
+                              declaration's, not this simulation's, and read as a result.) */}
+                          <td style={{ ...td, textAlign: "left", color: "#fff", fontWeight: 500, maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis" }} title={r.address}>
+                            {r.address}
+                            {/* UK gas-boiler runs: fuel actually burnt, which is what a gas meter reads. */}
+                            {r.totalGasKwh != null && (
+                              <div style={{ fontSize: 11.5, fontWeight: 400, color: "rgba(255,255,255,0.55)", whiteSpace: "normal" }}>
+                                {t("Gas use:")} {t("{n} kWh/yr for the building", { n: Math.round(r.totalGasKwh).toLocaleString("en-GB") })}
+                                {r.dwellings && r.dwellings > 0 ? <> · {t("{n} kWh/yr per home", { n: Math.round(r.totalGasKwh / r.dwellings).toLocaleString("en-GB") })}</> : null}
+                                {r.heatedAreaM2 != null && <> · {t("simulated heated area {n} m²", { n: Math.round(r.heatedAreaM2).toLocaleString("en-GB") })}</>}
+                              </div>
+                            )}
+                          </td>
+                          {cols.map((c) => (
+                            <td key={c.key} style={{ ...td, color: c.key === "total" ? c.color : "rgba(255,255,255,0.85)", fontWeight: c.key === "total" ? 600 : 400 }}>
+                              {c.get(r)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-
-              {resultView === "building" && activeBuildingResult && (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 700 }}>{t("Building")}</span>
-                  <select
-                    value={activeBuildingResult.address}
-                    onChange={(e) => setActiveResultAddress(e.target.value)}
-                    style={{
-                      minWidth: 240, padding: "6px 10px", borderRadius: 8, fontSize: 11,
-                      color: "#fff", background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)",
-                    }}
-                  >
-                    {results.map((r) => <option key={r.address} value={r.address}>{r.address}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {/* Above the chart: whether these numbers mean anything for this building */}
-              {resultView === "building" && activeBuildingResult?.modelScope && (
-                <ModelScopeNotice scope={activeBuildingResult.modelScope} />
-              )}
-              {(() => {
-                const fixed = resultView === "building"
-                  ? (activeBuildingResult?.heightCorrected ? [activeBuildingResult] : [])
-                  : results.filter((r) => r.heightCorrected);
-                if (fixed.length === 0) return null;
-                return (
-                  <div style={{ fontSize: 12, lineHeight: 1.55, color: "#E8880C", background: "rgba(232,136,12,0.08)",
-                    border: "1px solid rgba(232,136,12,0.35)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>
-                    <b>{t("Height corrected:")}</b>{" "}
-                    {fixed.length === 1
-                      ? t("the building outline was too low for the number of floors in the energy declaration, so this building was simulated at floors × 3.2 m instead —")
-                      : t("the building outline was too low for the number of floors in the energy declaration, so {n} buildings were simulated at floors × 3.2 m instead —", { n: fixed.length })}{" "}
-                    {fixed.map((r) => t("{address}: {floors} floors, {from} m → {to} m", { address: r.address, floors: r.heightCorrected!.floors, from: r.heightCorrected!.from_m, to: r.heightCorrected!.to_m })).join(" · ")}.{" "}
-                    {t("The outline may belong to a lower wing or be linked to the wrong declaration, so treat these results with care.")}
-                  </div>
-                );
-              })()}
-              {resultView === "all" && results.some((r) => r.modelScope?.level === "out_of_scope") && (
-                <ModelScopeNotice
-                  scope={{
-                    level: "out_of_scope",
-                    reason: t(
-                      "{n} of {total} buildings in this comparison are types the model cannot represent (swimming pools, hospitals, industrial process buildings). Select them individually to see which.",
-                      { n: results.filter((r) => r.modelScope?.level === "out_of_scope").length, total: results.length },
-                    ),
-                  }}
-                />
-              )}
-
-              {/* Row pitch drives the panel height, so it shrinks with the bars
-                  rather than leaving a tall band of empty space. At 28px per
-                  building a 20-building portfolio is ~600px instead of ~1120. */}
-              <div style={{ width: "100%", height: resultView === "all" ? Math.max(130, results.length * 28 + 46) : 280 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  {resultView === "all" ? (
-                    <BarChart data={allBuildingsChartData} layout="vertical" barSize={20} margin={{ top: 8, right: 20, left: 10, bottom: 0 }}>
-                      <CartesianGrid stroke="rgba(255,255,255,0.06)" horizontal={false} />
-                      <XAxis type="number" stroke="rgba(255,255,255,0.35)" tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10 }} unit=" kWh/m²·yr" />
-                      <YAxis type="category" dataKey="shortName" width={180} stroke="rgba(255,255,255,0.25)" tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 10 }} />
-                      <Tooltip
-                        cursor={{ fill: "rgba(255,255,255,0.03)" }}
-                        contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff" }}
-                        formatter={(value: number, name: string) => [`${Number(value).toFixed(1)} kWh/m²·yr`, name]}
-                        labelFormatter={(_, payload) => (payload?.[0]?.payload?.name as string) ?? ""}
-                      />
-                      <Bar dataKey="heating" stackId="enduse" fill={END_USE_COLORS.heating} radius={[0, 0, 0, 0]} name={t("Heating")} />
-                      <Bar dataKey="dhw" stackId="enduse" fill={END_USE_COLORS.dhw} radius={[0, 0, 0, 0]} name={t("Hot water")} />
-                      <Bar dataKey="cooling" stackId="enduse" fill={END_USE_COLORS.cooling} radius={[0, 0, 0, 0]} name={t("Cooling")} />
-                      {showElec && <Bar dataKey="lighting" stackId="enduse" fill={END_USE_COLORS.lighting} radius={[0, 0, 0, 0]} name={t("Lighting")} />}
-                      {showElec && <Bar dataKey="equipment" stackId="enduse" fill={END_USE_COLORS.equipment} radius={[0, 4, 4, 0]} name={t("Equipment")} />}
-                    </BarChart>
-                  ) : (
-                    <BarChart data={activeBuildingChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                      <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                      <XAxis dataKey="key" stroke="rgba(255,255,255,0.35)" tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 10 }} tickFormatter={(v) => t(String(v))} />
-                      <YAxis stroke="rgba(255,255,255,0.35)" tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10 }} unit=" kWh/m²·yr" />
-                      <Tooltip
-                        contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff" }}
-                        labelFormatter={(l) => t(String(l))}
-                        formatter={(value: number) => `${Number(value).toFixed(1)} kWh/m²·yr`}
-                      />
-                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                        {activeBuildingChartData.map((d) => <Cell key={d.key} fill={d.color} />)}
-                      </Bar>
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
-              </div>
-
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-                {[
-                  { label: "Heating", color: END_USE_COLORS.heating },
-                  { label: "Hot water", color: END_USE_COLORS.dhw },
-                  { label: "Cooling", color: END_USE_COLORS.cooling },
-                  ...(showElec ? [
-                    { label: "Lighting", color: END_USE_COLORS.lighting },
-                    { label: "Equipment", color: END_USE_COLORS.equipment },
-                  ] : []),
-                ].map((item) => (
-                  <div key={item.label} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
-                    <span style={{ width: 9, height: 9, borderRadius: 999, background: item.color, display: "inline-block" }} />
-                    {t(item.label)}
-                  </div>
-                ))}
-              </div>
-            </div>
-            {results.map(r => (
-              <div key={r.address} style={{
-                borderRadius: 12, padding: "14px 16px",
-                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
-              }}>
-                {/* Building name. (The EPC energy-class badge was removed: the class is
-                    the declaration's, not this simulation's, and read as a result.) */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <Building2 size={13} color="rgba(255,255,255,0.4)" />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.address}</span>
-                </div>
-                {/* Metric grid - all six are real EPSM end-use output. Hot water
-                    is EnergyPlus's "Water Systems" end use, driven by a Sveby
-                    standard draw profile (see tools/idf/defaults.py). */}
-                {/* Results saved before the hot-water field existed stored dhw: 0
-                    even when the run itself included it. The total is the sum of
-                    all five end uses by construction, so the residual recovers it
-                    exactly - and stays 0 for genuinely DHW-free older runs. */}
-                {/* Fixed six columns, not auto-fit: with a min track width the
-                    sixth tile (hot water) wrapped onto its own line and looked
-                    like a separate, lesser thing. minmax(0,1fr) lets them
-                    compress instead of wrapping. */}
-                {(() => {
-                  // Sweden reports building energy without household/business
-                  // electricity (utils/energyTotals), so those two tiles go.
-                  const noHouseholdEl = !showElec;
-                  const tiles = [
-                    // Results saved before this rule still carry lighting/equipment
-                    // inside energyUse; new ones store them as 0, so this is a no-op there.
-                    { icon: <BarChart2 size={13} color="#E8880C" />, label: "Total energy use",
-                      value: `${noHouseholdEl ? Math.round((r.energyUse - r.lighting - r.equipment) * 10) / 10 : r.energyUse} kWh/m²·yr`, color: "#E8880C" },
-                    { icon: <Thermometer size={13} color="#E2483B" />, label: "Heating demand",   value: `${r.heating} kWh/m²·yr`,  color: "#fca5a5" },
-                    { icon: <Droplets size={13} color="#4A90E2" />,    label: "Cooling demand",   value: `${r.cooling} kWh/m²·yr`,  color: "#93c5fd" },
-                    ...(noHouseholdEl ? [] : [
-                      { icon: <Lightbulb size={13} color="#E8880C" />, label: "Lighting",  value: `${r.lighting} kWh/m²·yr`,  color: "#fcd34d" },
-                      { icon: <Cpu size={13} color="#2FB477" />,        label: "Equipment", value: `${r.equipment} kWh/m²·yr`, color: "#86efac" },
-                    ]),
-                    { icon: <Droplets size={13} color="#4A90E2" />,     label: "Hot water",
-                      value: `${r.dhw || Math.max(0, Math.round((r.energyUse - r.heating - r.cooling - r.lighting - r.equipment) * 10) / 10)} kWh/m²·yr`,
-                      color: "#93c5fd" },
-                  ];
-                  return (
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))`, gap: 8 }}>
-                  {tiles.map(m => (
-                    <div key={m.label} style={{ borderRadius: 8, padding: "10px 10px", minWidth: 0, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5, minWidth: 0 }}>{m.icon}<span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t(m.label)}</span></div>
-                      <div style={{ fontSize: 13.5, fontWeight: 800, color: m.color, whiteSpace: "nowrap",
-                                    overflow: "hidden", textOverflow: "ellipsis" }} title={m.value}>{m.value}</div>
-                    </div>
-                  ))}
-                </div>
-                  );
-                })()}
-                {/* UK gas-boiler runs: fuel actually burnt, which is what a gas meter reads. */}
-                {r.totalGasKwh != null && (
-                  <div style={{ marginTop: 8, fontSize: 11.5, color: "rgba(255,255,255,0.65)" }}>
-                    <b style={{ color: "#E8880C" }}>{t("Gas use:")}</b>{" "}
-                    {t("{n} kWh/yr for the building", { n: Math.round(r.totalGasKwh).toLocaleString("en-GB") })}
-                    {r.dwellings && r.dwellings > 0 ? <> · <b style={{ color: "#fff" }}>{t("{n} kWh/yr per home", { n: Math.round(r.totalGasKwh / r.dwellings).toLocaleString("en-GB") })}</b> ({r.dwellings === 1 ? t("{n} home", { n: r.dwellings }) : t("{n} homes", { n: r.dwellings })})</> : null}
-                    {r.gasKwh != null && <> · {t("space heating {heating}, hot water {dhw}", { heating: Math.round(r.gasKwh).toLocaleString("en-GB"), dhw: Math.round(r.totalGasKwh - r.gasKwh).toLocaleString("en-GB") })}</>}
-                    {r.heatedAreaM2 != null && <> · {t("simulated heated area {n} m²", { n: Math.round(r.heatedAreaM2).toLocaleString("en-GB") })}</>}
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })()}
             {project.baselineBatchId && (
               <BaselineLoadProfile
                 batchId={project.baselineBatchId}
@@ -878,15 +716,15 @@ export default function BaselineSetup() {
               <PeakDemandPanel scenarios={[{ label: t("Baseline"), batchId: project.baselineBatchId }]} />
             )}
             {project.country === "Belgium" ? (
-            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
               {t("* Real EnergyPlus (EPSM) output with {weather} weather. Belgium has no open per-building EPCs, so the envelope is the TABULA Belgium archetype for the building's type and construction period, and the period is sampled from Statbel's municipal building stock unless OpenStreetMap records a year. Shared walls with neighbours are modelled as adiabatic. Heating is ideal loads (heat delivered, not fuel) and the model is not yet calibrated against Belgian EPB certificate statistics, so treat absolute values as indicative and compare packages relative to this baseline in Step 4.", { weather: project.city === "Liège" ? "Liège-Bierset" : "Uccle" })}
             </p>
             ) : project.country === "United Kingdom" ? (
-            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
               {t("* Real EnergyPlus (EPSM) output for UK homes: a gas boiler with radiators (efficiency from the EPC heating rating), SAP intermittent heating calibrated to DESNZ metered postcode gas, hot water from SAP 2012 Appendix J, simulated at the heated area (the homes' EPC floor areas) rather than the gross OSM footprint. Per-m² figures are per heated m². Proceed to Step 4 to test refurbishment tiers.")}
             </p>
             ) : (
-            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: 0 }}>
               {t("* EPSM RC model output (ISO 13790 5R1C, hourly, a typical weather year), calibrated against our EnergyPlus model (median 1.01×). Non-flats built 2006 or later use EPSM's archetype constructions, air change and window share. Homes use Sveby 2.0 (2024) standard use. Hot water is what the building's own energy declaration reports where it gives a figure, otherwise Sveby's 21 kWh/m²·yr, added as given. Household and business electricity (appliances and lighting; 21 kWh/m²·yr in homes, of which 70% warms the building) is simulated because its heat lowers the heating need, but — as in Swedish energy declarations — it is not part of the total and not shown. Office, shop and school lighting is dimmed by daylight near the windows. Infiltration is modelled too and counted inside heating rather than as its own end use. Proceed to Step 4 to test renovation packages against this baseline.")}
             </p>
             )}

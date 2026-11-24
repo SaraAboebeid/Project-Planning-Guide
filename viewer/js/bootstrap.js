@@ -20,7 +20,7 @@
       '<p style="color:#94a3b8;font-size:13px;line-height:1.8">Cesium cannot load its 3D engine from <b>file://</b>.<br><br>' +
       'Open a terminal in the project folder and run:<br><br>' +
       '<code style="background:rgba(255,255,255,0.1);padding:8px 20px;border-radius:8px;font-size:14px">python launch.py</code><br><br>' +
-      'Your browser will open automatically at<br><b style="color:#a78bfa">http://localhost:8765</b></p>' +
+      'Your browser will open automatically at<br><b style="color:#c1afd6">http://localhost:8765</b></p>' +
       '</div>';
     throw new Error('file:// not supported');
   }

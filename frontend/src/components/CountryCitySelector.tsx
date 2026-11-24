@@ -58,7 +58,7 @@ export default function CountryCitySelector() {
               borderRadius: 8,
               border: 0,
               cursor: enabled ? "pointer" : "not-allowed",
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: country === c.id ? 700 : 500,
               background: country === c.id ? "var(--brand-deep)" : "transparent",
               color: !enabled ? "rgba(255,255,255,0.32)"
@@ -92,9 +92,9 @@ export default function CountryCitySelector() {
                   borderRadius: 8,
                   border: 0,
                   cursor: enabled ? "pointer" : "not-allowed",
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: city === name ? 700 : 500,
-                  background: city === name ? "#4ECDC4" : "transparent",
+                  background: city === name ? "#8B6EAD" : "transparent",
                   color: !enabled ? "rgba(255,255,255,0.32)"
                     : city === name ? "#0b1220" : "rgba(255,255,255,0.72)",
                   opacity: enabled ? 1 : 0.6,
@@ -117,13 +117,13 @@ export default function CountryCitySelector() {
             width: 28,
             height: 28,
             borderRadius: "50%",
-            background: "linear-gradient(135deg,var(--brand-deep),var(--brand-dark))",
+            background: "var(--brand-deep)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             color: "#fff",
-            fontSize: 11,
-            fontWeight: 700,
+            fontSize: 12,
+            fontWeight: 600,
           }}
         >
           SA

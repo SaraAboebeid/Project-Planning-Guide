@@ -129,7 +129,7 @@ const SOURCES: DataSource[] = [
     name: "TABULA Archetypes",
     description: "Swedish residential building archetypes matched by type and construction era. Used as fallback for missing EPC data.",
     iconD: IC.tabula,
-    accent: "#4ECDC4",
+    accent: "#8B6EAD",
     count: "17,346",
     countLabel: "matched",
     status: "static",
@@ -288,26 +288,26 @@ function WikellsPreview() {
                 background: isOpen ? `${accent}22` : "rgba(255,255,255,0.06)",
                 border: `1px solid ${isOpen ? accent + "50" : "rgba(255,255,255,0.10)"}`,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, fontWeight: 800,
+                fontSize: 11, fontWeight: 700,
                 color: isOpen ? accent : "rgba(255,255,255,0.40)",
               }}>{ch.chapter}</div>
 
               {/* Title */}
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: isOpen ? "#fff" : "rgba(255,255,255,0.75)" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: isOpen ? "#fff" : "rgba(255,255,255,0.75)" }}>
                   {ch.titleEN}
                 </div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.30)", marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.30)", marginTop: 2 }}>
                   {ch.subGroups.length} subgroup{ch.subGroups.length !== 1 ? "s" : ""} · {allItems.length} items
                 </div>
               </div>
 
               {/* Cost range */}
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: accent }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: accent }}>
                   {minC.toLocaleString("sv-SE")}–{maxC.toLocaleString("sv-SE")}
                 </div>
-                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.28)" }}>SEK/m²</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.28)" }}>SEK/m²</div>
               </div>
 
               {/* Chevron */}
@@ -335,8 +335,8 @@ function WikellsPreview() {
                         borderBottom: "1px solid rgba(255,255,255,0.07)",
                         display: "flex", alignItems: "center", justifyContent: "space-between",
                       }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: accent }}>{sg.label}</span>
-                        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.30)" }}>{sg.items.length} items</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: accent }}>{sg.label}</span>
+                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.30)" }}>{sg.items.length} items</span>
                       </div>
                       {/* Sample item fields */}
                       <div style={{
@@ -352,12 +352,12 @@ function WikellsPreview() {
                           { k: "Cost",        v: `${s.costSEK.toLocaleString("sv-SE")} SEK/m²`, c: accent },
                           ...(s.uValue     != null ? [{ k: "U-value",   v: `${s.uValue} W/(m²·K)`, c: "#4A90E2" }] : []),
                           ...(s.fireClass         ? [{ k: "Fire class", v: s.fireClass,             c: "#2FB477" }] : []),
-                          ...(s.soundRw    != null ? [{ k: "Sound Rw",  v: `${s.soundRw} dB`,       c: "#4ECDC4" }] : []),
+                          ...(s.soundRw    != null ? [{ k: "Sound Rw",  v: `${s.soundRw} dB`,       c: "#8B6EAD" }] : []),
                           ...(s.weightKgM2 != null ? [{ k: "Weight",    v: `${s.weightKgM2} kg/m²`, c: "rgba(255,255,255,0.50)" }] : []),
                         ] as { k: string; v: string; c: string }[]).map(({ k, v, c }) => (
                           <div key={k}>
-                            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.28)", marginBottom: 1 }}>{k}</div>
-                            <div style={{ fontSize: 11, fontWeight: 600, color: c,
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.28)", marginBottom: 1 }}>{k}</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: c,
                                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v}</div>
                           </div>
                         ))}
@@ -383,7 +383,7 @@ function StatusBadge({ status }: { status: DataSource["status"] }) {
   }[status];
   return (
     <span style={{
-      fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+      fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase",
       padding: "2px 7px", borderRadius: 99, color: cfg.color,
       background: cfg.bg, border: `1px solid ${cfg.color}40`,
     }}>
@@ -553,19 +553,19 @@ function SourceCard({
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{source.name}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{source.name}</span>
               <StatusBadge status={source.status} />
             </div>
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.50)", lineHeight: 1.5, margin: 0 }}>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.50)", lineHeight: 1.5, margin: 0 }}>
               {source.description}
             </p>
           </div>
           {/* Count badge */}
           <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: source.accent, lineHeight: 1 }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: source.accent, lineHeight: 1 }}>
               {liveCount ?? source.count}
             </div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.40)", marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.40)", marginTop: 2 }}>
               {source.countLabel}
             </div>
           </div>
@@ -584,7 +584,7 @@ function SourceCard({
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5, padding: "0 18px 14px" }}>
           {source.fields.map(f => (
             <span key={f} style={{
-              fontSize: 10, padding: "2px 8px", borderRadius: 99,
+              fontSize: 11, padding: "2px 8px", borderRadius: 99,
               background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)",
               color: "rgba(255,255,255,0.55)", fontFamily: "monospace",
             }}>
@@ -603,12 +603,12 @@ function SourceCard({
               <>
             {source.renderExtra?.()}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.40)", flex: 1 }}>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.40)", flex: 1 }}>
                 {loading ? "Fetching sample…" : `Showing ${(displayRows ?? []).length} record(s)`}
               </span>
               <button onClick={copyJSON} disabled={!rows} style={{
                 display: "flex", alignItems: "center", gap: 5, padding: "5px 10px",
-                borderRadius: 7, fontSize: 11, fontWeight: 500, cursor: "pointer",
+                borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: "pointer",
                 background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
                 color: copied ? "#2FB477" : "rgba(255,255,255,0.70)",
               }}>
@@ -616,7 +616,7 @@ function SourceCard({
               </button>
               <button onClick={downloadSample} disabled={!rows} style={{
                 display: "flex", alignItems: "center", gap: 5, padding: "5px 10px",
-                borderRadius: 7, fontSize: 11, fontWeight: 500, cursor: "pointer",
+                borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: "pointer",
                 background: `${source.accent}20`, border: `1px solid ${source.accent}50`,
                 color: source.accent,
               }}>
@@ -639,7 +639,7 @@ function SourceCard({
               const cols = Object.keys(displayRows[0]!).slice(0, 8);
               return (
                 <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                     <thead>
                       <tr style={{ background: "rgba(255,255,255,0.04)" }}>
                         {cols.map(c => (
@@ -647,7 +647,7 @@ function SourceCard({
                             padding: "8px 12px", textAlign: "left", fontWeight: 600,
                             color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap",
                             borderBottom: "1px solid rgba(255,255,255,0.08)",
-                            fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em",
+                            fontSize: 11, textTransform: "uppercase", letterSpacing: "0.07em",
                           }}>{c}</th>
                         ))}
                       </tr>
@@ -721,9 +721,9 @@ export default function DataExplorer() {
       {/* Page header */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: 0 }}>Data Explorer</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: 0 }}>Data Explorer</h1>
           <span style={{
-            fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 99,
+            fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 99,
             background: healthOk ? "rgba(47,180,119,0.15)" : "rgba(255,255,255,0.08)",
             border: `1px solid ${healthOk ? "#2FB47750" : "rgba(255,255,255,0.12)"}`,
             color: healthOk ? "#2FB477" : "rgba(255,255,255,0.40)",
@@ -740,7 +740,7 @@ export default function DataExplorer() {
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         {(["all","live","cached","static"] as const).map(f => (
           <button key={f} onClick={() => setStatusFilter(f)} style={{
-            padding: "5px 14px", borderRadius: 99, fontSize: 11, fontWeight: 600, cursor: "pointer",
+            padding: "5px 14px", borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer",
             textTransform: "capitalize",
             background: statusFilter === f ? "var(--brand-deep)" : "rgba(255,255,255,0.06)",
             border: `1px solid ${statusFilter === f ? "var(--brand-deep)" : "rgba(255,255,255,0.10)"}`,

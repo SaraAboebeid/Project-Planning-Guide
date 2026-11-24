@@ -21,7 +21,7 @@ const input: React.CSSProperties = {
 };
 const primary = (disabled: boolean): React.CSSProperties => ({
   display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "10px 16px",
-  borderRadius: 10, border: 0, fontSize: 14, fontWeight: 800, cursor: disabled ? "not-allowed" : "pointer",
+  borderRadius: 10, border: 0, fontSize: 14, fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer",
   background: disabled ? "rgba(255,255,255,0.08)" : "var(--brand-deep)", color: disabled ? "rgba(255,255,255,0.4)" : "#fff",
 });
 
@@ -52,14 +52,14 @@ export function LoginPage() {
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
         <Mail size={20} color={C.selected} />
-        <h1 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: 0 }}>{t("Sign in")}</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#fff", margin: 0 }}>{t("Sign in")}</h1>
       </div>
       {state !== "sent" ? (
         <>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.6, margin: "0 0 18px" }}>
             {t("Enter your work email and we'll send you a sign-in link. Signing in lets you save projects and open them again later.")}
           </p>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 6 }} htmlFor="login-email">
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)", marginBottom: 6 }} htmlFor="login-email">
             {t("Work email")}
           </label>
           <input id="login-email" type="email" autoComplete="email" value={email} autoFocus
@@ -74,7 +74,7 @@ export function LoginPage() {
             {state === "sending" ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />}
             {t("Email me a sign-in link")}
           </button>
-          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", margin: "14px 0 0", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", margin: "14px 0 0", lineHeight: 1.5 }}>
             {t("For now, sign-in is open to partner organisations (Chalmers, Framtiden, Poseidon, Nacka, Chalmers Next Labs, HSB).")}
           </p>
         </>
@@ -86,7 +86,7 @@ export function LoginPage() {
               ? t("Check your inbox at {email}. The link works once and expires in 15 minutes.", { email: email.trim() })
               : t("This server has no outgoing email set up yet, so the sign-in link was written to the backend log. Ask the administrator, or set SMTP_* in .env.")}</span>
           </p>
-          <button onClick={() => setState("idle")} style={{ background: "transparent", border: 0, color: C.selected, cursor: "pointer", fontSize: 12.5, fontWeight: 700, padding: 0 }}>
+          <button onClick={() => setState("idle")} style={{ background: "transparent", border: 0, color: C.selected, cursor: "pointer", fontSize: 12.5, fontWeight: 600, padding: 0 }}>
             {t("Use a different email")}
           </button>
         </div>
@@ -123,7 +123,7 @@ export function LoginVerifyPage() {
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <LogIn size={20} color={C.selected} />
-        <h1 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: 0 }}>{t("Finish signing in")}</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#fff", margin: 0 }}>{t("Finish signing in")}</h1>
       </div>
       {error ? (
         <>

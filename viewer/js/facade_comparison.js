@@ -144,15 +144,15 @@ function renderSingleBuildingComparison(container) {
     </div>
     
     <!-- Manual capture slot (full-width, prominent) -->
-    <div style="margin-bottom:10px;position:relative;border-radius:8px;overflow:hidden;border:2px solid #a78bfa;background:#0d0d1a" id="cmp-manual-canvas-wrap">
+    <div style="margin-bottom:10px;position:relative;border-radius:8px;overflow:hidden;border:2px solid #c1afd6;background:#0d0d1a" id="cmp-manual-canvas-wrap">
       <canvas id="cmp-canvas-manual" width="520" height="120" style="width:100%;height:auto;display:block;max-height:200px;object-fit:contain"></canvas>
-      <div style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;background:rgba(114,28,184,0.85);color:#fff;padding:2px 10px;border-radius:4px">Manual View</div>
+      <div style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;background:rgba(104,72,140,0.85);color:#fff;padding:2px 10px;border-radius:4px">Manual View</div>
     </div>
     
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px">
       ${['N','E','S','W'].map(dir => `
         <div style="border:1px solid var(--border);border-radius:8px;padding:8px;background:rgba(0,0,0,0.02)">
-          <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:4px">${dir}</div>
+          <div style="font-size:11px;font-weight:700;color:#9171b6;margin-bottom:4px">${dir}</div>
           <canvas id="cmp-canvas-${dir}" width="160" height="120" 
                   style="width:100%;height:auto;border-radius:4px;background:#1a1a2e;cursor:pointer"></canvas>
           <div style="margin-top:6px;font-size:10px">
@@ -164,7 +164,7 @@ function renderSingleBuildingComparison(container) {
             </div>
             <div style="display:flex;justify-content:space-between">
               <span style="color:var(--muted)">Score:</span>
-              <span style="font-weight:600;color:#7c3aed">${data[dir]?.score || '—'}/100</span>
+              <span style="font-weight:600;color:#9171b6">${data[dir]?.score || '—'}/100</span>
             </div>
           </div>
         </div>
@@ -173,12 +173,12 @@ function renderSingleBuildingComparison(container) {
     
     <!-- Capture action buttons -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
-      <button class="btn" id="btn-cmp-manual-capture" style="background:rgba(114,28,184,0.4);border-color:#a78bfa;color:#c4b5fd;font-weight:600">📷 Draw & Capture</button>
+      <button class="btn" id="btn-cmp-manual-capture" style="background:rgba(104,72,140,0.4);border-color:#c1afd6;color:#d8cde5;font-weight:600">📷 Draw & Capture</button>
       <button class="btn" id="btn-cmp-capture-all">▶ Capture All (N/E/S/W)</button>
     </div>
     
-    <div style="padding:10px;background:rgba(124,58,237,0.08);border:1px solid #a78bfa;border-radius:8px;margin-bottom:10px">
-      <div style="font-size:11px;font-weight:600;color:#7c3aed;margin-bottom:6px">Priority Ranking</div>
+    <div style="padding:10px;background:rgba(145,113,182,0.08);border:1px solid #c1afd6;border-radius:8px;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:600;color:#9171b6;margin-bottom:6px">Priority Ranking</div>
       <div id="facade-priority-list"></div>
     </div>
   `;
@@ -206,7 +206,7 @@ function renderSingleBuildingComparison(container) {
     const mctx = mc.getContext('2d');
     mctx.fillStyle = '#0d0d1a';
     mctx.fillRect(0, 0, mc.width, mc.height);
-    mctx.fillStyle = '#a78bfa';
+    mctx.fillStyle = '#c1afd6';
     mctx.font = '600 13px Inter';
     mctx.textAlign = 'center';
     mctx.fillText('Click 📷 Draw & Capture then drag a box', mc.width / 2, mc.height / 2 - 8);
@@ -279,7 +279,7 @@ function renderMultipleBuildingsComparison(container) {
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:10px">
               <div>
                 <div style="color:var(--muted)">Avg Score</div>
-                <div style="font-weight:700;font-size:14px;color:#7c3aed">${avgScore}/100</div>
+                <div style="font-weight:700;font-size:14px;color:#9171b6">${avgScore}/100</div>
               </div>
               <div>
                 <div style="color:var(--muted)">Priority</div>
@@ -299,8 +299,8 @@ function renderMultipleBuildingsComparison(container) {
       }).join('')}
     </div>
     
-    <div style="margin-top:12px;padding:10px;background:rgba(124,58,237,0.08);border:1px solid #a78bfa;border-radius:8px">
-      <div style="font-size:11px;font-weight:600;color:#7c3aed;margin-bottom:6px">
+    <div style="margin-top:12px;padding:10px;background:rgba(145,113,182,0.08);border:1px solid #c1afd6;border-radius:8px">
+      <div style="font-size:11px;font-weight:600;color:#9171b6;margin-bottom:6px">
         Renovation Priority Ranking
       </div>
       <div id="building-priority-list"></div>
@@ -334,7 +334,7 @@ function captureFacadeForComparison(building, direction) {
   
   document.getElementById('comparison-status').textContent = 
     `Capturing ${direction} facade...`;
-  document.getElementById('comparison-status').style.color = '#7c3aed';
+  document.getElementById('comparison-status').style.color = '#9171b6';
   
   // Use same fly logic from facade_inspector.js
   const center = getBuildingCenter(building);
@@ -418,8 +418,8 @@ function enterCropModeComparison(building) {
   
   const sel = document.createElement('div');
   Object.assign(sel.style, {
-    position: 'absolute', border: '2px dashed #a78bfa',
-    background: 'rgba(114,28,184,0.12)', display: 'none',
+    position: 'absolute', border: '2px dashed #c1afd6',
+    background: 'rgba(104,72,140,0.12)', display: 'none',
     boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
   });
   overlay.appendChild(sel);
@@ -428,10 +428,10 @@ function enterCropModeComparison(building) {
   Object.assign(tip.style, {
     position: 'absolute', top: '50%', left: '50%',
     transform: 'translate(-50%,-50%)',
-    background: 'rgba(10,10,20,0.9)', color: '#c4b5fd',
+    background: 'rgba(10,10,20,0.9)', color: '#d8cde5',
     padding: '10px 20px', borderRadius: '10px', fontSize: '13px',
     fontWeight: '600', pointerEvents: 'none', textAlign: 'center',
-    border: '1px solid #a78bfa',
+    border: '1px solid #c1afd6',
   });
   tip.textContent = 'Drag to select the area to capture   ·   Esc to cancel';
   overlay.appendChild(tip);
@@ -508,7 +508,7 @@ function enterCropModeComparison(building) {
       const wrap = document.getElementById('cmp-manual-canvas-wrap');
       if (wrap) {
         wrap.style.borderColor = '#4ade80';
-        setTimeout(() => { wrap.style.borderColor = '#a78bfa'; }, 1200);
+        setTimeout(() => { wrap.style.borderColor = '#c1afd6'; }, 1200);
       }
     }
   });
@@ -529,7 +529,7 @@ function enterCropModeComparison(building) {
 async function captureAllFacadesComparison(building) {
   document.getElementById('comparison-status').textContent = 
     'Capturing all 4 facades…';
-  document.getElementById('comparison-status').style.color = '#7c3aed';
+  document.getElementById('comparison-status').style.color = '#9171b6';
   
   const DIRS = ['N','E','S','W'];
   
@@ -552,7 +552,7 @@ async function captureAllFacadesComparison(building) {
 document.getElementById('btn-analyze-ai')?.addEventListener('click', async () => {
   const statusEl = document.getElementById('comparison-status');
   statusEl.textContent = 'Analyzing facades with AI...';
-  statusEl.style.color = '#7c3aed';
+  statusEl.style.color = '#9171b6';
 
   const btn = document.getElementById('btn-analyze-ai');
   btn.disabled = true;
@@ -660,7 +660,7 @@ function showManualScoringModal() {
     </p>
     <div id="manual-scoring-forms"></div>
     <div style="display:flex;gap:8px;margin-top:16px">
-      <button id="btn-save-manual" style="flex:1;padding:10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">
+      <button id="btn-save-manual" style="flex:1;padding:10px;background:#9171b6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">
         Save Scores
       </button>
       <button id="btn-cancel-manual" style="flex:1;padding:10px;background:#e2e8f0;color:#1e293b;border:none;border-radius:6px;cursor:pointer">
@@ -698,7 +698,7 @@ function renderManualScoringForms() {
         </div>
         ${['N','E','S','W'].map(dir => `
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span style="width:20px;font-size:11px;font-weight:700;color:#7c3aed">${dir}</span>
+            <span style="width:20px;font-size:11px;font-weight:700;color:#9171b6">${dir}</span>
             <input type="range" min="0" max="100" value="50" 
                    id="score-${buildingId}-${dir}"
                    style="flex:1" />
@@ -862,7 +862,7 @@ function updateBuildingPriorityRanking() {
     <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:5px 0;
                 border-bottom:1px solid rgba(0,0,0,0.06)">
       <div style="flex:1">
-        <span style="font-weight:700;color:#7c3aed;margin-right:6px">${rank + 1}.</span>
+        <span style="font-weight:700;color:#9171b6;margin-right:6px">${rank + 1}.</span>
         <span style="color:var(--text)">${item.building.address || 'Building ' + (item.idx + 1)}</span>
       </div>
       <span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;
@@ -929,6 +929,6 @@ document.getElementById('btn-clear-comparison')?.addEventListener('click', () =>
     updateComparisonUI();
     document.getElementById('comparison-status').textContent = 
       'Comparison data cleared';
-    document.getElementById('comparison-status').style.color = '#7c3aed';
+    document.getElementById('comparison-status').style.color = '#9171b6';
   }
 });

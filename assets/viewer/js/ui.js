@@ -315,7 +315,7 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
     const eclassColor = b.eclass ? (ECLASS_COLORS_CSS[b.eclass] || '#94a3b8') : '#94a3b8';
     const tabulaLabel = b.tabula_period ? (TABULA_LABELS[b.tabula_period] || b.tabula_period) : null;
 
-    let html = '<div style="font-weight:600;font-size:13px;margin-bottom:4px;color:#6d28d9">' +
+    let html = '<div style="font-weight:600;font-size:13px;margin-bottom:4px;color:#7e58a9">' +
       (b.address || b.all_addresses || 'Building') + '</div>';
     // Show every entrance when one EPC covers multiple addresses (pipe-separated)
     if (b.all_addresses && b.all_addresses.indexOf('|') !== -1) {
@@ -326,7 +326,7 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
       }
     }
     const useLabel = b.use_cat ? b.use_cat.replace(/_/g,' ') : 'Unknown';
-    html += '<div style="margin-bottom:6px"><span style="background:rgba(114,28,184,0.12);color:#4c1d95;border-radius:4px;padding:2px 7px;font-size:11px">' + useLabel + '</span></div>';
+    html += '<div style="margin-bottom:6px"><span style="background:rgba(104,72,140,0.12);color:#573d75;border-radius:4px;padding:2px 7px;font-size:11px">' + useLabel + '</span></div>';
     html += '<table style="width:100%;border-collapse:collapse">';
     const row = (lbl, val, color) => (val != null && val !== '') ?
       '<tr><td style="color:#64748b;padding:2px 0;white-space:nowrap">' + lbl + '</td>' +
@@ -339,7 +339,7 @@ viewer.screenSpaceEventHandler.setInputAction(movement => {
     if (b.floors) html += row('Floors', b.floors, null);
     if (isResidential && tabulaLabel) {
       html += '<tr><td colspan="2" style="padding-top:6px;padding-bottom:2px;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.5px">TABULA Archetype</td></tr>';
-      html += row('Era', tabulaLabel, '#7c3aed');
+      html += row('Era', tabulaLabel, '#9171b6');
       if (b.tabula_u_wall) html += row('U-wall', b.tabula_u_wall+' W/m&#178;K', null);
       if (b.tabula_u_win)  html += row('U-window', b.tabula_u_win+' W/m&#178;K', null);
     }
@@ -483,7 +483,7 @@ document.getElementById('info-close').addEventListener('click', hideInfoPanel);
 // facts and a street-level photo, joined to the pin by a leader line. The sidebar
 // info panel and its tools are unchanged - the card is a summary on top.
 // =============================================================
-const SEL_VIOLET = '#8b5cf6';
+const SEL_VIOLET = '#a78dc5';
 let selectionEntities = [];
 let selectionHidden = false;
 let selPinPos = null;       // Cartesian3 of the roof pin, for the leader line
@@ -575,7 +575,7 @@ function _selEnsureDom() {
   const style = document.createElement('style');
   style.textContent = `
   .sel-card{position:fixed;top:105px;right:30px;width:480px;max-width:calc(125vw - 60px);z-index:950;display:none;zoom:0.8;
-    background:#fff;color:#0f172a;border-radius:18px;box-shadow:0 22px 50px rgba(15,23,42,.22),0 0 0 1px rgba(139,92,246,.18);
+    background:#fff;color:#0f172a;border-radius:18px;box-shadow:0 22px 50px rgba(15,23,42,.22),0 0 0 1px rgba(167,141,197,.18);
     font-family:inherit;overflow:hidden}
   .sel-card .sc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 20px 10px}
   .sel-card h3{margin:0;font-size:21px;font-weight:700;line-height:1.2;color:#1e1b4b}

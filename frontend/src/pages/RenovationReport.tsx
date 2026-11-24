@@ -153,8 +153,8 @@ function recordToLookup(r: BuildingRecord): BuildingLookup {
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
 const COMP_COLORS: Record<string, string> = {
-  "Walls": "var(--brand)", "Windows": "#E8880C", "Doors": "#4ECDC4",
-  "Floor": "#4A90E2", "Roof": "#4ECDC4", "Balcony": "#2FB477",
+  "Walls": "var(--brand)", "Windows": "#E8880C", "Doors": "#8B6EAD",
+  "Floor": "#4A90E2", "Roof": "#8B6EAD", "Balcony": "#2FB477",
   "Structure (Columns & Beams)": "#E2483B", "Vertical Extension (New Floor)": "#F97316",
 };
 /** Rooftop PV assumptions - the same as the 3D viewer's Rooftop PV button and the
@@ -191,7 +191,7 @@ function kg(n: number)  { return `${Math.abs(n) < 10 ? (Math.round(n * 10) / 10)
 function Badge({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <span style={{
-      fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+      fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
       background: `${color}22`, color, border: `1px solid ${color}44`,
     }}>{children}</span>
   );
@@ -211,7 +211,7 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
       {icon}
-      <h2 style={{ fontSize: 15, fontWeight: 800, color: "#fff", margin: 0 }}>{title}</h2>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: "#fff", margin: 0 }}>{title}</h2>
     </div>
   );
 }
@@ -656,13 +656,13 @@ export default function RenovationReport() {
   * { box-sizing: border-box; }
   body { font-family: Inter, system-ui, sans-serif; color:#0f172a; margin:0; font-size:11pt; line-height:1.5; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   h1 { font-size:20pt; margin:0 0 4px; }
-  h2 { font-size:12pt; margin:22px 0 8px; padding-bottom:4px; border-bottom:2px solid #4ECDC4; }
+  h2 { font-size:12pt; margin:22px 0 8px; padding-bottom:4px; border-bottom:2px solid #8B6EAD; }
   .sub { color:#64748b; font-size:10pt; margin-bottom:4px; }
   table { width:100%; border-collapse:collapse; font-size:9.5pt; margin-top:6px; }
   th { text-align:left; background:#f1f5f9; padding:5px 7px; font-size:8.5pt; text-transform:uppercase; letter-spacing:.04em; color:#475569; }
   td { padding:5px 7px; border-bottom:1px solid #e2e8f0; vertical-align:top; }
   .muted { color:#94a3b8; font-style:italic; }
-  .best { border:1px solid #cbd5e1; border-left:4px solid #4ECDC4; border-radius:6px; padding:10px 13px; margin-bottom:10px; page-break-inside:avoid; }
+  .best { border:1px solid #cbd5e1; border-left:4px solid #8B6EAD; border-radius:6px; padding:10px 13px; margin-bottom:10px; page-break-inside:avoid; }
   .best-h { font-weight:800; font-size:11pt; }
   .why { font-weight:500; color:#64748b; font-size:9pt; }
   .best-n { color:#64748b; font-size:9pt; margin-bottom:4px; }
@@ -682,7 +682,7 @@ export default function RenovationReport() {
   .cover { background:#0d1117; color:#fff; border-radius:10px; padding:26px 30px; margin-bottom:14px; }
   .cover-logos { display:flex; align-items:center; gap:26px; margin-bottom:20px; }
   .cover-logos img { height:30px; width:auto; }
-  .cover-kicker { font-size:9pt; letter-spacing:2px; text-transform:uppercase; color:#4ECDC4; font-weight:800; }
+  .cover-kicker { font-size:9pt; letter-spacing:2px; text-transform:uppercase; color:#8B6EAD; font-weight:800; }
   .cover-title { font-size:23pt; font-weight:800; margin:5px 0 9px; line-height:1.12; }
   .cover-meta { font-size:9.5pt; color:#94a3b8; }
   .prepared { font-size:9pt; color:#475569; margin:0 0 18px; }
@@ -690,7 +690,7 @@ export default function RenovationReport() {
   .prepared .lbl { text-transform:uppercase; letter-spacing:.08em; font-size:7.5pt; color:#94a3b8; margin-right:8px; }
 </style></head><body>
   <div class="no-print">
-    <button onclick="window.print()" style="padding:9px 18px;font-size:13px;font-weight:700;border-radius:8px;border:1px solid #4ECDC4;background:#e6fffb;cursor:pointer">
+    <button onclick="window.print()" style="padding:9px 18px;font-size:13px;font-weight:700;border-radius:8px;border:1px solid #8B6EAD;background:#f2eef6;cursor:pointer">
       ${t("Save as PDF")}
     </button>
   </div>
@@ -906,15 +906,15 @@ export default function RenovationReport() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
           {icon}
-          <span style={{ fontSize: 11, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: 1 }}>{label}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: 1 }}>{label}</span>
         </div>
-        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 8 }}>{t("Package {n}", { n: result.packageIndex })}</div>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 8 }}>{t("Package {n}", { n: result.packageIndex })}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {Object.entries(result.components).map(([comp, item]) => (
             <div key={comp} style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: compColor(comp), flexShrink: 0, alignSelf: "center" }} />
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", flexShrink: 0 }}>{compLabel(comp)}</span>
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.75)", flex: 1, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={layerText(item) || item.description}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", flexShrink: 0 }}>{compLabel(comp)}</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", flex: 1, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={layerText(item) || item.description}>
                 {item.description || item.code}
               </span>
               {item.uValue != null && <Badge color={compColor(comp)}>U {item.uValue.toFixed(2)}</Badge>}
@@ -923,20 +923,20 @@ export default function RenovationReport() {
         </div>
         <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.07)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("Energy use")}</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#E8880C" }}>{kwh(result.energyUse)}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("Energy use")}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#E8880C" }}>{kwh(result.energyUse)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("Saving")}</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#2FB477" }}>−{kwh(result.saving)}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("Saving")}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#2FB477" }}>−{kwh(result.saving)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("CO₂e saved")}</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#4A90E2" }}>{co2Saved(result.carbonSaving)}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("CO₂e saved")}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#4A90E2" }}>{co2Saved(result.carbonSaving)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("Material cost")}</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "rgba(255,255,255,0.7)" }}>{money(result.cost)}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8 }}>{t("Material cost")}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{money(result.cost)}</div>
           </div>
         </div>
       </div>
@@ -950,7 +950,7 @@ export default function RenovationReport() {
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
             {t("Renovation Planning · Step 5")}
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 900, color: "#fff", margin: "0 0 6px" }}>
@@ -968,9 +968,9 @@ export default function RenovationReport() {
             onClick={downloadPdf}
             style={{
               display: "flex", alignItems: "center", gap: 8,
-              padding: "10px 20px", borderRadius: 10, border: "1px solid rgba(78,205,196,0.55)",
-              background: "rgba(78,205,196,0.16)", color: "#4ECDC4",
-              fontSize: 13, fontWeight: 800, cursor: "pointer",
+              padding: "10px 20px", borderRadius: 10, border: "1px solid rgba(139,110,173,0.55)",
+              background: "rgba(139,110,173,0.16)", color: "#8B6EAD",
+              fontSize: 13, fontWeight: 700, cursor: "pointer",
             }}
           >
             <Download size={14} /> {t("Download PDF")}
@@ -982,7 +982,7 @@ export default function RenovationReport() {
               display: "flex", alignItems: "center", gap: 8,
               padding: "10px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.15)",
               background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)",
-              fontSize: 13, fontWeight: 700, cursor: "pointer",
+              fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
             JSON
@@ -1015,10 +1015,10 @@ export default function RenovationReport() {
           ].map((f, i) => (
             <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {i > 0 && <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 14 }}>→</span>}
-              <div style={{ borderRadius: 10, padding: "8px 14px", background: "rgba(78,205,196,0.07)", border: "1px solid rgba(78,205,196,0.22)" }}>
-                <div style={{ fontSize: 18, fontWeight: 900, color: "#4ECDC4", lineHeight: 1.1 }}>{f.n}</div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{f.label}</div>
-                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>{f.step}</div>
+              <div style={{ borderRadius: 10, padding: "8px 14px", background: "rgba(139,110,173,0.07)", border: "1px solid rgba(139,110,173,0.22)" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#8B6EAD", lineHeight: 1.1 }}>{f.n}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{f.label}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>{f.step}</div>
               </div>
             </div>
           ))}
@@ -1033,7 +1033,7 @@ export default function RenovationReport() {
             { label: t("KPIs"),           value: project.selectedKpis.length > 0 ? project.selectedKpis.map((k) => t(k)).join(", ") : "—" },
           ].map(r => (
             <div key={r.label} style={{ borderRadius: 8, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>{r.label}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>{r.label}</div>
               <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>{r.value}</div>
             </div>
           ))}
@@ -1043,31 +1043,31 @@ export default function RenovationReport() {
       {/* ── 2. Buildings ── */}
       {buildings.length > 0 && (
         <Card>
-          <SectionTitle icon={<Building2 size={15} color="#4ECDC4" />} title={t("Buildings")} />
+          <SectionTitle icon={<Building2 size={15} color="#8B6EAD" />} title={t("Buildings")} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {buildings.map((b, i) => {
               const bl = baselines[i];
               return (
                 <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr repeat(4, auto)", gap: 12, alignItems: "center", padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{b.address ?? t("Building {n}", { n: i + 1 })}</div>
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{project.country !== "Sweden" ? buildingUseLabel(b.use_cat) : (b.use_cat ?? "—")} · {b.year ?? "—"}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{b.address ?? t("Building {n}", { n: i + 1 })}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{project.country !== "Sweden" ? buildingUseLabel(b.use_cat) : (b.use_cat ?? "—")} · {b.year ?? "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{t("Area")}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{b.area_atemp ? `${Math.round(b.area_atemp).toLocaleString(numLocale)} m²` : "—"}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{t("Area")}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{b.area_atemp ? `${Math.round(b.area_atemp).toLocaleString(numLocale)} m²` : "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{isUK && !b.has_epc && b.eclass ? t("Energy class (est.)") : t("Energy class")}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{isUK && !b.has_epc && b.eclass ? t("Energy class (est.)") : t("Energy class")}</div>
                     <div style={{ fontSize: 13, fontWeight: 900, color: "#E8880C" }}>{b.eclass ?? "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{t("EPSM baseline")}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: bl ? "#E8880C" : "rgba(255,255,255,0.25)" }}>{bl ? kwh(bl.energyUse) : "—"}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{t("EPSM baseline")}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: bl ? "#E8880C" : "rgba(255,255,255,0.25)" }}>{bl ? kwh(bl.energyUse) : "—"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{t("Baseline status")}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: bl ? "#2FB477" : "rgba(255,255,255,0.25)" }}>{bl ? `✓ ${t("Done")}` : t("Pending")}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{t("Baseline status")}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: bl ? "#2FB477" : "rgba(255,255,255,0.25)" }}>{bl ? `✓ ${t("Done")}` : t("Pending")}</div>
                   </div>
                 </div>
               );
@@ -1096,18 +1096,18 @@ export default function RenovationReport() {
           invisible here. */}
       {facadeEntries.length > 0 && (
         <Card>
-          <SectionTitle icon={<ScanSearch size={15} color="#B98BE8" />} title={t("Facade Condition")} />
-          <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 12px" }}>
+          <SectionTitle icon={<ScanSearch size={15} color="#B8A3D0" />} title={t("Facade Condition")} />
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 12px" }}>
             {t("Photos analysed by the MBDD2025 defect detector with an AI vision second opinion — a screening aid, not a structural survey.")}
           </p>
           {facadeEntries.map(([key, sum]) => (
             <div key={key} style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>{sum.label || key}</span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#fff" }}>{sum.label || key}</span>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
                   {sum.imageCount} {sum.imageCount === 1 ? t("photo") : t("photos")} · {sum.defectCount} {sum.defectCount === 1 ? t("defect") : t("defects")}
                 </span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{breakdownText(sum.byClass)}</span>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{breakdownText(sum.byClass)}</span>
               </div>
               {(sum.photos ?? []).length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
@@ -1116,10 +1116,10 @@ export default function RenovationReport() {
                       <img src={ph.url} alt={t("{side} facade of {building}", { side: t(FACADE_LABELS[ph.orientation]), building: sum.label || key })}
                            style={{ display: "block", width: "100%", height: "auto" }} />
                       <div style={{ padding: "6px 9px" }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>
                           {t("{side} facade", { side: t(FACADE_LABELS[ph.orientation]) })}
                         </div>
-                        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
                           {ph.detections.length
                             ? ph.detections.map((d) => `${FACADE_DEFECT_LABELS[d.label] ? t(FACADE_DEFECT_LABELS[d.label]!) : d.label} ${Math.round(d.score * 100)}%`).join(" · ")
                             : t("No defects detected")}
@@ -1146,11 +1146,11 @@ export default function RenovationReport() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 5, flex: 1 }}>
                   {codes.map(c => <Badge key={c} color={COMP_COLORS[comp] ?? "var(--brand)"}>{c}</Badge>)}
                 </div>
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{codes.length} {codes.length !== 1 ? t("options") : t("option")}</span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>{codes.length} {codes.length !== 1 ? t("options") : t("option")}</span>
               </div>
             ))}
           </div>
-          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", margin: "10px 0 0" }}>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", margin: "10px 0 0" }}>
             {simResults.length} {simResults.length !== 1 ? t("packages") : t("package")} {t("simulated (cartesian product of above selections)")}
           </p>
         </Card>
@@ -1171,16 +1171,16 @@ export default function RenovationReport() {
           <div dangerouslySetInnerHTML={{ __html: packageChartHtml(SCREEN_THEME) }} style={{ marginBottom: 14 }} />
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData} barSize={28}>
-              <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} unit=" kWh" />
+              <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 11 }} axisLine={false} tickLine={false} unit=" kWh" />
               <Tooltip
                 cursor={{ fill: "rgba(148,163,184,0.15)" }}
-                contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, fontSize: 11 }}
-                labelStyle={{ color: "#fff", fontWeight: 700 }}
+                contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, fontSize: 12 }}
+                labelStyle={{ color: "#fff", fontWeight: 600 }}
                 itemStyle={{ color: "#fff" }}
                 formatter={(v: number) => [`${v} kWh/m²·yr`]}
               />
-              <ReferenceLine y={climateBaselineEU} stroke="rgba(226,72,59,0.5)" strokeDasharray="4 3" label={{ value: t("Baseline"), fill: "rgba(226,72,59,0.6)", fontSize: 10 }} />
+              <ReferenceLine y={climateBaselineEU} stroke="rgba(226,72,59,0.5)" strokeDasharray="4 3" label={{ value: t("Baseline"), fill: "rgba(226,72,59,0.6)", fontSize: 11 }} />
               <Bar dataKey="energyUse" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
               </Bar>
@@ -1193,8 +1193,8 @@ export default function RenovationReport() {
           so they come first when they exist. */}
       {perBuildingPicks.length > 0 && (
         <Card>
-          <SectionTitle icon={<Building2 size={15} color="#4ECDC4" />} title={t("Chosen Package per Building")} />
-          <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", margin: "0 0 10px" }}>
+          <SectionTitle icon={<Building2 size={15} color="#8B6EAD" />} title={t("Chosen Package per Building")} />
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 10px" }}>
             {t("Selected building by building in Step 4 — a single portfolio-wide pick would average over real differences between them.")}
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1203,13 +1203,13 @@ export default function RenovationReport() {
               return (
                 <div key={r.address} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
                   padding: "8px 12px", borderRadius: 9, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", minWidth: 160 }}>{r.address}</span>
-                  <span style={{ fontSize: 11.5, color: "#4ECDC4", flex: 1 }}>{r.pkg}</span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#fff", minWidth: 160 }}>{r.address}</span>
+                  <span style={{ fontSize: 12, color: "#8B6EAD", flex: 1 }}>{r.pkg}</span>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
                     {r.baseline.toFixed(1)} → {r.after == null ? "—" : r.after.toFixed(1)} kWh/m²·yr
                   </span>
                   {pct != null && (
-                    <span style={{ fontSize: 12, fontWeight: 800, color: pct < 0 ? "#2FB477" : "#E2483B" }}>{pct}%</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: pct < 0 ? "#2FB477" : "#E2483B" }}>{pct}%</span>
                   )}
                 </div>
               );
@@ -1226,7 +1226,7 @@ export default function RenovationReport() {
             {bestEnergy  && <PackageCard result={bestEnergy}   label={t("Best energy saving")}  accent="#2FB477" icon={<Zap size={13} color="#2FB477" />} />}
             {bestCarbon  && bestCarbon.packageIndex !== bestEnergy?.packageIndex  && <PackageCard result={bestCarbon}  label={t("Lowest carbon")}      accent="#4A90E2" icon={<Leaf size={13} color="#4A90E2" />} />}
             {bestCost    && bestCost.packageIndex !== bestEnergy?.packageIndex    && <PackageCard result={bestCost}    label={t("Lowest cost")}        accent="#E8880C" icon={<DollarSign size={13} color="#E8880C" />} />}
-            {bestBalanced && bestBalanced.packageIndex !== bestEnergy?.packageIndex && <PackageCard result={bestBalanced} label={t("Best balanced")}    accent="#c084fc" icon={<Award size={13} color="#c084fc" />} />}
+            {bestBalanced && bestBalanced.packageIndex !== bestEnergy?.packageIndex && <PackageCard result={bestBalanced} label={t("Best balanced")}    accent="#bfacd4" icon={<Award size={13} color="#bfacd4" />} />}
           </div>
         </div>
       )}
@@ -1234,20 +1234,20 @@ export default function RenovationReport() {
       {/* ── 6. Full results table ── */}
       {hasResults && (
         <Card>
-          <SectionTitle icon={<TrendingDown size={15} color="#4ECDC4" />} title={t("All {n} Packages — Ranked by Energy Saving", { n: simResults.length })} />
+          <SectionTitle icon={<TrendingDown size={15} color="#8B6EAD" />} title={t("All {n} Packages — Ranked by Energy Saving", { n: simResults.length })} />
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             <div style={{ display: "grid", gridTemplateColumns: "78px 1fr 130px 120px 120px 130px", gap: 10, padding: "3px 12px", marginBottom: 2 }}>
               {["Package", "Components", "Energy use", "Saving", "CO₂e saved", "Cost"].map((h, i) => (
-                <span key={i} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, textAlign: i > 1 ? "right" : "left" }}>{t(h)}</span>
+                <span key={i} style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.8, textAlign: i > 1 ? "right" : "left" }}>{t(h)}</span>
               ))}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "78px 1fr 130px 120px 120px 130px", gap: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", alignItems: "center" }}>
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>—</span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{t("Baseline")}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.4)", textAlign: "right" }}>{kwh(baselineEU)}</span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>—</span>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{t("Baseline")}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)", textAlign: "right" }}>{kwh(baselineEU)}</span>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", textAlign: "right" }}>—</span>
             </div>
             {simResults.map((r, i) => (
               <div key={i} style={{
@@ -1258,36 +1258,36 @@ export default function RenovationReport() {
               }}>
                 {/* The package's own number - the same one the chart and the cards use -
                     with ★ on the biggest saving (rows are ranked by saving). */}
-                <span style={{ fontSize: 11.5, fontWeight: 800, color: i === 0 ? "#2FB477" : "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}
+                <span style={{ fontSize: 12, fontWeight: 700, color: i === 0 ? "#2FB477" : "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}
                   title={i === 0 ? t("Biggest energy saving") : t("Rank {n} by energy saving", { n: i + 1 })}>
                   {i === 0 ? "★ " : ""}{t("Package {n}", { n: r.packageIndex })}
                 </span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {/* Which building this package is for — identical materials on
                       two buildings were otherwise indistinguishable here. */}
-                  <span style={{ fontSize: 10, fontWeight: 700, color: r.buildingLabel ? "#4ECDC4" : "rgba(255,255,255,0.35)" }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: r.buildingLabel ? "#8B6EAD" : "rgba(255,255,255,0.35)" }}>
                     {r.buildingLabel ?? t("All buildings")}
                   </span>
                   {Object.entries(r.components).map(([comp, item]) => (
                     <div key={comp} style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 5 }}>
-                      <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 5, flexShrink: 0, background: `${compColor(comp)}22`, color: compColor(comp), border: `1px solid ${compColor(comp)}44` }}>
+                      <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 5, flexShrink: 0, background: `${compColor(comp)}22`, color: compColor(comp), border: `1px solid ${compColor(comp)}44` }}>
                         {compLabel(comp)}
                       </span>
-                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>
+                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
                         {layerText(item) || item.description || item.code}
                         {item.uValue != null && <span style={{ color: "rgba(255,255,255,0.4)" }}> · U {item.uValue.toFixed(2)}</span>}
                       </span>
                     </div>
                   ))}
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.65)", textAlign: "right" }}>{kwh(r.energyUse)}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#2FB477", textAlign: "right" }}>−{kwh(r.saving)}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#4A90E2", textAlign: "right" }}>{co2Saved(r.carbonSaving)}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>{money(r.cost)}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.65)", textAlign: "right" }}>{kwh(r.energyUse)}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#2FB477", textAlign: "right" }}>−{kwh(r.saving)}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#4A90E2", textAlign: "right" }}>{co2Saved(r.carbonSaving)}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>{money(r.cost)}</span>
               </div>
             ))}
           </div>
-          <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: "10px 0 0" }}>
+          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", fontStyle: "italic", margin: "10px 0 0" }}>
             * {t("EnergyPlus (EPSM) results; packages are numbered as in Step 4, ★ marks the biggest energy saving.")}{" "}
             {isBE
               ? t("Cost and CO₂e are not reported for Belgium: no open Belgian retrofit cost or carbon data is wired in yet.")
@@ -1307,12 +1307,12 @@ export default function RenovationReport() {
             })}
           </p>
           <div style={{ borderRadius: 10, padding: "14px 16px", background: "rgba(47,180,119,0.07)", border: "1px solid rgba(47,180,119,0.2)", marginBottom: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "#2FB477", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#2FB477", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>
               ★ {t("Recommended Package #{n} — Best Balance of Cost, Energy & Carbon", { n: bestBalanced.packageIndex })}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
               {Object.entries(bestBalanced.components).map(([comp, item]) => (
-                <span key={comp} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 7, background: `${compColor(comp)}22`, color: compColor(comp), border: `1px solid ${compColor(comp)}44`, fontWeight: 600 }}>
+                <span key={comp} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 7, background: `${compColor(comp)}22`, color: compColor(comp), border: `1px solid ${compColor(comp)}44`, fontWeight: 600 }}>
                   {compLabel(comp)}: {item.description}{layerText(item) ? ` (${layerText(item)})` : ""}
                 </span>
               ))}
@@ -1375,7 +1375,7 @@ export default function RenovationReport() {
           <ClimateGoalPanel a={goalAssessment} />
           {buildingGoal && (
             <div style={{ marginTop: 18 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>
                 {t("Per-building goal")}
               </div>
               <ClimateGoalBuildingTable a={buildingGoal} />
@@ -1386,8 +1386,8 @@ export default function RenovationReport() {
 
       {/* ── Staged plan (Step 4.5) ── */}
       {staged && stagedSettings && (
-        <Card accent="#B98BE8">
-          <SectionTitle icon={<CalendarClock size={15} color="#B98BE8" />} title={t("Staged plan")} />
+        <Card accent="#B8A3D0">
+          <SectionTitle icon={<CalendarClock size={15} color="#B8A3D0" />} title={t("Staged plan")} />
           <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.7)", margin: "0 0 8px" }}>
             {t("{y} years from {s}, budget {b}. {f} of {m} measures fit ({c} of {p}).", { y: stagedSettings.years, s: stagedSettings.startYear, b: stagedMoney(stagedSettings.budget, staged.currency), f: staged.fitted, m: staged.measures, c: stagedMoney(staged.fittedCost, staged.currency), p: stagedMoney(staged.planCost, staged.currency) })}
             {staged.robustness ? ` ${staged.robustness}` : ""}
@@ -1438,13 +1438,13 @@ export default function RenovationReport() {
                 })}
               </p>
               {pvOk.length > 1 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px", fontSize: 11.5, color: "rgba(255,255,255,0.6)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px", fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
                   <span>{t("Set all roofs to")}</span>
                   <input type="range" min={0} max={100} step={5}
                     value={pvRows[0]?.cov ?? PV_DEFAULT_COV}
                     onChange={(e) => { const v = Number(e.target.value); setPvCov(Object.fromEntries(pvRows.map((r) => [r.key, v]))); }}
                     style={{ width: 160, accentColor: "#E8B10C" }} />
-                  <span style={{ color: "#E8B10C", fontWeight: 700, minWidth: 34 }}>{pvRows[0]?.cov ?? PV_DEFAULT_COV}%</span>
+                  <span style={{ color: "#E8B10C", fontWeight: 600, minWidth: 34 }}>{pvRows[0]?.cov ?? PV_DEFAULT_COV}%</span>
                   <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("covered with panels — or adjust each building below")}</span>
                 </div>
               )}
@@ -1462,7 +1462,7 @@ export default function RenovationReport() {
                       <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
                         <td style={{ padding: "6px 8px", color: "#fff" }}>
                           {r.address ?? t("Building")}
-                          {r.source === "saved" && <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 10.5 }}> · {t("saved from the 3D viewer")}</span>}
+                          {r.source === "saved" && <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 11.5 }}> · {t("saved from the 3D viewer")}</span>}
                         </td>
                         {r.annual_kwh == null ? (
                           <td colSpan={4} style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.4)" }}>— {r.error ?? t("no result")}</td>
@@ -1472,21 +1472,21 @@ export default function RenovationReport() {
                               onChange={(e) => setPvCov((m) => ({ ...m, [r.key]: Number(e.target.value) }))}
                               aria-label={r.address ? t("Share of {address} roof covered with panels", { address: r.address }) : t("Share of the roof covered with panels")}
                               style={{ width: 110, verticalAlign: "middle", accentColor: "#E8B10C" }} />
-                            <span style={{ display: "inline-block", minWidth: 38, color: "#E8B10C", fontWeight: 700 }}>{r.cov}%</span>
+                            <span style={{ display: "inline-block", minWidth: 38, color: "#E8B10C", fontWeight: 600 }}>{r.cov}%</span>
                           </td>
                           <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{r.roof_area_m2?.toLocaleString("sv-SE")} m²</td>
                           <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{r.kWp?.toLocaleString("sv-SE")} kWp</td>
-                          <td style={{ padding: "6px 8px", textAlign: "right", color: "#E8B10C", fontWeight: 700 }}>{Math.round(r.annual_kwh).toLocaleString("sv-SE")} kWh/yr</td>
+                          <td style={{ padding: "6px 8px", textAlign: "right", color: "#E8B10C", fontWeight: 600 }}>{Math.round(r.annual_kwh).toLocaleString("sv-SE")} kWh/yr</td>
                        </>)}
                       </tr>
                     ))}
                     {pvOk.length > 1 && (
                       <tr style={{ borderTop: "1px solid rgba(255,255,255,0.15)" }}>
-                        <td style={{ padding: "6px 8px", color: "#fff", fontWeight: 700 }}>{t("Total")}</td>
+                        <td style={{ padding: "6px 8px", color: "#fff", fontWeight: 600 }}>{t("Total")}</td>
                         <td />
                         <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{pvOk.reduce((s, r) => s + (r.roof_area_m2 ?? 0), 0).toLocaleString("sv-SE")} m²</td>
                         <td style={{ padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.7)" }}>{pvTotalKwp.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} kWp</td>
-                        <td style={{ padding: "6px 8px", textAlign: "right", color: "#E8B10C", fontWeight: 800 }}>{Math.round(pvTotalKwh).toLocaleString("sv-SE")} kWh/yr</td>
+                        <td style={{ padding: "6px 8px", textAlign: "right", color: "#E8B10C", fontWeight: 700 }}>{Math.round(pvTotalKwh).toLocaleString("sv-SE")} kWh/yr</td>
                       </tr>
                     )}
                   </tbody>
@@ -1494,8 +1494,8 @@ export default function RenovationReport() {
               </div>
               {/* Assumptions behind every row (same as the 3D viewer's Rooftop PV button). */}
               <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>{t("Assumptions")}</div>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>{t("Assumptions")}</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
                   {PV_ASSUMPTIONS.map((a) => <li key={a}>{t(a)}</li>)}
                 </ul>
               </div>
@@ -1544,11 +1544,11 @@ export default function RenovationReport() {
                   {ha.results.map((s) => {
                     const isSel = s.id === ha.selectedId;
                     return (
-                      <tr key={s.id} style={{ borderTop: "1px solid rgba(255,255,255,0.07)", background: isSel ? "rgba(78,205,196,0.10)" : s.isBaseline ? "rgba(232,136,12,0.05)" : undefined, boxShadow: isSel ? "inset 3px 0 0 #4ECDC4" : undefined }}>
+                      <tr key={s.id} style={{ borderTop: "1px solid rgba(255,255,255,0.07)", background: isSel ? "rgba(139,110,173,0.10)" : s.isBaseline ? "rgba(232,136,12,0.05)" : undefined, boxShadow: isSel ? "inset 3px 0 0 #8B6EAD" : undefined }}>
                         <td style={{ padding: "6px 8px", color: "#fff" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color }} />
-                            {s.shortName}{isSel && <span style={{ fontSize: 8.5, color: "#4ECDC4", fontWeight: 800 }}>✓ {t("chosen")}</span>}{s.isBaseline && <span style={{ fontSize: 8.5, color: "#E8880C" }}>{t("baseline")}</span>}
+                            {s.shortName}{isSel && <span style={{ fontSize: 8.5, color: "#8B6EAD", fontWeight: 700 }}>✓ {t("chosen")}</span>}{s.isBaseline && <span style={{ fontSize: 8.5, color: "#E8880C" }}>{t("baseline")}</span>}
                           </span>
                         </td>
                         <td style={td2}>{s.spf.toFixed(s.spf >= 1.5 ? 1 : 2)}</td>
@@ -1563,7 +1563,7 @@ export default function RenovationReport() {
                 </tbody>
               </table>
             </div>
-            <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", marginTop: 10, lineHeight: 1.6 }}>
+            <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.35)", marginTop: 10, lineHeight: 1.6 }}>
               {t("Heat demand from EnergyPlus (EPSM); system economics are a supply-side layer (delivered = demand ÷ SPF).")} {t("Values are {defaults} — see the tool's Heating-system panel for sources.", { defaults: hcur === "GBP" ? t("UK defaults (Ofgem price cap, DESNZ carbon factors and install costs)") : t("Swedish defaults") })}
             </p>
           </Card>

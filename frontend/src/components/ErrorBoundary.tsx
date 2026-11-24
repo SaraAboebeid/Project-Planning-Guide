@@ -27,12 +27,12 @@ export default class ErrorBoundary extends Component<Props, State> {
           <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, margin: "0 0 14px", lineHeight: 1.6 }}>
             A component hit an error. Copy the details below so it can be fixed — or reset the session if it keeps happening.
           </p>
-          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 11.5, background: "#000", padding: 12, borderRadius: 8, color: "#fca5a5", overflow: "auto", maxHeight: 320, margin: 0 }}>
+          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, background: "#000", padding: 12, borderRadius: 8, color: "#fca5a5", overflow: "auto", maxHeight: 320, margin: 0 }}>
             {error.message}
             {"\n\n"}
             {error.stack}
           </pre>
-          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 11.5, margin: "12px 0 0", lineHeight: 1.6 }}>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, margin: "12px 0 0", lineHeight: 1.6 }}>
             If the tool was just updated, <b style={{ color: "rgba(255,255,255,0.65)" }}>Reload page</b> fetches the newest version — a plain in-page retry keeps running the old code.
           </p>
           <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
@@ -41,7 +41,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               Reload page
             </button>
             <button onClick={() => { try { sessionStorage.clear(); localStorage.removeItem("ppg-wizard-v1"); } catch { /**/ } location.href = "/"; }}
-              style={{ padding: "8px 16px", borderRadius: 8, border: 0, background: "var(--brand-deep)", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+              style={{ padding: "8px 16px", borderRadius: 8, border: 0, background: "var(--brand-deep)", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
               Reset session &amp; reload
             </button>
             <button onClick={() => this.setState({ error: null })}

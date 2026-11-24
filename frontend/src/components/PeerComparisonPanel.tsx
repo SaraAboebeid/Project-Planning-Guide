@@ -83,8 +83,8 @@ export default function PeerComparisonPanel({ buildings, cityId }: { buildings: 
         return (
           <div key={b.key} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
-              <span style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>{b.label}</span>
-              <span style={{ fontSize: 12.5, fontWeight: 800, color: v.color }}>{v.icon} {t(v.label)}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{b.label}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: v.color }}>{v.icon} {t(v.label)}</span>
               <span style={{ fontSize: 12.5, color: "rgba(255,255,255,0.7)" }}>
                 · {t("better than {n} of 100 similar buildings", { n: betterThan })}
               </span>
@@ -103,12 +103,12 @@ export default function PeerComparisonPanel({ buildings, cityId }: { buildings: 
                 width: 18, height: 18, borderRadius: "50%", background: "#fff", border: `4px solid ${v.color === "rgba(255,255,255,0.75)" ? C.selected : v.color}`,
                 boxShadow: "0 1px 4px rgba(0,0,0,0.4)" }} />
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
               <span>◀ {t("Uses least energy")}</span>
               <span>{t("Uses most energy")} ▶</span>
             </div>
 
-            <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)", marginTop: 6 }}>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 6 }}>
               {t("This building: {e} kWh/m² per year · typical for similar buildings: {median} kWh/m² · compared with {n} buildings", {
                 e, median: Math.round(median), n: r.n!.toLocaleString(locale) })}
             </div>
@@ -125,7 +125,7 @@ export default function PeerComparisonPanel({ buildings, cityId }: { buildings: 
         </details>
       )}
 
-      <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", lineHeight: 1.5 }}>
+      <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.35)", lineHeight: 1.5 }}>
         {t("Source: Boverket energy performance certificates (national register), specific energy use. A certificate can be up to ten years old, so recent changes may not show yet.")}
       </div>
     </div>

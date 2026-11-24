@@ -35,7 +35,7 @@ const TOOLS = [
     id: "wwr",
     title: "WWR Estimation",
     subtitle: "Window-to-Wall Ratio Analysis",
-    color: "#4ECDC4",
+    color: "#8B6EAD",
     status: "integrated",
     icon: Eye,
     description:
@@ -104,7 +104,7 @@ const TOOLS = [
     id: "optimization",
     title: "Optimization Model",
     subtitle: "Multi-Objective Retrofit Package Optimisation",
-    color: "#B98BE8",
+    color: "#B8A3D0",
     status: "integrated",
     icon: Target,
     description:
@@ -151,7 +151,7 @@ const TOOLS = [
     id: "regret",
     title: "Decision Under Uncertainty",
     subtitle: "Regret · Robustness · Hurwicz",
-    color: "#4ECDC4",
+    color: "#8B6EAD",
     status: "integrated",
     icon: Scale,
     description:
@@ -212,14 +212,14 @@ function StatusBadge({ status }: { status: string }) {
   const isExt = status === "external";
   return (
     <span style={{
-      fontSize: 9,
-      fontWeight: 800,
+      fontSize: 11,
+      fontWeight: 700,
       letterSpacing: 1.2,
       padding: "3px 8px",
       borderRadius: 100,
-      background: isExt ? "rgba(var(--brand-rgb),0.15)" : "rgba(78,205,196,0.12)",
-      color: isExt ? "#a060e8" : "#4ECDC4",
-      border: `1px solid ${isExt ? "rgba(var(--brand-rgb),0.3)" : "rgba(78,205,196,0.25)"}`,
+      background: isExt ? "rgba(var(--brand-rgb),0.15)" : "rgba(139,110,173,0.12)",
+      color: isExt ? "#a287c1" : "#8B6EAD",
+      border: `1px solid ${isExt ? "rgba(var(--brand-rgb),0.3)" : "rgba(139,110,173,0.25)"}`,
     }}>
       {isExt ? "EXTERNAL TOOL" : "INTEGRATED"}
     </span>
@@ -262,10 +262,10 @@ function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
               <Icon size={20} color={tool.color} />
             </div>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#f0f4ff", lineHeight: 1.2 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: "#f0f4ff", lineHeight: 1.2 }}>
                 {tool.title}
               </div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
                 {tool.subtitle}
               </div>
             </div>
@@ -285,7 +285,7 @@ function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
           padding: "12px 14px",
           border: "1px solid rgba(255,255,255,0.05)",
         }}>
-          <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: "rgba(255,255,255,0.3)", marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, color: "rgba(255,255,255,0.3)", marginBottom: 10 }}>
             KEY CAPABILITIES
           </div>
           <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -304,21 +304,21 @@ function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
             background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: "12px 14px",
             border: `1px solid ${tool.color}22`,
           }}>
-            <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: `${tool.color}aa`, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, color: `${tool.color}aa`, marginBottom: 12 }}>
               METHOD &amp; EQUATIONS
             </div>
             {/* Criteria hierarchy */}
             {meth.criteria && <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
               {meth.criteria.map((c) => (
                 <div key={c.key} style={{ display: "flex", gap: 9 }}>
-                  <span style={{ width: 16, flexShrink: 0, fontWeight: 800, color: tool.color, fontSize: 12 }}>{c.key}</span>
+                  <span style={{ width: 16, flexShrink: 0, fontWeight: 700, color: tool.color, fontSize: 12 }}>{c.key}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12 }}>
                       <span style={{ color: "#f0f4ff", fontWeight: 600 }}>{c.name}</span>
                       <span style={{ color: tool.color, marginLeft: 6 }}>w = {c.weight}</span>
                     </div>
-                    <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>{c.vars}</div>
-                    <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.55)", marginTop: 1 }}>Score: {c.rule}</div>
+                    <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>{c.vars}</div>
+                    <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.55)", marginTop: 1 }}>Score: {c.rule}</div>
                   </div>
                 </div>
               ))}
@@ -327,24 +327,24 @@ function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {meth.equations.map((eq) => (
                 <div key={eq.label}>
-                  <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.4)", marginBottom: 3 }}>{eq.label}</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 3 }}>{eq.label}</div>
                   <div style={{
-                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11.5, color: "#f0f4ff",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: "#f0f4ff",
                     background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "7px 10px", overflowX: "auto",
                     border: "1px solid rgba(255,255,255,0.06)",
                   }}>{eq.tex}</div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.42)", marginTop: 11, lineHeight: 1.55 }}>{meth.note}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.42)", marginTop: 11, lineHeight: 1.55 }}>{meth.note}</div>
             {meth.sources && (
               <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 10 }}>
-                <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>
                   SOURCES &amp; ASSUMPTIONS
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {meth.sources.map((s) => (
-                    <div key={s.label} style={{ fontSize: 10, lineHeight: 1.5 }}>
+                    <div key={s.label} style={{ fontSize: 11, lineHeight: 1.5 }}>
                       <span style={{ color: "#f0f4ff", fontWeight: 600 }}>{s.label}</span>
                       <span style={{ color: "rgba(255,255,255,0.45)" }}> — {s.cite}</span>
                       {s.url && (
@@ -365,7 +365,7 @@ function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {tool.usedIn.map(u => (
             <span key={u} style={{
-              fontSize: 10, padding: "3px 8px", borderRadius: 100,
+              fontSize: 11, padding: "3px 8px", borderRadius: 100,
               background: "rgba(255,255,255,0.06)",
               color: "rgba(255,255,255,0.45)",
               border: "1px solid rgba(255,255,255,0.08)",
@@ -385,14 +385,14 @@ function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
             borderRadius: 10,
             padding: "12px 14px",
           }}>
-            <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: `${tool.color}aa`, marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, color: `${tool.color}aa`, marginBottom: 8 }}>
               {t.attribution.heading}
             </div>
             <div style={{ fontSize: 13, color: "#f0f4ff", fontWeight: 600 }}>
               {t.attribution.headline}
             </div>
             {t.attribution.sub && (
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
                 {t.attribution.sub}
               </div>
             )}
@@ -406,7 +406,7 @@ function ToolCard({ tool }: { tool: typeof TOOLS[number] }) {
             {t.attribution.contact && (
               <a
                 href={`mailto:${t.attribution.contact}`}
-                style={{ fontSize: 11, color: tool.color, textDecoration: "none", marginTop: 6, display: "inline-block", opacity: 0.8 }}
+                style={{ fontSize: 12, color: tool.color, textDecoration: "none", marginTop: 6, display: "inline-block", opacity: 0.8 }}
               >
                 {t.attribution.contact}
               </a>
@@ -453,10 +453,10 @@ export default function AnalysisTools() {
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 8px" }}>
       {/* Page header */}
       <div style={{ marginBottom: 32 }}>
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>
           ANALYSIS MODULES
         </div>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: "#f0f4ff", margin: 0, lineHeight: 1.2 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#f0f4ff", margin: 0, lineHeight: 1.2 }}>
           Available Analysis Tools
         </h1>
         <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", marginTop: 8, maxWidth: 600, lineHeight: 1.6 }}>
@@ -468,7 +468,7 @@ export default function AnalysisTools() {
             sync with the catalogue when a tool is added or removed. */}
         <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
           {[
-            { label: `${TOOLS.length} tools`, sub: "total", color: "#4ECDC4" },
+            { label: `${TOOLS.length} tools`, sub: "total", color: "#8B6EAD" },
             { label: `${TOOLS.filter(t => t.status === "integrated").length}`, sub: "integrated", color: "#2FB477" },
             { label: `${TOOLS.filter(t => t.status === "external").length}`, sub: "external", color: "var(--brand-deep)" },
           ].map(p => (
@@ -478,7 +478,7 @@ export default function AnalysisTools() {
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.08)",
             }}>
-              <span style={{ fontWeight: 800, fontSize: 14, color: p.color }}>{p.label}</span>
+              <span style={{ fontWeight: 700, fontSize: 14, color: p.color }}>{p.label}</span>
               <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{p.sub}</span>
             </div>
           ))}

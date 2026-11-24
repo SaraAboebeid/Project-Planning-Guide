@@ -26,9 +26,9 @@ const PATHWAYS = [
     key: "Energy Community Planning",
     label: "Energy Community",
     sub: "Planning",
-    color: "#4ECDC4",
-    bgActive: "#4ECDC4",
-    borderActive: "#4ECDC4",
+    color: "#8B6EAD",
+    bgActive: "#8B6EAD",
+    borderActive: "#8B6EAD",
     Icon: Zap,
     outputs: [
       { n: "01", text: "Member building eligibility" },
@@ -61,7 +61,7 @@ const ENGINE_TAGS = [
   { label: "Global SA",          color: "#4A90E2" },
   { label: "Model Confidence",   color: "#E8880C" },
   { label: "Data Coverage",      color: "#2FB477" },
-  { label: "TABULA Archetypes",  color: "#4ECDC4" },
+  { label: "TABULA Archetypes",  color: "#8B6EAD" },
   { label: "Wikells Cost DB",    color: "var(--brand-deep)" },
 ];
 
@@ -97,7 +97,7 @@ const STATUS_LABEL: Record<string, string> = {
 /* ΓöÇΓöÇΓöÇ EC pathway detail ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 function ECPathwayDetail() {
   const scenarios = [
-    { id: "A", name: "Micro cluster",  buildings: "2ΓÇô4 bldgs",  pv: "20ΓÇô40 kWp",  self: "55ΓÇô70%", color: "#4ECDC4" },
+    { id: "A", name: "Micro cluster",  buildings: "2ΓÇô4 bldgs",  pv: "20ΓÇô40 kWp",  self: "55ΓÇô70%", color: "#8B6EAD" },
     { id: "B", name: "Block sharing",  buildings: "5ΓÇô12 bldgs", pv: "50ΓÇô120 kWp", self: "70ΓÇô85%", color: "#4A90E2" },
     { id: "C", name: "District-scale", buildings: "13+ bldgs",  pv: "150+ kWp",   self: "85ΓÇô95%", color: "#2FB477" },
   ];
@@ -110,7 +110,7 @@ function ECPathwayDetail() {
   ];
   return (
     <div style={{ marginTop: 28 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.35)",
+      <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.35)",
                     textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>
         Your active pathway ΓÇö Energy Community
       </div>
@@ -127,14 +127,14 @@ function ECPathwayDetail() {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontWeight: 900, fontSize: 15, color: s.color,
               }}>{s.id}</div>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{s.name}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{s.name}</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {[{ k: "Members", v: s.buildings }, { k: "PV system", v: s.pv }, { k: "Self-consumption", v: s.self }]
                 .map(({ k, v }) => (
                   <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.40)" }}>{k}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{v}</span>
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.40)" }}>{k}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{v}</span>
                   </div>
                 ))}
             </div>
@@ -147,15 +147,15 @@ function ECPathwayDetail() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <Users size={14} color="rgba(255,255,255,0.40)" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.55)" }}>
             Inputs needed to run this pathway
           </span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {inputs.map((inp, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11,
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12,
                                   color: "rgba(255,255,255,0.55)" }}>
-              <span style={{ color: "#4ECDC4", fontWeight: 800, fontSize: 10, marginTop: 1, flexShrink: 0 }}>
+              <span style={{ color: "#8B6EAD", fontWeight: 700, fontSize: 11, marginTop: 1, flexShrink: 0 }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
               {inp}
@@ -183,7 +183,7 @@ function REPathwayDetail() {
   ];
   return (
     <div style={{ marginTop: 28 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.35)",
+      <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.35)",
                     textTransform: "uppercase", letterSpacing: 2, marginBottom: 14 }}>
         Your active pathway ΓÇö Renewable Energy
       </div>
@@ -201,15 +201,15 @@ function REPathwayDetail() {
                 fontWeight: 900, fontSize: 15, color: s.color,
               }}>{s.id}</div>
               <div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", display: "block" }}>{s.name}</span>
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.30)" }}>Roof coverage {s.pct}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", display: "block" }}>{s.name}</span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.30)" }}>Roof coverage {s.pct}</span>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {[{ k: "Capacity", v: s.kWp }, { k: "Annual yield", v: s.yield }].map(({ k, v }) => (
                 <div key={k} style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.40)" }}>{k}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{v}</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.40)" }}>{k}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{v}</span>
                 </div>
               ))}
             </div>
@@ -222,15 +222,15 @@ function REPathwayDetail() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <BarChart2 size={14} color="rgba(255,255,255,0.40)" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.55)" }}>
             Inputs needed to run this pathway
           </span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {inputs.map((inp, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11,
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12,
                                   color: "rgba(255,255,255,0.55)" }}>
-              <span style={{ color: "#2FB477", fontWeight: 800, fontSize: 10, marginTop: 1, flexShrink: 0 }}>
+              <span style={{ color: "#2FB477", fontWeight: 700, fontSize: 11, marginTop: 1, flexShrink: 0 }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
               {inp}
@@ -260,10 +260,10 @@ function SensitivityPanel() {
             <TrendingUp size={16} color="#4A90E2" />
           </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", letterSpacing: 0.3 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", letterSpacing: 0.3 }}>
               SENSITIVITY ANALYSIS ΓÇö OAT
             </div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.30)", marginTop: 1 }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.30)", marginTop: 1 }}>
               One-At-a-Time ┬╖ heating demand (kWh/yr) ┬╖ reference building
             </div>
           </div>
@@ -278,7 +278,7 @@ function SensitivityPanel() {
           ].map(({ s, l }) => (
             <div key={s} style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <div style={{ width: 7, height: 7, borderRadius: 2, background: STATUS_COLOR[s] }} />
-              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>{l}</span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{l}</span>
             </div>
           ))}
         </div>
@@ -295,12 +295,12 @@ function SensitivityPanel() {
               {/* Rank */}
               <span style={{
                 width: 18, flexShrink: 0, textAlign: "right",
-                fontSize: 9, fontWeight: 800, color: rank <= 3 ? "#E8880C" : "rgba(255,255,255,0.20)",
+                fontSize: 11, fontWeight: 700, color: rank <= 3 ? "#E8880C" : "rgba(255,255,255,0.20)",
               }}>#{rank}</span>
 
               {/* Label */}
               <span style={{
-                width: 148, flexShrink: 0, fontSize: 11, fontWeight: 500,
+                width: 148, flexShrink: 0, fontSize: 12, fontWeight: 500,
                 color: "rgba(255,255,255,0.70)", whiteSpace: "nowrap",
                 overflow: "hidden", textOverflow: "ellipsis",
               }}>{p.label}</span>
@@ -322,19 +322,19 @@ function SensitivityPanel() {
               {/* Pct */}
               <span style={{
                 width: 36, flexShrink: 0, textAlign: "right",
-                fontSize: 11, fontWeight: 700, color: barColor,
+                fontSize: 12, fontWeight: 600, color: barColor,
               }}>{pct.toFixed(1)}%</span>
 
               {/* Range */}
               <span style={{
                 width: 88, flexShrink: 0, textAlign: "right",
-                fontSize: 10, color: "rgba(255,255,255,0.25)", fontVariantNumeric: "tabular-nums",
+                fontSize: 11, color: "rgba(255,255,255,0.25)", fontVariantNumeric: "tabular-nums",
               }}>┬▒{(p.rangeKwh / 1000).toFixed(0)} MWh</span>
 
               {/* Status pill */}
               <span style={{
                 width: 60, flexShrink: 0, textAlign: "center",
-                padding: "1px 0", borderRadius: 4, fontSize: 9, fontWeight: 700,
+                padding: "1px 0", borderRadius: 4, fontSize: 11, fontWeight: 600,
                 background: `${STATUS_COLOR[p.status]}18`,
                 color: STATUS_COLOR[p.status],
                 border: `1px solid ${STATUS_COLOR[p.status]}30`,
@@ -350,7 +350,7 @@ function SensitivityPanel() {
         display: "flex", alignItems: "flex-start", gap: 8,
       }}>
         <span style={{ fontSize: 18, lineHeight: 1.1 }}>≡ƒÆí</span>
-        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.30)", margin: 0, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.30)", margin: 0, lineHeight: 1.6 }}>
           Bar width = % share of total model output range.
           Bar colour = data availability in your project.
           <strong style={{ color: "rgba(255,255,255,0.45)" }}> Missing or proxy parameters at the top create the largest confidence penalty.</strong>
@@ -384,7 +384,7 @@ function FlowConnector() {
       }} />
       <div style={{
         position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
-        color: "rgba(255,255,255,0.22)", fontSize: 11, lineHeight: 1,
+        color: "rgba(255,255,255,0.22)", fontSize: 12, lineHeight: 1,
       }}>Γû╝</div>
     </div>
   );
@@ -394,7 +394,7 @@ function DownArrow() {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", height: 32, justifyContent: "center" }}>
       <div style={{ width: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
-      <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 11, lineHeight: 1 }}>Γû╝</div>
+      <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 12, lineHeight: 1 }}>Γû╝</div>
     </div>
   );
 }
@@ -409,9 +409,9 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: 0 }}>Pathways</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: "#fff", margin: 0 }}>Pathways</h2>
           <span style={{
-            padding: "2px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700,
+            padding: "2px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
             background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.40)",
             border: "1px solid rgba(255,255,255,0.09)", letterSpacing: 1,
           }}>TOOL CAPABILITY MAP</span>
@@ -426,7 +426,7 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
         {PATHWAYS.map((pw) => {
           const isActive = activeType === pw.key;
-          const selectedText = pw.color === "#4ECDC4" ? "#0b1220" : "#fff";
+          const selectedText = pw.color === "#8B6EAD" ? "#0b1220" : "#fff";
           const Ic = pw.Icon;
           return (
             <div key={pw.key} style={{
@@ -439,7 +439,7 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
               {isActive && (
                 <div style={{
                   position: "absolute", top: 10, right: 10,
-                  padding: "2px 7px", borderRadius: 5, fontSize: 9, fontWeight: 700,
+                  padding: "2px 7px", borderRadius: 5, fontSize: 11, fontWeight: 600,
                   background: pw.color, color: selectedText, letterSpacing: 1, textTransform: "uppercase",
                 }}>Active</div>
               )}
@@ -454,20 +454,20 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
                   <Ic size={18} color={isActive ? selectedText : "rgba(255,255,255,0.28)"} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.2,
+                  <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.2,
                                 color: isActive ? selectedText : "rgba(255,255,255,0.40)" }}>{pw.label}</div>
-                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", marginTop: 1 }}>{pw.sub}</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 1 }}>{pw.sub}</div>
                 </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {pw.outputs.map((o) => (
                   <div key={o.n} style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
                     <span style={{
-                      fontSize: 8, fontWeight: 800, flexShrink: 0, marginTop: 1.5, letterSpacing: 0.5,
+                      fontSize: 8, fontWeight: 700, flexShrink: 0, marginTop: 1.5, letterSpacing: 0.5,
                       color: isActive ? selectedText : "rgba(255,255,255,0.18)",
                     }}>{o.n}</span>
                     <span style={{
-                      fontSize: 11, lineHeight: 1.4,
+                      fontSize: 12, lineHeight: 1.4,
                       color: isActive ? selectedText : "rgba(255,255,255,0.28)",
                     }}>{o.text}</span>
                   </div>
@@ -477,7 +477,7 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
                 <button onClick={() => navigate("/step/1")} style={{
                   marginTop: 12, width: "100%", padding: "5px 0", borderRadius: 7,
                   border: "1px solid rgba(255,255,255,0.07)", background: "transparent",
-                  color: "rgba(255,255,255,0.25)", fontSize: 9, fontWeight: 600,
+                  color: "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 600,
                   cursor: "pointer", letterSpacing: 0.5,
                 }}>SELECT IN STEP 1 Γåù</button>
               )}
@@ -503,13 +503,13 @@ function ToolRoadmap({ activeType }: { activeType: string | null }) {
           <Cpu size={20} color="#4A90E2" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", marginBottom: 8, letterSpacing: 0.3 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 8, letterSpacing: 0.3 }}>
             ANALYSIS ENGINE
           </div>
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             {ENGINE_TAGS.map((t) => (
               <span key={t.label} style={{
-                padding: "2px 8px", borderRadius: 5, fontSize: 9, fontWeight: 700,
+                padding: "2px 8px", borderRadius: 5, fontSize: 11, fontWeight: 600,
                 background: `${t.color}14`, color: t.color,
                 border: `1px solid ${t.color}28`, letterSpacing: 0.3,
               }}>{t.label}</span>

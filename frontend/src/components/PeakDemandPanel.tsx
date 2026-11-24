@@ -17,8 +17,8 @@ import { useT, useLang, translate } from "../i18n";
 import { C } from "../config/colors";
 
 // Validated pair (dataviz palette checker, dark surface #0d1117).
-const BASE = "#9575CD";
-const ALT = "#26A69A";
+const BASE = "#A08BB7";
+const ALT = "#644686";
 
 interface PeakStats {
   peak_kw: number; peak_hour?: number; peak_w_m2?: number | null; peak_daily_avg_kw?: number; peak_day?: number;
@@ -99,7 +99,7 @@ export default function PeakDemandPanel({ scenarios, points }: {
   }
   if (!base.total) return <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>{t("This run predates hourly output — re-run it to see peak demand.")}</div>;
 
-  const th: React.CSSProperties = { padding: "6px 8px", textAlign: "right", fontWeight: 700, color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap" };
+  const th: React.CSSProperties = { padding: "6px 8px", textAlign: "right", fontWeight: 600, color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap" };
   const td: React.CSSProperties = { padding: "6px 8px", textAlign: "right", color: "rgba(255,255,255,0.8)", whiteSpace: "nowrap" };
   const change = (now: number, ref: number) => {
     if (!ref) return "—";
@@ -113,8 +113,8 @@ export default function PeakDemandPanel({ scenarios, points }: {
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
         <Activity size={18} color={BASE} style={{ marginTop: 2 }} />
         <div>
-          <h3 style={{ fontSize: 14, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>{t(comparing ? "Peak demand — before and after" : "Peak demand")}</h3>
-          <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.55 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>{t(comparing ? "Peak demand — before and after" : "Peak demand")}</h3>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", margin: 0, lineHeight: 1.55 }}>
             {t(comparing
               ? "How much each package lowers the highest heat demand. Power charges and the size of the heating connection follow the peak, not the yearly total, so a package can save more money than its kWh suggest."
               : "The highest heat (space heating + hot water) and electricity demand over the year, from the hourly simulation. Power charges and the size of the heating connection follow these peaks, not the yearly total.")}
@@ -124,7 +124,7 @@ export default function PeakDemandPanel({ scenarios, points }: {
 
       {comparing ? (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                 <th style={{ ...th, textAlign: "left" }}>{t("Scenario")}</th>
@@ -144,9 +144,9 @@ export default function PeakDemandPanel({ scenarios, points }: {
                     <td style={{ ...td, textAlign: "left", fontWeight: i === 0 ? 800 : 600 }}>{s.label}</td>
                     {r ? (<>
                       <td style={td}>{n(r.heat.peak_kw, 1)}</td>
-                      <td style={{ ...td, color: i === 0 ? "rgba(255,255,255,0.35)" : changeColor(r.heat.peak_kw, ref.heat.peak_kw), fontWeight: 700 }}>{i === 0 ? "—" : change(r.heat.peak_kw, ref.heat.peak_kw)}</td>
+                      <td style={{ ...td, color: i === 0 ? "rgba(255,255,255,0.35)" : changeColor(r.heat.peak_kw, ref.heat.peak_kw), fontWeight: 600 }}>{i === 0 ? "—" : change(r.heat.peak_kw, ref.heat.peak_kw)}</td>
                       <td style={td}>{n(r.heat.peak_daily_avg_kw, 1)}</td>
-                      <td style={{ ...td, color: i === 0 ? "rgba(255,255,255,0.35)" : changeColor(r.heat.peak_daily_avg_kw ?? 0, ref.heat.peak_daily_avg_kw ?? 0), fontWeight: 700 }}>{i === 0 ? "—" : change(r.heat.peak_daily_avg_kw ?? 0, ref.heat.peak_daily_avg_kw ?? 0)}</td>
+                      <td style={{ ...td, color: i === 0 ? "rgba(255,255,255,0.35)" : changeColor(r.heat.peak_daily_avg_kw ?? 0, ref.heat.peak_daily_avg_kw ?? 0), fontWeight: 600 }}>{i === 0 ? "—" : change(r.heat.peak_daily_avg_kw ?? 0, ref.heat.peak_daily_avg_kw ?? 0)}</td>
                       <td style={td}>{n(r.electricity.peak_kw, 1)}</td>
                     </>) : <td colSpan={5} style={{ ...td, textAlign: "left", color: "rgba(255,255,255,0.4)" }}>{data[s.batchId] ? t("no hourly data") : t("Loading…")}</td>}
                   </tr>
@@ -154,7 +154,7 @@ export default function PeakDemandPanel({ scenarios, points }: {
               })}
             </tbody>
           </table>
-          <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", marginTop: 6 }}>
+          <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", marginTop: 6 }}>
             {base.total.buildings === 1
               ? t("One building, from its hourly results.")
               : t("All {n} buildings together, added up hour by hour — buildings that peak at different times are not double counted.", { n: base.total.buildings })}
@@ -162,7 +162,7 @@ export default function PeakDemandPanel({ scenarios, points }: {
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                 <th style={{ ...th, textAlign: "left" }}>{t("Building")}</th>
@@ -197,12 +197,12 @@ export default function PeakDemandPanel({ scenarios, points }: {
 
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)" }}>
             {t("Heat demand duration curve — every hour of the year, highest first")}
           </div>
           {comparing && scenarios.length > 2 && (
             <select value={compareTo ?? scenarios[1]!.batchId} onChange={(e) => setCompareTo(e.target.value)} aria-label={t("Package to compare")}
-              style={{ padding: "3px 8px", borderRadius: 7, fontSize: 11, background: "#0d1117", color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }}>
+              style={{ padding: "3px 8px", borderRadius: 7, fontSize: 12, background: "#0d1117", color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }}>
               {scenarios.slice(1).map((s) => <option key={s.batchId} value={s.batchId}>{s.label}</option>)}
             </select>
           )}
@@ -211,21 +211,21 @@ export default function PeakDemandPanel({ scenarios, points }: {
           <LineChart data={curve} margin={{ top: 8, right: 14, bottom: 18, left: 8 }}>
             <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
             <XAxis dataKey="hours" type="number" domain={[0, 8760]} ticks={[0, 1000, 2000, 4000, 6000, 8760]}
-              tick={{ fontSize: 10, fill: "rgba(255,255,255,0.45)" }}
-              label={{ value: t("hours of the year"), position: "insideBottom", offset: -10, fontSize: 10, fill: "rgba(255,255,255,0.45)" }} />
-            <YAxis tick={{ fontSize: 10, fill: "rgba(255,255,255,0.45)" }} width={48}
-              label={{ value: "kW", angle: -90, position: "insideLeft", fontSize: 10, fill: "rgba(255,255,255,0.45)" }} />
-            <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, fontSize: 11 }}
+              tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }}
+              label={{ value: t("hours of the year"), position: "insideBottom", offset: -10, fontSize: 11, fill: "rgba(255,255,255,0.45)" }} />
+            <YAxis tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }} width={48}
+              label={{ value: "kW", angle: -90, position: "insideLeft", fontSize: 11, fill: "rgba(255,255,255,0.45)" }} />
+            <Tooltip contentStyle={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, fontSize: 12 }}
               labelFormatter={(h) => t("{h} hours a year at or above", { h: Number(h).toLocaleString(locale) })}
               formatter={(v: number, name: string) => [`${v.toLocaleString(locale, { maximumFractionDigits: 1 })} kW`, name]} />
-            {comparing && <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 10.5, paddingBottom: 6 }} />}
+            {comparing && <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 11.5, paddingBottom: 6 }} />}
             <Line type="monotone" dataKey="base" name={scenarios[0]!.label} stroke={BASE} strokeWidth={2} dot={false} isAnimationActive={false} />
             {comparing && <Line type="monotone" dataKey="alt" name={altLabel} stroke={ALT} strokeWidth={2} dot={false} isAnimationActive={false} />}
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
+      <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
         {t("Heat = space heating + hot water; electricity = lighting and household appliances. Each value is an hourly average in a typical weather year, so the real peak on the coldest day of an actual winter is somewhat higher — use these figures to compare scenarios, not to size equipment.")}
         {base.without_hourly_data > 0 && ` ${t("{n} buildings have no hourly data (older runs) and are left out.", { n: base.without_hourly_data })}`}
       </div>

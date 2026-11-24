@@ -86,7 +86,7 @@ export default function ChatWidget() {
               </span>
               <div className="leading-tight">
                 <div className="text-sm font-semibold text-white/90">{t("Data assistant")}</div>
-                <div className="text-[10px] text-white/40">{t("Gothenburg buildings · EN / SV")}</div>
+                <div className="text-[11px] text-white/40">{t("Gothenburg buildings · EN / SV")}</div>
               </div>
             </div>
             <button onClick={() => setOpen(false)} aria-label={t("Close")} className="text-white/40 hover:text-white/80">

@@ -206,6 +206,9 @@ interface ProjectState {
   currentBbox: { north: number; south: number; east: number; west: number } | null;
   /* optional drawn polygon "lon,lat;lon,lat;…" refining the bbox to any shape */
   selectionPolygon: string | null;
+  /* Step 1 map mode the selection was made with, so returning to Step 1 reopens
+     it (address list / picked buildings / box / shape) instead of an empty map. */
+  selectionMode?: "addresses" | "pick" | "bbox" | "polygon" | "area";
   /* all bbox building rows loaded in step 2 */
   bboxRows: BuildingRecord[];
   /* simulation material selections (Step 4, Renovation) */
@@ -401,6 +404,8 @@ export interface SavedProjectRef {
   id: string;
   name: string;
   savedAt: string;
+  /** Where the saved copy lives (utils/projectStore.ts). Older refs have none = account. */
+  where?: "account" | "browser";
 }
 
 interface WizardState {
@@ -484,7 +489,7 @@ export const LOCATION_SCOPED_RESET: Partial<ProjectState> = {
   address: DEFAULT_PROJECT.address, lat: null, lon: null, locationLabel: "",
   district: null, neighborhoodName: "",
   buildingPoints: [], lookedUpBuilding: null, lookedUpBuildings: [],
-  bboxStats: null, currentBbox: null, selectionPolygon: null, bboxRows: [],
+  bboxStats: null, currentBbox: null, selectionPolygon: null, selectionMode: undefined, bboxRows: [],
   savedWWR: null, simulationMaterials: {}, renovationPackages: [], selectedPackageId: null,
   renovationCalcPackages: [], supplementaryData: {},
   baselineStatus: "idle", renovationBaselineResults: [], baselineBatchId: null,

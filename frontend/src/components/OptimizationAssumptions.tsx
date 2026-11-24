@@ -18,25 +18,25 @@ function AssumptionRow({ a, liveText }: { a: Assumption; liveText?: string | nul
     <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${white(0.08)}`, borderRadius: 10, padding: "10px 14px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: white(0.85) }}>{a.label}</span>
-        <span style={{ fontSize: 13, fontWeight: 800, color: "#4ECDC4", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#8B6EAD", whiteSpace: "nowrap" }}>
           {liveText ?? (a.value == null ? a.unit : `${a.value} ${a.unit}`)}
-          {a.live && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: "#2FB477" }}>● LIVE{!liveText ? " (fallback shown)" : ""}</span>}
-          {a.provisional && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: "#F5A623" }}>ASSUMED / PROVISIONAL</span>}
+          {a.live && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: "#2FB477" }}>● LIVE{!liveText ? " (fallback shown)" : ""}</span>}
+          {a.provisional && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: "#F5A623" }}>ASSUMED / PROVISIONAL</span>}
         </span>
       </div>
       {a.usedIn && (
         <div style={{ marginTop: 4 }}>
-          <span style={{ fontSize: 9.5, fontWeight: 700, padding: "1px 8px", borderRadius: 99,
-            background: "rgba(78,205,196,0.12)", border: "1px solid rgba(78,205,196,0.3)", color: "#4ECDC4" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, padding: "1px 8px", borderRadius: 99,
+            background: "rgba(139,110,173,0.12)", border: "1px solid rgba(139,110,173,0.3)", color: "#8B6EAD" }}>
             Used in: {a.usedIn}
           </span>
         </div>
       )}
-      {a.note && <div style={{ fontSize: 11, color: white(0.42), marginTop: 4 }}>{a.note}</div>}
+      {a.note && <div style={{ fontSize: 12, color: white(0.42), marginTop: 4 }}>{a.note}</div>}
       {/* An assumption with no published source says so instead of linking somewhere unrelated. */}
       {a.sourceUrl
-        ? <a href={a.sourceUrl} target="_blank" rel="noreferrer" style={{ fontSize: 10.5, color: "#9B7FD4", textDecoration: "none", marginTop: 4, display: "inline-block" }}>Source: {a.source} ↗</a>
-        : <span style={{ fontSize: 10.5, color: white(0.42), marginTop: 4, display: "inline-block" }}>Source: {a.source}</span>}
+        ? <a href={a.sourceUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: "#A894BF", textDecoration: "none", marginTop: 4, display: "inline-block" }}>Source: {a.source} ↗</a>
+        : <span style={{ fontSize: 11.5, color: white(0.42), marginTop: 4, display: "inline-block" }}>Source: {a.source}</span>}
     </div>
   );
 }
@@ -69,14 +69,14 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
 
   const pill = (
     <span style={{
-      padding: "2px 10px", borderRadius: 99, fontSize: 10.5, fontWeight: 700,
+      padding: "2px 10px", borderRadius: 99, fontSize: 11.5, fontWeight: 600,
       background: "rgba(var(--brand-rgb),0.35)", border: "1px solid rgba(var(--brand-rgb),0.6)", color: "#fff",
     }}>{countryName}</span>
   );
 
   return (
     <div style={{ marginTop: 10 }}>
-      <CollapsibleCard title="Optimization Model" subtitle="Step 4 optimisation & 50-year cost/carbon — every input, where it comes from, where it is used" color="#B98BE8" badge={pill}>
+      <CollapsibleCard title="Optimization Model" subtitle="Step 4 optimisation & 50-year cost/carbon — every input, where it comes from, where it is used" color="#B8A3D0" badge={pill}>
         {/* Country economy/climate data */}
         <SubHead>Energy, climate &amp; economy — {countryName}</SubHead>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -87,9 +87,9 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
         <SubHead>Cost &amp; carbon of each renovation option — {countryName}</SubHead>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {OPTION_DATA_SOURCES[country].map((s) => (
-            <div key={s.label} style={{ display: "flex", gap: 10, fontSize: 11.5, lineHeight: 1.5,
+            <div key={s.label} style={{ display: "flex", gap: 10, fontSize: 12, lineHeight: 1.5,
               background: "rgba(255,255,255,0.03)", border: `1px solid ${white(0.08)}`, borderRadius: 10, padding: "8px 14px" }}>
-              <span style={{ minWidth: 150, fontWeight: 700, color: white(0.8) }}>{s.label}</span>
+              <span style={{ minWidth: 150, fontWeight: 600, color: white(0.8) }}>{s.label}</span>
               <span style={{ color: white(0.55) }}>{s.text}</span>
             </div>
           ))}
@@ -103,10 +103,10 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
 
         {/* Equations */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "16px 0 8px 0" }}>
-          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.4, color: white(0.35), textTransform: "uppercase" }}>Equations</span>
-          <span style={{ fontSize: 10, color: white(0.35) }}>based on the work of</span>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, color: white(0.35), textTransform: "uppercase" }}>Equations</span>
+          <span style={{ fontSize: 11, color: white(0.35) }}>based on the work of</span>
           {OPTIMIZER_ATTRIBUTION.names.map((n) => (
-            <span key={n} style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 99, background: "rgba(78,205,196,0.12)", border: "1px solid rgba(78,205,196,0.35)", color: "#4ECDC4" }}>{n}</span>
+            <span key={n} style={{ fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 99, background: "rgba(139,110,173,0.12)", border: "1px solid rgba(139,110,173,0.35)", color: "#8B6EAD" }}>{n}</span>
           ))}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -114,7 +114,7 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
             <EquationRow key={eq.name} label={eq.name} tex={eq.latexish} explain={eq.explain} />
           ))}
         </div>
-        <p style={{ fontSize: 11, color: white(0.35), marginTop: 10 }}>
+        <p style={{ fontSize: 12, color: white(0.35), marginTop: 10 }}>
           The optimiser screens every combination on these fast equations; shortlisted packages are then simulated in
           EnergyPlus, and the Results view shows those verified figures. Values marked ASSUMED / PROVISIONAL still need
           confirming against the cited source or the building's own data.
@@ -126,7 +126,7 @@ export default function OptimizationAssumptions({ country = "SE" }: { country?: 
           {METHODS.map((m) => (
             <div key={m.name}>
               <EquationRow label={m.name} tex={m.latexish} explain={m.explain} />
-              <a href={m.sourceUrl} target="_blank" rel="noreferrer" style={{ fontSize: 10.5, color: "#9B7FD4", textDecoration: "none", marginTop: 3, display: "inline-block" }}>Source: {m.source} ↗</a>
+              <a href={m.sourceUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: "#A894BF", textDecoration: "none", marginTop: 3, display: "inline-block" }}>Source: {m.source} ↗</a>
             </div>
           ))}
         </div>

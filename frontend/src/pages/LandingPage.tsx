@@ -154,26 +154,26 @@ export default function LandingPage() {
     ? [
         { label: "3D buildings",   value: beStats ? beStats.buildings.toLocaleString("en-US") : "—",   color: "#4A90E2" },
         { label: "residential",    value: beStats ? beStats.residential.toLocaleString("en-US") : "—", color: "#2FB477" },
-        { label: "TABULA matched", value: beStats ? beStats.tabula.toLocaleString("en-US") : "—",      color: "#4ECDC4" },
+        { label: "TABULA matched", value: beStats ? beStats.tabula.toLocaleString("en-US") : "—",      color: "#8B6EAD" },
         { label: "districts",      value: beStats ? String(beStats.districts) : "—",                  color: "var(--brand)" },
       ]
     : selectedCountry === "gb"
     ? [
         { label: "buildings",      value: ukStats ? ukStats.buildings.toLocaleString("en-US") : "—", color: "#4A90E2" },
         { label: "EPC matched",    value: ukStats ? ukStats.withEpc.toLocaleString("en-US") : "—",   color: "#2FB477" },
-        { label: "EHS estimated",  value: ukStats ? ukStats.estimated.toLocaleString("en-US") : "—", color: "#4ECDC4" },
+        { label: "EHS estimated",  value: ukStats ? ukStats.estimated.toLocaleString("en-US") : "—", color: "#8B6EAD" },
         { label: "districts",      value: ukStats ? String(ukStats.districts) : "—",                 color: "var(--brand)" },
       ]
     : selectedCity !== "Gothenburg"
     ? [
         { label: "3D buildings",     value: seCity?.city === selectedCity ? seCity.buildings.toLocaleString("en-US") : "—",    color: "#4A90E2" },
         { label: "EPC matched",      value: seCity?.city === selectedCity ? seCity.epc_match.toLocaleString("en-US") : "—",    color: "#2FB477" },
-        { label: "TABULA matched",   value: seCity?.city === selectedCity ? seCity.tabula_match.toLocaleString("en-US") : "—", color: "#4ECDC4" },
+        { label: "TABULA matched",   value: seCity?.city === selectedCity ? seCity.tabula_match.toLocaleString("en-US") : "—", color: "#8B6EAD" },
       ]
     : [
         { label: "3D buildings",     value: seVal("buildings", "92,973"),     color: "#4A90E2" },
         { label: "EPC matched",      value: seVal("epc_match", "85,670"),     color: "#2FB477" },
-        { label: "TABULA matched",   value: seVal("tabula_match", "26,257"),  color: "#4ECDC4" },
+        { label: "TABULA matched",   value: seVal("tabula_match", "26,257"),  color: "#8B6EAD" },
       ];
 
   // UK district totals for the country-aware stat pills + per-band data for
@@ -312,13 +312,13 @@ export default function LandingPage() {
 
               {/* Badges row */}
               <div className="flex items-center gap-3 mb-5">
-                <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-white/90
-                                 bg-[var(--brand)]/40 border border-[var(--brand)]/50 backdrop-blur-sm
+                <span className="text-[12px] font-medium text-white/85
+                                 bg-black/30 border border-white/20 backdrop-blur-sm
                                  px-2.5 py-1 rounded-md pointer-events-none select-none no-hover-shadow">
                   {t("{place} 3D Viewer", { place: t(selectedCity || country.name) })}
                 </span>
-                <span className="flex items-center gap-1.5 text-[10px] text-white/60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#2FB477] animate-pulse" />
+                <span className="flex items-center gap-1.5 text-[12px] text-white/60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#2FB477]" />
                   {t("Live data")}
                 </span>
               </div>
@@ -326,13 +326,13 @@ export default function LandingPage() {
               {/* Main heading */}
               <h1 className="text-[2.6rem] font-black text-white leading-[1.08] tracking-tight mb-2">
                 {t("Renovation Planning Toolbox + EPBD")}
-                <span className="ml-2 align-top relative top-[0.35em] text-[10px] font-bold tracking-[0.14em] uppercase
+                <span className="ml-2 align-top relative top-[0.35em] text-[11px] font-semibold tracking-[0.14em] uppercase
                                  text-white/80 border border-white/30 px-1.5 py-[1px] rounded
                                  select-none whitespace-nowrap">
                   {t("Beta")}
                 </span>
               </h1>
-              <div className="text-[15px] font-semibold mb-3" style={{ color: "#B98BE8" }}>
+              <div className="text-[15px] font-semibold mb-3" style={{ color: "#B8A3D0" }}>
                 {t("Digital Twin Decision Support")}
               </div>
               <p className="text-[13px] text-white/50 leading-relaxed mb-6 max-w-[400px]">
@@ -352,21 +352,20 @@ export default function LandingPage() {
                   key={step.n}
                   className="flex-1 rounded-2xl p-3 text-left border no-hover-shadow"
                   style={{
-                    background: "rgba(13,17,40,0.82)",
-                    borderColor: "rgba(var(--brand-rgb),0.34)",
-                    boxShadow: "0 2px 14px rgba(0,0,0,0.35)",
+                    background: "rgba(12,16,24,0.82)",
+                    borderColor: "rgba(255,255,255,0.10)",
+                    boxShadow: "none",
                     backdropFilter: "blur(12px)",
                   }}
                 >
                   <div className="flex items-center gap-2 mb-1.5">
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold"
-                          style={{ background: "rgba(var(--brand-rgb),0.38)", border: "1px solid rgba(var(--brand-rgb),0.7)", color: "#fff" }}>
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold tabular-nums"
+                          style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.18)", color: "#fff" }}>
                       {step.n}
                     </span>
-                    <span style={{ color: "#8FF0E8" }}><Icon d={step.icon} size={15} /></span>
-                    <span className="text-[11px] font-semibold text-white">{t(step.name)}</span>
+                    <span className="text-[12px] font-semibold text-white">{t(step.name)}</span>
                   </div>
-                  <p className="text-[10px] leading-relaxed text-white/60">{t(step.desc)}</p>
+                  <p className="text-[11px] leading-relaxed text-white/60">{t(step.desc)}</p>
                 </div>
               );
             })}

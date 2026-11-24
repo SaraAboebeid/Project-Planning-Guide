@@ -32,7 +32,7 @@ export default function DeliverablesSection({ projectType, systemsInScope }: Pro
       {/* Header */}
       <div className="flex items-center gap-2">
         <FileText className="w-4 h-4 text-[var(--brand-deep)]" />
-        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+        <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
           Expected Deliverables
         </span>
         <span className="ml-auto text-xs font-semibold text-[var(--brand-deep)] bg-[var(--brand-deep)]/8 rounded-full px-2.5 py-0.5">
@@ -63,10 +63,10 @@ export default function DeliverablesSection({ projectType, systemsInScope }: Pro
                   {items.map(([name, desc]) => (
                     <div
                       key={name}
-                      className="pl-3 py-1.5 rounded-lg bg-slate-50 border-l-[3px] border-[#6E2AAE]"
+                      className="pl-3 py-1.5 rounded-lg bg-slate-50 border-l-[3px] border-[#6A4B8D]"
                     >
                       <div className="text-xs font-semibold text-slate-800">{name}</div>
-                      <div className="text-[11px] text-slate-500">{desc}</div>
+                      <div className="text-[12px] text-slate-500">{desc}</div>
                     </div>
                   ))}
                 </div>
@@ -97,7 +97,7 @@ export default function DeliverablesSection({ projectType, systemsInScope }: Pro
                   className="pl-3 py-1.5 rounded-lg bg-slate-50 border-l-[3px] border-slate-300"
                 >
                   <div className="text-xs font-semibold text-slate-800">{name}</div>
-                  <div className="text-[11px] text-slate-500">{desc}</div>
+                  <div className="text-[12px] text-slate-500">{desc}</div>
                 </div>
               ))}
             </div>

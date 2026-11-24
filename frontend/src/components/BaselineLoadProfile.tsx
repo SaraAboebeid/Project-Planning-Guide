@@ -128,7 +128,7 @@ export default function BaselineLoadProfile({
   }, [building, rows, present, resolution, unit]);
 
   const pill = (active: boolean) => ({
-    fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
+    fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 99, cursor: "pointer",
     background: active ? C.selected : tint(C.selected, 0.12),
     border: `1px solid ${active ? C.selected : tint(C.selected, 0.35)}`,
     color: active ? "#0b1220" : C.selected,
@@ -137,8 +137,8 @@ export default function BaselineLoadProfile({
   return (
     <div style={{ borderRadius: 14, padding: "14px 18px", background: white(0.03), border: `1px solid ${white(0.08)}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{t("Load profile")}</span>
-        <span style={{ fontSize: 11, color: white(0.35) }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{t("Load profile")}</span>
+        <span style={{ fontSize: 12, color: white(0.35) }}>
           {resolution === "monthly" ? t("real EnergyPlus output, summed per calendar month") : t("real EnergyPlus output, hour by hour")}
         </span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -152,7 +152,7 @@ export default function BaselineLoadProfile({
             disabled={!rows.length}
             style={{
               display: "flex", alignItems: "center", gap: 5,
-              fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99,
+              fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 99,
               cursor: rows.length ? "pointer" : "not-allowed",
               background: tint(C.selected, 0.08), border: `1px solid ${tint(C.selected, 0.35)}`,
               color: rows.length ? C.selected : white(0.25),
@@ -170,7 +170,7 @@ export default function BaselineLoadProfile({
               key={`${addr}-${i}`}
               onClick={() => setBuildingIdx(i)}
               style={{
-                fontSize: 11, padding: "4px 10px", borderRadius: 8, fontWeight: 600, cursor: "pointer",
+                fontSize: 12, padding: "4px 10px", borderRadius: 8, fontWeight: 600, cursor: "pointer",
                 background: i === buildingIdx ? C.selected : white(0.03),
                 color: i === buildingIdx ? "#0b1220" : white(0.4),
                 border: `1px solid ${i === buildingIdx ? C.selected : white(0.08)}`,
@@ -196,7 +196,7 @@ export default function BaselineLoadProfile({
       {!loading && !error && !present.length && (
         <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "14px 0" }}>
           <AlertTriangle size={14} color={C.warn} style={{ flexShrink: 0, marginTop: 1 }} />
-          <p style={{ fontSize: 11.5, color: white(0.5), margin: 0 }}>
+          <p style={{ fontSize: 12, color: white(0.5), margin: 0 }}>
             {t("This run carries no hourly trace, so there is no profile to draw — that means the data is absent, not that demand was zero. Re-run the baseline to record one.")}
           </p>
         </div>
@@ -209,13 +209,13 @@ export default function BaselineLoadProfile({
               {resolution === "monthly" ? (
                 <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={white(0.06)} vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: white(0.4) }} stroke={white(0.12)} tickFormatter={localLabel} />
-                  <YAxis tick={{ fontSize: 10, fill: white(0.4) }} stroke={white(0.12)}
-                         label={{ value: unit, angle: -90, position: "insideLeft", fill: white(0.35), fontSize: 10 }} />
-                  <Tooltip contentStyle={{ background: "#0f1523", border: `1px solid ${white(0.12)}`, borderRadius: 8, fontSize: 11 }}
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: white(0.4) }} stroke={white(0.12)} tickFormatter={localLabel} />
+                  <YAxis tick={{ fontSize: 11, fill: white(0.4) }} stroke={white(0.12)}
+                         label={{ value: unit, angle: -90, position: "insideLeft", fill: white(0.35), fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: "#0f1523", border: `1px solid ${white(0.12)}`, borderRadius: 8, fontSize: 12 }}
                            labelFormatter={localLabel}
                            formatter={(v: number, n: string) => [`${v} ${unit}`, t(END_USES.find((e) => e.key === n)?.label ?? n)]} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} formatter={(n: string) => t(END_USES.find((e) => e.key === n)?.label ?? n)} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} formatter={(n: string) => t(END_USES.find((e) => e.key === n)?.label ?? n)} />
                   {present.map((e) => (
                     <Bar key={e.key} dataKey={e.key} stackId="a" fill={e.color} />
                   ))}
@@ -223,13 +223,13 @@ export default function BaselineLoadProfile({
               ) : (
                 <LineChart data={rows} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={white(0.06)} vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: white(0.4) }} stroke={white(0.12)} minTickGap={60} tickFormatter={localLabel} />
-                  <YAxis tick={{ fontSize: 10, fill: white(0.4) }} stroke={white(0.12)}
-                         label={{ value: unit, angle: -90, position: "insideLeft", fill: white(0.35), fontSize: 10 }} />
-                  <Tooltip contentStyle={{ background: "#0f1523", border: `1px solid ${white(0.12)}`, borderRadius: 8, fontSize: 11 }}
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: white(0.4) }} stroke={white(0.12)} minTickGap={60} tickFormatter={localLabel} />
+                  <YAxis tick={{ fontSize: 11, fill: white(0.4) }} stroke={white(0.12)}
+                         label={{ value: unit, angle: -90, position: "insideLeft", fill: white(0.35), fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: "#0f1523", border: `1px solid ${white(0.12)}`, borderRadius: 8, fontSize: 12 }}
                            labelFormatter={localLabel}
                            formatter={(v: number, n: string) => [`${v} ${unit}`, t(END_USES.find((e) => e.key === n)?.label ?? n)]} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} formatter={(n: string) => t(END_USES.find((e) => e.key === n)?.label ?? n)} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} formatter={(n: string) => t(END_USES.find((e) => e.key === n)?.label ?? n)} />
                   {present.map((e) => (
                     // 8760 points x N series: dots and animation would make this
                     // unusable, and the brush is how you actually read it.
@@ -245,12 +245,12 @@ export default function BaselineLoadProfile({
           </div>
 
           {resolution === "hourly" && (
-            <p style={{ fontSize: 10, color: white(0.28), margin: "6px 0 0" }}>
+            <p style={{ fontSize: 11, color: white(0.28), margin: "6px 0 0" }}>
               {t("Showing the first two weeks — drag the handles under the chart to pan across the year.")}
             </p>
           )}
           {present.some((e) => e.key === "cooling") && (
-            <p style={{ fontSize: 10, color: white(0.28), margin: "6px 0 0", fontStyle: "italic" }}>
+            <p style={{ fontSize: 11, color: white(0.28), margin: "6px 0 0", fontStyle: "italic" }}>
               {t("Cooling here is the ideal-loads zone cooling the trace records. It is NOT in the headline total above: EPSM's end-use table carries only electricity and district heating columns, so district cooling falls through. A single-zone shoebox with no openable windows also overheats more readily than the real building would.")}
             </p>
           )}

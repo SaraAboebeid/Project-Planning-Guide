@@ -64,7 +64,7 @@ export default function EpcPanel() {
                       `${name} ${(percent * 100).toFixed(0)}%`
                     }
                     labelLine={{ strokeWidth: 1 }}
-                    fontSize={10}
+                    fontSize={11}
                   >
                     {EPC_DISTRIBUTION.map((d) => (
                       <Cell key={d.class} fill={d.color} />
@@ -79,7 +79,7 @@ export default function EpcPanel() {
               {EPC_DISTRIBUTION.map((d) => (
                 <div key={d.class} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50">
                   <span
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-semibold"
                     style={{ background: d.color }}
                   >
                     {d.class}
@@ -111,10 +111,10 @@ export default function EpcPanel() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={EPC_PERFORMANCE_TREND} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="year" fontSize={11} />
+                <XAxis dataKey="year" fontSize={12} />
                 <YAxis
-                  fontSize={11}
-                  label={{ value: "kWh/m²·yr", angle: -90, position: "insideLeft", fontSize: 11 }}
+                  fontSize={12}
+                  label={{ value: "kWh/m²·yr", angle: -90, position: "insideLeft", fontSize: 12 }}
                 />
                 <Tooltip
                   formatter={(v: number) => [`${v} kWh/m²·yr`, "Avg. Performance"]}
@@ -133,16 +133,16 @@ export default function EpcPanel() {
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="ppg-stat ppg-stat-navy">
-              <div className="text-lg font-bold text-navy">165 → 90</div>
-              <div className="text-[11px] text-gray-500">kWh/m² Reduction</div>
+              <div className="text-lg font-semibold text-navy">165 → 90</div>
+              <div className="text-[12px] text-gray-500">kWh/m² Reduction</div>
             </div>
             <div className="ppg-stat ppg-stat-teal">
-              <div className="text-lg font-bold text-teal">−45%</div>
-              <div className="text-[11px] text-gray-500">Overall Improvement</div>
+              <div className="text-lg font-semibold text-teal">−45%</div>
+              <div className="text-[12px] text-gray-500">Overall Improvement</div>
             </div>
             <div className="ppg-stat ppg-stat-green">
-              <div className="text-lg font-bold text-green">~5.4</div>
-              <div className="text-[11px] text-gray-500">kWh/m²·yr drop/year</div>
+              <div className="text-lg font-semibold text-green">~5.4</div>
+              <div className="text-[12px] text-gray-500">kWh/m²·yr drop/year</div>
             </div>
           </div>
         </>
@@ -157,10 +157,10 @@ export default function EpcPanel() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={EPC_BUILDING_TYPES} margin={{ top: 10, right: 20, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="type" fontSize={11} />
+                <XAxis dataKey="type" fontSize={12} />
                 <YAxis
-                  fontSize={11}
-                  label={{ value: "kWh/m²·yr", angle: -90, position: "insideLeft", fontSize: 11 }}
+                  fontSize={12}
+                  label={{ value: "kWh/m²·yr", angle: -90, position: "insideLeft", fontSize: 12 }}
                 />
                 <Tooltip
                   formatter={(v: number, name: string) => [
@@ -169,7 +169,7 @@ export default function EpcPanel() {
                   ]}
                   contentStyle={{ fontSize: 12, borderRadius: 8 }}
                 />
-                <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+                <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
                 <Bar name="Avg Performance (kWh/m²)" dataKey="avgPerf" fill="var(--brand-deep)" radius={[4, 4, 0, 0]} />
                 <Bar name="Building Count" dataKey="count" fill="#2FB477" radius={[4, 4, 0, 0]} />
               </BarChart>

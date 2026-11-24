@@ -62,8 +62,8 @@ import StagedPlan from "./StagedPlan";
 const UK_TIER_SELECTIONS_KEY = "UK::RefurbTier";
 
 const COMPONENT_COLORS: Record<string, string> = {
-  "Walls": "var(--brand)", "Windows": "#E8880C", "Doors": "#4ECDC4", "Floor": "#4A90E2",
-  "Roof": "#4ECDC4", "Balcony": "#2FB477", "Vertical Extension (New Floor)": "#F97316",
+  "Walls": "var(--brand)", "Windows": "#E8880C", "Doors": "#8B6EAD", "Floor": "#4A90E2",
+  "Roof": "#8B6EAD", "Balcony": "#2FB477", "Vertical Extension (New Floor)": "#F97316",
 };
 
 /* Package totals run to millions, where every digit past the first few is false
@@ -107,24 +107,24 @@ type EstRow = {
 
 const ROW_TAG_STYLE: Record<string, { bg: string; fg: string }> = {
   "Cheapest":          { bg: "rgba(47,180,119,0.16)", fg: "#2FB477" },
-  "Lowest 50-yr cost": { bg: "rgba(185,139,232,0.18)", fg: "#9B6BD6" },
-  "Lowest carbon":     { bg: "rgba(78,205,196,0.16)", fg: "#2BA59C" },
+  "Lowest 50-yr cost": { bg: "rgba(184,163,208,0.18)", fg: "#9F86BB" },
+  "Lowest carbon":     { bg: "rgba(139,110,173,0.16)", fg: "#664A86" },
   "Lowest energy":     { bg: "rgba(74,144,226,0.16)", fg: "#4A90E2" },
 };
 
 /** Change against the baseline, shown under a value. Down = less energy = good. */
 function vsBaseline(value: number | null, base: number | null, isBaseline: boolean) {
   if (isBaseline) {
-    return <span style={{ display: "block", fontSize: 9.5, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>{translate("baseline")}</span>;
+    return <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 2 }}>{translate("baseline")}</span>;
   }
   if (value == null || base == null || base === 0) return null;
   const pct = Math.round(((value - base) / base) * 100);
   if (pct === 0) {
-    return <span style={{ display: "block", fontSize: 9.5, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{translate("±0% vs baseline")}</span>;
+    return <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{translate("±0% vs baseline")}</span>;
   }
   const better = pct < 0;
   return (
-    <span style={{ display: "block", fontSize: 9.5, fontWeight: 700, marginTop: 2, color: better ? "#2FB477" : "#E2483B" }}>
+    <span style={{ display: "block", fontSize: 11, fontWeight: 600, marginTop: 2, color: better ? "#2FB477" : "#E2483B" }}>
       {better ? "▼" : "▲"} {translate("{pct}% vs baseline", { pct: Math.abs(pct) })}
     </span>
   );
@@ -173,7 +173,7 @@ function Step4Hub({ views, active, onSelect }: {
 }) {
   // Always a slim bar (the 2×2 card overview read as a separate page). Each
   // view's status is its tooltip; the active view's status shows under the bar.
-  const TEAL = "#4ECDC4";
+  const TEAL = "#8B6EAD";
   const current = views.find((v) => v.n === active);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -189,14 +189,14 @@ function Step4Hub({ views, active, onSelect }: {
               background: on ? `${TEAL}1c` : "transparent",
               color: on ? "#fff" : "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: on ? 800 : 600 }}>
             <span style={{ color: on ? TEAL : "rgba(255,255,255,0.45)", display: "flex" }}>{v.icon}</span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)" }}>{`${STEP_NUMBER}.${v.n}`}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>{`${STEP_NUMBER}.${v.n}`}</span>
             {v.title}
           </button>
         );
       })}
     </div>
     {current && (
-      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", padding: "0 6px" }}>
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", padding: "0 6px" }}>
         {current.desc} · <span style={{ color: TEAL, fontWeight: 600 }}>{current.status}</span>
       </div>
     )}
@@ -224,7 +224,7 @@ function uAddedToExisting(existingU: number | null, addedU: number | null | unde
 function uLabel(u?: number) {
   if (!u) return null;
   if (u <= 0.13) return { label: translate("Excellent"), color: "#2FB477" };
-  if (u <= 0.20) return { label: translate("Good"), color: "#4ECDC4" };
+  if (u <= 0.20) return { label: translate("Good"), color: "#8B6EAD" };
   if (u <= 0.30) return { label: translate("Standard"), color: "#E8880C" };
   return { label: translate("Basic"), color: "#E2483B" };
 }
@@ -468,7 +468,7 @@ function LineItemPicker({
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   const t = useT();
   if (items.length === 0) {
-    return <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{t("No catalogue materials found for this item.")}</p>;
+    return <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>{t("No catalogue materials found for this item.")}</p>;
   }
 
   // Recommended shortlist: whatever the KPI logic tagged (already filtered to
@@ -503,7 +503,7 @@ function LineItemPicker({
     if (p.insulationMm != null) {
       chips.push(p.insulationMm === 0
         ? { label: t("no insulation"), color: "#E2483B" }
-        : { label: `${p.insulationMm} mm ${p.insulationType ?? t("insulation")}`, color: "#4ECDC4" });
+        : { label: `${p.insulationMm} mm ${p.insulationType ?? t("insulation")}`, color: "#8B6EAD" });
     }
     if (p.cladding) chips.push({ label: p.cladding, color: "#4A90E2" });
     const hovered = hoveredCode === it.code;
@@ -528,20 +528,20 @@ function LineItemPicker({
           gridTemplateColumns: "18px 34px minmax(0,1fr) 96px 58px 74px",
           gap: 8, alignItems: "center", textAlign: "left",
           padding: "6px 9px", borderRadius: 8, cursor: "pointer",
-          border: `1px solid ${checked ? "rgba(78,205,196,0.45)" : worsens ? "rgba(226,72,59,0.32)" : isRec ? "rgba(47,180,119,0.4)" : hovered ? `${color}55` : "transparent"}`,
-          background: checked ? "rgba(78,205,196,0.12)" : hovered ? `${color}18` : worsens ? "rgba(226,72,59,0.06)" : isRec ? "rgba(47,180,119,0.07)" : "rgba(255,255,255,0.02)",
+          border: `1px solid ${checked ? "rgba(139,110,173,0.45)" : worsens ? "rgba(226,72,59,0.32)" : isRec ? "rgba(47,180,119,0.4)" : hovered ? `${color}55` : "transparent"}`,
+          background: checked ? "rgba(139,110,173,0.12)" : hovered ? `${color}18` : worsens ? "rgba(226,72,59,0.06)" : isRec ? "rgba(47,180,119,0.07)" : "rgba(255,255,255,0.02)",
         }}
       >
         <span style={{
           width: 15, height: 15, borderRadius: 4, display: "flex", alignItems: "center",
-          justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#0b1220",
-          border: `2px solid ${checked ? "#4ECDC4" : hovered ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.2)"}`,
-          background: checked ? "#4ECDC4" : "transparent",
+          justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#0b1220",
+          border: `2px solid ${checked ? "#8B6EAD" : hovered ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.2)"}`,
+          background: checked ? "#8B6EAD" : "transparent",
         }}>{checked ? "✓" : ""}</span>
-        <span style={{ fontSize: 9.5, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", overflow: "hidden" }}>{it.code.replace(/^(gb|be):/, "")}</span>
+        <span style={{ fontSize: 11, fontFamily: "monospace", color: "rgba(255,255,255,0.3)", overflow: "hidden" }}>{it.code.replace(/^(gb|be):/, "")}</span>
 
         <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: 11, color: hovered ? "#fff" : "rgba(255,255,255,0.7)", lineHeight: 1.25,
+          <span style={{ fontSize: 12, color: hovered ? "#fff" : "rgba(255,255,255,0.7)", lineHeight: 1.25,
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
             title={it.description}>{readableAssembly(it.description)}</span>
           <span style={{ display: "flex", gap: 3, overflow: "hidden", whiteSpace: "nowrap", alignItems: "center" }}>
@@ -549,39 +549,39 @@ function LineItemPicker({
               const bal = tag === "Balanced";
               const c = bal ? "#E9B949" : "#2FB477";
               return (
-                <span key={tag} style={{ fontSize: 8.5, fontWeight: 800, color: c, background: `${c}24`,
+                <span key={tag} style={{ fontSize: 8.5, fontWeight: 700, color: c, background: `${c}24`,
                   border: `1px solid ${c}66`, borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>★ {t(tag)}</span>
               );
             })}
             {worsens && (
-              <span style={{ fontSize: 8.5, fontWeight: 800, color: "#E2483B", background: "rgba(226,72,59,0.14)",
+              <span style={{ fontSize: 8.5, fontWeight: 700, color: "#E2483B", background: "rgba(226,72,59,0.14)",
                 border: "1px solid rgba(226,72,59,0.4)", borderRadius: 6, padding: "0 4px", flexShrink: 0 }}>▲ {t("raises energy")}</span>
             )}
             {improves && !tags.length && (
-              <span style={{ fontSize: 8.5, fontWeight: 700, color: "#4ECDC4", flexShrink: 0 }}>{t("improves")}</span>
+              <span style={{ fontSize: 8.5, fontWeight: 600, color: "#8B6EAD", flexShrink: 0 }}>{t("improves")}</span>
             )}
             {chips.map((c) => (
               <span key={c.label} style={{
-                fontSize: 8.5, fontWeight: 700, color: c.color, background: `${c.color}1e`,
+                fontSize: 8.5, fontWeight: 600, color: c.color, background: `${c.color}1e`,
                 border: `1px solid ${c.color}44`, borderRadius: 6, padding: "0 4px", flexShrink: 0,
               }}>{c.label}</span>
             ))}
           </span>
         </span>
 
-        <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.5)", textAlign: "right" }}>
           {(it as CatalogueAssembly).costMissing
             ? <span style={{ color: "rgba(255,255,255,0.3)", fontWeight: 600 }} title={t("No price in the materials catalogue")}>{t("price n/a")}</span>
             : `${fmtSEK(it.costSEK)}/${item.quantityKind === "area" ? "m²" : "st"}`}
         </span>
         <span style={{ textAlign: "right" }}>
           {ul && (
-            <span style={{ fontSize: 9, fontWeight: 700, color: worsens ? "#E2483B" : ul.color, background: `${worsens ? "#E2483B" : ul.color}22`, borderRadius: 7, padding: "1px 5px" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: worsens ? "#E2483B" : ul.color, background: `${worsens ? "#E2483B" : ul.color}22`, borderRadius: 7, padding: "1px 5px" }}>
               U {it.uValue}
             </span>
           )}
         </span>
-        <span style={{ fontSize: 9, fontWeight: 700, color: "#4A90E2", textAlign: "right" }}
+        <span style={{ fontSize: 11, fontWeight: 600, color: "#4A90E2", textAlign: "right" }}
           title={carbon.a1a3 != null
             ? `${t("{v} kg CO₂e/m² (A1–A5) = {a13} production (A1–A3) + {a45} transport & installation incl. waste (A4–A5).", { v: carbon.value, a13: carbon.a1a3, a45: String(carbon.a4a5) })} ${carbon.basis ?? ""}`
             : t("{v} kg CO₂e per unit (A1–A3, materials catalogue)", { v: carbon.value })}>
@@ -592,7 +592,7 @@ function LineItemPicker({
   };
 
   const SectionLabel = ({ children }: { children: ReactNode }) => (
-    <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "8px 2px 4px" }}>
+    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", margin: "8px 2px 4px" }}>
       {children}
     </div>
   );
@@ -600,9 +600,9 @@ function LineItemPicker({
   return (
     <div style={{ display: "flex", flexDirection: "column", maxHeight: 320, overflowY: "auto", overflowX: "hidden" }}>
       {baselineU != null && (
-        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", margin: "0 2px 4px", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", margin: "0 2px 4px", lineHeight: 1.5 }}>
           {t("This building's current {part} ≈", { part: t(item.label).toLowerCase() })} <strong style={{ color: "#fff" }}>U {baselineU.toFixed(2)}</strong>.
-          {" "}<span style={{ color: "#4ECDC4" }}>{t("Lower U = better.")}</span>{" "}
+          {" "}<span style={{ color: "#8B6EAD" }}>{t("Lower U = better.")}</span>{" "}
           <span style={{ color: "#E2483B" }}>{t("Red rows are worse than what's already there.")}</span>
         </div>
       )}
@@ -694,21 +694,21 @@ function UkTierPicker({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ borderRadius: 10, padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
           <span>{t("As-built (TABULA {type}, {period}) - matched from building 1", { type: archetype.type_label, period: archetype.period_label })}{buildingCount > 1 ? ` ${t("of {n}", { n: buildingCount })}` : ""}</span>
-          <span style={{ color: eraColor, background: `${eraColor}22`, padding: "1px 7px", borderRadius: 8, fontWeight: 700, textTransform: "none", letterSpacing: 0 }}>
+          <span style={{ color: eraColor, background: `${eraColor}22`, padding: "1px 7px", borderRadius: 8, fontWeight: 600, textTransform: "none", letterSpacing: 0 }}>
             {eraLabel}
           </span>
         </div>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           {(["u_wall", "u_roof", "u_window", "u_floor"] as const).map((k) => (
             archetype.as_built[k] != null && (
-              <span key={k} style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+              <span key={k} style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
                 {k.replace("u_", "U-")}: <b style={{ color: "rgba(255,255,255,0.8)" }}>{archetype.as_built[k]}</b>
               </span>
             )
           ))}
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
             {t("TABULA estimate:")} <b style={{ color: "rgba(255,255,255,0.8)" }}>{archetype.as_built.kwh_m2_yr} kWh/m²/yr</b>
           </span>
         </div>
@@ -738,21 +738,21 @@ function UkTierPicker({
                 border: `2px solid ${checked ? color : "rgba(255,255,255,0.2)"}`,
                 background: checked ? color : "transparent",
               }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: checked ? "#fff" : "rgba(255,255,255,0.75)" }}>{t(label)}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: checked ? "#fff" : "rgba(255,255,255,0.75)" }}>{t(label)}</span>
             </div>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", paddingLeft: 23 }}>
               {(["u_wall", "u_roof", "u_window", "u_door"] as const).map((k) => (
                 tier[k] != null && (
-                  <span key={k} style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                  <span key={k} style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
                     {k.replace("u_", "U-")}: <b style={{ color: "rgba(255,255,255,0.8)" }}>{tier[k]}</b>
                   </span>
                 )
               ))}
-              <span style={{ fontSize: 11, color: "#4A90E2" }}>
+              <span style={{ fontSize: 12, color: "#4A90E2" }}>
                 {t("TABULA estimate:")} <b>{tier.kwh_m2_yr} kWh/m²/yr</b>
               </span>
               {estCost != null && estCarbon != null && (
-                <span style={{ fontSize: 11, color: "#E8880C" }}>
+                <span style={{ fontSize: 12, color: "#E8880C" }}>
                   ~{fmtGBP(estCost)} · ~{estCarbon.toLocaleString("en-GB")} kg CO₂e <i>({t("building 1")}, {UK_COST_PRICE_BASIS})</i>
                 </span>
               )}
@@ -760,7 +760,7 @@ function UkTierPicker({
             {est && est.lines.length > 0 && (
               <div style={{ paddingLeft: 23, marginTop: 5, display: "flex", flexDirection: "column", gap: 1 }}>
                 {est.lines.map((l) => (
-                  <span key={l.element} style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+                  <span key={l.element} style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
                     {l.element}: {l.measure}
                     {l.quantityM2 != null ? ` · ${Math.round(l.quantityM2).toLocaleString("en-GB")} m²` : ""}
                     {l.costGbp != null ? ` · ${fmtGBP(l.costGbp)}` : ""}
@@ -774,12 +774,12 @@ function UkTierPicker({
         );
       })}
       {isBE ? (
-      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: 0 }}>
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>
         {t("TABULA Belgium (VITO): standard = upgrade towards EPBD new-build requirements, ambitious = towards a low-energy standard. No open Belgian retrofit cost dataset is wired in yet, so packages show no cost.")}
         {" "}{t("The energy columns below come from an EnergyPlus simulation using this tier's U-values, applied to every selected building.")}
       </p>
       ) : (
-      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", margin: 0 }}>
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", margin: 0 }}>
         {UK_COST_CARBON_SOURCE_NOTE} {t("Quantities come from the building's footprint, wall area and window-to-wall ratio.")}
         {" "}{t("The energy columns below come from an EnergyPlus simulation using this tier's U-values, applied to every selected building.")}
       </p>
@@ -1554,7 +1554,7 @@ export default function RenovationSimulator() {
   const activeCombos = packageCombosList.filter((c) => !excludedCombos.has(comboKey(c)));
 
   /* ── add a new package ─────────────────────────────────────────────────── */
-  const PACKAGE_COLORS = ["var(--brand)", "#4ECDC4", "#E8880C", "#2FB477", "#F97316", "#5FA5FF"];
+  const PACKAGE_COLORS = ["#721CB8", "#4ECDC4", "#E8880C", "#2FB477", "#F97316", "#5FA5FF"];
 
   // Short material label for auto-naming, e.g. "300 blown glass wool".
   function matShort(it?: WikellsItem): string {
@@ -2487,10 +2487,10 @@ export default function RenovationSimulator() {
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
       <div>
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, color: "rgba(255,255,255,0.3)", marginBottom: 6, textTransform: "uppercase" }}>
           {t("Renovation Planning · Step 4")}
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>{t("Renovation Calculator")}</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>{t("Renovation Calculator")}</h1>
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, lineHeight: 1.6 }}>
           <>{t("Pick materials per component, combine them into packages, and simulate each against the baseline to compare energy, cost and carbon")}
             {geometries.length > 1 ? ` — ${t("across the {n} buildings from Step 3.", { n: geometries.length })}` : "."}</>
@@ -2578,7 +2578,7 @@ export default function RenovationSimulator() {
             style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", borderRadius: 9, border: 0,
               background: baselineRunning ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg,#5a9e1e,#2FB477)",
               color: baselineRunning ? "rgba(255,255,255,0.35)" : "#0a0d14",
-              fontSize: 12.5, fontWeight: 800, cursor: baselineRunning ? "not-allowed" : "pointer" }}>
+              fontSize: 12.5, fontWeight: 700, cursor: baselineRunning ? "not-allowed" : "pointer" }}>
             {baselineRunning
               ? <><Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> {t("Running baseline…")}</>
               : <><Play size={13} /> {t("Run baseline energy simulation (EPSM)")}</>}
@@ -2597,18 +2597,18 @@ export default function RenovationSimulator() {
               replaced took a third of the stage. */}
           {geometries.length > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{t("These assemblies are for")}</span>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{t("These assemblies are for")}</span>
               <select
                 value={targetIdx === "all" ? "all" : String(targetIdx)}
                 onChange={(e) => setTargetIdx(e.target.value === "all" ? "all" : Number(e.target.value))}
-                style={{ padding: "5px 9px", borderRadius: 8, fontSize: 11.5, fontWeight: 700,
+                style={{ padding: "5px 9px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                   background: "#0d1117", color: "#fff", border: "1px solid rgba(255,255,255,0.15)", maxWidth: 280 }}>
                 <option value="all">{t("All buildings ({n})", { n: geometries.length })}</option>
                 {geometries.map((g, i) => (
                   <option key={`${g.lat},${g.lon}`} value={i}>{g.address ?? t("Building {n}", { n: i + 1 })}</option>
                 ))}
               </select>
-              <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.3)" }}>
+              <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.3)" }}>
                 {targetIdx === "all"
                   ? t("one package, applied to every building")
                   : t("a package built just for this building")}
@@ -2623,7 +2623,7 @@ export default function RenovationSimulator() {
           {!isUK && !isBE && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 8, position: "relative" }}>
               {(project.supplierDiscountPct || 0) > 0 && (
-                <span style={{ fontSize: 10.5, color: "#2FB477", fontWeight: 700 }}>
+                <span style={{ fontSize: 11.5, color: "#2FB477", fontWeight: 600 }}>
                   {t("prices net of −{pct}%", { pct: project.supplierDiscountPct })}
                 </span>
               )}
@@ -2631,7 +2631,7 @@ export default function RenovationSimulator() {
                 onClick={() => setDiscountOpen((o) => !o)}
                 title={t("Supplier discount — deducted from catalogue material prices")}
                 style={{ display: "flex", alignItems: "center", gap: 5, background: "transparent", border: 0, cursor: "pointer",
-                  color: (project.supplierDiscountPct || 0) > 0 ? "#2FB477" : "rgba(255,255,255,0.35)", fontSize: 11, padding: 2 }}>
+                  color: (project.supplierDiscountPct || 0) > 0 ? "#2FB477" : "rgba(255,255,255,0.35)", fontSize: 12, padding: 2 }}>
                 <Settings size={13} /> {t("Supplier discount")}
               </button>
               {discountOpen && (
@@ -2640,13 +2640,13 @@ export default function RenovationSimulator() {
                   <div style={{ position: "absolute", top: 24, right: 0, zIndex: 40, width: 290, padding: "12px 14px", borderRadius: 10,
                     background: "#0d1117", border: "1px solid rgba(255,255,255,0.15)", boxShadow: "0 12px 30px rgba(0,0,0,0.5)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1 }}>{t("Supplier discount")}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#fff", flex: 1 }}>{t("Supplier discount")}</div>
                       <button onClick={() => setDiscountOpen(false)} title={t("Close")}
                         style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(255,255,255,0.45)", padding: 0, lineHeight: 1 }}>
                         <XCircle size={14} />
                       </button>
                     </div>
-                    <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginBottom: 9, lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)", marginBottom: 9, lineHeight: 1.5 }}>
                       {t("Deducted from every catalogue material price (cost only — carbon is unaffected). Re-pick materials or rebuild packages to apply it to existing ones.")}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -2655,9 +2655,9 @@ export default function RenovationSimulator() {
                         value={project.supplierDiscountPct || 0}
                         onChange={(e) => setProject({ supplierDiscountPct: Math.min(90, Math.max(0, Number(e.target.value) || 0)) })}
                         style={{ width: 78, padding: "6px 8px", borderRadius: 8, textAlign: "right",
-                          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: 13, fontWeight: 700 }}
+                          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontSize: 13, fontWeight: 600 }}
                       />
-                      <span style={{ fontSize: 14, fontWeight: 800, color: "#2FB477" }}>%</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#2FB477" }}>%</span>
                     </div>
                   </div>
                 </>
@@ -2680,7 +2680,7 @@ export default function RenovationSimulator() {
                 });
                 return [...groups.entries()].map(([groupLabel, items]) => (
                   <div key={groupLabel} style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 4 }}>
-                    <div style={{ fontSize: 9.5, fontWeight: 800, color: "rgba(255,255,255,0.28)", letterSpacing: 1.2, textTransform: "uppercase", marginTop: 2 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.28)", letterSpacing: 1.2, textTransform: "uppercase", marginTop: 2 }}>
                       {groupLabel}
                     </div>
                     {items.map((item) => {
@@ -2698,11 +2698,11 @@ export default function RenovationSimulator() {
                           }}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfgCount > 0 ? "#4ECDC4" : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
+                            <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfgCount > 0 ? "#8B6EAD" : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
                             <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? "#fff" : "rgba(255,255,255,0.6)" }}>{t(item.label)}</span>
                           </div>
                           {cfgCount > 0 && (
-                            <span style={{ fontSize: 10, fontWeight: 800, color: "#4ECDC4", background: "rgba(78,205,196,0.16)", borderRadius: 99, padding: "1px 7px" }}>{cfgCount}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#8B6EAD", background: "rgba(139,110,173,0.16)", borderRadius: 99, padding: "1px 7px" }}>{cfgCount}</span>
                           )}
                         </button>
                       );
@@ -2711,7 +2711,7 @@ export default function RenovationSimulator() {
                 ));
               })()}
               {lineItems.length === 0 && (
-                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>
+                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>
                   {t("No components ticked. Choose them under Recommended measures above.")}
                 </p>
               )}
@@ -2720,8 +2720,8 @@ export default function RenovationSimulator() {
             {activeItem && (
               <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: `1px solid ${COMPONENT_COLORS[activeItem.parentComponent] ?? "var(--brand)"}33` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>{t(activeItem.label)}</h3>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, color: "#fff", margin: 0 }}>{t(activeItem.label)}</h3>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
                     {activeQuantity != null
                       ? `${activeQuantity.toLocaleString("sv-SE", { maximumFractionDigits: 1 })} ${t(quantityUnitLabel(activeItem.quantityKind))}${geometries.length > 1 ? ` (${pickedGeo?.address ?? t("building {n}", { n: pickedIdx + 1 })})` : ""}`
                       : t("quantity: manual entry needed")}
@@ -2735,7 +2735,7 @@ export default function RenovationSimulator() {
                       onChange={(e) => setManualOverrides((m) => ({ ...m, [activeItem.key]: Number(e.target.value) || 0 }))}
                       style={{ width: 140, padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }}
                     />
-                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
                       {activeItem.key === "Doors" ? t("no automatic signal — enter a door count (applied to every building)") : t("no data source for this building yet")}
                     </span>
                   </div>
@@ -2756,10 +2756,10 @@ export default function RenovationSimulator() {
                         return (
                           <button key={m} disabled={disabled} onClick={() => setDraftMode(m)}
                             title={disabled ? t("Windows and doors are picked as whole units, not layer-composed") : undefined}
-                            style={{ fontSize: 11, fontWeight: 700, padding: "4px 11px", borderRadius: 8,
+                            style={{ fontSize: 12, fontWeight: 600, padding: "4px 11px", borderRadius: 8,
                               cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.35 : 1,
-                              border: `1px solid ${active ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
-                              background: active ? "#4ECDC4" : "transparent",
+                              border: `1px solid ${active ? "#8B6EAD" : "rgba(255,255,255,0.12)"}`,
+                              background: active ? "#8B6EAD" : "transparent",
                               color: active ? "#0b1220" : "rgba(255,255,255,0.55)" }}>
                             {m === "catalogue" ? t("Catalogue assembly") : t("Build from layers")}
                           </button>
@@ -2769,11 +2769,11 @@ export default function RenovationSimulator() {
                     <input value={draftName} onChange={(e) => setDraftName(e.target.value)}
                       placeholder={t("Name (optional)")}
                       style={{ marginLeft: "auto", width: 180, padding: "5px 10px", borderRadius: 8,
-                        border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 11.5 }} />
+                        border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "#fff", fontSize: 12 }} />
                   </div>
 
                   {(isUK || isBE) && (
-                    <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.42)", lineHeight: 1.5, margin: "-2px 0 10px" }}>
+                    <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.42)", lineHeight: 1.5, margin: "-2px 0 10px" }}>
                       {catalogueNote(isUK ? "gb" : "be")} {t("Hover an option for its price and carbon sources.")}
                     </div>
                   )}
@@ -2782,7 +2782,7 @@ export default function RenovationSimulator() {
                       {/* Add to what is there, or build it new - same in every country.
                           Not for a new storey: there is nothing there to add to. */}
                       {isNewBuild ? (
-                        <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, marginBottom: 8 }}>
+                        <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, marginBottom: 8 }}>
                           {t("New construction for the added storey — the U-value comes from these layers alone.")}
                         </div>
                       ) : (
@@ -2791,14 +2791,14 @@ export default function RenovationSimulator() {
                           {([["add", "Add to existing"], ["replace", "Replace with new"]] as const).map(([m, label]) => (
                             <button key={m} type="button"
                               onClick={() => { if (m !== layerMode) { setLayerMode(m); setDraftLayers([]); } }}
-                              style={{ padding: "5px 12px", borderRadius: 7, border: 0, cursor: "pointer", fontSize: 11.5, fontWeight: 700,
-                                background: layerMode === m ? "#4ECDC4" : "transparent",
+                              style={{ padding: "5px 12px", borderRadius: 7, border: 0, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                                background: layerMode === m ? "#8B6EAD" : "transparent",
                                 color: layerMode === m ? "#0b1220" : "rgba(255,255,255,0.6)" }}>
                               {t(label)}
                             </button>
                           ))}
                         </div>
-                        <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, flex: 1, minWidth: 220 }}>
+                        <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, flex: 1, minWidth: 220 }}>
                           {layerMode === "add"
                             ? <>{t("The existing {part} stays (first layer) — add insulation and finishes to it. The U-value includes what is already there.", { part: t(activeItem.label).toLowerCase() })}</>
                             : <>{t("The existing {part} is removed and built new — the U-value comes from the new layers alone. Demolition is not costed.", { part: t(activeItem.label).toLowerCase() })}</>}
@@ -2806,9 +2806,9 @@ export default function RenovationSimulator() {
                       </div>
                       )}
                       {!isNewBuild && baselineUForKey(activeItem.key, pickedGeo) != null && (
-                        <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", marginBottom: 8, lineHeight: 1.5 }}>
+                        <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)", marginBottom: 8, lineHeight: 1.5 }}>
                           {t("Compose the assembly layer by layer — the live U-value updates as you go.")}
-                          {" "}{t("Aim")} <strong style={{ color: "#4ECDC4" }}>{t("below U {u}", { u: baselineUForKey(activeItem.key, pickedGeo)!.toFixed(2) })}</strong> {t("to improve this building's {part}.", { part: t(activeItem.label).toLowerCase() })}
+                          {" "}{t("Aim")} <strong style={{ color: "#8B6EAD" }}>{t("below U {u}", { u: baselineUForKey(activeItem.key, pickedGeo)!.toFixed(2) })}</strong> {t("to improve this building's {part}.", { part: t(activeItem.label).toLowerCase() })}
                         </div>
                       )}
                       <AssemblyBuilder
@@ -2822,9 +2822,9 @@ export default function RenovationSimulator() {
                       />
                       <button onClick={saveLayerConfig} disabled={draftLayers.length === 0}
                         style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 15px",
-                          borderRadius: 8, fontSize: 12, fontWeight: 700,
+                          borderRadius: 8, fontSize: 12, fontWeight: 600,
                           cursor: draftLayers.length ? "pointer" : "not-allowed", opacity: draftLayers.length ? 1 : 0.45,
-                          border: "1px solid rgba(78,205,196,0.5)", background: "rgba(78,205,196,0.15)", color: "#4ECDC4" }}>
+                          border: "1px solid rgba(139,110,173,0.5)", background: "rgba(139,110,173,0.15)", color: "#8B6EAD" }}>
                         <Plus size={13} /> {t("Save as configuration")}
                       </button>
                     </>
@@ -2837,14 +2837,14 @@ export default function RenovationSimulator() {
                           <div style={{ display: "inline-flex", padding: 3, borderRadius: 9, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
                             {([["add", "Add to existing"], ["replace", "Replace with new"]] as const).map(([m, label]) => (
                               <button key={m} type="button" onClick={() => setLayerMode(m)}
-                                style={{ padding: "5px 12px", borderRadius: 7, border: 0, cursor: "pointer", fontSize: 11.5, fontWeight: 700,
-                                  background: layerMode === m ? "#4ECDC4" : "transparent",
+                                style={{ padding: "5px 12px", borderRadius: 7, border: 0, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                                  background: layerMode === m ? "#8B6EAD" : "transparent",
                                   color: layerMode === m ? "#0b1220" : "rgba(255,255,255,0.6)" }}>
                                 {t(label)}
                               </button>
                             ))}
                           </div>
-                          <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, flex: 1, minWidth: 220 }}>
+                          <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, flex: 1, minWidth: 220 }}>
                             {layerMode === "add"
                               ? <>{t("The existing {part} stays and the assembly is built onto it — the U-value combines both. Ticked items are saved this way.", { part: t(activeItem.label).toLowerCase() })}</>
                               : <>{t("The existing {part} is removed and the assembly replaces it — its own U-value applies. Demolition is not costed.", { part: t(activeItem.label).toLowerCase() })}</>}
@@ -2870,21 +2870,21 @@ export default function RenovationSimulator() {
                   if (!mine.length) return null;
                   return (
                     <div style={{ marginTop: 14 }}>
-                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 6 }}>
                         {t("Saved ({n}) — each becomes a package option", { n: mine.length })}
                       </div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {mine.map((c) => (
                           <div key={c.id} style={{ minWidth: 190, padding: "9px 11px", borderRadius: 10,
-                            background: "rgba(78,205,196,0.07)", border: "1px solid rgba(78,205,196,0.28)" }}>
+                            background: "rgba(139,110,173,0.07)", border: "1px solid rgba(139,110,173,0.28)" }}>
                             <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", flex: 1 }}>{c.name}</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: "#fff", flex: 1 }}>{c.name}</span>
                               <button onClick={() => removeConfig(c.id)} title={t("Delete configuration")}
                                 style={{ background: "transparent", border: 0, cursor: "pointer", color: "rgba(226,72,59,0.75)", padding: 0 }}>
                                 <XCircle size={13} />
                               </button>
                             </div>
-                            <div style={{ fontSize: 11, color: "#4ECDC4", fontWeight: 700, marginTop: 3 }}>
+                            <div style={{ fontSize: 12, color: "#8B6EAD", fontWeight: 600, marginTop: 3 }}>
                               U {c.uValue?.toFixed(2) ?? "—"} W/m²K
                               {c.mode && kindForKey(c.componentKey) && !c.componentKey.startsWith("VertExt::") && (
                                 <span style={{ fontWeight: 600, color: "rgba(255,255,255,0.5)" }}>
@@ -2892,18 +2892,18 @@ export default function RenovationSimulator() {
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
+                            <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
                               {c.costPerM2 != null ? `${fmtSEK(c.costPerM2)}/${activeItem.quantityKind === "area" ? "m²" : t("unit")}` : t("cost —")}
                               {" · "}
                               {c.carbonPerM2 != null ? `${c.carbonPerM2.toFixed(1)} kg CO₂e/m²` : t("carbon —")}
                             </div>
                             {c.costFromCode && (
-                              <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.32)", marginTop: 3 }}>
+                              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", marginTop: 3 }}>
                                 {t("cost from Wikells {code} (nearest, ΔU {du})", { code: c.costFromCode, du: c.costDeltaU?.toFixed(2) ?? "—" })}
                               </div>
                             )}
                             {c.carbonUnmatched && c.carbonUnmatched.length > 0 && (
-                              <div style={{ fontSize: 9.5, color: "#E8880C", marginTop: 3 }}>
+                              <div style={{ fontSize: 11, color: "#E8880C", marginTop: 3 }}>
                                 {layerCountry ? t("missing in the catalogue") : t("no Boverket data")}: {c.carbonUnmatched.join(", ")}
                               </div>
                             )}
@@ -2922,12 +2922,12 @@ export default function RenovationSimulator() {
           {/* UK / Belgium: the TABULA refurbishment tier stays as a one-click
               alternative to designing component by component above. */}
           {(isUK || isBE) && openStage === 1 && (
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", margin: "6px 0 -4px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(255,255,255,0.3)", margin: "6px 0 -4px" }}>
               {t("Or, in one click: a TABULA refurbishment tier")}
             </div>
           )}
           {(isUK || isBE) && openStage === 1 && (
-            <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(114,28,184,0.2)" }}>
+            <div style={{ borderRadius: 14, padding: "18px 20px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(104,72,140,0.2)" }}>
               <UkTierPicker
                 country={isBE ? "be" : "gb"}
                 archetype={ukArchetype} selectedTier={ukTier} onSelect={setUkTier}
@@ -2941,7 +2941,7 @@ export default function RenovationSimulator() {
           {(isUK || isBE) && openStage === 1 && canAddPackage && (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button onClick={() => addPackage()}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                   border: "1px solid rgba(47,180,119,0.4)", background: "rgba(47,180,119,0.12)", color: "#2FB477", cursor: "pointer" }}>
                 <Plus size={13} /> {t("Simulate this tier as a package")}
               </button>
@@ -3013,7 +3013,7 @@ export default function RenovationSimulator() {
                 background: "rgba(232,136,12,0.10)", border: "1px solid rgba(232,136,12,0.32)" }}>
                 <span style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(232,136,12,0.3)",
                   borderTopColor: "#E8880C", display: "inline-block", animation: "spin 0.9s linear infinite", flexShrink: 0 }} />
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#E8880C" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#E8880C" }}>
                   {t("Running EnergyPlus simulations… {done}/{total} runs done", { done, total })}
                   {geometries.length ? ` (${t(Math.round(total / geometries.length) === 1 ? "{n} package" : "{n} packages", { n: Math.max(1, Math.round(total / geometries.length)) })} × ${t(geometries.length === 1 ? "{n} building" : "{n} buildings", { n: geometries.length })})` : ""}.
                   <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.6)", marginLeft: 6 }}>
@@ -3030,12 +3030,12 @@ export default function RenovationSimulator() {
             <div style={{ borderRadius: 12, padding: "12px 16px", margin: "0 0 12px",
               background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.18)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff", flex: 1 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#fff", flex: 1 }}>
                   {t(activeCombos.length === 1 ? "{n} of {total} designed package not simulated yet" : "{n} of {total} designed packages not simulated yet", { n: unsimulatedCombos.length, total: activeCombos.length })}
                 </span>
                 <button onClick={() => simulateConfiguredPackages(true)}
                   style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9,
-                    fontSize: 12.5, fontWeight: 800, border: "1px solid rgba(47,180,119,0.45)",
+                    fontSize: 12.5, fontWeight: 700, border: "1px solid rgba(47,180,119,0.45)",
                     background: "rgba(47,180,119,0.14)", color: "#2FB477", cursor: "pointer" }}>
                   <Play size={14} /> {t("Run EnergyPlus")} · {t(unsimulatedCombos.length === 1 ? "{n} package" : "{n} packages", { n: unsimulatedCombos.length })}
                 </button>
@@ -3044,7 +3044,7 @@ export default function RenovationSimulator() {
               {estimateRows.length === 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {unsimulatedCombos.map((combo) => (
-                  <div key={comboKey(combo)} style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
+                  <div key={comboKey(combo)} style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
                     · {combo.map((c) => c.name).join("  +  ")}
                   </div>
                 ))}
@@ -3060,12 +3060,12 @@ export default function RenovationSimulator() {
                 component-material side of the comparison, and without a heading
                 it was not obvious which half of the retrofit it covered. */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <span style={{ padding: 6, borderRadius: 9, background: "rgba(78,205,196,0.16)", color: "#4ECDC4", display: "flex" }}>
+              <span style={{ padding: 6, borderRadius: 9, background: "rgba(139,110,173,0.16)", color: "#8B6EAD", display: "flex" }}>
                 <Layers size={16} />
               </span>
               <span style={{ flex: 1 }}>
-                <span style={{ display: "block", fontSize: 14, fontWeight: 800, color: "#fff" }}>{t("Simulated packages · EnergyPlus")}</span>
-                <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: "#fff" }}>{t("Simulated packages · EnergyPlus")}</span>
+                <span style={{ display: "block", fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
                   {t("Verified outcomes against the as-built baseline: heating and total energy per package and building, cost and carbon upfront and over 50 years.")}
                 </span>
               </span>
@@ -3074,9 +3074,9 @@ export default function RenovationSimulator() {
               <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
                 {([["package", "By package"], ["building", "By building"]] as const).map(([v, label]) => (
                   <button key={v} onClick={() => setResultView(v)}
-                    style={{ padding: "5px 12px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                      border: `1px solid ${resultView === v ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
-                      background: resultView === v ? "#4ECDC4" : "transparent",
+                    style={{ padding: "5px 12px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      border: `1px solid ${resultView === v ? "#8B6EAD" : "rgba(255,255,255,0.12)"}`,
+                      background: resultView === v ? "#8B6EAD" : "transparent",
                       color: resultView === v ? "#0b1220" : "rgba(255,255,255,0.5)" }}>
                     {t(label)}
                   </button>
@@ -3086,17 +3086,17 @@ export default function RenovationSimulator() {
             {resultView === "package" ? (
             <>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{t("Sort by:")}</span>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{t("Sort by:")}</span>
               {([["default", "Simulated first"], ["energy", "Energy"], ["cost", "Cost"], ["lcc", "50-yr cost"], ["lcCarbon", "50-yr carbon"]] as const).map(([k, lbl]) => (
                 <button key={k} onClick={() => setResultSort(k)} style={{
-                  fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
-                  border: `1px solid ${resultSort === k ? "#4ECDC4" : "rgba(255,255,255,0.12)"}`,
-                  background: resultSort === k ? "#4ECDC4" : "transparent",
+                  fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 8, cursor: "pointer",
+                  border: `1px solid ${resultSort === k ? "#8B6EAD" : "rgba(255,255,255,0.12)"}`,
+                  background: resultSort === k ? "#8B6EAD" : "transparent",
                   color: resultSort === k ? "#0b1220" : "rgba(255,255,255,0.55)" }}>{t(lbl)}</button>
               ))}
               {estimateRows.length > 0 && (
                 <label style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer",
-                  fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>
+                  fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)" }}>
                   <input type="checkbox" checked={includeEstimates} onChange={(e) => setIncludeEstimates(e.target.checked)}
                     style={{ accentColor: "#E8880C" }} />
                   {t(estimateRows.length === 1 ? "Include {n} unsimulated package (estimates)" : "Include {n} unsimulated packages (estimates)", { n: estimateRows.length })}
@@ -3104,7 +3104,7 @@ export default function RenovationSimulator() {
               )}
             </div>
             {includeEstimates && estimateRows.length > 0 && (
-              <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", marginBottom: 8, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)", marginBottom: 8, lineHeight: 1.5 }}>
                 {t("Rows marked")} <b style={{ color: "#E8880C" }}>{t("≈ estimate")}</b> {t("are not simulated yet — quick degree-day figures from the optimiser, usually somewhat optimistic.")}
                 {" "}{t("Press")} <b>{t("Simulate")}</b> {t("to replace them with EnergyPlus results.")}
               </div>
@@ -3143,7 +3143,7 @@ export default function RenovationSimulator() {
                 { k: "status", l: t("Status") },
               ] as { k: string; l: string; sub?: string; info?: string }[];
               })().map((h) => (
-                <span key={h.k} style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>
+                <span key={h.k} style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: 1 }}>
                   {h.l}
                   {h.info && (
                     <span title={h.info} aria-label={h.info} tabIndex={0}
@@ -3171,39 +3171,39 @@ export default function RenovationSimulator() {
                       {(rowTags[row.id] ?? []).length > 0 && (
                         <span style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 3 }}>
                           {rowTags[row.id]!.map((tag) => (
-                            <span key={tag} style={{ fontSize: 9.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, background: ROW_TAG_STYLE[tag]?.bg, color: ROW_TAG_STYLE[tag]?.fg }}>{t(tag)}</span>
+                            <span key={tag} style={{ fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 99, background: ROW_TAG_STYLE[tag]?.bg, color: ROW_TAG_STYLE[tag]?.fg }}>{t(tag)}</span>
                           ))}
                         </span>
                       )}
                       {row.parts.map(([k, v]) => (
-                        <span key={k} style={{ display: "block", fontSize: 11.5 }}>
+                        <span key={k} style={{ display: "block", fontSize: 12 }}>
                           <span style={{ color: "rgba(255,255,255,0.45)" }}>{t(k)}:</span> {v}
                         </span>
                       ))}
-                      <span style={{ display: "inline-block", marginTop: 3, fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 99,
+                      <span style={{ display: "inline-block", marginTop: 3, fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 99,
                         color: "#E8880C", background: "rgba(232,136,12,0.12)" }}>{t("≈ estimate · not simulated")}</span>
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{m.cost == null ? "—" : fmtSEK(m.cost)}</span>
                     <span style={{ fontSize: 12, color: "#4A90E2" }}>{m.carbon == null ? "—" : `${m.carbon.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
-                    <span style={{ fontSize: 12, color: "#B98BE8" }}>{m.lcc == null ? "—" : `≈ ${fmtSEK(m.lcc)}`}
-                      {m.lcc != null && m.repl.cost > 0 && <span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>{t("incl. {v} replacements", { v: fmtSEK(m.repl.cost) })}</span>}
+                    <span style={{ fontSize: 12, color: "#B8A3D0" }}>{m.lcc == null ? "—" : `≈ ${fmtSEK(m.lcc)}`}
+                      {m.lcc != null && m.repl.cost > 0 && <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{t("incl. {v} replacements", { v: fmtSEK(m.repl.cost) })}</span>}
                     </span>
                     <span style={{ fontSize: 12, color: "#4A90E2" }}>{m.lcc_c == null ? "—" : `≈ ${m.lcc_c.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}
-                      {m.lcc_c != null && m.repl.carbon > 0 && <span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>{t("incl. {v} kg replacements", { v: m.repl.carbon.toLocaleString(isUK ? "en-GB" : "sv-SE") })}</span>}
+                      {m.lcc_c != null && m.repl.carbon > 0 && <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{t("incl. {v} kg replacements", { v: m.repl.carbon.toLocaleString(isUK ? "en-GB" : "sv-SE") })}</span>}
                     </span>
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{row.heat == null ? "—" : `≈ ${row.heat}`}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>
                       {row.total == null ? "—" : `≈ ${row.total}`}
                       {vsBaseline(row.total, baselineAgg?.avgTotalKwhM2Yr ?? null, false)}
                     </span>
                     <span>
                       {running ? (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700, color: "#E8880C" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: "#E8880C" }}>
                           <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> {t("Running…")}
                         </span>
                       ) : (
                         <button onClick={() => validateOptimizerPick(row.pt)}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700,
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600,
                             padding: "5px 10px", borderRadius: 8, cursor: "pointer",
                             border: "1px solid rgba(47,180,119,0.45)", background: "rgba(47,180,119,0.14)", color: "#2FB477" }}>
                           <Play size={11} /> {t("Simulate")}
@@ -3234,8 +3234,8 @@ export default function RenovationSimulator() {
                     </button>
                     {!pkg.isBaseline && pkg.buildings.length === 1 && geometries.length > 1 && (
                       <span title={t("Built for {address} only", { address: pkg.buildings[0]!.address })}
-                        style={{ fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 99, marginRight: 6,
-                          color: "#4ECDC4", background: "rgba(78,205,196,0.14)", whiteSpace: "nowrap" }}>
+                        style={{ fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 99, marginRight: 6,
+                          color: "#8B6EAD", background: "rgba(139,110,173,0.14)", whiteSpace: "nowrap" }}>
                         {t("1 building")}
                       </span>
                     )}
@@ -3243,7 +3243,7 @@ export default function RenovationSimulator() {
                       {(rowTags[row.id] ?? []).length > 0 && (
                         <span style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 3 }}>
                           {rowTags[row.id]!.map((tag) => (
-                            <span key={tag} style={{ fontSize: 9.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, background: ROW_TAG_STYLE[tag]?.bg, color: ROW_TAG_STYLE[tag]?.fg }}>{t(tag)}</span>
+                            <span key={tag} style={{ fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 99, background: ROW_TAG_STYLE[tag]?.bg, color: ROW_TAG_STYLE[tag]?.fg }}>{t(tag)}</span>
                           ))}
                         </span>
                       )}
@@ -3255,13 +3255,13 @@ export default function RenovationSimulator() {
                         const us = appliedUValues(pkg, itemByCode);
                         if (!us.length) return null;
                         return (
-                          <span style={{ display: "block", fontSize: 9.5, marginTop: 3, color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>
+                          <span style={{ display: "block", fontSize: 11, marginTop: 3, color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>
                             {t("applies")}{" "}
                             {us.map((x, i) => (
                               <span key={x.label}>
                                 {i > 0 ? " · " : ""}{x.label} U{" "}
                                 {/* Windows are judged on window scales (triple ≈ 0.8 is good). */}
-                                <span style={{ fontWeight: 700, color: /window|fönster/i.test(x.label)
+                                <span style={{ fontWeight: 600, color: /window|fönster/i.test(x.label)
                                   ? (x.u > 1.6 ? "#E2483B" : x.u > 1.2 ? "#E8880C" : "#2FB477")
                                   : (x.u > 0.4 ? "#E2483B" : x.u > 0.3 ? "#E8880C" : "#2FB477") }}>
                                   {x.u.toFixed(2)}
@@ -3275,7 +3275,7 @@ export default function RenovationSimulator() {
                           energy exceeds the as-built baseline, say why in plain terms. */}
                       {!pkg.isBaseline && agg.avgTotalKwhM2Yr != null && baselineAgg?.avgTotalKwhM2Yr != null
                         && agg.avgTotalKwhM2Yr > baselineAgg.avgTotalKwhM2Yr && (
-                        <span style={{ display: "block", fontSize: 9.5, marginTop: 3, color: "#E2483B", fontWeight: 600, lineHeight: 1.4 }}>
+                        <span style={{ display: "block", fontSize: 11, marginTop: 3, color: "#E2483B", fontWeight: 600, lineHeight: 1.4 }}>
                           ⚠ {t("Less insulated than the current building — this raises energy use. Choose an assembly with insulation (e.g. M95 / M145 walls, or an insulated roof).")}
                         </span>
                       )}
@@ -3283,7 +3283,7 @@ export default function RenovationSimulator() {
                     <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }} title={isUK && agg.totalCostSEK != null ? t("DESNZ install costs, {basis}; doors not costed", { basis: UK_COST_PRICE_BASIS }) : undefined}>
                       {agg.totalCostSEK == null ? "—" : fmtSEK(agg.totalCostSEK)}
                       {!pkg.isBaseline && agg.totalCostSEK == null && pkgCostSource(pkg) === "catalogue" && (
-                        <span style={{ display: "block", fontSize: 9.5, color: "#E8880C", marginTop: 2 }}>
+                        <span style={{ display: "block", fontSize: 11, color: "#E8880C", marginTop: 2 }}>
                           {t("a material has no price in the catalogue")}
                         </span>
                       )}
@@ -3295,11 +3295,11 @@ export default function RenovationSimulator() {
                     {(() => {
                       const m = rowMetrics(row);
                       return (<>
-                        <span style={{ fontSize: 12, color: "#B98BE8", fontWeight: 600 }}
+                        <span style={{ fontSize: 12, color: "#B8A3D0", fontWeight: 600 }}
                           title={t("Cost today + replacements within 50 years + 50 years of energy at {price} per kWh, discounted (same price and rate as the optimiser). The future energy prices panel below tests other prices.", { price: lccPrice?.toFixed(3) ?? "—" })}>
                           {m.lcc == null ? "—" : fmtSEK(m.lcc)}
                           {m.lcc != null && m.repl.cost > 0 && (
-                            <span style={{ display: "block", fontSize: 10, fontWeight: 500, color: "rgba(255,255,255,0.45)" }}>
+                            <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: "rgba(255,255,255,0.45)" }}>
                               {t("incl. {v} replacements", { v: fmtSEK(m.repl.cost) })}
                             </span>
                           )}
@@ -3308,7 +3308,7 @@ export default function RenovationSimulator() {
                           title={t("Embodied carbon + replacements + 50 years of energy at {v} kg CO₂e per kWh", { v: lcCarbonFactor?.toFixed(3) ?? "—" })}>
                           {m.lcc_c == null ? "—" : `${m.lcc_c.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}
                           {m.lcc_c != null && m.repl.carbon > 0 && (
-                            <span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
+                            <span style={{ display: "block", fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
                               {t("incl. {v} kg replacements", { v: m.repl.carbon.toLocaleString(isUK ? "en-GB" : "sv-SE") })}
                             </span>
                           )}
@@ -3319,7 +3319,7 @@ export default function RenovationSimulator() {
                       {agg.avgHeatingKwhM2Yr ?? "—"}
                       {vsBaseline(agg.avgHeatingKwhM2Yr, baselineAgg?.avgHeatingKwhM2Yr ?? null, pkg.isBaseline)}
                     </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: pkg.isBaseline ? "rgba(255,255,255,0.6)" : "#2FB477" }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: pkg.isBaseline ? "rgba(255,255,255,0.6)" : "#2FB477" }}>
                       {agg.avgTotalKwhM2Yr ?? "—"}
                       {vsBaseline(agg.avgTotalKwhM2Yr, baselineAgg?.avgTotalKwhM2Yr ?? null, pkg.isBaseline)}
                     </span>
@@ -3328,7 +3328,7 @@ export default function RenovationSimulator() {
                       {/* Pending but nothing in flight = never submitted. A spinner
                           here claims work is happening when none is. */}
                       {agg.running === 0 && agg.pending > 0 && (
-                        <span title={t("Not simulated yet")} style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{t("not run")}</span>
+                        <span title={t("Not simulated yet")} style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>{t("not run")}</span>
                       )}
                       {agg.pending === 0 && agg.failed === 0 && <CheckCircle2 size={13} color="#2FB477" />}
                       {agg.failed > 0 && <XCircle size={13} color="#E2483B" />}
@@ -3340,13 +3340,13 @@ export default function RenovationSimulator() {
                           <RefreshCw size={12} />
                         </button>
                       )}
-                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{agg.completed}/{agg.n}</span>
+                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{agg.completed}/{agg.n}</span>
                     </span>
                   </div>
                   {expanded && (
                     <div style={{ padding: "6px 4px 10px 34px", display: "flex", flexDirection: "column", gap: 4 }}>
                       {pkg.buildings.map((b) => (
-                        <div key={`${pkg.id}-${b.address}-${b.lat}-${b.lon}`} style={{ display: "grid", gridTemplateColumns: BREAKDOWN_COLS, gap: 10, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                        <div key={`${pkg.id}-${b.address}-${b.lat}-${b.lon}`} style={{ display: "grid", gridTemplateColumns: BREAKDOWN_COLS, gap: 10, fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.address}</span>
                           <span>{b.costSEK == null ? "—" : fmtSEK(b.costSEK)}</span>
                           <span>{b.carbonKgCO2e == null ? "—" : `${b.carbonKgCO2e.toLocaleString(isUK ? "en-GB" : "sv-SE")} kg`}</span>
@@ -3356,7 +3356,7 @@ export default function RenovationSimulator() {
                             {b.totalKwhM2Yr ?? "—"}
                             {/* UK gas-boiler runs: what a household's gas meter would read. */}
                             {isUK && b.totalGasKwh != null && (
-                              <span style={{ display: "block", fontSize: 9.5, color: "#E8880C" }}>
+                              <span style={{ display: "block", fontSize: 11, color: "#E8880C" }}>
                                 {t("gas {v} kWh/yr per home", { v: Math.round(b.totalGasKwh / Math.max(1, b.dwellings ?? 1)).toLocaleString("en-GB") })}
                               </span>
                             )}
@@ -3377,15 +3377,15 @@ export default function RenovationSimulator() {
               );
             })}
             {packages.length === 0 && (
-              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>{t("No packages yet.")}</p>
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>{t("No packages yet.")}</p>
             )}
             {isUK && packages.some((p) => pkgCostSource(p) === "desnz" && pkgAggregate(p).totalCostSEK != null) && (
-              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
                 * {UK_COST_CARBON_SOURCE_NOTE}
               </p>
             )}
             {(isUK || isBE) && packages.some((p) => pkgCostSource(p) === "catalogue") && (
-              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "6px 4px 0" }}>
                 † {catalogueNote(isUK ? "gb" : "be")} {t("Package cost = material per m² × each building's own area; labour and installation are not included.")}
               </p>
             )}
@@ -3405,12 +3405,12 @@ export default function RenovationSimulator() {
                     if (v == null || base == null || base === 0) return null;
                     const pct = Math.round(((v - base) / base) * 100);
                     return (
-                      <span style={{ fontSize: 9, fontWeight: 700, marginLeft: 4, color: pct < 0 ? "#2FB477" : pct > 0 ? "#E2483B" : "rgba(255,255,255,0.35)" }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 4, color: pct < 0 ? "#2FB477" : pct > 0 ? "#E2483B" : "rgba(255,255,255,0.35)" }}>
                         {pct === 0 ? "±0%" : `${pct < 0 ? "▼" : "▲"}${Math.abs(pct)}%`}
                       </span>
                     );
                   };
-                  const th = { fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: 1 };
+                  const th = { fontSize: 11, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: 1 };
                   // Buildings are identified by rounded coordinates, the same basis
                   // Step 3 uses to match its shortlist — addresses are not unique
                   // and are sometimes just "Building 3".
@@ -3434,11 +3434,11 @@ export default function RenovationSimulator() {
                           </span>
                         ))}
                       </div>
-                      {rows.length === 0 && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>{t("Run a package to compare buildings.")}</p>}
+                      {rows.length === 0 && <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", padding: "8px 4px" }}>{t("Run a package to compare buildings.")}</p>}
                       {rows.map((b) => (
                         <div key={`${b.address}-${b.lat}-${b.lon}`} style={{ display: "grid", gridTemplateColumns: cols, gap: 10, padding: "7px 4px", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                          <span style={{ fontSize: 11.5, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={b.address}>{b.address}</span>
-                          <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.55)" }}>{b.totalKwhM2Yr ?? "—"}</span>
+                          <span style={{ fontSize: 12, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={b.address}>{b.address}</span>
+                          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{b.totalKwhM2Yr ?? "—"}</span>
                           {others.map((p) => {
                             const v = findTotal(p, b);
                             const isSaved = savedFor(b) === p.id;
@@ -3448,7 +3448,7 @@ export default function RenovationSimulator() {
                                 disabled={v == null}
                                 title={v == null ? t("Run this package first") : isSaved ? t("Saved for {address} — click to unsave", { address: b.address }) : t("Save {name} for {address}", { name: p.name, address: b.address })}
                                 style={{ display: "flex", alignItems: "center", gap: 4, textAlign: "left",
-                                  fontSize: 11.5, color: "rgba(255,255,255,0.85)", padding: "3px 6px", borderRadius: 7,
+                                  fontSize: 12, color: "rgba(255,255,255,0.85)", padding: "3px 6px", borderRadius: 7,
                                   background: isSaved ? "rgba(47,180,119,0.16)" : "transparent",
                                   border: `1px solid ${isSaved ? "#2FB477" : "transparent"}`,
                                   cursor: v == null ? "default" : "pointer" }}>
@@ -3459,7 +3459,7 @@ export default function RenovationSimulator() {
                           })}
                         </div>
                       ))}
-                      <p style={{ fontSize: 9.5, color: "rgba(255,255,255,0.3)", padding: "8px 4px 0", lineHeight: 1.5 }}>
+                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", padding: "8px 4px 0", lineHeight: 1.5 }}>
                         {t("Total energy, kWh/m²·yr.")} <span style={{ color: "#2FB477" }}>▼ {t("green")}</span> {t("= less energy than as-built")} · <span style={{ color: "#E2483B" }}>▲ {t("red")}</span> {t("= more.")}
                         <br />{t("Click a value to")} <b style={{ color: "rgba(255,255,255,0.5)" }}>{t("save that package for that building")}</b> {t("— each building can keep a different one, and Step 5 reports them per building. Click again to unsave.")}
                       </p>
